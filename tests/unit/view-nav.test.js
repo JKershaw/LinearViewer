@@ -27,7 +27,7 @@ const STYLE_CSS = join(__dirname, '../../public/style.css');
 test('getViewNavLinks always includes the first-class views, workspace-prefixed', () => {
   const links = getViewNavLinks('acme', {});
   const texts = links.map(l => l.text);
-  assert.deepEqual(texts, ['observation', 'swipe', 'swim', 'projects', 'settings']);
+  assert.deepEqual(texts, ['projects', 'swipe', 'swim', 'observation', 'settings']);
   for (const link of links) {
     assert.match(link.href, /^\/workspace\/acme\//);
   }
@@ -82,12 +82,24 @@ test('renderViewNav returns empty string without a urlKey (nothing to navigate t
   assert.equal(renderViewNav({ urlKey: null, currentPage: 'swim' }), '');
 });
 
+test('renderViewNav shows visible label "tasks" but testid keeps internal key "projects"', () => {
+  const html = renderViewNav({ urlKey: 'acme', currentPage: 'observation', featureFlags: {} });
+  // Visible label renders as "tasks", not "projects".
+  assert.match(html, />tasks</);
+  assert.doesNotMatch(html, />projects</);
+  // Data-testid and active-matching keep the internal key.
+  assert.match(html, /data-testid="nav-view-projects"/);
+  // Active-matching still works with internal key.
+  const activeHtml = renderViewNav({ urlKey: 'acme', currentPage: 'projects', featureFlags: {} });
+  assert.match(activeHtml, /aria-current="page">tasks</);
+});
+
 // --- primary/overflow split + active-hoist (LIN-1058 "Confident CLI tab strip") -
 
 test('partitionViewLinks splits first-class (primary) from flag-gated (overflow)', () => {
   const links = getViewNavLinks('acme', { roadmap: true, dispatch: true, proxy: true });
   const { primary, overflow } = partitionViewLinks(links, 'observation');
-  assert.deepEqual(primary.map(l => l.text), ['observation', 'swipe', 'swim', 'projects', 'settings']);
+  assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings']);
   assert.deepEqual(overflow.map(l => l.text), ['roadmap', 'dispatch', 'proxy']);
 });
 
@@ -95,7 +107,7 @@ test('partitionViewLinks HOISTS the active overflow view inline (never hidden)',
   const links = getViewNavLinks('acme', { roadmap: true, dispatch: true, proxy: true });
   const { primary, overflow } = partitionViewLinks(links, 'dispatch');
   // Active flag-gated view is lifted onto the primary strip, after the five.
-  assert.deepEqual(primary.map(l => l.text), ['observation', 'swipe', 'swim', 'projects', 'settings', 'dispatch']);
+  assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings', 'dispatch']);
   // …and removed from overflow so it is not rendered twice.
   assert.deepEqual(overflow.map(l => l.text), ['roadmap', 'proxy']);
 });
