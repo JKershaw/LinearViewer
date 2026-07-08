@@ -301,12 +301,7 @@
     bottom: 56px;
   }
 
-  /* Stack the actions full-width on narrow screens. */
-  .feedback-popup-foot {
-    flex-direction: column-reverse;
-  }
-
-  .feedback-submit {
-    width: 100%;
-  }
+  /* Buttons stay side-by-side (flex row) even on narrow screens;
+     the default flex-wrap on .feedback-popup-foot lets them wrap
+     when three won't fit. */
 }
