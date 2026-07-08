@@ -11,6 +11,11 @@
  * General (no issueIdentifier) runs are used so the validation path is exercised
  * without needing a resolved workspace/issue — variant is validated up front,
  * right beside mode, before any issue resolution.
+ *
+ * LIN-1138 — model/harness forwarding on autopilot kickoff:
+ *   - explicit model/harness are forwarded to the dispatch item
+ *   - validation rejects non-string, over-length, and control-char values
+ *   - omitted model/harness become null
  */
 
 import { test, before } from 'node:test';
@@ -47,6 +52,8 @@ function buildApp() {
           promptName: doc.promptName,
           issueIdentifier: doc.issueIdentifier ?? null,
           target: doc.target,
+          model: doc.model ?? null,
+          harness: doc.harness ?? null,
           dispatchedAt: new Date('2026-06-29T00:00:00Z'),
         };
         added.push({ urlKey, doc, item });
@@ -55,7 +62,7 @@ function buildApp() {
     },
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null,
-    workspacePreferencesStore: {},
+    workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
   }));
   return { app, added };
@@ -217,4 +224,123 @@ test('GET kickoff preview: ?variant=stepper swaps in the disposition; default om
   const bogus = await request(app, '/api/proxy/autopilot/kickoff?variant=sideways');
   assert.equal(bogus.status, 200);
   assert.doesNotMatch(bogus.body, /You're running as the STEPPER/);
+});
+
+// ── LIN-1138 — model/harness forwarding on autopilot kickoff ─────────────────
+
+const MODEL = 'anthropic/claude-opus-4.8';
+const HARNESS = 'opencode';
+
+test('POST kickoff (LIN-1138): an explicit model is forwarded to the dispatch item', async () => {
+  const { app, added } = buildApp();
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { model: MODEL },
+  });
+  assert.equal(status, 201);
+  assert.equal(added.length, 1);
+  assert.equal(added[0].doc.model, MODEL);
+});
+
+test('POST kickoff (LIN-1138): an explicit harness is forwarded to the dispatch item', async () => {
+  const { app, added } = buildApp();
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { harness: HARNESS },
+  });
+  assert.equal(status, 201);
+  assert.equal(added.length, 1);
+  assert.equal(added[0].doc.harness, HARNESS);
+});
+
+test('POST kickoff (LIN-1138): model and harness are forwarded together', async () => {
+  const { app, added } = buildApp();
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { model: MODEL, harness: HARNESS },
+  });
+  assert.equal(status, 201);
+  assert.equal(added.length, 1);
+  assert.equal(added[0].doc.model, MODEL);
+  assert.equal(added[0].doc.harness, HARNESS);
+});
+
+test('POST kickoff (LIN-1138): an omitted model/harness becomes null', async () => {
+  const { app, added } = buildApp();
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: {},
+  });
+  assert.equal(status, 201);
+  assert.equal(added.length, 1);
+  assert.strictEqual(added[0].doc.model, null);
+  assert.strictEqual(added[0].doc.harness, null);
+});
+
+test('POST kickoff (LIN-1138): a non-string model is rejected with 400', async () => {
+  const { app, added } = buildApp();
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { model: 42 },
+  });
+  assert.equal(status, 400);
+  assert.match(body.error, /model must be a string/);
+  assert.equal(added.length, 0);
+});
+
+test('POST kickoff (LIN-1138): an over-length model is rejected with 400', async () => {
+  const { app, added } = buildApp();
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { model: 'x'.repeat(1001) },
+  });
+  assert.equal(status, 400);
+  assert.match(body.error, /model exceeds maximum length/);
+  assert.equal(added.length, 0);
+});
+
+test('POST kickoff (LIN-1138): a model with dangerous control characters is rejected with 400', async () => {
+  const { app, added } = buildApp();
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { model: 'anthropic/claude\x00opus' },
+  });
+  assert.equal(status, 400);
+  assert.match(body.error, /model contains invalid characters/);
+  assert.equal(added.length, 0);
+});
+
+test('POST kickoff (LIN-1138): model: 0 (a falsy non-string) is rejected with 400', async () => {
+  const { app, added } = buildApp();
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { model: 0 },
+  });
+  assert.equal(status, 400);
+  assert.match(body.error, /model must be a string/);
+  assert.equal(added.length, 0);
+});
+
+test('POST kickoff (LIN-1138): harness validation rejects non-string, over-length, and control chars', async () => {
+  const { app } = buildApp();
+  // non-string
+  const r1 = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST', body: { harness: 42 },
+  });
+  assert.equal(r1.status, 400);
+  assert.match(r1.body.error, /harness must be a string/);
+
+  // over-length
+  const r2 = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST', body: { harness: 'x'.repeat(1001) },
+  });
+  assert.equal(r2.status, 400);
+  assert.match(r2.body.error, /harness exceeds maximum length/);
+
+  // control chars
+  const r3 = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST', body: { harness: 'opencode\x00' },
+  });
+  assert.equal(r3.status, 400);
+  assert.match(r3.body.error, /harness contains invalid characters/);
 });
