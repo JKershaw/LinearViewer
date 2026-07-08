@@ -158,11 +158,14 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     // Tasks-touched surface carries the seeded task.
     await expect(page.locator('[data-testid="session-tasks"]')).toContainText('LIN-1003');
 
-    // At least one run row rendered.
-    await expect(page.locator('[data-testid="session-run"]').first()).toBeVisible();
+    // At least one run row rendered — click to expand so the transcript loads.
+    const run = page.locator('[data-testid="session-run"]').first();
+    await expect(run).toBeVisible();
+    await page.locator('[data-testid="session-run-toggle"]').first().click();
+    await expect(page.locator('[data-testid="session-run-body"]').first()).toBeVisible();
 
-    // The transcript rendered with the evidence link.
-    await expect(page.locator('[data-testid="session-transcript"]')).toBeVisible();
+    // The per-run transcript rendered with evidence links (client-side markdown).
+    await expect(page.locator('[data-testid="session-run-transcript"]').first()).toBeVisible();
     const link = page.locator('[data-testid="session-transcript-link"]').first();
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', 'https://example.com/pr/42');
