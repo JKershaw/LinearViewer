@@ -146,13 +146,9 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
   btn.disabled = true
 
   try {
-    // Append proxy block if +proxy is on (maybeAppendProxyBlock provided by
-    // common.js / window.ProxyToggle). Inside the try so a failed token mint
-    // surfaces as "failed" instead of dispatching a bare prompt while the
-    // toggle still shows active.
-    const finalPrompt = typeof maybeAppendProxyBlock === 'function'
-      ? await maybeAppendProxyBlock(prompt, urlKey)
-      : prompt
+    // Proxy-context appending is now handled internally by dispatchPrompt()
+    // (LIN-1137). The dispatch.js `typeof maybeAppendProxyBlock` guard and the
+    // separate append call are no longer needed.
 
     const { model, harness } = window.readDispatchExecControls(execScope)
 
@@ -161,7 +157,7 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
     // explicit kind ('autopilot') and name so it's tagged as the meta-loop.
     await dispatchPrompt({
       urlKey,
-      prompt: finalPrompt,
+      prompt,
       promptName: promptName || 'Custom',
       kind: kind || undefined,
       target,
@@ -287,14 +283,12 @@ function initDispatchPagePrompt() {
     // listener strips dataset.kind/promptName on any keystroke, so it can't be
     // hand-typed in after loading. Append it as ?goal= for buildAutopilotKickoff.
     const goal = goalInput ? goalInput.value.trim() : ''
-    // LIN-836: optional stepper variant — append ?variant=stepper alongside the
-    // goal. Server validates and falls back to standard when absent.
-    const params = new URLSearchParams()
-    if (goal) params.set('goal', goal)
-    if (variant) params.set('variant', variant)
-    const query = params.toString() ? `?${params.toString()}` : ''
-    // on401:false — failures surface on the bespoke inline feedback el.
-    const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt${query}`, { on401: false })
+    const data = await window.fetchAutopilotKickoff({
+      urlKey,
+      goal: goal || undefined,
+      variant: variant || undefined,
+      on401: false
+    })
     textarea.value = data.prompt
     textarea.dataset.kind = data.kind || 'autopilot'
     textarea.dataset.promptName = data.promptName || 'Autopilot (stack walk)'

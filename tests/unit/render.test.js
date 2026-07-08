@@ -647,8 +647,10 @@ describe('Periodicals group rendering (LIN-341)', () => {
       urlKey: 'test-workspace'
     });
     assert.ok(result.includes('data-kind="periodical"'), 'dispatch container tagged kind=periodical');
-    assert.ok(result.includes('prompt-dispatch'), 'has a dispatch button');
-    // Synthetic rows are not Linear issues: no "View in Linear" link.
+    // LIN-1137: the server now renders a placeholder div instead of the dispatch
+    // buttons directly; initDispatchDisclosures() replaces it client-side.
+    assert.ok(result.includes('dispatch-disclosure-placeholder'), 'has a dispatch disclosure placeholder');
+    // Synthetic rows are not Linear issues: no \"View in Linear\" link.
     assert.ok(!result.includes('View in Linear'), 'no View in Linear link for periodicals');
   });
 
@@ -911,6 +913,11 @@ describe('Recent activity section', () => {
 // getElementById, which only matches the FIRST element with that id — so a panel
 // id keyed on issue id alone makes the second appearance's "Dispatch ▾" target
 // the first's panel and look broken. The fix folds `section` into the panel ids.
+//
+// LIN-1137: the server now renders placeholder divs (data-disclosure-prefix)
+// instead of the actual panels; initDispatchDisclosures() in common.js replaces
+// them client-side. The prefix values (not the final panel ids) are what assert
+// uniqueness.
 describe('Per-render-instance dispatch panel ids (LIN-732)', () => {
   const issue = {
     id: 'i1', identifier: 'STB-1', title: 'A task',
@@ -919,39 +926,37 @@ describe('Per-render-instance dispatch panel ids (LIN-732)', () => {
   const flags = { dispatch: true, proxy: true };
   const opts = (section) => ({ isLanding: false, urlKey: 'ws', featureFlags: flags, section });
 
-  test('no section ⇒ ids keyed on issue id (byte-identical to pre-LIN-732)', () => {
+  test('no section ⇒ prefix keyed on issue id (byte-identical to pre-LIN-732)', () => {
     const html = renderDetailsContent(issue, opts(''));
-    assert.ok(html.includes('id="prompt-options-i1"'), 'prompt panel keyed on issue id');
-    assert.ok(html.includes('id="recommend-options-i1"'), 'recommend panel keyed on issue id');
-    assert.ok(html.includes('id="autopilot-options-i1"'), 'autopilot panel keyed on issue id');
+    assert.ok(html.includes('data-disclosure-prefix="prompt-options-i1"'), 'prompt placeholder keyed on issue id');
+    assert.ok(html.includes('data-disclosure-prefix="recommend-options-i1"'), 'recommend placeholder keyed on issue id');
+    assert.ok(html.includes('data-disclosure-prefix="autopilot-options-i1"'), 'autopilot placeholder keyed on issue id');
   });
 
-  test('section is folded into every dispatch panel id', () => {
+  test('section is folded into every dispatch placeholder prefix', () => {
     const html = renderDetailsContent(issue, opts('in-progress'));
-    assert.ok(html.includes('id="prompt-options-in-progress-i1"'), 'prompt panel namespaced by section');
-    assert.ok(html.includes('id="recommend-options-in-progress-i1"'), 'recommend panel namespaced by section');
-    assert.ok(html.includes('id="autopilot-options-in-progress-i1"'), 'autopilot panel namespaced by section');
-    assert.ok(!html.includes('id="prompt-options-i1"'), 'no bare issue-id panel id remains');
+    assert.ok(html.includes('data-disclosure-prefix="prompt-options-in-progress-i1"'), 'prompt placeholder namespaced by section');
+    assert.ok(html.includes('data-disclosure-prefix="recommend-options-in-progress-i1"'), 'recommend placeholder namespaced by section');
+    assert.ok(html.includes('data-disclosure-prefix="autopilot-options-in-progress-i1"'), 'autopilot placeholder namespaced by section');
+    assert.ok(!html.includes('data-disclosure-prefix="prompt-options-i1"'), 'no bare issue-id placeholder prefix remains');
   });
 
-  test('two sections yield disjoint panel ids for the same issue (no DOM collision)', () => {
+  test('two sections yield disjoint placeholder prefixes for the same issue (no DOM collision)', () => {
     const ids = (section) => {
       const html = renderDetailsContent(issue, opts(section));
-      return [...html.matchAll(/id="((?:prompt|recommend|autopilot)-options-[^"]+)"/g)].map(m => m[1]);
+      return [...html.matchAll(/data-disclosure-prefix="((?:prompt|recommend|autopilot)-options-[^"]+)"/g)].map(m => m[1]);
     };
     const inProgress = ids('in-progress');
     const project = ids('project');
-    assert.equal(inProgress.length, 3, 'three dispatch panels per render instance');
+    assert.equal(inProgress.length, 3, 'three dispatch placeholders per render instance');
     const overlap = inProgress.filter(id => project.includes(id));
-    assert.deepEqual(overlap, [], 'In Progress and project appearances share no panel id');
+    assert.deepEqual(overlap, [], 'In Progress and project appearances share no placeholder prefix');
   });
 
-  test('the disclosure trigger aria-controls matches its own panel id', () => {
+  test('every placeholder prefix in the render output is unique', () => {
     const html = renderDetailsContent(issue, opts('in-progress'));
-    // Every aria-controls value must have a matching id="" in the same render.
-    for (const m of html.matchAll(/aria-controls="((?:prompt|recommend|autopilot)-options-[^"]+)"/g)) {
-      assert.ok(html.includes(`id="${m[1]}"`), `panel ${m[1]} exists for its trigger`);
-    }
+    const prefixes = [...html.matchAll(/data-disclosure-prefix="([^"]+)"/g)].map(m => m[1]);
+    assert.equal(new Set(prefixes).size, prefixes.length, 'all placeholder prefixes are unique');
   });
 });
 
