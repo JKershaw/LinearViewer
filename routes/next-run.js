@@ -24,7 +24,7 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext, buildNextRunSummary, ensureSizeCoverage, attachReferencedTaskTitles } from '../lib/next-run.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
-import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
+import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
@@ -185,7 +185,7 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
     try {
       const { organizationName, projects, issues } =
         await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceCallScope(workspace));
-      const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+      const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'next-run', forceDefault: isFreeTier });
       // Fold the latest durable roadmap narrative into context when one exists and
       // is fresh; getLatest already returns null on absence/error, and the lib gates
       // staleness, so suggestions degrade cleanly when there is nothing to add (LIN-742).
