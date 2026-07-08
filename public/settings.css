@@ -154,6 +154,70 @@
 }
 
 /* =============================================================================
+   AI model overrides (LIN-1145)
+
+   Per-operation model override rows — select + "or" + custom input,
+   mirroring the dispatch defaults pattern but for the prompt-generation model.
+   No pricing hints on override rows per scoping decision.
+   ============================================================================= */
+.ai-override-row {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.ai-override-row .field-label {
+  min-width: 14ch;
+}
+
+.ai-override-select,
+.ai-override-input {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.ai-override-select {
+  min-width: 18ch;
+}
+
+.ai-override-input {
+  min-width: 16ch;
+}
+
+.ai-override-select:focus,
+.ai-override-input:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.ai-override-input::placeholder {
+  color: var(--fg-dim);
+}
+
+.ai-overrides-form {
+  display: block;
+}
+
+.ai-kind-overrides-summary {
+  cursor: pointer;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--fg);
+}
+
+.ai-kind-overrides .children {
+  margin-top: var(--space-2);
+}
+
+.ai-overrides-submit {
+  margin-top: var(--space-3);
+}
+
+/* =============================================================================
    Dispatch defaults (LIN-1095)
 
    The workspace-wide row + ~15 per-prompt-type override rows are structurally
@@ -376,7 +440,9 @@
 
   .harness-select,
   .harness-input,
-  .dispatch-model-input {
+  .dispatch-model-input,
+  .ai-override-select,
+  .ai-override-input {
     min-width: 100%;
   }
 

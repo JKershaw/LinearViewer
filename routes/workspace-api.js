@@ -42,7 +42,7 @@ const RECOMMEND_DESCENT_BUDGET_MS = 180_000;
 // with the client-disconnect signal and the shared descent budget so a stalled Linear
 // call can't hold the SSE socket open until Heroku's H15 fires (LIN-346, gap #1).
 const CONTEXT_FETCH_TIMEOUT_MS = 45_000;
-import { resolveWorkspaceModel, resolveDispatchDefaults } from '../lib/workspace-preferences.js';
+import { resolveWorkspaceModel, resolveAiOperationModel, resolveDispatchDefaults } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
@@ -663,7 +663,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
     // Resolve the workspace's configured LLM model so the footer can surface it.
     // Same single-source-of-truth helper every LLM call site uses.
-    const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore })
+    const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend' })
 
     const result = { enabled, source, model, modelName: getModelDisplayName(model) }
 
@@ -814,7 +814,7 @@ ${goal}`
       // pinned is transparently resolved to its actionable descendant, with the
       // descent breadcrumb returned. Free-tier usage is charged once per request
       // (above, before this point), not per hop.
-      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier })
+      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier })
       const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)
       const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
         startIdentifier: issueId,
@@ -1109,7 +1109,7 @@ ${goal}`
 
       if (closed) return;
 
-      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier });
       const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
 
       // Node-shaped tasks (LIN-327): the first hop is a `defer` with no prompt body,
@@ -1567,7 +1567,7 @@ ${goal}`
 
       const canonicalId = context.issue?.id || issueId;
       const inputHash = hashContext(context);
-      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recap', forceDefault: isFreeTier });
 
       let recap;
       let modelUsed;
@@ -1791,7 +1791,7 @@ ${goal}`
 
       const canonicalId = context.issue?.id || issueId;
       const inputHash = hashContext(context);
-      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier });
 
       let brief;
       let modelUsed;

@@ -38,6 +38,7 @@ import { armKeepalive } from '../lib/http-keepalive.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { hasPaidEnvKey } from '../lib/openrouter.js';
+import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import {
   generateRunSummary,
   parseRunSummaryResponse,
@@ -373,6 +374,7 @@ export function createDashboardRoutes({
   fetchWorkspaceIssues,
   getOpenRouterSource,
   getDeployInfo,
+  workspacePreferencesStore = null,
   recentLimit = 120,
   sessionsFeedCache = createSessionsFeedCache()
 }) {
@@ -978,13 +980,13 @@ export function createDashboardRoutes({
     // Resolve the OpenRouter key: user OAuth → env (via streamChat default) → free tier.
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const useFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
 
     if (!sessionApiKey && !hasPaidEnvKey() && !freeTierKey) {
       return res.status(503).json({ error: 'AI summaries are not configured' });
     }
 
-    if (useFreeTier && freeTierStore) {
+    if (isFreeTier && freeTierStore) {
       const check = await freeTierStore.tryUse(workspace.urlKey);
       if (!check.allowed) {
         return res.status(429).json({ error: check.reason, freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
@@ -992,8 +994,9 @@ export function createDashboardRoutes({
     }
 
     try {
-      const apiKey = sessionApiKey || (useFreeTier ? freeTierKey : undefined);
-      const { summary, model } = await generateRunSummary(loop, { apiKey, model: DEFAULT_RUN_SUMMARY_MODEL });
+      const apiKey = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
+      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'run-summary', forceDefault: isFreeTier });
+      const { summary, model } = await generateRunSummary(loop, { apiKey, model: selectedModel });
       await runSummaryCacheStore.put(workspace.urlKey, loopId, { inputHash, summary, model });
       res.json({ status: 'fresh', loopId, summary, model, generatedAt: new Date().toISOString() });
     } catch (error) {
@@ -1165,13 +1168,13 @@ export function createDashboardRoutes({
     // Resolve the OpenRouter key: user OAuth → env (via streamChat default) → free tier.
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const useFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
 
     if (!sessionApiKey && !hasPaidEnvKey() && !freeTierKey) {
       return res.status(503).json({ error: 'AI summaries are not configured' });
     }
 
-    if (useFreeTier && freeTierStore) {
+    if (isFreeTier && freeTierStore) {
       const check = await freeTierStore.tryUse(workspace.urlKey);
       if (!check.allowed) {
         return res.status(429).json({ error: check.reason, freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
@@ -1179,9 +1182,10 @@ export function createDashboardRoutes({
     }
 
     try {
-      const apiKey = sessionApiKey || (useFreeTier ? freeTierKey : undefined);
+      const apiKey = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
       const childOutcomes = await gatherChildOutcomes(session, workspace.urlKey);
-      const { summary, model } = await generateSessionSummary(session, { apiKey, model: DEFAULT_SESSION_SUMMARY_MODEL, childOutcomes });
+      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'session-summary', forceDefault: isFreeTier });
+      const { summary, model } = await generateSessionSummary(session, { apiKey, model: selectedModel, childOutcomes });
       await sessionSummaryCacheStore.put(workspace.urlKey, sessionId, { inputHash, summary, model });
       res.json({ status: 'fresh', sessionId, live: false, summary, model, generatedAt: new Date().toISOString() });
     } catch (error) {

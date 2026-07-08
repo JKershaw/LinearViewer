@@ -44,7 +44,7 @@ import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decode
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
-import { resolveWorkspaceModel, resolveDispatchDefaults } from '../lib/workspace-preferences.js';
+import { resolveWorkspaceModel, resolveAiOperationModel, resolveDispatchDefaults } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
@@ -3038,7 +3038,7 @@ One convention across every endpoint, so you can branch on the same fields every
     // Resolved BEFORE the model so the free-tier clamp (LIN-513) can force the
     // default model — a free-tier descent must never bill a workspace-preferred model.
     const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
-    const selectedModel = await resolveWorkspaceModel({ urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+    const selectedModel = await resolveAiOperationModel({ urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier });
     // Cancel the in-flight LLM call when its deadline trips instead of racing and
     // leaving it running orphaned (fetchWithTimeout vs withTimeout, LIN-346 surface 5).
     // getRecommendation now honors options.signal (gap #2). The per-hop deadline guard
@@ -3443,7 +3443,7 @@ One convention across every endpoint, so you can branch on the same fields every
           }
         }
 
-        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+        const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'recap', forceDefault: isFreeTier });
         let recap;
         let modelUsed;
         if (isTestMode) {
@@ -3559,7 +3559,7 @@ One convention across every endpoint, so you can branch on the same fields every
         const inputHash = hashContext(context);
         captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
 
-        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+        const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'recap', forceDefault: isFreeTier });
         let recap;
         let modelUsed;
         if (isTestMode) {
@@ -3709,13 +3709,13 @@ One convention across every endpoint, so you can branch on the same fields every
         if (isFreeTier && !isTestMode) {
           const rejection = await chargeFreeTierOrReject(req, '/api/proxy/brief');
           if (rejection) {
-            keepalive.stop();
-            logEvent(req, '/api/proxy/brief', 429);
-            return keepalive.send(rejection.status, rejection.body);
-          }
+          keepalive.stop();
+          logEvent(req, '/api/proxy/brief', 429);
+          return keepalive.send(rejection.status, rejection.body);
         }
+      }
 
-        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+        const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier });
         let brief;
         let modelUsed;
         if (isTestMode) {
@@ -3830,7 +3830,7 @@ One convention across every endpoint, so you can branch on the same fields every
         const inputHash = hashContext(context);
         captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
 
-        const selectedModel = await resolveWorkspaceModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+        const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier });
         let brief;
         let modelUsed;
         if (isTestMode) {

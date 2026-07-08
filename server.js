@@ -99,7 +99,7 @@ import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, hasPaidEnvKey } from './lib/openrouter.js'
-import { resolveWorkspaceModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults } from './lib/workspace-preferences.js'
+import { resolveWorkspaceModel, resolveAiOperationModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults, AI_OPERATION_KINDS } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 import { PROMPT_TEMPLATES } from './lib/prompt-template-defs.js'
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from './lib/dispatch-validation.js'
@@ -1319,7 +1319,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, briefCacheStore, recapCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, briefCacheStore, recapCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore }))
@@ -1744,6 +1744,11 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   const dispatchDefaults = dispatchDefaultsPrefs.dispatchDefaults || {};
   const dispatchDefaultsError = req.query.dispatchDefaultsError || null;
 
+  // AI model overrides (LIN-1145): per-operation model overrides read from the
+  // same prefs object as dispatchDefaults, keyed under aiModelOverrides.
+  const aiModelOverrides = dispatchDefaultsPrefs.aiModelOverrides || {};
+  const aiOverridesError = req.query.aiOverridesError || null;
+
   // Live OpenRouter model catalog (LIN-1111 Session 2): the same cache module
   // the dispatch-time client controls fetch via /api/openrouter/models, called
   // here directly since Settings renders server-side. Supplements (never
@@ -1770,6 +1775,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     dispatchDefaults,
     dispatchDefaultsError,
     dispatchModelCatalog,
+    aiModelOverrides,
+    aiOverridesError,
     // Gate the GitHub add affordance on the SAME shared predicate the /auth/github
     // route guard and landing hero use (LIN-761), so the settings page never offers
     // an add that would 503/hang on a server where GitHub isn't fully configured.
@@ -2029,6 +2036,64 @@ app.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, asyn
   } catch (err) {
     console.error('Failed to save workspace dispatch defaults:', err);
     return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save dispatch defaults. Please try again.', {
+      action: 'Back to settings',
+      actionUrl: settingsUrl
+    }));
+  }
+
+  res.redirect(settingsUrl);
+});
+
+/**
+ * Save per-operation AI model overrides (LIN-1145).
+ * Each of the 6 AI_OPERATION_KINDS gets an optional model override stored
+ * under prefs.aiModelOverrides.byKind[op].model. Blank rows signal "inherit
+ * the global default" and are NOT stored as empty-string overrides — they
+ * are simply omitted from the byKind map. Uses the same session-auth +
+ * read-merge-write discipline as /settings/model so aiModelOverrides
+ * never clobbers modelId/features/dispatchDefaults.
+ */
+app.post('/workspace/:urlKey/settings/ai-model-overrides', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
+  const modelIdRegex = /^[a-z0-9-]+\/[a-z0-9.-]+(?::[a-z0-9-]+)?$/i;
+  const MAX_LENGTH = 100;
+
+  let hasFieldError = false;
+
+  const byKind = {};
+  for (const kind of AI_OPERATION_KINDS) {
+    const fieldName = `byKind__${kind}__model`;
+    const customFieldName = `${fieldName}Custom`;
+    const custom = (req.body[customFieldName] || '').trim();
+    const select = (req.body[fieldName] || '').trim();
+    const model = custom || select || '';
+
+    if (!model) continue;
+
+    if (model.length > MAX_LENGTH || model.includes('..') || !modelIdRegex.test(model)) {
+      hasFieldError = true;
+      break;
+    }
+
+    byKind[kind] = { model };
+  }
+
+  if (hasFieldError) {
+    return res.redirect(`${settingsUrl}?aiOverridesError=invalid-format`);
+  }
+
+  try {
+    const existingPrefs = await workspacePreferencesStore.getWorkspacePreferences(workspace.urlKey);
+    const aiModelOverrides = Object.keys(byKind).length ? { byKind } : {};
+    const ok = await workspacePreferencesStore.saveWorkspacePreferences(workspace.urlKey, {
+      ...existingPrefs,
+      aiModelOverrides
+    });
+    if (!ok) throw new Error('saveWorkspacePreferences returned false');
+  } catch (err) {
+    console.error('Failed to save workspace AI model overrides:', err);
+    return res.status(500).send(renderErrorPage('Settings Error', 'Failed to save AI model overrides. Please try again.', {
       action: 'Back to settings',
       actionUrl: settingsUrl
     }));
