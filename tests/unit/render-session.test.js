@@ -254,13 +254,17 @@ describe('render-session: human reply box (LIN-1004)', () => {
     assert.match(html, /<script src="\/session\.js"><\/script>/);
   });
 
-  test('NO reply box and NO script when canReply is false (dash/local session)', () => {
+  test('scripts load whenever feedback needs client-side rendering, even without canReply', () => {
     const html = renderSessionPage(
       { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: false },
       {}
     );
-    assert.ok(!html.includes('data-testid="session-reply"'), 'no reply box when canReply is false');
-    assert.ok(!html.includes('/session.js'), 'no scoped script when the box is absent');
+    assert.ok(!html.includes('data-testid="session-reply"'), 'no global reply box when canReply is false');
+    assert.ok(!html.includes('data-testid="session-inline-reply"'), 'no inline reply boxes when canReply is false');
+    // Scripts DO load because the fixture has feedback entries — the expand/collapse
+    // toggle and markdown rendering need them even without reply capability.
+    assert.match(html, /<script src="\/session\.js"><\/script>/);
+    assert.match(html, /<script src="\/marked\.min\.js"><\/script>/);
   });
 
   test('a terminal session sends force (data-session-terminal="true") with an honest resume note', () => {
@@ -379,7 +383,7 @@ describe('render-session: per-run expandable transcript + inline reply (LIN-1133
     assert.match(html, /<script src="\/session\.js"><\/script>/);
   });
 
-  test('base scripts load when issueContext is present even without canReply', () => {
+  test('base scripts + session.js load when issueContext is present even without canReply', () => {
     const html = renderSessionPage(
       { session: fixtureSession(), urlKey: 'ws-a', issueContext: [{
         issueIdentifier: 'LIN-900', issueId: 'uuid-900', brief: null, recap: null
@@ -390,8 +394,8 @@ describe('render-session: per-run expandable transcript + inline reply (LIN-1133
     assert.match(html, /<script src="\/common\.js"><\/script>/);
     assert.match(html, /<script src="\/brief\.js"><\/script>/);
     assert.match(html, /<script src="\/recap\.js"><\/script>/);
-    // No session.js when canReply is false.
-    assert.ok(!html.includes('/session.js'), 'no session.js without canReply');
+    // session.js loads too when issueContext needs widget init.
+    assert.match(html, /<script src="\/session\.js"><\/script>/);
   });
 });
 

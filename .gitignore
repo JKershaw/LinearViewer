@@ -12,3 +12,6 @@ scripts/eval/fixtures/*
 !scripts/eval/fixtures/*.json
 !scripts/eval/fixtures/recommend/
 !scripts/eval/fixtures/recommend/*.json
+.claude/settings.local.json
+.sd-opencode-heartbeat
+.sd-opencode-session-id
