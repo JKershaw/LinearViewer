@@ -5,7 +5,7 @@ import { renderLandingHero } from '../../lib/components/landing-hero.js';
 test('landing hero renders the brand lockup as the page <h1>', () => {
   const html = renderLandingHero({ githubEnabled: false });
   // Lowercase wordmark is the single page heading (S3 treatment, mono not serif).
-  assert.match(html, /<h1 class="landing-wordmark">harbour/);
+  assert.match(html, /<h1 class="landing-wordmark">harbour<span class="landing-wordmark-accent" aria-hidden="true">.cat<\/span><\/h1>/);
   assert.ok(html.includes('data-testid="landing-hero"'));
   // Anchor mark (S1) is present as an inline, themeable SVG.
   assert.ok(html.includes('<svg'), 'anchor mark SVG present');
