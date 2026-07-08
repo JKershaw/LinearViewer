@@ -161,8 +161,11 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     // At least one run row rendered.
     await expect(page.locator('[data-testid="session-run"]').first()).toBeVisible();
 
-    // The transcript rendered with the evidence link.
-    await expect(page.locator('[data-testid="session-transcript"]')).toBeVisible();
+    // LIN-1133: expand the first run card to reveal its per-run transcript.
+    await page.locator('[data-session-run-toggle]').first().click();
+    await expect(page.locator('[data-session-run-tx]').first()).toBeVisible();
+
+    // The transcript fallback renders evidence links.
     const link = page.locator('[data-testid="session-transcript-link"]').first();
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', 'https://example.com/pr/42');
