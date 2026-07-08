@@ -117,3 +117,48 @@ test.describe('Header view switcher (LIN-978)', () => {
     expect(box.y).toBeLessThan(800); // within the initial viewport, no scroll needed
   });
 });
+
+// LIN-1149: nav-actions placement — the deliberate order of shared nav-chrome
+// actions. Search (projects-only) must precede the queue badge (feature-gated,
+// all pages), and the gating rules must not leak one onto the wrong page.
+test.describe('nav-actions placement (LIN-1149)', () => {
+  test('search toggle precedes queue badge in DOM order on the projects page', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed, { features: FLAGS });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    // Both search and badge exist in .nav-actions on the projects page.
+    const actions = page.locator('.nav-actions');
+    await expect(actions.locator('.search-toggle')).toBeAttached();
+    await expect(actions.locator('[data-queue-badge]')).toBeAttached();
+    // The search toggle renders BEFORE the queue badge in the source order so it
+    // is first in DOM and first in visual reading order (LTR).
+    const firstChild = actions.locator('> :first-child');
+    await expect(firstChild).toHaveClass(/search-toggle/);
+  });
+
+  test('queue badge is the sole nav-action on non-projects pages when dispatch is on (no search leak)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed, { features: FLAGS });
+    // The observation page is non-projects — search must NOT leak here.
+    await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
+    await page.waitForLoadState('networkidle');
+
+    const actions = page.locator('.nav-actions');
+    // Queue badge is present (dispatch flag is on).
+    await expect(actions.locator('[data-queue-badge]')).toBeAttached();
+    // Search toggle must NOT appear on non-projects pages.
+    await expect(actions.locator('.search-toggle')).toHaveCount(0);
+  });
+
+  test('search toggle is present but queue badge absent on projects when dispatch is off (search is NOT dispatch-gated)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed, { features: {} }); // dispatch flag OFF
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    const actions = page.locator('.nav-actions');
+    // Search toggle is on (projects page, NOT gated on dispatch).
+    await expect(actions.locator('.search-toggle')).toBeAttached();
+    // Queue badge is absent (dispatch flag is off).
+    await expect(actions.locator('[data-queue-badge]')).toHaveCount(0);
+  });
+});

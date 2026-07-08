@@ -302,7 +302,36 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     expect(resp.status()).toBe(404);
     expect(await resp.text()).toContain('data-testid="session-not-found"');
   });
+
+  test('Observation nav tab is active and links to the feed, not the session page (LIN-1149)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedSessionWithTranscript(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    // The page rendered.
+    await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
+    // The page-local back link points to the Observation feed.
+    await expect(page.locator('[data-testid="session-back"]'))
+      .toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);
+
+    // The shared Observation nav tab is active (aria-current) on the session page.
+    const observationTab = page.locator('[data-testid="nav-view-observation"]');
+    await expect(observationTab).toBeVisible();
+    await expect(observationTab).toHaveAttribute('aria-current', 'page');
+    // The Observation tab is a direct link to the feed, not the session page —
+    // verified by navigating from a different surface.
+    await page.goto(`/workspace/${URL_KEY}/swipe`);
+    await page.waitForLoadState('networkidle');
+    // On the swipe page the Observation tab is a clickable anchor (not active).
+    const tabHref = await page.locator('[data-testid="nav-view-observation"]').getAttribute('href');
+    expect(tabHref).toBe(`/workspace/${URL_KEY}/observation`);
+  });
 });
+
 // Note: cross-workspace / no-session isolation is workspaceFromUrl's contract
 // (shared middleware, covered by existing specs) and is not re-tested here — in
 // PAT mode the server auto-recreates a session on the next visit, so "no
