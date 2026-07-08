@@ -1,9 +1,9 @@
-/* Dedicated per-session page (LIN-1003, Phase 1 of LIN-950).
+/* Dedicated per-session page (LIN-1003, Phase 1 of LIN-950; LIN-1133 per-run expansion).
  *
- * A server-rendered snapshot (no client JS). Styling is deliberately minimal —
- * it reuses the shared token layer (semantic colours + the mono/sans type split)
- * and only adds the net-new transcript / run / context surfaces. Machine facts
- * (ids, timestamps, chips, transcript body) take the structural mono face;
+ * A server-rendered snapshot enhanced with client-side JS (common.js, marked.min.js,
+ * purify.min.js, brief.js, recap.js, session.js) for per-run expandable transcripts,
+ * inline reply boxes, brief/recap widgets, and markdown rendering.
+ * Machine facts (ids, timestamps, chips, transcript body) take the structural mono face;
  * human structure (headings, labels) takes the content sans face. */
 
 .sess-page {
@@ -126,6 +126,20 @@
   color: var(--green);
 }
 .sess-run-status--live { color: var(--amber); }
+/* ── Expand/collapse toggle (LIN-1133) ────────────────────────────────── */
+.sess-run-head[role="button"] { cursor: pointer; user-select: none; }
+.sess-run-head[role="button"]:hover { color: var(--brand); }
+.sess-run-toggle-icon {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+.sess-run--expanded > .sess-run-head .sess-run-toggle-icon { transform: rotate(90deg); }
+/* The body container inside an expanded run card. Default hidden — toggled by JS. */
+.sess-run-body { display: none; }
+.sess-run--expanded > .sess-run-body { display: block; }
 .sess-run-title {
   font-family: var(--font-content);
   font-size: 0.85rem;
@@ -156,33 +170,23 @@
   color: var(--muted);
 }
 
-/* ── Transcript ───────────────────────────────────────────────────────────── */
-/* Contain a long transcript in its own scroll region (LIN-1024) instead of
-   letting it stretch the page — which also keeps the reply box (which sits
-   below it) reachable on mobile. Reuses the repo's established
-   max-height / overflow-y:auto / scrollbar-gutter pattern (~8 uses in
-   style.css/swipe.css). */
-.sess-tx {
-  max-height: 480px;
+/* ── Per-run transcript (LIN-1133) ────────────────────────────────────────
+   Each run card contains its own scrollable transcript. Feedback entries are
+   rendered client-side as markdown. */
+.sess-run-tx {
+  max-height: 360px;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
-  padding: 0.1rem 0.7rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
   background: var(--inset);
 }
-/* No trailing divider against the container's bottom edge. */
-.sess-tx-loop:last-child .sess-tx-entry:last-child { border-bottom: none; }
-.sess-tx-loop { margin-bottom: 1rem; }
-.sess-tx-loop-head {
-  font-family: var(--font-structural);
-  font-size: 0.8rem;
-  color: var(--muted);
-  margin-bottom: 0.3rem;
-}
-.sess-tx-list { list-style: none; margin: 0; padding: 0; }
-.sess-tx-entry {
+.sess-run-tx-list { list-style: none; margin: 0; padding: 0; }
+/* Client-rendered markdown transcript entry (LIN-1133). */
+.sess-run-tx-entry {
   padding: 0.3rem 0;
   border-bottom: 1px solid var(--line-soft);
   font-family: var(--font-structural);
@@ -190,9 +194,14 @@
   line-height: 1.5;
   word-break: break-word;
 }
-.sess-tx-time { color: var(--faint, var(--muted)); margin-right: 0.5rem; }
-.sess-tx-msg { color: var(--text); white-space: pre-wrap; }
-.sess-tx-link { color: var(--blue); margin-left: 0.35rem; overflow-wrap: anywhere; }
+.sess-run-tx-entry:last-child { border-bottom: none; }
+/* Markdown-rendered content within transcript entries — reuse the established
+   .markdown-content pattern from style.css for consistency. */
+.sess-run-tx-entry .markdown-content {
+  font-family: var(--font-structural);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
 
 /* ── Task context (brief / recap) ─────────────────────────────────────────── */
 .sess-ctx-issue {
@@ -325,6 +334,17 @@
   color: var(--muted);
 }
 .sess-reply-feedback.error { color: var(--red); }
+/* VISIBLE send button styling (LIN-1133) — matches the .action-btn.save pattern
+   from common-actions.css: green text + 12% green tint background, so it looks
+   like a button, not plain link text. */
+.sess-reply-send {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+.sess-reply-send:hover {
+  background: color-mix(in srgb, var(--green) 22%, transparent);
+}
+.sess-reply-send:disabled { opacity: 0.5; cursor: default; }
 .sess-reply-note {
   margin: 0.5rem 0 0;
   font-family: var(--font-content);
@@ -332,17 +352,49 @@
   color: var(--muted);
 }
 
+/* ── Per-run inline reply box (LIN-1133) ──────────────────────────────────
+   Scoped within each expanded run card. Textarea + send button + feedback span. */
+.sess-inline-reply {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line-soft);
+}
+.sess-inline-reply-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 3rem;
+  resize: vertical;
+  padding: 0.4rem 0.5rem;
+  font-family: var(--font-structural);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.sess-inline-reply-input:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+.sess-inline-reply-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+  margin-top: 0.4rem;
+}
+
 /* ── Small-screen polish (LIN-1024) ───────────────────────────────────────────
    Basic readability/spacing tightening for the reported surface (360px Android
-   Chrome): reclaim horizontal room, keep the waiting banner and reply box
-   comfortable to read and tap. CSS-only; no markup or data-testid changes. */
+   Chrome): reclaim horizontal room, keep the waiting banner, reply box, inline
+   reply, and expanded transcript comfortable to read and tap. */
 @media (max-width: 480px) {
   .sess-page { padding: 0 0.75rem 2.5rem; }
-  /* The fixed 8rem key column crowds the value on a narrow row — give the
-     machine fact more room while keeping the key/value rhythm. */
   .sess-k { min-width: 6rem; }
   .sess-waiting { padding: 0.75rem 0.85rem; }
   .sess-waiting-msg { line-height: 1.5; }
-  /* A touch more room to read/compose the reply on a phone. */
   .sess-reply-input { min-height: 5.5rem; }
+  .sess-inline-reply-input { min-height: 4rem; }
+  .sess-run-tx { max-height: 280px; }
 }

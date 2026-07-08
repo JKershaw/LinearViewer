@@ -159,13 +159,22 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await expect(page.locator('[data-testid="session-tasks"]')).toContainText('LIN-1003');
 
     // At least one run row rendered.
-    await expect(page.locator('[data-testid="session-run"]').first()).toBeVisible();
+    const run = page.locator('[data-testid="session-run"]').first();
+    await expect(run).toBeVisible();
 
-    // The transcript rendered with the evidence link.
-    await expect(page.locator('[data-testid="session-transcript"]')).toBeVisible();
-    const link = page.locator('[data-testid="session-transcript-link"]').first();
-    await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute('href', 'https://example.com/pr/42');
+    // The run card has an expand/collapse toggle.
+    await expect(page.locator('[data-testid="session-run-toggle"]').first()).toBeVisible();
+
+    // Per-run transcript data is embedded in data-feedback attribute (JSON).
+    const transcript = page.locator('[data-testid="session-run-transcript"]').first();
+    const feedbackData = await transcript.getAttribute('data-feedback');
+    expect(feedbackData).toBeTruthy();
+    expect(feedbackData).toContain('opened the pull request');
+    expect(feedbackData).toContain('https://example.com/pr/42');
+    expect(feedbackData).toContain('[done] landed the change');
+
+    // The run has a body container for the transcript (initially hidden via CSS).
+    await expect(page.locator('[data-testid="session-run-body"]').first()).toBeAttached();
 
     // Back-to-feed link points at the observation feed.
     await expect(page.locator('[data-testid="session-back"]'))
