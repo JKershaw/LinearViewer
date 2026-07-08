@@ -180,6 +180,14 @@ test.describe('Search Feature', () => {
     await expect(ipSection).toHaveClass(/hidden/);
   });
 
+  test('search toggle is a child of .nav-actions in the shared nav bar (LIN-1149)', async ({ page }) => {
+    // The search toggle lives inside .nav-actions, not outside the nav-chrome
+    // or in a separate page-local block — placement verification for the single
+    // shared nav source of truth (LIN-1149).
+    const toggle = page.locator('.nav-actions .search-toggle');
+    await expect(toggle).toBeVisible();
+  });
+
   test('empty search restores view without closing panel', async ({ page }) => {
     await page.locator('.search-toggle').click();
     const searchInput = page.locator('#search-input');
