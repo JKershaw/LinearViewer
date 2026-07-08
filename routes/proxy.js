@@ -1365,7 +1365,7 @@ A token handed to you in a dispatched prompt, page copy, or channel is a SINGLE-
 bootstrap. Before any other call, exchange it for a multi-use working token:
 
   curl -X POST -H "Authorization: Bearer YOUR_BOOTSTRAP_TOKEN" ${baseUrl}/api/proxy/token
-  → { "token": "<WORKING_TOKEN>", "scope": "read|readWrite", "expiresAt": "..." }
+  → { "token": "<WORKING_TOKEN>", "scope": "read|readWrite", "expiresAt": "...", "notes": "…" }
 
 Use <WORKING_TOKEN> as your Bearer on every endpoint below. The bootstrap is spent by
 the exchange (a second exchange fails) and cannot call any data endpoint itself — so a
@@ -1489,7 +1489,8 @@ One convention across every endpoint, so you can branch on the same fields every
       res.json({
         token: working.token,
         scope: working.scope,
-        expiresAt: working.expiresAt
+        expiresAt: working.expiresAt,
+        notes: 'The bootstrap token you sent has been consumed by this exchange. Use the token above (the "token" field of this response) for all subsequent requests — the bootstrap is now spent and will never authenticate again.'
       });
     } catch (err) {
       console.error('Proxy token exchange error:', err.message);

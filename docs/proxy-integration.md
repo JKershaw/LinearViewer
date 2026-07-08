@@ -97,7 +97,7 @@ Authorization: Bearer YOUR_BOOTSTRAP_TOKEN
 Response:
 
 ```json
-{ "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "2026-07-09T12:00:00.000Z" }
+{ "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "2026-07-09T12:00:00.000Z", "notes": "The bootstrap token you sent has been consumed by this exchange. Use the token above (the \"token\" field of this response) for all subsequent requests — the bootstrap is now spent and will never authenticate again." }
 ```
 
 Use `<WORKING_TOKEN>` as the Bearer on every subsequent call. The bootstrap is spent by the

@@ -115,7 +115,7 @@ First, exchange your single-use bootstrap token for a working token:
 
 curl -X POST -H "Authorization: Bearer ${token}" ${tokenUrl}
 
-That returns { "token": "<WORKING_TOKEN>", "scope": "${scope}", "expiresAt": "..." }. The bootstrap is single-use — this exchange spends it — so use <WORKING_TOKEN> for everything from here on. Then fetch the full API documentation:
+That returns { "token": "<WORKING_TOKEN>", "scope": "${scope}", "expiresAt": "...", "notes": "…" }. The bootstrap is single-use — this exchange spends it — so use <WORKING_TOKEN> for everything from here on. Then fetch the full API documentation:
 
 curl -H "Authorization: Bearer <WORKING_TOKEN>" ${instructionsUrl}
 

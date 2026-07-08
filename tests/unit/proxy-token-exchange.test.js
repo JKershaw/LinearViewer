@@ -101,6 +101,8 @@ describe('LIN-376 — POST /api/proxy/token (bootstrap exchange)', () => {
     assert.equal(res.body.scope, 'readWrite');
     assert.ok(res.body.token && res.body.token !== boot.token, 'working token is a fresh secret');
     assert.ok(res.body.expiresAt, 'working token carries an expiry');
+    assert.ok(res.body.notes, 'response includes notes field for LLM guidance');
+    assert.match(res.body.notes, /bootstrap.*consumed|spent|single.use/i, 'notes warns the bootstrap is spent');
 
     // The working token authenticates data endpoints; the bootstrap never did.
     const working = await store.validateToken(res.body.token);
