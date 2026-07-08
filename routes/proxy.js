@@ -4072,7 +4072,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription } = req.body || {};
+      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness } = req.body || {};
 
       // Validate caller-supplied inputs. (The composed body is server-generated
       // and trusted, so only these raw inputs are checked — same split as the
@@ -4118,6 +4118,19 @@ One convention across every endpoint, so you can branch on the same fields every
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
       }
+      // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
+      // via the shared helper (type/length/dangerous-chars only — NOT checked
+      // against a model registry). Mirrors POST /dispatch + recommend-and-dispatch.
+      const kickoffModelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
+      if (kickoffModelValidationError) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, kickoffModelValidationError.error);
+      }
+      const kickoffHarnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+      if (kickoffHarnessValidationError) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, kickoffHarnessValidationError.error);
+      }
 
       // Subscription is DECLARED on the edge (LIN-900 §6), never reconstructed from
       // incidental fields: an undeclared edge is `terminal-only`, full stop. (This
@@ -4126,6 +4139,23 @@ One convention across every endpoint, so you can branch on the same fields every
       // declares `subscription: 'everything'` explicitly; the autopilot prompts are
       // the sole declarers.)
       const subscriptionResolved = subscription ?? DEFAULT_SUBSCRIPTION;
+
+      // Resolve blank incoming model/harness against the workspace's
+      // dispatchDefaults (LIN-1138, mirroring POST /dispatch's LIN-1094
+      // wiring): per-kind override -> workspace-wide default -> null. `autopilot`
+      // is a meta-kind (∉ PROMPT_TEMPLATES), so byKind is skipped and the
+      // workspace-wide default is the only fallback.
+      let resolvedModel = model || null;
+      let resolvedHarness = harness || null;
+      if ((!model || !harness) && workspacePreferencesStore) {
+        const defaults = await resolveDispatchDefaults({
+          urlKey: req.proxyUrlKey,
+          kind: 'autopilot',
+          store: workspacePreferencesStore
+        });
+        if (!model) resolvedModel = defaults.model;
+        if (!harness) resolvedHarness = defaults.harness;
+      }
 
       const baseUrl = `${req.protocol}://${req.get('host')}`;
 
@@ -4190,6 +4220,11 @@ One convention across every endpoint, so you can branch on the same fields every
         dispatchedBy: req.proxyCreatedBy || null,
         target: target || 'cli',
         repo: resolvedRepo,
+        // Execution model + harness the runner passes to its CLI (LIN-438,
+        // LIN-1084); opaque, forwarded blindly. Resolved against workspace
+        // dispatchDefaults when not explicit (LIN-1138).
+        model: resolvedModel,
+        harness: resolvedHarness,
         // Park the orchestrator holdable (LIN-826). Under push-based comms the
         // subscribed children run independently to terminal and then WAKE the
         // parent with a follow-up (the LIN-826 auto-enqueue), so the orchestrator

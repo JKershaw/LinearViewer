@@ -42,7 +42,7 @@ const RECOMMEND_DESCENT_BUDGET_MS = 180_000;
 // with the client-disconnect signal and the shared descent budget so a stalled Linear
 // call can't hold the SSE socket open until Heroku's H15 fires (LIN-346, gap #1).
 const CONTEXT_FETCH_TIMEOUT_MS = 45_000;
-import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
+import { resolveWorkspaceModel, resolveDispatchDefaults } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
@@ -2175,6 +2175,21 @@ ${goal}`
         }
       }
 
+      // Resolve model/harness from workspace dispatchDefaults (LIN-1138).
+      // These call sites don't accept user-supplied model/harness, so
+      // resolution is purely from workspace defaults.
+      let triageModel = null;
+      let triageHarness = null;
+      if (workspacePreferencesStore) {
+        const defaults = await resolveDispatchDefaults({
+          urlKey: workspace.urlKey,
+          kind: 'triage',
+          store: workspacePreferencesStore
+        });
+        triageModel = defaults.model;
+        triageHarness = defaults.harness;
+      }
+
       await dispatchQueueStore.addItem(workspace.urlKey, {
         prompt,
         promptName: 'Triage',
@@ -2184,7 +2199,9 @@ ${goal}`
         issueTitle: issue.title || null,
         issueUrl: issue.url || null,
         dispatchedBy: session?.linearUserId || null,
-        target: 'cli'
+        target: 'cli',
+        model: triageModel,
+        harness: triageHarness
       });
     } catch (err) {
       console.error('Feedback triage enqueue failed:', err.message);
@@ -2226,6 +2243,21 @@ ${goal}`
         }
       }
 
+      // Resolve model/harness from workspace dispatchDefaults (LIN-1138).
+      // The feedback autopilot doesn't accept user-supplied model/harness,
+      // so resolution is purely from workspace defaults.
+      let autopilotModel = null;
+      let autopilotHarness = null;
+      if (workspacePreferencesStore) {
+        const defaults = await resolveDispatchDefaults({
+          urlKey: workspace.urlKey,
+          kind: 'autopilot',
+          store: workspacePreferencesStore
+        });
+        autopilotModel = defaults.model;
+        autopilotHarness = defaults.harness;
+      }
+
       await dispatchQueueStore.addItem(workspace.urlKey, {
         prompt,
         promptName: `Autopilot — ${issue.identifier}`,
@@ -2235,7 +2267,9 @@ ${goal}`
         issueTitle: issue.title || null,
         issueUrl: issue.url || null,
         dispatchedBy: session?.linearUserId || null,
-        target: 'cli'
+        target: 'cli',
+        model: autopilotModel,
+        harness: autopilotHarness
       });
     } catch (err) {
       console.error('Feedback autopilot enqueue failed:', err.message);

@@ -57,7 +57,7 @@ function fakeProxyTokenStore(token = 'minted-rw-token') {
   };
 }
 
-function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features = {}, proxyTokenStore } = {}) {
+function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features = {}, proxyTokenStore, workspacePreferencesStore: wsPrefs } = {}) {
   registerProvider(provider);
   const app = express();
   // Mirror the production global JSON parser (250kb, application/json only) so
@@ -73,7 +73,8 @@ function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features =
     proxyTokenStore,
     // Unused by the feedback route but part of the factory signature.
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
-    workspacePreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {},
+    workspacePreferencesStore: wsPrefs ?? { getWorkspacePreferences: async () => ({}) },
+    customPromptsStore: {}, recapCacheStore: {},
     briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {}
   });
   app.use(router);
@@ -351,5 +352,106 @@ describe('feedback submit (LIN-635)', () => {
     const { status, body } = await submit(app, 'acme', { message: 'hi' });
     assert.strictEqual(status, 201);
     assert.strictEqual(body.success, true);
+  });
+
+  // ── LIN-1138 — model/harness defaults resolution on feedback dispatch paths ──
+
+  test("LIN-1138: action:'triage' resolves model/harness from workspace dispatchDefaults", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-triage');
+
+    const store = new (await import('../../lib/workspace-preferences.js')).WorkspacePreferencesStore({
+      collection: (() => {
+        const docs = [];
+        return {
+          async findOne(query) { return docs.find(d => d._id === query._id) || null; },
+          async updateOne(query, update, options = {}) {
+            let doc = docs.find(d => d._id === query._id);
+            if (!doc) {
+              if (!options.upsert) return { matchedCount: 0 };
+              doc = { _id: query._id, ...(update.$setOnInsert || {}) };
+              docs.push(doc);
+            }
+            Object.assign(doc, update.$set || {});
+            return { matchedCount: 1 };
+          }
+        };
+      })()
+    });
+    await store.saveWorkspacePreferences('acme', {
+      dispatchDefaults: { model: 'workspace-model', harness: 'workspace-harness' }
+    });
+
+    const app = buildApp({
+      provider, dispatchQueueStore: dispatch,
+      proxyTokenStore, features: { feedbackTriage: true },
+      workspacePreferencesStore: store
+    });
+
+    const { status } = await submit(app, 'acme', { message: 'triage me', action: 'triage' });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    assert.equal(dispatch.items[0].item.model, 'workspace-model');
+    assert.equal(dispatch.items[0].item.harness, 'workspace-harness');
+  });
+
+  test("LIN-1138: action:'autopilot' resolves model/harness from workspace dispatchDefaults", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-auto');
+
+    const store = new (await import('../../lib/workspace-preferences.js')).WorkspacePreferencesStore({
+      collection: (() => {
+        const docs = [];
+        return {
+          async findOne(query) { return docs.find(d => d._id === query._id) || null; },
+          async updateOne(query, update, options = {}) {
+            let doc = docs.find(d => d._id === query._id);
+            if (!doc) {
+              if (!options.upsert) return { matchedCount: 0 };
+              doc = { _id: query._id, ...(update.$setOnInsert || {}) };
+              docs.push(doc);
+            }
+            Object.assign(doc, update.$set || {});
+            return { matchedCount: 1 };
+          }
+        };
+      })()
+    });
+    await store.saveWorkspacePreferences('acme', {
+      dispatchDefaults: { model: 'ws-autopilot-model', harness: 'ws-autopilot-harness' }
+    });
+
+    const app = buildApp({
+      provider, dispatchQueueStore: dispatch,
+      proxyTokenStore, features: { feedbackTriage: false },
+      workspacePreferencesStore: store
+    });
+
+    const { status } = await submit(app, 'acme', { message: 'run this', action: 'autopilot' });
+    assert.strictEqual(status, 201);
+    // One dispatch item (autopilot kickoff), no triage
+    assert.strictEqual(dispatch.items.length, 1);
+    const item = dispatch.items[0].item;
+    assert.strictEqual(item.kind, 'autopilot');
+    assert.equal(item.model, 'ws-autopilot-model');
+    assert.equal(item.harness, 'ws-autopilot-harness');
+  });
+
+  test('LIN-1138: feedback dispatch path with no defaults configured resolves model/harness to null', async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok');
+    const app = buildApp({
+      provider, dispatchQueueStore: dispatch,
+      proxyTokenStore, features: { feedbackTriage: true }
+    });
+
+    const { status } = await submit(app, 'acme', { message: 'hi', action: 'triage' });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    assert.strictEqual(dispatch.items[0].item.model, null);
+    assert.strictEqual(dispatch.items[0].item.harness, null);
   });
 });
