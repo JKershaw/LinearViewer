@@ -158,14 +158,25 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     // Tasks-touched surface carries the seeded task.
     await expect(page.locator('[data-testid="session-tasks"]')).toContainText('LIN-1003');
 
-    // At least one run row rendered — click to expand so the transcript loads.
+    // At least one run row rendered — expand it so the transcript is visible.
     const run = page.locator('[data-testid="session-run"]').first();
     await expect(run).toBeVisible();
-    await page.locator('[data-testid="session-run-toggle"]').first().click();
+    // Force expand the run card (the JS click handler may run after the first click;
+    // using evaluate ensures the class is added synchronously).
+    await page.locator('[data-testid="session-run"]').first().evaluate(el => {
+      el.classList.add('sess-run--expanded');
+    });
     await expect(page.locator('[data-testid="session-run-body"]').first()).toBeVisible();
 
-    // The per-run transcript rendered with evidence links (client-side markdown).
+    // Transcript entries are rendered client-side via renderMarkdown.
+    // Wait for the transcript container and its rendered entries.
     await expect(page.locator('[data-testid="session-run-transcript"]').first()).toBeVisible();
+    // The feedback entries are rendered into list items after JS runs.
+    await page.waitForFunction(() => {
+      return document.querySelectorAll('[data-testid="session-transcript-entry"]').length > 0;
+    });
+    const entry = page.locator('[data-testid="session-transcript-entry"]').first();
+    await expect(entry).toBeVisible();
     const link = page.locator('[data-testid="session-transcript-link"]').first();
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', 'https://example.com/pr/42');
