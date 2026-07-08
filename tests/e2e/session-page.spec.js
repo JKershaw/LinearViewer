@@ -158,25 +158,23 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     // Tasks-touched surface carries the seeded task.
     await expect(page.locator('[data-testid="session-tasks"]')).toContainText('LIN-1003');
 
-    // At least one run row rendered — expand it so the transcript is visible.
+    // At least one run row rendered.
     const run = page.locator('[data-testid="session-run"]').first();
     await expect(run).toBeVisible();
-    // Force expand the run card (the JS click handler may run after the first click;
-    // using evaluate ensures the class is added synchronously).
-    await page.locator('[data-testid="session-run"]').first().evaluate(el => {
-      el.classList.add('sess-run--expanded');
-    });
-    await expect(page.locator('[data-testid="session-run-body"]').first()).toBeVisible();
 
-    // Transcript entries are rendered client-side via renderMarkdown.
-    // Wait for the transcript container and its rendered entries.
-    await expect(page.locator('[data-testid="session-run-transcript"]').first()).toBeVisible();
-    // The feedback entries are rendered into list items after JS runs.
+    // Wait for client JS to render transcript entries before expanding.
     await page.waitForFunction(() => {
       return document.querySelectorAll('[data-testid="session-transcript-entry"]').length > 0;
     });
-    const entry = page.locator('[data-testid="session-transcript-entry"]').first();
-    await expect(entry).toBeVisible();
+
+    // Click the toggle to expand the first run card so the transcript becomes visible.
+    await page.locator('[data-testid="session-run-toggle"]').first().click();
+    await page.waitForFunction(() => {
+      return document.querySelector('.sess-run--expanded') !== null;
+    });
+
+    // The per-run transcript is now visible.
+    await expect(page.locator('[data-testid="session-run-transcript"]').first()).toBeVisible();
     const link = page.locator('[data-testid="session-transcript-link"]').first();
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', 'https://example.com/pr/42');
