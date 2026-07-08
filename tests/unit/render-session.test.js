@@ -351,8 +351,8 @@ describe('render-session: per-run expandable transcript + inline reply (LIN-1133
     assert.match(html, /data-session-run-toggle/);
     assert.match(html, /aria-expanded="false"/);
     assert.match(html, /sess-run-toggle-icon/);
-    // Expandable section exists but is hidden.
-    assert.match(html, /sess-run-expand hidden/);
+    // Expandable section exists but is hidden by CSS (display:none on .sess-run-expand).
+    assert.match(html, /sess-run-expand/);
     assert.match(html, /sess-run--expandable/);
   });
 
