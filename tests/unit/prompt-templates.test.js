@@ -1038,6 +1038,23 @@ describe('triage template', () => {
       'triage readiness should account for project, not just labels/priority/state'
     );
   });
+
+  // LIN-1136: bug label stays — no longer removed when the fix lands.
+  test('bug label rule does not tell agent to remove the label after fix', () => {
+    const result = generatePrompt('triage', mockIssue, mockContext);
+    assert.ok(!result.prompt.includes('remove it when the fix lands'),
+      'should not tell agent to remove the bug label when the fix lands');
+  });
+
+  // LIN-1136: triage is organization, not research.
+  test('clarifies boundary — triage is organization, not research', () => {
+    const result = generatePrompt('triage', mockIssue, mockContext);
+    assert.ok(/organization/i.test(result.prompt), 'should describe triage as organization');
+    assert.ok(/research step follows separately/i.test(result.prompt),
+      'should note that research is a separate next step');
+    assert.ok(/present analysis as completed research/i.test(result.prompt),
+      'should warn against presenting analysis as completed research');
+  });
 });
 
 // =============================================================================
