@@ -40,6 +40,7 @@ import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
+import { ShipBiscuitHistoryStore } from './lib/ship-biscuit-history-store.js'
 import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
@@ -92,6 +93,7 @@ import { fetchIssueContext } from './lib/linear.js'
 import { createTaskChatRoutes } from './routes/task-chat.js'
 import { createNextRunRoutes } from './routes/next-run.js'
 import { createFlightCompanionRoutes } from './routes/flight-companion.js'
+import { createShipBiscuitRoutes } from './routes/ship-biscuit.js'
 import { yapClientFromEnv } from './lib/yap-client.js'
 import { getLoopsForWorkspace } from './lib/pipeline-loops.js'
 import { buildSessionCounts } from './lib/sessions-view.js'
@@ -397,6 +399,14 @@ const reportHistoryStore = new ReportHistoryStore({
   collection: reportHistoryCollection
 })
 
+// Ship's Biscuit editions (LIN-818): durable per-workspace generated newspaper
+// editions (front page + index). No TTL, per-workspace count-capped, modelled on
+// report-history above.
+const shipBiscuitHistoryCollection = db.collection('ship-biscuit-editions')
+const shipBiscuitHistoryStore = new ShipBiscuitHistoryStore({
+  collection: shipBiscuitHistoryCollection
+})
+
 // Task snapshot archive (LIN-598): append-only per-task history of the observed
 // issue slice. Captured fire-and-forget at the proxy recap/brief read seams
 // (which already compute hashContext), hash-gated so a write happens only on a
@@ -498,7 +508,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }))
 }
 
 // =============================================================================
@@ -1329,6 +1339,11 @@ app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferen
 
 // Mount flight-companion routes (experimental prototype for LIN-751 realtime chat — LIN-922).
 app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
+
+// The Ship's Biscuit (experimental, LIN-818): flag-gated LLM-set newspaper — a
+// deterministic edition model over the wired event stores + one editor-in-chief
+// call → durable front page + index. Mirrors next-run's free-tier/model wiring.
+app.use(createShipBiscuitRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, observationSessionsStore, agentStatusStore, llmCallLogStore, shipBiscuitHistoryStore }))
 
 /**
  * Workspace project view - renders the interactive tree view.
