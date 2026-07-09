@@ -141,6 +141,20 @@
   box-shadow: 0 0 0 2px var(--blue-bg, rgba(37, 99, 235, 0.08));
 }
 
+/* Model/harness override controls (LIN-1132). The inner control pair is the
+   shared .dispatch-exec-controls block (styled in style.css); this wrapper just
+   stacks the label above it, matching the other fields' rhythm. */
+.feedback-exec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feedback-exec-hint {
+  font-weight: 400;
+  color: var(--muted, #6b7280);
+}
+
 /* Drop zone: a dashed target that wraps the native file input so the whole
    area is click-to-choose as well as a drag-and-drop / paste surface. */
 .feedback-drop {

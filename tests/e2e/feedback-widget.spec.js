@@ -73,6 +73,70 @@ test.describe('Feedback widget', () => {
     expect(postedAction).toBe('triage')
   })
 
+  // LIN-1132: the popup carries the shared model/harness exec-controls (the same
+  // window.renderDispatchExecControls block the Dispatch page uses), and a
+  // dispatching action forwards the entered override in its payload.
+  test('forwards an entered model/harness override on a triage dispatch (LIN-1132)', async ({ page, seedLocal }) => {
+    const { urlKey } = await seedLocal()
+    await enableWidget(page, urlKey)
+
+    await page.getByTestId('feedback-fab').click()
+    // The shared exec-controls render inside the popup.
+    const exec = page.getByTestId('feedback-exec-controls')
+    await expect(exec).toBeVisible()
+    await expect(exec.locator('.dispatch-exec-model')).toBeVisible()
+    await expect(exec.locator('.dispatch-exec-harness-select')).toBeVisible()
+
+    let posted = null
+    await page.route(`**/workspace/${urlKey}/api/feedback`, async (route) => {
+      posted = JSON.parse(route.request().postData() || '{}')
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, issue: { identifier: 'LIN-778' } })
+      })
+    })
+
+    await page.getByTestId('feedback-message').fill('use a specific model')
+    await exec.locator('.dispatch-exec-model').fill('anthropic/claude-opus-4')
+    await exec.locator('.dispatch-exec-harness-custom').fill('opencode')
+    await page.getByTestId('feedback-submit-triage').click()
+
+    await expect(page.getByTestId('feedback-status')).toContainText('Filed LIN-778')
+    expect(posted.action).toBe('triage')
+    expect(posted.model).toBe('anthropic/claude-opus-4')
+    expect(posted.harness).toBe('opencode')
+  })
+
+  // LIN-1132: Save files a ticket WITHOUT dispatching, so model/harness are
+  // meaningless there — an entered override must not ride the Save payload.
+  test('omits model/harness from a plain Save even when entered (LIN-1132)', async ({ page, seedLocal }) => {
+    const { urlKey } = await seedLocal()
+    await enableWidget(page, urlKey)
+
+    await page.getByTestId('feedback-fab').click()
+    const exec = page.getByTestId('feedback-exec-controls')
+
+    let posted = null
+    await page.route(`**/workspace/${urlKey}/api/feedback`, async (route) => {
+      posted = JSON.parse(route.request().postData() || '{}')
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, issue: { identifier: 'LIN-779' } })
+      })
+    })
+
+    await page.getByTestId('feedback-message').fill('just save, no dispatch')
+    await exec.locator('.dispatch-exec-model').fill('anthropic/claude-opus-4')
+    await page.getByTestId('feedback-submit').click()
+
+    await expect(page.getByTestId('feedback-status')).toContainText('Filed LIN-779')
+    expect(posted.action).toBe('save')
+    expect(posted.model).toBeUndefined()
+    expect(posted.harness).toBeUndefined()
+  })
+
   test('preserves draft input across minimize and reload', async ({ page, seedLocal }) => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)

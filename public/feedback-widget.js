@@ -143,6 +143,10 @@
           <select id="feedback-priority" class="feedback-priority" data-testid="feedback-priority">
             ${PRIORITIES.map(p => `<option value="${p.value}">${esc(p.label)}</option>`).join('')}
           </select>
+          <div class="feedback-exec" data-testid="feedback-exec-controls">
+            <span class="feedback-label">Model / harness <span class="feedback-exec-hint">(triage &amp; autopilot only)</span></span>
+            <span class="feedback-exec-mount"></span>
+          </div>
           <span class="feedback-label">Screenshot (optional)</span>
           <label class="feedback-drop" data-testid="feedback-drop">
             <input id="feedback-file" class="feedback-file" data-testid="feedback-file"
@@ -166,10 +170,30 @@
         </div>
       </div>`;
 
+    // Model/harness override controls (LIN-1132) — the SAME shared exec-controls
+    // the Dispatch page uses (window.renderDispatchExecControls, public/common.js),
+    // so the widget can't drift from that control style. They apply only to the
+    // dispatching actions (triage / autopilot); Save omits them (see submit()).
+    // The workspace default rides in via the mount's data-default-* attrs and is
+    // shown as a UX-only placeholder/pre-select hint (blank still inherits the
+    // workspace default server-side). Guarded on the helper being present so the
+    // widget still works if common.js hasn't loaded.
+    const execMount = root.querySelector('.feedback-exec-mount');
+    if (execMount && typeof window.renderDispatchExecControls === 'function') {
+      const defaultModel = root.dataset.defaultModel || '';
+      const defaultHarness = root.dataset.defaultHarness || '';
+      execMount.innerHTML = window.renderDispatchExecControls('feedback', {
+        modelPlaceholder: defaultModel ? `model (default: ${defaultModel})` : 'model',
+        harnessPlaceholder: defaultHarness ? `harness (default: ${defaultHarness})` : 'harness',
+        harnessDefault: defaultHarness || undefined
+      });
+    }
+
     const fab = root.querySelector('.feedback-fab');
     const popup = root.querySelector('.feedback-popup');
     const messageEl = root.querySelector('.feedback-message');
     const priorityEl = root.querySelector('.feedback-priority');
+    const execControlsEl = root.querySelector('.feedback-exec');
     const fileEl = root.querySelector('.feedback-file');
     const dropZone = root.querySelector('.feedback-drop');
     const fileChip = root.querySelector('.feedback-file-chip');
@@ -369,6 +393,17 @@
           userAgent: navigator.userAgent
         };
         if (image) payload.image = image;
+
+        // Model/harness override (LIN-1132) — only carried for the DISPATCHING
+        // actions; Save files a ticket without dispatching, so model/harness are
+        // meaningless there. Blank omitted (same `if (x) payload.x = x` idiom as
+        // window.dispatchPrompt) so the server + factory fill blanks from the
+        // workspace default.
+        if (action !== 'save' && execControlsEl && typeof window.readDispatchExecControls === 'function') {
+          const { model, harness } = window.readDispatchExecControls(execControlsEl);
+          if (model) payload.model = model;
+          if (harness) payload.harness = harness;
+        }
 
         // text/plain (not application/json) so the request bypasses the global
         // 250kb express.json cap and is parsed by the feedback route's own
