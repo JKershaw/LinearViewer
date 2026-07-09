@@ -561,6 +561,83 @@ test.describe('Dispatch Page', () => {
     });
   });
 
+  // LIN-1162: a UI dispatch with +proxy ON now attaches the workspace-API block
+  // SERVER-SIDE (routes/dispatch.js → attachProxyContext), so a claude-code dispatch
+  // takes the MCP `bootstrapToken` field path instead of the browser-appended prose
+  // block that could never reach it. The client sends `attachProxy:true`; the server
+  // mints + appends and gates prose-vs-MCP on the harness. Needs the proxy feature on
+  // (renders the +proxy toggle).
+  test.describe('+proxy dispatch delivers the MCP token field (LIN-1162)', () => {
+    const PROXY_MARKER = '## Workspace API access (auto-appended)';
+
+    test.beforeEach(async ({ page }) => {
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: true }, urlKey: WS });
+      await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+      await page.locator('.dispatch-toggle').click();
+    });
+
+    test('claude-code + proxy on → item carries bootstrapToken, prompt has no token/curl prose', async ({ page }) => {
+      await page.locator('.dispatch-prompt-input').fill('MCP token path test');
+      // Harness select pre-selects claude-code (LIN-1111); leave it untouched.
+      // Turn +proxy ON.
+      await page.locator('.prompt-proxy-toggle').click();
+      await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
+
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.prompt.startsWith('MCP token path test'));
+      expect(item).toBeDefined();
+      expect(item.harness).toBe('claude-code');
+      // The MCP token-field path: token travels as a structured field, and the
+      // injection-prone token/curl prose is gone from the prompt.
+      expect(item.bootstrapToken).toBeTruthy();
+      expect(item.prompt).toContain(PROXY_MARKER);
+      expect(item.prompt).not.toContain('curl -X POST');
+    });
+
+    test('opencode + proxy on → prose block, no bootstrapToken field (non-claude-code unaffected)', async ({ page }) => {
+      await page.locator('.dispatch-prompt-input').fill('Prose path test');
+      await page.locator('.dispatch-exec-harness-select').selectOption('opencode');
+      await page.locator('.prompt-proxy-toggle').click();
+      await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
+
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.prompt.startsWith('Prose path test'));
+      expect(item).toBeDefined();
+      expect(item.harness).toBe('opencode');
+      expect(item.bootstrapToken).toBeNull();
+      expect(item.prompt).toContain(PROXY_MARKER);
+      // Prose delivery keeps the curl exchange (the token lives in the text).
+      expect(item.prompt).toContain('curl -X POST');
+    });
+
+    test('proxy OFF → no proxy block attached (raw prompt dispatched)', async ({ page }) => {
+      await page.locator('.dispatch-prompt-input').fill('No proxy test');
+      // Leave +proxy off.
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.prompt === 'No proxy test');
+      expect(item).toBeDefined();
+      expect(item.bootstrapToken).toBeNull();
+      expect(item.prompt).not.toContain(PROXY_MARKER);
+    });
+  });
+
   test.describe('Queue List', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);

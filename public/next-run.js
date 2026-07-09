@@ -123,10 +123,12 @@
   }
 
   // Inline-dispatch a goal: build the autopilot kickoff (proxy-gated endpoint),
-  // then dispatch it issue-less and tagged kind=autopilot. Proxy-context
-  // appending is now handled internally by dispatchPrompt (LIN-1137) via the
-  // proxyForce option, replacing the separate forced `ProxyToggle.maybeAppend`.
-  // The shared fetchAutopilotKickoff replaces the raw GET.
+  // then dispatch it issue-less and tagged kind=autopilot. The kickoff REQUIRES
+  // the proxy, so proxyForce:true is passed; dispatchPrompt turns that into an
+  // `attachProxy:true` payload and the SERVER attaches the harness-aware proxy
+  // block (LIN-1162, superseding the client-side append LIN-1137 added), so a
+  // claude-code kickoff takes the MCP `bootstrapToken` field path. The shared
+  // fetchAutopilotKickoff replaces the raw GET.
   function dispatchGoal(btn) {
     var target = btn.getAttribute('data-target') || 'cli';
     var goal = btn.getAttribute('data-goal') || '';

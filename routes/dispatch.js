@@ -15,7 +15,7 @@
  */
 
 import { Router } from 'express';
-import { badRequest, jsonError, notFound, unauthorized } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, unauthorized, serviceUnavailable } from '../lib/errors.js';
 import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 import path from 'path';
@@ -25,6 +25,7 @@ import { isValidDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js'
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateDispatchPayload } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
+import { attachProxyContext } from '../lib/proxy-preamble.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -107,9 +108,14 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  * @param {Object} [options.harbourFeedbackTokenStore] - Short-TTL feedback token store for Harbour OS dispatches
  * @param {Object} [options.workspacePreferencesStore] - Workspace preferences store, used to
  *   resolve dispatchDefaults (model/harness) for blank incoming values (LIN-1094)
+ * @param {Object} [options.proxyTokenStore] - Proxy token store, used to mint the single-use
+ *   bootstrap and attach the workspace-API proxy-context block server-side when the client
+ *   requests it (`attachProxy:true`), so a claude-code dispatch carries the token as the
+ *   structured `bootstrapToken` field instead of injectable prose (LIN-1162). Absent → the
+ *   attach degrades to a no-op (attachProxyContext returns the prompt unchanged).
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, proxyTokenStore }) {
   const router = Router();
 
   // =========================================================================
@@ -201,7 +207,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription, attachProxy } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -279,6 +285,18 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
       }
 
+      // Server-side proxy-context attach (LIN-1162). The dispatch UI used to mint a
+      // bootstrap token and append the "+proxy" access block IN THE BROWSER, then POST
+      // the finished prompt here — so this route never reached attachProxyContext and
+      // a claude-code dispatch could never take the MCP `bootstrapToken` field path.
+      // The client now sends `attachProxy:true` (a boolean intent, derived from its
+      // +proxy toggle / force) and lets the server attach the block, exactly like the
+      // proxy dispatch seams. Only meaningful for a real prompt — an abort carries none.
+      if (attachProxy !== undefined && typeof attachProxy !== 'boolean') {
+        return badRequest.json(res, 'attachProxy must be a boolean');
+      }
+      const wantProxyContext = attachProxy === true && !isAbort;
+
       // Reject local target from non-localhost requests
       if (target === 'local') {
         const host = (req.get('host') || '').split(':')[0];
@@ -318,8 +336,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       // Create the dispatch item through the shared factory (LIN-1139): it
       // resolves kind, fills blank model/harness from workspace dispatchDefaults
-      // (LIN-1094), and calls addItem. This path carries no proxy context (the
-      // prompt is already built), so it passes a plain prompt and no finalizePrompt.
+      // (LIN-1094), and calls addItem.
       //
       // applyDefaultHarness:false — the session route deliberately does NOT
       // interpose the claude-code default (LIN-1159 scoped that to the proxy
@@ -328,6 +345,16 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // "blank" option whose contract is "send null" (dispatch-page.spec.js's
       // LIN-1111 escape-hatch test). A server-side interpose here would silently
       // override that blank choice, so the null passthrough is load-bearing.
+      //
+      // Proxy context (LIN-1162): when the client asks (`attachProxy:true`), attach
+      // the workspace-API block through the SAME finalizePrompt→attachProxyContext
+      // seam the proxy dispatch routes use, so the harness gates the MCP-token-field
+      // vs prose branch (LIN-1155) — a claude-code dispatch stores `bootstrapToken`
+      // and its prompt carries no token/curl. The client no longer appends the block
+      // itself, so the two token-delivery mechanisms don't double-append. When the
+      // client does NOT ask, we pass the plain prompt and no finalizePrompt, byte-for-
+      // byte the pre-LIN-1162 path (and the copy/download flows still append client-side).
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
       const item = await createDispatchItem({
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
@@ -336,7 +363,34 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         kind,
         model,
         harness,
-        prompt,
+        ...(wantProxyContext
+          ? {
+              finalizePrompt: async (resolvedHarness) => {
+                const attached = await attachProxyContext({
+                  proxyTokenStore,
+                  urlKey: workspace.urlKey,
+                  baseUrl,
+                  issueIdentifier: issueIdentifier || null,
+                  prompt,
+                  label: 'dispatch-bootstrap',
+                  harness: resolvedHarness
+                });
+                // "Surface, don't silently drop" (LIN-525): the client dropped its
+                // own mint+append and trusted the server to attach the block. If the
+                // block did not get appended (mint failed / rate-limited, or no store/
+                // baseUrl), attachProxyContext returns the prompt UNCHANGED — enqueuing
+                // that would ship a bare prompt while the UI still shows +proxy active.
+                // Signal it instead of degrading silently (the buildProxyContextPreamble
+                // block always changes the prompt on success, prose or MCP).
+                if (attached.prompt === prompt) {
+                  const err = new Error('proxy context requested but could not be attached');
+                  err.proxyAttachFailed = true;
+                  throw err;
+                }
+                return attached;
+              }
+            }
+          : { prompt }),
         fields: {
           promptName: promptName || 'Prompt',
           issueId: issueId || null,
@@ -424,6 +478,13 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         ...(spawn ? { spawn } : {})
       });
     } catch (err) {
+      // Proxy-context attach failure (LIN-1162): a requested `attachProxy:true`
+      // could not mint/append its block. Surface it (503, transient — mirrors the
+      // client's old token-rate-limit message) rather than the generic 500, and
+      // NEVER as a success: no item was enqueued (the throw fired before addItem).
+      if (err && err.proxyAttachFailed) {
+        return serviceUnavailable.json(res, 'Proxy context was requested but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
+      }
       console.error('Dispatch error:', err.message);
       jsonError(res, 500, 'Failed to dispatch prompt');
     }

@@ -292,13 +292,24 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       expect(body.target).toBe('cli');
       // Issue-less: no Linear issue is anchored on a goal dispatch.
       expect(body.issueId == null).toBe(true);
-      // LIN-645: the autopilot kickoff promises a readWrite proxy token, so the
-      // dispatched prompt MUST carry the +proxy block — even though this surface
-      // exposes no +proxy toggle (the append is forced).
-      expect(body.prompt).toContain('Workspace API access');
-      expect(body.prompt).toContain('/api/proxy/instructions');
+      // LIN-1162: the +proxy block is attached SERVER-SIDE now. The kickoff requires
+      // the proxy (this surface exposes no +proxy toggle → proxyForce), so the client
+      // sends attachProxy:true and the RAW prompt — the block is NOT in the request
+      // body any more...
+      expect(body.attachProxy).toBe(true);
+      expect(body.prompt).not.toContain('Workspace API access');
 
       await expect(cli).toHaveText('dispatched!', { timeout: 5000 });
+
+      // ...and the SERVER attaches it (LIN-645's promise is preserved): the stored
+      // dispatch item's prompt carries the access block + catalog link. The client's
+      // no-toggle surface still guarantees the token via attachProxy.
+      const list = await page.request.get(`/workspace/${URL_KEY}/api/dispatch`);
+      const { items } = await list.json();
+      const item = items.find(i => i.kind === 'autopilot');
+      expect(item).toBeDefined();
+      expect(item.prompt).toContain('Workspace API access');
+      expect(item.prompt).toContain('/api/proxy/instructions');
     });
 
     // LIN-1096: the shared model/harness exec controls live inside the same
@@ -324,19 +335,19 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       expect(body.model).toBe('anthropic/claude-opus-4.8');
     });
 
-    test('a failed proxy-token mint surfaces as failure, not a bare dispatch (LIN-645)', async ({ page }) => {
-      // Trip the token mint as a rate limiter would. The kickoff must NOT be
-      // dispatched without its promised proxy block.
-      await page.route('**/api/proxy/tokens', route => {
+    test('a failed proxy-token mint surfaces as failure, not a bare dispatch (LIN-645/LIN-1162)', async ({ page }) => {
+      // LIN-1162: the +proxy block is now attached SERVER-SIDE, so the client no
+      // longer mints /api/proxy/tokens on dispatch — the dispatch route mints and,
+      // when it CANNOT attach the promised proxy context, returns 503 and enqueues
+      // NOTHING ("surface, don't silently drop"; the no-enqueue guarantee is pinned
+      // by dispatch-route-proxy-context.test.js). The client must show that failure
+      // rather than swallowing it into a silent bare dispatch. Simulate the server's
+      // 503 on the dispatch POST and assert the button surfaces it.
+      await page.route('**/api/dispatch', route => {
         if (route.request().method() === 'POST') {
-          return route.fulfill({ status: 429, contentType: 'application/json', body: '{"error":"rate limited"}' });
+          return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"a proxy token could not be created"}' });
         }
         return route.continue();
-      });
-
-      let dispatched = false;
-      page.on('request', req => {
-        if (req.url().includes('/api/dispatch') && req.method() === 'POST') dispatched = true;
       });
 
       const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
@@ -348,7 +359,6 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await cli.click();
 
       await expect(cli).toHaveText('failed', { timeout: 5000 });
-      expect(dispatched).toBe(false);
     });
 
     // LIN-1002: the goal sent to the autopilot-kickoff endpoint carries the
