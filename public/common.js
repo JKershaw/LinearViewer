@@ -324,13 +324,16 @@ window.api = async function api(url, opts = {}) {
  * The dispatch history these records become is joined back to tasks by
  * `issueIdentifier` (see lib/pipeline-loops.js), so it is required by default.
  *
- * The `prompt` passed in is treated as final: callers append any proxy block
- * themselves beforehand (the proxy-token mechanisms differ per surface).
+ * Proxy-context appending is handled internally (LIN-1137): callers pass the raw
+ * prompt and `dispatchPrompt` appends the `+proxy` block when the toggle is on
+ * (or when `proxyForce` is set), so no surface needs to remember to call
+ * `ProxyToggle.maybeAppend` separately before dispatch. Copy/download flows keep
+ * their own direct `ProxyToggle.maybeAppend` calls.
  *
  * @global
  * @param {Object} opts
  * @param {string} opts.urlKey               Workspace URL key (required)
- * @param {string} opts.prompt               Final prompt text (required)
+ * @param {string} opts.prompt               Prompt text BEFORE proxy append (required)
  * @param {Object} [opts.issue]              Issue context — required unless `issueless`
  * @param {string} opts.issue.id             Issue UUID
  * @param {string} opts.issue.identifier     Issue identifier, e.g. "LIN-42"
@@ -343,12 +346,16 @@ window.api = async function api(url, opts = {}) {
  * @param {string} [opts.kind]               Explicit dispatch kind (e.g. 'autopilot'); omit to derive from promptName
  * @param {string} [opts.model]              Execution model (opaque string, LIN-1084); blank/omitted inherits the consumer's own default (LIN-1094)
  * @param {string} [opts.harness]            Execution harness (opaque string, LIN-1084); blank/omitted inherits the consumer's own default (LIN-1094)
+ * @param {boolean} [opts.appendProxyContext=true]  When true, append proxy block via ProxyToggle.maybeAppend before POST (LIN-1137)
+ * @param {boolean} [opts.proxyForce=false]         Pass `force:true` through to ProxyToggle.maybeAppend (LIN-645)
+ * @param {string} [opts.followUpTo]                Resume a prior session (cli/web only); forwarded to the server as an opaque id
+ * @param {boolean} [opts.force]                    Whether to force-follow-up even into a terminal session
  * @returns {Promise<Object>} Parsed JSON response body
  * @throws {Error} on missing required args or a non-ok response. The thrown
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, model, harness } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -359,7 +366,11 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
     throw new Error('dispatchPrompt: issue with id and identifier is required (pass issueless:true to opt out)');
   }
 
-  const payload = { prompt, promptName, target };
+  const finalPrompt = appendProxyContext
+    ? await window.ProxyToggle.maybeAppend(prompt, urlKey, { force: proxyForce })
+    : prompt;
+
+  const payload = { prompt: finalPrompt, promptName, target };
   // `kind` is normally derived server-side from promptName; pass it explicitly
   // only for meta-loops that don't map to a prompt template (e.g. 'autopilot').
   if (kind) payload.kind = kind;
@@ -375,6 +386,8 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   // (LIN-1094) — never send a value that overrides a real default with "".
   if (model) payload.model = model;
   if (harness) payload.harness = harness;
+  if (followUpTo) payload.followUpTo = followUpTo;
+  if (force !== undefined) payload.force = force;
 
   // on401:false — dispatch surfaces (swipe etc.) branch on err.status rather
   // than redirecting, so the 401 is thrown like any other error.
@@ -585,8 +598,86 @@ window.readDispatchExecControls = function readDispatchExecControls(scopeEl) {
 };
 
 // =============================================================================
-// Proxy Toggle (append workspace API proxy instructions + token to prompts)
+// Dispatch Disclosure (shared dispatch toggle + options panel) — LIN-1137
 // =============================================================================
+
+/**
+ * Shared client-side renderer for the "Dispatch ▾" disclosure toggle, target
+ * buttons, and exec controls. Replaces the three divergent approaches (server
+ * string in lib/render.js, inline HTML in prompt-section.js, DOM-building in
+ * next-run.js) with one reusable function that composes the existing shared
+ * infrastructure: renderDispatchExecControls() + initDisclosure().
+ *
+ * Emits the same `.disclosure-toggle` + `.prompt-options` class contract that
+ * E2E tests and CSS expect by default. Callers that need custom classes (e.g.
+ * swipe, which delegates via `data-action="dispatch"` and its own selectors)
+ * can override via the optional `opts`.
+ *
+ * @global
+ * @param {Object} opts
+ * @param {string} opts.idPrefix - Unique prefix for this instance (e.g. issue id or synthetic id)
+ * @param {boolean} [opts.isLocalhost=false] - Whether to include the local-only harbour target button
+ * @param {string} [opts.toggleClass='dispatch-disclosure disclosure-toggle'] - CSS classes for the toggle button
+ * @param {string} [opts.panelClass='prompt-options'] - CSS class for the hidden options panel
+ * @param {string} [opts.buttonClass='prompt-dispatch dispatch-btn'] - CSS class for each dispatch target button
+ * @param {string} [opts.buttonDataAction=''] - Value for `data-action` attribute on dispatch buttons (swipe uses 'dispatch')
+ * @returns {string} HTML for the disclosure toggle + hidden options panel
+ */
+window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, isLocalhost = false, toggleClass = 'dispatch-disclosure disclosure-toggle', panelClass = 'prompt-options', buttonClass = 'prompt-dispatch dispatch-btn', buttonDataAction = '' } = {}) {
+  const prefix = idPrefix ? window.escapeHtml(String(idPrefix)) : 'unknown';
+  const panelId = `dispatch-options-${prefix}`;
+  const localButton = isLocalhost
+    ? `<button class="${buttonClass}" data-target="local"${buttonDataAction ? ` data-action="${window.escapeHtml(buttonDataAction)}"` : ''}>harbour</button>`
+    : '';
+  const dataActionAttr = buttonDataAction ? ` data-action="${window.escapeHtml(buttonDataAction)}"` : '';
+
+  return `<button class="${toggleClass}" aria-expanded="false" aria-haspopup="true" aria-controls="${panelId}">Dispatch ▾</button>` +
+    `<span class="${panelClass} hidden" id="${panelId}">` +
+    window.renderDispatchExecControls(panelId) +
+    `<button class="${buttonClass}" data-target="cli"${dataActionAttr}>cli</button>` +
+    `<button class="${buttonClass}" data-target="web"${dataActionAttr}>web</button>` +
+    `<button class="${buttonClass}" data-target="dash"${dataActionAttr}>dash</button>` +
+    localButton +
+    '</span>';
+};
+
+// =============================================================================
+// Autopilot Kickoff (shared fetch helper) — LIN-1137
+// =============================================================================
+
+/**
+ * Shared fetch for the autopilot kickoff prompt (GET /api/autopilot-prompt).
+ * Replaces four duplicated raw GET calls across dashboard, dispatch page, swipe,
+ * and next-run with one parameterized helper.
+ *
+ * @global
+ * @param {Object} opts
+ * @param {string} opts.urlKey                  Workspace URL key (required)
+ * @param {string} [opts.issueId]               Issue-scoped kickoff: appends `/${issueId}` to the URL
+ * @param {string} [opts.goal]                  Goal-scoped kickoff: appends `?goal=<goal>` to the URL
+ * @param {string} [opts.variant]               Optional `?variant=<variant>` query param
+ * @param {AbortSignal} [opts.signal]           Passed through to the fetch
+ * @param {boolean} [opts.on401=false]          Passed through to window.api
+ * @returns {Promise<{prompt: string, promptName: string, kind: string, repo?: string}>}
+ */
+window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, signal, on401 = false } = {}) {
+  if (!urlKey) throw new Error('fetchAutopilotKickoff: urlKey is required');
+
+  let url;
+
+  if (issueId) {
+    const variantQuery = variant ? `?variant=${encodeURIComponent(variant)}` : '';
+    url = `/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt/${encodeURIComponent(issueId)}${variantQuery}`;
+  } else {
+    const params = new URLSearchParams();
+    if (goal) params.set('goal', goal);
+    if (variant) params.set('variant', variant);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    url = `/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt${query}`;
+  }
+
+  return window.api(url, { signal, on401 });
+};
 
 /**
  * Single shared home for the `+proxy` toggle (LIN-525 #7). Previously this

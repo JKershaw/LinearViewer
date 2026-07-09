@@ -123,24 +123,16 @@
       html += `<button class="prompt-proxy-toggle" title="Append proxy API instructions to prompt">+proxy</button>`;
     }
     if (dispatchEnabled) {
-      // Collapse the dispatch targets behind a single "Dispatch ▾" trigger. The
-      // trigger uses the shared .disclosure-toggle convention (initDisclosure in
-      // common.js, delegated at document level — no per-card wiring needed). It
-      // carries no data-action, so the card's own handleClick ignores it; the
-      // panel is resolved as the trigger's next sibling (no id needed). The
-      // option buttons keep data-action="dispatch" so they still reach
-      // handleDispatch from inside the panel.
-      html += '<button class="swipe-prompt-dispatch-toggle disclosure-toggle" aria-expanded="false" aria-haspopup="true">Dispatch ▾</button>';
-      html += '<div class="swipe-prompt-options hidden">';
-      // Shared model/harness exec controls (LIN-1096) — window.renderDispatchExecControls, common.js.
-      html += window.renderDispatchExecControls(`swipe-${issue && issue.id}`);
-      html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="cli">cli</button>';
-      html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="web">web</button>';
-      html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="dash">dash</button>';
-      if (isLocalhost) {
-        html += '<button class="swipe-prompt-dispatch" data-action="dispatch" data-target="local">harbour</button>';
-      }
-      html += '</div>';
+      // Shared dispatch disclosure (LIN-1137): composes the toggle, exec controls,
+      // and target buttons with swipe-specific class names and data-action delegation.
+      html += window.renderDispatchDisclosure({
+        idPrefix: `swipe-${issue && issue.id}`,
+        isLocalhost,
+        toggleClass: 'swipe-prompt-dispatch-toggle disclosure-toggle',
+        panelClass: 'swipe-prompt-options',
+        buttonClass: 'swipe-prompt-dispatch',
+        buttonDataAction: 'dispatch'
+      });
     }
     html += '<button class="swipe-prompt-change" data-action="change" title="Choose another prompt">\u21BB change</button>';
     return html;
@@ -277,8 +269,15 @@
         } else if (label === '__autopilot__' || label === '__autopilot_stepper__') {
           // LIN-836: the stepper label fetches the same kickoff endpoint with
           // ?variant=stepper; standard (`__autopilot__`) is byte-identical to before.
-          const variantQuery = label === '__autopilot_stepper__' ? '?variant=stepper' : '';
-          const result = await window.api(`${apiPrefix}/api/autopilot-prompt/${issueId}${variantQuery}`, { signal: ac.signal, on401: false });
+          // Shared fetch helper (LIN-1137) replaces the raw GET.
+          const variant = label === '__autopilot_stepper__' ? 'stepper' : undefined;
+          const result = await window.fetchAutopilotKickoff({
+            urlKey: opts.urlKey,
+            issueId,
+            variant,
+            signal: ac.signal,
+            on401: false
+          });
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           // Carry kind through so the dispatch tags the item as the autopilot meta-loop.
@@ -528,16 +527,14 @@
       btn.disabled = true;
       const originalText = btn.textContent;
       try {
-        // Append the proxy block (if +proxy is on) inside the try so a failed
-        // token mint surfaces as "err" instead of dispatching a bare prompt.
-        const prompt = await window.ProxyToggle.maybeAppend(raw, opts.urlKey);
-        // Exec controls (LIN-1096) live inside this button's own dispatch options panel.
+        // Proxy-context appending is now handled internally by dispatchPrompt()
+        // (LIN-1137). Exec controls (LIN-1096) still live in the dispatch options panel.
         const { model, harness } = window.readDispatchExecControls(btn.closest('.swipe-prompt-options'));
-        // `issue` is the full card object (id/identifier/title/url) \u2014 passing it
+        // `issue` is the full card object (id/identifier/title/url) — passing it
         // through is what ties Swipe-dispatched sessions back to their task.
         await window.dispatchPrompt({
           urlKey: opts.urlKey,
-          prompt,
+          prompt: raw,
           promptName: (state.result && state.result.name) || 'Prompt',
           kind: (state.result && state.result.kind) || undefined,
           issue,

@@ -237,9 +237,11 @@ async function loadDetails(details) {
     details.innerHTML = (data && data.html) || ''
     details.dataset.loaded = 'true'
     // The fetched fragment's dispatch panels (prompt/recommend/autopilot) need
-    // the shared exec controls too — the initial page-load pass (LIN-1096) only
-    // covers panels present in the static HTML (e.g. periodicals).
-    initDispatchExecControls(details)
+    // the shared disclosures too — the initial page-load pass (LIN-1096) only
+    // covers placeholders present in the static HTML (e.g. periodicals). The
+    // client-side initDispatchDisclosures now renders full disclosures with exec
+    // controls, replacing the old two-step render+inject pattern (LIN-1137).
+    initDispatchDisclosures(details)
   } catch (error) {
     console.error('Failed to load detail:', error)
     details.innerHTML = '<div class="detail-line"><span class="detail-text">Failed to load details</span></div>'
@@ -1134,12 +1136,9 @@ function initPrompts() {
     try {
       dispatchBtn.textContent = 'sending...'
 
-      // Append the proxy block (if +proxy is on) inside the try so a failed
-      // token mint surfaces as "failed" instead of dispatching a bare prompt.
-      prompt = await maybeAppendProxyBlock(prompt, urlKey)
+      // Proxy-context appending is now handled internally by dispatchPrompt()
+      // (LIN-1137). The exec controls still live in the dispatch options panel.
 
-      // The exec controls (LIN-1096) live inside this button's own dispatch
-      // options panel — see initDispatchExecControls().
       const { model, harness } = window.readDispatchExecControls(dispatchBtn.closest('.prompt-options'))
 
       await dispatchPrompt({
@@ -1174,26 +1173,37 @@ function initPrompts() {
 }
 
 // =============================================================================
-// Dispatch Execution Controls (model/harness) — LIN-1096
+// Dispatch Disclosure Initialization — LIN-1137
 // =============================================================================
+//
+// The server formerly rendered dispatch toggle + target buttons inline, then
+// initDispatchExecControls injected model/harness controls separately — a
+// fragile two-step pattern. Now the server emits placeholder divs
+// (.dispatch-disclosure-placeholder), and this function scans them and injects
+// the shared window.renderDispatchDisclosure() output, which composes the full
+// disclosure (toggle, exec controls, and target buttons) in one call.
+// Replaces the old initDispatchExecControls() (LIN-1096).
 
 /**
- * Injects the shared model/harness exec controls (window.renderDispatchExecControls,
- * public/common.js) into every dispatch options panel under `root` that doesn't
- * already have one (dataset-guarded, so re-running is cheap and safe). Periodical
- * rows render their `.prompt-options` panel eagerly (lib/render.js), so the initial
- * document-wide pass at load covers those; every other issue's detail block
- * (including its prompt/recommend/autopilot dispatch panels) is fetched lazily
- * on first expand (LIN-442) — loadDetails() re-runs this scoped to the freshly
- * injected `.details` subtree so those panels get controls too.
+ * Scans `.dispatch-disclosure-placeholder` elements under `root` and replaces
+ * each with window.renderDispatchDisclosure() output. Re-running is safe:
+ * placeholders are replaced, so subsequent passes find nothing to do.
+ *
+ * Periodical rows render their placeholders eagerly in the static HTML, so the
+ * initial document-wide pass at load covers those. Every other issue's detail
+ * block (including its prompt/recommend/autopilot dispatch panels) is fetched
+ * lazily on first expand (LIN-442) — loadDetails() re-runs this scoped to the
+ * freshly injected `.details` subtree.
+ *
  * @param {ParentNode} [root=document] - Subtree to scan
  */
-function initDispatchExecControls(root) {
-  (root || document).querySelectorAll('.prompt-options').forEach((panel) => {
-    if (panel.dataset.execInjected) return
-    panel.dataset.execInjected = 'true'
-    panel.insertAdjacentHTML('afterbegin', window.renderDispatchExecControls(panel.id || ''))
-  })
+function initDispatchDisclosures(root) {
+  (root || document).querySelectorAll('.dispatch-disclosure-placeholder').forEach((placeholder) => {
+    const idPrefix = placeholder.dataset.disclosurePrefix;
+    const isLocalhost = placeholder.dataset.localhost === 'true';
+    placeholder.insertAdjacentHTML('afterend', window.renderDispatchDisclosure({ idPrefix, isLocalhost }));
+    placeholder.remove();
+  });
 }
 
 // =============================================================================
@@ -2169,12 +2179,12 @@ function initAutopilot() {
 
     try {
       const urlKey = container.dataset.urlKey
-      const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      const variantQuery = variant ? `?variant=${encodeURIComponent(variant)}` : ''
-      const data = await window.api(
-        `${apiPrefix}/api/autopilot-prompt/${issueId}${variantQuery}`,
-        { signal: abortController.signal }
-      )
+      const data = await window.fetchAutopilotKickoff({
+        urlKey,
+        issueId,
+        variant: variant || undefined,
+        signal: abortController.signal
+      })
 
       if (activeAutopilotFetch === abortController) {
         promptText.dataset.rawPrompt = data.prompt
@@ -2209,7 +2219,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // initNavBar() runs from common.js's DOMContentLoaded handler (LIN-288)
   initSearch()
   initPrompts()
-  initDispatchExecControls()
+  initDispatchDisclosures()
   initMorePrompts()
   initRecommendations()
   initAutopilot()

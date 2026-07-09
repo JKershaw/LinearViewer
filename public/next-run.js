@@ -100,76 +100,53 @@
   // Unique id seed for each card's dispatch panel (aria-controls target).
   var disclosureSeq = 0;
 
-  // Build a `Dispatch ▾` disclosure mirroring the projects-view markup
-  // (lib/render.js renderDispatchDisclosure): a `.disclosure-toggle` trigger +
-  // a `.prompt-options.hidden` panel of per-target buttons. The shared
-  // initDisclosure() (common.js, document-delegated, auto-run on this page)
-  // handles open/close; our delegated handler below does the dispatch. The
-  // chosen `goal` is stamped on each button as data-goal (empty for the open
-  // option) so the delegated handler can read it without per-card closures.
+  // Shared dispatch disclosure (LIN-1137): the disclosure toggle, exec controls,
+  // and target buttons all come from window.renderDispatchDisclosure. We wrap it
+  // to stamp `data-goal` on each button so the delegated dispatchGoal handler can
+  // read the goal without per-card closures. Also wraps in a .next-run-dispatch-wrap
+  // span for layout.
   function buildDispatchDisclosure(goal) {
     var panelId = 'next-run-dispatch-' + (++disclosureSeq);
     var wrap = document.createElement('span');
     wrap.className = 'next-run-dispatch-wrap';
-
-    var targets = [
-      { target: 'cli', label: 'cli' },
-      { target: 'web', label: 'web' },
-      { target: 'dash', label: 'dash' }
-    ];
-    // harbour (the `local` target) only makes sense on the operator's own box.
-    if (data.isLocalhost) targets.push({ target: 'local', label: 'harbour' });
-
-    var safeGoal = escapeHtml(goal || '');
-    var btns = targets.map(function (t) {
-      return '<button type="button" class="next-run-dispatch dispatch-btn" data-target="' +
-        t.target + '" data-goal="' + safeGoal + '">' + escapeHtml(t.label) + '</button>';
-    }).join('');
-
-    // Shared model/harness exec controls (LIN-1096) — window.renderDispatchExecControls, common.js.
-    var execControlsHtml = window.renderDispatchExecControls(panelId + '-exec');
-
-    wrap.innerHTML =
-      '<button type="button" class="dispatch-disclosure disclosure-toggle next-run-dispatch-toggle" ' +
-      'aria-expanded="false" aria-haspopup="true" aria-controls="' + panelId + '">Dispatch ▾</button>' +
-      '<span class="prompt-options hidden" id="' + panelId + '">' + execControlsHtml + btns + '</span>';
+    wrap.innerHTML = window.renderDispatchDisclosure({
+      idPrefix: panelId,
+      isLocalhost: data.isLocalhost,
+      toggleClass: 'next-run-dispatch-toggle disclosure-toggle',
+      buttonClass: 'next-run-dispatch dispatch-btn'
+    });
+    // Stamp data-goal on each dispatch button so dispatchGoal can read it.
+    wrap.querySelectorAll('.next-run-dispatch').forEach(function (btn) {
+      btn.setAttribute('data-goal', escapeHtml(goal || ''));
+    });
     return wrap;
   }
 
   // Inline-dispatch a goal: build the autopilot kickoff (proxy-gated endpoint),
-  // then dispatch it issue-less and tagged kind=autopilot, with in-place
-  // sending…/dispatched!/failed feedback (mirrors app.js's .prompt-dispatch flow).
-  //
-  // The kickoff body promises a `readWrite` proxy token (the +proxy block), so we
-  // MUST attach it before dispatch (LIN-645). This surface exposes no +proxy
-  // toggle and emits no data-proxy-feature, so the normal toggle-gated append
-  // would be a no-op here — force the append unconditionally. Appending inside
-  // the try means a failed token-mint surfaces as the button's `failed` state
-  // rather than dispatching a bare, proxy-less autopilot prompt.
+  // then dispatch it issue-less and tagged kind=autopilot. Proxy-context
+  // appending is now handled internally by dispatchPrompt (LIN-1137) via the
+  // proxyForce option, replacing the separate forced `ProxyToggle.maybeAppend`.
+  // The shared fetchAutopilotKickoff replaces the raw GET.
   function dispatchGoal(btn) {
     var target = btn.getAttribute('data-target') || 'cli';
     var goal = btn.getAttribute('data-goal') || '';
     var original = btn.textContent;
-    // Exec controls (LIN-1096) live inside this button's own dispatch options panel.
     var exec = window.readDispatchExecControls(btn.closest('.prompt-options'));
     btn.disabled = true;
     btn.textContent = 'sending…';
-    var query = goal ? '?goal=' + encodeURIComponent(goal) : '';
-    api('/workspace/' + encodeURIComponent(urlKey) + '/api/autopilot-prompt' + query, { on401: false })
+    window.fetchAutopilotKickoff({ urlKey: urlKey, goal: goal || undefined, on401: false })
       .then(function (kickoff) {
-        return window.ProxyToggle.maybeAppend(kickoff.prompt, urlKey, { force: true })
-          .then(function (prompt) {
-            return dispatchPrompt({
-              urlKey: urlKey,
-              prompt: prompt,
-              promptName: kickoff.promptName || 'Autopilot',
-              kind: kickoff.kind || 'autopilot',
-              issueless: true,
-              target: target,
-              model: exec.model,
-              harness: exec.harness
-            });
-          });
+        return dispatchPrompt({
+          urlKey: urlKey,
+          prompt: kickoff.prompt,
+          promptName: kickoff.promptName || 'Autopilot',
+          kind: kickoff.kind || 'autopilot',
+          issueless: true,
+          target: target,
+          model: exec.model,
+          harness: exec.harness,
+          proxyForce: true
+        });
       })
       .then(function () {
         btn.textContent = 'dispatched!';
