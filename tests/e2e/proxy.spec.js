@@ -1295,6 +1295,39 @@ test.describe('Proxy API - Dispatch', () => {
     expect(item.prompt).not.toContain('/api/proxy/foreman/status');
   });
 
+  test('claude-code harness: token travels as a field, not in the prompt (LIN-1155)', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'fix the bug', issueIdentifier: 'LIN-288', harness: 'claude-code' }
+    });
+    const { id } = await enqueue.json();
+
+    // The proxy WATCH endpoint must NOT expose the live credential (allowlist).
+    const watch = await request.get(`/api/proxy/dispatch/${id}`, {
+      headers: { Authorization: `Bearer ${writeToken}` }
+    });
+    const watchBody = await watch.json();
+    expect(watchBody.bootstrapToken).toBeUndefined();
+
+    // The runner claims the item and receives the token as a structured field.
+    const take = await request.post(`/api/dispatch/take/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    const { item } = await take.json();
+    expect(item.harness).toBe('claude-code');
+    // Structured field carries a real, non-empty bootstrap (not the caller's token).
+    expect(typeof item.bootstrapToken).toBe('string');
+    expect(item.bootstrapToken.length).toBeGreaterThan(0);
+    expect(item.bootstrapToken).not.toBe(writeToken);
+    // The prompt keeps the access guidance but carries NO token / curl exchange.
+    expect(item.prompt).toContain('fix the bug');
+    expect(item.prompt).toContain('Workspace API access');
+    expect(item.prompt).toContain('MCP tool');
+    expect(item.prompt).not.toContain('curl -X POST');
+    expect(item.prompt).not.toContain(item.bootstrapToken);
+    expect(item.prompt).not.toContain(writeToken);
+  });
+
   test('auto-append uses generic endpoints when there is no issueIdentifier', async ({ request }) => {
     const enqueue = await request.post('/api/proxy/dispatch', {
       headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },

@@ -4176,17 +4176,21 @@ One convention across every endpoint, so you can branch on the same fields every
       // channel) by default — the kickoff guide refers the autopilot to "the
       // +proxy block" for its concrete token. Opt out with appendProxyContext:false.
       let finalPrompt = kickoff;
+      let bootstrapToken = null;
       if (appendProxyContext !== false) {
         // LIN-376: embed a fresh single-use bootstrap, never the caller's own
         // authenticating token. Skips the block if minting fails (graceful).
-        finalPrompt = await attachProxyContext({
+        // LIN-1155: for the claude-code harness the token is stripped from the
+        // prose and returned as `bootstrapToken` to carry on the item instead.
+        ({ prompt: finalPrompt, bootstrapToken } = await attachProxyContext({
           proxyTokenStore,
           urlKey: req.proxyUrlKey,
           baseUrl,
           issueIdentifier: issueIdentifier || null,
           prompt: kickoff,
-          label: 'kickoff-bootstrap'
-        });
+          label: 'kickoff-bootstrap',
+          harness: resolvedHarness
+        }));
       }
 
       const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
@@ -4202,6 +4206,9 @@ One convention across every endpoint, so you can branch on the same fields every
         // dispatchDefaults when not explicit (LIN-1138).
         model: resolvedModel,
         harness: resolvedHarness,
+        // Structured bootstrap token for the claude-code MCP branch (LIN-1155);
+        // null for every other harness.
+        bootstrapToken,
         // Park the orchestrator holdable (LIN-826). Under push-based comms the
         // subscribed children run independently to terminal and then WAKE the
         // parent with a follow-up (the LIN-826 auto-enqueue), so the orchestrator
@@ -4503,26 +4510,13 @@ One convention across every endpoint, so you can branch on the same fields every
       const shouldAppendProxyContext = isFollowUp
         ? appendProxyContext === true
         : appendProxyContext !== false;
-      // An abort item carries no prompt, so there is nothing to append the proxy
-      // context to — guard on prompt presence (LIN-743).
-      if (prompt && shouldAppendProxyContext) {
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
-        finalPrompt = await attachProxyContext({
-          proxyTokenStore,
-          urlKey: req.proxyUrlKey,
-          baseUrl,
-          issueIdentifier: issueIdentifier || null,
-          prompt,
-          label: 'dispatch-bootstrap'
-        });
-      }
 
       // Resolve blank incoming model/harness against the workspace's
       // dispatchDefaults (LIN-1099, mirroring routes/dispatch.js's LIN-1094
       // wiring): per-kind override -> workspace-wide default -> null. Each
       // field resolves independently, and the lookup is skipped entirely when
-      // no store is wired or both fields are already set.
+      // no store is wired or both fields are already set. LIN-1155: resolved
+      // BEFORE the proxy-context append so the append can gate on the harness.
       const effectiveKind = kind || deriveDispatchKind(promptName);
       let resolvedModel = model || null;
       let resolvedHarness = harness || null;
@@ -4534,6 +4528,24 @@ One convention across every endpoint, so you can branch on the same fields every
         });
         if (!model) resolvedModel = defaults.model;
         if (!harness) resolvedHarness = defaults.harness;
+      }
+
+      // An abort item carries no prompt, so there is nothing to append the proxy
+      // context to — guard on prompt presence (LIN-743).
+      let bootstrapToken = null;
+      if (prompt && shouldAppendProxyContext) {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
+        // LIN-1155: claude-code harness -> token stripped from prose, returned here.
+        ({ prompt: finalPrompt, bootstrapToken } = await attachProxyContext({
+          proxyTokenStore,
+          urlKey: req.proxyUrlKey,
+          baseUrl,
+          issueIdentifier: issueIdentifier || null,
+          prompt,
+          label: 'dispatch-bootstrap',
+          harness: resolvedHarness
+        }));
       }
 
       const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
@@ -4549,6 +4561,9 @@ One convention across every endpoint, so you can branch on the same fields every
         repo: repo || null,
         model: resolvedModel,
         harness: resolvedHarness,
+        // Structured bootstrap token for the claude-code MCP branch (LIN-1155);
+        // null for every other harness.
+        bootstrapToken,
         followUpTo: followUpTo || null,
         force: force === true,
         abort: isAbort,
@@ -4735,23 +4750,10 @@ One convention across every endpoint, so you can branch on the same fields every
         // The body is server-generated/trusted, so it skips the dangerous-char /
         // length checks the caller-supplied POST /dispatch path runs, and is
         // never returned to the caller — same contract as the LLM-driven path.
-        let finalPrompt = generated.prompt;
-        if (appendProxyContext !== false) {
-          const baseUrl = `${req.protocol}://${req.get('host')}`;
-          // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
-          finalPrompt = await attachProxyContext({
-            proxyTokenStore,
-            urlKey: req.proxyUrlKey,
-            baseUrl,
-            issueIdentifier,
-            prompt: generated.prompt,
-            label: 'dispatch-bootstrap'
-          });
-        }
-
         // Resolve blank incoming model/harness against the workspace's
         // dispatchDefaults (LIN-1099, mirroring routes/dispatch.js's LIN-1094
         // wiring). `kind` is already guaranteed set on this verb-override branch.
+        // LIN-1155: resolved BEFORE the proxy-context append so it can gate on harness.
         let resolvedModel = model || null;
         let resolvedHarness = harness || null;
         if ((!model || !harness) && workspacePreferencesStore) {
@@ -4762,6 +4764,23 @@ One convention across every endpoint, so you can branch on the same fields every
           });
           if (!model) resolvedModel = defaults.model;
           if (!harness) resolvedHarness = defaults.harness;
+        }
+
+        let finalPrompt = generated.prompt;
+        let bootstrapToken = null;
+        if (appendProxyContext !== false) {
+          const baseUrl = `${req.protocol}://${req.get('host')}`;
+          // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
+          // LIN-1155: claude-code harness -> token stripped from prose, returned here.
+          ({ prompt: finalPrompt, bootstrapToken } = await attachProxyContext({
+            proxyTokenStore,
+            urlKey: req.proxyUrlKey,
+            baseUrl,
+            issueIdentifier,
+            prompt: generated.prompt,
+            label: 'dispatch-bootstrap',
+            harness: resolvedHarness
+          }));
         }
 
         try {
@@ -4783,6 +4802,9 @@ One convention across every endpoint, so you can branch on the same fields every
             // default.
             model: resolvedModel,
             harness: resolvedHarness,
+            // Structured bootstrap token for the claude-code MCP branch (LIN-1155);
+            // null for every other harness.
+            bootstrapToken,
             sessionId: sessionId || null,
             // Push-comms: `subscription` is the declared edge (LIN-900 §6),
             // `terminal-only` unless the caller declares `everything`; queueIfBusy
@@ -4891,19 +4913,6 @@ One convention across every endpoint, so you can branch on the same fields every
         // not the parent the caller named — the worker should inherit context for the
         // task it is actually working on (LIN-327). For a leaf these are identical.
         const terminalIdentifier = rec.identifier || issueIdentifier;
-        let finalPrompt = rec.prompt;
-        if (appendProxyContext !== false) {
-          const baseUrl = `${req.protocol}://${req.get('host')}`;
-          // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
-          finalPrompt = await attachProxyContext({
-            proxyTokenStore,
-            urlKey: req.proxyUrlKey,
-            baseUrl,
-            issueIdentifier: terminalIdentifier,
-            prompt: rec.prompt,
-            label: 'dispatch-bootstrap'
-          });
-        }
 
         // kind provenance: parseRecommendedAction (in computeRecommendation) →
         // recommendedAction → deriveDispatchKind → BOTH the stored item's kind
@@ -4913,7 +4922,8 @@ One convention across every endpoint, so you can branch on the same fields every
 
         // Resolve blank incoming model/harness against the workspace's
         // dispatchDefaults (LIN-1099, mirroring routes/dispatch.js's LIN-1094
-        // wiring).
+        // wiring). LIN-1155: resolved BEFORE the proxy-context append so it can
+        // gate on the harness.
         let resolvedModel = model || null;
         let resolvedHarness = harness || null;
         if ((!model || !harness) && workspacePreferencesStore) {
@@ -4924,6 +4934,23 @@ One convention across every endpoint, so you can branch on the same fields every
           });
           if (!model) resolvedModel = defaults.model;
           if (!harness) resolvedHarness = defaults.harness;
+        }
+
+        let finalPrompt = rec.prompt;
+        let bootstrapToken = null;
+        if (appendProxyContext !== false) {
+          const baseUrl = `${req.protocol}://${req.get('host')}`;
+          // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
+          // LIN-1155: claude-code harness -> token stripped from prose, returned here.
+          ({ prompt: finalPrompt, bootstrapToken } = await attachProxyContext({
+            proxyTokenStore,
+            urlKey: req.proxyUrlKey,
+            baseUrl,
+            issueIdentifier: terminalIdentifier,
+            prompt: rec.prompt,
+            label: 'dispatch-bootstrap',
+            harness: resolvedHarness
+          }));
         }
 
         const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
@@ -4946,6 +4973,9 @@ One convention across every endpoint, so you can branch on the same fields every
           // default.
           model: resolvedModel,
           harness: resolvedHarness,
+          // Structured bootstrap token for the claude-code MCP branch (LIN-1155);
+          // null for every other harness.
+          bootstrapToken,
           sessionId: sessionId || null,
           // Opt-in completion hold (LIN-797), forwarded blindly to the runner.
           waitForFollowUps: waitForFollowUps === true,

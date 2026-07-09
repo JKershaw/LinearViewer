@@ -268,6 +268,54 @@ describe('feedback submit (LIN-635)', () => {
     assert.match(item.prompt, /\/api\/proxy\/brief\/LIN-900/);
   });
 
+  // === LIN-1155: claude-code harness branch on the feedback dispatch sites ===
+  // These sites take no body harness — the harness is resolved purely from the
+  // workspace dispatchDefaults, so a claude-code default is the only trigger.
+  const claudeCodePrefs = { getWorkspacePreferences: async () => ({ dispatchDefaults: { harness: 'claude-code' } }) };
+
+  test("action:'triage' with a claude-code workspace default carries the token as a field, not in the prose (LIN-1155)", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-cc-triage');
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore, workspacePreferencesStore: claudeCodePrefs });
+
+    const { status } = await submit(app, 'acme', { message: 'triage on claude-code', action: 'triage' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    const item = dispatch.items[0].item;
+    assert.strictEqual(item.kind, 'triage');
+    assert.strictEqual(item.harness, 'claude-code');
+    // Token travels out-of-band as the structured field...
+    assert.strictEqual(item.bootstrapToken, 'rw-tok-cc-triage');
+    // ...and NOT in the prompt text (no bearer token, no curl exchange).
+    assert.doesNotMatch(item.prompt, /Authorization: Bearer rw-tok-cc-triage/);
+    assert.doesNotMatch(item.prompt, /curl -X POST/);
+    assert.match(item.prompt, /Workspace API access/, 'still gets the access block');
+    // The label is still the per-site one (characterized behaviour).
+    assert.strictEqual(proxyTokenStore.calls[0].options.label, 'feedback-triage');
+  });
+
+  test("action:'autopilot' with a claude-code workspace default carries the token as a field, not in the prose (LIN-1155)", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-cc-auto');
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore, workspacePreferencesStore: claudeCodePrefs });
+
+    const { status } = await submit(app, 'acme', { message: 'autopilot on claude-code', action: 'autopilot' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    const item = dispatch.items[0].item;
+    assert.strictEqual(item.kind, 'autopilot');
+    assert.strictEqual(item.harness, 'claude-code');
+    assert.strictEqual(item.bootstrapToken, 'rw-tok-cc-auto');
+    assert.doesNotMatch(item.prompt, /Authorization: Bearer rw-tok-cc-auto/);
+    assert.doesNotMatch(item.prompt, /curl -X POST/);
+    assert.match(item.prompt, /Workspace API access/);
+    assert.strictEqual(proxyTokenStore.calls[0].options.label, 'feedback-autopilot');
+  });
+
   test('an unknown action falls back to the legacy plain send (flag-gated triage)', async () => {
     const { provider } = makeFakeProvider();
     const dispatch = capturingDispatchStore();
