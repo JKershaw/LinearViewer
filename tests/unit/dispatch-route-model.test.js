@@ -129,18 +129,19 @@ describe('LIN-1084 — user-facing /api/dispatch carries the execution harness',
     assert.equal(captured.item.harness, HARNESS);
   });
 
-  test('an omitted harness defaults to claude-code (LIN-1139 convergence)', async () => {
-    // CONVERGENCE (LIN-1139/LIN-1135): the session route now runs through the
-    // shared dispatch factory, which applies applyDefaultDispatchHarness
-    // (LIN-1159) uniformly — so a blank harness resolves to 'claude-code' here
-    // just as it already did on the proxy dispatch twin. Previously this path
-    // stored a null harness. `model` keeps its null passthrough (no default).
+  test('an omitted harness becomes null', async () => {
+    // The session route routes through the shared factory (LIN-1139) with
+    // applyDefaultHarness:false — it deliberately does NOT interpose the
+    // claude-code default (that is scoped to the proxy dispatch boundary,
+    // LIN-1159). The dispatch-page UI owns the harness default and offers an
+    // explicit "blank -> null" escape hatch (LIN-1111), so a blank harness must
+    // stay null here.
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', PATH, { prompt: 'run me' });
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.strictEqual(captured.item.harness, 'claude-code');
+    assert.strictEqual(captured.item.harness, null);
   });
 
   test('a non-string harness is rejected with 400', async () => {

@@ -196,16 +196,13 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(proxyTokenStore.calls[0].options.scope, 'readWrite');
 
     // ...and the proxy details (Workspace API access block) are appended to the
-    // triage prompt, carrying the per-issue brief endpoint. LIN-1139 CONVERGENCE:
-    // the feedback dispatch now runs through the shared factory, which interposes
-    // the claude-code default harness (applyDefaultDispatchHarness, LIN-1159), so
-    // the minted token travels as the structured `bootstrapToken` field (LIN-1155)
-    // instead of embedded in the prose (no injectable credential in prompt text).
+    // triage prompt, carrying the minted token and the per-issue brief endpoint.
+    // LIN-1139: the feedback dispatch now runs through the shared factory with
+    // applyDefaultHarness:false, so a no-default workspace keeps a null harness and
+    // the token stays in the prose exactly as before (the claude-code interpose
+    // remains scoped to the proxy dispatch boundary, LIN-1159).
     assert.match(prompt, /Workspace API access/);
-    assert.strictEqual(dispatch.items[0].item.harness, 'claude-code');
-    assert.strictEqual(dispatch.items[0].item.bootstrapToken, 'rw-tok-123');
-    assert.doesNotMatch(prompt, /Authorization: Bearer rw-tok-123/);
-    assert.doesNotMatch(prompt, /curl -X POST/);
+    assert.match(prompt, /Authorization: Bearer rw-tok-123/);
     assert.match(prompt, /\/api\/proxy\/brief\/LIN-900/);
   });
 
@@ -239,11 +236,7 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(status, 201);
     assert.strictEqual(dispatch.items.length, 1);
     assert.strictEqual(dispatch.items[0].item.kind, 'triage');
-    // LIN-1139 CONVERGENCE: claude-code default harness -> token as a structured
-    // field (LIN-1155), not embedded in the prose.
-    assert.strictEqual(dispatch.items[0].item.harness, 'claude-code');
-    assert.strictEqual(dispatch.items[0].item.bootstrapToken, 'rw-tok-triage');
-    assert.doesNotMatch(dispatch.items[0].item.prompt, /Authorization: Bearer rw-tok-triage/);
+    assert.match(dispatch.items[0].item.prompt, /Authorization: Bearer rw-tok-triage/);
   });
 
   test("action:'autopilot' enqueues a scoped autopilot run with the feedback-origin brief", async () => {
@@ -275,11 +268,7 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(proxyTokenStore.calls[0].options.scope, 'readWrite');
     assert.strictEqual(proxyTokenStore.calls[0].options.label, 'feedback-autopilot');
     assert.match(item.prompt, /Workspace API access/);
-    // LIN-1139 CONVERGENCE: claude-code default harness -> token as a structured
-    // field (LIN-1155), not embedded in the prose.
-    assert.strictEqual(item.harness, 'claude-code');
-    assert.strictEqual(item.bootstrapToken, 'rw-tok-auto');
-    assert.doesNotMatch(item.prompt, /Authorization: Bearer rw-tok-auto/);
+    assert.match(item.prompt, /Authorization: Bearer rw-tok-auto/);
     assert.match(item.prompt, /\/api\/proxy\/brief\/LIN-900/);
   });
 
@@ -502,12 +491,11 @@ describe('feedback submit (LIN-635)', () => {
     assert.equal(item.harness, 'ws-autopilot-harness');
   });
 
-  test('LIN-1139: feedback dispatch with no defaults keeps model null, harness defaults to claude-code', async () => {
-    // CONVERGENCE (LIN-1139/LIN-1135): the feedback dispatch paths now run through
-    // the shared factory, which applies applyDefaultDispatchHarness (LIN-1159)
-    // uniformly with the proxy/session paths — so a blank harness with no
-    // configured default resolves to 'claude-code' (previously it stayed null).
-    // `model` keeps its null passthrough (no default interposed).
+  test('LIN-1138: feedback dispatch path with no defaults configured resolves model/harness to null', async () => {
+    // LIN-1139: the feedback paths route through the shared factory with
+    // applyDefaultHarness:false, so with no configured default both model and
+    // harness stay null — behavior-preserving. The claude-code interpose remains
+    // scoped to the proxy dispatch boundary (LIN-1159), NOT feedback.
     const { provider } = makeFakeProvider();
     const dispatch = capturingDispatchStore();
     const proxyTokenStore = fakeProxyTokenStore('rw-tok');
@@ -520,6 +508,6 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(status, 201);
     assert.strictEqual(dispatch.items.length, 1);
     assert.strictEqual(dispatch.items[0].item.model, null);
-    assert.strictEqual(dispatch.items[0].item.harness, 'claude-code');
+    assert.strictEqual(dispatch.items[0].item.harness, null);
   });
 });

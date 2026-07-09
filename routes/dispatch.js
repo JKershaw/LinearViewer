@@ -318,15 +318,21 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       // Create the dispatch item through the shared factory (LIN-1139): it
       // resolves kind, fills blank model/harness from workspace dispatchDefaults
-      // (LIN-1094), interposes the default harness, and calls addItem. This path
-      // carries no proxy context (the prompt is already built), so it passes a
-      // plain prompt and no finalizePrompt. CONVERGENCE (LIN-1135): the session
-      // route now runs applyDefaultDispatchHarness like the proxy twin, so a blank
-      // harness resolves to claude-code here too (previously it stayed null).
+      // (LIN-1094), and calls addItem. This path carries no proxy context (the
+      // prompt is already built), so it passes a plain prompt and no finalizePrompt.
+      //
+      // applyDefaultHarness:false — the session route deliberately does NOT
+      // interpose the claude-code default (LIN-1159 scoped that to the proxy
+      // dispatch boundary). The dispatch-page UI owns the harness default (its
+      // selector is pre-selected to claude-code, LIN-1111) AND offers an explicit
+      // "blank" option whose contract is "send null" (dispatch-page.spec.js's
+      // LIN-1111 escape-hatch test). A server-side interpose here would silently
+      // override that blank choice, so the null passthrough is load-bearing.
       const item = await createDispatchItem({
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
+        applyDefaultHarness: false,
         kind,
         model,
         harness,

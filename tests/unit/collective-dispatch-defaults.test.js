@@ -7,9 +7,14 @@
  * dispatchDefaults. Routing it through the shared createDispatchItem factory
  * closes that gap (the exact inheritance gap the parent LIN-1135 names): a
  * collective dispatch now resolves model/harness from the participant workspace's
- * own dispatchDefaults and interposes the default harness (LIN-1159) like every
- * other dispatch path. This is a DELIBERATE behavior change, pinned here so it
- * can't silently regress.
+ * own dispatchDefaults. This is a DELIBERATE behavior change (the parent's
+ * inheritance goal), pinned here so it can't silently regress.
+ *
+ * The factory is called with applyDefaultHarness:false, so the claude-code
+ * interpose (LIN-1159) is NOT applied here — it stays scoped to the proxy dispatch
+ * boundary. A participant workspace with no configured default therefore keeps a
+ * null harness, exactly as the collective fan-out did before; only the inheritance
+ * of a CONFIGURED default is new.
  *
  * Note: resolution is keyed on the PARTICIPANT workspace's urlKey (each character
  * is bound to its own repo/workspace), not the anchor the request is posted to.
@@ -91,7 +96,7 @@ async function call(app, method, path, body) {
 const START_PATH = '/workspace/alpha/collective/start';
 
 describe('LIN-1139 — collective fan-out inherits workspace dispatch defaults', () => {
-  test('with no prefs store wired: model null, harness defaults to claude-code', async () => {
+  test('with no prefs store wired: model and harness stay null (no claude-code interpose)', async () => {
     const captured = [];
     const app = buildApp(captured);
     const res = await call(app, 'post', START_PATH, {
@@ -100,7 +105,7 @@ describe('LIN-1139 — collective fan-out inherits workspace dispatch defaults',
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.equal(captured.length, 1);
     assert.strictEqual(captured[0].item.model, null);
-    assert.strictEqual(captured[0].item.harness, 'claude-code');
+    assert.strictEqual(captured[0].item.harness, null);
   });
 
   test("inherits the participant workspace's configured model/harness defaults", async () => {
@@ -134,9 +139,9 @@ describe('LIN-1139 — collective fan-out inherits workspace dispatch defaults',
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     const byKey = Object.fromEntries(captured.map(c => [c.urlKey, c.item]));
-    // alpha: no defaults -> model null, harness claude-code default.
+    // alpha: no defaults -> model + harness stay null (no interpose here).
     assert.strictEqual(byKey.alpha.model, null);
-    assert.strictEqual(byKey.alpha.harness, 'claude-code');
+    assert.strictEqual(byKey.alpha.harness, null);
     // bravo: its own defaults inherited.
     assert.equal(byKey.bravo.model, 'bravo-model');
     assert.equal(byKey.bravo.harness, 'bravo-harness');

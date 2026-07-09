@@ -2161,19 +2161,27 @@ ${goal}`
       // Create the dispatch item through the shared factory (LIN-1139): it
       // resolves model/harness from workspace dispatchDefaults (LIN-1138 — this
       // site takes no user-supplied model/harness, so resolution is purely from
-      // workspace defaults) and, via CONVERGENCE (LIN-1135), now also interposes
-      // the default harness (LIN-1159) so a blank harness resolves to claude-code
-      // like the proxy dispatch paths. The proxy-context append always runs here
-      // (LIN-733); it moves inside finalizePrompt AFTER the harness is resolved so
-      // it can gate its MCP-token-vs-prose branch on it (LIN-1155) and hand back
-      // the bootstrapToken to carry as a field. A fresh single-use BOOTSTRAP token
-      // (LIN-376) is minted per dispatch, never a standing readWrite token; if
-      // minting is unavailable/fails, attachProxyContext returns the prompt
-      // unchanged so the triage still dispatches (best-effort, like the enqueue).
+      // workspace defaults) and calls addItem. The proxy-context append always
+      // runs here (LIN-733); it moves inside finalizePrompt AFTER the harness is
+      // resolved so it can still gate its MCP-token-vs-prose branch on a resolved
+      // (workspace-default) claude-code harness (LIN-1155) and hand back the
+      // bootstrapToken. A fresh single-use BOOTSTRAP token (LIN-376) is minted per
+      // dispatch, never a standing readWrite token; if minting is unavailable/
+      // fails, attachProxyContext returns the prompt unchanged so the triage still
+      // dispatches (best-effort, like the enqueue).
+      //
+      // applyDefaultHarness:false — preserve the feedback path's existing behavior
+      // exactly: LIN-1159 deliberately scoped the claude-code interpose to the 4
+      // proxy dispatch sites, NOT feedback. Interposing it here would flip the
+      // token delivery from prose to the MCP field for every feedback dispatch — a
+      // real behavior change that belongs in its own deliberate ticket, not a DRY
+      // refactor. A configured workspace claude-code default still takes the MCP
+      // path (that path is unchanged).
       await createDispatchItem({
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
+        applyDefaultHarness: false,
         kind: 'triage',
         finalizePrompt: (resolvedHarness) => attachProxyContext({
           proxyTokenStore,
@@ -2224,18 +2232,21 @@ ${goal}`
 
       // Create the dispatch item through the shared factory (LIN-1139): it
       // resolves model/harness from workspace dispatchDefaults (LIN-1138 — this
-      // site takes no user-supplied model/harness) and, via CONVERGENCE
-      // (LIN-1135), now also interposes the default harness (LIN-1159) so a blank
-      // harness resolves to claude-code like the proxy dispatch paths. The
+      // site takes no user-supplied model/harness) and calls addItem. The
       // proxy-context append (the "+proxy block" the kickoff refers to for its
       // token) moves inside finalizePrompt AFTER the harness is resolved so it can
-      // gate its MCP-token-vs-prose branch on it (LIN-1155) and hand back the
-      // bootstrapToken to carry as a field. LIN-376: a single-use bootstrap is
-      // minted, exchanged by the run for a working token.
+      // still gate its MCP-token-vs-prose branch on a resolved (workspace-default)
+      // claude-code harness (LIN-1155) and hand back the bootstrapToken. LIN-376: a
+      // single-use bootstrap is minted, exchanged by the run for a working token.
+      //
+      // applyDefaultHarness:false — see the triage twin above: preserve the
+      // feedback path's existing behavior (LIN-1159's claude-code interpose is
+      // deliberately proxy-scoped; interposing here would flip token delivery).
       await createDispatchItem({
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
+        applyDefaultHarness: false,
         kind: 'autopilot',
         finalizePrompt: (resolvedHarness) => attachProxyContext({
           proxyTokenStore,

@@ -305,16 +305,22 @@ export function createCollectiveRoutes({
       try {
         // Create through the shared factory (LIN-1139). CONVERGENCE (LIN-1135):
         // the collective fan-out previously hand-rolled addItem with NO model/
-        // harness resolution at all — it now inherits the workspace's dispatch
-        // defaults (resolveDispatchDefaults) and the default harness (LIN-1159),
-        // closing the exact inheritance gap the parent names. The participant
-        // prompt is already built (with its own inline token, when minted), so this
-        // path passes a plain prompt and no finalizePrompt — no proxy-context
-        // append and no bootstrapToken field here.
+        // harness resolution at all — it now inherits the participant workspace's
+        // dispatch defaults (resolveDispatchDefaults), closing the exact
+        // inheritance gap the parent names. The participant prompt is already built
+        // (with its own inline token, when minted), so this path passes a plain
+        // prompt and no finalizePrompt — no proxy-context append and no
+        // bootstrapToken field here.
+        //
+        // applyDefaultHarness:false — inherit configured defaults, but do NOT
+        // interpose the claude-code floor (LIN-1159 scoped that to the proxy
+        // dispatch boundary). This keeps a no-defaults workspace's harness null, as
+        // before; the interpose is not this refactor's to add here.
         const item = await createDispatchItem({
           store: dispatchQueueStore,
           urlKey: ws.urlKey,
           workspacePreferencesStore,
+          applyDefaultHarness: false,
           kind: 'custom',
           prompt,
           fields: {
