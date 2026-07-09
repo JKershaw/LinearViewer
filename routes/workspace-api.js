@@ -2163,18 +2163,10 @@ ${goal}`
       // POST /api/proxy/token for a working token. If minting is unavailable or
       // fails, fall back to dispatching without the block rather than dropping the
       // triage entirely (best-effort, like the enqueue itself).
-      prompt = await attachProxyContext({
-        proxyTokenStore,
-        urlKey: workspace.urlKey,
-        baseUrl,
-        issueIdentifier: issue.identifier,
-        prompt,
-        label: 'feedback-triage'
-      });
-
       // Resolve model/harness from workspace dispatchDefaults (LIN-1138).
       // These call sites don't accept user-supplied model/harness, so
-      // resolution is purely from workspace defaults.
+      // resolution is purely from workspace defaults. LIN-1155: resolved BEFORE
+      // the proxy-context append so it can gate on the harness.
       let triageModel = null;
       let triageHarness = null;
       if (workspacePreferencesStore) {
@@ -2187,6 +2179,19 @@ ${goal}`
         triageHarness = defaults.harness;
       }
 
+      // LIN-1155: claude-code harness -> token stripped from prose, returned as
+      // a field to carry on the item; every other harness keeps the prose block.
+      let bootstrapToken = null;
+      ({ prompt, bootstrapToken } = await attachProxyContext({
+        proxyTokenStore,
+        urlKey: workspace.urlKey,
+        baseUrl,
+        issueIdentifier: issue.identifier,
+        prompt,
+        label: 'feedback-triage',
+        harness: triageHarness
+      }));
+
       await dispatchQueueStore.addItem(workspace.urlKey, {
         prompt,
         promptName: 'Triage',
@@ -2198,7 +2203,8 @@ ${goal}`
         dispatchedBy: session?.linearUserId || null,
         target: 'cli',
         model: triageModel,
-        harness: triageHarness
+        harness: triageHarness,
+        bootstrapToken
       });
     } catch (err) {
       console.error('Feedback triage enqueue failed:', err.message);
@@ -2229,18 +2235,10 @@ ${goal}`
       });
 
       // LIN-376: single-use bootstrap, exchanged by the run for a working token.
-      prompt = await attachProxyContext({
-        proxyTokenStore,
-        urlKey: workspace.urlKey,
-        baseUrl,
-        issueIdentifier: issue.identifier,
-        prompt,
-        label: 'feedback-autopilot'
-      });
-
       // Resolve model/harness from workspace dispatchDefaults (LIN-1138).
       // The feedback autopilot doesn't accept user-supplied model/harness,
-      // so resolution is purely from workspace defaults.
+      // so resolution is purely from workspace defaults. LIN-1155: resolved
+      // BEFORE the proxy-context append so it can gate on the harness.
       let autopilotModel = null;
       let autopilotHarness = null;
       if (workspacePreferencesStore) {
@@ -2253,6 +2251,19 @@ ${goal}`
         autopilotHarness = defaults.harness;
       }
 
+      // LIN-1155: claude-code harness -> token stripped from prose, returned as
+      // a field to carry on the item; every other harness keeps the prose block.
+      let bootstrapToken = null;
+      ({ prompt, bootstrapToken } = await attachProxyContext({
+        proxyTokenStore,
+        urlKey: workspace.urlKey,
+        baseUrl,
+        issueIdentifier: issue.identifier,
+        prompt,
+        label: 'feedback-autopilot',
+        harness: autopilotHarness
+      }));
+
       await dispatchQueueStore.addItem(workspace.urlKey, {
         prompt,
         promptName: `Autopilot — ${issue.identifier}`,
@@ -2264,7 +2275,8 @@ ${goal}`
         dispatchedBy: session?.linearUserId || null,
         target: 'cli',
         model: autopilotModel,
-        harness: autopilotHarness
+        harness: autopilotHarness,
+        bootstrapToken
       });
     } catch (err) {
       console.error('Feedback autopilot enqueue failed:', err.message);
