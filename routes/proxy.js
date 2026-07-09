@@ -53,7 +53,7 @@ import { isTerminalState, isBlocked } from '../lib/tree.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
-import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
+import { attachProxyContext } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS, WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
@@ -421,8 +421,9 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
 
 // The proxy-context preamble (the "Workspace API access" block appended to
 // dispatched prompts) now lives in lib/proxy-preamble.js so non-proxy dispatch
-// seams (feedback triage) append the byte-identical block (LIN-733).
-// buildProxyContextPreamble is imported at the top of this file.
+// seams (feedback triage) append the byte-identical block (LIN-733). The
+// mint-bootstrap + append sequence is consolidated there as attachProxyContext
+// (LIN-1157), imported at the top of this file.
 
 // Terminal-marker detection (the runner prefixes "[done]"/"[failed]"/… onto its
 // final feedback entry while the queue status stays 'taken') lives in the shared
@@ -592,31 +593,6 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       return jsonError(res, 403, 'This endpoint requires a read-write token');
     }
     next();
-  }
-
-  /**
-   * Mint a single-use bootstrap token for a handoff (LIN-376). The token embedded
-   * in a dispatched prompt is ALWAYS a fresh bootstrap — never the caller's own
-   * authenticating token and never a standing working token — so the durable
-   * prompt (queue/history/log/clipboard, also readable via GET .../dispatch/:id/prompt)
-   * carries a credential that is inert the instant the agent exchanges it at
-   * POST /api/proxy/token. Returns the plain bootstrap token, or null if minting
-   * fails (the caller then dispatches without an API-access block, mirroring the
-   * collective fan-out's graceful degradation).
-   */
-  async function mintHandoffBootstrap(urlKey, { scope = 'readWrite', label = 'dispatch-bootstrap' } = {}) {
-    try {
-      const minted = await proxyTokenStore.createToken(urlKey, {
-        kind: 'bootstrap',
-        scope,
-        label,
-        ttl: BOOTSTRAP_TOKEN_TTL_SECONDS
-      });
-      return minted?.token || null;
-    } catch (err) {
-      console.error('Bootstrap token mint failed:', err.message);
-      return null;
-    }
   }
 
   /**
@@ -4202,15 +4178,15 @@ One convention across every endpoint, so you can branch on the same fields every
       let finalPrompt = kickoff;
       if (appendProxyContext !== false) {
         // LIN-376: embed a fresh single-use bootstrap, never the caller's own
-        // authenticating token. Skip the block if minting fails (graceful).
-        const bootstrapToken = await mintHandoffBootstrap(req.proxyUrlKey, { label: 'kickoff-bootstrap' });
-        if (bootstrapToken) {
-          finalPrompt = kickoff + buildProxyContextPreamble({
-            baseUrl,
-            token: bootstrapToken,
-            issueIdentifier: issueIdentifier || null
-          });
-        }
+        // authenticating token. Skips the block if minting fails (graceful).
+        finalPrompt = await attachProxyContext({
+          proxyTokenStore,
+          urlKey: req.proxyUrlKey,
+          baseUrl,
+          issueIdentifier: issueIdentifier || null,
+          prompt: kickoff,
+          label: 'kickoff-bootstrap'
+        });
       }
 
       const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
@@ -4532,14 +4508,14 @@ One convention across every endpoint, so you can branch on the same fields every
       if (prompt && shouldAppendProxyContext) {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
-        const bootstrapToken = await mintHandoffBootstrap(req.proxyUrlKey, { label: 'dispatch-bootstrap' });
-        if (bootstrapToken) {
-          finalPrompt = prompt + buildProxyContextPreamble({
-            baseUrl,
-            token: bootstrapToken,
-            issueIdentifier: issueIdentifier || null
-          });
-        }
+        finalPrompt = await attachProxyContext({
+          proxyTokenStore,
+          urlKey: req.proxyUrlKey,
+          baseUrl,
+          issueIdentifier: issueIdentifier || null,
+          prompt,
+          label: 'dispatch-bootstrap'
+        });
       }
 
       // Resolve blank incoming model/harness against the workspace's
@@ -4763,14 +4739,14 @@ One convention across every endpoint, so you can branch on the same fields every
         if (appendProxyContext !== false) {
           const baseUrl = `${req.protocol}://${req.get('host')}`;
           // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
-          const bootstrapToken = await mintHandoffBootstrap(req.proxyUrlKey, { label: 'dispatch-bootstrap' });
-          if (bootstrapToken) {
-            finalPrompt = generated.prompt + buildProxyContextPreamble({
-              baseUrl,
-              token: bootstrapToken,
-              issueIdentifier
-            });
-          }
+          finalPrompt = await attachProxyContext({
+            proxyTokenStore,
+            urlKey: req.proxyUrlKey,
+            baseUrl,
+            issueIdentifier,
+            prompt: generated.prompt,
+            label: 'dispatch-bootstrap'
+          });
         }
 
         // Resolve blank incoming model/harness against the workspace's
@@ -4919,14 +4895,14 @@ One convention across every endpoint, so you can branch on the same fields every
         if (appendProxyContext !== false) {
           const baseUrl = `${req.protocol}://${req.get('host')}`;
           // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
-          const bootstrapToken = await mintHandoffBootstrap(req.proxyUrlKey, { label: 'dispatch-bootstrap' });
-          if (bootstrapToken) {
-            finalPrompt = rec.prompt + buildProxyContextPreamble({
-              baseUrl,
-              token: bootstrapToken,
-              issueIdentifier: terminalIdentifier
-            });
-          }
+          finalPrompt = await attachProxyContext({
+            proxyTokenStore,
+            urlKey: req.proxyUrlKey,
+            baseUrl,
+            issueIdentifier: terminalIdentifier,
+            prompt: rec.prompt,
+            label: 'dispatch-bootstrap'
+          });
         }
 
         // kind provenance: parseRecommendedAction (in computeRecommendation) →
