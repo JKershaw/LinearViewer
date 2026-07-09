@@ -56,7 +56,7 @@ import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
-import { isAuthError } from './lib/errors.js'
+import { isAuthError, clientErrorStatus, clientErrorMessage } from './lib/errors.js'
 import { renderLandingPage } from './lib/render-landing.js'
 import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
@@ -2419,11 +2419,32 @@ app.use(createLegacyRedirects())
 // crashing the dyno or silently hanging the request. Must be registered last,
 // after every route.
 app.use((err, req, res, next) => {
-  console.error('Unhandled route error:', req.method, req.originalUrl, '-', err?.stack || err)
   if (res.headersSent) return next(err)
   const wantsJson = req.path.includes('/api/') ||
     req.xhr ||
     (req.headers.accept || '').includes('application/json')
+
+  // Honor a client error (4xx) the error already carries — most importantly a
+  // malformed / oversized request body, which body-parser throws with
+  // `type: 'entity.parse.failed'` / `status: 400` (or `entity.too.large` / 413)
+  // BEFORE any route handler runs, so it can only be caught here (LIN-1158).
+  // Surfacing it as 500 misleads callers into thinking the server/provider is
+  // broken and floods the logs with bogus "Unhandled route error" stacks.
+  const clientStatus = clientErrorStatus(err)
+  if (clientStatus !== null) {
+    // Quiet, single-line log — this is bad input, not a server fault.
+    console.warn('Client request error:', req.method, req.originalUrl, '-', clientStatus, err?.type || err?.message)
+    const message = clientErrorMessage(clientStatus, err)
+    if (wantsJson) {
+      res.status(clientStatus).json({ error: message })
+    } else {
+      res.status(clientStatus).send(renderErrorPage(message, message, { action: 'Go back', actionUrl: req.originalUrl || '/' }))
+    }
+    return
+  }
+
+  // Genuinely unexpected error → full stack + 500 (unchanged path).
+  console.error('Unhandled route error:', req.method, req.originalUrl, '-', err?.stack || err)
   if (wantsJson) {
     res.status(500).json({ error: 'Internal server error' })
   } else {
