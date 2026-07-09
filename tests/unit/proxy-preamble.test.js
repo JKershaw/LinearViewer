@@ -16,7 +16,9 @@ import assert from 'node:assert/strict';
 import {
   attachProxyContext,
   buildProxyContextPreamble,
-  shouldUseMcpTokenField
+  shouldUseMcpTokenField,
+  applyDefaultDispatchHarness,
+  DEFAULT_DISPATCH_HARNESS
 } from '../../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../../lib/proxy-tokens.js';
 
@@ -48,6 +50,28 @@ describe('shouldUseMcpTokenField (LIN-1155 gate)', () => {
     for (const h of [null, undefined, '', '   ', 'opencode', 'claude', 'codex', 42, {}]) {
       assert.equal(shouldUseMcpTokenField(h), false, `expected false for ${JSON.stringify(h)}`);
     }
+  });
+});
+
+describe('applyDefaultDispatchHarness (LIN-1159 default)', () => {
+  test('an absent/empty resolved harness defaults to claude-code', () => {
+    assert.equal(DEFAULT_DISPATCH_HARNESS, 'claude-code');
+    for (const h of [null, undefined, '', '   ', 42, {}]) {
+      assert.equal(applyDefaultDispatchHarness(h), 'claude-code', `expected default for ${JSON.stringify(h)}`);
+    }
+  });
+  test('an explicit non-claude-code harness is left untouched', () => {
+    assert.equal(applyDefaultDispatchHarness('opencode'), 'opencode');
+    assert.equal(applyDefaultDispatchHarness('codex'), 'codex');
+  });
+  test('an explicit claude-code harness passes through unchanged', () => {
+    assert.equal(applyDefaultDispatchHarness('claude-code'), 'claude-code');
+  });
+  test('the default feeds the MCP gate: applied output trips shouldUseMcpTokenField', () => {
+    // The whole point of LIN-1159: the defaulted harness must make the LIN-1155
+    // gate fire on the common null-harness path, while opencode still does not.
+    assert.equal(shouldUseMcpTokenField(applyDefaultDispatchHarness(null)), true);
+    assert.equal(shouldUseMcpTokenField(applyDefaultDispatchHarness('opencode')), false);
   });
 });
 

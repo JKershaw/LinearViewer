@@ -1,9 +1,15 @@
 /**
- * LIN-1155 — route-level: the claude-code harness branch at the proxy.js
- * dispatch seams. For a resolved harness of claude-code the minted bootstrap is
- * carried on the dispatch item as `bootstrapToken` and the prompt text contains
- * NO token / curl exchange; for every other harness (incl. null/default and
- * opencode) the token stays embedded in the prose block and no field is set.
+ * LIN-1155 / LIN-1159 — route-level: the claude-code harness branch at the
+ * proxy.js dispatch seams. For a resolved harness of claude-code the minted
+ * bootstrap is carried on the dispatch item as `bootstrapToken` and the prompt
+ * text contains NO token / curl exchange; an EXPLICIT non-claude-code harness
+ * (e.g. opencode) keeps the token embedded in the prose block with no field set.
+ *
+ * LIN-1159 flipped the DEFAULT: an absent/null resolved harness is now interposed
+ * as claude-code at the proxy dispatch boundary (applyDefaultDispatchHarness), so
+ * the common (no-harness) proxy dispatch takes the MCP token-field path rather
+ * than the historical prose block. The previous decision-A assertions (null/default
+ * -> prose) are therefore now MCP-default assertions.
  *
  * Observed at the addItem seam (the item handed to the store), across the sites
  * that had to hoist their harness resolution above the append: plain
@@ -111,13 +117,16 @@ describe('LIN-1155 — plain POST /api/proxy/dispatch (site 2)', () => {
     assertProse(captured.item);
   });
 
-  test('no harness (null/default) -> prose token, no field (decision A)', async () => {
+  test('no harness (null/default) -> MCP token-field path (LIN-1159 default)', async () => {
     const captured = {};
     const res = await call(buildApp(captured), 'post', '/api/proxy/dispatch', {
       prompt: 'do the thing', issueIdentifier: 'TEST-1'
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assertProse(captured.item);
+    // LIN-1159: the common no-harness dispatch now resolves to claude-code, so the
+    // token travels as the structured field and the injectable prose is gone.
+    assertMcp(captured.item);
+    assert.equal(captured.item.harness, 'claude-code', 'default resolved harness is claude-code');
   });
 
   test('reorder-correctness: no body harness but workspace default claude-code -> MCP branch fires', async () => {
@@ -153,6 +162,17 @@ describe('LIN-1155 — recommend-and-dispatch verb-override (site 3)', () => {
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assertProse(captured.item);
   });
+
+  test('no harness -> MCP token-field path (LIN-1159 default)', async () => {
+    const captured = {};
+    const res = await call(buildApp(captured), 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation'
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.ok(captured.item, 'verb-override path dispatched an item');
+    assertMcp(captured.item);
+    assert.equal(captured.item.harness, 'claude-code', 'default resolved harness is claude-code');
+  });
 });
 
 describe('LIN-1155 — autopilot kickoff (site 1)', () => {
@@ -165,13 +185,14 @@ describe('LIN-1155 — autopilot kickoff (site 1)', () => {
     assertMcp(captured.item);
   });
 
-  test('no harness -> prose token, no field', async () => {
+  test('no harness -> MCP token-field path (LIN-1159 default)', async () => {
     const captured = {};
     const res = await call(buildApp(captured), 'post', '/api/proxy/autopilot/kickoff', {
       goal: 'ship it', target: 'cli'
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assertProse(captured.item);
+    assertMcp(captured.item);
+    assert.equal(captured.item.harness, 'claude-code', 'default resolved harness is claude-code');
   });
 });
 

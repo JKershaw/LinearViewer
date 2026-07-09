@@ -210,13 +210,13 @@ describe('LIN-1084 — POST /api/proxy/dispatch carries the execution harness', 
     assert.equal(captured.item.harness, HARNESS);
   });
 
-  test('an omitted harness becomes null (consumer default preserved)', async () => {
+  test('an omitted harness defaults to claude-code (LIN-1159 dispatch-boundary default)', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'run me' });
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.strictEqual(captured.item.harness, null);
+    assert.strictEqual(captured.item.harness, 'claude-code');
   });
 
   test('a non-string harness is rejected with 400', async () => {
@@ -267,7 +267,7 @@ describe('LIN-1084 — POST /api/proxy/recommend-and-dispatch carries the execut
     assert.equal(captured.item.harness, HARNESS);
   });
 
-  test('an omitted harness becomes null', async () => {
+  test('an omitted harness defaults to claude-code (LIN-1159)', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
@@ -275,7 +275,7 @@ describe('LIN-1084 — POST /api/proxy/recommend-and-dispatch carries the execut
     });
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.strictEqual(captured.item.harness, null);
+    assert.strictEqual(captured.item.harness, 'claude-code');
   });
 
   test('an invalid harness is rejected with 400', async () => {
@@ -301,7 +301,7 @@ describe('LIN-1084 — POST /api/proxy/recommend-and-dispatch carries the execut
     assert.equal(captured.item.harness, HARNESS);
   });
 
-  test('an omitted harness becomes null (recommendation-derived path)', async () => {
+  test('an omitted harness defaults to claude-code (recommendation-derived path; LIN-1159)', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
@@ -310,7 +310,7 @@ describe('LIN-1084 — POST /api/proxy/recommend-and-dispatch carries the execut
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
     assert.ok(captured.item, 'recommendation-derived path must dispatch an item');
-    assert.strictEqual(captured.item.harness, null);
+    assert.strictEqual(captured.item.harness, 'claude-code');
   });
 });
 
