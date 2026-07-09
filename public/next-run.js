@@ -112,6 +112,7 @@
     wrap.innerHTML = window.renderDispatchDisclosure({
       idPrefix: panelId,
       isLocalhost: data.isLocalhost,
+      toggleClass: 'next-run-dispatch-toggle disclosure-toggle',
       buttonClass: 'next-run-dispatch dispatch-btn'
     });
     // Stamp data-goal on each dispatch button so dispatchGoal can read it.
