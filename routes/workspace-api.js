@@ -2170,18 +2170,17 @@ ${goal}`
       // fails, attachProxyContext returns the prompt unchanged so the triage still
       // dispatches (best-effort, like the enqueue).
       //
-      // applyDefaultHarness:false — preserve the feedback path's existing behavior
-      // exactly: LIN-1159 deliberately scoped the claude-code interpose to the 4
-      // proxy dispatch sites, NOT feedback. Interposing it here would flip the
-      // token delivery from prose to the MCP field for every feedback dispatch — a
-      // real behavior change that belongs in its own deliberate ticket, not a DRY
-      // refactor. A configured workspace claude-code default still takes the MCP
-      // path (that path is unchanged).
+      // The feedback path now inherits the factory's default harness interpose
+      // (LIN-1164, discharging the deferral the LIN-1139 refactor named here):
+      // a blank workspace harness resolves to claude-code, so attachProxyContext
+      // takes the LIN-1155 MCP-token-field branch — the item carries a
+      // bootstrapToken and the prompt no longer embeds Bearer/curl exchange prose.
+      // An explicit non-claude-code workspace harness (e.g. opencode) is left
+      // untouched by applyDefaultDispatchHarness and keeps token-in-prose delivery.
       await createDispatchItem({
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
-        applyDefaultHarness: false,
         kind: 'triage',
         finalizePrompt: (resolvedHarness) => attachProxyContext({
           proxyTokenStore,
@@ -2239,14 +2238,14 @@ ${goal}`
       // claude-code harness (LIN-1155) and hand back the bootstrapToken. LIN-376: a
       // single-use bootstrap is minted, exchanged by the run for a working token.
       //
-      // applyDefaultHarness:false — see the triage twin above: preserve the
-      // feedback path's existing behavior (LIN-1159's claude-code interpose is
-      // deliberately proxy-scoped; interposing here would flip token delivery).
+      // This path inherits the factory default harness interpose (LIN-1164) — see
+      // the triage twin above: a blank workspace harness resolves to claude-code so
+      // the bootstrap travels via the MCP bootstrapToken field, while an explicit
+      // non-claude-code workspace harness still keeps token-in-prose delivery.
       await createDispatchItem({
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
-        applyDefaultHarness: false,
         kind: 'autopilot',
         finalizePrompt: (resolvedHarness) => attachProxyContext({
           proxyTokenStore,
