@@ -1283,11 +1283,21 @@ test.describe('Proxy API - Dispatch', () => {
     expect(item.prompt).toContain('/api/proxy/instructions');
     // Starting context is the distilled brief, not the raw issue dump (LIN-260).
     expect(item.prompt).toContain('/api/proxy/brief/LIN-288');
-    // LIN-376: the caller's own standing token is NEVER replayed into the prompt.
-    // The worker gets a fresh single-use bootstrap and exchanges it for a working
-    // token at POST /api/proxy/token.
+    // LIN-1159: a no-harness dispatch now defaults to claude-code, so the common
+    // path takes LIN-1155's MCP token-field flow — the bootstrap travels as the
+    // `bootstrapToken` field and the prompt stays credential-free (no token, no
+    // curl exchange, no /api/proxy/token prose).
+    expect(item.harness).toBe('claude-code');
+    expect(typeof item.bootstrapToken).toBe('string');
+    expect(item.bootstrapToken.length).toBeGreaterThan(0);
+    expect(item.bootstrapToken).not.toBe(writeToken);
+    expect(item.prompt).toContain('MCP tool');
+    expect(item.prompt).not.toContain('curl -X POST');
+    expect(item.prompt).not.toContain('/api/proxy/token');
+    // LIN-376: the caller's own standing token is NEVER replayed into the prompt,
+    // and neither is the minted bootstrap.
     expect(item.prompt).not.toContain(writeToken);
-    expect(item.prompt).toContain('/api/proxy/token');
+    expect(item.prompt).not.toContain(item.bootstrapToken);
     // Reporting is the runner's Stop hook, not the prompt — but the evidence
     // discipline for the final summary is still taught at source.
     expect(item.prompt).toContain('evidence');

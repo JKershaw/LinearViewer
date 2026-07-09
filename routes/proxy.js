@@ -53,7 +53,7 @@ import { isTerminalState, isBlocked } from '../lib/tree.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
-import { attachProxyContext } from '../lib/proxy-preamble.js';
+import { attachProxyContext, applyDefaultDispatchHarness } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS, WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
@@ -4133,6 +4133,10 @@ One convention across every endpoint, so you can branch on the same fields every
         if (!model) resolvedModel = defaults.model;
         if (!harness) resolvedHarness = defaults.harness;
       }
+      // LIN-1159: interpose claude-code as the default harness so the common
+      // (null-harness) dispatch takes LIN-1155's MCP token-field path. Explicit
+      // harnesses (incl. opencode) and workspace defaults are left untouched.
+      resolvedHarness = applyDefaultDispatchHarness(resolvedHarness);
 
       const baseUrl = `${req.protocol}://${req.get('host')}`;
 
@@ -4529,6 +4533,10 @@ One convention across every endpoint, so you can branch on the same fields every
         if (!model) resolvedModel = defaults.model;
         if (!harness) resolvedHarness = defaults.harness;
       }
+      // LIN-1159: interpose claude-code as the default harness so the common
+      // (null-harness) dispatch takes LIN-1155's MCP token-field path. Explicit
+      // harnesses (incl. opencode) and workspace defaults are left untouched.
+      resolvedHarness = applyDefaultDispatchHarness(resolvedHarness);
 
       // An abort item carries no prompt, so there is nothing to append the proxy
       // context to — guard on prompt presence (LIN-743).
@@ -4765,6 +4773,10 @@ One convention across every endpoint, so you can branch on the same fields every
           if (!model) resolvedModel = defaults.model;
           if (!harness) resolvedHarness = defaults.harness;
         }
+        // LIN-1159: interpose claude-code as the default harness so the common
+        // (null-harness) dispatch takes LIN-1155's MCP token-field path. Explicit
+        // harnesses (incl. opencode) and workspace defaults are left untouched.
+        resolvedHarness = applyDefaultDispatchHarness(resolvedHarness);
 
         let finalPrompt = generated.prompt;
         let bootstrapToken = null;
@@ -4935,6 +4947,10 @@ One convention across every endpoint, so you can branch on the same fields every
           if (!model) resolvedModel = defaults.model;
           if (!harness) resolvedHarness = defaults.harness;
         }
+        // LIN-1159: interpose claude-code as the default harness so the common
+        // (null-harness) dispatch takes LIN-1155's MCP token-field path. Explicit
+        // harnesses (incl. opencode) and workspace defaults are left untouched.
+        resolvedHarness = applyDefaultDispatchHarness(resolvedHarness);
 
         let finalPrompt = rec.prompt;
         let bootstrapToken = null;

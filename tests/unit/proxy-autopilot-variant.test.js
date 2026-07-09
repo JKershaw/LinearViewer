@@ -265,7 +265,7 @@ test('POST kickoff (LIN-1138): model and harness are forwarded together', async 
   assert.equal(added[0].doc.harness, HARNESS);
 });
 
-test('POST kickoff (LIN-1138): an omitted model/harness becomes null', async () => {
+test('POST kickoff (LIN-1138): an omitted model stays null; an omitted harness defaults to claude-code (LIN-1159)', async () => {
   const { app, added } = buildApp();
   const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
     method: 'POST',
@@ -274,7 +274,9 @@ test('POST kickoff (LIN-1138): an omitted model/harness becomes null', async () 
   assert.equal(status, 201);
   assert.equal(added.length, 1);
   assert.strictEqual(added[0].doc.model, null);
-  assert.strictEqual(added[0].doc.harness, null);
+  // LIN-1159: the proxy dispatch boundary now interposes claude-code as the
+  // default harness (model keeps its null passthrough).
+  assert.strictEqual(added[0].doc.harness, 'claude-code');
 });
 
 test('POST kickoff (LIN-1138): a non-string model is rejected with 400', async () => {

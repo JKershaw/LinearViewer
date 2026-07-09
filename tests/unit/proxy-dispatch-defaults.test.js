@@ -13,6 +13,12 @@
  * Mirrors tests/unit/dispatch-route-defaults.test.js's scenarios, and reuses
  * proxy-dispatch-model.test.js's buildApp/TEST-14 scaffolding for the
  * recommendation-derived branch.
+ *
+ * LIN-1159 NOTE: the proxy dispatch boundary now interposes `claude-code` as the
+ * default resolved harness (applyDefaultDispatchHarness), so a blank harness with
+ * no configured default resolves to 'claude-code' rather than null. `model` keeps
+ * its null-passthrough (no default interposed). The "no default configured" cases
+ * below therefore assert model:null but harness:'claude-code'.
  */
 process.env.NODE_ENV = 'test';
 
@@ -91,17 +97,17 @@ async function call(app, method, path, body) {
 }
 
 describe('LIN-1099 — POST /api/proxy/dispatch resolves dispatchDefaults', () => {
-  test('no workspacePreferencesStore wired at all: null passthrough unchanged', async () => {
+  test('no workspacePreferencesStore wired at all: model null passthrough, harness defaults to claude-code (LIN-1159)', async () => {
     const captured = {};
     const app = buildApp(captured); // workspacePreferencesStore omitted entirely
     const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'run me', kind: 'implementation' });
 
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.strictEqual(captured.item.model, null);
-    assert.strictEqual(captured.item.harness, null);
+    assert.strictEqual(captured.item.harness, 'claude-code');
   });
 
-  test('a store is wired but no dispatchDefaults are configured: null passthrough unchanged', async () => {
+  test('a store is wired but no dispatchDefaults are configured: model null passthrough, harness defaults to claude-code (LIN-1159)', async () => {
     const store = new WorkspacePreferencesStore({ collection: createMockCollection() });
     const captured = {};
     const app = buildApp(captured, { workspacePreferencesStore: store });
@@ -109,7 +115,7 @@ describe('LIN-1099 — POST /api/proxy/dispatch resolves dispatchDefaults', () =
 
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.strictEqual(captured.item.model, null);
-    assert.strictEqual(captured.item.harness, null);
+    assert.strictEqual(captured.item.harness, 'claude-code');
   });
 
   test('an explicit model/harness still wins over configured defaults', async () => {
@@ -241,7 +247,7 @@ describe('LIN-1099 — POST /api/proxy/recommend-and-dispatch resolves dispatchD
     assert.equal(captured.item.harness, 'kind-harness');
   });
 
-  test('no store wired: null passthrough unchanged', async () => {
+  test('no store wired: model null passthrough, harness defaults to claude-code (LIN-1159)', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
@@ -250,7 +256,7 @@ describe('LIN-1099 — POST /api/proxy/recommend-and-dispatch resolves dispatchD
 
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.strictEqual(captured.item.model, null);
-    assert.strictEqual(captured.item.harness, null);
+    assert.strictEqual(captured.item.harness, 'claude-code');
   });
 });
 
@@ -316,7 +322,7 @@ describe('LIN-1099 — POST /api/proxy/recommend-and-dispatch resolves dispatchD
     assert.equal(captured.item.harness, 'workspace-harness');
   });
 
-  test('no store wired: null passthrough unchanged', async () => {
+  test('no store wired: model null passthrough, harness defaults to claude-code (LIN-1159)', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
@@ -325,6 +331,6 @@ describe('LIN-1099 — POST /api/proxy/recommend-and-dispatch resolves dispatchD
 
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.strictEqual(captured.item.model, null);
-    assert.strictEqual(captured.item.harness, null);
+    assert.strictEqual(captured.item.harness, 'claude-code');
   });
 });
