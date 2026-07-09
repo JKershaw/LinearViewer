@@ -197,6 +197,10 @@ describe('feedback submit (LIN-635)', () => {
 
     // ...and the proxy details (Workspace API access block) are appended to the
     // triage prompt, carrying the minted token and the per-issue brief endpoint.
+    // LIN-1139: the feedback dispatch now runs through the shared factory with
+    // applyDefaultHarness:false, so a no-default workspace keeps a null harness and
+    // the token stays in the prose exactly as before (the claude-code interpose
+    // remains scoped to the proxy dispatch boundary, LIN-1159).
     assert.match(prompt, /Workspace API access/);
     assert.match(prompt, /Authorization: Bearer rw-tok-123/);
     assert.match(prompt, /\/api\/proxy\/brief\/LIN-900/);
@@ -488,6 +492,10 @@ describe('feedback submit (LIN-635)', () => {
   });
 
   test('LIN-1138: feedback dispatch path with no defaults configured resolves model/harness to null', async () => {
+    // LIN-1139: the feedback paths route through the shared factory with
+    // applyDefaultHarness:false, so with no configured default both model and
+    // harness stay null — behavior-preserving. The claude-code interpose remains
+    // scoped to the proxy dispatch boundary (LIN-1159), NOT feedback.
     const { provider } = makeFakeProvider();
     const dispatch = capturingDispatchStore();
     const proxyTokenStore = fakeProxyTokenStore('rw-tok');

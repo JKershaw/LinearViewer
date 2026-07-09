@@ -17,7 +17,8 @@ import rateLimit from 'express-rate-limit';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
-import { validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
+import { validateOpaqueDispatchField, validateDispatchPayload } from '../lib/dispatch-validation.js';
+import { createDispatchItem } from '../lib/dispatch-factory.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
 // route owns no GraphQL. Provider SELECTION for the consumer read + write data
@@ -44,7 +45,7 @@ import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decode
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
-import { resolveWorkspaceModel, resolveAiOperationModel, resolveDispatchDefaults } from '../lib/workspace-preferences.js';
+import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
@@ -53,7 +54,7 @@ import { isTerminalState, isBlocked } from '../lib/tree.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
-import { attachProxyContext, applyDefaultDispatchHarness } from '../lib/proxy-preamble.js';
+import { attachProxyContext } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS, WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
@@ -326,9 +327,10 @@ const PROMPT_PROXY_TOKEN_TTL_SECONDS = 48 * 60 * 60;
 // from lib/proxy-tokens.js so every mint site shares one source of truth.
 const MAX_COMMENT_LENGTH = 50000;
 
-// Dispatch input limits (mirror routes/dispatch.js, the session-auth twin).
-const MAX_PROMPT_LENGTH = 10000000;    // 10MB max for prompt content
-const MAX_URL_LENGTH = 8000;           // URLs (covers long query strings)
+// Dispatch input limits. The prompt/url caps for the POST /dispatch payload now
+// live in lib/dispatch-validation.js (shared with the session-auth twin via
+// validateDispatchPayload, LIN-1139); MAX_IDENTIFIER_LENGTH remains for the other
+// proxy handlers that cap an identifier directly.
 const MAX_IDENTIFIER_LENGTH = 100;     // Issue identifiers
 // Proxy consumers are remote, so 'local' (Harbour OS, spawns on the server's
 // own /dev/tty) is intentionally excluded from the targets they may set.
@@ -4117,27 +4119,6 @@ One convention across every endpoint, so you can branch on the same fields every
       // the sole declarers.)
       const subscriptionResolved = subscription ?? DEFAULT_SUBSCRIPTION;
 
-      // Resolve blank incoming model/harness against the workspace's
-      // dispatchDefaults (LIN-1138, mirroring POST /dispatch's LIN-1094
-      // wiring): per-kind override -> workspace-wide default -> null. `autopilot`
-      // is a meta-kind (∉ PROMPT_TEMPLATES), so byKind is skipped and the
-      // workspace-wide default is the only fallback.
-      let resolvedModel = model || null;
-      let resolvedHarness = harness || null;
-      if ((!model || !harness) && workspacePreferencesStore) {
-        const defaults = await resolveDispatchDefaults({
-          urlKey: req.proxyUrlKey,
-          kind: 'autopilot',
-          store: workspacePreferencesStore
-        });
-        if (!model) resolvedModel = defaults.model;
-        if (!harness) resolvedHarness = defaults.harness;
-      }
-      // LIN-1159: interpose claude-code as the default harness so the common
-      // (null-harness) dispatch takes LIN-1155's MCP token-field path. Explicit
-      // harnesses (incl. opencode) and workspace defaults are left untouched.
-      resolvedHarness = applyDefaultDispatchHarness(resolvedHarness);
-
       const baseUrl = `${req.protocol}://${req.get('host')}`;
 
       // SCOPED run: resolve the named issue so the goal line can name it and we
@@ -4176,60 +4157,64 @@ One convention across every endpoint, so you can branch on the same fields every
         variant: resolvedVariant
       });
 
-      // Append the proxy context (workspace API access + bearer token + reporting
-      // channel) by default — the kickoff guide refers the autopilot to "the
-      // +proxy block" for its concrete token. Opt out with appendProxyContext:false.
-      let finalPrompt = kickoff;
-      let bootstrapToken = null;
-      if (appendProxyContext !== false) {
-        // LIN-376: embed a fresh single-use bootstrap, never the caller's own
-        // authenticating token. Skips the block if minting fails (graceful).
-        // LIN-1155: for the claude-code harness the token is stripped from the
-        // prose and returned as `bootstrapToken` to carry on the item instead.
-        ({ prompt: finalPrompt, bootstrapToken } = await attachProxyContext({
-          proxyTokenStore,
-          urlKey: req.proxyUrlKey,
-          baseUrl,
-          issueIdentifier: issueIdentifier || null,
-          prompt: kickoff,
-          label: 'kickoff-bootstrap',
-          harness: resolvedHarness
-        }));
-      }
-
-      const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
-        prompt: finalPrompt,
-        promptName: issue ? `Autopilot (${issue.identifier})` : 'Autopilot (stack walk)',
+      // Create the dispatch item through the shared factory (LIN-1139): it
+      // resolves model/harness from workspace dispatchDefaults (LIN-1138 —
+      // `autopilot` is a meta-kind ∉ PROMPT_TEMPLATES, so only the workspace-wide
+      // default applies), interposes the default harness (LIN-1159), and calls
+      // addItem. The proxy-context append is the default ("+proxy block" the
+      // kickoff guide refers to); it runs inside finalizePrompt AFTER the harness
+      // is resolved so it can gate its MCP-token-vs-prose branch on it (LIN-1155),
+      // and hands back the bootstrapToken to carry as a structured field. Opt out
+      // with appendProxyContext:false.
+      const item = await createDispatchItem({
+        store: dispatchQueueStore,
+        urlKey: req.proxyUrlKey,
+        workspacePreferencesStore,
         kind: 'autopilot',
-        issueIdentifier: issueIdentifier || null,
-        dispatchedBy: req.proxyCreatedBy || null,
-        target: target || 'cli',
-        repo: resolvedRepo,
-        // Execution model + harness the runner passes to its CLI (LIN-438,
-        // LIN-1084); opaque, forwarded blindly. Resolved against workspace
-        // dispatchDefaults when not explicit (LIN-1138).
-        model: resolvedModel,
-        harness: resolvedHarness,
-        // Structured bootstrap token for the claude-code MCP branch (LIN-1155);
-        // null for every other harness.
-        bootstrapToken,
-        // Park the orchestrator holdable (LIN-826). Under push-based comms the
-        // subscribed children run independently to terminal and then WAKE the
-        // parent with a follow-up (the LIN-826 auto-enqueue), so the orchestrator
-        // must stop at a holdable AWAITING_FOLLOWUP point to receive those wakes
-        // instead of polling. This inverts the old "free the producer" rule only
-        // for the subscribed case; Phase 2 retires that rule in the prose.
-        waitForFollowUps: true,
-        // Coordinator up-chain edge (LIN-813): when this kickoff is a CHILD
-        // autopilot dispatched by a coordinator, `sessionId` targets the coordinator
-        // and a declared `subscription: 'everything'` routes the child's reports back
-        // up to it. A top-level kickoff passes neither, so subscription defaults to
-        // 'terminal-only' and the standard single-head behavior is unchanged. Stored
-        // + forwarded blindly; note `sessionId` here is the PARENT edge — the child's
-        // own `_id` is what addItem stamps into its prompt for its own sub-workers,
-        // so the two ids stay distinct by construction.
-        sessionId: sessionId || null,
-        subscription: subscriptionResolved
+        model,
+        harness,
+        finalizePrompt: async (resolvedHarness) => {
+          if (appendProxyContext !== false) {
+            // LIN-376: embed a fresh single-use bootstrap, never the caller's own
+            // authenticating token. Skips the block if minting fails (graceful).
+            // LIN-1155: for the claude-code harness the token is stripped from the
+            // prose and returned as `bootstrapToken` to carry on the item instead.
+            return attachProxyContext({
+              proxyTokenStore,
+              urlKey: req.proxyUrlKey,
+              baseUrl,
+              issueIdentifier: issueIdentifier || null,
+              prompt: kickoff,
+              label: 'kickoff-bootstrap',
+              harness: resolvedHarness
+            });
+          }
+          return { prompt: kickoff, bootstrapToken: null };
+        },
+        fields: {
+          promptName: issue ? `Autopilot (${issue.identifier})` : 'Autopilot (stack walk)',
+          issueIdentifier: issueIdentifier || null,
+          dispatchedBy: req.proxyCreatedBy || null,
+          target: target || 'cli',
+          repo: resolvedRepo,
+          // Park the orchestrator holdable (LIN-826). Under push-based comms the
+          // subscribed children run independently to terminal and then WAKE the
+          // parent with a follow-up (the LIN-826 auto-enqueue), so the orchestrator
+          // must stop at a holdable AWAITING_FOLLOWUP point to receive those wakes
+          // instead of polling. This inverts the old "free the producer" rule only
+          // for the subscribed case; Phase 2 retires that rule in the prose.
+          waitForFollowUps: true,
+          // Coordinator up-chain edge (LIN-813): when this kickoff is a CHILD
+          // autopilot dispatched by a coordinator, `sessionId` targets the coordinator
+          // and a declared `subscription: 'everything'` routes the child's reports back
+          // up to it. A top-level kickoff passes neither, so subscription defaults to
+          // 'terminal-only' and the standard single-head behavior is unchanged. Stored
+          // + forwarded blindly; note `sessionId` here is the PARENT edge — the child's
+          // own `_id` is what addItem stamps into its prompt for its own sub-workers,
+          // so the two ids stay distinct by construction.
+          sessionId: sessionId || null,
+          subscription: subscriptionResolved
+        }
       });
 
       logEvent(req, '/api/proxy/autopilot/kickoff', 201);
@@ -4359,115 +4344,19 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
       }
 
-      if (prompt && prompt.length > MAX_PROMPT_LENGTH) {
+      // Shared payload validation for the two main handlers (LIN-1139): length
+      // caps, opaque model/harness (LIN-438/1084), dangerous-char rejection, and
+      // the issueId/followUpTo/force/sessionId format + combination rules. Lifted
+      // verbatim + in order into validateDispatchPayload so this proxy twin and
+      // the session route can't re-drift. The proxy caller keeps its own
+      // logEvent(..., 400) on reject — the helper only returns the error
+      // structure. The caller-specific checks that DIFFER (prompt-required,
+      // target vocab, abort/cascade/kind/waitForFollowUps/queueIfBusy/subscription)
+      // already ran above, preserving the original interleaving/first-error.
+      const payloadError = validateDispatchPayload(req.body || {});
+      if (payloadError) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, `prompt exceeds maximum length of ${MAX_PROMPT_LENGTH}`);
-      }
-      if (promptName && promptName.length > MAX_NAME_LENGTH) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, `promptName exceeds maximum length of ${MAX_NAME_LENGTH}`);
-      }
-      if (issueIdentifier && issueIdentifier.length > MAX_IDENTIFIER_LENGTH) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, `issueIdentifier exceeds maximum length of ${MAX_IDENTIFIER_LENGTH}`);
-      }
-      if (issueTitle && issueTitle.length > MAX_NAME_LENGTH) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, `issueTitle exceeds maximum length of ${MAX_NAME_LENGTH}`);
-      }
-      if (issueUrl && issueUrl.length > MAX_URL_LENGTH) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, `issueUrl exceeds maximum length of ${MAX_URL_LENGTH}`);
-      }
-      if (repo && repo.length > MAX_NAME_LENGTH) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, `repo exceeds maximum length of ${MAX_NAME_LENGTH}`);
-      }
-      // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
-      // via the shared helper (type/length/dangerous-chars only — NOT checked
-      // against openrouter AVAILABLE_MODELS, which is the generation-model
-      // namespace; these are the consumer's execution-model/harness fields).
-      const modelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
-      if (modelValidationError) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, modelValidationError.error);
-      }
-      const harnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
-      if (harnessValidationError) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, harnessValidationError.error);
-      }
-
-      if (prompt && DANGEROUS_CHARS_REGEX.test(prompt)) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'prompt contains invalid characters');
-      }
-      if (promptName && DANGEROUS_CHARS_REGEX.test(promptName)) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'promptName contains invalid characters');
-      }
-      if (issueTitle && DANGEROUS_CHARS_REGEX.test(issueTitle)) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'issueTitle contains invalid characters');
-      }
-      if (repo && DANGEROUS_CHARS_REGEX.test(repo)) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'repo contains invalid characters');
-      }
-      if (issueId && !UUID_REGEX.test(issueId)) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'Invalid issueId format');
-      }
-      // Follow-up reference (LIN-415): the original dispatchId whose session
-      // the downstream dispatcher should resume. Optional UUID; stored +
-      // forwarded blindly (no liveness check here). cli/web only — resuming a
-      // dash session is undefined.
-      if (followUpTo !== undefined && followUpTo !== null) {
-        if (!UUID_REGEX.test(followUpTo)) {
-          logEvent(req, '/api/proxy/dispatch', 400);
-          return badRequest.json(res, 'Invalid followUpTo format');
-        }
-        const followUpTarget = target || 'cli';
-        if (!['cli', 'web'].includes(followUpTarget)) {
-          logEvent(req, '/api/proxy/dispatch', 400);
-          return badRequest.json(res, 'followUpTo is only supported for cli/web targets');
-        }
-      }
-
-      // Force flag: overrides a runner-side guard, so it is meaningful ONLY
-      // alongside a verb that has one — reject a bare force on a fresh dispatch
-      // rather than storing an inert flag. Two verbs qualify:
-      //   - followUpTo (LIN-559): bypass the active-session liveness guard so a
-      //     follow-up can resume a wedged/sleeping session (LIN-546).
-      //   - a single abort (LIN-946/LIN-951): bypass the runner's human-continued
-      //     skip so a DELIBERATE targeted abort still cancels a human-continued
-      //     session (the escape hatch). A cascade emits its own plain, UNforced
-      //     aborts (those skip), so force is never a cascade concern — reject the
-      //     force+cascade contradiction rather than silently dropping force.
-      // force:false / omitted is always fine. The runner reads item.force off the
-      // polled/claimed item.
-      if (force !== undefined && typeof force !== 'boolean') {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'force must be a boolean');
-      }
-      if (force === true && cascade === true) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'force and cascade are mutually exclusive');
-      }
-      if (force === true && !isAbort && (followUpTo === undefined || followUpTo === null)) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'force requires followUpTo or abort');
-      }
-
-      // Autopilot session reference (LIN-591): the autopilot dispatchId that
-      // spawned this worker, used to group workers into one session. Optional
-      // UUID; stored + forwarded blindly. Unlike followUpTo there is NO target
-      // restriction — sessions span all targets.
-      if (sessionId !== undefined && sessionId !== null) {
-        if (!UUID_REGEX.test(sessionId)) {
-          logEvent(req, '/api/proxy/dispatch', 400);
-          return badRequest.json(res, 'Invalid sessionId format');
-        }
+        return badRequest.json(res, payloadError.error);
       }
 
       // Subscription is DECLARED on the edge (LIN-900 §6), never reconstructed from
@@ -4515,72 +4404,58 @@ One convention across every endpoint, so you can branch on the same fields every
         ? appendProxyContext === true
         : appendProxyContext !== false;
 
-      // Resolve blank incoming model/harness against the workspace's
-      // dispatchDefaults (LIN-1099, mirroring routes/dispatch.js's LIN-1094
-      // wiring): per-kind override -> workspace-wide default -> null. Each
-      // field resolves independently, and the lookup is skipped entirely when
-      // no store is wired or both fields are already set. LIN-1155: resolved
-      // BEFORE the proxy-context append so the append can gate on the harness.
-      const effectiveKind = kind || deriveDispatchKind(promptName);
-      let resolvedModel = model || null;
-      let resolvedHarness = harness || null;
-      if ((!model || !harness) && workspacePreferencesStore) {
-        const defaults = await resolveDispatchDefaults({
-          urlKey: req.proxyUrlKey,
-          kind: effectiveKind,
-          store: workspacePreferencesStore
-        });
-        if (!model) resolvedModel = defaults.model;
-        if (!harness) resolvedHarness = defaults.harness;
-      }
-      // LIN-1159: interpose claude-code as the default harness so the common
-      // (null-harness) dispatch takes LIN-1155's MCP token-field path. Explicit
-      // harnesses (incl. opencode) and workspace defaults are left untouched.
-      resolvedHarness = applyDefaultDispatchHarness(resolvedHarness);
-
-      // An abort item carries no prompt, so there is nothing to append the proxy
-      // context to — guard on prompt presence (LIN-743).
-      let bootstrapToken = null;
-      if (prompt && shouldAppendProxyContext) {
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
-        // LIN-1155: claude-code harness -> token stripped from prose, returned here.
-        ({ prompt: finalPrompt, bootstrapToken } = await attachProxyContext({
-          proxyTokenStore,
-          urlKey: req.proxyUrlKey,
-          baseUrl,
+      // Create the dispatch item through the shared factory (LIN-1139): it
+      // resolves kind, fills blank model/harness from workspace dispatchDefaults
+      // (LIN-1099), interposes the default harness (LIN-1159), and calls addItem.
+      // The proxy-context ordering constraint (LIN-1155 — harness resolved BEFORE
+      // the append, because attachProxyContext gates its MCP-token-vs-prose branch
+      // on the resolved harness) is preserved by the finalizePrompt(resolvedHarness)
+      // callback: the factory hands it the resolved harness, it runs the append,
+      // and returns { prompt, bootstrapToken } to carry on the item. An abort item
+      // carries no prompt, so the append stays guarded on prompt presence (LIN-743).
+      const item = await createDispatchItem({
+        store: dispatchQueueStore,
+        urlKey: req.proxyUrlKey,
+        workspacePreferencesStore,
+        kind,
+        model,
+        harness,
+        finalizePrompt: async (resolvedHarness) => {
+          if (prompt && shouldAppendProxyContext) {
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
+            // LIN-1155: claude-code harness -> token stripped from prose, returned here.
+            return attachProxyContext({
+              proxyTokenStore,
+              urlKey: req.proxyUrlKey,
+              baseUrl,
+              issueIdentifier: issueIdentifier || null,
+              prompt,
+              label: 'dispatch-bootstrap',
+              harness: resolvedHarness
+            });
+          }
+          return { prompt: finalPrompt, bootstrapToken: null };
+        },
+        fields: {
+          promptName: promptName || 'Prompt',
+          issueId: issueId || null,
           issueIdentifier: issueIdentifier || null,
-          prompt,
-          label: 'dispatch-bootstrap',
-          harness: resolvedHarness
-        }));
-      }
-
-      const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
-        prompt: finalPrompt,
-        promptName: promptName || 'Prompt',
-        kind: effectiveKind,
-        issueId: issueId || null,
-        issueIdentifier: issueIdentifier || null,
-        issueTitle: issueTitle || null,
-        issueUrl: issueUrl || null,
-        dispatchedBy: req.proxyCreatedBy || null,
-        target: target || 'cli',
-        repo: repo || null,
-        model: resolvedModel,
-        harness: resolvedHarness,
-        // Structured bootstrap token for the claude-code MCP branch (LIN-1155);
-        // null for every other harness.
-        bootstrapToken,
-        followUpTo: followUpTo || null,
-        force: force === true,
-        abort: isAbort,
-        abortTo: isAbort ? abortTo : null,
-        cascade: cascade === true,
-        sessionId: sessionId || null,
-        waitForFollowUps: waitForFollowUps === true,
-        queueIfBusy: queueIfBusy === true,
-        subscription: subscriptionResolved
+          issueTitle: issueTitle || null,
+          issueUrl: issueUrl || null,
+          dispatchedBy: req.proxyCreatedBy || null,
+          target: target || 'cli',
+          repo: repo || null,
+          followUpTo: followUpTo || null,
+          force: force === true,
+          abort: isAbort,
+          abortTo: isAbort ? abortTo : null,
+          cascade: cascade === true,
+          sessionId: sessionId || null,
+          waitForFollowUps: waitForFollowUps === true,
+          queueIfBusy: queueIfBusy === true,
+          subscription: subscriptionResolved
+        }
       });
 
       logEvent(req, '/api/proxy/dispatch', 201);
@@ -4758,71 +4633,56 @@ One convention across every endpoint, so you can branch on the same fields every
         // The body is server-generated/trusted, so it skips the dangerous-char /
         // length checks the caller-supplied POST /dispatch path runs, and is
         // never returned to the caller — same contract as the LLM-driven path.
-        // Resolve blank incoming model/harness against the workspace's
-        // dispatchDefaults (LIN-1099, mirroring routes/dispatch.js's LIN-1094
-        // wiring). `kind` is already guaranteed set on this verb-override branch.
-        // LIN-1155: resolved BEFORE the proxy-context append so it can gate on harness.
-        let resolvedModel = model || null;
-        let resolvedHarness = harness || null;
-        if ((!model || !harness) && workspacePreferencesStore) {
-          const defaults = await resolveDispatchDefaults({
-            urlKey: req.proxyUrlKey,
-            kind,
-            store: workspacePreferencesStore
-          });
-          if (!model) resolvedModel = defaults.model;
-          if (!harness) resolvedHarness = defaults.harness;
-        }
-        // LIN-1159: interpose claude-code as the default harness so the common
-        // (null-harness) dispatch takes LIN-1155's MCP token-field path. Explicit
-        // harnesses (incl. opencode) and workspace defaults are left untouched.
-        resolvedHarness = applyDefaultDispatchHarness(resolvedHarness);
-
-        let finalPrompt = generated.prompt;
-        let bootstrapToken = null;
-        if (appendProxyContext !== false) {
-          const baseUrl = `${req.protocol}://${req.get('host')}`;
-          // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
-          // LIN-1155: claude-code harness -> token stripped from prose, returned here.
-          ({ prompt: finalPrompt, bootstrapToken } = await attachProxyContext({
-            proxyTokenStore,
-            urlKey: req.proxyUrlKey,
-            baseUrl,
-            issueIdentifier,
-            prompt: generated.prompt,
-            label: 'dispatch-bootstrap',
-            harness: resolvedHarness
-          }));
-        }
-
         try {
-          const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
-            prompt: finalPrompt,
-            promptName: generated.name || getPromptDisplayName(kind),
+          // Create the dispatch item through the shared factory (LIN-1139): it
+          // resolves model/harness from workspace dispatchDefaults (LIN-1099;
+          // `kind` is guaranteed set on this verb-override branch), interposes the
+          // default harness (LIN-1159), and calls addItem. The proxy-context append
+          // runs inside finalizePrompt AFTER the harness is resolved (LIN-1155), so
+          // it can gate its MCP-token-vs-prose branch on it and hand back the
+          // bootstrapToken to carry as a field. Opt out with appendProxyContext:false.
+          const item = await createDispatchItem({
+            store: dispatchQueueStore,
+            urlKey: req.proxyUrlKey,
+            workspacePreferencesStore,
             kind,
-            issueId: null,
-            issueIdentifier,
-            issueTitle: null,
-            issueUrl: null,
-            dispatchedBy: req.proxyCreatedBy || null,
-            target: target || 'cli',
-            // Mirror /prompt's repo resolution: project `repo=` from the
-            // description, with an explicit caller repo winning (LIN-537).
-            repo: repo || parseRepoFromDescription(project?.description) || null,
-            // Execution model + harness the runner passes to its CLI (LIN-438,
-            // LIN-1084); opaque, forwarded blindly. null preserves the consumer
-            // default.
-            model: resolvedModel,
-            harness: resolvedHarness,
-            // Structured bootstrap token for the claude-code MCP branch (LIN-1155);
-            // null for every other harness.
-            bootstrapToken,
-            sessionId: sessionId || null,
-            // Push-comms: `subscription` is the declared edge (LIN-900 §6),
-            // `terminal-only` unless the caller declares `everything`; queueIfBusy
-            // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
-            queueIfBusy: queueIfBusy === true,
-            subscription: subscriptionResolved
+            model,
+            harness,
+            finalizePrompt: async (resolvedHarness) => {
+              if (appendProxyContext !== false) {
+                const baseUrl = `${req.protocol}://${req.get('host')}`;
+                // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
+                // LIN-1155: claude-code harness -> token stripped from prose, returned here.
+                return attachProxyContext({
+                  proxyTokenStore,
+                  urlKey: req.proxyUrlKey,
+                  baseUrl,
+                  issueIdentifier,
+                  prompt: generated.prompt,
+                  label: 'dispatch-bootstrap',
+                  harness: resolvedHarness
+                });
+              }
+              return { prompt: generated.prompt, bootstrapToken: null };
+            },
+            fields: {
+              promptName: generated.name || getPromptDisplayName(kind),
+              issueId: null,
+              issueIdentifier,
+              issueTitle: null,
+              issueUrl: null,
+              dispatchedBy: req.proxyCreatedBy || null,
+              target: target || 'cli',
+              // Mirror /prompt's repo resolution: project `repo=` from the
+              // description, with an explicit caller repo winning (LIN-537).
+              repo: repo || parseRepoFromDescription(project?.description) || null,
+              sessionId: sessionId || null,
+              // Push-comms: `subscription` is the declared edge (LIN-900 §6),
+              // `terminal-only` unless the caller declares `everything`; queueIfBusy
+              // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
+              queueIfBusy: queueIfBusy === true,
+              subscription: subscriptionResolved
+            }
           });
 
           // Record the override so it can feed heuristic improvement — the
@@ -4932,74 +4792,59 @@ One convention across every endpoint, so you can branch on the same fields every
         // action can't be parsed.
         const effectiveKind = deriveDispatchKind(rec.recommendedAction);
 
-        // Resolve blank incoming model/harness against the workspace's
-        // dispatchDefaults (LIN-1099, mirroring routes/dispatch.js's LIN-1094
-        // wiring). LIN-1155: resolved BEFORE the proxy-context append so it can
-        // gate on the harness.
-        let resolvedModel = model || null;
-        let resolvedHarness = harness || null;
-        if ((!model || !harness) && workspacePreferencesStore) {
-          const defaults = await resolveDispatchDefaults({
-            urlKey: req.proxyUrlKey,
-            kind: effectiveKind,
-            store: workspacePreferencesStore
-          });
-          if (!model) resolvedModel = defaults.model;
-          if (!harness) resolvedHarness = defaults.harness;
-        }
-        // LIN-1159: interpose claude-code as the default harness so the common
-        // (null-harness) dispatch takes LIN-1155's MCP token-field path. Explicit
-        // harnesses (incl. opencode) and workspace defaults are left untouched.
-        resolvedHarness = applyDefaultDispatchHarness(resolvedHarness);
-
-        let finalPrompt = rec.prompt;
-        let bootstrapToken = null;
-        if (appendProxyContext !== false) {
-          const baseUrl = `${req.protocol}://${req.get('host')}`;
-          // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
-          // LIN-1155: claude-code harness -> token stripped from prose, returned here.
-          ({ prompt: finalPrompt, bootstrapToken } = await attachProxyContext({
-            proxyTokenStore,
-            urlKey: req.proxyUrlKey,
-            baseUrl,
-            issueIdentifier: terminalIdentifier,
-            prompt: rec.prompt,
-            label: 'dispatch-bootstrap',
-            harness: resolvedHarness
-          }));
-        }
-
-        const item = await dispatchQueueStore.addItem(req.proxyUrlKey, {
-          prompt: finalPrompt,
-          promptName: rec.recommendedAction || 'Prompt',
+        // Create the dispatch item through the shared factory (LIN-1139): it
+        // resolves model/harness from workspace dispatchDefaults (LIN-1099, keyed
+        // on the recommendation-derived effectiveKind), interposes the default
+        // harness (LIN-1159), and calls addItem. The proxy-context append runs
+        // inside finalizePrompt AFTER the harness is resolved (LIN-1155), so it can
+        // gate its MCP-token-vs-prose branch on it and hand back the bootstrapToken
+        // to carry as a field. Opt out with appendProxyContext:false.
+        const item = await createDispatchItem({
+          store: dispatchQueueStore,
+          urlKey: req.proxyUrlKey,
+          workspacePreferencesStore,
           kind: effectiveKind,
-          issueId: null,
-          issueIdentifier: terminalIdentifier,
-          issueTitle: null,
-          issueUrl: null,
-          dispatchedBy: req.proxyCreatedBy || null,
-          target: target || 'cli',
-          // Inherit the server-resolved repo (terminal node's project `repo=`)
-          // when the caller omits one; an explicit caller repo still wins. repo
-          // is functional execution context (working directory), so this fused
-          // verb must propagate it, not just the display header fields (LIN-537).
-          repo: repo || rec.repo || null,
-          // Execution model + harness the runner passes to its CLI (LIN-438,
-          // LIN-1084); opaque, forwarded blindly. null preserves the consumer
-          // default.
-          model: resolvedModel,
-          harness: resolvedHarness,
-          // Structured bootstrap token for the claude-code MCP branch (LIN-1155);
-          // null for every other harness.
-          bootstrapToken,
-          sessionId: sessionId || null,
-          // Opt-in completion hold (LIN-797), forwarded blindly to the runner.
-          waitForFollowUps: waitForFollowUps === true,
-          // Push-comms: `subscription` is the declared edge (LIN-900 §6),
-          // `terminal-only` unless the caller declares `everything`; queueIfBusy
-          // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
-          queueIfBusy: queueIfBusy === true,
-          subscription: subscriptionResolved
+          model,
+          harness,
+          finalizePrompt: async (resolvedHarness) => {
+            if (appendProxyContext !== false) {
+              const baseUrl = `${req.protocol}://${req.get('host')}`;
+              // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
+              // LIN-1155: claude-code harness -> token stripped from prose, returned here.
+              return attachProxyContext({
+                proxyTokenStore,
+                urlKey: req.proxyUrlKey,
+                baseUrl,
+                issueIdentifier: terminalIdentifier,
+                prompt: rec.prompt,
+                label: 'dispatch-bootstrap',
+                harness: resolvedHarness
+              });
+            }
+            return { prompt: rec.prompt, bootstrapToken: null };
+          },
+          fields: {
+            promptName: rec.recommendedAction || 'Prompt',
+            issueId: null,
+            issueIdentifier: terminalIdentifier,
+            issueTitle: null,
+            issueUrl: null,
+            dispatchedBy: req.proxyCreatedBy || null,
+            target: target || 'cli',
+            // Inherit the server-resolved repo (terminal node's project `repo=`)
+            // when the caller omits one; an explicit caller repo still wins. repo
+            // is functional execution context (working directory), so this fused
+            // verb must propagate it, not just the display header fields (LIN-537).
+            repo: repo || rec.repo || null,
+            sessionId: sessionId || null,
+            // Opt-in completion hold (LIN-797), forwarded blindly to the runner.
+            waitForFollowUps: waitForFollowUps === true,
+            // Push-comms: `subscription` is the declared edge (LIN-900 §6),
+            // `terminal-only` unless the caller declares `everything`; queueIfBusy
+            // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
+            queueIfBusy: queueIfBusy === true,
+            subscription: subscriptionResolved
+          }
         });
 
         keepalive.stop();

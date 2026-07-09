@@ -130,6 +130,12 @@ describe('LIN-1084 — user-facing /api/dispatch carries the execution harness',
   });
 
   test('an omitted harness becomes null', async () => {
+    // The session route routes through the shared factory (LIN-1139) with
+    // applyDefaultHarness:false — it deliberately does NOT interpose the
+    // claude-code default (that is scoped to the proxy dispatch boundary,
+    // LIN-1159). The dispatch-page UI owns the harness default and offers an
+    // explicit "blank -> null" escape hatch (LIN-1111), so a blank harness must
+    // stay null here.
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', PATH, { prompt: 'run me' });

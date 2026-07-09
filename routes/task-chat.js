@@ -450,6 +450,9 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           sessionIsTerminal,
           followUpEnabled: true,
           dispatchedBy: req.session.linearUserId || null,
+          // LIN-1139: thread the workspace prefs store so a tool-driven follow-up
+          // resolves model/harness through the shared dispatch factory.
+          workspacePreferencesStore,
         });
         await streamChatWithTools(
           messages,

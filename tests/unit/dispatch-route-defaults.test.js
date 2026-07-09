@@ -9,6 +9,13 @@
  * same buildApp/call scaffolding, plus an injected workspacePreferencesStore
  * backed by a real WorkspacePreferencesStore over an in-memory collection so
  * the precedence logic runs against the actual store shape.
+ *
+ * LIN-1139: the session route now creates its item through the shared dispatch
+ * factory, but with applyDefaultHarness:false — it deliberately does NOT interpose
+ * the claude-code default (that is scoped to the proxy dispatch boundary,
+ * LIN-1159; the dispatch-page UI owns the harness default and its "blank -> null"
+ * escape hatch, LIN-1111). So a blank harness with no configured default stays
+ * null here, exactly as before. Only the DRY seam changed, not this behavior.
  */
 process.env.NODE_ENV = 'test';
 

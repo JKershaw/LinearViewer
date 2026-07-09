@@ -1314,7 +1314,7 @@ app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRoute
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
 const yapClient = yapClientFromEnv()
-app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, collectiveCharactersStore, collectivePresetsStore, yapClient, getOpenRouterSource, getDeployInfo }))
+app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, collectiveCharactersStore, collectivePresetsStore, yapClient, getOpenRouterSource, getDeployInfo, workspacePreferencesStore }))
 
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
