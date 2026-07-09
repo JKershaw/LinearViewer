@@ -86,6 +86,35 @@ describe('footer feedback surface (LIN-635)', () => {
     assert.match(deployRow[1], /footer-feedback-toggle/);
   });
 
+  // LIN-1132: the widget's model/harness exec-controls read the workspace
+  // dispatch default from the mount's data-default-* attrs (the same UX-only
+  // placeholder-hint seam the Dispatch page threads through its
+  // exec-controls container). This pins the server-rendered mount attributes;
+  // the client control render + payload wiring is covered by the E2E spec.
+  test('threads the workspace dispatch defaults onto the widget mount (LIN-1132)', () => {
+    const html = renderPageFooter({
+      urlKey: 'acme', featureFlags: { feedbackWidget: true },
+      dispatchDefaults: { model: 'anthropic/claude-opus-4.8', harness: 'opencode' }
+    });
+    assert.match(html, /id="feedback-widget-root"[^>]*data-default-model="anthropic\/claude-opus-4\.8"/);
+    assert.match(html, /id="feedback-widget-root"[^>]*data-default-harness="opencode"/);
+  });
+
+  test('renders blank default attrs when no dispatch defaults are configured (LIN-1132)', () => {
+    const html = renderPageFooter({ urlKey: 'acme', featureFlags: { feedbackWidget: true } });
+    assert.match(html, /id="feedback-widget-root"[^>]*data-default-model=""/);
+    assert.match(html, /id="feedback-widget-root"[^>]*data-default-harness=""/);
+  });
+
+  test('escapes dispatch default values in the mount attributes (LIN-1132)', () => {
+    const html = renderPageFooter({
+      urlKey: 'acme', featureFlags: { feedbackWidget: true },
+      dispatchDefaults: { model: '"><script>alert(1)</script>', harness: 'claude-code' }
+    });
+    assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
+    assert.match(html, /&lt;script&gt;/);
+  });
+
   test('is omitted on the unauthenticated landing footer', () => {
     const html = renderPageFooter({ isLanding: true, currentPage: '/' });
     assert.doesNotMatch(html, /feedback-widget-root/);

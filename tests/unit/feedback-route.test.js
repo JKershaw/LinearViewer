@@ -531,6 +531,166 @@ describe('feedback submit (LIN-635)', () => {
     assert.equal(item.harness, 'ws-autopilot-harness');
   });
 
+  // ── LIN-1132 — per-dispatch model/harness override from the feedback widget ──
+  // The widget may now include `model`/`harness` in the /api/feedback body to
+  // override the workspace default for that one dispatch. Validated server-side
+  // with the same opaque-field helper the dispatch/proxy routes use; blank/absent
+  // preserves the existing default-resolution behaviour exactly.
+
+  test("LIN-1132: action:'triage' forwards a body model/harness override to the dispatch item", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-override');
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore });
+
+    const { status } = await submit(app, 'acme', {
+      message: 'triage with override', action: 'triage',
+      model: 'anthropic/claude-opus-4', harness: 'opencode'
+    });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    const item = dispatch.items[0].item;
+    assert.strictEqual(item.kind, 'triage');
+    assert.strictEqual(item.model, 'anthropic/claude-opus-4');
+    assert.strictEqual(item.harness, 'opencode');
+  });
+
+  test("LIN-1132: action:'autopilot' forwards a body model/harness override to the dispatch item", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-override-auto');
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore });
+
+    const { status } = await submit(app, 'acme', {
+      message: 'autopilot with override', action: 'autopilot',
+      model: 'anthropic/claude-opus-4', harness: 'opencode'
+    });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    const item = dispatch.items[0].item;
+    assert.strictEqual(item.kind, 'autopilot');
+    assert.strictEqual(item.model, 'anthropic/claude-opus-4');
+    assert.strictEqual(item.harness, 'opencode');
+  });
+
+  test('LIN-1132: a body model/harness override wins over the workspace dispatchDefaults', async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-wins');
+
+    const store = new (await import('../../lib/workspace-preferences.js')).WorkspacePreferencesStore({
+      collection: (() => {
+        const docs = [];
+        return {
+          async findOne(query) { return docs.find(d => d._id === query._id) || null; },
+          async updateOne(query, update, options = {}) {
+            let doc = docs.find(d => d._id === query._id);
+            if (!doc) {
+              if (!options.upsert) return { matchedCount: 0 };
+              doc = { _id: query._id, ...(update.$setOnInsert || {}) };
+              docs.push(doc);
+            }
+            Object.assign(doc, update.$set || {});
+            return { matchedCount: 1 };
+          }
+        };
+      })()
+    });
+    await store.saveWorkspacePreferences('acme', {
+      dispatchDefaults: { model: 'workspace-model', harness: 'workspace-harness' }
+    });
+
+    const app = buildApp({
+      provider, dispatchQueueStore: dispatch,
+      proxyTokenStore, workspacePreferencesStore: store
+    });
+
+    const { status } = await submit(app, 'acme', {
+      message: 'override beats default', action: 'triage',
+      model: 'body-model', harness: 'body-harness'
+    });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    const item = dispatch.items[0].item;
+    assert.strictEqual(item.model, 'body-model');
+    assert.strictEqual(item.harness, 'body-harness');
+  });
+
+  test('LIN-1132: blank/absent body model/harness still resolves the workspace default (behaviour preserved)', async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-default');
+
+    const store = new (await import('../../lib/workspace-preferences.js')).WorkspacePreferencesStore({
+      collection: (() => {
+        const docs = [];
+        return {
+          async findOne(query) { return docs.find(d => d._id === query._id) || null; },
+          async updateOne(query, update, options = {}) {
+            let doc = docs.find(d => d._id === query._id);
+            if (!doc) {
+              if (!options.upsert) return { matchedCount: 0 };
+              doc = { _id: query._id, ...(update.$setOnInsert || {}) };
+              docs.push(doc);
+            }
+            Object.assign(doc, update.$set || {});
+            return { matchedCount: 1 };
+          }
+        };
+      })()
+    });
+    await store.saveWorkspacePreferences('acme', {
+      dispatchDefaults: { model: 'workspace-model', harness: 'workspace-harness' }
+    });
+
+    const app = buildApp({
+      provider, dispatchQueueStore: dispatch,
+      proxyTokenStore, workspacePreferencesStore: store
+    });
+
+    // No model/harness in the body → factory resolves the workspace default.
+    const { status } = await submit(app, 'acme', { message: 'no override', action: 'triage' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    const item = dispatch.items[0].item;
+    assert.strictEqual(item.model, 'workspace-model');
+    assert.strictEqual(item.harness, 'workspace-harness');
+  });
+
+  test('LIN-1132: an invalid model is rejected with 400 before any ticket is filed', async () => {
+    const { provider, calls } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore() });
+
+    // A non-string model fails validateOpaqueDispatchField — same reject the
+    // dispatch/proxy routes use (400 + "model must be a string").
+    const { status, body } = await submit(app, 'acme', { message: 'bad model', action: 'triage', model: 42 });
+
+    assert.strictEqual(status, 400);
+    assert.match(body.error, /model must be a string/);
+    // Rejected up front: no ticket created, nothing enqueued.
+    assert.strictEqual(calls.createIssue.length, 0);
+    assert.strictEqual(dispatch.items.length, 0);
+  });
+
+  test('LIN-1132: an invalid harness is rejected with 400 before any ticket is filed', async () => {
+    const { provider, calls } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore() });
+
+    // A control character in the harness trips the dangerous-chars guard.
+    const { status, body } = await submit(app, 'acme', { message: 'bad harness', action: 'autopilot', harness: 'open\x00code' });
+
+    assert.strictEqual(status, 400);
+    assert.match(body.error, /harness contains invalid characters/);
+    assert.strictEqual(calls.createIssue.length, 0);
+    assert.strictEqual(dispatch.items.length, 0);
+  });
+
   test('LIN-1138/LIN-1164: feedback dispatch with no defaults leaves model null and interposes the claude-code harness default', async () => {
     // LIN-1164: the feedback paths route through the shared factory and now
     // inherit its default harness interpose. With no configured workspace default,

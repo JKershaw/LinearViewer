@@ -43,6 +43,7 @@ const RECOMMEND_DESCENT_BUDGET_MS = 180_000;
 const CONTEXT_FETCH_TIMEOUT_MS = 45_000;
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
+import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
@@ -2142,7 +2143,7 @@ ${goal}`
   // best-effort readWrite token + the standard "Workspace API access" block)
   // so the triage agent can ground itself and update the ticket — the same
   // preamble the proxy dispatch endpoints append.
-  async function enqueueFeedbackTriage(workspace, issue, priority, session, baseUrl) {
+  async function enqueueFeedbackTriage(workspace, issue, priority, session, baseUrl, overrides = {}) {
     if (!dispatchQueueStore || !issue?.identifier) return;
     try {
       const triageIssue = {
@@ -2182,6 +2183,12 @@ ${goal}`
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
         kind: 'triage',
+        // Optional per-dispatch override from the feedback widget (LIN-1132).
+        // Blank/absent falls through to the factory's default resolution
+        // (workspace dispatchDefaults → claude-code interpose), byte-identical to
+        // before this override path existed.
+        model: overrides.model,
+        harness: overrides.harness,
         finalizePrompt: (resolvedHarness) => attachProxyContext({
           proxyTokenStore,
           urlKey: workspace.urlKey,
@@ -2220,7 +2227,7 @@ ${goal}`
   // +proxy block)", so the `attachProxyContext` mint+append (LIN-1157) is how
   // the run gets its API access — the same append the triage path makes. (The store
   // then appends the "Your autopilot session id" block for `kind: 'autopilot'`.)
-  async function enqueueFeedbackAutopilot(workspace, issue, session, baseUrl) {
+  async function enqueueFeedbackAutopilot(workspace, issue, session, baseUrl, overrides = {}) {
     if (!dispatchQueueStore || !issue?.identifier || !baseUrl) return;
     try {
       const kickoff = buildAutopilotKickoff({
@@ -2247,6 +2254,12 @@ ${goal}`
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
         kind: 'autopilot',
+        // Optional per-dispatch override from the feedback widget (LIN-1132).
+        // Blank/absent falls through to the factory's default resolution
+        // (workspace dispatchDefaults → claude-code interpose), byte-identical to
+        // before this override path existed.
+        model: overrides.model,
+        harness: overrides.harness,
         finalizePrompt: (resolvedHarness) => attachProxyContext({
           proxyTokenStore,
           urlKey: workspace.urlKey,
@@ -2290,6 +2303,20 @@ ${goal}`
     // anything else (including an omitted `action`) is the legacy plain send.
     const rawAction = typeof req.body?.action === 'string' ? req.body.action : null;
     const action = FEEDBACK_ACTIONS.has(rawAction) ? rawAction : null;
+
+    // Optional per-dispatch execution overrides from the feedback widget
+    // (LIN-1132). Validated with the SAME opaque-field helper the dispatch/proxy
+    // routes use (type/length/dangerous-chars only, NOT a model registry); blank/
+    // absent stays valid and falls through to the factory's default resolution.
+    const { model, harness } = req.body || {};
+    const modelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
+    if (modelValidationError) {
+      return badRequest.json(res, modelValidationError.error);
+    }
+    const harnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+    if (harnessValidationError) {
+      return badRequest.json(res, harnessValidationError.error);
+    }
 
     if (!message || typeof message !== 'string' || !message.trim()) {
       return badRequest.json(res, 'message is required');
@@ -2411,11 +2438,11 @@ ${goal}`
       // behaviour: triage only when the per-user `feedbackTriage` flag is on.
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       if (action === 'triage') {
-        await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl);
+        await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness });
       } else if (action === 'autopilot') {
-        await enqueueFeedbackAutopilot(workspace, result.issue, req.session, baseUrl);
+        await enqueueFeedbackAutopilot(workspace, result.issue, req.session, baseUrl, { model, harness });
       } else if (!action && getFeatureFlags(req.session).feedbackTriage) {
-        await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl);
+        await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness });
       }
 
       return res.status(201).json({ success: true, issue: result.issue });
