@@ -199,9 +199,12 @@ describe('attachProxyContext — claude-code MCP path (LIN-1155)', () => {
   });
 });
 
-describe('attachProxyContext — graceful degradation (both paths)', () => {
+describe('attachProxyContext — prose path degrades gracefully (unchanged, LIN-1157)', () => {
+  // Non-claude-code (prose) delivery keeps the historical no-op on failure: the
+  // token is embedded inline when present, so its absence just means no proxy
+  // access and the prompt never claims otherwise. NEVER throws.
   test('mint returns no token: prompt unchanged, bootstrapToken null', async () => {
-    for (const harness of [null, 'claude-code']) {
+    for (const harness of [null, 'opencode']) {
       const store = fakeStore({ result: { token: null } });
       const out = await attachProxyContext({
         proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', prompt: BASE, harness
@@ -217,25 +220,75 @@ describe('attachProxyContext — graceful degradation (both paths)', () => {
     let out;
     await assert.doesNotReject(async () => {
       out = await attachProxyContext({
-        proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', prompt: BASE, harness: 'claude-code'
+        proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', prompt: BASE, harness: 'opencode'
       });
     });
     assert.equal(out.prompt, BASE);
     assert.equal(out.bootstrapToken, null);
   });
 
-  test('no proxyTokenStore: prompt unchanged, no mint attempted', async () => {
-    const out = await attachProxyContext({ proxyTokenStore: null, urlKey: 'acme', baseUrl: 'https://host', prompt: BASE, harness: 'claude-code' });
-    assert.equal(out.prompt, BASE);
-    assert.equal(out.bootstrapToken, null);
+  test('no proxyTokenStore / falsy baseUrl: prompt unchanged, no mint attempted', async () => {
+    const a = await attachProxyContext({ proxyTokenStore: null, urlKey: 'acme', baseUrl: 'https://host', prompt: BASE, harness: 'opencode' });
+    assert.equal(a.prompt, BASE);
+    assert.equal(a.bootstrapToken, null);
+    const store = fakeStore();
+    const b = await attachProxyContext({ proxyTokenStore: store, urlKey: 'acme', baseUrl: '', prompt: BASE, harness: 'opencode' });
+    assert.equal(b.prompt, BASE);
+    assert.equal(b.bootstrapToken, null);
+    assert.equal(store.calls.length, 0, 'no mint without a baseUrl');
+  });
+});
+
+describe('attachProxyContext — claude-code MCP path fails CLOSED (LIN-1175)', () => {
+  // Out-of-band (bootstrapToken field + MCP tool) delivery has NO in-prompt
+  // fallback: any inability to attach a token must THROW so the dispatch is
+  // refused, never silently launch a credential-less claude-code session whose
+  // prompt still claims a token was "supplied alongside" it (the dead-session bug).
+  const MCP_HARNESSES = ['claude-code', '  Claude-Code  '];
+
+  test('mint returns no token: throws (does NOT return the prompt unchanged)', async () => {
+    for (const harness of MCP_HARNESSES) {
+      const store = fakeStore({ result: { token: null } });
+      await assert.rejects(
+        () => attachProxyContext({ proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', prompt: BASE, harness }),
+        /LIN-1175/,
+        `throws for harness=${JSON.stringify(harness)}`
+      );
+      assert.equal(store.calls.length, 1, 'mint was attempted before failing closed');
+    }
   });
 
-  test('falsy baseUrl: prompt unchanged, no mint attempted', async () => {
+  test('mint throws: the failure propagates (fail closed), not swallowed', async () => {
+    const store = fakeStore({ throwErr: new Error('boom') });
+    await assert.rejects(
+      () => attachProxyContext({ proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', prompt: BASE, harness: 'claude-code' }),
+      /LIN-1175/
+    );
+  });
+
+  test('no proxyTokenStore: throws before any mint (no silent credential-less dispatch)', async () => {
+    await assert.rejects(
+      () => attachProxyContext({ proxyTokenStore: null, urlKey: 'acme', baseUrl: 'https://host', prompt: BASE, harness: 'claude-code' }),
+      /LIN-1175/
+    );
+  });
+
+  test('falsy baseUrl: throws before any mint attempt', async () => {
     const store = fakeStore();
-    const out = await attachProxyContext({ proxyTokenStore: store, urlKey: 'acme', baseUrl: '', prompt: BASE, harness: 'claude-code' });
-    assert.equal(out.prompt, BASE);
-    assert.equal(out.bootstrapToken, null);
-    assert.equal(store.calls.length, 0);
+    await assert.rejects(
+      () => attachProxyContext({ proxyTokenStore: store, urlKey: 'acme', baseUrl: '', prompt: BASE, harness: 'claude-code' }),
+      /LIN-1175/
+    );
+    assert.equal(store.calls.length, 0, 'no mint attempted without a baseUrl');
+  });
+
+  test('success path is untouched — token attaches, no throw', async () => {
+    const store = fakeStore({ token: 'TOK123' });
+    const out = await attachProxyContext({
+      proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', prompt: BASE, harness: 'claude-code'
+    });
+    assert.equal(out.bootstrapToken, 'TOK123');
+    assert.ok(out.prompt.includes(MARKER), 'access block still appended on success');
   });
 });
 

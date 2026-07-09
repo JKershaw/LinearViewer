@@ -320,6 +320,12 @@ const TEST_LOCAL_URL_KEY = 'local-workspace';
 const PROMPT_PROXY_LABEL = 'prompt-proxy';
 const PROMPT_PROXY_TOKEN_TTL_SECONDS = 48 * 60 * 60;
 
+// LIN-1175: fail-closed 503 message for a claude-code dispatch whose out-of-band
+// bootstrap token could not be minted. attachProxyContext refuses (throws with
+// proxyAttachFailed) rather than launch a credential-less session; the route
+// surfaces this transient, retryable condition instead of a silent bare dispatch.
+const PROXY_ATTACH_FAILED_MESSAGE = 'Proxy context was requested but a proxy token could not be created (LIN-1175) — refusing to launch a credential-less session; you may have hit the token rate limit, wait a minute and retry.';
+
 // LIN-376: every handoff (dispatch preamble, feedback, collective, page copy,
 // +proxy toggle) embeds a single-use BOOTSTRAP token, never a standing/working
 // one. The agent exchanges it at POST /api/proxy/token for a multi-use working
@@ -4234,6 +4240,14 @@ One convention across every endpoint, so you can branch on the same fields every
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
       });
     } catch (err) {
+      // Fail closed (LIN-1175): a claude-code dispatch whose out-of-band bootstrap
+      // token could not be minted must be REFUSED, never launched credential-less.
+      // attachProxyContext flags this as proxyAttachFailed (same convention as the
+      // dispatch.js route) — surface it as a transient 503, not a generic 500.
+      if (err && err.proxyAttachFailed) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 503);
+        return jsonError(res, 503, PROXY_ATTACH_FAILED_MESSAGE);
+      }
       logEvent(req, '/api/proxy/autopilot/kickoff', 500);
       console.error('Proxy autopilot kickoff error:', err.message);
       jsonError(res, 500, 'Failed to dispatch autopilot kickoff');
@@ -4474,6 +4488,11 @@ One convention across every endpoint, so you can branch on the same fields every
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
       });
     } catch (err) {
+      // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
+      if (err && err.proxyAttachFailed) {
+        logEvent(req, '/api/proxy/dispatch', 503);
+        return jsonError(res, 503, PROXY_ATTACH_FAILED_MESSAGE);
+      }
       logEvent(req, '/api/proxy/dispatch', 500);
       console.error('Proxy dispatch error:', err.message);
       jsonError(res, 500, 'Failed to dispatch prompt');
@@ -4704,6 +4723,11 @@ One convention across every endpoint, so you can branch on the same fields every
             override: true
           });
         } catch (err) {
+          // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
+          if (err && err.proxyAttachFailed) {
+            logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
+            return jsonError(res, 503, PROXY_ATTACH_FAILED_MESSAGE);
+          }
           logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
           console.error('Proxy recommend-and-dispatch override error:', err.message);
           return jsonError(res, 500, 'Failed to dispatch prompt');
@@ -4869,6 +4893,11 @@ One convention across every endpoint, so you can branch on the same fields every
         });
       } catch (err) {
         keepalive.stop();
+        // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
+        if (err && err.proxyAttachFailed) {
+          logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
+          return keepalive.send(503, { error: PROXY_ATTACH_FAILED_MESSAGE });
+        }
         logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
         console.error('Proxy recommend-and-dispatch error:', err.message);
         keepalive.send(500, { error: 'Failed to dispatch prompt' });

@@ -26,6 +26,9 @@ function buildApp(captured) {
   app.use(express.json());
   app.use(createProxyRoutes({
     proxyTokenStore: {
+      // LIN-1175: claude-code (default harness) dispatch now fails closed without a
+      // mintable token; give the stub a minting createToken like production.
+      createToken: async () => ({ token: "test-bootstrap", kind: "bootstrap", scope: "readWrite" }),
       validateToken: async () => ({
         tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1'
       })
