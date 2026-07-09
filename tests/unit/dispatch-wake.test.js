@@ -461,3 +461,115 @@ describe('addFeedback wake — edge ownership across a follow-up repoint (LIN-10
     assert.equal(wakeItems(collection, historyCollection).length, 1, 'the heartbeat did not re-fire the earlier pending wake');
   });
 });
+
+// ── LIN-1165: up-chain wake self-loop guard ──────────────────────────────────
+//
+// The kind:'wake' loop guard was applied only to the RESOLVED edge doc, so
+// `_resolveEdgeDoc` walking PAST a kind:'wake' feedback item to a real root
+// dispatch defeated it: a session executing a RECEIVED wake and posting its own
+// terminal could mint a fresh wake back into itself (the self-loop). The fix
+// applies the guard to the ORIGINAL feedback `doc` (the self-termination shape)
+// AND rejects any mint whose `followUpTo` points back at the feedback doc — while
+// staying SELECTIVE so LIN-1059's repoint edge (a subscribed child's outcome
+// riding on a kind:'wake' carrier) still bubbles to its DISTINCT ancestor.
+describe('addFeedback wake — LIN-1165 self-loop guard', () => {
+  const wakesTo = (collection, historyCollection, target) =>
+    wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
+
+  // The exact LIN-1165 self-loop topology. A received wake item W (the doc that
+  // RECEIVES the terminal feedback) whose followUpTo resolves to a REAL root R —
+  // so `_resolveEdgeDoc` walks PAST W (the bug: the kind:'wake' guard is defeated)
+  // — and R's own edge points back at W (`R.sessionId === W._id`). Under the old
+  // `buildWakeFollowUp(edgeDoc, …)` seam this minted a wake addressed to W: a
+  // self-loop back into the producing item. Returns { wakeId, rootId }.
+  async function seedSelfLoopTopology(store) {
+    const root = await store.addItem(URL_KEY, {
+      prompt: 'root that loops back onto the wake', kind: 'autopilot', issueIdentifier: 'LIN-1165'
+    });
+    await store.takeItem(root._id, URL_KEY, 'token-r');
+    const wake = await store.addItem(URL_KEY, {
+      prompt: 'received wake, now finishing', kind: 'wake', issueIdentifier: 'LIN-1165',
+      followUpTo: root._id, sessionId: root._id, subscription: 'terminal-only'
+    });
+    await store.takeItem(wake._id, URL_KEY, 'token-w');
+    // Close the loop on the resolved edge: R's own session points back at W, so the
+    // OLD seam (guard on edgeDoc, not doc) would mint a wake addressed to W.
+    await store.historyCollection.updateOne({ _id: root._id }, { $set: { sessionId: wake._id } });
+    return { wakeId: wake._id, rootId: root._id };
+  }
+
+  test('CASE 1 — a received wake posting its own terminal does NOT self-loop a fresh wake back into the producing session (kind:wake guard no longer defeated by _resolveEdgeDoc)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const { wakeId } = await seedSelfLoopTopology(store);
+
+    const res = await store.addFeedback(wakeId, URL_KEY, { message: '[done] cross-check complete' }, 'token-w');
+    await drain();
+
+    assert.ok(res && res.success, 'the terminal feedback is recorded and the session finalizes');
+    // No wake addressed back into the producing item — the self-loop is broken.
+    // (On the pre-fix code the resolved root R minted a wake with followUpTo === W.)
+    assert.equal(wakesTo(collection, historyCollection, wakeId).length, 0,
+      'no fresh wake is minted back into the producing wake item');
+  });
+
+  test('CASE 2 — a stale/superseded terminal on an already-handled edge does NOT re-deliver a wake (terminalWakeEnqueued one-shot)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const child = await takenChild(store, { kind: 'implementation', subscription: 'terminal-only' });
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[done] merged abc123' }, 'token-a');
+    await drain();
+    assert.equal(wakeItems(collection, historyCollection).length, 1, 'the terminal fires exactly one wake');
+
+    // A stale / superseded re-report of the same terminal on the already-witnessed edge.
+    await store.addFeedback(child._id, URL_KEY, { message: '[done] merged abc123 (re-reported)' }, 'token-a');
+    await drain();
+    assert.equal(wakeItems(collection, historyCollection).length, 1,
+      'no second wake for the already-handled edge (stale re-delivery suppressed)');
+
+    const childDoc = await store.historyCollection.findOne({ _id: child._id });
+    assert.equal(childDoc.terminalWakeEnqueued, true, 'the edge carries the one-shot terminal witness');
+  });
+
+  test('LIN-1059 PIN — a genuine NON-wake child terminal (kind:implementation) STILL bubbles a wake to the parent (fix is selective, not blanket kind:wake suppression)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    // The fix must not re-sever genuine wakes. A real child terminal (a non-wake
+    // kind) still mints its up-chain wake exactly as before.
+    const child = await takenChild(store, { kind: 'implementation', subscription: 'terminal-only' });
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[done] LIN-42 shipped' }, 'token-a');
+    await drain();
+
+    const wakes = wakeItems(collection, historyCollection);
+    assert.equal(wakes.length, 1, 'a real child terminal still wakes its parent');
+    assert.equal(wakes[0].followUpTo, 'parent-S1', 'bubbles up-chain to the orchestrator — not severed');
+  });
+
+  test('LIN-1059 PIN — a subscribed-stepper beat riding on a kind:wake repoint carrier STILL bubbles up-chain (the fix did not re-sever the repointed edge)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    // LIN-1059 ("wake edge severed by follow-up itemId repoint") topology: a stepper
+    // ROOT (edge → grandparent, everything) is resumed via an incoming grandchild
+    // wake (kind:'wake', followUpTo/sessionId = ROOT) onto which the runner repoints
+    // ownership. A subscribed [pending] beat now lands on that kind:'wake' carrier.
+    // The LIN-1165 doc-level kind:'wake' guard must NOT suppress it, because
+    // _resolveEdgeDoc resolves to the DISTINCT root whose edge points at the
+    // grandparent — a blanket `doc.kind === 'wake'` skip would re-sever this wake.
+    const GP = 'grandparent-S1';
+    const root = await store.addItem(URL_KEY, {
+      prompt: 'stepper for LIN-1046', kind: 'autopilot', issueIdentifier: 'LIN-1046',
+      sessionId: GP, subscription: 'everything'
+    });
+    await store.takeItem(root._id, URL_KEY, 'token-a');
+    const repoint = await store.addItem(URL_KEY, {
+      prompt: 'grandchild wake (resume target)', kind: 'wake', issueIdentifier: 'LIN-1046',
+      followUpTo: root._id, sessionId: root._id, subscription: 'terminal-only'
+    });
+    await store.takeItem(repoint._id, URL_KEY, 'token-b');
+
+    await store.addFeedback(repoint._id, URL_KEY, { message: '[pending] beat 2/4 done, standing by' }, 'token-b');
+    await drain();
+
+    const wakes = wakesTo(collection, historyCollection, GP);
+    assert.equal(wakes.length, 1, 'the PENDING beat still bubbles to the grandparent via the resolved root edge');
+    assert.match(wakes[0].prompt, /paused \(pending\), not done/i, 'and is a labelled pause, not a terminal');
+  });
+});
