@@ -324,11 +324,15 @@ window.api = async function api(url, opts = {}) {
  * The dispatch history these records become is joined back to tasks by
  * `issueIdentifier` (see lib/pipeline-loops.js), so it is required by default.
  *
- * Proxy-context appending is handled internally (LIN-1137): callers pass the raw
- * prompt and `dispatchPrompt` appends the `+proxy` block when the toggle is on
- * (or when `proxyForce` is set), so no surface needs to remember to call
- * `ProxyToggle.maybeAppend` separately before dispatch. Copy/download flows keep
- * their own direct `ProxyToggle.maybeAppend` calls.
+ * Proxy-context appending is handled by the SERVER for dispatch (LIN-1162): callers
+ * pass the raw prompt and `dispatchPrompt` sends an `attachProxy` boolean (true when
+ * the +proxy toggle is on, or `proxyForce` is set) so routes/dispatch.js mints the
+ * bootstrap and attaches the access block through the harness-aware
+ * attachProxyContext seam — a claude-code dispatch then carries the token as the
+ * structured `bootstrapToken` field instead of injectable prose. The client no
+ * longer mints or appends for dispatch (that would double-append and could never
+ * take the MCP path). Copy/download flows keep their own client-side
+ * `ProxyToggle.maybeAppend` calls (dashboard manual copy/paste, unaffected).
  *
  * @global
  * @param {Object} opts
@@ -346,8 +350,8 @@ window.api = async function api(url, opts = {}) {
  * @param {string} [opts.kind]               Explicit dispatch kind (e.g. 'autopilot'); omit to derive from promptName
  * @param {string} [opts.model]              Execution model (opaque string, LIN-1084); blank/omitted inherits the consumer's own default (LIN-1094)
  * @param {string} [opts.harness]            Execution harness (opaque string, LIN-1084); blank/omitted inherits the consumer's own default (LIN-1094)
- * @param {boolean} [opts.appendProxyContext=true]  When true, append proxy block via ProxyToggle.maybeAppend before POST (LIN-1137)
- * @param {boolean} [opts.proxyForce=false]         Pass `force:true` through to ProxyToggle.maybeAppend (LIN-645)
+ * @param {boolean} [opts.appendProxyContext=true]  When true, let the server attach proxy context (send `attachProxy`) if the toggle/force says so (LIN-1162); false opts out entirely
+ * @param {boolean} [opts.proxyForce=false]         Force `attachProxy:true` regardless of the toggle (LIN-645) — for surfaces whose prompt requires the proxy (e.g. next-run kickoff)
  * @param {string} [opts.followUpTo]                Resume a prior session (cli/web only); forwarded to the server as an opaque id
  * @param {boolean} [opts.force]                    Whether to force-follow-up even into a terminal session
  * @returns {Promise<Object>} Parsed JSON response body
@@ -366,11 +370,18 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
     throw new Error('dispatchPrompt: issue with id and identifier is required (pass issueless:true to opt out)');
   }
 
-  const finalPrompt = appendProxyContext
-    ? await window.ProxyToggle.maybeAppend(prompt, urlKey, { force: proxyForce })
-    : prompt;
+  // Proxy context is attached SERVER-SIDE for dispatch (LIN-1162): send the raw
+  // prompt plus an `attachProxy` intent and let routes/dispatch.js mint the bootstrap
+  // and append the harness-aware block (claude-code → structured `bootstrapToken`
+  // field, no injectable token/curl prose). `appendProxyContext:false` opts out
+  // entirely; otherwise the +proxy toggle (or `proxyForce`) decides. No client mint,
+  // so no double-append and no client-side throw — a failed server mint surfaces as
+  // a 503 from the POST below, preserving the "surface, don't silently drop" contract.
+  const attachProxy = appendProxyContext
+    && window.ProxyToggle.shouldAppend(urlKey, { force: proxyForce });
 
-  const payload = { prompt: finalPrompt, promptName, target };
+  const payload = { prompt, promptName, target };
+  if (attachProxy) payload.attachProxy = true;
   // `kind` is normally derived server-side from promptName; pass it explicitly
   // only for meta-loops that don't map to a prompt template (e.g. 'autopilot').
   if (kind) payload.kind = kind;
@@ -811,6 +822,23 @@ window.ProxyToggle = (function () {
   }
 
   /**
+   * Decide whether a prompt SHOULD carry proxy context, WITHOUT minting a token or
+   * appending anything (LIN-1162). Same gate as `maybeAppend` — active + feature-on,
+   * or `force` — but it returns only the boolean intent. The dispatch choke point
+   * uses this to set `attachProxy` on the payload and let the SERVER mint + append
+   * (harness-aware, so claude-code takes the MCP `bootstrapToken` field path). The
+   * "surface, don't silently drop" contract moves to the server, which 503s when the
+   * mint fails rather than enqueuing a bare prompt. Copy/download keep `maybeAppend`.
+   * @param {string} urlKey
+   * @param {{ force?: boolean }} [opts]
+   * @returns {boolean}
+   */
+  function shouldAppend(urlKey, opts) {
+    if (opts && opts.force) return true;
+    return isActive() && isFeatureEnabled();
+  }
+
+  /**
    * Restore the rendered state and wire a single delegated click handler for
    * every +proxy button on the page (current and future-injected).
    */
@@ -825,7 +853,7 @@ window.ProxyToggle = (function () {
     });
   }
 
-  return { isActive, isFeatureEnabled, getOrCreateToken, invalidate, buildBlock, maybeAppend, init, setActive };
+  return { isActive, isFeatureEnabled, getOrCreateToken, invalidate, buildBlock, maybeAppend, shouldAppend, init, setActive };
 })();
 
 // Back-compat global consumed by app.js / dispatch.js call sites
