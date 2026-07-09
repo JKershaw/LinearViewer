@@ -27,13 +27,20 @@ before(() => { process.env.NODE_ENV = 'test'; });
 
 const URL_KEY = 'test-workspace';
 
-/** Build an app with the proxy router + a fake readWrite token and dispatch store. */
-function buildApp() {
+/**
+ * Build an app with the proxy router + a fake readWrite token and dispatch store.
+ * `createToken` overrides the bootstrap mint (default: a working mint like
+ * production) so a test can exercise the LIN-1175 fail-closed path.
+ */
+function buildApp({ createToken } = {}) {
   const added = [];
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
     proxyTokenStore: {
+      // LIN-1175: claude-code (default harness) dispatch now fails closed without a
+      // mintable token; give the stub a minting createToken like production.
+      createToken: createToken || (async () => ({ token: "test-bootstrap", kind: "bootstrap", scope: "readWrite" })),
       validateToken: async () => ({
         tokenId: 't1', urlKey: URL_KEY, label: 'test', scope: 'readWrite', createdBy: 'u1',
       }),
@@ -345,4 +352,28 @@ test('POST kickoff (LIN-1138): harness validation rejects non-string, over-lengt
   });
   assert.equal(r3.status, 400);
   assert.match(r3.body.error, /harness contains invalid characters/);
+});
+
+// LIN-1175 — a claude-code autopilot kickoff (the DEFAULT harness) must FAIL
+// CLOSED when its out-of-band bootstrap token can't be minted, never launch a
+// credential-less session. This is the regression test for the dead-session bug:
+// before the fix, attachProxyContext degraded to a no-op and the kickoff enqueued
+// a token-less prompt that still claimed "a token is supplied alongside" it.
+test('POST kickoff: mint returns no token -> 503, nothing enqueued (fail closed)', async () => {
+  const { app, added } = buildApp({ createToken: async () => ({ token: null }) });
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST', body: { goal: 'walk the stack' },
+  });
+  assert.equal(status, 503, JSON.stringify(body));
+  assert.match(body.error, /LIN-1175|credential-less|proxy token could not be created/i);
+  assert.equal(added.length, 0, 'no credential-less item is enqueued');
+});
+
+test('POST kickoff: mint throws -> 503, nothing enqueued (fail closed)', async () => {
+  const { app, added } = buildApp({ createToken: async () => { throw new Error('rate limited'); } });
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST', body: { goal: 'walk the stack' },
+  });
+  assert.equal(status, 503);
+  assert.equal(added.length, 0, 'no credential-less item is enqueued');
 });
