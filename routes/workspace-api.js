@@ -24,8 +24,7 @@ import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } 
 import { renderDetailsContent } from '../lib/render.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
-import { buildProxyContextPreamble } from '../lib/proxy-preamble.js';
-import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
+import { attachProxyContext } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, streamChat, resolveReasoningBudget, getModelDisplayName, AVAILABLE_MODELS, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { getModelCatalog } from '../lib/openrouter-catalog.js';
@@ -2164,16 +2163,14 @@ ${goal}`
       // POST /api/proxy/token for a working token. If minting is unavailable or
       // fails, fall back to dispatching without the block rather than dropping the
       // triage entirely (best-effort, like the enqueue itself).
-      if (proxyTokenStore && baseUrl) {
-        try {
-          const minted = await proxyTokenStore.createToken(workspace.urlKey, { kind: 'bootstrap', scope: 'readWrite', label: 'feedback-triage', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS });
-          if (minted?.token) {
-            prompt += buildProxyContextPreamble({ baseUrl, token: minted.token, issueIdentifier: issue.identifier });
-          }
-        } catch (err) {
-          console.error('Feedback triage proxy token mint failed:', err.message);
-        }
-      }
+      prompt = await attachProxyContext({
+        proxyTokenStore,
+        urlKey: workspace.urlKey,
+        baseUrl,
+        issueIdentifier: issue.identifier,
+        prompt,
+        label: 'feedback-triage'
+      });
 
       // Resolve model/harness from workspace dispatchDefaults (LIN-1138).
       // These call sites don't accept user-supplied model/harness, so
@@ -2219,7 +2216,7 @@ ${goal}`
   // it explicitly in the widget.
   //
   // The kickoff assumes a readWrite token is "supplied alongside this prompt (the
-  // +proxy block)", so the minted token + `buildProxyContextPreamble` block is how
+  // +proxy block)", so the `attachProxyContext` mint+append (LIN-1157) is how
   // the run gets its API access — the same append the triage path makes. (The store
   // then appends the "Your autopilot session id" block for `kind: 'autopilot'`.)
   async function enqueueFeedbackAutopilot(workspace, issue, session, baseUrl) {
@@ -2231,17 +2228,15 @@ ${goal}`
         originNote: FEEDBACK_AUTOPILOT_ORIGIN_NOTE
       });
 
-      if (proxyTokenStore) {
-        try {
-          // LIN-376: single-use bootstrap, exchanged by the run for a working token.
-          const minted = await proxyTokenStore.createToken(workspace.urlKey, { kind: 'bootstrap', scope: 'readWrite', label: 'feedback-autopilot', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS });
-          if (minted?.token) {
-            prompt += buildProxyContextPreamble({ baseUrl, token: minted.token, issueIdentifier: issue.identifier });
-          }
-        } catch (err) {
-          console.error('Feedback autopilot proxy token mint failed:', err.message);
-        }
-      }
+      // LIN-376: single-use bootstrap, exchanged by the run for a working token.
+      prompt = await attachProxyContext({
+        proxyTokenStore,
+        urlKey: workspace.urlKey,
+        baseUrl,
+        issueIdentifier: issue.identifier,
+        prompt,
+        label: 'feedback-autopilot'
+      });
 
       // Resolve model/harness from workspace dispatchDefaults (LIN-1138).
       // The feedback autopilot doesn't accept user-supplied model/harness,
