@@ -9,6 +9,13 @@
  * same buildApp/call scaffolding, plus an injected workspacePreferencesStore
  * backed by a real WorkspacePreferencesStore over an in-memory collection so
  * the precedence logic runs against the actual store shape.
+ *
+ * LIN-1139 CONVERGENCE: the session route now creates its item through the
+ * shared dispatch factory, which applies applyDefaultDispatchHarness (LIN-1159)
+ * uniformly — so a blank `harness` with no configured default resolves to
+ * 'claude-code' (matching the proxy dispatch twin), not null. `model` keeps its
+ * null passthrough (no default interposed). The "no default configured" cases
+ * below therefore assert model:null but harness:'claude-code'.
  */
 process.env.NODE_ENV = 'test';
 
@@ -83,17 +90,17 @@ async function call(app, method, path, body) {
 const PATH = '/workspace/acme/api/dispatch';
 
 describe('LIN-1094 — backward compatibility: no defaults configured', () => {
-  test('no workspacePreferencesStore wired at all: null passthrough unchanged', async () => {
+  test('no workspacePreferencesStore wired at all: model null passthrough, harness defaults to claude-code (LIN-1139)', async () => {
     const captured = {};
     const app = buildApp(captured); // workspacePreferencesStore omitted entirely
     const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'implementation' });
 
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.strictEqual(captured.item.model, null);
-    assert.strictEqual(captured.item.harness, null);
+    assert.strictEqual(captured.item.harness, 'claude-code');
   });
 
-  test('a store is wired but no dispatchDefaults are configured: null passthrough unchanged', async () => {
+  test('a store is wired but no dispatchDefaults are configured: model null passthrough, harness defaults to claude-code (LIN-1139)', async () => {
     const store = new WorkspacePreferencesStore({ collection: createMockCollection() });
     const captured = {};
     const app = buildApp(captured, { workspacePreferencesStore: store });
@@ -101,7 +108,7 @@ describe('LIN-1094 — backward compatibility: no defaults configured', () => {
 
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.strictEqual(captured.item.model, null);
-    assert.strictEqual(captured.item.harness, null);
+    assert.strictEqual(captured.item.harness, 'claude-code');
   });
 
   test('an explicit model/harness still wins over configured defaults (no resolution needed)', async () => {
@@ -213,7 +220,7 @@ describe('LIN-1094 — precedence: per-kind override > workspace-wide > null', (
     assert.equal(captured.item.harness, 'workspace-harness');
   });
 
-  test('is workspace-scoped: another workspace with no defaults still gets null passthrough', async () => {
+  test('is workspace-scoped: another workspace with no defaults gets model null passthrough, harness claude-code (LIN-1139)', async () => {
     const store = new WorkspacePreferencesStore({ collection: createMockCollection() });
     await store.saveWorkspacePreferences('acme', {
       dispatchDefaults: { model: 'workspace-model', harness: 'workspace-harness' }
@@ -224,6 +231,6 @@ describe('LIN-1094 — precedence: per-kind override > workspace-wide > null', (
 
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.strictEqual(captured.item.model, null);
-    assert.strictEqual(captured.item.harness, null);
+    assert.strictEqual(captured.item.harness, 'claude-code');
   });
 });

@@ -23,6 +23,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { normalizeYapChannel, nickFromWorkspaceName, randomChannelName } from '../lib/yap-client.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
+import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { jsonError, notFound } from '../lib/errors.js';
 import {
   buildCollectiveParticipantPrompt,
@@ -83,6 +84,7 @@ export function createCollectiveRoutes({
   yapClient,
   getOpenRouterSource,
   getDeployInfo,
+  workspacePreferencesStore,
 }) {
   const router = Router();
 
@@ -301,12 +303,25 @@ export function createCollectiveRoutes({
         : buildCollectiveParticipantPrompt(buildArgs);
 
       try {
-        const item = await dispatchQueueStore.addItem(ws.urlKey, {
-          prompt,
-          promptName: isFacilitator ? 'collective-facilitator' : 'collective-participant',
+        // Create through the shared factory (LIN-1139). CONVERGENCE (LIN-1135):
+        // the collective fan-out previously hand-rolled addItem with NO model/
+        // harness resolution at all — it now inherits the workspace's dispatch
+        // defaults (resolveDispatchDefaults) and the default harness (LIN-1159),
+        // closing the exact inheritance gap the parent names. The participant
+        // prompt is already built (with its own inline token, when minted), so this
+        // path passes a plain prompt and no finalizePrompt — no proxy-context
+        // append and no bootstrapToken field here.
+        const item = await createDispatchItem({
+          store: dispatchQueueStore,
+          urlKey: ws.urlKey,
+          workspacePreferencesStore,
           kind: 'custom',
-          target,
-          dispatchedBy: req.session.linearUserId || null,
+          prompt,
+          fields: {
+            promptName: isFacilitator ? 'collective-facilitator' : 'collective-participant',
+            target,
+            dispatchedBy: req.session.linearUserId || null,
+          }
         });
         dispatched.push({ urlKey: ws.urlKey, name: ws.name, nick, id: item._id, ok: true });
 

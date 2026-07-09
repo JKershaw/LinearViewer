@@ -865,9 +865,18 @@ describe('pass-3 write tool — send_follow_up (LIN-1073)', () => {
     const result = await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } });
     assert.deepStrictEqual(result, { queued: true, itemId: 'queued-item-1', sessionId: 'sess-done', target: 'cli', force: true });
     assert.strictEqual(dispatchQueueStore.calls.length, 1);
+    // LIN-1139: send_follow_up now creates the item through the shared dispatch
+    // factory, so the item also carries the resolved kind/model/harness/
+    // bootstrapToken. With no workspacePreferencesStore wired here, model stays
+    // null and harness defaults to claude-code (applyDefaultDispatchHarness);
+    // kind derives to 'custom' (no promptName); bootstrapToken is null (no proxy
+    // context on this path). The caller-owned fields are unchanged.
     assert.deepStrictEqual(dispatchQueueStore.calls[0], {
       urlKey: URL_KEY,
-      item: { prompt: 'ship it', followUpTo: 'sess-done', target: 'cli', force: true, dispatchedBy: 'user-42' },
+      item: {
+        prompt: 'ship it', followUpTo: 'sess-done', target: 'cli', force: true, dispatchedBy: 'user-42',
+        kind: 'custom', model: null, harness: 'claude-code', bootstrapToken: null,
+      },
     });
   });
 

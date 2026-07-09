@@ -21,10 +21,10 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
-import { isValidDispatchKind, deriveDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
+import { isValidDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
-import { validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
-import { resolveDispatchDefaults } from '../lib/workspace-preferences.js';
+import { validateDispatchPayload } from '../lib/dispatch-validation.js';
+import { createDispatchItem } from '../lib/dispatch-factory.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -85,11 +85,12 @@ const tokenCreationLimiter = rateLimit({
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Input length limits to prevent MongoDB errors (16MB document limit)
-const MAX_PROMPT_LENGTH = 10000000;    // 10MB max for prompt content
+// Input length limits to prevent MongoDB errors (16MB document limit). The
+// prompt/identifier caps for the POST /dispatch payload now live in
+// lib/dispatch-validation.js (shared with the proxy twin, LIN-1139); these
+// remain for the other endpoints in this router (token label, feedback message).
 const MAX_NAME_LENGTH = 1000;          // Names/labels/titles
 const MAX_URL_LENGTH = 8000;           // URLs (covers long query strings)
-const MAX_IDENTIFIER_LENGTH = 100;     // Issue identifiers
 const MAX_FEEDBACK_MESSAGE_LENGTH = 2000; // Feedback message
 
 // Pattern to detect null bytes and dangerous control characters (except common whitespace)
@@ -286,106 +287,19 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
       }
 
-      // Validate input lengths to prevent database bloat. `prompt` is optional for
-      // abort items, so guard the prompt-specific checks on its presence.
-      if (prompt && prompt.length > MAX_PROMPT_LENGTH) {
-        return badRequest.json(res, `prompt exceeds maximum length of ${MAX_PROMPT_LENGTH}`);
-      }
-      if (promptName && promptName.length > MAX_NAME_LENGTH) {
-        return badRequest.json(res, `promptName exceeds maximum length of ${MAX_NAME_LENGTH}`);
-      }
-      if (issueIdentifier && issueIdentifier.length > MAX_IDENTIFIER_LENGTH) {
-        return badRequest.json(res, `issueIdentifier exceeds maximum length of ${MAX_IDENTIFIER_LENGTH}`);
-      }
-      if (issueTitle && issueTitle.length > MAX_NAME_LENGTH) {
-        return badRequest.json(res, `issueTitle exceeds maximum length of ${MAX_NAME_LENGTH}`);
-      }
-      if (issueUrl && issueUrl.length > MAX_URL_LENGTH) {
-        return badRequest.json(res, `issueUrl exceeds maximum length of ${MAX_URL_LENGTH}`);
-      }
-      if (repo && repo.length > MAX_NAME_LENGTH) {
-        return badRequest.json(res, `repo exceeds maximum length of ${MAX_NAME_LENGTH}`);
-      }
-      // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
-      // via the shared helper (type/length/dangerous-chars only). Deliberately
-      // NOT validated against a model registry (openrouter AVAILABLE_MODELS is
-      // the generation-model namespace; these are the consumer's execution-model/
-      // harness namespace, which may include values the server doesn't enumerate).
-      // Wire convention for `model` is OpenRouter-style provider/model.
-      const modelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
-      if (modelValidationError) {
-        return badRequest.json(res, modelValidationError.error);
-      }
-      const harnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
-      if (harnessValidationError) {
-        return badRequest.json(res, harnessValidationError.error);
-      }
-
-      // Reject null bytes and dangerous control characters
-      if (prompt && DANGEROUS_CHARS_REGEX.test(prompt)) {
-        return badRequest.json(res, 'prompt contains invalid characters');
-      }
-      if (promptName && DANGEROUS_CHARS_REGEX.test(promptName)) {
-        return badRequest.json(res, 'promptName contains invalid characters');
-      }
-      if (issueTitle && DANGEROUS_CHARS_REGEX.test(issueTitle)) {
-        return badRequest.json(res, 'issueTitle contains invalid characters');
-      }
-      if (repo && DANGEROUS_CHARS_REGEX.test(repo)) {
-        return badRequest.json(res, 'repo contains invalid characters');
-      }
-
-      // Validate issueId format if provided
-      if (issueId && !UUID_REGEX.test(issueId)) {
-        return badRequest.json(res, 'Invalid issueId format');
-      }
-
-      // Validate follow-up reference if provided. A follow-up resumes an
-      // existing session, so it carries the original dispatchId (a UUID).
-      // We store + forward it blindly — the downstream dispatcher owns session
-      // liveness — but the value must be well-formed. Follow-ups are cli/web
-      // only; resuming a Harbour OS/dash session is out of scope. See LIN-415.
-      if (followUpTo !== undefined && followUpTo !== null) {
-        if (!UUID_REGEX.test(followUpTo)) {
-          return badRequest.json(res, 'Invalid followUpTo format');
-        }
-        const followUpTarget = target || 'cli';
-        if (!['cli', 'web'].includes(followUpTarget)) {
-          return badRequest.json(res, 'followUpTo is only supported for cli/web targets');
-        }
-      }
-
-      // Validate the force flag if provided. `force` overrides a runner-side
-      // guard, so it is meaningful alongside a verb that HAS such a guard — and
-      // ONLY such a verb, so reject a bare force on a fresh dispatch rather than
-      // persisting an inert flag:
-      //   - followUpTo (LIN-559): bypass the active-session liveness guard so a
-      //     follow-up can resume a wedged/sleeping session (the human asserts the
-      //     prior process is dead — LIN-546).
-      //   - a single abort (LIN-946/LIN-951): bypass the runner's human-continued
-      //     skip so a DELIBERATE targeted abort still cancels a human-continued
-      //     session (the escape hatch). A cascade emits its own plain, UNforced
-      //     aborts (those skip), so force is never a cascade concern — reject the
-      //     force+cascade contradiction rather than silently dropping force.
-      // force:false / omitted is always fine.
-      if (force !== undefined && typeof force !== 'boolean') {
-        return badRequest.json(res, 'force must be a boolean');
-      }
-      if (force === true && cascade === true) {
-        return badRequest.json(res, 'force and cascade are mutually exclusive');
-      }
-      if (force === true && !isAbort && (followUpTo === undefined || followUpTo === null)) {
-        return badRequest.json(res, 'force requires followUpTo or abort');
-      }
-
-      // Validate autopilot session reference if provided. Unlike followUpTo,
-      // sessionId carries NO target restriction — it groups worker dispatches
-      // into one autopilot session regardless of target. Store + forward it
-      // blindly; only the UUID format is enforced here. See LIN-591.
-      if (sessionId !== undefined && sessionId !== null) {
-        if (!UUID_REGEX.test(sessionId)) {
-          return badRequest.json(res, 'Invalid sessionId format');
-        }
+      // Shared payload validation for the two main handlers (LIN-1139): length
+      // caps, opaque model/harness (LIN-438/1084), dangerous-char rejection, and
+      // the issueId/followUpTo/force/sessionId format + combination rules. This
+      // block ran verbatim here and in the proxy twin; it now lives once in
+      // validateDispatchPayload so the two caller-supplied paths cannot drift.
+      // dispatch.js owns its own reject response (no logEvent); the helper only
+      // returns the error structure. The caller-specific checks that DIFFER
+      // between the two handlers (prompt-required, target vocab, abort/cascade/
+      // kind/waitForFollowUps/queueIfBusy/subscription, local-target) already ran
+      // above, preserving the original interleaving.
+      const payloadError = validateDispatchPayload(req.body);
+      if (payloadError) {
+        return badRequest.json(res, payloadError.error);
       }
 
       // Cascade close (LIN-946): a cascade request is not a single abort — it is a
@@ -402,51 +316,40 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return res.status(201).json({ success: true, cascade: true, ...result });
       }
 
-      // Effective prompt kind, shared between the stored item and the
-      // dispatchDefaults resolution below (so both agree on the same kind).
-      const effectiveKind = kind || deriveDispatchKind(promptName);
-
-      // Resolve blank incoming model/harness against the workspace's
-      // dispatchDefaults (LIN-1094): per-kind override -> workspace-wide
-      // default -> null. Each field resolves independently, and the lookup
-      // is skipped entirely (falling straight to the existing null
-      // passthrough) when no store is wired or both fields are already set —
-      // so with no defaults configured this is byte-identical to before.
-      let resolvedModel = model || null;
-      let resolvedHarness = harness || null;
-      if ((!model || !harness) && workspacePreferencesStore) {
-        const defaults = await resolveDispatchDefaults({
-          urlKey: workspace.urlKey,
-          kind: effectiveKind,
-          store: workspacePreferencesStore
-        });
-        if (!model) resolvedModel = defaults.model;
-        if (!harness) resolvedHarness = defaults.harness;
-      }
-
-      // Create dispatch item
-      const item = await dispatchQueueStore.addItem(workspace.urlKey, {
+      // Create the dispatch item through the shared factory (LIN-1139): it
+      // resolves kind, fills blank model/harness from workspace dispatchDefaults
+      // (LIN-1094), interposes the default harness, and calls addItem. This path
+      // carries no proxy context (the prompt is already built), so it passes a
+      // plain prompt and no finalizePrompt. CONVERGENCE (LIN-1135): the session
+      // route now runs applyDefaultDispatchHarness like the proxy twin, so a blank
+      // harness resolves to claude-code here too (previously it stayed null).
+      const item = await createDispatchItem({
+        store: dispatchQueueStore,
+        urlKey: workspace.urlKey,
+        workspacePreferencesStore,
+        kind,
+        model,
+        harness,
         prompt,
-        promptName: promptName || 'Prompt',
-        kind: effectiveKind,
-        issueId: issueId || null,
-        issueIdentifier: issueIdentifier || null,
-        issueTitle: issueTitle || null,
-        issueUrl: issueUrl || null,
-        dispatchedBy: req.session.linearUserId || null,
-        target: target || 'cli',
-        repo: repo || null,
-        model: resolvedModel,
-        harness: resolvedHarness,
-        followUpTo: followUpTo || null,
-        force: force === true,
-        abort: isAbort,
-        abortTo: isAbort ? abortTo : null,
-        cascade: cascade === true,
-        sessionId: sessionId || null,
-        waitForFollowUps: waitForFollowUps === true,
-        queueIfBusy: queueIfBusy === true,
-        subscription: subscription ?? DEFAULT_SUBSCRIPTION
+        fields: {
+          promptName: promptName || 'Prompt',
+          issueId: issueId || null,
+          issueIdentifier: issueIdentifier || null,
+          issueTitle: issueTitle || null,
+          issueUrl: issueUrl || null,
+          dispatchedBy: req.session.linearUserId || null,
+          target: target || 'cli',
+          repo: repo || null,
+          followUpTo: followUpTo || null,
+          force: force === true,
+          abort: isAbort,
+          abortTo: isAbort ? abortTo : null,
+          cascade: cascade === true,
+          sessionId: sessionId || null,
+          waitForFollowUps: waitForFollowUps === true,
+          queueIfBusy: queueIfBusy === true,
+          subscription: subscription ?? DEFAULT_SUBSCRIPTION
+        }
       });
 
       // Spawn a Harbour OS Claude session when target is 'local' (the API value
