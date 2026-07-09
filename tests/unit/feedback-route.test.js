@@ -185,9 +185,10 @@ describe('feedback submit (LIN-635)', () => {
     // Triage follow-up enqueued on the dispatch substrate.
     assert.strictEqual(dispatch.items.length, 1);
     assert.strictEqual(dispatch.items[0].urlKey, 'acme');
-    assert.strictEqual(dispatch.items[0].item.kind, 'triage');
-    assert.strictEqual(dispatch.items[0].item.issueIdentifier, 'LIN-900');
-    const prompt = dispatch.items[0].item.prompt;
+    const item = dispatch.items[0].item;
+    assert.strictEqual(item.kind, 'triage');
+    assert.strictEqual(item.issueIdentifier, 'LIN-900');
+    const prompt = item.prompt;
     assert.match(prompt, /Triage/);
 
     // A readWrite token was minted for this dispatch...
@@ -196,13 +197,16 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(proxyTokenStore.calls[0].options.scope, 'readWrite');
 
     // ...and the proxy details (Workspace API access block) are appended to the
-    // triage prompt, carrying the minted token and the per-issue brief endpoint.
-    // LIN-1139: the feedback dispatch now runs through the shared factory with
-    // applyDefaultHarness:false, so a no-default workspace keeps a null harness and
-    // the token stays in the prose exactly as before (the claude-code interpose
-    // remains scoped to the proxy dispatch boundary, LIN-1159).
+    // triage prompt with the per-issue brief endpoint. LIN-1164: the feedback
+    // dispatch now inherits the factory's default harness interpose, so a
+    // no-default workspace resolves harness → claude-code and the token travels
+    // out-of-band via the bootstrapToken field (LIN-1155 MCP branch), NOT in the
+    // prose — no Bearer/curl exchange text.
     assert.match(prompt, /Workspace API access/);
-    assert.match(prompt, /Authorization: Bearer rw-tok-123/);
+    assert.strictEqual(item.harness, 'claude-code');
+    assert.strictEqual(item.bootstrapToken, 'rw-tok-123');
+    assert.doesNotMatch(prompt, /Authorization: Bearer rw-tok-123/);
+    assert.doesNotMatch(prompt, /curl -X POST/);
     assert.match(prompt, /\/api\/proxy\/brief\/LIN-900/);
   });
 
@@ -235,8 +239,13 @@ describe('feedback submit (LIN-635)', () => {
 
     assert.strictEqual(status, 201);
     assert.strictEqual(dispatch.items.length, 1);
-    assert.strictEqual(dispatch.items[0].item.kind, 'triage');
-    assert.match(dispatch.items[0].item.prompt, /Authorization: Bearer rw-tok-triage/);
+    const item = dispatch.items[0].item;
+    assert.strictEqual(item.kind, 'triage');
+    // No workspace harness default → factory interposes claude-code (LIN-1164),
+    // so the token rides the bootstrapToken field, not the prompt prose.
+    assert.strictEqual(item.harness, 'claude-code');
+    assert.strictEqual(item.bootstrapToken, 'rw-tok-triage');
+    assert.doesNotMatch(item.prompt, /Authorization: Bearer rw-tok-triage/);
   });
 
   test("action:'autopilot' enqueues a scoped autopilot run with the feedback-origin brief", async () => {
@@ -268,7 +277,12 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(proxyTokenStore.calls[0].options.scope, 'readWrite');
     assert.strictEqual(proxyTokenStore.calls[0].options.label, 'feedback-autopilot');
     assert.match(item.prompt, /Workspace API access/);
-    assert.match(item.prompt, /Authorization: Bearer rw-tok-auto/);
+    // LIN-1164: no workspace harness default → factory interposes claude-code, so
+    // the bootstrap arrives via the bootstrapToken field, not Bearer/curl prose.
+    assert.strictEqual(item.harness, 'claude-code');
+    assert.strictEqual(item.bootstrapToken, 'rw-tok-auto');
+    assert.doesNotMatch(item.prompt, /Authorization: Bearer rw-tok-auto/);
+    assert.doesNotMatch(item.prompt, /curl -X POST/);
     assert.match(item.prompt, /\/api\/proxy\/brief\/LIN-900/);
   });
 
@@ -318,6 +332,32 @@ describe('feedback submit (LIN-635)', () => {
     assert.doesNotMatch(item.prompt, /curl -X POST/);
     assert.match(item.prompt, /Workspace API access/);
     assert.strictEqual(proxyTokenStore.calls[0].options.label, 'feedback-autopilot');
+  });
+
+  // === LIN-1164 regression: an explicit NON-claude-code workspace harness is ===
+  // left untouched by the default interpose, so token delivery stays in prose.
+  // This pins the acceptance criterion that the LIN-1164 flip only affects the
+  // blank-harness path, never an explicit harness like opencode.
+  const opencodePrefs = { getWorkspacePreferences: async () => ({ dispatchDefaults: { harness: 'opencode' } }) };
+
+  test("action:'triage' with an explicit non-claude-code (opencode) workspace default keeps the token in prose (LIN-1164)", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-oc-triage');
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore, workspacePreferencesStore: opencodePrefs });
+
+    const { status } = await submit(app, 'acme', { message: 'triage on opencode', action: 'triage' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    const item = dispatch.items[0].item;
+    assert.strictEqual(item.kind, 'triage');
+    // The explicit harness is preserved verbatim (no interpose)...
+    assert.strictEqual(item.harness, 'opencode');
+    // ...so the token stays in the prose and NOT in the structured field.
+    assert.strictEqual(item.bootstrapToken, null);
+    assert.match(item.prompt, /Authorization: Bearer rw-tok-oc-triage/);
+    assert.match(item.prompt, /Workspace API access/);
   });
 
   test('an unknown action falls back to the legacy plain send (flag-gated triage)', async () => {
@@ -491,11 +531,11 @@ describe('feedback submit (LIN-635)', () => {
     assert.equal(item.harness, 'ws-autopilot-harness');
   });
 
-  test('LIN-1138: feedback dispatch path with no defaults configured resolves model/harness to null', async () => {
-    // LIN-1139: the feedback paths route through the shared factory with
-    // applyDefaultHarness:false, so with no configured default both model and
-    // harness stay null — behavior-preserving. The claude-code interpose remains
-    // scoped to the proxy dispatch boundary (LIN-1159), NOT feedback.
+  test('LIN-1138/LIN-1164: feedback dispatch with no defaults leaves model null and interposes the claude-code harness default', async () => {
+    // LIN-1164: the feedback paths route through the shared factory and now
+    // inherit its default harness interpose. With no configured workspace default,
+    // model still resolves to null (no model floor), but the blank harness is
+    // interposed to claude-code (LIN-1159) — the flip this ticket lands.
     const { provider } = makeFakeProvider();
     const dispatch = capturingDispatchStore();
     const proxyTokenStore = fakeProxyTokenStore('rw-tok');
@@ -508,6 +548,6 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(status, 201);
     assert.strictEqual(dispatch.items.length, 1);
     assert.strictEqual(dispatch.items[0].item.model, null);
-    assert.strictEqual(dispatch.items[0].item.harness, null);
+    assert.strictEqual(dispatch.items[0].item.harness, 'claude-code');
   });
 });
