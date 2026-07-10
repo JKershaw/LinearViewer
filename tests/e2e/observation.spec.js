@@ -478,3 +478,82 @@ test.describe('Autopilot Observation page (first-class)', () => {
     });
   });
 });
+
+// LIN-1194: the Sessions tab. An intra-page switcher on the Observation page adds
+// a "Sessions" view that surfaces every in-flight session — including standalone
+// user-dispatched (non-autopilot) cli/web prompts the autopilot-centric feed drops.
+test.describe('Sessions tab — in-flight standalone sessions (LIN-1194)', () => {
+  // A standalone RUNNING session: a non-autopilot cli prompt (no sessionId) that a
+  // consumer has TAKEN but not finished → reconstructs taken + non-terminal, i.e.
+  // running-only in-flight. Standalone because kind !== 'autopilot' and no sessionId.
+  async function seedStandaloneRunning(page, { issueIdentifier, issueTitle }) {
+    const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+      data: { prompt: 'do the thing', promptName: 'implementation', kind: 'implementation', issueIdentifier, issueTitle, target: 'cli' }
+    });
+    expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
+    const item = (await res.json()).item;
+    const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+    const { token } = await tokenResp.json();
+    const take = await page.request.post(`/api/dispatch/take/${item.id}`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(take.status(), `take failed: ${await take.text()}`).toBe(200);
+    return item;
+  }
+
+  test('both tabs render, Autopilot active by default', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    const tabs = page.locator('#obs-tabs .obs-tab');
+    await expect(tabs).toHaveCount(2);
+    await expect(page.locator('.obs-tab[data-view="autopilot"]')).toHaveClass(/is-active/);
+    await expect(page.locator('.obs-tab[data-view="sessions"]')).not.toHaveClass(/is-active/);
+  });
+
+  test('a standalone running session shows under Sessions but NOT under Autopilot', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedStandaloneRunning(page, { issueIdentifier: 'LIN-1194', issueTitle: 'Standalone in-flight' });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Autopilot tab (default): the standalone session must not appear at all.
+    await expect(
+      page.locator('.obs-session').filter({ hasText: 'Standalone in-flight' })
+    ).toHaveCount(0);
+
+    // Switch to the Sessions tab — the standalone session appears in the Active feed.
+    await page.locator('.obs-tab[data-view="sessions"]').click();
+    await expect(page.locator('.obs-tab[data-view="sessions"]')).toHaveClass(/is-active/);
+    const card = page.locator('#obs-active .obs-session').filter({ hasText: 'Standalone in-flight' });
+    await expect(card).toBeVisible();
+
+    // Switch back to Autopilot — it disappears again (the two views are distinct).
+    await page.locator('.obs-tab[data-view="autopilot"]').click();
+    await expect(
+      page.locator('.obs-session').filter({ hasText: 'Standalone in-flight' })
+    ).toHaveCount(0);
+  });
+
+  test('the standalone session card links to its own per-session page (reuses LIN-1003/1004)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedStandaloneRunning(page, { issueIdentifier: 'LIN-1194', issueTitle: 'Standalone drill-in' });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="sessions"]').click();
+
+    const card = page.locator('#obs-active .obs-session').filter({ hasText: 'Standalone drill-in' });
+    await expect(card).toBeVisible();
+    const sessionPathRe = new RegExp(`/workspace/${URL_KEY}/observation/session/[^"']+$`);
+    const open = card.locator('.obs-session-open');
+    await expect(open).toHaveAttribute('href', sessionPathRe);
+    await open.click();
+    await page.waitForLoadState('networkidle');
+    // The dedicated per-session page renders the standalone session with no new
+    // plumbing (it resolves by the session's own dispatch id).
+    expect(page.url()).toMatch(sessionPathRe);
+    await expect(page.locator('.page-header')).toContainText(/Session|session/);
+  });
+});

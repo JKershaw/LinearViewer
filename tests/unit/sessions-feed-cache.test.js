@@ -26,6 +26,17 @@ describe('sessions-feed-cache: keyFor', () => {
     assert.equal(cache.keyFor(), '');
     assert.equal(cache.keyFor([]), '');
   });
+
+  test('a view discriminator namespaces the key, and omitting it is byte-identical to the legacy key (LIN-1194)', () => {
+    const cache = createSessionsFeedCache();
+    const ws = [{ urlKey: 'ws-a' }, { urlKey: 'ws-b' }];
+    // Omitted/falsy view → the exact legacy key (existing Autopilot callers).
+    assert.equal(cache.keyFor(ws), 'ws-a,ws-b');
+    assert.equal(cache.keyFor(ws, undefined), 'ws-a,ws-b');
+    // A view namespaces the entry so the two tabs never collide.
+    assert.equal(cache.keyFor(ws, 'sessions'), 'sessions::ws-a,ws-b');
+    assert.notEqual(cache.keyFor(ws), cache.keyFor(ws, 'sessions'));
+  });
 });
 
 describe('sessions-feed-cache: get', () => {
@@ -171,6 +182,23 @@ describe('sessions-feed-cache: clear (LIN-799 test-reset seam)', () => {
     assert.equal(aCalls, 2, 'ws-a entry re-produced');
     assert.equal(abCalls, 2, 'ws-a∪ws-b entry re-produced');
     assert.equal(cCalls, 1, 'unrelated ws-c entry untouched');
+  });
+
+  test('clear invalidates a view-namespaced entry by its workspace set (LIN-1194)', async () => {
+    const cache = createSessionsFeedCache();
+    const ws = [{ urlKey: 'ws-a' }, { urlKey: 'ws-b' }];
+    const autoKey = cache.keyFor(ws);
+    const sessKey = cache.keyFor(ws, 'sessions');
+    let autoCalls = 0, sessCalls = 0;
+    await cache.get(autoKey, async () => { autoCalls++; return 'auto'; });
+    await cache.get(sessKey, async () => { sessCalls++; return 'sess'; });
+
+    cache.clear('ws-a'); // must drop BOTH the plain and the sessions-namespaced entry
+
+    await cache.get(autoKey, async () => { autoCalls++; return 'auto'; });
+    await cache.get(sessKey, async () => { sessCalls++; return 'sess'; });
+    assert.equal(autoCalls, 2, 'autopilot entry re-produced');
+    assert.equal(sessCalls, 2, 'sessions-namespaced entry also re-produced');
   });
 
   test('clear() with no argument drops every entry', async () => {

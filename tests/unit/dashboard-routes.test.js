@@ -848,6 +848,106 @@ describe('GET /api/dashboard/sessions — materialized read-model (LIN-623)', ()
   });
 });
 
+// ─── Sessions view / in-flight tab (LIN-1194) ─────────────────────────────────
+//
+// The Observation page gained a second tab. The same /api/dashboard/sessions
+// endpoint serves both, discriminated by `?view=sessions`:
+//   - default (Autopilot): UNCHANGED — standalone sessions filtered OUT.
+//   - view=sessions: standalone user-dispatched cli/web sessions INCLUDED, split
+//     running-only (taken ∧ non-terminal) Active vs terminal Archive.
+
+// A standalone (non-autopilot, no sessionId) cli dispatch — the case the current
+// feed drops. `target: 'cli'` is required for pass 3 to synthesize a session.
+function standaloneRunning(id, identifier) {
+  return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', target: 'cli', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: 'working…' }] };
+}
+function standaloneTerminal(id, identifier) {
+  return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', target: 'cli', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[done] shipped', timestamp: NOW_ISO }] };
+}
+// A queued-but-not-yet-taken standalone dispatch (still on the live queue).
+function standaloneQueued(id, identifier) {
+  return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', target: 'cli', dispatchedAt: NOW_ISO };
+}
+
+const sessionsHandler = (router) => getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+const wsSession = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+
+describe('GET /api/dashboard/sessions — Sessions view (LIN-1194)', () => {
+  test('a running standalone cli dispatch appears in the Sessions view active, NOT in Autopilot', async () => {
+    const router = makeRouter({ 'ws-a': { live: [], history: [standaloneRunning('m1', 'LIN-1')], agentStatus: [] } });
+    const handler = sessionsHandler(router);
+
+    // Autopilot (default) — standalone filtered out entirely.
+    const auto = makeReqRes({ session: wsSession, query: {} });
+    await handler(auto.req, auto.res);
+    assert.equal(auto.res.statusCode, 200);
+    assert.equal(findSession(auto.res.jsonBody, 'm1'), undefined, 'standalone leaked into Autopilot');
+    assert.equal(auto.res.jsonBody.view, 'autopilot');
+
+    // Sessions view — the standalone session is present and in the Active list.
+    const sess = makeReqRes({ session: wsSession, query: { view: 'sessions' } });
+    await handler(sess.req, sess.res);
+    assert.equal(sess.res.jsonBody.view, 'sessions');
+    const s = sess.res.jsonBody.active.find(x => x.sessionId === 'm1');
+    assert.ok(s, 'standalone running session is in-flight/active');
+    assert.equal(s.standalone, true);
+    assert.equal(s.taken, true);
+    assert.equal(s.terminal, false);
+  });
+
+  test('a queued-but-not-taken standalone dispatch is excluded from the Sessions view (running-only V1)', async () => {
+    const router = makeRouter({ 'ws-a': { live: [standaloneQueued('q1', 'LIN-2')], history: [], agentStatus: [] } });
+    const handler = sessionsHandler(router);
+    const sess = makeReqRes({ session: wsSession, query: { view: 'sessions' } });
+    await handler(sess.req, sess.res);
+    assert.equal(findSession(sess.res.jsonBody, 'q1'), undefined, 'queued-but-not-taken must not surface as in-flight');
+  });
+
+  test('a terminal standalone session drops to the Sessions view archive, not active', async () => {
+    const router = makeRouter({ 'ws-a': { live: [], history: [standaloneTerminal('t1', 'LIN-3')], agentStatus: [] } });
+    const handler = sessionsHandler(router);
+    const sess = makeReqRes({ session: wsSession, query: { view: 'sessions' } });
+    await handler(sess.req, sess.res);
+    assert.equal(sess.res.jsonBody.active.find(x => x.sessionId === 't1'), undefined, 'terminal is not in-flight');
+    assert.ok(sess.res.jsonBody.recent.find(x => x.sessionId === 't1'), 'terminal standalone is archived');
+  });
+
+  test('an autopilot session stays in the Autopilot view AND appears in the Sessions view (in-flight superset)', async () => {
+    const router = makeRouter({
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('ap1', 'LIN-10'), workerHistoryItem('w1', 'LIN-11', 'ap1')],
+        agentStatus: []
+      }
+    });
+    const handler = sessionsHandler(router);
+
+    const auto = makeReqRes({ session: wsSession, query: {} });
+    await handler(auto.req, auto.res);
+    const apAuto = findSession(auto.res.jsonBody, 'ap1');
+    assert.ok(apAuto, 'autopilot session present in Autopilot view');
+    assert.equal(apAuto.standalone, false);
+
+    const sess = makeReqRes({ session: wsSession, query: { view: 'sessions' } });
+    await handler(sess.req, sess.res);
+    assert.ok(findSession(sess.res.jsonBody, 'ap1'), 'autopilot in-flight session also shows in Sessions view');
+  });
+
+  test('the Autopilot view is byte-identical whether or not a standalone session exists (regression pin)', async () => {
+    const withoutStandalone = makeRouter({ 'ws-a': { live: [], history: [autopilotHistoryItem('ap1', 'LIN-10')], agentStatus: [] } });
+    const withStandalone = makeRouter({ 'ws-a': { live: [], history: [autopilotHistoryItem('ap1', 'LIN-10'), standaloneRunning('m1', 'LIN-99')], agentStatus: [] } });
+
+    const a = makeReqRes({ session: wsSession, query: {} });
+    await sessionsHandler(withoutStandalone)(a.req, a.res);
+    const b = makeReqRes({ session: wsSession, query: {} });
+    await sessionsHandler(withStandalone)(b.req, b.res);
+
+    const ids = (body) => [...(body.active || []), ...(body.recent || [])].map(s => s.sessionId).sort();
+    assert.deepEqual(ids(a.res.jsonBody), ['ap1'], 'only the autopilot session, no standalone');
+    assert.deepEqual(ids(b.res.jsonBody), ['ap1'], 'the standalone session did NOT leak into Autopilot');
+  });
+});
+
 // ─── run-summary ─────────────────────────────────────────────────────────────
 
 describe('run-summary endpoint', () => {

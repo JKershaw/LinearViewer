@@ -47,6 +47,14 @@ const ARCHIVE_PAGE_SIZE = 30;               // archive "load more" page size
 const hiddenWorkspaces = new Set();        // urlKeys toggled off
 let archiveOpen = false;
 
+// Active view/tab (LIN-1194): 'autopilot' (default — the existing feed) or
+// 'sessions' (the in-flight Sessions view: standalone sessions included, a
+// running-only Active split instead of the recency one). The tab is a pure
+// in-page switch: it flips the poll URL's `?view=` discriminator and the
+// client-side Active/Archive bucketing, and resets the feed state so the two
+// views' distinct session sets never bleed together.
+let currentView = 'autopilot';
+
 // Archive pagination state (LIN-631). The live poll always refreshes the first
 // page (offset 0); "load more" requests subsequent offsets and those extra
 // sessions persist across polls instead of being clobbered by the next refresh.
@@ -171,6 +179,14 @@ function passesFilter(session) {
 function isRecentlyActive(session) {
   const t = Date.parse(session.lastActivity);
   return Number.isFinite(t) && (Date.now() - t) <= STALE_AFTER_MS;
+}
+
+// Sessions-view in-flight predicate (LIN-1194) — mirrors the server's running-only
+// boundary (routes/dashboard.js): a session is in-flight iff it has been taken
+// (past the live queue) and is not yet terminal. Completed sessions fall to the
+// Archive; queued-but-not-taken items are excluded from V1 entirely.
+function isInFlight(session) {
+  return !!session.taken && !session.terminal;
 }
 
 function shortSessionId(id) {
@@ -413,11 +429,17 @@ function diffSessionList(listId, emptyId, cardMap, sessions) {
 
 function renderFeeds() {
   const sessions = [...sessionIndex.values()].filter(passesFilter);
-  // Recency-only split (LIN-631), mirroring the server: Active iff touched within
-  // 24h, else Archive — regardless of terminal state. Old non-terminal sessions
-  // therefore land in Archive, where the stale render branch still labels them.
-  const active = sessions.filter(isRecentlyActive);
-  const recent = sessions.filter(s => !isRecentlyActive(s));
+  // Per-view Active/Archive split (LIN-1194), each mirroring its server predicate
+  // so client and server bucket a session the same way (cross-cutting concern #4):
+  //   - Sessions view: running-only in-flight (taken ∧ non-terminal) is Active;
+  //     completed (terminal) is Archive. Queued/non-taken items are already dropped
+  //     by the server, so they never reach here.
+  //   - Autopilot view (UNCHANGED, LIN-631): recency-only — Active iff touched
+  //     within 24h, else Archive, regardless of terminal state (old non-terminal
+  //     sessions land in Archive, where the stale render branch still labels them).
+  const inSessionsView = currentView === 'sessions';
+  const active = inSessionsView ? sessions.filter(isInFlight) : sessions.filter(isRecentlyActive);
+  const recent = inSessionsView ? sessions.filter(s => s.terminal) : sessions.filter(s => !isRecentlyActive(s));
   diffSessionList('obs-active', 'obs-active-empty', activeCards, active);
   diffSessionList('obs-recent', 'obs-recent-empty', recentCards, recent);
 
@@ -1018,13 +1040,28 @@ function repaintSession(sessionId) {
 
 // ─── Polling ──────────────────────────────────────────────────────────────────
 
+// Build the /sessions poll URL for the active tab (LIN-1194). The Sessions view
+// carries `?view=sessions`; Autopilot omits it (byte-identical legacy URL). Extra
+// query params (offset/limit for archive pagination) are appended by the caller.
+function sessionsUrl(urlKey, extra = '') {
+  const view = currentView === 'sessions' ? 'view=sessions' : '';
+  const qs = [view, extra].filter(Boolean).join('&');
+  return `/workspace/${encodeURIComponent(urlKey)}/api/dashboard/sessions${qs ? '?' + qs : ''}`;
+}
+
 async function pollSessions() {
   const urlKey = observationData?.urlKey;
   if (!urlKey) return;
+  // Snapshot the view this poll was issued for, so a late response that lands
+  // AFTER the user switched tabs is discarded instead of populating the wrong feed.
+  const pollView = currentView;
   try {
-    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dashboard/sessions`);
+    const res = await fetch(sessionsUrl(urlKey));
     if (res.status === 401) { window.location.href = '/logout'; return; }
     if (!res.ok) { setPollStatus('● disconnected'); return; }
+    // Tab switched while this poll was in flight → its payload belongs to the old
+    // view; drop it (the switch already kicked a fresh poll for the new view).
+    if (pollView !== currentView) return;
 
     const data = await res.json();
     const active = Array.isArray(data.active) ? data.active : [];
@@ -1058,7 +1095,7 @@ async function loadMoreArchive() {
   archiveLoading = true;
   updateLoadMore();
   try {
-    const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dashboard/sessions?offset=${archiveOffset}&limit=${ARCHIVE_PAGE_SIZE}`);
+    const res = await fetch(sessionsUrl(urlKey, `offset=${archiveOffset}&limit=${ARCHIVE_PAGE_SIZE}`));
     if (!res.ok) return;
     const data = await res.json();
     const page = Array.isArray(data.recent) ? data.recent : [];
@@ -1096,7 +1133,53 @@ function startPolling() {
 
 // ─── Controls ──────────────────────────────────────────────────────────────────
 
+// Switch the active Observation tab (LIN-1194). The two views carry different
+// session sets (Autopilot excludes standalone; Sessions includes standalone but is
+// running-only), so the feed state is reset before re-polling to keep them from
+// bleeding together, and the collapsed cards are torn down so a fresh poll rebuilds
+// them for the new view.
+function switchView(view) {
+  if (view !== 'sessions' && view !== 'autopilot') return;
+  if (view === currentView) return;
+  currentView = view;
+
+  // Reflect selection on the tabs (aria + active class).
+  const tabs = document.getElementById('obs-tabs');
+  if (tabs) {
+    for (const tab of tabs.querySelectorAll('.obs-tab')) {
+      const on = tab.dataset.view === view;
+      tab.classList.toggle('is-active', on);
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+    }
+  }
+
+  // Tear down the feed state — the other view's sessions must not linger.
+  for (const el of activeCards.values()) el.remove();
+  for (const el of recentCards.values()) el.remove();
+  activeCards.clear();
+  recentCards.clear();
+  sessionIndex.clear();
+  expandedSessions.clear();
+  knownSessions.clear();
+  loadedArchiveIds.clear();
+  archiveTotal = 0;
+  archiveOffset = ARCHIVE_PAGE_SIZE;
+  renderFeeds();
+
+  setPollStatus('loading…');
+  pollSessions();
+}
+
 function initControls() {
+  const tabs = document.getElementById('obs-tabs');
+  if (tabs) {
+    tabs.addEventListener('click', (e) => {
+      const tab = e.target.closest('.obs-tab');
+      if (!tab || !tab.dataset.view) return;
+      switchView(tab.dataset.view);
+    });
+  }
+
   const chips = document.getElementById('obs-chips');
   if (chips) {
     chips.addEventListener('click', (e) => {

@@ -79,6 +79,42 @@
   .obs-poll-status { animation: none; }
 }
 
+/* ─── View tabs (LIN-1194) — intra-page Autopilot | Sessions switcher ───────── */
+
+.obs-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.obs-tab {
+  appearance: none;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px; /* overlap the container border so the active underline sits on it */
+  padding: 0.4rem 0.7rem;
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.obs-tab:hover { color: var(--text); }
+
+.obs-tab.is-active {
+  color: var(--text);
+  border-bottom-color: var(--brand);
+}
+
+.obs-tab:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
 /* ─── Sections — flat uppercase eyebrows (LIN-927; boxed framing dropped) ───── */
 
 .obs-section { margin-bottom: 0.8rem; }

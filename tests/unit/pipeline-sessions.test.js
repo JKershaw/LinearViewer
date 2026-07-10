@@ -167,13 +167,24 @@ describe('inference fallback over an injected issue graph', () => {
       worker('w3', UNRELATED, '2026-06-22T11:00:00.000Z'),    // not in subtree → exclude
       worker('w4', CHILD, '2026-06-22T13:30:00.000Z')         // descendant but AFTER window end → exclude
     ]);
-    const [s] = _buildSessions(loops, { issueGraph: ISSUE_GRAPH, now: NOW });
+    const sessions = _buildSessions(loops, { issueGraph: ISSUE_GRAPH, now: NOW });
 
+    // The ap-1 autopilot session's loop set is the regression pin — unchanged by
+    // the LIN-1194 standalone pass (find it by id; it is no longer sessions[0]
+    // now that the excluded workers form their own sessions).
+    const s = sessions.find(x => x.sessionId === SESSION_ID);
     assert.strictEqual(s.sessionId, SESSION_ID); // stable id == orchestrator loopId
     assert.strictEqual(s.seedIssue, EPIC);
     const ids = s.loops.map(l => l.loopId).sort();
     assert.deepStrictEqual(ids, ['ap-1', 'w1', 'w2']);
     assert.deepStrictEqual(s.tasksTouched, [EPIC, CHILD, SPAWNED]);
+
+    // LIN-1194: w3 (unrelated) and w4 (descendant but dispatched AFTER the window
+    // end) are claimed by no autopilot session, so they now reconstruct as their
+    // OWN standalone single-loop sessions keyed by their dispatch id — never
+    // absorbed into ap-1, and no longer silently dropped.
+    assert.ok(sessions.find(x => x.sessionId === 'w3' && x.loops.length === 1), 'unrelated worker → standalone session');
+    assert.ok(sessions.find(x => x.sessionId === 'w4' && x.loops.length === 1), 'out-of-window worker → standalone session');
   });
 
   test('without an issue graph, inference attaches only the seed issue\'s own loops', () => {
@@ -182,8 +193,12 @@ describe('inference fallback over an injected issue graph', () => {
       worker('w1', EPIC, '2026-06-22T10:30:00.000Z'),  // same issue as seed → attach
       worker('w2', CHILD, '2026-06-22T11:00:00.000Z')  // descendant, but no graph → cannot attach
     ]);
-    const [s] = _buildSessions(loops, { now: NOW });
+    const sessions = _buildSessions(loops, { now: NOW });
+    const s = sessions.find(x => x.sessionId === SESSION_ID);
     assert.deepStrictEqual(s.loops.map(l => l.loopId).sort(), ['ap-1', 'w1']);
+    // LIN-1194: w2 (a descendant, unreachable without an injected graph) is
+    // unclaimed → its own standalone session, not silently dropped.
+    assert.ok(sessions.find(x => x.sessionId === 'w2' && x.loops.length === 1), 'ungraphed descendant → standalone session');
   });
 
   test('a worker stamped for another session is never stolen by inference', () => {
@@ -215,6 +230,69 @@ describe('orphan sessionId group (orchestrator absent)', () => {
     assert.strictEqual(sessions[0].sessionId, 'ghost');
     assert.strictEqual(sessions[0].seedIssue, null);
     assert.strictEqual(sessions[0].loops.length, 2);
+  });
+});
+
+// ─── Standalone single-loop sessions (LIN-1194) ───────────────────────────────
+
+describe('standalone single-loop sessions (LIN-1194)', () => {
+  test('an unclaimed non-autopilot cli prompt becomes its own single-loop session keyed by its dispatch id', () => {
+    const loops = loopsFrom([
+      worker('m1', UNRELATED, '2026-06-22T11:00:00.000Z') // no sessionId, kind implementation, cli
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+    assert.strictEqual(sessions.length, 1);
+    const s = sessions[0];
+    assert.strictEqual(s.sessionId, 'm1');            // keyed by its own loopId
+    assert.strictEqual(s.loops.length, 1);
+    assert.strictEqual(s.loops[0].loopId, 'm1');
+    assert.deepStrictEqual(s.tasksTouched, [UNRELATED]);
+  });
+
+  test('a web-target standalone prompt is included', () => {
+    const loops = loopsFrom([
+      worker('m1', UNRELATED, '2026-06-22T11:00:00.000Z', { target: 'web' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+    assert.deepStrictEqual(sessions.map(s => s.sessionId), ['m1']);
+  });
+
+  test('dash/local standalone dispatches are NOT emitted (no live session identity, V1)', () => {
+    const loops = loopsFrom([
+      worker('d1', UNRELATED, '2026-06-22T11:00:00.000Z', { target: 'dash' }),
+      worker('l1', CHILD, '2026-06-22T11:05:00.000Z', { target: 'local' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+    assert.strictEqual(sessions.length, 0);
+  });
+
+  test('a loop already claimed by an autopilot session is never double-emitted as standalone', () => {
+    const loops = loopsFrom([
+      orchestrator(),
+      worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+    // Exactly one session (the autopilot one); w1 is claimed, not standalone.
+    assert.strictEqual(sessions.length, 1);
+    assert.strictEqual(sessions[0].sessionId, SESSION_ID);
+    assert.strictEqual(sessions[0].loops.length, 2);
+  });
+
+  test('an explicit-sessionId worker is grouped, not made standalone', () => {
+    // Orchestrator absent → orphan group path (pass 2), still NOT a standalone.
+    const loops = loopsFrom([
+      worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: 'ghost' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+    assert.strictEqual(sessions.length, 1);
+    assert.strictEqual(sessions[0].sessionId, 'ghost'); // orphan group, keyed by sessionId
+  });
+
+  test('an autopilot orchestrator alone is its own session, never a standalone', () => {
+    const loops = loopsFrom([orchestrator()]);
+    const sessions = _buildSessions(loops, { now: NOW });
+    assert.strictEqual(sessions.length, 1);
+    assert.strictEqual(sessions[0].sessionId, SESSION_ID);
   });
 });
 
