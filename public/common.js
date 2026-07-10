@@ -706,17 +706,18 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
  *    server; the page shell emits it as `data-proxy-feature` on <body>. When it
  *    is absent/off the toggle is inert — no block appended, no token minted —
  *    even if the global toggle key is on from a flag-on workspace (LIN-525 #2).
- *  - Minted tokens are cached per workspace `urlKey` (LIN-525 #3) and can be
- *    dropped via invalidate() after a revoke; a failed/401 mint never populates
- *    the cache, so the next append re-mints (LIN-525 #4).
+ *  - Bootstrap tokens are single-use (LIN-376): each is spent by the agent's
+ *    one exchange at `POST /api/proxy/token`. They are therefore minted FRESH on
+ *    every append and never cached — caching one and serving it to a later
+ *    copy/download would re-embed an already-consumed credential (LIN-1140). A
+ *    failed/401 mint yields null and appends nothing, so the next append re-mints
+ *    (LIN-525 #4). Each mint is scoped to the passed `urlKey`, so a page that
+ *    targets more than one workspace never embeds the wrong workspace's token.
  *
  * @global
  */
 window.ProxyToggle = (function () {
   const TOGGLE_KEY = 'proxy-toggle-active';
-  // urlKey -> minted token string. Keyed by workspace so a page that dispatches
-  // to more than one workspace never embeds the first workspace's token.
-  const tokenCache = new Map();
 
   function isActive() {
     try {
@@ -747,16 +748,17 @@ window.ProxyToggle = (function () {
   }
 
   /**
-   * Get or create a proxy token for a workspace, cached per urlKey for the page
-   * session. on401:false — a failed mint (incl. 401 or token rate-limit) falls
-   * through to null so the caller surfaces it, rather than redirecting to
-   * /logout. A null result is never cached, so the next call re-mints.
+   * Mint a fresh single-use bootstrap proxy token for a workspace. Bootstrap
+   * tokens are single-use (LIN-376), so this ALWAYS mints — it never caches or
+   * reuses a token, which would embed an already-consumed credential in a later
+   * copy/download from the same page load (LIN-1140). on401:false — a failed mint
+   * (incl. 401 or token rate-limit) falls through to null so the caller surfaces
+   * it, rather than redirecting to /logout.
    * @param {string} urlKey
    * @returns {Promise<string|null>}
    */
   async function getOrCreateToken(urlKey) {
     if (!urlKey) return null;
-    if (tokenCache.has(urlKey)) return tokenCache.get(urlKey);
     try {
       const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
         method: 'POST',
@@ -766,22 +768,10 @@ window.ProxyToggle = (function () {
         body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', bootstrap: true }),
         on401: false
       });
-      const token = (data && data.token) || null;
-      if (token) tokenCache.set(urlKey, token);
-      return token;
+      return (data && data.token) || null;
     } catch {
       return null;
     }
-  }
-
-  /**
-   * Drop cached token(s) so the next append re-mints. Called after a token is
-   * revoked in the Tokens UI (LIN-525 #4). With no urlKey, clears everything.
-   * @param {string} [urlKey]
-   */
-  function invalidate(urlKey) {
-    if (urlKey) tokenCache.delete(urlKey);
-    else tokenCache.clear();
   }
 
   function buildBlock(token) {
@@ -853,7 +843,7 @@ window.ProxyToggle = (function () {
     });
   }
 
-  return { isActive, isFeatureEnabled, getOrCreateToken, invalidate, buildBlock, maybeAppend, shouldAppend, init, setActive };
+  return { isActive, isFeatureEnabled, getOrCreateToken, buildBlock, maybeAppend, shouldAppend, init, setActive };
 })();
 
 // Back-compat global consumed by app.js / dispatch.js call sites

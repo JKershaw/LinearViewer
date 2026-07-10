@@ -115,6 +115,65 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toBe('__SENTINEL__');
   });
+
+  // LIN-1140 regression: bootstrap tokens are single-use (LIN-376), so two copies
+  // from ONE page load must each embed a FRESHLY-minted token — never a cached,
+  // already-consumed one. Pre-fix, `getOrCreateToken` cached per urlKey and the
+  // second copy re-embedded the spent token, 401ing the next agent's exchange.
+  test('copying twice from one page load mints a fresh bootstrap each time (no reuse)', async ({ page }) => {
+    // Intercept the mint: count POSTs and return a DISTINCT token per call so a
+    // reused (cached) token is detectable in the embedded block.
+    let mintCount = 0;
+    await page.route('**/api/proxy/tokens', route => {
+      if (route.request().method() === 'POST') {
+        mintCount += 1;
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ token: `bootstrap-token-${mintCount}` })
+        });
+      }
+      return route.continue();
+    });
+
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}`);
+    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    const container = await selectDashboardPrompt(page);
+    await container.locator('.prompt-proxy-toggle').click();
+    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
+
+    // Pull the bootstrap token out of the embedded `Bearer <token>` exchange line.
+    const embeddedToken = async () => {
+      const clip = await page.evaluate(() => navigator.clipboard.readText());
+      expect(clip).toContain(PROXY_MARKER);
+      const m = clip.match(/Bearer\s+(bootstrap-token-\d+)/);
+      return m && m[1];
+    };
+
+    const copyBtn = container.locator('.prompt-copy');
+
+    await copyBtn.click();
+    await expect(copyBtn).toHaveText('copied!');
+    const first = await embeddedToken();
+
+    // Let the button revert from "copied!" so the second click's transition back
+    // to "copied!" is a genuine signal the second copy finished (not the first's
+    // label still showing) before we re-read the clipboard.
+    await expect(copyBtn).not.toHaveText('copied!');
+
+    // Copy again WITHOUT reloading — the second embed must carry a new token.
+    await copyBtn.click();
+    await expect(copyBtn).toHaveText('copied!');
+    const second = await embeddedToken();
+
+    // Two mints fired (no cache short-circuit) and the embedded tokens differ.
+    expect(mintCount).toBe(2);
+    expect(first).toBe('bootstrap-token-1');
+    expect(second).toBe('bootstrap-token-2');
+    expect(second).not.toBe(first);
+  });
 });
 
 test.describe('+proxy copy — swipe (prompt-section.js)', () => {
