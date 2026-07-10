@@ -18,11 +18,20 @@
   margin-bottom: var(--space-5);
 }
 
+/* Section heading rhythm (LIN-1222): a deliberate eyebrow — a brand-accent tick
+   on the left (replacing the former bare `│` glyph baked into the text) plus a
+   hairline divider beneath — so the long page reads as a sequence of intentional
+   sections rather than whitespace-separated blocks. The disclosure ▸/▾ marker
+   (::after) and the collapsible <details> behaviour are preserved below. */
 .roadmap-section-heading {
   font-family: var(--font-structural);
-  font-size: 1.1em;
+  font-size: 1.05em;
   font-weight: 600;
-  margin: 0 0 0.75rem 0;
+  letter-spacing: 0.01em;
+  margin: 0 0 var(--space-3) 0;
+  padding: 0 0 0.45em 0.7em;
+  border-left: 3px solid var(--brand);
+  border-bottom: 1px solid var(--line);
   color: var(--text);
 }
 
@@ -109,12 +118,27 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   color: var(--text);
 }
 
+/* Header meta (LIN-1222): a flex-wrap row of atomic facts. The `·` separators
+   are pseudo-elements that travel WITH the fact they precede, so at 390 the row
+   wraps fact-by-fact and never leaves a dangling separator orphaned at a line
+   edge (the old fix was literal ` · ` text between facts). Layout-only — no fact
+   is truncated or removed. */
 .roadmap-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25em 0.5em;
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   color: var(--muted);
   margin: 0;
   line-height: 1.5;
+}
+
+.roadmap-header-meta > * + *::before {
+  content: '·';
+  color: var(--muted);
+  margin-right: 0.5em;
 }
 
 .roadmap-header-workspace {
@@ -157,25 +181,43 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   margin: 0;
 }
 
+/* Shipped item (LIN-1222): a two-line, hierarchical entry — a green ✓ marker,
+   then a body column whose title wraps freely (sans human label) above a
+   secondary `project · date` meta line (mono machine facts). Borrows the
+   By-project cards' typography split + line/spacing tokens so the feed reads as
+   their sibling, without making each row a heavy card. The hairline top border
+   gives the list quiet structure. NOTHING truncates at any width — the former
+   grid + nowrap/ellipsis title was the mobile clipping. */
 .ship-item {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
   align-items: baseline;
   gap: 0.5em;
-  padding: 0.2em 0;
-  font-size: var(--font-size-sm);
-  color: var(--text);
+  padding: 0.4em 0;
+  border-top: 1px solid var(--line);
+}
+
+.ship-item:first-child {
+  border-top: none;
 }
 
 .ship-icon {
   color: var(--green);
   font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.ship-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1em;
+  min-width: 0;
 }
 
 .ship-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-family: var(--font-content);
+  font-size: var(--font-size-base);
+  line-height: 1.4;
+  color: var(--text);
 }
 
 .ship-state {
@@ -185,9 +227,9 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
 }
 
 .ship-meta {
+  font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   color: var(--muted);
-  white-space: nowrap;
 }
 
 .ship-project {
@@ -867,16 +909,9 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
     padding: var(--space-2) 0;
   }
 
-  .ship-item {
-    grid-template-columns: auto 1fr;
-    grid-template-rows: auto auto;
-    row-gap: 0.1em;
-  }
-
-  .ship-meta {
-    grid-column: 2;
-    font-size: 0.8em;
-  }
+  /* The shipped feed's two-line flex row (LIN-1222) is width-agnostic — it wraps
+     and stacks by construction at every width — so the former grid-column mobile
+     override is gone; no ship-specific rule is needed at 390. */
 
   .roadmap-milestone-card .card-header {
     flex-direction: column;
