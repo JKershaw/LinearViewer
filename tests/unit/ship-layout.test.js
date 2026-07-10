@@ -27,7 +27,8 @@ import {
   BEARINGS,
   bearingToAngle,
   orientationLayout,
-  ORIENTATION_SPREAD
+  ORIENTATION_SPREAD,
+  computeFitZoom
 } from '../../lib/ship-layout.js';
 
 // =============================================================================
@@ -1331,5 +1332,74 @@ describe('orientationLayout', () => {
       orientation: [{ identifier: 'LIN-1', bearing: 'S', reason: 'x', archived: false }]
     });
     assert.deepStrictEqual(result.positions.get(c.id), before);
+  });
+});
+
+// =============================================================================
+// computeFitZoom (LIN-1221 F1) — first-paint fit so the graph is visible on a
+// phone instead of clipping off-canvas at zoom=1. Mirrored inline in ship.js.
+// =============================================================================
+describe('computeFitZoom', () => {
+  test('content smaller than the viewport does not zoom in (capped at maxZoom 1)', () => {
+    const z = computeFitZoom({
+      contentWidth: 400, contentHeight: 400, availWidth: 1200, availHeight: 900
+    });
+    assert.strictEqual(z, 1);
+  });
+
+  test('content larger than the viewport zooms out to fit', () => {
+    // 2000-wide content into a 1000-wide viewport (pad 24): usable 952/2000.
+    const z = computeFitZoom({
+      contentWidth: 2000, contentHeight: 2000, availWidth: 1000, availHeight: 1000
+    });
+    assert.ok(z < 1, `expected fit < 1, got ${z}`);
+    // The scaled content must sit inside the usable box in both axes.
+    assert.ok(2000 * z <= 1000 - 2 * 24 + 1e-6);
+  });
+
+  test('picks the tighter axis (a tall narrow phone is width-constrained)', () => {
+    // Square content, tall-narrow viewport → width is the binding constraint.
+    const z = computeFitZoom({
+      contentWidth: 2000, contentHeight: 2000,
+      availWidth: 390, availHeight: 844, minZoom: 0.05
+    });
+    const byWidth = (390 - 48) / 2000;
+    assert.ok(Math.abs(z - byWidth) < 1e-9, `expected width-bound ${byWidth}, got ${z}`);
+  });
+
+  test('never returns below minZoom (interactive floor honoured)', () => {
+    const z = computeFitZoom({
+      contentWidth: 100000, contentHeight: 100000,
+      availWidth: 390, availHeight: 844, minZoom: 0.15
+    });
+    assert.strictEqual(z, 0.15);
+  });
+
+  test('a lower fit floor lets a large graph shrink further than the default 0.3', () => {
+    const opts = { contentWidth: 5000, contentHeight: 5000, availWidth: 390, availHeight: 844 };
+    const def = computeFitZoom(opts);                       // minZoom 0.3 default
+    const low = computeFitZoom({ ...opts, minZoom: 0.15 }); // fit floor
+    assert.strictEqual(def, 0.3);
+    assert.ok(low < def, `expected ${low} < ${def}`);
+  });
+
+  test('degenerate inputs (zero content / viewport) fall back to 1', () => {
+    assert.strictEqual(computeFitZoom({
+      contentWidth: 0, contentHeight: 0, availWidth: 390, availHeight: 844
+    }), 1);
+    assert.strictEqual(computeFitZoom({
+      contentWidth: 2000, contentHeight: 2000, availWidth: 0, availHeight: 0
+    }), 1);
+  });
+
+  test('respects a custom pad', () => {
+    const tight = computeFitZoom({
+      contentWidth: 1000, contentHeight: 1000, availWidth: 500, availHeight: 500, pad: 0
+    });
+    const padded = computeFitZoom({
+      contentWidth: 1000, contentHeight: 1000, availWidth: 500, availHeight: 500, pad: 50
+    });
+    assert.strictEqual(tight, 0.5);          // 500/1000
+    assert.ok(padded < tight);               // (500-100)/1000 = 0.4
   });
 });

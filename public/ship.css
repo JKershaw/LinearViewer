@@ -15,8 +15,9 @@ body:has(.ship-page) {
    near-top controls (the ship mode toggle), which `scroll-margin` can't rescue
    because they never scroll. So the header keeps the normal-flow fallback on
    ship: static, opaque, no blur → no stacking context, exactly as it behaved
-   before LIN-984. The fixed controls (mode toggle at top:68px) stay clickable
-   and clear of the empty-space drag/pan zone. */
+   before LIN-984. The fixed controls (mode toggle offset below the measured
+   --ship-nav-h; LIN-1221 F2) stay clickable and clear of the empty-space
+   drag/pan zone. */
 body:has(.ship-page) .nav-bar {
   position: static;
   background: var(--bg);
@@ -29,8 +30,12 @@ body:has(.ship-page) .nav-bar {
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   cursor: grab;
-  /* Fill remaining viewport beneath navbar; height tweaked once nav is measured. */
-  height: calc(100vh - 56px);
+  /* Fill the viewport beneath the (normal-flow) nav. Driven off the REAL nav
+     height measured at runtime (--ship-nav-h; LIN-1221 F2) so this stays exact
+     against the finished S2 two-row header — the stale `56px` under-reserved and
+     left the canvas overflowing the viewport. The `56px` fallback only applies
+     before ship.js runs. */
+  height: calc(100vh - var(--ship-nav-h, 56px));
   background: var(--bg);
 }
 
@@ -186,17 +191,39 @@ body:has(.ship-page) .nav-bar {
   stroke-dasharray: 6 4;
 }
 
+/* F3 (LIN-1221): the radial guide/seam/spoke strokes ENCODE the dependency
+   geometry — the whole point of this view. On dark, --line (#2c313a) and
+   --line-soft (white @ 12%) sit near-invisible on the near-black canvas, so the
+   graph reads as unstructured. Lift the strokes SHIP-SCOPED — the global --line
+   token is co-loaded by swim.css and other views and must not change. Light
+   theme keeps the original subtle strokes. Seams (the load-bearing segment
+   boundaries) get the most lift; rings/diagonals a gentler bump so they still
+   read as secondary reference. */
+.theme-dark .ship-page .ship-sector-guide line {
+  stroke: var(--fg-mid); /* #5c6370 — clearly legible seam on near-black */
+}
+
+.theme-dark .ship-page .ship-sector-guide circle {
+  stroke: var(--border-strong); /* #3d4450 — visible ring, still secondary */
+}
+
 .ship-sector-label {
   position: absolute;
   font-family: var(--font-structural);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text);
-  background: var(--bg);
+  /* F4 (LIN-1221): a raised --card surface + hairline + soft shadow (all
+     theme-aware) lifts each wedge label off the canvas so it reads as the
+     ANCHORED HEADER of its segment rather than a flat chip lost among the
+     cards — the "which cards belong where" grouping cue. Was a flat var(--bg)
+     chip that blended into the canvas. */
+  background: var(--card);
   border: 1px solid var(--line);
-  padding: 3px 9px;
+  box-shadow: var(--shadow-sm);
+  padding: 3px 10px;
   border-radius: var(--radius-sm);
   pointer-events: none;
   z-index: 6; /* above .ship-rect (5) so labels never get clipped by the ship */
@@ -224,12 +251,15 @@ body:has(.ship-page) .nav-bar {
   font-family: var(--font-structural);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text);
-  background: var(--bg);
+  /* Match .ship-sector-label's raised register (F4, LIN-1221) so the heading
+     reads as part of the chart's label system, not a foreign control. */
+  background: var(--card);
   border: 1px solid var(--line);
-  padding: 3px 9px;
+  box-shadow: var(--shadow-sm);
+  padding: 3px 10px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   white-space: nowrap;
@@ -316,7 +346,10 @@ body:has(.ship-page) .nav-bar {
 
 .ship-mode-control {
   position: fixed;
-  top: 68px;
+  /* Sit just below the normal-flow nav, measured at runtime (LIN-1221 F2). The
+     stale `top:68px` landed the toggle over the finished S2 nav's second (view-
+     switcher) row — the live LIN-984 collision. `56px` fallback pre-JS. */
+  top: calc(var(--ship-nav-h, 56px) + 12px);
   left: 16px;
   z-index: 8; /* above heading control (7) */
   display: flex;
@@ -377,6 +410,14 @@ body:has(.ship-page) .nav-bar {
 .ship-sector-guide line.ship-compass-diagonal {
   stroke: var(--line-soft);
   stroke-dasharray: 3 5;
+}
+
+/* F3 (LIN-1221): keep the diagonal a step below the cardinal seams on dark, but
+   lift it off near-invisible --line-soft so the rose still reads. Ship-scoped;
+   re-asserts over the dark seam override above via the extra .ship-compass-
+   diagonal class. */
+.theme-dark .ship-page .ship-sector-guide line.ship-compass-diagonal {
+  stroke: var(--border-strong);
 }
 
 .ship-compass-label {
@@ -476,4 +517,11 @@ body:has(.ship-page) .nav-bar {
     font-size: 10px;
   }
 
+  /* The "run a roadmap report to orient" hint (shown when orientation data is
+     absent) makes the fixed mode toolbar wider than a 390px phone, running it
+     off-canvas (LIN-1221 F2). Drop the supplementary note on mobile — the
+     disabled orientation button already signals the state. */
+  .ship-mode-note {
+    display: none;
+  }
 }

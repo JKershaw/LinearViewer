@@ -672,6 +672,26 @@
     };
   }
 
+  // First-paint fit zoom (LIN-1221 F1). Mirror of lib/ship-layout.js
+  // computeFitZoom — pick the largest scale at which the content box fits the
+  // viewport (with padding), clamped to [minZoom, maxZoom]; never zoom IN on
+  // fit (maxZoom default 1). Keep in sync with the pure version.
+  function computeFitZoom(opts) {
+    var contentWidth = opts.contentWidth, contentHeight = opts.contentHeight;
+    var availWidth = opts.availWidth, availHeight = opts.availHeight;
+    var pad = opts.pad === undefined ? 24 : opts.pad;
+    var minZoom = opts.minZoom === undefined ? 0.3 : opts.minZoom;
+    var maxZoom = opts.maxZoom === undefined ? 1 : opts.maxZoom;
+    if (!(contentWidth > 0) || !(contentHeight > 0) ||
+        !(availWidth > 0) || !(availHeight > 0)) {
+      return Math.min(1, maxZoom);
+    }
+    var usableW = Math.max(1, availWidth - 2 * pad);
+    var usableH = Math.max(1, availHeight - 2 * pad);
+    var raw = Math.min(usableW / contentWidth, usableH / contentHeight);
+    return Math.max(minZoom, Math.min(maxZoom, raw));
+  }
+
   // =============================================================================
   // Card markup (matches swim's .swim-box)
   // =============================================================================
@@ -784,7 +804,12 @@
     orientFlags: {},
     // id → { radius, projectAngle, orientationAngle, bearing }
     cardAngles: {},
-    animating: false
+    animating: false,
+    // First-paint fit zoom (LIN-1221 F1). render() recomputes this every pass so
+    // resetView() can return to "fit" rather than a hardcoded 100% that re-clips
+    // the graph on a phone. Applied as the live zoom only on the first render.
+    fitZoom: 1,
+    hasFitOnce: false
   };
 
   function uniqueProjects(issues) {
@@ -883,10 +908,34 @@
     }
     var halfSize = Math.ceil(maxR + CARD_SIZE.width / 2 + SECTOR_LABEL_OFFSET + 16);
 
+    // Measure the REAL viewport the canvas scrolls in. `.ship-page` height is
+    // driven off the measured nav height (--ship-nav-h; see measureNavHeight),
+    // so clientHeight is the true available height here — the single fact F1's
+    // fit and F2's page-fit share (LIN-1221).
     var pageEl = document.querySelector('.ship-page');
     var viewportW = pageEl ? pageEl.clientWidth : 1200;
     var viewportH = pageEl ? pageEl.clientHeight : 800;
     var canvasSize = Math.max(viewportW, viewportH, halfSize * 2);
+
+    // First-paint fit (LIN-1221 F1): the content box is centred and spans
+    // 2×halfSize in each axis. Fit it into the true viewport so the graph is
+    // visible on load instead of clipping off-canvas. resetView() reuses this.
+    var contentExtent = halfSize * 2;
+    viewState.fitZoom = computeFitZoom({
+      contentWidth: contentExtent,
+      contentHeight: contentExtent,
+      availWidth: viewportW,
+      availHeight: viewportH,
+      // The fit gets a lower floor than the interactive MIN_ZOOM (0.3): a tall,
+      // narrow phone needs to zoom out past the button floor to show the whole
+      // graph without off-canvas clipping (the F1 acceptance). resetView()
+      // applies fitZoom directly, so it can reach this floor too.
+      minZoom: FIT_MIN_ZOOM
+    });
+    if (!viewState.hasFitOnce) {
+      zoom = viewState.fitZoom;
+      viewState.hasFitOnce = true;
+    }
 
     geom.centerX = canvasSize / 2;
     geom.centerY = canvasSize / 2;
@@ -1429,6 +1478,10 @@
 
   var MIN_ZOOM = 0.3;
   var MAX_ZOOM = 2.5;
+  // The first-paint fit (LIN-1221 F1) may need to zoom out below the interactive
+  // MIN_ZOOM to show a large graph whole on a phone. Interactive +/- still clamp
+  // to MIN_ZOOM; only the fit/reset path reaches this floor.
+  var FIT_MIN_ZOOM = 0.15;
   var zoom = 1;
 
   // Push the current zoom into the DOM: stage gets the scaled footprint, canvas
@@ -1438,9 +1491,25 @@
     var canvas = document.getElementById('ship-canvas');
     if (!stage || !canvas) return;
     var size = viewState.canvasSize || 0;
-    stage.style.width = (size * zoom) + 'px';
-    stage.style.height = (size * zoom) + 'px';
-    canvas.style.transform = 'scale(' + zoom + ')';
+    var scaled = size * zoom;
+    var page = document.querySelector('.ship-page');
+    var vpW = page ? page.clientWidth : scaled;
+    var vpH = page ? page.clientHeight : scaled;
+    // Stage carries the scaled footprint, but never smaller than the viewport so
+    // a fit-shrunk graph has room to centre rather than pin to the corner.
+    stage.style.width = Math.max(scaled, vpW) + 'px';
+    stage.style.height = Math.max(scaled, vpH) + 'px';
+    // When the scaled graph is smaller than the viewport in an axis, the scroll
+    // container can't centre it (scrollLeft/Top clamp at 0), which left the
+    // fit-zoomed graph jammed into the top-left with a large void beside it
+    // (LIN-1221 F1). Translate the canvas to centre it within the stage in that
+    // axis. The offset is non-zero ONLY when there is no scroll room in the
+    // axis, so the pan/zoom scroll math (which assumes transform-origin 0,0)
+    // is untouched whenever the graph is actually scrollable.
+    var offX = scaled < vpW ? (vpW - scaled) / 2 : 0;
+    var offY = scaled < vpH ? (vpH - scaled) / 2 : 0;
+    canvas.style.transform =
+      'translate(' + offX + 'px, ' + offY + 'px) scale(' + zoom + ')';
     updateZoomLabel();
   }
 
@@ -1469,14 +1538,18 @@
     page.scrollTop = contentY * ratio - fy;
   }
 
-  // Reset zoom to 1 and recentre on the ship (mirrors render()'s initial centre).
+  // Reset zoom to the first-paint FIT and recentre on the ship (LIN-1221 F1).
+  // Reset-to-100% is no longer safe: on a phone 100% re-clips the graph the fit
+  // was there to reveal, so "reset" returns to the same fit the page loaded at.
+  // Assigns viewState.fitZoom directly (not via setZoom) so it can reach a fit
+  // below the interactive MIN_ZOOM floor when the graph is large.
   function resetView() {
     var page = document.querySelector('.ship-page');
-    zoom = 1;
+    zoom = viewState.fitZoom || 1;
     applyZoomTransform();
     if (page && viewState.geom) {
-      page.scrollLeft = viewState.geom.centerX - page.clientWidth / 2;
-      page.scrollTop = viewState.geom.centerY - page.clientHeight / 2;
+      page.scrollLeft = viewState.geom.centerX * zoom - page.clientWidth / 2;
+      page.scrollTop = viewState.geom.centerY * zoom - page.clientHeight / 2;
     }
   }
 
@@ -1627,6 +1700,33 @@
   }
 
   // =============================================================================
+  // Nav-height fact (LIN-1221 F2)
+  //
+  // The shared header is forced into normal flow on ship (`.nav-bar{position:
+  // static}`, the LIN-984 pointer-interception guard — must NOT be re-pinned).
+  // The ONE fact three consumers need is the vertical space consumed ABOVE the
+  // canvas — the nav's BOTTOM edge in the viewport (its height PLUS any page
+  // padding above it; the nav does not sit flush at y=0). That drives `.ship-
+  // page`'s height (`100vh - navBottom`), the fixed mode/zoom control offsets,
+  // and — via `.ship-page` clientHeight — F1's fit `availH`. It used to be
+  // triplicated as stale `56px` / `68px` / `6rem` constants; against the
+  // finished S2 two-row nav the `top:68px` toggle landed over the nav's view
+  // strip (the live LIN-984 collision). Measure it once, expose it as
+  // `--ship-nav-h`; the CSS drives everything off that variable.
+  // =============================================================================
+  function measureNavHeight() {
+    var nav = document.querySelector('.nav-bar');
+    if (!nav) return;
+    // Bottom edge relative to the viewport top = everything consumed above the
+    // canvas. `.ship-page` follows the nav in normal flow, so this is exactly
+    // where the canvas begins and where fixed controls must clear.
+    var bottom = Math.round(nav.getBoundingClientRect().bottom);
+    if (bottom > 0) {
+      document.documentElement.style.setProperty('--ship-nav-h', bottom + 'px');
+    }
+  }
+
+  // =============================================================================
   // Init
   // =============================================================================
 
@@ -1637,11 +1737,24 @@
   }
 
   function init() {
+    // Measure the nav BEFORE the first render so `.ship-page` clientHeight (F1's
+    // fit availH) already reflects the corrected `100vh - navH` height.
+    measureNavHeight();
     render();
     wirePopover();
     wireHeadingControl();
     wireModeControl();
     wireZoomControl();
     wirePan();
+
+    // Keep the nav-height fact current on viewport changes (a resize/orientation
+    // flip can reflow the two-row nav). Re-measuring updates `.ship-page` height
+    // and the control offsets; the live zoom is intentionally left untouched so a
+    // resize doesn't yank the user's current zoom out from under them.
+    var resizeTimer = null;
+    window.addEventListener('resize', function () {
+      if (resizeTimer) window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(measureNavHeight, 150);
+    });
   }
 })();
