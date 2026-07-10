@@ -98,46 +98,46 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('confirm CI went green and report the run URL'));
   });
 
-  test('flips on the end-of-run close --cascade over the autopilot own session tree (LIN-946 Phase 3)', () => {
+  test('the autopilot issues NO end-of-run close --cascade — the completion axis is the runner\'s (LIN-1206)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
-    // The single end-of-run trigger: once the top task is verified complete and the
-    // run is concluding, the autopilot issues ONE close --cascade on its OWN session
-    // id to reap its whole descendant tree in one deterministic call.
-    assert.ok(text.includes('close --cascade'), 'names the end-of-run cascade close');
-    assert.ok(text.includes('cascade: true'), 'gives the concrete cascade wire flag');
-    assert.ok(/abortTo: <your own\s+session id>/.test(text),
-      'the cascade roots on the autopilot own session id');
-    // Reconciled with the leave-open default: this is the run's FINAL CLEANUP, not the
-    // never-on-completion default reversed — distinct from the during-run disposition.
-    assert.ok(text.includes('final cleanup'), 'framed as the run-terminal cleanup, not the leave-open default');
-    // Load-bearing safety rationale: safe because the runner skips human-continued
-    // sessions (LIN-951, verified live), so a blanket end-of-run cascade cannot slam a
-    // window someone is mid-reply in.
-    assert.ok(text.includes('[skipped] human-continued'), 'states the runner-skips-human-continued safety rationale');
-    // force is NOT used by the cascade (a deliberate single abort is the only override).
-    assert.ok(text.includes('Never add `force` to the cascade'), 'the cascade never carries force');
+    const flat = text.replace(/\s+/g, ' ');
+    // LIN-1100 step 2 / Strategy B: the autopilot closes NOTHING on the completion axis.
+    // The end-of-run `close --cascade` is retired now that SD's `closeOnDone` auto-closes
+    // DONE windows (LIN-1100 step 1, made reliable by LIN-1219).
+    assert.ok(!text.includes('cascade: true'), 'the concrete end-of-run cascade wire flag must be gone');
+    assert.ok(!/abortTo: <your own\s+session id>/.test(text),
+      'the autopilot no longer roots a cascade on its own session id');
+    assert.ok(flat.includes('you close nothing'),
+      'the run-end prose states the autopilot closes nothing on completion');
+    assert.ok(flat.includes('no end-of-run cascade to issue'),
+      'the end-of-run cascade is explicitly retired');
+    assert.ok(text.includes('closeOnDone'), 'names the runner-owned DONE auto-close that replaces it');
   });
 
-  test('closes each session on-done by default, with the judged-terminal child autopilot as one instance (LIN-1071)', () => {
+  test('the autopilot never closes a DONE window itself — the runner does (closeOnDone); non-DONE stays open (LIN-1206)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
-    // The composed prompt inlines the manual, so both surfaces must carry the inverted
-    // default: now that resuming a closed session is reliable, the parent closes each
-    // spent session when it's done rather than leaving it open. The child autopilot is
-    // named as one instance of that general default, not a carve-out from a stricter one.
-    assert.ok(text.includes('close-on-done default'),
-      'manual should name the general close-on-done default');
-    assert.ok(text.includes('resuming a closed session is reliable'),
-      'manual should state the resume-is-reliable premise that unlocked the inversion');
+    const flat = text.replace(/\s+/g, ' ');
+    // The composed prompt inlines the manual, so both surfaces carry the inversion:
+    // the runner closes a session on its DONE sentinel; the autopilot judges + advances
+    // but closes no DONE window itself. (Reverses LIN-1071.)
+    assert.ok(text.includes('closeOnDone'), 'names the runner-owned DONE auto-close');
+    assert.ok(flat.includes("the runner's job now, not yours"),
+      'the manual section is titled for the runner owning the close');
+    assert.ok(flat.includes('never close a DONE window yourself'),
+      'the autopilot is told it never closes a DONE window itself');
+    // The child autopilot is no longer closed by the autopilot either — same inversion.
     assert.ok(text.includes('child autopilot'),
-      'the child autopilot must still be named as an instance of the default');
-    assert.ok(text.includes('abortTo'),
-      'the close must reuse the existing abort:true/abortTo wire, not a new path');
-    // The kickoff complete-branch coherence line names the same close.
-    assert.ok(text.includes('abortTo=<child session id>'),
-      'the kickoff advance/complete step should name closing the spent child on the abort wire');
-    // The human-continued guard is the one hold-out from close-on-done, not removed by it.
-    assert.ok(text.includes('human-continued'),
-      'human-continued sessions should still be the guarded exception to close-on-done');
+      'the child autopilot case is still named');
+    assert.ok(flat.includes('do not issue an `abort`/`abortTo` to reap it'),
+      'the autopilot no longer aborts/abortTo-reaps a done child');
+    // Invariants preserved: no timer/guess close; resume-via-`--resume` (LIN-486) reversibility.
+    assert.ok(flat.includes('event-driven off the DONE sentinel'),
+      'closing stays event-driven, never timer/guess-based');
+    assert.ok(text.includes('LIN-486'),
+      'the --resume/LIN-486 reversibility premise is kept');
+    // Non-DONE terminal windows stay open deliberately (a feature, not a leak).
+    assert.ok(flat.includes('Non-DONE terminal windows are deliberately left open'),
+      'non-DONE windows stay open as investigation affordances');
   });
 
   test('coordinates a child set as PARALLEL fan-out / fan-in with per-child liveness (LIN-874)', () => {
@@ -184,17 +184,18 @@ describe('buildAutopilotKickoff (inline handbook / disposition layer)', () => {
     assert.ok(text.includes(`${BASE_URL}/api/proxy/autopilot/manual`));
   });
 
-  test('the handbook itself carries the end-of-run cascade-close disposition (LIN-946 Phase 3)', () => {
-    // Anchor on the load-bearing facts, not the exact prose (which stays freely
-    // editable): the manual states the end-of-run close --cascade on the run's own
-    // session id, frames it as the run's final cleanup distinct from leave-open, and
-    // grounds its safety in the runner's human-continued skip + no-force rule.
+  test('the inlined handbook retires the end-of-run cascade — the runner owns DONE closing (LIN-1206)', () => {
+    // The manual (composed inline into every run) no longer carries an end-of-run
+    // close --cascade disposition. On the completion axis the autopilot closes nothing:
+    // SD's closeOnDone reaps DONE windows and non-DONE windows are left open.
     const manual = buildAutopilotManual();
-    assert.ok(manual.includes('close --cascade'), 'manual names the end-of-run cascade close');
-    assert.ok(manual.includes('cascade: true'), 'manual gives the concrete cascade wire flag');
-    assert.ok(manual.includes('final cleanup'), 'framed as run-terminal cleanup, not the leave-open default');
-    assert.ok(manual.includes('[skipped] human-continued'), 'grounds safety in the runner-skips-human-continued contract');
-    assert.ok(/never carries\s+`force`|no `force`/.test(manual), 'the cascade never carries force');
+    const flat = manual.replace(/\s+/g, ' ');
+    assert.ok(!manual.includes('cascade: true'), 'the manual no longer gives the cascade wire flag');
+    assert.ok(manual.includes('closeOnDone'), 'the manual names the runner-owned DONE auto-close');
+    assert.ok(flat.includes('you close nothing'),
+      'the manual states the autopilot closes nothing on completion');
+    assert.ok(flat.includes('Non-DONE terminal windows are deliberately left open'),
+      'the manual keeps non-DONE windows open deliberately');
   });
 });
 
