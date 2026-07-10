@@ -207,3 +207,88 @@ describe('LIN-1173 — Collective fan-out token delivery via attachProxyContext'
     assert.ok(byKey.bravo.prompt.includes('boot_bravo'));
   });
 });
+
+// LIN-1189 — the facilitator seat rides the SAME harness-agnostic finalizePrompt/
+// buildPrompt branch as a participant (only `isFacilitator` swaps the builder), so
+// the risk that the field-vs-prose split behaves differently there is low — but it
+// was untested. These pin the facilitator variant explicitly. A facilitator seat is
+// designated by naming its bound workspaceUrlKey in the `facilitator` body field.
+describe('LIN-1189 — facilitator seat token delivery via attachProxyContext', () => {
+  test('claude-code facilitator: token travels as the bootstrapToken field, NOT in prompt prose', async () => {
+    const workspacePreferencesStore = await prefsWith({ alpha: { harness: 'claude-code' } });
+    const minted = [];
+    const captured = [];
+    const app = buildApp(captured, { workspacePreferencesStore, proxyTokenStore: mintingStore(minted) });
+
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#room', characters: [{ workspaceUrlKey: 'alpha' }], facilitator: 'alpha', target: 'cli',
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(captured.length, 1);
+    const { item } = captured[0];
+
+    // This really is the facilitator seat, not a participant.
+    assert.equal(item.promptName, 'collective-facilitator', 'the designated seat gets the facilitator prompt');
+    assert.ok(item.prompt.includes('## You are the facilitator'), 'facilitator prompt body present');
+
+    // The structured field carries the minted bootstrap...
+    assert.equal(item.harness, 'claude-code');
+    assert.equal(item.bootstrapToken, 'boot_alpha', 'bootstrap must travel as the structured field');
+    // ...and the prompt carries NO token and NO curl-exchange prose.
+    assert.ok(!item.prompt.includes('boot_alpha'), 'claude-code prompt must not embed the token');
+    assert.ok(!item.prompt.includes('FIRST, exchange your single-use bootstrap token'), 'no bespoke inline exchange prose');
+    assert.ok(!item.prompt.includes('curl -X POST -H "Authorization: Bearer'), 'no curl exchange in prompt');
+    // The shared MCP access block is what got appended instead.
+    assert.ok(item.prompt.includes('Obtain your working token from your configured dispatch MCP tool'), 'MCP access block present');
+    // A single-use bootstrap was minted for the facilitator's workspace.
+    assert.ok(minted.some(m => m.urlKey === 'alpha' && m.opts.kind === 'bootstrap' && m.opts.scope === 'readWrite'));
+  });
+
+  test('non-claude-code facilitator: byte-identical inline prose block, no bootstrapToken field', async () => {
+    const workspacePreferencesStore = await prefsWith({ alpha: { harness: 'opencode' } });
+    const minted = [];
+    const captured = [];
+    const app = buildApp(captured, { workspacePreferencesStore, proxyTokenStore: mintingStore(minted) });
+
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#room', characters: [{ workspaceUrlKey: 'alpha' }], facilitator: 'alpha', target: 'cli',
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(captured.length, 1);
+    const { item } = captured[0];
+
+    assert.equal(item.promptName, 'collective-facilitator', 'the designated seat gets the facilitator prompt');
+    assert.ok(item.prompt.includes('## You are the facilitator'), 'facilitator prompt body present');
+
+    assert.equal(item.harness, 'opencode');
+    assert.strictEqual(item.bootstrapToken, null, 'prose path carries no structured token field');
+    // The bespoke Linear-access block IS present, with the token embedded inline.
+    assert.ok(item.prompt.includes('## Workspace API access (auto-appended)'), 'bespoke access block present');
+    assert.ok(item.prompt.includes('FIRST, exchange your single-use bootstrap token for a working token:'), 'inline exchange prose present');
+    assert.ok(item.prompt.includes('boot_alpha'), 'token embedded inline for a prose harness');
+    // NOT the MCP block.
+    assert.ok(!item.prompt.includes('Obtain your working token from your configured dispatch MCP tool'), 'no MCP block on the prose path');
+
+    // The prose access block is byte-identical to the participant seat's — both
+    // builders share buildLinearAccessBlock, so the facilitator's appended block
+    // must match a participant's for the same workspace/token exactly.
+    const participantCaptured = [];
+    const participantApp = buildApp(participantCaptured, {
+      workspacePreferencesStore: await prefsWith({ alpha: { harness: 'opencode' } }),
+      proxyTokenStore: mintingStore([]),
+    });
+    await call(participantApp, 'post', START_PATH, {
+      channel: '#room', characters: [{ workspaceUrlKey: 'alpha' }], target: 'cli',
+    });
+    const MARKER = '## Workspace API access (auto-appended)';
+    // Normalise the ephemeral test-server origin (each `call` binds a fresh random
+    // port) so the comparison pins the prose, not the port.
+    const normalise = (p) => p.slice(p.indexOf(MARKER)).replace(/http:\/\/127\.0\.0\.1:\d+/g, 'ORIGIN');
+    const facilitatorBlock = normalise(item.prompt);
+    const participantBlock = normalise(participantCaptured[0].item.prompt);
+    assert.ok(facilitatorBlock.startsWith(MARKER), 'access-block marker found in facilitator prompt');
+    assert.strictEqual(facilitatorBlock, participantBlock, 'facilitator prose block is byte-identical to the participant one');
+  });
+});
