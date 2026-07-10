@@ -51,6 +51,22 @@ function statusAt(id, offsetDays, extra = {}) {
   };
 }
 
+// A raw task-snapshot record in the shape listByWorkspace(...).items yields (see
+// TaskSnapshotStore.toRecord): { taskIdentifier, capturedAt (ISO), snapshot{...} }.
+// Larger offsetDays = further in the past, so an (earliest → latest) transition is
+// modelled as a bigger-offset "before" and a smaller-offset "after".
+function taskSnap(taskIdentifier, offsetDays, snap = {}) {
+  return {
+    taskIdentifier,
+    capturedAt: new Date(NOW - offsetDays * 86400000).toISOString(),
+    snapshot: {
+      title: snap.title || 'A task',
+      state: snap.state || { name: 'In Progress', type: 'started' },
+      priority: snap.priority ?? 2
+    }
+  };
+}
+
 describe('resolveWindow', () => {
   test('passes recognised windows through', () => {
     for (const w of WINDOWS) assert.strictEqual(resolveWindow(w), w);
@@ -181,5 +197,209 @@ describe('formatEditionContext', () => {
     const ctx = formatEditionContext(m);
     assert.match(ctx, /id: session:sess-1/);
     assert.match(ctx, /id: status:st-9/);
+  });
+});
+
+// ── LIN-1197: task-snapshot feedstock ────────────────────────────────────────
+
+describe('buildEditionModel — task sources (LIN-1197)', () => {
+  test('a state change produces a kind:task SourceRef with the full slice shape', () => {
+    const m = buildEditionModel({
+      window: 'week', now: NOW,
+      taskSnapshotItems: [
+        taskSnap('LIN-10', 3, { title: 'Fix the boiler', state: { name: 'In Progress', type: 'started' }, priority: 2 }),
+        taskSnap('LIN-10', 1, { title: 'Fix the boiler', state: { name: 'In Review', type: 'started' }, priority: 2 }),
+      ],
+    });
+    const s = m.sources.find(x => x.kind === 'task');
+    assert.ok(s, 'a task source exists');
+    assert.strictEqual(s.id, 'task:LIN-10');
+    assert.strictEqual(s.kind, 'task');
+    assert.strictEqual(s.desk, 'The Wire');            // non-completion transition
+    assert.strictEqual(s.weight, 3);                    // real move is lead-worthy
+    assert.strictEqual(s.headline, 'Fix the boiler — In Progress → In Review');
+    assert.strictEqual(new Date(s.timestamp).getTime(), NOW - 1 * 86400000); // latest capturedAt
+    assert.deepStrictEqual(s.snapshot, {
+      taskIdentifier: 'LIN-10',
+      title: 'Fix the boiler',
+      from: 'In Progress',
+      to: 'In Review',
+      transitioned: true,
+      completed: false,
+      priorityBefore: 2,
+      priorityAfter: 2,
+      priorityChanged: false,
+      snapshots: 2,
+      capturedFrom: new Date(NOW - 3 * 86400000).toISOString(),
+      capturedTo: new Date(NOW - 1 * 86400000).toISOString(),
+    });
+  });
+
+  test('a completion (state.type completed) floats to the Front Page', () => {
+    const m = buildEditionModel({
+      window: 'week', now: NOW,
+      taskSnapshotItems: [
+        taskSnap('LIN-11', 3, { state: { name: 'In Progress', type: 'started' } }),
+        taskSnap('LIN-11', 1, { state: { name: 'Done', type: 'completed' } }),
+      ],
+    });
+    const s = m.sources.find(x => x.id === 'task:LIN-11');
+    assert.strictEqual(s.snapshot.completed, true);
+    assert.strictEqual(s.desk, 'Front Page');
+    assert.strictEqual(s.weight, 3);
+    assert.strictEqual(s.headline, 'A task — In Progress → Done');
+  });
+
+  test('a priority-only move (no state change) headlines "priority changed"', () => {
+    const m = buildEditionModel({
+      window: 'week', now: NOW,
+      taskSnapshotItems: [
+        taskSnap('LIN-12', 3, { title: 'Paint the hull', state: { name: 'In Progress', type: 'started' }, priority: 3 }),
+        taskSnap('LIN-12', 1, { title: 'Paint the hull', state: { name: 'In Progress', type: 'started' }, priority: 1 }),
+      ],
+    });
+    const s = m.sources.find(x => x.id === 'task:LIN-12');
+    assert.strictEqual(s.snapshot.transitioned, false);
+    assert.strictEqual(s.snapshot.priorityChanged, true);
+    assert.strictEqual(s.snapshot.priorityBefore, 3);
+    assert.strictEqual(s.snapshot.priorityAfter, 1);
+    assert.strictEqual(s.headline, 'Paint the hull — priority changed');
+    assert.strictEqual(s.weight, 2);
+  });
+
+  test('a degenerate no-change snapshot headlines "still <state>", never a null X → X', () => {
+    const m = buildEditionModel({
+      window: 'week', now: NOW,
+      taskSnapshotItems: [
+        // Single in-window snapshot, and a same-state pair — both are degenerate.
+        taskSnap('LIN-13', 1, { title: 'Stow the sails', state: { name: 'In Progress', type: 'started' } }),
+        taskSnap('LIN-14', 3, { title: 'Swab the deck', state: { name: 'Todo', type: 'unstarted' } }),
+        taskSnap('LIN-14', 1, { title: 'Swab the deck', state: { name: 'Todo', type: 'unstarted' } }),
+      ],
+    });
+    const single = m.sources.find(x => x.id === 'task:LIN-13');
+    assert.strictEqual(single.snapshot.transitioned, false);
+    assert.strictEqual(single.headline, 'Stow the sails — still In Progress');
+    assert.strictEqual(single.weight, 2);
+    // No degenerate task may ever render a transition arrow (a null X → X).
+    for (const s of m.sources.filter(x => x.kind === 'task')) {
+      assert.strictEqual(s.snapshot.transitioned, false);
+      assert.doesNotMatch(s.headline, / → /);
+    }
+  });
+
+  test('task snapshots outside the window are excluded (by capturedAt)', () => {
+    const m = buildEditionModel({
+      window: 'week', now: NOW,
+      taskSnapshotItems: [
+        taskSnap('LIN-in', 2, { state: { name: 'Done', type: 'completed' } }),
+        taskSnap('LIN-out', 20, { state: { name: 'Done', type: 'completed' } }),
+      ],
+    });
+    assert.deepStrictEqual(m.sources.map(s => s.id), ['task:LIN-in']);
+  });
+
+  test('only in-window snapshots form a group — a pre-window snapshot is not the "before"', () => {
+    const m = buildEditionModel({
+      window: 'week', now: NOW,
+      taskSnapshotItems: [
+        taskSnap('LIN-16', 20, { state: { name: 'Backlog', type: 'backlog' } }),   // pre-window
+        taskSnap('LIN-16', 1, { state: { name: 'In Progress', type: 'started' } }), // in-window
+      ],
+    });
+    const s = m.sources.find(x => x.id === 'task:LIN-16');
+    assert.strictEqual(s.snapshot.snapshots, 1);
+    assert.strictEqual(s.snapshot.transitioned, false);
+    assert.strictEqual(s.headline, 'A task — still In Progress');
+  });
+
+  test('a month window includes a task a week window excludes (no raised ceiling)', () => {
+    const input = { now: NOW, taskSnapshotItems: [taskSnap('LIN-17', 20, { state: { name: 'Done', type: 'completed' } })] };
+    assert.strictEqual(buildEditionModel({ ...input, window: 'week' }).counts.tasks, 0);
+    assert.strictEqual(buildEditionModel({ ...input, window: 'month' }).counts.tasks, 1);
+  });
+
+  test('identical task inputs produce deeply-equal sources; ordering is newest capturedAt first', () => {
+    const input = {
+      window: 'month', now: NOW,
+      taskSnapshotItems: [
+        taskSnap('LIN-old', 10, { state: { name: 'Done', type: 'completed' } }),
+        taskSnap('LIN-new', 1, { state: { name: 'Done', type: 'completed' } }),
+      ],
+    };
+    assert.deepStrictEqual(buildEditionModel(input).sources, buildEditionModel(input).sources);
+    const ids = buildEditionModel(input).sources.filter(s => s.kind === 'task').map(s => s.id);
+    assert.deepStrictEqual(ids, ['task:LIN-new', 'task:LIN-old']);
+  });
+
+  test('equal-timestamp task slices tie-break by their stable id', () => {
+    const m = buildEditionModel({
+      window: 'month', now: NOW,
+      taskSnapshotItems: [
+        taskSnap('LIN-b', 3, { state: { name: 'Done', type: 'completed' } }),
+        taskSnap('LIN-a', 3, { state: { name: 'Done', type: 'completed' } }),
+      ],
+    });
+    const ids = m.sources.filter(s => s.kind === 'task').map(s => s.id);
+    assert.deepStrictEqual(ids, ['task:LIN-a', 'task:LIN-b']);
+  });
+});
+
+describe('buildEditionModel — task additivity & counts (LIN-1197)', () => {
+  test('omitted vs empty taskSnapshotItems leaves the edition byte-identical (regression pin)', () => {
+    const base = {
+      window: 'week', now: NOW, workspaceName: 'WS',
+      sessions: [sessionAt('s1', 1)],
+      agentStatusItems: [statusAt('st1', 1)],
+      llmStats: { totalCalls: 2, totalCost: 0.01, totalTokens: 100, byFeature: [] },
+    };
+    assert.deepStrictEqual(buildEditionModel({ ...base, taskSnapshotItems: [] }), buildEditionModel(base));
+  });
+
+  test('empty task input keeps a quiet window quiet', () => {
+    const m = buildEditionModel({ window: 'week', now: NOW, sessions: [], agentStatusItems: [], taskSnapshotItems: [], llmStats: null });
+    assert.strictEqual(m.isQuiet, true);
+    assert.strictEqual(m.sources.length, 0);
+  });
+
+  test('counts pins sessions/status/tasks/total, with tasks folded into total', () => {
+    const m = buildEditionModel({
+      window: 'week', now: NOW,
+      sessions: [sessionAt('s1', 1)],
+      agentStatusItems: [statusAt('st1', 1)],
+      taskSnapshotItems: [
+        taskSnap('LIN-10', 3, { state: { name: 'In Progress', type: 'started' } }),
+        taskSnap('LIN-10', 1, { state: { name: 'Done', type: 'completed' } }),
+      ],
+    });
+    assert.deepStrictEqual(m.counts, { sessions: 1, status: 1, tasks: 1, total: 3 });
+  });
+});
+
+describe('formatEditionContext — task branch (LIN-1197)', () => {
+  test('emits the task by id with a state-change/completion line and a priority line', () => {
+    const m = buildEditionModel({
+      window: 'week', now: NOW,
+      taskSnapshotItems: [
+        taskSnap('LIN-10', 3, { title: 'Fix the boiler', state: { name: 'In Progress', type: 'started' }, priority: 2 }),
+        taskSnap('LIN-10', 1, { title: 'Fix the boiler', state: { name: 'Done', type: 'completed' }, priority: 1 }),
+      ],
+    });
+    const ctx = formatEditionContext(m);
+    assert.match(ctx, /id: task:LIN-10/);
+    assert.match(ctx, /Fix the boiler — In Progress → Done/);       // title-led headline seed
+    assert.match(ctx, /state change: In Progress → Done \(completed\)/);
+    assert.match(ctx, /priority change: 2 → 1/);
+    assert.match(ctx, /1 task\(s\) that moved on the board/);        // activity summary
+  });
+
+  test('a degenerate task shows an unchanged-state line, not a transition', () => {
+    const m = buildEditionModel({
+      window: 'week', now: NOW,
+      taskSnapshotItems: [taskSnap('LIN-13', 1, { title: 'Stow the sails', state: { name: 'In Progress', type: 'started' } })],
+    });
+    const ctx = formatEditionContext(m);
+    assert.match(ctx, /state: In Progress \(unchanged in window\)/);
+    assert.doesNotMatch(ctx, /state change:/);
   });
 });
