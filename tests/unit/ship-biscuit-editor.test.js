@@ -14,6 +14,7 @@ import assert from 'node:assert';
 import { buildEditionModel } from '../../lib/ship-biscuit.js';
 import {
   parseEditorResponse,
+  assessEditorOutcome,
   buildQuietEdition,
   buildMockEdition,
   buildEditorMessages
@@ -106,6 +107,72 @@ describe('parseEditorResponse — grounding guard', () => {
     const model = modelWithSources();
     const raw = '```json\n' + JSON.stringify({ frontPage: { lede: 'Fenced.' }, index: [] }) + '\n```';
     assert.strictEqual(parseEditorResponse(raw, model).frontPage.lede, 'Fenced.');
+  });
+});
+
+describe('assessEditorOutcome — non-quiet parse/degrade path (LIN-1185)', () => {
+  // The real editor-LLM path had ZERO coverage before this: the only non-quiet test
+  // exercised buildMockEdition, which bypasses parseEditorResponse and the
+  // degrade-to-quiet branch entirely. These pin the exact regression — a busy week
+  // whose editor JSON is TRUNCATED must NOT silently render as a quiet edition.
+
+  test('a truncated (unclosed) editor JSON reply is a failure, not a quiet edition', () => {
+    const model = modelWithSources();
+    // A realistic busy-edition reply that the token cap cut off mid-object — the
+    // production failure mode: valid JSON prefix, no closing braces.
+    const full = JSON.stringify({
+      frontPage: { lede: 'A tidy week on the autopilot, with steady progress across the board and several tasks carried over the line.' },
+      index: [
+        { section: 'The Wire', headline: 'LIN-1 shipped', dek: 'The autopilot finished it.', weight: 5, sourceRefs: ['session:sess-1'] },
+        { section: 'Deep Dive', headline: 'Bug hunt on LIN-2', dek: 'Root cause found.', weight: 4, sourceRefs: ['status:st-1'] }
+      ]
+    });
+    const truncated = full.slice(0, Math.floor(full.length * 0.6)); // cut off before it closes
+
+    const body = parseEditorResponse(truncated, model);
+    // The real parser can't recover an unclosed object → empty body …
+    assert.strictEqual(body.frontPage.lede, '');
+    assert.strictEqual(body.index.length, 0);
+
+    // … and the outcome assessment classifies that (with finish_reason 'length') as a
+    // FAILURE — the caller surfaces an error instead of degrading to a quiet edition.
+    const outcome = assessEditorOutcome(body, 'length');
+    assert.strictEqual(outcome.ok, false, 'a truncated busy edition must not be treated as usable');
+    assert.strictEqual(outcome.truncated, true, 'finish_reason length ⇒ truncated');
+    assert.strictEqual(outcome.reason, 'truncated');
+  });
+
+  test('an empty body without a length signal is an unparseable failure (still not quiet)', () => {
+    const model = modelWithSources();
+    const body = parseEditorResponse('the model rambled without any JSON at all', model);
+    const outcome = assessEditorOutcome(body, 'stop');
+    assert.strictEqual(outcome.ok, false);
+    assert.strictEqual(outcome.truncated, false);
+    assert.strictEqual(outcome.reason, 'unparseable');
+  });
+
+  test('a complete, grounded reply is a usable outcome', () => {
+    const model = modelWithSources();
+    const raw = JSON.stringify({
+      frontPage: { lede: 'A busy week.' },
+      index: [{ section: 'The Wire', headline: 'LIN-1 shipped', dek: 'Done.', weight: 5, sourceRefs: ['session:sess-1'] }]
+    });
+    const outcome = assessEditorOutcome(parseEditorResponse(raw, model), 'stop');
+    assert.strictEqual(outcome.ok, true);
+    assert.strictEqual(outcome.reason, null);
+  });
+
+  test('a partial-but-usable edition (lede only, no stubs) is preserved, not failed', () => {
+    // Behaviour-preservation: the pre-fix degrade fired only on BOTH empty lede AND
+    // empty index, so a lede-only edition stayed usable. assessEditorOutcome matches.
+    const outcome = assessEditorOutcome({ frontPage: { lede: 'Just a headline note.' }, index: [] }, 'stop');
+    assert.strictEqual(outcome.ok, true);
+  });
+
+  test('is defensive against a malformed body shape', () => {
+    assert.strictEqual(assessEditorOutcome(null, 'length').ok, false);
+    assert.strictEqual(assessEditorOutcome({}, 'stop').ok, false);
+    assert.strictEqual(assessEditorOutcome({ frontPage: {}, index: 'nope' }, null).ok, false);
   });
 });
 
