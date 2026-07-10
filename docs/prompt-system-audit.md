@@ -246,3 +246,22 @@ removes the re-grounding obligation *and* the re-grounding spend in one change. 
 highest-durability output of this research may not be the findings — it's the instrumentation:
 emitting worker tokens on the feedback markers turns a one-off log study into a permanent
 instrument, so every future determinism change can be measured, not argued.
+
+---
+
+## Part II Appendix — Track-A baseline (first pull, 2026-07-10)
+
+First outside-view silhouette, pulled live through the workspace proxy (`/dispatch` + feedback markers) and parsed with the repo's **own** `parseHeartbeats` (`lib/session-telemetry.js`) + `dispatch-terminal` helpers. **26 recent sessions; 21 did real tool work (≥3 tools); 13 terminal-done.** Tool-**count** silhouette only — no tokens, no file targets (that's Track B).
+
+**Numbers**
+
+- Orientation share (explore-class Read/Grep/Glob ÷ all *named* tools): median **18%**, range 0–38%.
+- Read:edit ratio median **1.1**; the edit-bearing sessions (n=5) ran a median **11 tools before the first Edit**.
+- **16/21 sessions did zero edits** — correctly: they're read-only / orchestration kinds (research, triage, review, close-out, plan, wake, periodical, autopilot).
+- Tool mix: explore 63 · edit 39 · **Bash 197** · other 18.
+
+**The headline finding is a limit — and it's the useful one.** **Bash is 62% of all tool calls, and a heartbeat can't say what a Bash call *did*** (git log = orientation? `npm test` = verify? a real change?). So the 18% orientation figure is a hard **lower bound** — most of the read-vs-work signal is hiding inside Bash, which the outside view cannot open. This is the first *measured* argument for Track B: the `<sessionId>.jsonl` transcripts carry the actual bash commands, file targets, and per-turn tokens that resolve exactly this ambiguity.
+
+**What we can't yet claim.** The done-vs-not-done orientation split (21% vs 14%) is **confounded** — the not-done set is mostly orchestration/wake sessions with no edits, not failed work — so H1/H3 need the inside view and more edit-bearing sessions. Track A proved the join + parse work end-to-end and **sized the resolution wall**; it did not (and cannot) put a real number on the orientation *tax*.
+
+**Triangulation note.** This is the **D2** dataset. When the JSONL lands, **D3** resolves the Bash 62% and **D1** (LIN-824's busy-span method) sits between — the three-way compare then tells us whether this cheap silhouette can stand in for the token truth.
