@@ -11,7 +11,9 @@ import { test, expect } from '../fixtures/test-base.js';
 
 const TEST_WORKSPACE_URL_KEY = 'test-workspace';
 const SHIP_URL = `/workspace/${TEST_WORKSPACE_URL_KEY}/ship`;
-const SCREENSHOT_DIR = 'tests/screenshots/ship';
+// SHIP_SHOT_DIR lets the before/after capture write into sibling folders
+// (LIN-1221 acceptance: before/after at 1280 + 390, light + dark).
+const SCREENSHOT_DIR = process.env.SHIP_SHOT_DIR || 'tests/screenshots/ship';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -161,6 +163,39 @@ test.describe('Ship Screenshots', () => {
         });
       }
     });
+  });
+
+  // ==========================================================================
+  // LIN-1221 S3 acceptance matrix — realistic (dense) data at the ticket's
+  // review sizes and both themes. Uses the theme=dark cookie (the shared shell
+  // reads it pre-paint) rather than a client toggle so the capture is stable.
+  // ==========================================================================
+  test.describe('S3 matrix (LIN-1221): 1280 + 390, light + dark', () => {
+    const sizes = [
+      { name: 'desktop-1280', width: 1280, height: 720 },
+      { name: 'mobile-390', width: 390, height: 844 }
+    ];
+    const themes = ['light', 'dark'];
+
+    for (const size of sizes) {
+      for (const theme of themes) {
+        test(`s3 ${size.name} ${theme}`, async ({ page, context, baseURL }) => {
+          await context.addCookies([{
+            name: 'theme', value: theme, url: baseURL
+          }]);
+          await page.setViewportSize({ width: size.width, height: size.height });
+          // Dense, realistic fixture (8 projects, 6 WIP, ~36 cards).
+          await page.goto('/test/set-session?shipSample=true&features=' +
+            encodeURIComponent('{"ship":true}'));
+          await page.goto(SHIP_URL);
+          await page.waitForLoadState('networkidle');
+          await page.waitForTimeout(200); // settle fit + label placement
+          await page.screenshot({
+            path: `${SCREENSHOT_DIR}/s3-${size.name}-${theme}.png`
+          });
+        });
+      }
+    }
   });
 
   test('07 - picker open', async ({ page }) => {

@@ -16,10 +16,12 @@ test.describe('Ship Page', () => {
   test('renders the ship rectangle at the centre', async ({ page }) => {
     const ship = page.locator('#ship-rect');
     await expect(ship).toBeVisible();
-    const box = await ship.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box.width).toBeGreaterThan(100);
-    expect(box.height).toBeGreaterThan(50);
+    // Measure the rect's LAYOUT footprint (offsetWidth/Height), which ignores
+    // the canvas zoom transform — the first-paint fit (LIN-1221 F1) scales the
+    // whole canvas down, so boundingBox would report the shrunk visual size.
+    const size = await ship.evaluate(n => ({ w: n.offsetWidth, h: n.offsetHeight }));
+    expect(size.w).toBeGreaterThan(100);
+    expect(size.h).toBeGreaterThan(50);
   });
 
   test('in-progress items are placed inside the ship', async ({ page }) => {
@@ -131,44 +133,134 @@ test.describe('Ship Page', () => {
     await expect(page.locator('#ship-orbit .swim-box[data-sector="forward"]')).toHaveCount(0);
   });
 
-  // LIN-535: zoom, pan, overlap recovery, and a swipe destination link.
-  test('zoom controls scale the canvas and reset returns to 100%', async ({ page }) => {
+  // LIN-535 / LIN-1221 F1: zoom, pan, overlap recovery, a swipe link — and the
+  // new fit contract. Reset returns to the first-paint FIT (not a hardcoded
+  // 100%): on a phone 100% re-clips the graph the fit was there to reveal.
+  test('zoom controls scale the canvas and reset returns to fit', async ({ page }) => {
     const canvas = page.locator('#ship-canvas');
-    const transformOf = () => canvas.evaluate(n => n.style.transform);
+    // The transform now carries a centring translate before the scale; read the
+    // scale factor out of it.
+    const scaleOf = async () => {
+      const t = await canvas.evaluate(n => n.style.transform);
+      const m = t.match(/scale\(([\d.]+)\)/);
+      return m ? parseFloat(m[1]) : 1;
+    };
 
-    // Starts unzoomed (no transform or scale(1)).
-    const initial = await transformOf();
-    expect(initial === '' || /scale\(1\)/.test(initial)).toBeTruthy();
+    // First paint applies a fit zoom (≤ 1) so the whole graph is visible.
+    const fit = await scaleOf();
+    expect(fit).toBeGreaterThan(0);
+    expect(fit).toBeLessThanOrEqual(1);
+    const fitLabel = await page.locator('#ship-zoom-reset').textContent();
 
     await page.locator('#ship-zoom-in').click();
-    const zoomed = await transformOf();
-    const scaleIn = parseFloat(zoomed.match(/scale\(([\d.]+)\)/)[1]);
-    expect(scaleIn).toBeGreaterThan(1);
-    await expect(page.locator('#ship-zoom-reset')).not.toHaveText('100%');
-
-    // Stage footprint grows with zoom so the scroll extent follows.
-    const stageW = await page.locator('#ship-stage').evaluate(n => parseFloat(n.style.width));
-    const canvasW = await canvas.evaluate(n => parseFloat(n.style.width));
-    expect(stageW).toBeCloseTo(canvasW * scaleIn, 0);
+    const scaleIn = await scaleOf();
+    expect(scaleIn).toBeGreaterThan(fit);
 
     await page.locator('#ship-zoom-out').click();
     await page.locator('#ship-zoom-out').click();
-    const scaleOut = parseFloat((await transformOf()).match(/scale\(([\d.]+)\)/)[1]);
-    expect(scaleOut).toBeLessThan(1);
+    expect(await scaleOf()).toBeLessThan(scaleIn);
 
     await page.locator('#ship-zoom-reset').click();
-    await expect(page.locator('#ship-zoom-reset')).toHaveText('100%');
-    expect(parseFloat((await transformOf()).match(/scale\(([\d.]+)\)/)[1])).toBeCloseTo(1, 5);
+    // Reset returns to the exact first-paint fit, label and all.
+    expect(await scaleOf()).toBeCloseTo(fit, 5);
+    await expect(page.locator('#ship-zoom-reset')).toHaveText(fitLabel);
+  });
+
+  // LIN-1221 F1: on a 390px phone the whole graph must be visible on first paint
+  // — no orbit card clipped off-canvas (the old default-100% "empty void" bug).
+  test('mobile 390 first paint fits the graph on-canvas (F1)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // Fit zoomed out below 100% to make room.
+    const scale = await page.locator('#ship-canvas').evaluate(n => {
+      const m = n.style.transform.match(/scale\(([\d.]+)\)/);
+      return m ? parseFloat(m[1]) : 1;
+    });
+    expect(scale).toBeLessThan(1);
+
+    // Every orbit card sits within the viewport horizontally (the binding axis
+    // on a tall-narrow phone). A few px tolerance for sub-pixel rounding.
+    const clip = await page.evaluate(() => {
+      const W = window.innerWidth, H = window.innerHeight;
+      const cards = [...document.querySelectorAll('#ship-orbit .swim-box')];
+      let offX = 0;
+      for (const c of cards) {
+        const b = c.getBoundingClientRect();
+        if (b.left < -2 || b.right > W + 2) offX++;
+      }
+      return { count: cards.length, offX, W, H };
+    });
+    expect(clip.count).toBeGreaterThan(0);
+    expect(clip.offX).toBe(0);
+  });
+
+  // LIN-1221 F2 / LIN-984 non-regression: on desktop the fixed mode toggle must
+  // sit clear of the (normal-flow) shared nav and stay clickable — the nav must
+  // not overlay and intercept it.
+  test('desktop mode toggle clears the nav and stays clickable (F2 / LIN-984)', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    const geom = await page.evaluate(() => {
+      const nav = document.querySelector('.nav-bar').getBoundingClientRect();
+      const ctl = document.querySelector('.ship-mode-control').getBoundingClientRect();
+      // What actually receives a click at the toggle's centre?
+      const cx = ctl.left + ctl.width / 2;
+      const cy = ctl.top + ctl.height / 2;
+      const hit = document.elementFromPoint(cx, cy);
+      const ctlEl = document.querySelector('.ship-mode-control');
+      return {
+        navBottom: nav.bottom,
+        ctlTop: ctl.top,
+        interceptedByNav: !!(hit && hit.closest('.nav-bar')),
+        toggleOwnsHit: !!(hit && ctlEl.contains(hit))
+      };
+    });
+    // The toggle sits entirely below the nav (no vertical overlap).
+    expect(geom.ctlTop).toBeGreaterThanOrEqual(geom.navBottom);
+    // And nothing from the nav overlays the toggle's hit point.
+    expect(geom.interceptedByNav).toBe(false);
+    expect(geom.toggleOwnsHit).toBe(true);
+
+    // It genuinely responds to a click (project mode stays active, unintercepted).
+    await page.locator('#ship-mode-project').click();
+    await expect(page.locator('#ship-mode-project')).toHaveClass(/active/);
   });
 
   test('drag in empty space pans the canvas', async ({ page }) => {
     const pageEl = page.locator('.ship-page');
+    // At first-paint FIT (LIN-1221 F1) the whole graph fits the viewport, so
+    // there is no scroll room to pan. Zoom in past fit first so the canvas
+    // overflows and dragging has somewhere to go.
+    for (let i = 0; i < 6; i++) await page.locator('#ship-zoom-in').click();
+
+    // Pick a drag origin over empty canvas — NOT on a card or a fixed control
+    // (the mode toggle now sits top-left, the zoom control bottom-left; LIN-1221
+    // F2). Scan a few control-free candidate points for bare canvas.
+    const origin = await page.evaluate(() => {
+      const r = document.querySelector('.ship-page').getBoundingClientRect();
+      const IGNORE = '.swim-box, .ship-heading-control, .ship-mode-control, .ship-zoom-control, .swim-popover';
+      const candidates = [
+        [r.right - 24, r.top + 24],
+        [r.right - 24, r.bottom - 24],
+        [r.right - 24, r.top + r.height / 2],
+        [r.left + r.width / 2, r.top + 24]
+      ];
+      for (const [x, y] of candidates) {
+        const el = document.elementFromPoint(x, y);
+        if (el && !el.closest(IGNORE)) return { x, y };
+      }
+      return { x: r.right - 24, y: r.top + 24 };
+    });
+
     const before = await pageEl.evaluate(n => n.scrollLeft);
-    const box = await pageEl.boundingBox();
-    // Drag from a corner (empty space, away from the central ship/cards).
-    await page.mouse.move(box.x + 30, box.y + 30);
+    // Drag leftward → the pan handler increases scrollLeft.
+    await page.mouse.move(origin.x, origin.y);
     await page.mouse.down();
-    await page.mouse.move(box.x + 30 - 120, box.y + 30 - 80, { steps: 8 });
+    await page.mouse.move(origin.x - 140, origin.y - 60, { steps: 8 });
     await page.mouse.up();
     const after = await pageEl.evaluate(n => n.scrollLeft);
     expect(after).toBeGreaterThan(before);
