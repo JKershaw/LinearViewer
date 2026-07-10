@@ -67,6 +67,7 @@ function shouldMockAi(workspace) {
  * @param {Object}   deps.agentStatusStore        - agent-status log (listStatus)
  * @param {Object}   deps.llmCallLogStore         - LLM call log (summarize → Weather)
  * @param {Object}   deps.taskSnapshotStore       - task-snapshot archive (listByWorkspace → task feedstock)
+ * @param {Object}   deps.reportHistoryStore      - roadmap report-history (getLatest → roadmap narrative/orientation source, LIN-1212)
  * @param {Object}   deps.shipBiscuitHistoryStore - durable edition store (save/getLatest)
  * @returns {Router}
  */
@@ -80,6 +81,7 @@ export function createShipBiscuitRoutes({
   agentStatusStore,
   llmCallLogStore,
   taskSnapshotStore,
+  reportHistoryStore,
   shipBiscuitHistoryStore
 }) {
   const router = Router();
@@ -152,7 +154,7 @@ export function createShipBiscuitRoutes({
     try {
       // 1) Gather the window's already-wired event sources (deterministic inputs).
       const range = windowRange(req.body?.window);
-      const [sessionsResult, statusResult, taskSnapshotResult, llmStats] = await Promise.all([
+      const [sessionsResult, statusResult, taskSnapshotResult, llmStats, roadmapReport] = await Promise.all([
         observationSessionsStore ? observationSessionsStore.findByWorkspace(workspace.urlKey).catch(() => ({ sessions: [] })) : Promise.resolve({ sessions: [] }),
         agentStatusStore ? agentStatusStore.listStatus(workspace.urlKey, { since: range.since }).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
         // Workspace-wide task-snapshot window scan (LIN-1197) — the SAME `range.since`
@@ -160,6 +162,11 @@ export function createShipBiscuitRoutes({
         // degrades to { items: [] } exactly like the other reads (guards LIN-1185).
         taskSnapshotStore ? taskSnapshotStore.listByWorkspace(workspace.urlKey, { since: range.since }).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
         llmCallLogStore ? llmCallLogStore.summarize(workspace.urlKey).catch(() => null) : Promise.resolve(null),
+        // Latest saved roadmap report (LIN-1212). getLatest returns the newest report
+        // regardless of window; buildEditionModel window-filters it by generatedAt so a
+        // stale report never flips a quiet edition loud. Store miss/error degrades to
+        // null (no roadmap source) exactly like the other reads.
+        reportHistoryStore ? reportHistoryStore.getLatest(workspace.urlKey).catch(() => null) : Promise.resolve(null),
       ]);
 
       // 2) Build the deterministic, addressable edition model.
@@ -170,6 +177,7 @@ export function createShipBiscuitRoutes({
         agentStatusItems: statusResult.items || [],
         taskSnapshotItems: taskSnapshotResult.items || [],
         llmStats,
+        roadmapReport,
       });
 
       // 3) Produce the front page + index.
