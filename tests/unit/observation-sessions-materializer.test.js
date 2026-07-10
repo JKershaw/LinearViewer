@@ -103,7 +103,12 @@ test('EQUIVALENCE: issue-set recompute == full build for sessions sharing an iss
   // The ground truth: the live whole-workspace reconstruction the feed runs today.
   const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore, agentStatusStore, lean: true });
   const fullById = new Map(full.map(s => [s.sessionId, s]));
-  assert.deepEqual([...fullById.keys()].sort(), ['S1', 'S2'], 'manual dispatch is not a session');
+  // LIN-1194: the live full build now ALSO emits the manual sessionless cli
+  // dispatch (M1) as a standalone single-loop session keyed by its own dispatch id.
+  // The materializer's discovery stays autopilot/sessionId-centric, so it
+  // deliberately does NOT materialize the standalone one — that divergence is
+  // exactly why the Sessions view reads live instead of the durable store.
+  assert.deepEqual([...fullById.keys()].sort(), ['M1', 'S1', 'S2'], 'the manual dispatch now reconstructs as its own standalone session (LIN-1194)');
 
   // Simulate an agent-status write on the shared issue → recompute its sessions.
   await materializer.rebuildForWrite(URL_KEY, { issueIdentifier: 'LIN-300' });
@@ -111,7 +116,9 @@ test('EQUIVALENCE: issue-set recompute == full build for sessions sharing an iss
   const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
   const matById = new Map(sessions.map(s => [s.sessionId, s]));
 
-  assert.deepEqual([...matById.keys()].sort(), ['S1', 'S2'], 'both sessions touching the issue were materialized');
+  // The materializer covers only the autopilot/sessionId sessions touching the
+  // issue; the standalone M1 stays live-only (see above).
+  assert.deepEqual([...matById.keys()].sort(), ['S1', 'S2'], 'only the autopilot/sessionId sessions touching the issue were materialized');
   assert.deepEqual(matById.get('S1'), fullById.get('S1'), 'S1 byte-identical to the full build');
   assert.deepEqual(matById.get('S2'), fullById.get('S2'), 'S2 byte-identical to the full build');
 });

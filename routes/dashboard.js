@@ -168,6 +168,30 @@ export function sessionIsTerminal(session) {
 }
 
 /**
+ * Is this a STANDALONE session — a single user-dispatched cli/web prompt that
+ * `_buildSessions` pass 3 synthesized into its own single-loop session (LIN-1194)?
+ *
+ * This is the DERIVED read-time discriminator that keeps the two Observation tabs
+ * apart WITHOUT changing the shared session builder (cross-cutting concern #1 in
+ * the plan): the Autopilot feed filters standalone sessions OUT (so extending the
+ * builder cannot leak them into the existing feed on a live-fallback read), and the
+ * Sessions feed keeps them. A session is standalone iff it has NO autopilot anchor
+ * AND none of its loops carries an explicit `sessionId` — the latter clause keeps
+ * orphan explicit-`sessionId` worker groups (an aged-out orchestrator, `_buildSessions`
+ * pass 2) on the Autopilot side, since those ARE autopilot-shaped. Pure; exported for
+ * unit tests.
+ *
+ * @param {Object} session - a reconstructed session (getSessionsForWorkspace shape)
+ * @returns {boolean}
+ */
+export function isStandaloneSession(session) {
+  if (findAnchorLoop(session)) return false;                 // autopilot-anchored
+  const loops = Array.isArray(session?.loops) ? session.loops : [];
+  if (loops.length === 0) return false;
+  return !loops.some(l => l && l.sessionId);                 // no explicit-sessionId group
+}
+
+/**
  * The observation session status string — the single contract consumed by the
  * client's icon/label maps and CSS (`public/observation.js` / `observation.css`).
  *
@@ -464,6 +488,16 @@ export function createDashboardRoutes({
     const waiting = !terminal && rawWaiting;
     const waitingMessage = waiting ? rawWaitingMessage : null;
 
+    // Sessions-tab discriminators (LIN-1194), both additive fields the Autopilot
+    // tab ignores. `standalone` routes a synthesized single-loop session to the
+    // Sessions view only (never the Autopilot feed). `taken` is the running-only
+    // in-flight boundary: a loop is taken once it leaves the live queue (its
+    // agentState is anything but 'queued' — see `_deriveAgentState`), so a
+    // queued-but-not-yet-taken dispatch is excluded from the Sessions in-flight
+    // list (the decided V1 boundary), while completed sessions fall to the archive.
+    const standalone = isStandaloneSession(session);
+    const taken = enriched.some(l => l.agentState !== 'queued');
+
     // The per-poll feed honours an explicit no-Linear cost contract, so it never
     // looks up the touched task's current state — `taskDone` stays false here.
     // The `done-with-warning` upgrade (LIN-749) is applied client-side from the
@@ -519,6 +553,9 @@ export function createDashboardRoutes({
       status,
       terminal,
       stale,
+      // Sessions-tab discriminators (LIN-1194; additive, Autopilot ignores them).
+      standalone,
+      taken,
       // Feed flag (LIN-1005): the client badges/filters waiting sessions and
       // surfaces the blocked message text. Null message when nothing is waiting.
       waiting,
@@ -547,9 +584,16 @@ export function createDashboardRoutes({
    * degrades to each seed's own loops. One bad store degrades to empty.
    *
    * @param {Array<{urlKey: string, name: string}>} workspaces
+   * @param {Object} [opts]
+   * @param {boolean} [opts.live=false] - force the LIVE reconstruction and bypass the
+   *   materialized `observation-sessions` store. The Sessions tab (LIN-1194) needs this
+   *   because the materializer's discovery (`_sessionsTouchingIssue`) only marks
+   *   autopilot/explicit-`sessionId` rows as session targets, so a store-backed read
+   *   stays blind to standalone dispatches even after the `_buildSessions` pass-3
+   *   extension. Reading live sidesteps that second seam entirely (V1).
    * @returns {Promise<Array<Object>>}
    */
-  async function mergeSessions(workspaces) {
+  async function mergeSessions(workspaces, { live = false } = {}) {
     // Per-workspace source of the session objects (LIN-623): the durable
     // `observation-sessions` read-model when present, else the live 30-day
     // reconstruction. The read swap changes ONLY where the session objects come
@@ -558,6 +602,9 @@ export function createDashboardRoutes({
     // omitted here (a drill-down concern); the materializer matches that by
     // building with no graph too.
     const sessionsForWorkspace = async (ws) => {
+      // Sessions tab (LIN-1194): skip the materialized store and read live, so
+      // standalone sessions (which the materializer never discovers) surface.
+      if (live) return getSessionsForWorkspace(ws.urlKey, { ...loopDeps, lean: true });
       if (observationSessionsStore) {
         const { sessions, backfilledAt } = await observationSessionsStore.findByWorkspace(ws.urlKey);
         // Hit: derived docs exist, OR the workspace was backfilled and is genuinely
@@ -844,6 +891,11 @@ export function createDashboardRoutes({
     // has no selective predicate to push down, so we bound the *request* with a
     // keepalive heartbeat rather than capping the store read (the workspace
     // branch of _fetchWorkspaceData stays option-free; truncation-footgun guard).
+    // Which Observation tab is polling (LIN-1194). `sessions` = the new in-flight
+    // Sessions view (live read, standalone sessions included, running-only split);
+    // anything else = the default Autopilot feed (byte-identical legacy behaviour).
+    const isSessionsView = req.query.view === 'sessions';
+
     const keepalive = armKeepalive(res);
     try {
       // Short-TTL stale-while-revalidate cache (LIN-617): only the first poll for
@@ -851,22 +903,39 @@ export function createDashboardRoutes({
       // served instantly (refreshed in the background) so the banner stops
       // sitting on its initial "loading…" placeholder. Caches the merged OUTPUT,
       // not the store reads, so the truncation-footgun guard above is untouched.
+      // The two tabs carry different payloads for the same workspace set, so the
+      // Sessions view rides a view-namespaced cache key + a live-forced producer
+      // (LIN-1194) rather than colliding on the Autopilot entry.
       const merged = await sessionsFeedCache.get(
-        sessionsFeedCache.keyFor(workspaces),
-        () => mergeSessions(workspaces)
+        sessionsFeedCache.keyFor(workspaces, isSessionsView ? 'sessions' : undefined),
+        () => mergeSessions(workspaces, { live: isSessionsView })
       );
-      // Active vs Archive is recency-only (LIN-631): a session is Active iff it
-      // has been touched within the last 24h, regardless of terminal state — so a
-      // run that completed <24h ago still shows as Active, and an old non-terminal
-      // session correctly drops into Archive. The same predicate is mirrored in
-      // public/observation.js (renderFeeds) so server and client buckets agree.
-      const now = Date.now();
-      const recentlyActive = (s) => {
-        const t = Date.parse(s.lastActivity);
-        return Number.isFinite(t) && (now - t) <= STALE_AFTER_MS;
-      };
-      const active = merged.filter(recentlyActive);
-      const archive = merged.filter(s => !recentlyActive(s));
+
+      let active;
+      let archive;
+      if (isSessionsView) {
+        // Sessions view (LIN-1194): the in-flight predicate is running-only —
+        // taken (past the live queue) AND non-terminal — NOT recency. Completed
+        // sessions drop to the shared archive; queued-but-not-taken and non-taken
+        // items are excluded from V1 entirely (the decided in-flight boundary).
+        // Standalone sessions are kept here (they are filtered OUT of Autopilot).
+        active = merged.filter(s => s.taken && !s.terminal);
+        archive = merged.filter(s => s.terminal);
+      } else {
+        // Autopilot view — UNCHANGED (LIN-631): recency-only Active/Archive split
+        // (Active iff touched within 24h, regardless of terminal state), mirrored
+        // in public/observation.js so server and client buckets agree. Standalone
+        // sessions are filtered OUT so extending `_buildSessions` cannot leak them
+        // into the existing feed on a live-fallback read (LIN-1194, concern #1).
+        const now = Date.now();
+        const recentlyActive = (s) => {
+          const t = Date.parse(s.lastActivity);
+          return Number.isFinite(t) && (now - t) <= STALE_AFTER_MS;
+        };
+        const feed = merged.filter(s => !s.standalone);
+        active = feed.filter(recentlyActive);
+        archive = feed.filter(s => !recentlyActive(s));
+      }
 
       // Archive is paginated (LIN-631): offset/limit page the bounded archive
       // instead of a hard slice(0, recentLimit) that silently hid older entries.
@@ -877,12 +946,13 @@ export function createDashboardRoutes({
       keepalive.stop();
       keepalive.send(200, {
         workspaces,
+        view: isSessionsView ? 'sessions' : 'autopilot',
         active,
         recent,
         recentTotal: archive.length,
         recentOffset: offset,
         recentLimit: limit,
-        counts: { active: active.length, recent: archive.length, total: merged.length },
+        counts: { active: active.length, recent: archive.length, total: active.length + archive.length },
         generatedAt: new Date().toISOString()
       });
     } catch (error) {
