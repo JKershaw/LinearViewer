@@ -30,6 +30,7 @@ import { buildEditionModel, windowRange } from '../lib/ship-biscuit.js';
 import { buildEditorMessages, parseEditorResponse, assessEditorOutcome, buildQuietEdition, buildMockEdition } from '../lib/prompts/ship-biscuit-editor.js';
 import { DEFAULT_MODEL, streamChat, resolveReasoningBudget, isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
+import { armKeepalive } from '../lib/http-keepalive.js';
 
 /**
  * Visible-output budget for the editor-in-chief JSON reply (LIN-1185).
@@ -140,6 +141,14 @@ export function createShipBiscuitRoutes({
       return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
     }
 
+    // The gather + editor-in-chief OpenRouter call can genuinely exceed Heroku's
+    // 30s router cap (H12) on a busy edition, surfacing a timeout/network error to
+    // the user. Arm a whitespace keepalive around the slow path so a >30s
+    // generation streams heartbeat bytes past H12 instead of erroring — mirroring
+    // the other long OpenRouter handlers (routes/workspace-api.js, routes/proxy.js).
+    // Every response from here on (success and error) must ride through
+    // keepalive.send() so it works whether or not the guard has already flushed.
+    const keepalive = armKeepalive(res);
     try {
       // 1) Gather the window's already-wired event sources (deterministic inputs).
       const range = windowRange(req.body?.window);
@@ -178,7 +187,8 @@ export function createShipBiscuitRoutes({
         if (isFreeTier) {
           const check = await freeTierStore.tryUse(workspace.urlKey);
           if (!check.allowed) {
-            return res.status(429).json({
+            keepalive.stop();
+            return keepalive.send(429, {
               error: check.reason,
               freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
             });
@@ -233,23 +243,25 @@ export function createShipBiscuitRoutes({
           })
         : { model: modelId, window: model.window, since: model.since, workspaceName: model.workspaceName, isQuiet: model.isQuiet, frontPage: body.frontPage, index: body.index, weather: model.weather };
 
-      res.json({ edition: saved });
+      keepalive.stop();
+      keepalive.send(200, { edition: saved });
     } catch (error) {
+      keepalive.stop();
       console.error("Ship's Biscuit generate error:", error);
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' });
+        return keepalive.send(401, { error: 'Token expired or invalid' });
       }
       // Non-quiet editor reply that couldn't be parsed (typically truncated). Surface
       // it as a retryable error rather than a silent quiet edition (LIN-1185).
       if (error.editorFailure) {
-        return res.status(502).json({
+        return keepalive.send(502, {
           error: error.editorFailure.truncated
             ? 'The edition was cut off before the editor finished writing it. Please try again.'
             : "The editor's reply couldn't be read. Please try again.",
           editorFailure: error.editorFailure,
         });
       }
-      res.status(502).json({ error: 'Failed to generate the edition' });
+      keepalive.send(502, { error: 'Failed to generate the edition' });
     }
   });
 
