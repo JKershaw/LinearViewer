@@ -276,7 +276,14 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
-  overflow-x: hidden;
+  /* `clip` (NOT `hidden`) clips horizontal overflow WITHOUT establishing a scroll
+     container. `overflow-x: hidden` here makes the root/`body` a scroll-container
+     ancestor of the sticky header (`.nav-bar` below), which sticks it relative to
+     that non-scrolling ancestor instead of the viewport — the classic
+     overflow-breaks-sticky interaction that left the header inert (LIN-1068). Keep
+     this `clip`: reverting to `hidden` silently re-breaks `position: sticky` for the
+     header and any sticky element under the root. */
+  overflow-x: clip;
   scrollbar-gutter: stable;
 }
 
@@ -291,7 +298,12 @@ body {
   max-width: 120ch;  /* Optimal reading width */
   margin-left: auto;
   margin-right: auto;
-  overflow-x: hidden;
+  /* `clip`, not `hidden`, for the same reason as the `html` reset above: `hidden`
+     would make `body` a scroll container and defeat the sticky header (LIN-1068).
+     Swim pages deliberately re-establish a horizontal scroll container via
+     `body:has(.swim-page) { overflow-x: auto }` (swim.css) — that override is
+     intentional and orthogonal to this base clip. */
+  overflow-x: clip;
 }
 
 /* =============================================================================
@@ -377,7 +389,10 @@ h1 {
      PER-INTERACTION `scroll-margin-top` on interactive controls (see the
      `--nav-sticky-h` rule below), NOT `scroll-padding-top` on the container.
      A sticky element still occupies normal flow, so the layout fallback (the
-     header simply sitting at the top on pages that don't scroll) is intact. */
+     header simply sitting at the top on pages that don't scroll) is intact.
+     DEPENDENCY: this pins only because the root/`body` use `overflow-x: clip`
+     (not `hidden`) — `hidden` would make an ancestor a scroll container and leave
+     this header inert (LIN-1068). See the `html`/`body` resets above. */
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);

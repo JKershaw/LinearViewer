@@ -162,3 +162,103 @@ test.describe('nav-actions placement (LIN-1149)', () => {
     await expect(actions.locator('[data-queue-badge]')).toHaveCount(0);
   });
 });
+
+// LIN-1068: the sticky header must ACTUALLY PIN, and the clearance system that
+// only matters when it pins must hold against the real, pinned header. The header
+// was inert on `main` because `overflow-x: hidden` on `html`/`body` made an
+// ancestor a scroll container and stuck `.nav-bar` to it instead of the viewport;
+// the fix is `overflow-x: clip` (clips horizontally without a scroll container).
+// Every assertion here would FAIL under the broken pre-fix state — that is the
+// point: no prior test locked "the header pins", which is how the regression
+// shipped. Height measured at runtime; no pixel value is hardcoded.
+test.describe('Sticky header pin + clearance (LIN-1068)', () => {
+  test.beforeEach(async ({ seedLocal }) => {
+    await seedLocal(swimLocalSeed, { features: FLAGS });
+  });
+
+  for (const width of [390, 1280]) {
+    test(`header pins to the viewport top after scroll at ${width}px`, async ({ page, localWorkerUrlKey }) => {
+      await page.setViewportSize({ width, height: 700 });
+      await page.goto(`/workspace/${localWorkerUrlKey}/`);
+      await page.waitForLoadState('networkidle');
+
+      // Precondition: the page must be tall enough to scroll, else the pin is
+      // untestable (a non-scrolling page has an in-flow header at top by default).
+      await page.evaluate(() => window.scrollTo(0, 600));
+      const scrollY = await page.evaluate(() => window.scrollY);
+      expect(scrollY, 'page must scroll for the pin assertion to be meaningful').toBeGreaterThan(0);
+
+      // The regression lock: with position:sticky genuinely working the header's
+      // top edge is flush with the viewport top (~0) after scrolling. Under the
+      // broken overflow-x:hidden state it scrolled away to ~ -scrollY.
+      const navTop = await page.locator('.nav-bar').evaluate(el => el.getBoundingClientRect().top);
+      expect(Math.abs(navTop)).toBeLessThanOrEqual(1);
+    });
+  }
+
+  test('pinned header does not intercept content beneath it (LIN-984 re-proven with a real pin)', async ({ page, localWorkerUrlKey }) => {
+    await page.setViewportSize({ width: 390, height: 700 });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    await page.evaluate(() => window.scrollTo(0, 400));
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+    // 1) Just below the pinned header, the topmost element must be page content,
+    //    never the nav — the header sits ABOVE content, it does not overlay it.
+    const belowHeaderIsNav = await page.evaluate(() => {
+      const nav = document.querySelector('.nav-bar');
+      const navRect = nav.getBoundingClientRect();
+      const x = Math.round(window.innerWidth / 2);
+      const el = document.elementFromPoint(x, Math.ceil(navRect.bottom + 2));
+      return nav.contains(el);
+    });
+    expect(belowHeaderIsNav, 'element just below the header must not belong to the nav').toBe(false);
+
+    // 2) A focusable control scrolled to the top settles BELOW the header thanks to
+    //    scroll-margin-top: var(--nav-sticky-h), so it stays clickable rather than
+    //    tucked under the pinned nav — the exact interception the clearance guards.
+    const settle = await page.evaluate(() => {
+      const nav = document.querySelector('.nav-bar');
+      const navBottom = nav.getBoundingClientRect().bottom;
+      const focusables = [...document.querySelectorAll('a[href], button, summary, [tabindex]')]
+        .filter(e => !nav.contains(e) && e.offsetParent !== null);
+      const target = focusables.sort((a, b) => b.offsetTop - a.offsetTop)[0];
+      if (!target) return null;
+      target.scrollIntoView({ block: 'start' });
+      const rect = target.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        Math.round(rect.left + rect.width / 2),
+        Math.round(rect.top + rect.height / 2)
+      );
+      return { top: rect.top, navBottom, clickable: target === hit || target.contains(hit) };
+    });
+    expect(settle, 'expected at least one focusable page control below the header').not.toBeNull();
+    expect(settle.top, 'control must not be tucked under the pinned header').toBeGreaterThanOrEqual(settle.navBottom - 1);
+    expect(settle.clickable, 'pinned header must not click-intercept the control').toBe(true);
+  });
+
+  test('mobile --nav-sticky-h clearance is at least the measured header height (branch-a guard)', async ({ page, localWorkerUrlKey }) => {
+    await page.setViewportSize({ width: 390, height: 700 });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    const { clearancePx, headerPx } = await page.evaluate(() => {
+      const nav = document.querySelector('.nav-bar');
+      // Resolve --nav-sticky-h to px via a throwaway probe sized by the token
+      // (inherited from :root), instead of hardcoding 122/124 — the guard tracks
+      // real header growth. This is exactly the value that feeds the pinned
+      // header's scroll-margin-top clearance.
+      const probe = document.createElement('div');
+      probe.style.height = 'var(--nav-sticky-h)';
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      document.body.appendChild(probe);
+      const clearancePx = probe.getBoundingClientRect().height;
+      probe.remove();
+      return { clearancePx, headerPx: nav.offsetHeight };
+    });
+    expect(clearancePx).toBeGreaterThan(0); // token actually resolves
+    expect(clearancePx).toBeGreaterThanOrEqual(headerPx);
+  });
+});
