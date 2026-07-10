@@ -109,29 +109,37 @@ test.describe("The Ship's Biscuit (experimental)", () => {
       await page.waitForLoadState('networkidle');
       await page.locator('#ship-biscuit-generate').click();
 
-      // A real front page: a lede plus at least one headline.
+      // A real front page (LIN-1198): a lead headline + lede plus at least one index headline.
       await expect(page.locator('[data-testid="ship-biscuit-lede"]')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('[data-testid="ship-biscuit-lead-headline"]')).toBeVisible();
       const headline = page.locator('[data-testid="ship-biscuit-headline"]').first();
       await expect(headline).toBeVisible();
 
-      // The headline is inert in V1: clicking it does NOT navigate; it surfaces a note.
+      // The lead headline is inert plain text (an h2), not a clickable link.
+      await expect(page.locator('h2[data-testid="ship-biscuit-lead-headline"]')).toHaveCount(1);
+
+      // The index headline is inert in V1: clicking it does NOT navigate; it surfaces a note.
       await headline.click();
       expect(page.url()).toContain('/ship-biscuit');
       await expect(page.locator('.ship-biscuit-inert-note').first()).toBeVisible();
     });
 
-    test('a generated edition persists and re-renders on reload (durable store)', async ({ page }) => {
+    test('a generated edition persists and re-renders on reload with the lead story (durable store)', async ({ page }) => {
       await page.request.post(`/test/seed-agent-status`, {
         data: { urlKey: URL_KEY, taskIdentifier: 'TEST-2', summary: 'Fixed the flaky test and re-ran CI green.' }
       });
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
       await page.locator('#ship-biscuit-generate').click();
-      await expect(page.locator('[data-testid="ship-biscuit-headline"]').first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('[data-testid="ship-biscuit-lead-headline"]')).toBeVisible({ timeout: 5000 });
+      const clientHeadline = await page.locator('[data-testid="ship-biscuit-lead-headline"]').textContent();
 
-      // Reload: the server renders the latest saved edition from the durable store.
+      // Reload: the server renders the latest saved edition from the durable store —
+      // server first-paint ↔ client post-generate parity (the lead story survives).
       await page.reload();
       await page.waitForLoadState('networkidle');
+      await expect(page.locator('[data-testid="ship-biscuit-lead-headline"]')).toBeVisible();
+      await expect(page.locator('[data-testid="ship-biscuit-lead-headline"]')).toHaveText(clientHeadline);
       await expect(page.locator('[data-testid="ship-biscuit-headline"]').first()).toBeVisible();
     });
   });
@@ -153,6 +161,9 @@ test.describe("The Ship's Biscuit (experimental)", () => {
       expect(body.edition.id).toBeTruthy();
       expect(body.edition.window).toBe('week');
       expect(typeof body.edition.frontPage.lede).toBe('string');
+      // Lead-story shape is present in the durable record (LIN-1198).
+      expect(typeof body.edition.frontPage.headline).toBe('string');
+      expect(typeof body.edition.frontPage.standfirst).toBe('string');
       expect(Array.isArray(body.edition.index)).toBe(true);
     });
 
