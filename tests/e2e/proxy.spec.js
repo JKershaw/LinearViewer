@@ -1588,6 +1588,37 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     expect(queued.repo).not.toBe('inherited-parent-repo');
   });
 
+  test('descent: a genuine cross-PROJECT child dispatches with the child project\'s repo, not the inherited parent repo (LIN-1210)', async ({ request }) => {
+    // The literal reported scenario, end-to-end (not by composition): TEST-30 is a
+    // container in proj-alpha (repo=test-repo); its actionable child TEST-31 lives in
+    // a DIFFERENT project, proj-gamma (repo=gamma-repo). An orchestrator forwards the
+    // PARENT project's repo (test-repo) it merely inherited and marks it
+    // repoInherited:true. Because the descent crosses into proj-gamma, the terminal
+    // rec.repo resolves to gamma-repo — from a project other than the parent's — and
+    // must win. This is the case the same-project TEST-1→TEST-2 fixture could not prove.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-30', repo: 'test-repo', repoInherited: true }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+    // The descent really crossed projects: it dispatched the gamma-project child.
+    expect(created.issueIdentifier).toBe('TEST-31');
+
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
+    const { token: dispatchToken } = await tokenResponse.json();
+    const pollResp = await request.get('/api/dispatch/poll', {
+      headers: { Authorization: `Bearer ${dispatchToken}` }
+    });
+    const { items } = await pollResp.json();
+    const queued = items.find(i => i.id === created.id);
+    expect(queued).toBeTruthy();
+    // The child's OWN project repo wins; the inherited parent-project repo does not
+    // mask it — the worker runs in the child's codebase (gamma-repo), not the parent's.
+    expect(queued.repo).toBe('gamma-repo');
+    expect(queued.repo).not.toBe('test-repo');
+  });
+
   test('descent: a user-explicit caller repo still wins over the child repo (LIN-1210 preserves LIN-537)', async ({ request }) => {
     // Same descent, but WITHOUT the inherited marker: the caller deliberately chose
     // this repo for this dispatch, so it must still override the child's rec.repo.

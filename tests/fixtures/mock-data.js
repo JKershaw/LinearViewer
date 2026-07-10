@@ -23,7 +23,12 @@ export const testMockData = {
   organizationName: 'Test Workspace',
   projects: [
     { id: 'proj-alpha', name: 'Project Alpha', content: 'First test project\n\nrepo=test-repo', url: 'https://linear.app/test/project/proj-alpha', sortOrder: 1 },
-    { id: 'proj-beta', name: 'Project Beta', content: 'Second test project', url: 'https://linear.app/test/project/proj-beta', sortOrder: 2 } // no repo= line — tests null repo case
+    { id: 'proj-beta', name: 'Project Beta', content: 'Second test project', url: 'https://linear.app/test/project/proj-beta', sortOrder: 2 }, // no repo= line — tests null repo case
+    // A THIRD project with its OWN distinct repo, used only for the LIN-1210
+    // genuine cross-project descent fixture (TEST-30 in proj-alpha → TEST-31 here).
+    // repo=gamma-repo differs from proj-alpha's test-repo so the terminal child's
+    // project repo is unambiguously distinguishable from an inherited parent repo.
+    { id: 'proj-gamma', name: 'Project Gamma', content: 'Cross-project child test project\n\nrepo=gamma-repo', url: 'https://linear.app/test/project/proj-gamma', sortOrder: 3 }
   ],
   issues: [
     // issue-1 carries a formal image attachment (LIN-652) so the lazy /api/detail
@@ -49,7 +54,17 @@ export const testMockData = {
     { id: 'ship-5', identifier: 'TEST-24', title: 'Migrate users table to new schema', description: '', estimate: 5, priority: 1, sortOrder: 24, createdAt: daysAgo(20), dueDate: null, completedAt: daysAgo(10), url: 'https://linear.app/test/issue/TEST-24', parent: null, project: { id: 'proj-alpha', name: 'Project Alpha' }, state: { name: 'Done', type: 'completed' }, assignee: { name: 'Bob' }, labels: { nodes: [] }, team: { id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' } },
     { id: 'ship-6', identifier: 'TEST-25', title: 'Reduce dashboard cold-start latency', description: '', estimate: 3, priority: 2, sortOrder: 25, createdAt: daysAgo(25), dueDate: null, completedAt: daysAgo(12), url: 'https://linear.app/test/issue/TEST-25', parent: null, project: { id: 'proj-alpha', name: 'Project Alpha' }, state: { name: 'Done', type: 'completed' }, assignee: { name: 'Alice' }, labels: { nodes: [] }, team: { id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' } },
     { id: 'ship-7', identifier: 'TEST-26', title: 'Add audit log retention policy', description: '', estimate: 2, priority: 3, sortOrder: 26, createdAt: daysAgo(30), dueDate: null, completedAt: daysAgo(20), url: 'https://linear.app/test/issue/TEST-26', parent: null, project: { id: 'proj-alpha', name: 'Project Alpha' }, state: { name: 'Done', type: 'completed' }, assignee: { name: 'Charlie' }, labels: { nodes: [] }, team: { id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' } },
-    { id: 'ship-8', identifier: 'TEST-27', title: 'Replace deprecated SDK', description: '', estimate: 4, priority: 2, sortOrder: 27, createdAt: daysAgo(40), dueDate: null, completedAt: daysAgo(28), url: 'https://linear.app/test/issue/TEST-27', parent: null, project: { id: 'proj-beta', name: 'Project Beta' }, state: { name: 'Done', type: 'completed' }, assignee: { name: 'Alice' }, labels: { nodes: [] }, team: { id: 'dddddddd-dddd-dddd-dddd-dddddddddddd' } }
+    { id: 'ship-8', identifier: 'TEST-27', title: 'Replace deprecated SDK', description: '', estimate: 4, priority: 2, sortOrder: 27, createdAt: daysAgo(40), dueDate: null, completedAt: daysAgo(28), url: 'https://linear.app/test/issue/TEST-27', parent: null, project: { id: 'proj-beta', name: 'Project Beta' }, state: { name: 'Done', type: 'completed' }, assignee: { name: 'Alice' }, labels: { nodes: [] }, team: { id: 'dddddddd-dddd-dddd-dddd-dddddddddddd' } },
+    // LIN-1210 genuine cross-project descent fixture. TEST-30 is a container in
+    // proj-alpha (repo=test-repo); its only actionable child TEST-31 lives in a
+    // DIFFERENT project, proj-gamma (repo=gamma-repo). A recommend-and-dispatch on
+    // TEST-30 descends to TEST-31, so the terminal rec.repo resolves from proj-gamma
+    // — a different project than the parent's — proving the child project's repo
+    // wins over an inherited parent repo end-to-end (not by composition). Both are
+    // Backlog so they stay out of the in-progress/todo/done pill counts other specs
+    // assert on. Placed after the ship-* completions so existing sortOrder holds.
+    { id: 'x-parent-30', identifier: 'TEST-30', title: 'Cross-project parent container', description: 'Parent whose actionable child is in another project/repo', estimate: 3, priority: 3, sortOrder: 30, createdAt: '2024-01-16T00:00:00Z', dueDate: null, completedAt: null, url: 'https://linear.app/test/issue/TEST-30', parent: null, project: { id: 'proj-alpha', name: 'Project Alpha' }, state: { name: 'Backlog', type: 'backlog' }, assignee: null, labels: { nodes: [] }, team: { id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' } },
+    { id: 'x-child-31', identifier: 'TEST-31', title: 'Cross-project child in gamma repo', description: 'Actionable child living in proj-gamma (repo=gamma-repo)', estimate: 2, priority: 3, sortOrder: 31, createdAt: '2024-01-17T00:00:00Z', dueDate: null, completedAt: null, url: 'https://linear.app/test/issue/TEST-31', parent: { id: 'x-parent-30' }, project: { id: 'proj-gamma', name: 'Project Gamma' }, state: { name: 'Backlog', type: 'backlog' }, assignee: null, labels: { nodes: [] }, team: { id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' } }
   ]
 }
 

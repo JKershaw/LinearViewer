@@ -226,10 +226,12 @@ test.describe('Swipe Page', () => {
     const alphaOption = options.find(o => o.includes('Project Alpha'));
     expect(alphaOption).toBeTruthy();
 
-    // Count should include in-progress issues (3 started + 4 incomplete = 7)
+    // Count should include in-progress issues (3 started + 5 incomplete = 8).
+    // The 5th incomplete is TEST-30, the LIN-1210 cross-project descent fixture's
+    // Backlog parent container in Project Alpha (its child TEST-31 lives in gamma).
     const match = alphaOption.match(/\((\d+)\)/);
     expect(match).toBeTruthy();
-    expect(parseInt(match[1], 10)).toBe(7);
+    expect(parseInt(match[1], 10)).toBe(8);
 
     await select.selectOption({ label: alphaOption });
 
