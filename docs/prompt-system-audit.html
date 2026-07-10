@@ -414,8 +414,122 @@
     </ol>
   </section>
 
+  <!-- ============ PART II ============ -->
+  <div style="margin-top:80px; padding:30px 0 6px; border-top:2px solid var(--brand);">
+    <div class="eyebrow" style="color:var(--brand-ink);">Part II · The Reframe</div>
+    <h1 style="font-size:clamp(26px,4.4vw,40px); margin:12px 0 8px;">Tokens are cheap.<span class="thin"> Attention isn’t.</span></h1>
+    <p class="dek" style="margin-bottom:0;">Part I measured prompt <em>size</em> — the wrong denominator. This part reframes the problem around the two things that actually move outcomes, then lays out a research piece to test whether the theory holds against real session logs.</p>
+  </div>
+
+  <!-- 07 TWO CURRENCIES -->
+  <section id="currencies" style="margin-top:44px;">
+    <div class="sec-head"><span class="sec-num">07</span><h2>Two currencies, not one</h2></div>
+    <p class="sec-sub">Raw tokens are cheap and getting cheaper — optimizing them polishes the wrong surface. What’s scarce is the agent’s <em>attention</em> while it works, and the <em>effort</em> it burns getting to the core change. Those are separate axes with separate payoffs.</p>
+    <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));">
+      <div class="tile accent">
+        <div class="k">Axis 1 · correctness</div>
+        <div class="v" style="font-size:22px;">Working memory</div>
+        <div class="d">How many live, interacting obligations — decision branches, invariants, exceptions — the model must hold <em>while</em> pursuing the goal. Not token count: a 500-token block with eight conditional rules is heavier than a 3,000-token slab of static context.</div>
+      </div>
+      <div class="tile accent">
+        <div class="k">Axis 2 · efficiency</div>
+        <div class="v" style="font-size:22px;">Spend trajectory</div>
+        <div class="d">Where the session’s <em>work</em> tokens actually go once it’s running: orientation &amp; re-grounding, the core change, and self-correction — versus the irreducible problem.</div>
+      </div>
+    </div>
+    <div class="callout" style="margin-top:22px;">
+      <div class="lead">The model to hold</div>
+      <p style="margin:0 0 10px;">Split the agent’s load into <strong>intrinsic</strong> (the actual problem) and <strong>extraneous</strong> (bookkeeping, routing, re-grounding, keeping invariants straight). Determinism’s whole job is to drive extraneous load toward zero so the entire attention budget goes to intrinsic.</p>
+      <p style="margin:0;">The two axes are one coin: pre-computing a fact deterministically <em>removes an obligation</em> the model was tracking (correctness) <strong>and</strong> the <em>re-derivation spend</em> it cost at runtime (efficiency). Which reframes Part I’s redundancy findings — deleting the re-narrated node-state sentence matters not for its ~200 tokens but because it removes a rule the model must reconcile against the computed one.</p>
+    </div>
+  </section>
+
+  <!-- 08 MEASURABILITY -->
+  <section id="measurability">
+    <div class="sec-head"><span class="sec-num">08</span><h2>What we can measure — and what we can’t</h2></div>
+    <p class="sec-sub">Harbour never runs the worker; an external runner does, and posts back only free-form feedback markers. So Harbour sees a rich <em>outside</em> and a low-resolution pulse of the <em>inside</em> — but is structurally blind to worker tokens. The gold data is the worker’s own Claude Code session transcript (JSONL).</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Signal</th><th>Available today?</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td>Session / step wall-clock, queue→take latency</td><td><span class="pill a">✓ yes</span></td><td class="fileref">timestamps · kpi-stats.js</td></tr>
+          <tr><td>Effort split — onboarding / active / waiting / wrap-up</td><td><span class="pill a">✓ yes</span> <span style="color:var(--muted);">heartbeat resolution</span></td><td class="fileref">wall-clock-summary.js (LIN-987)</td></tr>
+          <tr><td>Per-heartbeat tool tallies (<code>Bash×7</code>), kind sequences, outcomes</td><td><span class="pill a">✓ yes</span> <span style="color:var(--muted);">coarse</span></td><td class="fileref">session-telemetry.js · pipeline-loops.js</td></tr>
+          <tr><td>Token / cost for Harbour’s <em>own</em> calls (recommend/brief/recap)</td><td><span class="pill a">✓ yes</span></td><td class="fileref">llm-call-log.js (LIN-418)</td></tr>
+          <tr><td>Worker-session <strong>token counts</strong> (per-turn or total)</td><td><span class="pill crit">✗ blind</span></td><td class="fileref">emitted nowhere — needs the JSONL</td></tr>
+          <tr><td>Per-turn structure; which <strong>files</strong> read (re-read-same-file 5×)</td><td><span class="pill crit">✗ blind</span></td><td class="fileref">tools counted, targets not — needs the JSONL</td></tr>
+          <tr><td>Worker model id; full transcript</td><td><span class="pill crit">✗ blind</span></td><td class="fileref">only marker strings retained</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px; color:var(--muted);">The clean split: the <strong>outside view exists today</strong> (enough for a fast first pass), the <strong>inside view needs the JSONL</strong> — worker tokens, per-turn structure, and file targets are the exact gap the exported session logs fill.</p>
+  </section>
+
+  <!-- 09 HYPOTHESES -->
+  <section id="hypotheses">
+    <div class="sec-head"><span class="sec-num">09</span><h2>Four hypotheses to test</h2></div>
+    <p class="sec-sub">Each falls straight out of the reframe, each makes a prediction, and each names the data that confirms or refutes it. The point isn’t to prove ourselves right — it’s to find out where the effort actually goes before committing engineering to a theory.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:44px">ID</th><th>Hypothesis &amp; prediction</th><th>Data that tests it</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill c">H1</span></td><td><strong>Correctness tracks complexity, not prompt size.</strong> Failed / looping / sprawling sessions correlate with more concurrent constraints (surfaces, blockers, longer kind-sequences) — not with bigger prompts.</td><td>outcome × complexity proxies (loop data) × prompt size — <em>outside view, now</em></td></tr>
+          <tr><td><span class="pill c">H2</span></td><td><strong>Orientation dominates early spend.</strong> A large share of a session’s effort goes to re-grounding before the first productive edit.</td><td>time-to-first-Edit &amp; orientation ratio — coarse now (wall-clock), precise from JSONL</td></tr>
+          <tr><td><span class="pill c">H3</span></td><td><strong>Determinism pays.</strong> Tasks with richer deterministic facts (frontier facts present, session-fit stated) show lower orientation ratio and cleaner completion.</td><td>facts-present flag × orientation ratio × outcome — <em>needs JSONL for precision</em></td></tr>
+          <tr><td><span class="pill c">H4</span></td><td><strong>Cross-session duplication is real.</strong> Multiple sessions on one task re-read the same files from scratch each dispatch.</td><td>file-read overlap across sessions sharing a task id — <em>needs JSONL</em></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 10 METRICS + METHOD -->
+  <section id="method">
+    <div class="sec-head"><span class="sec-num">10</span><h2>Metrics, the join &amp; a two-track method</h2></div>
+    <p class="sec-sub">The analysis joins the inside and outside of every session on <code>sessionId</code> — the worker JSONL (tokens, tool calls, file targets, timestamps) against Harbour’s loop record (kind, task, terminal outcome). We run it in two tracks so the cheap one de-risks the expensive one.</p>
+
+    <h3 style="font-size:15px; margin:20px 0 8px; font-family:var(--mono); color:var(--brand-ink);">Per-session metrics</h3>
+    <ul class="clean">
+      <li><b>Orientation ratio</b> — Read + Grep + git/ls tokens ÷ total. The extraneous-load proxy.</li>
+      <li><b>Time-to-first-productive-action</b> — tokens/tool-calls before the first Edit/Write.</li>
+      <li><b>Rework ratio</b> — repeated edits to the same file; test-fail → edit loops.</li>
+      <li><b>Concurrent-constraint load</b> — surfaces touched, blockers, kind-sequence length (from loop data). The complexity proxy for H1.</li>
+      <li><b>Cross-session file-read overlap</b> — same-task duplication for H4.</li>
+    </ul>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:18px;">
+      <div class="card" style="padding:18px 20px;">
+        <div class="lead" style="font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--a); margin-bottom:6px;">Track A · basic · run now</div>
+        <p style="margin:0; font-size:14.5px;">The <strong>outside view</strong> from existing telemetry — extend <code>wall-clock-summary.js</code> + loop data. No new data, no JSONL. Answers H1 and a coarse H2 within a day, and gives us a baseline to sanity-check against.</p>
+      </div>
+      <div class="card" style="padding:18px 20px;">
+        <div class="lead" style="font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--b); margin-bottom:6px;">Track B · full · needs JSONL</div>
+        <p style="margin:0; font-size:14.5px;">The <strong>inside view</strong> — parse worker transcripts for tokens, per-turn structure, and file targets. Answers H2/H3/H4 precisely and produces the real spend profile.</p>
+      </div>
+    </div>
+    <div class="callout" style="margin-top:16px;">
+      <div class="lead">The compare — and the payoff</div>
+      <p style="margin:0 0 10px;"><strong>Does the coarse outside signal predict the fine inside truth?</strong> If Track A’s wall-clock orientation share tracks Track B’s token orientation share, we can run this analysis continuously from telemetry alone — no JSONL export needed after the calibration.</p>
+      <p style="margin:0;"><strong>Forward instrumentation.</strong> The cleanest way to make the inside view measurable <em>in production</em> is to have the runner post worker token/turn counts on the existing <code>[working]</code>/<code>[done]</code> markers — the same append-only feedback seam that already flows into <code>session-telemetry</code>. The research doubles as the spec for that small instrumentation.</p>
+    </div>
+  </section>
+
+  <!-- 11 DELIVERABLES -->
+  <section id="deliverables">
+    <div class="sec-head"><span class="sec-num">11</span><h2>Deliverables, success criteria &amp; caveats</h2></div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px;">
+      <div class="tile"><div class="k">Deliverable</div><div class="d" style="margin-top:8px;">A per-session <strong>spend profile</strong> (orientation / core / rework %), an aggregate across kinds &amp; outcomes, and a go/no-go on the determinism bet <em>with numbers</em>.</div></div>
+      <div class="tile"><div class="k">Success looks like</div><div class="d" style="margin-top:8px;">We can state: “<em>X% of a typical session is orientation, and cutting it via determinism predicts Y fewer failures/reworks</em>” — a claim precise enough to prioritize against.</div></div>
+      <div class="tile crit"><div class="k">Treat as directional</div><div class="d" style="margin-top:8px;">Small N, confounders (task difficulty), heartbeat sampling coarseness, <code>waiting</code> is a documented lower bound, and JSONL format may drift. Correlation, not proof — enough to steer, not to close the question.</div></div>
+    </div>
+    <div class="callout big" style="margin-top:22px;">
+      <div class="lead">My read</div>
+      <p style="margin:0 0 10px;">The reframe is right, and it re-ranks Part I. The prize isn’t trimming the 15k-token meta-prompt — it’s the <strong>orientation and rework tax</strong>, because that’s where both correctness and efficiency leak at once. Wiring the snapshot-diff (Part I, rec #1) is still the top move: it removes the re-grounding obligation <em>and</em> the re-grounding spend in one change.</p>
+      <p style="margin:0;">And the highest-durability output of this research may not be the findings — it’s the <strong>instrumentation</strong>. Emitting worker tokens on the feedback markers turns a one-off log study into a permanent instrument, so every future determinism change can be measured, not argued.</p>
+    </div>
+  </section>
+
   <footer>
-    <p class="mono">Harbour prompt-system audit · surfaces: lib/prompt-template-defs.js · lib/prompts/meta-prompt-template.js · lib/prompts/autopilot-kickoff.js · docs/autopilot-operating-manual.md</p>
+    <p class="mono">Harbour prompt-system audit · surfaces: lib/prompt-template-defs.js · lib/prompts/meta-prompt-template.js · lib/prompts/autopilot-kickoff.js · docs/autopilot-operating-manual.md · lib/wall-clock-summary.js · lib/session-telemetry.js · lib/llm-call-log.js</p>
     <p>Token figures from rendering each surface with a representative issue; estimate ≈ chars⁄4, treat as ±15% and directional — the ratios are the point, not the third digit. Bucket IDs (B1–B19) map to the directive-level classification behind this report.</p>
   </footer>
 

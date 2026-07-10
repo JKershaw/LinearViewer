@@ -141,3 +141,108 @@ suppressible ("slice unchanged AND HEAD unchanged → skip the re-read").
 *Token figures from rendering each surface with a representative issue; estimate ≈ chars⁄4,
 treat as ±15% and directional — the ratios are the point, not the third digit. Bucket IDs
 (B1–B19) map to the directive-level classification behind this report.*
+
+---
+
+# Part II — The Reframe & the Research Plan
+
+> Part I measured prompt *size* — the wrong denominator. Tokens are cheap and getting cheaper.
+> This part reframes the problem around the two things that actually move outcomes, then lays
+> out a research piece to test whether the theory holds against real session logs.
+
+## 7. Two currencies, not one
+
+Raw tokens are cheap; optimizing them polishes the wrong surface. What's scarce is:
+
+- **Axis 1 · correctness — working memory.** How many live, interacting obligations (decision
+  branches, invariants, exceptions) the model must hold *while* pursuing the goal. Not token
+  count: a 500-token block with eight conditional rules is heavier than a 3,000-token slab of
+  static context.
+- **Axis 2 · efficiency — spend trajectory.** Where the session's *work* tokens go once it's
+  running: orientation & re-grounding, the core change, self-correction — versus the
+  irreducible problem.
+
+**The model to hold:** split the agent's load into *intrinsic* (the actual problem) and
+*extraneous* (bookkeeping, routing, re-grounding, keeping invariants straight). Determinism's
+whole job is to drive extraneous load toward zero so the whole attention budget goes to
+intrinsic. The two axes are one coin: pre-computing a fact removes an obligation the model was
+tracking (correctness) **and** the re-derivation spend it cost at runtime (efficiency). That
+reframes Part I's redundancy findings — deleting the re-narrated node-state sentence matters
+not for its ~200 tokens but because it removes a rule the model must reconcile.
+
+## 8. What we can measure — and what we can't
+
+Harbour never runs the worker; an external runner does and posts back only free-form feedback
+markers. So Harbour sees a rich *outside* and a low-resolution pulse of the *inside* — but is
+structurally blind to worker tokens. The gold data is the worker's own Claude Code session
+transcript (JSONL).
+
+| Signal | Available today? | Source |
+|---|---|---|
+| Session / step wall-clock, queue→take latency | ✓ yes | timestamps · kpi-stats.js |
+| Effort split — onboarding / active / waiting / wrap-up | ✓ yes (heartbeat resolution) | wall-clock-summary.js (LIN-987) |
+| Per-heartbeat tool tallies (`Bash×7`), kind sequences, outcomes | ✓ yes (coarse) | session-telemetry.js · pipeline-loops.js |
+| Token / cost for Harbour's *own* calls (recommend/brief/recap) | ✓ yes | llm-call-log.js (LIN-418) |
+| Worker-session **token counts** (per-turn or total) | ✗ blind | emitted nowhere — needs the JSONL |
+| Per-turn structure; which **files** read (re-read-same-file 5×) | ✗ blind | tools counted, targets not — needs the JSONL |
+| Worker model id; full transcript | ✗ blind | only marker strings retained |
+
+The clean split: the **outside view exists today** (enough for a fast first pass); the
+**inside view needs the JSONL** — worker tokens, per-turn structure, and file targets are the
+exact gap the exported session logs fill.
+
+## 9. Four hypotheses to test
+
+| ID | Hypothesis & prediction | Data that tests it |
+|---|---|---|
+| **H1** | **Correctness tracks complexity, not prompt size.** Failed / looping / sprawling sessions correlate with more concurrent constraints (surfaces, blockers, longer kind-sequences) — not bigger prompts. | outcome × complexity proxies (loop data) × prompt size — *outside view, now* |
+| **H2** | **Orientation dominates early spend.** A large share of a session's effort goes to re-grounding before the first productive edit. | time-to-first-Edit & orientation ratio — coarse now (wall-clock), precise from JSONL |
+| **H3** | **Determinism pays.** Tasks with richer deterministic facts (frontier facts present, session-fit stated) show lower orientation ratio and cleaner completion. | facts-present flag × orientation ratio × outcome — *needs JSONL* |
+| **H4** | **Cross-session duplication is real.** Multiple sessions on one task re-read the same files from scratch each dispatch. | file-read overlap across sessions sharing a task id — *needs JSONL* |
+
+## 10. Metrics, the join & a two-track method
+
+The analysis joins the inside and outside of every session on `sessionId` — the worker JSONL
+(tokens, tool calls, file targets, timestamps) against Harbour's loop record (kind, task,
+terminal outcome).
+
+**Per-session metrics:**
+- **Orientation ratio** — Read + Grep + git/ls tokens ÷ total. The extraneous-load proxy.
+- **Time-to-first-productive-action** — tokens/tool-calls before the first Edit/Write.
+- **Rework ratio** — repeated edits to the same file; test-fail → edit loops.
+- **Concurrent-constraint load** — surfaces touched, blockers, kind-sequence length. The H1 proxy.
+- **Cross-session file-read overlap** — same-task duplication for H4.
+
+**Two tracks:**
+- **Track A · basic · run now** — the outside view from existing telemetry (extend
+  `wall-clock-summary.js` + loop data). No new data, no JSONL. Answers H1 and a coarse H2
+  within a day, and gives a baseline to sanity-check against.
+- **Track B · full · needs JSONL** — the inside view: parse worker transcripts for tokens,
+  per-turn structure, file targets. Answers H2/H3/H4 precisely; produces the real spend profile.
+
+**The compare:** does the coarse outside signal predict the fine inside truth? If Track A's
+wall-clock orientation share tracks Track B's token orientation share, we can run this
+continuously from telemetry alone — no JSONL export after calibration.
+
+**Forward instrumentation:** the cleanest way to make the inside view measurable *in
+production* is to have the runner post worker token/turn counts on the existing
+`[working]`/`[done]` markers — the same append-only feedback seam that already flows into
+`session-telemetry`. The research doubles as the spec for that instrumentation.
+
+## 11. Deliverables, success criteria & caveats
+
+- **Deliverable** — a per-session spend profile (orientation / core / rework %), an aggregate
+  across kinds & outcomes, and a go/no-go on the determinism bet *with numbers*.
+- **Success looks like** — "X% of a typical session is orientation, and cutting it via
+  determinism predicts Y fewer failures/reworks" — precise enough to prioritize against.
+- **Treat as directional** — small N, confounders (task difficulty), heartbeat sampling
+  coarseness, `waiting` is a documented lower bound, JSONL format may drift. Correlation, not
+  proof — enough to steer, not to close the question.
+
+**My read:** the reframe is right and it re-ranks Part I. The prize isn't trimming the
+15k-token meta-prompt — it's the orientation and rework tax, where both correctness and
+efficiency leak at once. Wiring the snapshot-diff (Part I, rec #1) is still the top move: it
+removes the re-grounding obligation *and* the re-grounding spend in one change. And the
+highest-durability output of this research may not be the findings — it's the instrumentation:
+emitting worker tokens on the feedback markers turns a one-off log study into a permanent
+instrument, so every future determinism change can be measured, not argued.
