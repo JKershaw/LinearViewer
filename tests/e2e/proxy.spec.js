@@ -1557,6 +1557,111 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
     expect(queued.repo).toBe('caller-override');
   });
 
+  // LIN-1210: repo context must switch to the descended CHILD's repo when the
+  // caller's repo was merely INHERITED (an orchestrator forwarding a parent
+  // project's repo onto a cross-project fan-out), while a genuinely user-explicit
+  // caller repo still wins unchanged (the LIN-537 invariant).
+  test('descent: an inherited caller repo yields to the descended child\'s repo (LIN-1210)', async ({ request }) => {
+    // TEST-1 (proj-alpha) descends to its actionable child TEST-2, whose project
+    // resolves repo=test-repo (rec.repo). The caller forwards a DIFFERENT repo it
+    // merely inherited from the parent context and marks it repoInherited:true, so
+    // the child's resolved repo must win — the worker runs in the child's codebase.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-1', repo: 'inherited-parent-repo', repoInherited: true }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+    // Sanity: this really is the cross-project descent path (dispatches the child).
+    expect(created.issueIdentifier).toBe('TEST-2');
+
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
+    const { token: dispatchToken } = await tokenResponse.json();
+    const pollResp = await request.get('/api/dispatch/poll', {
+      headers: { Authorization: `Bearer ${dispatchToken}` }
+    });
+    const { items } = await pollResp.json();
+    const queued = items.find(i => i.id === created.id);
+    expect(queued).toBeTruthy();
+    // Child's resolved repo wins; the inherited parent repo does NOT mask it.
+    expect(queued.repo).toBe('test-repo');
+    expect(queued.repo).not.toBe('inherited-parent-repo');
+  });
+
+  test('descent: a user-explicit caller repo still wins over the child repo (LIN-1210 preserves LIN-537)', async ({ request }) => {
+    // Same descent, but WITHOUT the inherited marker: the caller deliberately chose
+    // this repo for this dispatch, so it must still override the child's rec.repo.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-1', repo: 'explicit-caller-repo' }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+    expect(created.issueIdentifier).toBe('TEST-2');
+
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
+    const { token: dispatchToken } = await tokenResponse.json();
+    const pollResp = await request.get('/api/dispatch/poll', {
+      headers: { Authorization: `Bearer ${dispatchToken}` }
+    });
+    const { items } = await pollResp.json();
+    const queued = items.find(i => i.id === created.id);
+    expect(queued).toBeTruthy();
+    expect(queued.repo).toBe('explicit-caller-repo');
+  });
+
+  test('verb-override: an inherited caller repo yields to the node\'s own project repo (LIN-1210)', async ({ request }) => {
+    // The verb-override branch (kind pinned, no descent) has the same precedence
+    // seam. TEST-14 lives in proj-alpha (repo=test-repo); an inherited caller repo
+    // marked repoInherited:true must yield to the node's own project repo.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14', kind: 'implementation', repo: 'inherited-parent-repo', repoInherited: true }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
+    const { token: dispatchToken } = await tokenResponse.json();
+    const pollResp = await request.get('/api/dispatch/poll', {
+      headers: { Authorization: `Bearer ${dispatchToken}` }
+    });
+    const { items } = await pollResp.json();
+    const queued = items.find(i => i.id === created.id);
+    expect(queued).toBeTruthy();
+    expect(queued.repo).toBe('test-repo');
+    expect(queued.repo).not.toBe('inherited-parent-repo');
+  });
+
+  test('verb-override: a repo-less node falls back to the inherited caller repo (LIN-1210)', async ({ request }) => {
+    // TEST-4 lives in proj-beta, which has no `repo=` line (null derived repo). An
+    // inherited caller repo is still used — a repo-less child stays unchanged.
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-4', kind: 'implementation', repo: 'inherited-parent-repo', repoInherited: true }
+    });
+    expect(resp.status()).toBe(201);
+    const created = await resp.json();
+
+    const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
+    const { token: dispatchToken } = await tokenResponse.json();
+    const pollResp = await request.get('/api/dispatch/poll', {
+      headers: { Authorization: `Bearer ${dispatchToken}` }
+    });
+    const { items } = await pollResp.json();
+    const queued = items.find(i => i.id === created.id);
+    expect(queued).toBeTruthy();
+    expect(queued.repo).toBe('inherited-parent-repo');
+  });
+
+  test('rejects a non-boolean repoInherited with 400 (LIN-1210)', async ({ request }) => {
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14', repoInherited: 'yes' }
+    });
+    expect(resp.status()).toBe(400);
+  });
+
   test('kind reflects the recommendation action (started issue → implementation)', async ({ request }) => {
     // TEST-14 has no labels and is In Progress → mock recommendedAction 'implement'
     // → deriveDispatchKind('implement') === 'implementation'.
