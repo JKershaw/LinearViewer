@@ -219,10 +219,8 @@ This will return all available endpoints with examples. Your token scope is: ${s
         try {
           // on401:false — failure is reported by the catch's toast, not a redirect.
           await window.api(`${apiBase}/tokens/${tokenId}`, { method: 'DELETE', on401: false });
-          // LIN-525 #4: a revoke may have killed the cached +proxy token, so drop
-          // the client cache — the next dispatch re-mints instead of embedding a
-          // dead token.
-          if (window.ProxyToggle) window.ProxyToggle.invalidate();
+          // LIN-1140: +proxy bootstrap tokens are minted fresh per copy/download
+          // and never cached client-side, so a revoke leaves nothing stale to drop.
           loadTokens();
         } catch (err) {
           toast('Failed to revoke: ' + err.message, { type: 'error' });
