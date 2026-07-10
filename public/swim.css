@@ -210,7 +210,7 @@ body:has(.swim-page) {
 .swim-box:hover {
   background: var(--bg-muted);
   border-color: var(--border-strong);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Status accent — left border */
