@@ -48,7 +48,7 @@ function sampleEdition(tag = '') {
     since: '2026-07-02T00:00:00.000Z',
     workspaceName: 'Acme',
     isQuiet: false,
-    frontPage: { lede: 'A busy week ' + tag },
+    frontPage: { headline: 'Big week ' + tag, standfirst: 'Standfirst ' + tag, lede: 'A busy week ' + tag },
     index: [
       { id: 'art-1', section: 'The Wire', headline: 'Headline ' + tag, dek: 'A teaser.', weight: 5,
         sourceRefs: [{ id: 'session:s1', kind: 'session', headline: 'seed', snapshot: { outcome: 'completed cleanly' } }] }
@@ -80,6 +80,20 @@ describe('ShipBiscuitHistoryStore.save', () => {
     const rec = await store.save('ws1', { model: 'quiet', window: 'day', isQuiet: true, frontPage: { lede: 'Quiet.' }, index: [] });
     assert.strictEqual(rec.isQuiet, true);
     assert.strictEqual(rec.index.length, 0);
+  });
+
+  test('persists the lead-story headline + standfirst (LIN-1198)', async () => {
+    const rec = await store.save('ws1', sampleEdition('lead'));
+    assert.strictEqual(rec.frontPage.headline, 'Big week lead');
+    assert.strictEqual(rec.frontPage.standfirst, 'Standfirst lead');
+    assert.strictEqual(rec.frontPage.lede, 'A busy week lead');
+  });
+
+  test('tolerates an older lede-only edition (headline/standfirst default to "")', async () => {
+    const rec = await store.save('ws1', { model: 'mock', window: 'week', frontPage: { lede: 'Legacy body.' }, index: [] });
+    assert.strictEqual(rec.frontPage.headline, '');
+    assert.strictEqual(rec.frontPage.standfirst, '');
+    assert.strictEqual(rec.frontPage.lede, 'Legacy body.');
   });
 });
 

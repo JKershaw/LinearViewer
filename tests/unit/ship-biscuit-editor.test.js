@@ -101,12 +101,48 @@ describe('parseEditorResponse — grounding guard', () => {
     const out = parseEditorResponse('the model rambled without JSON', model);
     assert.strictEqual(out.index.length, 0);
     assert.strictEqual(out.frontPage.lede, '');
+    // The lead-story fields exist and are empty too (shape parity — LIN-1198).
+    assert.strictEqual(out.frontPage.headline, '');
+    assert.strictEqual(out.frontPage.standfirst, '');
   });
 
   test('tolerates a ```json fenced reply', () => {
     const model = modelWithSources();
     const raw = '```json\n' + JSON.stringify({ frontPage: { lede: 'Fenced.' }, index: [] }) + '\n```';
     assert.strictEqual(parseEditorResponse(raw, model).frontPage.lede, 'Fenced.');
+  });
+});
+
+describe('parseEditorResponse — lead story (headline + standfirst, LIN-1198)', () => {
+  test('parses frontPage.headline and frontPage.standfirst', () => {
+    const model = modelWithSources();
+    const raw = JSON.stringify({
+      frontPage: { headline: 'Autopilot clears the board', standfirst: 'A steady run of completed work.', lede: 'Details below.' },
+      index: [{ section: 'The Wire', headline: 'LIN-1 shipped', weight: 5, sourceRefs: ['session:sess-1'] }]
+    });
+    const out = parseEditorResponse(raw, model);
+    assert.strictEqual(out.frontPage.headline, 'Autopilot clears the board');
+    assert.strictEqual(out.frontPage.standfirst, 'A steady run of completed work.');
+    assert.strictEqual(out.frontPage.lede, 'Details below.');
+  });
+
+  test('accepts a "dek" alias for the front-page standfirst', () => {
+    const model = modelWithSources();
+    const raw = JSON.stringify({
+      frontPage: { headline: 'Big week', dek: 'Alias for standfirst.', lede: 'x' },
+      index: [{ headline: 'LIN-1 shipped', weight: 5, sourceRefs: ['session:sess-1'] }]
+    });
+    const out = parseEditorResponse(raw, model);
+    assert.strictEqual(out.frontPage.standfirst, 'Alias for standfirst.');
+  });
+
+  test('a headline-only reply (no lede, no index) still parses the headline', () => {
+    const model = modelWithSources();
+    const raw = JSON.stringify({ frontPage: { headline: 'Quiet but not nothing' }, index: [] });
+    const out = parseEditorResponse(raw, model);
+    assert.strictEqual(out.frontPage.headline, 'Quiet but not nothing');
+    assert.strictEqual(out.frontPage.lede, '');
+    assert.strictEqual(out.index.length, 0);
   });
 });
 
@@ -169,6 +205,22 @@ describe('assessEditorOutcome — non-quiet parse/degrade path (LIN-1185)', () =
     assert.strictEqual(outcome.ok, true);
   });
 
+  test('a headline-only reply is usable — NOT a silent degrade-to-quiet (LIN-1198)', () => {
+    // The newspaper layout can lead with just a headline. A reply carrying a lead
+    // headline but no lede and no stubs must count as a real edition, not a false
+    // "slow news day" (the LIN-1185 defect, widened for the LIN-1198 headline field).
+    const outcome = assessEditorOutcome({ frontPage: { headline: 'Autopilot clears the board', lede: '' }, index: [] }, 'stop');
+    assert.strictEqual(outcome.ok, true, 'a headline-only edition is usable');
+    assert.strictEqual(outcome.reason, null);
+    assert.strictEqual(outcome.truncated, false);
+  });
+
+  test('still fails when headline, lede AND index are all empty', () => {
+    const outcome = assessEditorOutcome({ frontPage: { headline: '', lede: '' }, index: [] }, 'length');
+    assert.strictEqual(outcome.ok, false);
+    assert.strictEqual(outcome.reason, 'truncated');
+  });
+
   test('is defensive against a malformed body shape', () => {
     assert.strictEqual(assessEditorOutcome(null, 'length').ok, false);
     assert.strictEqual(assessEditorOutcome({}, 'stop').ok, false);
@@ -183,6 +235,15 @@ describe('buildQuietEdition', () => {
     assert.strictEqual(q.index.length, 0);
     assert.match(q.frontPage.lede, /slow news day|quiet/i);
   });
+
+  test('carries the lead-story shape (headline + standfirst) for renderer parity', () => {
+    const model = buildEditionModel({ window: 'week', now: NOW, sessions: [], agentStatusItems: [], llmStats: null });
+    const q = buildQuietEdition(model);
+    assert.strictEqual(typeof q.frontPage.headline, 'string');
+    assert.ok(q.frontPage.headline.length > 0, 'a quiet edition still leads with an honest headline');
+    assert.match(q.frontPage.headline, /quiet/i);
+    assert.strictEqual(typeof q.frontPage.standfirst, 'string');
+  });
 });
 
 describe('buildMockEdition', () => {
@@ -195,6 +256,16 @@ describe('buildMockEdition', () => {
       assert.ok(stub.sourceRefs.length >= 1);
       assert.ok(model.sources.some(s => s.id === stub.sourceRefs[0].id), 'headline is grounded in a real source');
     }
+  });
+
+  test('leads with a grounded lead headline + standfirst (LIN-1198)', () => {
+    const model = modelWithSources();
+    const mock = buildMockEdition(model);
+    assert.strictEqual(typeof mock.frontPage.headline, 'string');
+    assert.ok(mock.frontPage.headline.length > 0);
+    // The lead headline is grounded in a real source slice's headline.
+    assert.ok(model.sources.some(s => s.headline === mock.frontPage.headline), 'lead headline comes from a real source');
+    assert.ok(mock.frontPage.standfirst.length > 0);
   });
 
   test('degrades to the honest quiet edition when the model is quiet', () => {
