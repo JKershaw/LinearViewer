@@ -27,9 +27,23 @@ import { renderShipBiscuitPage } from '../lib/render-ship-biscuit.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildEditionModel, windowRange } from '../lib/ship-biscuit.js';
-import { buildEditorMessages, parseEditorResponse, buildQuietEdition, buildMockEdition } from '../lib/prompts/ship-biscuit-editor.js';
-import { DEFAULT_MODEL, streamChat, isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { buildEditorMessages, parseEditorResponse, assessEditorOutcome, buildQuietEdition, buildMockEdition } from '../lib/prompts/ship-biscuit-editor.js';
+import { DEFAULT_MODEL, streamChat, resolveReasoningBudget, isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
+
+/**
+ * Visible-output budget for the editor-in-chief JSON reply (LIN-1185).
+ *
+ * A busy WEEK edition asks the model for a long structured object (lede + up to
+ * ~20 grounded index stubs). The original fixed 1600-token cap truncated that
+ * reply on busy weeks (`finish_reason: 'length'`) → unparseable JSON → the route
+ * silently degraded to a quiet "slow news day" edition = the user-visible "no
+ * results" bug. This budget is the *prose* floor; it is routed through
+ * `resolveReasoningBudget` so a reasoning model (the default `gpt-5.4-mini`) gets
+ * dedicated reasoning headroom on top instead of the hidden reasoning tokens
+ * eating the visible-output budget — exactly as the roadmap LLM layers do.
+ */
+const EDITOR_PROSE_MAX_TOKENS = 6000;
 
 /**
  * Whether the AI layer should be mocked for this request — mirrors `shouldMockAi`
@@ -164,19 +178,37 @@ export function createShipBiscuitRoutes({
           }
         }
         modelId = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'ship-biscuit', forceDefault: isFreeTier });
+        // Route through resolveReasoningBudget so a busy edition's JSON can complete
+        // (LIN-1185): reserve reasoning headroom for a reasoning model on top of the
+        // prose budget, instead of a single fixed cap the reply can truncate against.
+        const { reasoning, maxTokens } = resolveReasoningBudget({ model: modelId, proseTokens: EDITOR_PROSE_MAX_TOKENS });
         let buffer = '';
+        let finishReason = null;
         await streamChat(
           buildEditorMessages(model),
-          { apiKey: apiKeyToUse, model: modelId, maxTokens: 1600, temperature: 0.5,
+          { apiKey: apiKeyToUse, model: modelId, maxTokens, reasoning, temperature: 0.5,
             callMeta: { urlKey: workspace.urlKey, feature: 'ship-biscuit' } },
-          (type, data) => { if (type === 'token' && data?.token) buffer += data.token; }
+          (type, data) => {
+            if (type === 'token' && data?.token) buffer += data.token;
+            else if (type === 'done') finishReason = data?.finishReason || null;
+          }
         );
         body = parseEditorResponse(buffer, model);
-        // A model that returned nothing usable degrades to the honest quiet edition
-        // rather than an empty-but-loud front page.
-        if (!body.frontPage.lede && body.index.length === 0) {
-          body = buildQuietEdition(model);
-          modelId = `${modelId} (empty→quiet)`;
+        // The model is NON-quiet here (a genuinely quiet window took the no-LLM path
+        // above). So an empty parse is a FAILURE — almost always a JSON reply
+        // truncated by the token cap — NOT a slow news day. Surface it (observable
+        // in logs + a clear error to the caller) instead of silently degrading to a
+        // quiet edition, which was the "week returns no results" defect (LIN-1185).
+        const outcome = assessEditorOutcome(body, finishReason);
+        if (!outcome.ok) {
+          console.error(
+            `Ship's Biscuit editor produced no usable edition for ${workspace.urlKey}: ${outcome.reason} ` +
+            `(model=${modelId}, finishReason=${finishReason || 'unknown'}, chars=${buffer.length}, ` +
+            `sources=${model.sources?.length ?? 0}, window=${model.window}) — surfacing, not degrading to quiet.`
+          );
+          const err = new Error(`Ship's Biscuit editor reply was ${outcome.reason}`);
+          err.editorFailure = { reason: outcome.reason, truncated: outcome.truncated, finishReason: finishReason || null };
+          throw err;
         }
       }
 
@@ -199,6 +231,16 @@ export function createShipBiscuitRoutes({
       console.error("Ship's Biscuit generate error:", error);
       if (error.response?.status === 401) {
         return res.status(401).json({ error: 'Token expired or invalid' });
+      }
+      // Non-quiet editor reply that couldn't be parsed (typically truncated). Surface
+      // it as a retryable error rather than a silent quiet edition (LIN-1185).
+      if (error.editorFailure) {
+        return res.status(502).json({
+          error: error.editorFailure.truncated
+            ? 'The edition was cut off before the editor finished writing it. Please try again.'
+            : "The editor's reply couldn't be read. Please try again.",
+          editorFailure: error.editorFailure,
+        });
       }
       res.status(502).json({ error: 'Failed to generate the edition' });
     }
