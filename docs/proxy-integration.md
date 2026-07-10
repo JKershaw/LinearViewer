@@ -1265,6 +1265,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 | `issueIdentifier` | string | Yes | The issue to recommend a next step for (UUID or `LIN-123`) |
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour OS is **not** available to proxy consumers |
 | `repo` | string | No | Optional repository hint |
+| `repoInherited` | bool | No | Default `false`. Marks `repo` as **inherited** (forwarded from a parent context) rather than user-explicit. When `true`, a cross-project descent's child repo — or the named node's own project `repo=` on a `kind` override — wins over the inherited `repo`; a repo-less child still falls back to it. Leave it off (or `false`) for a deliberately chosen repo, which keeps winning (see below) |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block so the worker inherits workspace access via this proxy |
 | `noDescend` | bool | No | Default `false`. When `true`, recommend and dispatch the **named issue's own** next step and never descend into an open child (see below) |
 | `kind` | string | No | **Verb override.** A prompt template key (e.g. `review`, `plan`, `implementation`). When supplied, the LLM recommendation + descent is bypassed and the body is generated deterministically for the **named issue** with that template (see below) |
@@ -1292,6 +1293,18 @@ a parent whose deliverables live in its own description while a sub-issue is out
 scope or separately tracked — the lever is deterministic (the child is never fetched
 or dispatched), so it is the reliable way to make a parent's own work reachable
 through the verb.
+
+**`repoInherited` — switch repo context on a cross-project descent.** A `repo` you
+pass is treated as a **deliberate, user-explicit** choice and always wins over the
+server-resolved repo (the LIN-537 rule). But an orchestrator that fans work out often
+forwards a `repo` it merely **inherited** from the parent context — and when this verb
+then descends into a child in a *different* project with its own `repo=`, that inherited
+repo would wrongly mask the child's, dispatching the worker against the parent's
+codebase. Set `repoInherited: true` to mark the forwarded repo as inherited: the
+descended child's repo (or, on a `kind` override, the named node's own project `repo=`)
+then wins, while a repo-less child still falls back to the inherited value. Same-project
+descents, repo-less children, and dispatches that pass no `repo` are unaffected. Omit it
+(or send `false`) whenever the caller genuinely means to force a specific repo through.
 
 Returns `201`:
 ```json

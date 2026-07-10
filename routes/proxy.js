@@ -53,7 +53,7 @@ import { snapshotFromContext } from '../lib/task-snapshot-store.js';
 import { isTerminalState, isBlocked } from '../lib/tree.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
-import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
+import { parseRepoFromDescription, resolveDispatchRepo, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS, WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
@@ -4522,7 +4522,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { issueIdentifier, target, repo, model, harness, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
+      const { issueIdentifier, target, repo, repoInherited, model, harness, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -4563,6 +4563,15 @@ One convention across every endpoint, so you can branch on the same fields every
       if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, 'repo is invalid');
+      }
+      // Inherited-repo marker (LIN-1210): when true, `repo` was merely inherited
+      // (e.g. an autopilot orchestrator forwarding a parent project's repo onto a
+      // cross-project child fan-out), NOT deliberately chosen for THIS dispatch, so
+      // the server-derived child/node repo wins over it (see resolveDispatchRepo).
+      // Default false keeps the LIN-537 explicit-caller-repo precedence byte-for-byte.
+      if (repoInherited !== undefined && typeof repoInherited !== 'boolean') {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, 'repoInherited must be a boolean');
       }
       // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
       // via the shared helper (length + dangerous-chars). NOT a generation-model
@@ -4693,8 +4702,10 @@ One convention across every endpoint, so you can branch on the same fields every
               dispatchedBy: req.proxyCreatedBy || null,
               target: target || 'cli',
               // Mirror /prompt's repo resolution: project `repo=` from the
-              // description, with an explicit caller repo winning (LIN-537).
-              repo: repo || parseRepoFromDescription(project?.description) || null,
+              // description, with an explicit caller repo winning (LIN-537). When
+              // the caller marks its repo as inherited (LIN-1210), the named node's
+              // own project repo wins over it instead (repoInherited: true).
+              repo: resolveDispatchRepo(repo, parseRepoFromDescription(project?.description), { inherited: repoInherited === true }),
               sessionId: sessionId || null,
               // Push-comms: `subscription` is the declared edge (LIN-900 §6),
               // `terminal-only` unless the caller declares `everything`; queueIfBusy
@@ -4859,7 +4870,10 @@ One convention across every endpoint, so you can branch on the same fields every
             // when the caller omits one; an explicit caller repo still wins. repo
             // is functional execution context (working directory), so this fused
             // verb must propagate it, not just the display header fields (LIN-537).
-            repo: repo || rec.repo || null,
+            // On a cross-project descent the terminal child's repo (rec.repo) also
+            // wins over a merely *inherited* caller repo (repoInherited: true), so
+            // the worker runs in the child project's repo, not the parent's (LIN-1210).
+            repo: resolveDispatchRepo(repo, rec.repo, { inherited: repoInherited === true }),
             sessionId: sessionId || null,
             // Opt-in completion hold (LIN-797), forwarded blindly to the runner.
             waitForFollowUps: waitForFollowUps === true,
