@@ -24,6 +24,7 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { normalizeYapChannel, nickFromWorkspaceName, randomChannelName } from '../lib/yap-client.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
+import { attachProxyContext, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
 import { jsonError, notFound } from '../lib/errors.js';
 import {
   buildCollectiveParticipantPrompt,
@@ -265,64 +266,95 @@ export function createCollectiveRoutes({
     const dispatched = [];
     for (const { ws, character, raw, nick, isFacilitator } of entries) {
 
-      // Best-effort: mint a single-use BOOTSTRAP proxy token (LIN-376) so the
-      // participant can exchange it for a working token and pull its own
-      // workspace's Linear context (and act ONLY when John approves in channel).
-      // Never a standing readWrite token in the prompt. If the store is absent or
-      // minting fails, dispatch without it — the discussion still works; the
-      // participant just lacks Linear access.
-      let proxyToken = null;
-      if (proxyTokenStore) {
-        try {
-          const minted = await proxyTokenStore.createToken(ws.urlKey, { kind: 'bootstrap', scope: 'readWrite', label: 'collective', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS });
-          proxyToken = minted?.token || null;
-        } catch (err) {
-          console.error(`Collective: proxy token mint failed for ${ws.urlKey}:`, err.message);
-        }
-      }
-
-      const buildArgs = {
-        channel,
-        nick,
-        yapBaseUrl,
-        yapPassword,
-        topic,
-        proxyBaseUrl: proxyToken ? proxyBaseUrl : null,
-        proxyToken,
-        character,
-        roster: rosterLines,
+      // Build the participant/facilitator prompt for a given proxy token pair.
+      // Hoisted so finalizePrompt can build it either WITHOUT a token (claude-code,
+      // where the credential travels out-of-band) or WITH the inline Linear-access
+      // block (prose harnesses). The designated seat gets the DISTINCT facilitator
+      // prompt (LIN-1049); everyone else the participant prompt. Both share roster.
+      const buildPrompt = ({ proxyBaseUrl: pbUrl, proxyToken: pToken }) => {
+        const buildArgs = {
+          channel,
+          nick,
+          yapBaseUrl,
+          yapPassword,
+          topic,
+          proxyBaseUrl: pbUrl,
+          proxyToken: pToken,
+          character,
+          roster: rosterLines,
+        };
+        return isFacilitator
+          ? buildCollectiveFacilitatorPrompt({
+              ...buildArgs,
+              objective: facilitatorObjective,
+              exitCondition: facilitatorExitCondition,
+            })
+          : buildCollectiveParticipantPrompt(buildArgs);
       };
-      // The designated seat gets the DISTINCT facilitator prompt (LIN-1049);
-      // everyone else the participant prompt. Both share the roster block.
-      const prompt = isFacilitator
-        ? buildCollectiveFacilitatorPrompt({
-            ...buildArgs,
-            objective: facilitatorObjective,
-            exitCondition: facilitatorExitCondition,
-          })
-        : buildCollectiveParticipantPrompt(buildArgs);
 
       try {
         // Create through the shared factory (LIN-1139). CONVERGENCE (LIN-1135):
         // the collective fan-out previously hand-rolled addItem with NO model/
         // harness resolution at all — it now inherits the participant workspace's
-        // dispatch defaults (resolveDispatchDefaults), closing the exact
-        // inheritance gap the parent names. The participant prompt is already built
-        // (with its own inline token, when minted), so this path passes a plain
-        // prompt and no finalizePrompt — no proxy-context append and no
-        // bootstrapToken field here.
+        // dispatch defaults (resolveDispatchDefaults), closing that inheritance gap.
+        //
+        // TOKEN DELIVERY (LIN-1173): the bootstrap mint + prompt build now run
+        // INSIDE finalizePrompt, AFTER the harness is resolved, so this path finally
+        // joins the shared finalizePrompt → attachProxyContext seam (LIN-1155/1157).
+        // When the resolved harness is claude-code the token travels out-of-band as
+        // the structured `bootstrapToken` field and the prompt carries NO token/curl
+        // prose (attachProxyContext, mcp mode; fail-closed per LIN-1175 — an
+        // un-mintable token throws, and the surrounding catch marks the participant
+        // ok:false rather than launching a credential-less session). Every OTHER
+        // harness (incl. the null default this path keeps — see applyDefaultHarness
+        // below) keeps the byte-identical bespoke Linear-access prose block: a
+        // best-effort single-use BOOTSTRAP (LIN-376) is minted and embedded inline,
+        // exactly as before; if the store is absent or minting fails, dispatch
+        // proceeds without it (the discussion still works; the participant just
+        // lacks Linear access).
         //
         // applyDefaultHarness:false — inherit configured defaults, but do NOT
         // interpose the claude-code floor (LIN-1159 scoped that to the proxy
-        // dispatch boundary). This keeps a no-defaults workspace's harness null, as
-        // before; the interpose is not this refactor's to add here.
+        // dispatch boundary). A no-defaults workspace's harness stays null, so it
+        // takes the prose branch and its prompt is byte-identical to before.
         const item = await createDispatchItem({
           store: dispatchQueueStore,
           urlKey: ws.urlKey,
           workspacePreferencesStore,
           applyDefaultHarness: false,
           kind: 'custom',
-          prompt,
+          finalizePrompt: async (resolvedHarness) => {
+            if (shouldUseMcpTokenField(resolvedHarness)) {
+              // claude-code: no inline token. attachProxyContext mints the bootstrap,
+              // hands it back as `bootstrapToken`, and appends the credential-free
+              // MCP access block to a prompt built with no Linear-access prose.
+              return attachProxyContext({
+                proxyTokenStore,
+                urlKey: ws.urlKey,
+                baseUrl: proxyBaseUrl,
+                issueIdentifier: null,
+                prompt: buildPrompt({ proxyBaseUrl: null, proxyToken: null }),
+                label: 'collective',
+                harness: resolvedHarness,
+              });
+            }
+            // Prose harnesses: byte-identical bespoke Linear-access block. Mint a
+            // best-effort single-use BOOTSTRAP and embed it inline (unchanged from
+            // HEAD); an absent store / failed mint drops the block, as before.
+            let proxyToken = null;
+            if (proxyTokenStore) {
+              try {
+                const minted = await proxyTokenStore.createToken(ws.urlKey, { kind: 'bootstrap', scope: 'readWrite', label: 'collective', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS });
+                proxyToken = minted?.token || null;
+              } catch (err) {
+                console.error(`Collective: proxy token mint failed for ${ws.urlKey}:`, err.message);
+              }
+            }
+            return {
+              prompt: buildPrompt({ proxyBaseUrl: proxyToken ? proxyBaseUrl : null, proxyToken }),
+              bootstrapToken: null,
+            };
+          },
           fields: {
             promptName: isFacilitator ? 'collective-facilitator' : 'collective-participant',
             target,
