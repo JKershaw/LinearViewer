@@ -110,6 +110,39 @@ describe('parseEditorResponse — grounding guard', () => {
   });
 });
 
+describe('parseEditorResponse — lead-story fields (LIN-1198)', () => {
+  test('parses frontPage.headline and frontPage.standfirst alongside the lede', () => {
+    const model = modelWithSources();
+    const raw = JSON.stringify({
+      frontPage: { headline: 'Autopilot clears the board', standfirst: 'A steady week of small wins.', lede: 'A busy month.' },
+      index: []
+    });
+    const fp = parseEditorResponse(raw, model).frontPage;
+    assert.strictEqual(fp.headline, 'Autopilot clears the board');
+    assert.strictEqual(fp.standfirst, 'A steady week of small wins.');
+    assert.strictEqual(fp.lede, 'A busy month.');
+  });
+
+  test('tolerates an absent (optional) standfirst — defaults to empty string, headline kept', () => {
+    const model = modelWithSources();
+    const raw = JSON.stringify({
+      frontPage: { headline: 'A terse but real headline', lede: 'Short and plain.' },
+      index: []
+    });
+    const fp = parseEditorResponse(raw, model).frontPage;
+    assert.strictEqual(fp.headline, 'A terse but real headline');
+    assert.strictEqual(fp.standfirst, '', 'absent standfirst is the empty string, not undefined');
+    assert.strictEqual(fp.lede, 'Short and plain.');
+  });
+
+  test('a malformed reply still yields the full frontPage shape (headline/standfirst/lede empty)', () => {
+    const fp = parseEditorResponse('no json here', modelWithSources()).frontPage;
+    assert.strictEqual(fp.headline, '');
+    assert.strictEqual(fp.standfirst, '');
+    assert.strictEqual(fp.lede, '');
+  });
+});
+
 describe('assessEditorOutcome — non-quiet parse/degrade path (LIN-1185)', () => {
   // The real editor-LLM path had ZERO coverage before this: the only non-quiet test
   // exercised buildMockEdition, which bypasses parseEditorResponse and the
@@ -169,6 +202,24 @@ describe('assessEditorOutcome — non-quiet parse/degrade path (LIN-1185)', () =
     assert.strictEqual(outcome.ok, true);
   });
 
+  test('a headline-only reply (no lede, no stubs) is a real result, not a silent degrade (LIN-1198)', () => {
+    // A valid-but-terse headline-only edition must NOT be misclassified as a false
+    // "slow news day" failure. hasHeadline widens the ok condition.
+    const outcome = assessEditorOutcome({ frontPage: { headline: 'Autopilot clears the board', standfirst: '', lede: '' }, index: [] }, 'stop');
+    assert.strictEqual(outcome.ok, true);
+    assert.strictEqual(outcome.reason, null);
+  });
+
+  test('a genuinely empty reply (no headline, lede, or stubs) still fails', () => {
+    // The widened gate must not swallow the real failure it was built to surface.
+    const truncated = assessEditorOutcome({ frontPage: { headline: '', standfirst: '', lede: '' }, index: [] }, 'length');
+    assert.strictEqual(truncated.ok, false);
+    assert.strictEqual(truncated.reason, 'truncated');
+    const unparseable = assessEditorOutcome({ frontPage: { headline: '', standfirst: '', lede: '' }, index: [] }, 'stop');
+    assert.strictEqual(unparseable.ok, false);
+    assert.strictEqual(unparseable.reason, 'unparseable');
+  });
+
   test('is defensive against a malformed body shape', () => {
     assert.strictEqual(assessEditorOutcome(null, 'length').ok, false);
     assert.strictEqual(assessEditorOutcome({}, 'stop').ok, false);
@@ -202,5 +253,28 @@ describe('buildMockEdition', () => {
     const mock = buildMockEdition(model);
     assert.strictEqual(mock.index.length, 0);
     assert.match(mock.frontPage.lede, /slow news day|quiet/i);
+  });
+});
+
+describe('quiet + mock lead-story shape parity (LIN-1198)', () => {
+  const hasLeadStoryShape = (fp) => {
+    assert.strictEqual(typeof fp.headline, 'string');
+    assert.ok(fp.headline.length > 0, 'headline is present with real copy');
+    assert.strictEqual(typeof fp.standfirst, 'string', 'standfirst key is always present (string, may be empty)');
+    assert.strictEqual(typeof fp.lede, 'string');
+  };
+
+  test('buildQuietEdition emits headline + standfirst + lede', () => {
+    const model = buildEditionModel({ window: 'week', now: NOW, sessions: [], agentStatusItems: [], llmStats: null });
+    hasLeadStoryShape(buildQuietEdition(model).frontPage);
+  });
+
+  test('buildMockEdition emits the SAME lead-story shape as quiet', () => {
+    hasLeadStoryShape(buildMockEdition(modelWithSources()).frontPage);
+    // and the two builders agree on the key set for the frontPage object
+    const quietModel = buildEditionModel({ window: 'week', now: NOW, sessions: [], agentStatusItems: [], llmStats: null });
+    const quietKeys = Object.keys(buildQuietEdition(quietModel).frontPage).sort();
+    const mockKeys = Object.keys(buildMockEdition(modelWithSources()).frontPage).sort();
+    assert.deepStrictEqual(mockKeys, quietKeys, 'quiet + mock frontPage carry identical field names');
   });
 });
