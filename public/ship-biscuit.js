@@ -203,4 +203,12 @@
   }
 
   generateBtn.addEventListener('click', generate);
+
+  // Test-only seam (inert in the browser, where `module` is undefined): expose the
+  // pure layout + render helpers so the server↔client structural-parity test
+  // (tests/unit/ship-biscuit-parity.test.js) can diff renderEdition against
+  // renderEditionHtml over shared fixtures. Not part of the page's runtime contract.
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { renderEdition: renderEdition, layoutIndex: layoutIndex };
+  }
 })();
