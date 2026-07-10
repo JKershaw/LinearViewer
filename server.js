@@ -1343,7 +1343,7 @@ app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, get
 // The Ship's Biscuit (experimental, LIN-818): flag-gated LLM-set newspaper — a
 // deterministic edition model over the wired event stores + one editor-in-chief
 // call → durable front page + index. Mirrors next-run's free-tier/model wiring.
-app.use(createShipBiscuitRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, observationSessionsStore, agentStatusStore, llmCallLogStore, shipBiscuitHistoryStore }))
+app.use(createShipBiscuitRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, observationSessionsStore, agentStatusStore, llmCallLogStore, taskSnapshotStore, shipBiscuitHistoryStore }))
 
 /**
  * Workspace project view - renders the interactive tree view.

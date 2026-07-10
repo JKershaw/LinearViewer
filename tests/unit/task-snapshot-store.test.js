@@ -25,6 +25,13 @@ function createMockCollection() {
     if (query.urlKey !== undefined && doc.urlKey !== query.urlKey) return false;
     if (query.taskIdentifier !== undefined && doc.taskIdentifier !== query.taskIdentifier) return false;
     if (query.canonicalId !== undefined && doc.canonicalId !== query.canonicalId) return false;
+    // Range predicate on capturedAt, mirroring the { $gte: since } window scan the
+    // real Mongo/Mango layer honours (used by listByWorkspace — LIN-1197).
+    if (query.capturedAt !== undefined && query.capturedAt && typeof query.capturedAt === 'object' && query.capturedAt.$gte !== undefined) {
+      const docMs = doc.capturedAt instanceof Date ? doc.capturedAt.getTime() : new Date(doc.capturedAt).getTime();
+      const sinceMs = query.capturedAt.$gte instanceof Date ? query.capturedAt.$gte.getTime() : new Date(query.capturedAt.$gte).getTime();
+      if (!(docMs >= sinceMs)) return false;
+    }
     return true;
   }
   return {
@@ -262,5 +269,63 @@ describe('TaskSnapshotStore retention + reads', () => {
     const removed = await store.clear('ws');
     assert.equal(removed, 1);
     assert.equal((await store.list('ws', 'LIN-598')).total, 0);
+  });
+});
+
+// The workspace-wide window scan that feeds The Ship's Biscuit (LIN-1197). Seeds
+// docs directly with controlled capturedAt (captureIfChanged stamps `new Date()`,
+// which can't model an out-of-window "before").
+describe('TaskSnapshotStore.listByWorkspace (LIN-1197)', () => {
+  let collection;
+  let store;
+  const BASE = Date.UTC(2026, 6, 9, 12, 0, 0);
+  const at = (offsetDays) => new Date(BASE - offsetDays * 86400000);
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskSnapshotStore({ collection });
+  });
+
+  function seed(urlKey, taskIdentifier, capturedAt, snapshot = {}) {
+    collection._docs.push({
+      _id: `${urlKey}:${taskIdentifier}:${capturedAt.getTime()}`,
+      urlKey,
+      taskIdentifier,
+      canonicalId: taskIdentifier,
+      inputHash: `h-${capturedAt.getTime()}`,
+      capturedAt,
+      seq: 0,
+      snapshot
+    });
+  }
+
+  test('returns only in-window records for the workspace, newest-first, in { items, total } shape', async () => {
+    seed('ws-1', 'LIN-1', at(1), { title: 'recent' });
+    seed('ws-1', 'LIN-2', at(3), { title: 'mid' });
+    seed('ws-1', 'LIN-3', at(20), { title: 'pre-since, excluded' }); // older than the window
+    seed('ws-2', 'LIN-9', at(1), { title: 'other workspace, excluded' });
+
+    const res = await store.listByWorkspace('ws-1', { since: at(7) });
+
+    assert.strictEqual(res.total, 2);
+    assert.deepStrictEqual(res.items.map(r => r.taskIdentifier), ['LIN-1', 'LIN-2']); // newest capturedAt first
+    assert.ok(!res.items.some(r => r.taskIdentifier === 'LIN-3'), 'pre-since record excluded');
+    assert.ok(!res.items.some(r => r.taskIdentifier === 'LIN-9'), 'other-workspace record excluded');
+    // toRecord public shape: capturedAt is an ISO string, snapshot passes through.
+    assert.strictEqual(typeof res.items[0].capturedAt, 'string');
+    assert.strictEqual(res.items[0].snapshot.title, 'recent');
+  });
+
+  test('omitting since returns the whole workspace (no lower bound)', async () => {
+    seed('ws-1', 'LIN-1', at(1));
+    seed('ws-1', 'LIN-2', at(90));
+    const res = await store.listByWorkspace('ws-1', {});
+    assert.strictEqual(res.total, 2);
+  });
+
+  test('missing urlKey (or no collection) yields an empty result, never throws', async () => {
+    assert.deepStrictEqual(await store.listByWorkspace('', { since: at(7) }), { items: [], total: 0 });
+    const noColl = new TaskSnapshotStore({ collection: null });
+    assert.deepStrictEqual(await noColl.listByWorkspace('ws-1', { since: at(7) }), { items: [], total: 0 });
   });
 });
