@@ -275,3 +275,48 @@ describe('buildMockEdition', () => {
     assert.match(mock.frontPage.lede, /slow news day|quiet/i);
   });
 });
+
+// ── LIN-1212: roadmap report-history source ──────────────────────────────────
+
+function modelWithRoadmap() {
+  return buildEditionModel({
+    window: 'month', now: NOW, workspaceName: 'Acme',
+    roadmapReport: {
+      id: 'rep-1',
+      generatedAt: new Date(NOW - 86400000).toISOString(),
+      northStar: 'Ship faster',
+      narrative: { digest: 'Steady progress on the core path.', technical: null, product: null },
+      orientation: [{ identifier: 'LIN-9', bearing: 'toward', reason: 'core path', archived: false }],
+    },
+  });
+}
+
+describe('roadmap report-history source through the editor (LIN-1212)', () => {
+  test('buildMockEdition gives a roadmap slice a Deep Dive section and a roadmap-specific dek', () => {
+    const model = modelWithRoadmap();
+    const mock = buildMockEdition(model);
+    const stub = mock.index.find(s => s.sourceRefs[0].id === 'roadmap:rep-1');
+    assert.ok(stub, 'the roadmap slice reaches the mock edition');
+    assert.strictEqual(stub.section, 'Deep Dive');
+    // The dek must NOT fall through to the task "Status update on the work" default.
+    assert.doesNotMatch(stub.dek, /Status update on the work/);
+    assert.match(stub.dek, /roadmap/i);
+  });
+
+  test('parseEditorResponse resolves a roadmap:<id> sourceRef back by value (§B, generic byId)', () => {
+    const model = modelWithRoadmap();
+    const raw = JSON.stringify({
+      frontPage: { headline: 'The roadmap, re-read', lede: 'Where the work points.' },
+      index: [{ section: 'Deep Dive', headline: 'The roadmap, re-read', dek: 'Bearings.', weight: 2, sourceRefs: ['roadmap:rep-1'] }],
+    });
+    const out = parseEditorResponse(raw, model);
+    assert.strictEqual(out.index.length, 1, 'the roadmap-grounded stub survives the grounding guard');
+    assert.strictEqual(out.index[0].sourceRefs[0].id, 'roadmap:rep-1');
+    // Snapshotted by value — the digest + bearings, not a bare id.
+    assert.match(out.index[0].sourceRefs[0].snapshot.digest, /Steady progress/);
+    assert.deepStrictEqual(
+      out.index[0].sourceRefs[0].snapshot.orientation,
+      [{ identifier: 'LIN-9', bearing: 'toward', reason: 'core path' }]
+    );
+  });
+});

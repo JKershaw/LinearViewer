@@ -67,6 +67,21 @@ function taskSnap(taskIdentifier, offsetDays, snap = {}) {
   };
 }
 
+// A saved roadmap report in the shape reportHistoryStore.getLatest() returns (LIN-1212):
+// { id, generatedAt (ISO), northStar, narrative{digest,technical,product,…}, orientation[] }.
+function roadmapReportAt(id, offsetDays, extra = {}) {
+  return {
+    id,
+    generatedAt: new Date(NOW - offsetDays * 86400000).toISOString(),
+    northStar: extra.northStar ?? 'Ship the thing',
+    narrative: extra.narrative ?? { digest: 'Steady progress on the core path.', technical: 'Tech note.', product: 'Product note.' },
+    orientation: extra.orientation ?? [
+      { identifier: 'LIN-9', bearing: 'toward', reason: 'on the critical path', archived: false },
+      { identifier: 'LIN-8', bearing: 'away', reason: 'archived side quest', archived: true },
+    ],
+  };
+}
+
 describe('resolveWindow', () => {
   test('passes recognised windows through', () => {
     for (const w of WINDOWS) assert.strictEqual(resolveWindow(w), w);
@@ -372,7 +387,7 @@ describe('buildEditionModel — task additivity & counts (LIN-1197)', () => {
         taskSnap('LIN-10', 1, { state: { name: 'Done', type: 'completed' } }),
       ],
     });
-    assert.deepStrictEqual(m.counts, { sessions: 1, status: 1, tasks: 1, total: 3 });
+    assert.deepStrictEqual(m.counts, { sessions: 1, status: 1, tasks: 1, roadmap: 0, total: 3 });
   });
 });
 
@@ -401,5 +416,89 @@ describe('formatEditionContext — task branch (LIN-1197)', () => {
     const ctx = formatEditionContext(m);
     assert.match(ctx, /state: In Progress \(unchanged in window\)/);
     assert.doesNotMatch(ctx, /state change:/);
+  });
+});
+
+// ── LIN-1212: roadmap report-history feedstock ───────────────────────────────
+
+describe('buildEditionModel — roadmap report-history source (LIN-1212)', () => {
+  test('an in-window report produces a kind:roadmap SourceRef with the full slice shape + stable id', () => {
+    const m = buildEditionModel({ window: 'week', now: NOW, roadmapReport: roadmapReportAt('rep-1', 1) });
+    const s = m.sources.find(x => x.kind === 'roadmap');
+    assert.ok(s, 'a roadmap source exists');
+    assert.strictEqual(s.id, 'roadmap:rep-1');            // addressable by roadmap:<id>
+    assert.strictEqual(s.kind, 'roadmap');
+    assert.strictEqual(s.desk, 'Deep Dive');
+    assert.strictEqual(s.weight, 2);                       // analysis feedstock, not a lead
+    assert.strictEqual(s.headline, 'The roadmap, measured against "Ship the thing"');
+    assert.strictEqual(new Date(s.timestamp).getTime(), NOW - 1 * 86400000); // generatedAt
+    assert.deepStrictEqual(s.snapshot, {
+      reportId: 'rep-1',
+      generatedAt: new Date(NOW - 1 * 86400000).toISOString(),
+      northStar: 'Ship the thing',
+      digest: 'Steady progress on the core path.',
+      technical: 'Tech note.',
+      product: 'Product note.',
+      // Archived bearings are dropped; only the live bearing rides along, by value.
+      orientation: [{ identifier: 'LIN-9', bearing: 'toward', reason: 'on the critical path' }],
+    });
+  });
+
+  test('a report with no north star falls back to a plain "re-read" headline', () => {
+    const m = buildEditionModel({ window: 'week', now: NOW, roadmapReport: roadmapReportAt('rep-ns', 1, { northStar: '' }) });
+    const s = m.sources.find(x => x.kind === 'roadmap');
+    assert.strictEqual(s.headline, 'The roadmap, re-read');
+    assert.strictEqual(s.snapshot.northStar, '');
+  });
+
+  test('the roadmap source is counted and makes an otherwise-quiet window loud', () => {
+    const m = buildEditionModel({ window: 'week', now: NOW, sessions: [], agentStatusItems: [], roadmapReport: roadmapReportAt('rep-fresh', 1) });
+    assert.strictEqual(m.counts.roadmap, 1);
+    assert.strictEqual(m.isQuiet, false);
+    assert.ok(m.counts.total >= 1);
+  });
+
+  test('quiet-window honesty: a STALE (out-of-window) report never flips isQuiet loud', () => {
+    const m = buildEditionModel({ window: 'week', now: NOW, sessions: [], agentStatusItems: [], roadmapReport: roadmapReportAt('rep-old', 20) });
+    assert.strictEqual(m.isQuiet, true, 'a report generated before the window must not force a loud edition');
+    assert.strictEqual(m.counts.roadmap, 0);
+    assert.ok(!m.sources.some(s => s.kind === 'roadmap'));
+  });
+
+  test('a month window includes a report a week window excludes (window semantics, no raised ceiling)', () => {
+    const input = { now: NOW, roadmapReport: roadmapReportAt('rep-mid', 20) };
+    assert.strictEqual(buildEditionModel({ ...input, window: 'week' }).counts.roadmap, 0);
+    assert.strictEqual(buildEditionModel({ ...input, window: 'month' }).counts.roadmap, 1);
+  });
+
+  test('absent (null/omitted) report leaves the existing edition byte-identical (regression floor)', () => {
+    const base = {
+      window: 'week', now: NOW, workspaceName: 'WS',
+      sessions: [sessionAt('s1', 1)],
+      agentStatusItems: [statusAt('st1', 1)],
+      llmStats: { totalCalls: 2, totalCost: 0.01, totalTokens: 100, byFeature: [] },
+    };
+    assert.deepStrictEqual(buildEditionModel({ ...base, roadmapReport: null }), buildEditionModel(base));
+    const m = buildEditionModel(base);
+    assert.strictEqual(m.counts.roadmap, 0);
+    assert.ok(!m.sources.some(s => s.kind === 'roadmap'));
+  });
+
+  test('identical roadmap inputs produce a deeply-equal model (deterministic)', () => {
+    const input = { window: 'week', now: NOW, roadmapReport: roadmapReportAt('rep-det', 1) };
+    assert.deepStrictEqual(buildEditionModel(input), buildEditionModel(input));
+  });
+});
+
+describe('formatEditionContext — roadmap branch (LIN-1212)', () => {
+  test('emits the roadmap by id with north star, digest and live bearings; archived bearings never leak', () => {
+    const m = buildEditionModel({ window: 'week', now: NOW, roadmapReport: roadmapReportAt('rep-1', 1) });
+    const ctx = formatEditionContext(m);
+    assert.match(ctx, /id: roadmap:rep-1/);
+    assert.match(ctx, /north star: Ship the thing/);
+    assert.match(ctx, /roadmap digest: Steady progress on the core path\./);
+    assert.match(ctx, /LIN-9 — toward: on the critical path/);
+    assert.match(ctx, /1 roadmap report\(s\)/);            // activity summary line
+    assert.doesNotMatch(ctx, /LIN-8/);                     // archived bearing filtered upstream
   });
 });

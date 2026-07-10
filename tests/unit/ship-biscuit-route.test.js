@@ -169,3 +169,105 @@ describe('ship-biscuit generate survives H12 via the flushed keepalive branch (L
     assert.equal(res.jsonBody, null, 'edition rode the flushed res.end path, not the fast res.json path');
   });
 });
+
+// ─── LIN-1212: roadmap report-history source wiring ────────────────────────────
+
+describe('ship-biscuit roadmap report-history source wiring (LIN-1212)', () => {
+  test('destructures reportHistoryStore and window-filters getLatest into the model', () => {
+    // The factory accepts the store …
+    assert.match(ROUTE_SRC, /reportHistoryStore/);
+    // … and the gather guards the read + degrades to null exactly like the others,
+    // so a store miss/error never errors the generate path.
+    assert.match(ROUTE_SRC, /reportHistoryStore\s*\?\s*reportHistoryStore\.getLatest\([^)]*\)\.catch\(\(\)\s*=>\s*null\)/);
+    // … and the result is threaded into the deterministic model.
+    assert.match(ROUTE_SRC, /roadmapReport,/);
+  });
+});
+
+describe('ship-biscuit generate threads the latest roadmap report into the edition (LIN-1212)', () => {
+  // provider:'local' + NODE_ENV=test ⇒ shouldMockAi is true, so a non-quiet edition
+  // is built deterministically (buildMockEdition) with NO OpenRouter call.
+  const baseStores = () => ({
+    workspaceFromUrl: (req, res, next) => next(),
+    freeTierStore: { async tryUse() { return { allowed: true }; } },
+    workspacePreferencesStore: null,
+    getOpenRouterSource: () => 'oauth',
+    getDeployInfo: () => ({}),
+    observationSessionsStore: { async findByWorkspace() { return { sessions: [] }; } },
+    agentStatusStore: { async listStatus() { return { items: [] }; } },
+    llmCallLogStore: { async summarize() { return null; } },
+    taskSnapshotStore: { async listByWorkspace() { return { items: [] }; } },
+    shipBiscuitHistoryStore: { async save(_urlKey, edition) { return { id: 'ed-1', ...edition }; } },
+  });
+
+  async function generate(stores) {
+    const router = createShipBiscuitRoutes(stores);
+    const handler = getRouteHandler(router, 'post', '/workspace/:urlKey/api/ship-biscuit/generate');
+    const req = {
+      workspace: { urlKey: 'ws-a', name: 'Alpha', provider: 'local' },
+      session: { features: { shipBiscuit: true } },
+      body: {},
+    };
+    const res = makeFlushRes();
+    await handler(req, res);
+    return res;
+  }
+
+  test('an in-window roadmap report becomes a grounded, non-quiet edition', async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+    try {
+      const report = {
+        id: 'rep-1',
+        generatedAt: new Date().toISOString(), // now → inside every window
+        northStar: 'Ship faster',
+        narrative: { digest: 'Steady progress.', technical: null, product: null },
+        orientation: [{ identifier: 'LIN-9', bearing: 'toward', reason: 'core path', archived: false }],
+      };
+      const res = await generate({ ...baseStores(), reportHistoryStore: { async getLatest() { return report; } } });
+      const edition = res.jsonBody?.edition;
+      assert.ok(edition, 'an edition was returned');
+      assert.equal(edition.isQuiet, false, 'the in-window roadmap report makes the edition non-quiet');
+      assert.equal(edition.model, 'mock');
+      const refIds = edition.index.flatMap(s => s.sourceRefs.map(r => r.id));
+      assert.ok(refIds.includes('roadmap:rep-1'), 'the roadmap source is grounded into the edition');
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+
+  test('a report-history store miss degrades to no roadmap source without erroring', async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+    try {
+      const res = await generate({ ...baseStores(), reportHistoryStore: { async getLatest() { throw new Error('boom'); } } });
+      const edition = res.jsonBody?.edition;
+      assert.ok(edition, 'the generate path still returns an edition');
+      assert.equal(res.statusCode, 200, 'the store error does not surface as an HTTP error');
+      // No sources at all → an honest quiet edition, never a crash.
+      assert.equal(edition.isQuiet, true);
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+
+  test('a STALE (out-of-window) roadmap report leaves the edition quiet', async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+    try {
+      const stale = {
+        id: 'rep-old',
+        generatedAt: new Date(Date.now() - 60 * 86400000).toISOString(), // 60 days ago, past the month ceiling
+        northStar: 'Ship faster',
+        narrative: { digest: 'Old news.', technical: null, product: null },
+        orientation: [],
+      };
+      const res = await generate({ ...baseStores(), reportHistoryStore: { async getLatest() { return stale; } } });
+      const edition = res.jsonBody?.edition;
+      assert.ok(edition);
+      assert.equal(edition.isQuiet, true, 'a stale report must not force a loud edition (quiet-window honesty)');
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+});
