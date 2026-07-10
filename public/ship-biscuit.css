@@ -68,8 +68,6 @@
 .ship-biscuit-dateline {
   font-family: var(--font-structural);
   font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--muted);
   margin: 0 0 0.5rem;
 }
@@ -106,12 +104,14 @@
 }
 .ship-biscuit-article:last-child { border-bottom: none; }
 
+/* The small "kicker" label above a headline (e.g. "The Wire"). Scoped to the
+   article label only — this class must NOT be reused on the boxed section
+   wrappers (renderSection className), or its color/sizing would leak onto their
+   whole contents. Newspaper-natural: normal case, no shouty letter-spacing. */
 .ship-biscuit-section {
   display: inline-block;
   font-family: var(--font-structural);
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 0.72rem;
   color: var(--brand, var(--muted));
   margin-bottom: 0.25rem;
 }
