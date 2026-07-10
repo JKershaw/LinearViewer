@@ -3,8 +3,12 @@
  *
  * Semantic-token-only so the page is dark-safe under .theme-dark (no hard-coded
  * colours). Leans on the shared shell + observation.css for the section/box frame;
- * this file adds the newspaper character — a serif-ish masthead feel via the content
- * font, a front-page hero lede, and a headline index.
+ * this file adds the newspaper character — a masthead feel via the content font, and
+ * the Theme B front-page hierarchy (LIN-1198): a lead story (headline + optional
+ * standfirst/dek + lede), weighted section columns whose prominence recedes with
+ * weight (data-prominence), then compact lower-prominence stubs. Both column grids
+ * reuse the same auto-fill/minmax approach so they collapse to one column on narrow
+ * viewports without a bespoke mobile layout.
  */
 
 .ship-biscuit-page {
@@ -57,12 +61,16 @@
 }
 .ship-biscuit-feedback.error { color: var(--amber, var(--text)); }
 
-/* ── Front page ──────────────────────────────────────────────────────────── */
+/* ── Front page: lead story ──────────────────────────────────────────────── */
+/* The newspaper hierarchy (LIN-1198, Theme B). Type scale, largest → smallest:
+   masthead (page-header <h1>, unchanged) > lead-story headline > standfirst/dek >
+   lede > weighted section-column headlines (scaled by data-prominence) > stub text.
+   Semantic-token-only, so it stays dark-safe under .theme-dark. */
 
 .ship-biscuit-hero {
   border-bottom: 2px solid var(--line);
   padding-bottom: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .ship-biscuit-dateline {
@@ -70,6 +78,30 @@
   font-size: 0.78rem;
   color: var(--muted);
   margin: 0 0 0.5rem;
+}
+
+/* The lead-story headline: the largest editorial type on the page. Content (sans)
+   face, heavy and tight, so it reads as an editorial headline distinct from both the
+   brand masthead above it and the lede below. Inert — it is a plain <h2>, not a link. */
+.ship-biscuit-lead-headline {
+  font-family: var(--font-content);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin: 0 0 0.5rem;
+}
+
+/* The standfirst / dek: bridges the headline into the lede. Subordinate to the
+   headline, above the lede in the scale, muted. */
+.ship-biscuit-standfirst {
+  font-family: var(--font-content);
+  font-size: 1.1rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--muted);
+  margin: 0 0 0.6rem;
 }
 
 .ship-biscuit-lede {
@@ -88,16 +120,21 @@
   margin: 0.5rem 0;
 }
 
-/* ── Index of headlines ──────────────────────────────────────────────────── */
+/* ── Weighted section columns ────────────────────────────────────────────── */
+/* Prominent items (weight > 2) laid out as newspaper columns that collapse to a
+   single readable column on narrow viewports (auto-fill + minmax, no bespoke
+   breakpoint). Prominence recedes with weight via the data-prominence tiers below. */
 
-.ship-biscuit-index {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.ship-biscuit-sections {
   display: grid;
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem 1.5rem;
+  margin: 0 0 1.25rem;
 }
+/* Empty when every item is a stub — collapse the gap it would otherwise leave. */
+.ship-biscuit-sections:empty { display: none; margin: 0; }
 
+/* Shared row treatment for any index item (weighted block OR stub). */
 .ship-biscuit-article {
   border-bottom: 1px solid var(--line);
   padding-bottom: 0.85rem;
@@ -134,6 +171,53 @@
   margin: 0.3rem 0 0;
 }
 
+/* Prominence tiers — higher weight is visually louder, lower recedes. The lead
+   (high) block spans the full grid width as the front-of-paper story; medium and
+   standard sit in the columns at descending headline sizes. */
+.ship-biscuit-weighted[data-prominence="high"] {
+  grid-column: 1 / -1;
+}
+.ship-biscuit-weighted[data-prominence="high"] .ship-biscuit-headline {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.ship-biscuit-weighted[data-prominence="medium"] .ship-biscuit-headline {
+  font-size: 1.3rem;
+}
+.ship-biscuit-weighted[data-prominence="standard"] .ship-biscuit-headline {
+  font-size: 1.1rem;
+}
+.ship-biscuit-weighted[data-prominence="standard"] .ship-biscuit-dek {
+  font-size: 0.9rem;
+}
+
+/* ── Lower-prominence stubs ──────────────────────────────────────────────── */
+/* The least-weighted items (weight <= 2): compact, low-emphasis, packed tighter
+   into their own auto-collapsing grid beneath the weighted columns. */
+
+.ship-biscuit-stubs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.5rem 1.5rem;
+}
+.ship-biscuit-stubs:empty { display: none; }
+
+.ship-biscuit-stub {
+  padding-bottom: 0.5rem;
+}
+.ship-biscuit-stub .ship-biscuit-headline {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.ship-biscuit-stub .ship-biscuit-dek {
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+}
+
 .ship-biscuit-inert-note {
   font-family: var(--font-structural);
   font-size: 0.8rem;
@@ -147,7 +231,15 @@
   margin: 0;
 }
 
+/* Reuse the existing single narrow breakpoint: collapse both grids to one column
+   and step the editorial type down a notch. No new breakpoint system. */
 @media (max-width: 600px) {
+  .ship-biscuit-sections,
+  .ship-biscuit-stubs { grid-template-columns: 1fr; }
+  .ship-biscuit-lead-headline { font-size: 1.6rem; }
+  .ship-biscuit-standfirst { font-size: 1rem; }
   .ship-biscuit-lede { font-size: 1.05rem; }
   .ship-biscuit-headline { font-size: 1.05rem; }
+  .ship-biscuit-weighted[data-prominence="high"] .ship-biscuit-headline { font-size: 1.35rem; }
+  .ship-biscuit-weighted[data-prominence="medium"] .ship-biscuit-headline { font-size: 1.15rem; }
 }
