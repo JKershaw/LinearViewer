@@ -45,32 +45,47 @@
   padding: 0.6rem 0 0.4rem;
 }
 
-/* Arrow Buttons - compact circles in nav row */
+/* Arrow Buttons — nav-row circles. Given real button weight (LIN-1224): stronger
+   border + a resting shadow so they read as pressable, an inverting hover, and a
+   distinctly inert disabled state (dashed hairline, no fill/shadow) rather than a
+   faint dim that reads as "still clickable". */
 .swipe-arrow {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border);
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-strong);
   border-radius: 50%;
   background: var(--bg);
-  color: var(--fg-dim);
-  font-size: 14px;
+  color: var(--fg);
+  font-size: 15px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s;
   flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
 }
 
 .swipe-arrow:hover:not(:disabled) {
-  background: var(--bg-muted);
-  color: var(--fg);
-  border-color: var(--border-strong);
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+  box-shadow: var(--shadow-md);
+}
+
+.swipe-arrow:active:not(:disabled) {
+  box-shadow: none;
+  transform: translateY(1px);
 }
 
 .swipe-arrow:disabled {
-  opacity: 0.25;
+  opacity: 0.6;
   cursor: default;
+  color: var(--fg-vdim);
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--border);
+  box-shadow: none;
 }
 
 /* Card Container */
@@ -90,7 +105,17 @@
               opacity 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   cursor: grab;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
+}
+
+/* Dark elevation (LIN-1224): on near-black --bg the S1 hairline border and the
+   small shadow both vanish, so the card read as flat. Lift it onto the raised
+   --card surface with the stronger border + the theme-aware --shadow-lg (the
+   LIN-1046 token family) so the card is a clearly raised panel above the page. */
+.theme-dark .swipe-card {
+  background: var(--card);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lg);
 }
 
 .swipe-card.swiping {
@@ -310,14 +335,60 @@ a.swipe-relation-issue:hover {
 .swipe-relation-todo { color: var(--fg-dim); }
 .swipe-relation-backlog { color: var(--fg-vdim); }
 
-/* Expandable Accordion Sections */
+/* Expandable Accordion Sections — grouped into Details / Insights / Work
+   clusters (LIN-1224) so the stack reads as three scannable groups instead of
+   seven identical rows. */
+.swipe-accordion-group {
+  margin-top: var(--space-3);
+}
+
+.swipe-accordion-group:first-of-type {
+  margin-top: var(--space-2);
+}
+
+/* Group micro-label: a quiet uppercase caption over a slightly stronger rule
+   than the inter-row hairlines, so the eye registers the group boundary. */
+.swipe-accordion-group-label {
+  font-family: var(--font-content);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-dim);
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.1rem;
+  border-bottom: 1px solid var(--border);
+}
+
 .swipe-card-accordion {
-  margin-top: var(--space-1);
   border-top: 1px solid var(--fg-vdim);
 }
 
-.swipe-card-accordion:first-of-type {
+/* The group label (or the group top, when label-less as on landing) already
+   provides the divider, so the first row in a group drops its own top rule. */
+.swipe-accordion-group > .swipe-card-accordion:first-child,
+.swipe-accordion-group-label + .swipe-card-accordion {
+  border-top: none;
+}
+
+/* Prompts is the primary triage action — the anchor of the Work group. Frame it
+   as a CTA-like panel (bordered, brand-tinted toggle, heavier header) so it is
+   visibly the emphasised row rather than one more identical line. */
+.swipe-card-accordion--primary {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-muted);
   margin-top: var(--space-2);
+  padding: 0 0.6rem;
+}
+
+.swipe-card-accordion--primary .swipe-accordion-header {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.swipe-card-accordion--primary .swipe-accordion-toggle {
+  color: var(--brand);
 }
 
 .swipe-accordion-header {
@@ -785,6 +856,69 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
 
   .swipe-card-title {
     font-size: 22px;
+  }
+}
+
+/* Wide desktop — intentional two-pane composition (LIN-1224).
+   The mobile form is a single ~520px column; on a 1280px canvas that left the
+   card floating in a void with vast dead margins. At >=900px the page becomes a
+   framed grid: a left control rail (title + filter + prev/next) beside the card
+   stage, centred in a bounded panel. Nothing here touches the mobile layout —
+   below 900px the page stays the original single centred column. */
+@media (min-width: 900px) {
+  .swipe-page {
+    display: grid;
+    grid-template-columns: minmax(220px, 300px) minmax(0, 560px);
+    grid-template-rows: auto auto auto 1fr;
+    grid-template-areas:
+      "rail-header stage"
+      "rail-filter stage"
+      "rail-nav    stage"
+      "rail-fill   stage";
+    column-gap: var(--space-5);
+    align-items: start;
+    justify-content: center;
+    max-width: 960px;
+    padding: var(--space-4) var(--space-5) 3rem;
+    background: var(--bg-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-top: var(--space-4);
+  }
+
+  /* Card stage sits on the framed panel; the raised card + its shadow now read
+     against a surface instead of empty page. */
+  .theme-dark .swipe-page {
+    background: var(--bg);
+  }
+
+  .swipe-header { grid-area: rail-header; }
+  .swipe-filter-bar { grid-area: rail-filter; }
+  .swipe-nav-row { grid-area: rail-nav; }
+  .swipe-card-area { grid-area: stage; }
+
+  /* Rail header: left-aligned in the rail rather than page-centred. */
+  .swipe-header {
+    text-align: left;
+    margin-bottom: var(--space-3);
+  }
+
+  .swipe-header h1 {
+    font-size: 26px;
+  }
+
+  .swipe-filter-bar {
+    margin-bottom: 0;
+  }
+
+  /* Navigation cluster: a labelled control block at the foot of the rail,
+     separated from the filter by a hairline so it reads as its own affordance. */
+  .swipe-nav-row {
+    justify-content: flex-start;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
   }
 }
 
