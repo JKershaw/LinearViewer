@@ -404,3 +404,112 @@ H4's share metric is inflated by small read-sets though its direction is robust.
 Result-bytes ≈ tokens×4, directional. This is correlation to steer priorities, not
 proof — but the top three shortlist moves now rest on measured load, and the
 calibration question (§15) is answered cleanly in the negative.
+
+---
+
+# Part IV — H3's falsifiable close: before/after the suppression (LIN-1241, 2026-07-11)
+
+> Part III left H3 ("determinism pays") **◐ PARTIAL** — orientation-by-bytes
+> concentrated exactly in the kinds a snapshot-diff would help (research 80%, plan
+> 60%, impl 57%), but nothing yet *acted* on that, so the causal half was untested.
+> LIN-1238's grounding-suppression then landed (LIN-1239 git-HEAD channel →
+> **LIN-1240** `resolveGroundingFreshness`, PR #889, merged **2026-07-11 08:34 UTC**),
+> collapsing the full re-ground to a short "grounding current" note when a task's
+> slice *and* the worker's git HEAD are unchanged. This part is the pre-registered
+> falsifiable test: **re-measure orientation-by-bytes on the same task-kinds,
+> behind the LIN-1235 baseline, and report the delta — a null or negative result
+> being a valid, informative outcome.**
+
+## 18. Method — the same instrument, split on a boundary
+
+Same measurement path (`scripts/transcript-spend.mjs` + `lib/transcript-spend.js`),
+extended additively: `--boundary <iso>` propagates each session's `dispatchedAt`
+and partitions the joined corpus into a **before** cohort (dispatched before the
+feature merged) and an **after** cohort (at/after), reporting orientation-by-bytes
+per cohort with the delta. The partition is a pure, unit-tested helper
+(`partitionByDispatchTime`); with no `--boundary` the output is byte-identical to
+the Part III report. Reproduce:
+
+```
+PROXY_TOKEN=xxx node scripts/transcript-spend.mjs --no-cache --boundary 2026-07-11T08:34:24Z
+```
+
+Undated sessions are excluded from **both** cohorts (never folded into "before"),
+and a cohort's median is treated as a real number only with **≥5 edit-bearing
+sessions** — a single (worse, in-flight self-referential) session is noise, and
+declaring a delta on it is the exact over-claim the guard prevents.
+
+## 19. Result — INSUFFICIENT DATA; H3's causal half stays OPEN
+
+Fresh corpus: 167 dispatch items, **57 joined** (up from Part III's 39), 20
+edit-bearing. Split on the merge boundary:
+
+| Cohort | n | edit-bearing | orient-by-bytes (all) | orient-by-bytes (edit-bearing) |
+|---|--:|--:|--:|--:|
+| **before** (pre-feature) | 52 | 19 | 53% | **70%** |
+| **after** (post-feature) | 5 | **1** | 51% | 84% (n=1) |
+
+The apparent **+12–14pp** edit-bearing delta is **not a signal** and must not be
+read as "the feature made orientation *worse*". The entire after cohort is five
+sessions dispatched in the ~13 min between the 08:34 merge and the measurement,
+and only **one** is edit-bearing — session `43634b99`, **this very LIN-1241
+measurement session, in-flight (`taken`)**. A delta resting on a self-referential,
+incomplete n=1 is noise; the instrument correctly prints `⚠ INSUFFICIENT DATA`.
+The other four post-boundary sessions are non-edit-bearing (autopilot / triage /
+plan, plus `f44d84e5` — the aborted `blocked` mis-dispatch the LIN-1241 thread
+records). **Verdict: NULL / insufficient data. H3's falsifiable close remains
+OPEN** — a valid, pre-registered outcome, not a failure of the task. The before
+cohort cleanly reproduces the LIN-1235 baseline (edit-bearing 70% vs 68%; kinds
+consistent: research 78%, plan 67%, impl 68%, close-out 5%, triage 18%), so the
+instrument is stable across the two pulls — what is missing is *post-feature
+edit-bearing sessions*, which the tiny window has not yet produced.
+
+## 20. The three folded LIN-1240 post-merge observations
+
+LIN-1240's close-out routed its three "What CI Did Not Prove" ledger items here to
+be observed on real sessions (all three have a **conservative, code-verified
+failure mode** — any mismatch falls back to today's full re-ground, never an
+*incorrect* suppression, so none is a defect even unobserved):
+
+1. **Cross-seam hash parity / suppression firing rate.** Probed all 8 post-landing
+   transcripts for the "grounding current" note. Three matched — but all three are
+   **contamination, not fired notes**: `b867ae42` (the LIN-1240 **close-out**,
+   dispatched 08:30 UTC *before* the merge — it *read* the feature's own
+   description) and `6b24e489` (autopilot over the parent LIN-1238) surface the
+   phrase inside tool-results/prompt context describing the feature, and
+   `43634b99` is this session. **No clean fired note on an independent post-deploy
+   dispatch was observed.** Firing-vs-fallback rate is therefore unquantified in
+   this window. Code-verified: fires only for leaf tasks with ≥2 identical
+   snapshots + matching HEAD; parent tasks add `focusedChild` to the hashed slice
+   and conservatively fall back — an effectiveness ceiling to quantify later, not
+   a bug.
+2. **Producer `?head=` contract (LIN-1239 channel).** Zero `?head=` occurrences in
+   worker transcripts — but this is **expected and not evidence against the
+   contract**: the freshness reads (`/prompt`, `/recommend`) and capture reads
+   (recap/brief) that thread `?head=` are issued **server-side (runner→proxy at
+   prompt-generation)**, not by the worker's own curls, so they never appear in a
+   worker transcript. The contract is confirmable only via server-side
+   prompt-trace or *downstream* of a genuinely fired note (which cannot occur
+   unless `headSha` was reported and matched). Not independently observed in this
+   window; unfalsified.
+3. **"Grounding current" note is safe when fresh.** Not yet observable — no clean
+   fired note on an independent fresh dispatch (see #1). The code-verified
+   mitigation stands: the HEAD-equality gate means the snapshotted code equals the
+   worker's actual code, and the note still directs spot-checking the specific
+   files about to change.
+
+**Net:** all three remain **conservative-fallback / code-verified, not yet
+field-observed** — a clean null. The value delivered is the *instrument*: the
+`--boundary` harness makes the before/after delta and the firing-rate a one-command
+re-run the moment the post-feature corpus accrues comparable edit-bearing sessions
+(and, for #1/#2 with certainty, once server-side prompt-trace is joined in).
+
+## 21. Caveats (Part IV)
+
+Deploy lag: the boundary is the *merge* instant (08:34 UTC); Heroku deploy adds a
+few minutes, so the earliest post-boundary sessions may still have been served the
+pre-feature build — which only reinforces the insufficient-data verdict. The
+before/after split keys on `dispatchedAt` (≈ prompt-generation time), the right
+key for "which build generated this prompt". This is a measurement close-out, not
+a code-behaviour change to the engine: the suppression path itself is unchanged
+here.

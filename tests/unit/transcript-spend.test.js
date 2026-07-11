@@ -22,6 +22,7 @@ import {
   parseTranscriptLines,
   sessionSpend,
   normalizeRepoPath,
+  partitionByDispatchTime,
   __internal,
 } from '../../lib/transcript-spend.js';
 
@@ -241,5 +242,47 @@ describe('fileReadOverlap — H4 across sessions on one task', () => {
   });
   test('empty sets → 0', () => {
     assert.equal(__internal.jaccard([], []), 0);
+  });
+});
+
+// ─── partitionByDispatchTime — LIN-1241 before/after cohorts ──────────────────
+
+describe('partitionByDispatchTime — before/after cohorts (H3 falsifiable close)', () => {
+  const boundary = '2026-07-11T08:34:24.000Z';
+  const rows = [
+    { sessionId: 'a', dispatchedAt: '2026-07-10T16:00:00.000Z' }, // before
+    { sessionId: 'b', dispatchedAt: '2026-07-11T09:00:00.000Z' }, // after
+    { sessionId: 'c', dispatchedAt: boundary },                   // at boundary → after
+    { sessionId: 'd', dispatchedAt: null },                       // undated
+    { sessionId: 'e' },                                           // missing → undated
+  ];
+
+  test('splits strictly before vs at-or-after the boundary', () => {
+    const { before, after } = partitionByDispatchTime(rows, boundary);
+    assert.deepEqual(before.map((r) => r.sessionId), ['a']);
+    assert.deepEqual(after.map((r) => r.sessionId), ['b', 'c']); // boundary is inclusive → after
+  });
+
+  test('undated sessions are excluded from BOTH cohorts, not folded into before', () => {
+    const { before, after, undated } = partitionByDispatchTime(rows, boundary);
+    assert.deepEqual(undated.map((r) => r.sessionId), ['d', 'e']);
+    assert.ok(!before.some((r) => r.dispatchedAt == null));
+    assert.ok(!after.some((r) => r.dispatchedAt == null));
+  });
+
+  test('empty after cohort is representable (the expected just-landed null result)', () => {
+    const onlyBefore = [rows[0]];
+    const { before, after } = partitionByDispatchTime(onlyBefore, boundary);
+    assert.equal(before.length, 1);
+    assert.equal(after.length, 0);
+  });
+
+  test('an invalid boundary throws rather than mis-partitioning', () => {
+    assert.throws(() => partitionByDispatchTime(rows, 'not-a-date'), /invalid boundary/);
+  });
+
+  test('tolerates null/undefined results input', () => {
+    const { before, after, undated } = partitionByDispatchTime(null, boundary);
+    assert.deepEqual([before.length, after.length, undated.length], [0, 0, 0]);
   });
 });
