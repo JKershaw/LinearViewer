@@ -265,3 +265,142 @@ First outside-view silhouette, pulled live through the workspace proxy (`/dispat
 **What we can't yet claim.** The done-vs-not-done orientation split (21% vs 14%) is **confounded** — the not-done set is mostly orchestration/wake sessions with no edits, not failed work — so H1/H3 need the inside view and more edit-bearing sessions. Track A proved the join + parse work end-to-end and **sized the resolution wall**; it did not (and cannot) put a real number on the orientation *tax*.
 
 **Triangulation note.** This is the **D2** dataset. When the JSONL lands, **D3** resolves the Bash 62% and **D1** (LIN-824's busy-span method) sits between — the three-way compare then tells us whether this cheap silhouette can stand in for the token truth.
+
+---
+
+# Part III — Track B / D3 results: the inside view (2026-07-11)
+
+> The JSONL landed. This part opens the Bash box Track A couldn't, and puts a real
+> number on the orientation tax. Method, code, and data are reproducible:
+> `lib/transcript-spend.js` (pure, unit-tested) + `scripts/transcript-spend.mjs`.
+
+## 12. Method — D3, built on the LIN-824 join
+
+`scripts/transcript-spend.mjs` joins Harbour's dispatch records (kind + terminal
+outcome, via the proxy) to each worker's own Claude Code transcript
+(`<sessionId>.jsonl`) on the LIN-824 key — a dispatch item's feedback carries
+`[working] Session launched (session: <8hex>…)`, whose prefix is the transcript
+filename. `lib/transcript-spend.js` then classifies every `tool_use` into six
+spend classes. The load-bearing move — the one Track A structurally could not
+make — is **classifying Bash by its command**: dispatched sessions have **no
+Grep/Glob tool** (verified: a `<tool_use_error>` "No such tool available: Grep"),
+so all search routes through Bash `grep`/`find`, and git archaeology / file reads
+/ tests all arrive as Bash. The classes:
+
+- **ORIENT** — Read/LS; Bash `git log/diff/show/status/blame`, `cat/head/tail`, `grep/find`.
+- **CORE** — Edit/Write/MultiEdit; mutating Bash (`git commit/add`, `mkdir`, `sed -i`).
+- **VERIFY** — Bash matching the wall-clock CI signature (`npm test`, `node --test`, `playwright`, `tsc`, `gh pr checks`).
+- **COORD** — `mcp__*`, `ToolSearch`, `WebFetch`, and proxy/api curls (the appended proxy-context block makes workers curl the proxy heavily — it is coordination, **not** task work, and must be excluded or it swamps everything).
+- **SCAFFOLD** — pure `echo/cd/export` plumbing. **UNKNOWN** — unrecognised Bash (`python3` one-offs), kept distinct so it is never silently miscounted as orientation.
+
+Orientation ratio is reported **three ways** (per the LIN-1235 decision): by
+tool-**count** (comparable to Track A's 18%), by tool-result **bytes** (context
+ingested — the "load" headline), and by the **output tokens** of the issuing
+turns. Cross-session file identity is normalised to a repo-relative path
+(`normalizeRepoPath`) because each session runs in its own `…-workspaces/<uuid>/`
+clone — without that, the same file never matches across sessions (the H4 trap).
+
+**Sample.** 156 dispatch items across all statuses; **39 carried a launch marker
+and joined to a transcript** (the rest are aborts / wakes / pre-launch failures
+with no worker session). **16 edit-bearing.** Outcomes: 31 done, 8 in-flight
+(`taken`), **0 clean failures** — which bounds what we can claim (see H1).
+
+## 13. Headline — the tax is real, and Track A undercounted it ~4×
+
+| Orientation ratio (median) | by count | by result-bytes | by output-tokens |
+|---|--:|--:|--:|
+| all joined sessions (n=39) | 36% | **50%** | 33% |
+| edit-bearing only (n=16) | 39% | **68%** | 37% |
+
+**By the measure that matters — context ingested (result-bytes) — a median
+edit-bearing worker spends 68% of everything it reads on orientation.** Track A's
+count-based 18% was a hard lower bound, exactly as predicted; opening the Bash box
+and weighting by load roughly **quadruples** it. The reason the three lenses
+diverge so hard is itself the finding: **orientation tools return large payloads
+(a Read, a `git log`, a `cat`) while edits return a tiny `"ok"`** — so by
+tool-count orientation looks like a third of the work, but by *bytes pulled into
+the context window* it's two-thirds. And the context window is the scarce
+resource: across the corpus, **input+cache tokens outweigh output 100:1** (241.7M
+vs 2.39M). Optimising output tokens (Part I's instinct) polishes the 1%; the
+orientation re-reads fill the 99%.
+
+## 14. Hypothesis verdicts
+
+- **H2 — orientation dominates early spend. ✅ CONFIRMED.** Edit-bearing sessions
+  run a **median 15 tools before the first Edit** (implementation: 5–19). The
+  session front-loads re-grounding; productive change starts a long way in.
+- **H4 — cross-session duplication is real. ✅ CONFIRMED, strongly.** Six issues
+  in the sample were worked by ≥2 sessions (full arcs:
+  research→plan→impl→review→close-out). After path-normalisation, the **median
+  later session re-reads 100% of the repo files a prior same-issue session already
+  read**. Every dispatch re-grounds the same file-set from zero — precisely the
+  Part I §4 #1 duplication, now measured. (Caveat: some later sessions have small
+  read-sets, which inflates a share metric; the *direction* — near-total repeat —
+  is unambiguous.)
+- **H3 — determinism pays. ◐ PARTIAL / directional.** Orientation-by-bytes tracks
+  kind in the way the determinism thesis predicts: it is **highest where fresh
+  re-grounding is unavoidable** — research **80%**, periodical 69%, plan **60%**,
+  implementation **57%** — and lowest where the work is writing or coordinating,
+  not reading: close-out **11%**, triage 18%, autopilot 14%. So the tax
+  concentrates exactly in the kinds a snapshot-diff would help. We cannot yet close
+  the *outcome* half (facts-present → cleaner completion) — see H1.
+- **H1 — correctness tracks complexity, not prompt size. ⚠️ UNTESTED here.** The
+  joined set has **zero failed worker transcripts** (31 done, 8 in-flight), so the
+  outcome axis has no contrast — the same confound Track A flagged, not yet
+  resolved. Needs a sample that deliberately includes failed/looping runs. What we
+  *can* see: **rework concentrates in implementation** (mean 6.8 repeat-edits/
+  session, tail to 22), invisible in the whole-sample median (0%, dragged down by
+  read-only kinds) — a complexity signal worth pursuing when failures are in-set.
+
+## 15. The prize — the cheap signal does NOT predict the truth
+
+The two-track bet was: run D2 (heartbeat silhouette) continuously, recalibrate
+with D3 (JSONL) periodically. **For orientation, that bet fails.** D2's onboarding
+share vs D3's orientation ratio, across the 39 sessions:
+
+| D2 onboarding-share vs D3 orientation… | Pearson r |
+|---|--:|
+| …by count | **−0.43** |
+| …by result-bytes | **−0.50** |
+| …by output-tokens | −0.20 |
+
+Not just uncorrelated — mildly **inversely** correlated. The mechanism is
+structural: `decomposeEffort`'s "onboarding" only counts heartbeat intervals
+**before the first tool runs** (the cold project-summary prep). But the real
+orientation tax is **mid-session re-grounding** — re-reading source, `git log`,
+`grep` *interleaved with* edits — and every one of those intervals has a tool
+completing in it, so D2 files them as "active," not onboarding. **The cheap
+outside-view silhouette is blind to exactly the cost this study is about.** You
+cannot measure the orientation tax from heartbeats; you need the transcript, or
+new token-level instrumentation.
+
+## 16. The determinism shortlist, re-ranked by *measured* tax (feeds LIN-1153)
+
+1. **Wire `task-snapshot-store.diffLatest` into prompt-gen + a git-HEAD dimension
+   (Part I rec #1).** Now the top move on evidence, not just argument: orientation
+   is 57–80% of context bytes in research/plan/impl, and H4 shows the re-read is
+   100%-duplicated across a task's sessions. Gate the re-grounding on a real
+   change and this is the single largest measured tax.
+2. **Task-scoped "already-grounded" manifest (new, elevated by H4).** A
+   research→plan→impl→review→close-out arc re-reads the same files 5× from zero.
+   Carry a per-task file-ground set forward across dispatches so a later session
+   re-reads only what *changed*. This is the cross-session complement to #1.
+3. **Token/turn instrumentation on the feedback markers (LIN-817) — now
+   necessary, not optional.** §15 proves the orientation tax is unmeasurable from
+   the current outside view. Emitting per-marker token/tool-class counts is the
+   only way to run this continuously in production; it turns this one-off study
+   into a standing instrument. Sequenced with LIN-1114 (full-transcript ingest).
+4. **Request-scoped context memoization (Part I rec #2).** Unchanged; independent
+   of the worker-side tax but real.
+5. **§3 redundant-prose deletions.** Still cheap and correct, but now known to be
+   *low* measured tax — do them for the drift-risk hygiene, not the tokens.
+
+## 17. Caveats
+
+Small N (39 joined, 16 edit-bearing), done-heavy (H1 untestable without failures),
+single 4-day window, one workspace. Orientation classification is
+command-heuristic (a `python3` one-off lands in UNKNOWN, not ORIENT — conservative).
+H4's share metric is inflated by small read-sets though its direction is robust.
+Result-bytes ≈ tokens×4, directional. This is correlation to steer priorities, not
+proof — but the top three shortlist moves now rest on measured load, and the
+calibration question (§15) is answered cleanly in the negative.
