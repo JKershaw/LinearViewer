@@ -612,7 +612,12 @@ body:has(.swim-page) {
 .swim-page[data-orientation="vertical"] .swim-container {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: calc(100vh - 140px);
+  /* Re-derive the viewport-minus-chrome cap from real chrome instead of the
+     stale pre-S2 `140px` literal (LIN-1226). The old constant was exactly
+     nav 6rem + page top padding 0.75rem + page bottom --space-5 (96+12+32=140);
+     routing the nav portion through --nav-sticky-h keeps desktop identical while
+     tracking the S2 two-row nav's ≤640px bump (7.75rem) the frozen literal missed. */
+  max-height: calc(100vh - var(--nav-sticky-h) - 0.75rem - var(--space-5));
 }
 
 /* .swim-lanes padding-top is for horizontal mode (first row's group label
