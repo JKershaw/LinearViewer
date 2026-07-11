@@ -17,6 +17,7 @@ import assert from 'node:assert';
 import { createDashboardRoutes, buildTestSummary, buildTestSessionSummary, deriveSessionStatus } from '../../routes/dashboard.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
+import { createTaskDoneCache } from '../../lib/task-done-cache.js';
 
 const NOW_ISO = new Date().toISOString();
 // >24h ago: a session whose last activity is this old falls into Archive under
@@ -1845,12 +1846,21 @@ describe('bounded feed hydration (LIN-1258)', () => {
       agentStatus: [agentStatusDone(sessionId, seedIdent)]
     };
   }
+  // Same terminal+error session, but with N failed workers so `tasksTouched` is
+  // [seed, ...workerIdents] in order (worker loopIds `-w0..-wN` keep first-seen order
+  // deterministic). Lets a test drive the any-touched hydration path where the Done
+  // task is NOT the seed (LIN-1259, item 1).
+  function multiTaskErrorSession(sessionId, seedIdent, workerIdents) {
+    const history = [autopilotHistoryItem(sessionId, seedIdent)];
+    workerIdents.forEach((ident, i) => history.push(failWorker(`${sessionId}-w${i}`, ident, sessionId)));
+    return { history, agentStatus: [agentStatusDone(sessionId, seedIdent)] };
+  }
   // Pass-through feed cache: always re-runs the producer, so a second poll really
   // re-enters mergeSessions and the read count reflects the task-done cache alone.
   function passThroughFeedCache() {
     return { keyFor: () => 'k', get: async (_k, producer) => producer() };
   }
-  function hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache }) {
+  function hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache, taskDoneCache }) {
     const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
     return createDashboardRoutes({
       workspaceFromUrl: (req, res, next) => next(),
@@ -1865,7 +1875,11 @@ describe('bounded feed hydration (LIN-1258)', () => {
       fetchWorkspaceIssues: async () => [],
       getOpenRouterSource: () => 'env',
       getDeployInfo: () => ({}),
-      sessionsFeedCache
+      sessionsFeedCache,
+      // Injected only by the cross-TTL test (LIN-1259 item 2), which drives an
+      // injectable-clock cache to cross the 60s boundary; unset ⇒ the router's own
+      // default cache, exactly as production runs.
+      ...(taskDoneCache ? { taskDoneCache } : {})
     });
   }
   const doneCtx = { issue: { state: { name: 'Done', type: 'completed' } } };
@@ -1959,16 +1973,21 @@ describe('bounded feed hydration (LIN-1258)', () => {
     assert.equal(allSessions(second).filter(s => s.status === 'done-with-warning').length, 2, 'the upgrade still shows on the re-poll');
   });
 
-  test('buildSessionPayload back-compat: an errored session whose task is NOT done stays "error" (default-false path unchanged)', async () => {
+  test('buildSessionPayload back-compat: an errored session with NO done touched task stays "error" (default-false path unchanged)', async () => {
     const perWorkspace = { 'ws-a': { ...errorSessionFixture('sess-1', 'LIN-900', 'LIN-901') } };
     let reads = 0;
     const fetchIssueContext = async () => { reads++; return notDoneCtx; };
     const router = hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache: passThroughFeedCache() });
 
     const body = await poll(router, [{ urlKey: 'ws-a', name: 'A' }]);
-    assert.equal(reads, 1, 'the eligible session is still read');
+    // Any-touched hydration (LIN-1259): with no Done task to short-circuit on, the
+    // feed now reads BOTH touched tasks (seed LIN-900 + worker LIN-901) before it can
+    // conclude not-done — the cost the read-based cap exists to bound. Seed-only
+    // hydration (LIN-1258) read just one; the extra read is the multi-task any-touched
+    // coverage, not a regression.
+    assert.equal(reads, 2, 'both touched tasks are read when neither is Done (no short-circuit)');
     const s = allSessions(body).find(x => x.sessionId === 'sess-1');
-    assert.equal(s.status, 'error', 'a not-done task leaves the status byte-identical to the pre-LIN-1258 feed');
+    assert.equal(s.status, 'error', 'no touched task done ⇒ status byte-identical to the pre-hydration feed');
   });
 
   test('a hydration read that throws never breaks the feed (session degrades to error, not a 500)', async () => {
@@ -1980,5 +1999,112 @@ describe('bounded feed hydration (LIN-1258)', () => {
     const s = allSessions(body).find(x => x.sessionId === 'sess-1');
     assert.ok(s, 'the feed still renders the session');
     assert.equal(s.status, 'error', 'a hydration miss leaves the Mongo-sourced status untouched');
+  });
+
+  // ─── LIN-1259: any-touched-task hydration + read-based cap hardening ──────────
+  //
+  // The primary follow-up: the server feed must upgrade an errored session when ANY
+  // touched task is Done, not just the seed (tasksTouched[0]) — matching the client's
+  // any-touched `ensureHydration` OR. Before the fix a multi-task session whose seed
+  // is NOT done but a later touched task IS shows `error` on the collapsed feed card
+  // yet `done-with-warning` on drill-in: the exact feed-vs-drill-in disagreement.
+
+  test('any-touched (primary): a non-seed touched task being Done upgrades the collapsed card (feed matches drill-in)', async () => {
+    // tasksTouched = [LIN-100 (seed, NOT done), LIN-101, LIN-102 (Done)].
+    const perWorkspace = { 'ws-a': { ...multiTaskErrorSession('sess-1', 'LIN-100', ['LIN-101', 'LIN-102']) } };
+    const reads = [];
+    const doneByIdent = { 'LIN-102': true };
+    const fetchIssueContext = async (_t, ident) => { reads.push(ident); return doneByIdent[ident] ? doneCtx : notDoneCtx; };
+    const router = hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache: passThroughFeedCache() });
+
+    const body = await poll(router, [{ urlKey: 'ws-a', name: 'A' }]);
+    const s = allSessions(body).find(x => x.sessionId === 'sess-1');
+    assert.equal(s.status, 'done-with-warning', 'a Done NON-seed touched task upgrades the feed card (seed-only would have left it error)');
+    // Reads walk touched order and short-circuit ON the Done task — no read past it.
+    assert.deepEqual(reads, ['LIN-100', 'LIN-101', 'LIN-102'], 'reads seed→touched order and stops at the first Done task');
+  });
+
+  test('short-circuit: the seed being Done costs exactly ONE read even for a many-task session', async () => {
+    const perWorkspace = { 'ws-a': { ...multiTaskErrorSession('sess-1', 'LIN-200', ['LIN-201', 'LIN-202', 'LIN-203']) } };
+    let reads = 0;
+    // Every task would report Done, but the seed is read first and short-circuits.
+    const fetchIssueContext = async () => { reads++; return doneCtx; };
+    const router = hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache: passThroughFeedCache() });
+
+    const body = await poll(router, [{ urlKey: 'ws-a', name: 'A' }]);
+    assert.equal(reads, 1, 'the common case (seed is the done task) stays a single read regardless of touched count');
+    assert.equal(allSessions(body).find(x => x.sessionId === 'sess-1').status, 'done-with-warning');
+  });
+
+  test('cap = READS not sessions: a single multi-task session is bounded to N=5 reads and defers the rest', async () => {
+    // ONE eligible session with 7 touched tasks, NONE done. Under seed-only (LIN-1258)
+    // this cost 1 read; any-touched would cost 7 — the read-based cap (LIN-1259) bounds
+    // it to 5 this poll, proving the cap counts reads, not sessions (a per-session cap
+    // of 5 would have let all 7 through).
+    const workers = ['LIN-301', 'LIN-302', 'LIN-303', 'LIN-304', 'LIN-305', 'LIN-306'];
+    const perWorkspace = { 'ws-a': { ...multiTaskErrorSession('sess-1', 'LIN-300', workers) } };
+    let reads = 0;
+    const fetchIssueContext = async () => { reads++; return notDoneCtx; };
+    const router = hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache: passThroughFeedCache() });
+
+    const body = await poll(router, [{ urlKey: 'ws-a', name: 'A' }]);
+    assert.equal(reads, 5, 'a single session cannot exceed the N=5 per-poll READ budget');
+    assert.equal(allSessions(body).find(x => x.sessionId === 'sess-1').status, 'error', 'no Done found within budget ⇒ stays error, fills in on a later poll');
+  });
+
+  // ─── LIN-1259 item 2: cross-TTL overflow flicker (hardening — documented) ─────
+  //
+  // The resolved `done-with-warning` is NOT persisted per session; it is recomputed
+  // each poll from the 60s task-done cache. When a resolved card's cache entry EXPIRES
+  // and that same poll has more errored-terminal cache-misses than the read cap, the
+  // card can be deferred past the cap and briefly re-render `error` until re-read on a
+  // later poll (the client `warnedSessions` fallback only rescues it if the user had
+  // drilled in). This is a known, low-probability, SELF-HEALING limitation (Done is
+  // sticky). Per LIN-1259 we harden by DOCUMENTING it with a direct cross-TTL
+  // regression test rather than adding a sticky-resolved marker (kept out of scope to
+  // avoid unbounded per-session server memory for a rare cosmetic flicker). This test
+  // drives the boundary directly via an injectable-clock cache.
+
+  test('cross-TTL overflow: a resolved card whose cache expired flickers to error when the poll overflows the read cap, then self-heals', async () => {
+    let clock = 1_000_000;
+    const cache = createTaskDoneCache({ ttlMs: 60_000, now: () => clock });
+
+    // sess-keep: a single-task session, seed Done — resolves on poll 1 and caches.
+    // sess-1..6: six MORE single-task errored sessions, all Done, that only become
+    // eligible on poll 2 (added below). Six fresh misses > cap 5 ⇒ on poll 2, after
+    // sess-keep's entry has expired, it competes for the read budget and can lose.
+    const perWorkspace = { 'ws-a': { ...errorSessionFixture('sess-keep', 'LIN-500', 'LIN-599') } };
+    let reads = 0;
+    const fetchIssueContext = async () => { reads++; return doneCtx; };
+    const router = hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache: passThroughFeedCache(), taskDoneCache: cache });
+    const workspaces = [{ urlKey: 'ws-a', name: 'A' }];
+
+    // Poll 1: sess-keep is read (seed LIN-500 Done) and upgraded; its done-state cached.
+    const p1 = await poll(router, workspaces);
+    assert.equal(allSessions(p1).find(s => s.sessionId === 'sess-keep').status, 'done-with-warning', 'poll 1 resolves sess-keep');
+    const readsAfterP1 = reads;
+
+    // Advance the clock PAST the 60s TTL so sess-keep's cached entry expires, and add
+    // six fresh single-task eligible sessions whose seeds sort BEFORE LIN-500, so they
+    // consume the whole 5-read budget first and defer sess-keep this poll.
+    clock += 61_000;
+    for (let i = 1; i <= 6; i++) {
+      const f = errorSessionFixture(`sess-${i}`, `LIN-40${i}`, `LIN-45${i}`);
+      perWorkspace['ws-a'].history.push(...f.history);
+      perWorkspace['ws-a'].agentStatus.push(...f.agentStatus);
+    }
+
+    // Poll 2: 7 eligible, all cache-expired/fresh ⇒ 7 misses, cap = 5 reads. The six
+    // LIN-40x sessions (ordered first) consume the budget; sess-keep is deferred and
+    // re-renders `error` — the documented cross-TTL flicker.
+    const p2 = await poll(router, workspaces);
+    assert.equal(reads - readsAfterP1, 5, 'poll 2 is still hard-bounded to 5 reads across the 7 eligible sessions');
+    assert.equal(allSessions(p2).find(s => s.sessionId === 'sess-keep').status, 'error', 'the resolved card flickers back to error under cache-expiry + cap overflow (known limitation)');
+
+    // Poll 3 (same instant, within TTL of poll 2's reads): the six LIN-40x are now
+    // cached, so sess-keep is the only miss and is re-read → self-heals. Proves the
+    // flicker is transient, not a stuck state.
+    const p3 = await poll(router, workspaces);
+    assert.equal(allSessions(p3).find(s => s.sessionId === 'sess-keep').status, 'done-with-warning', 'the flicker self-heals on the next poll once the overflow sessions are cached');
   });
 });
