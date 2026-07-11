@@ -15,7 +15,7 @@
 import { Router, json } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
-import { deriveTerminalStatus, deriveCompletedAt } from '../lib/dispatch-terminal.js';
+import { deriveTerminalStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort } from '../lib/dispatch-terminal.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateOpaqueDispatchField, validateDispatchPayload } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
@@ -5068,9 +5068,30 @@ One convention across every endpoint, so you can branch on the same fields every
         ...history.items
       ];
 
+      // LIN-1261 F2: attribute an abort's terminality to the loop it TARGETS at the
+      // proxy read boundary too (same class as the reconstruction path, different
+      // consumer). Simple Dispatcher posts `[aborted]` to the abort row's OWN
+      // feedback, never to the `abortTo` target's — so without this a lister of the
+      // aborted TARGET reads it non-terminal until the 24h stale cutoff. Harvest the
+      // abort rows already in `merged` (no extra store call) and derive each item's
+      // effective feedback through the SAME shared F1 guard the reconstruction path
+      // uses — never overriding a later genuine terminal or rewinding completedAt.
+      // NOTE: an issue-scoped list (`?issueIdentifier=`) excludes abort rows at the
+      // store (they carry `issueIdentifier: null`), so attribution applies to the
+      // unscoped list; the point-read watch + follow-up gate are deliberately not
+      // reached here (they need a store seam that finds an abort by target; deferred).
+      const abortedTargets = harvestAbortedTargets(merged);
+
       // Resolve each item's effective status once (terminal marker → done/failed/
       // aborted, else the lifecycle status) so filtering and the response agree.
-      const resolved = merged.map(i => ({ ...i, status: deriveTerminalStatus(i.feedback) || i.status }));
+      // The abort attribution is derived onto `_terminalFeedback` (status +
+      // completedAt read from it below); the row's own `feedback` — hence the
+      // reported `feedbackCount` — is left untouched, so the synthetic abort entry
+      // never inflates the stored-feedback count.
+      const resolved = merged.map(i => {
+        const terminalFeedback = feedbackWithHarvestedAbort(i.feedback, abortedTargets.get(i.id));
+        return { ...i, _terminalFeedback: terminalFeedback, status: deriveTerminalStatus(terminalFeedback) || i.status };
+      });
 
       // `status` is derived from feedback (not stored), so it stays a JS filter;
       // `issueIdentifier` is already enforced at the store layer above.
@@ -5095,7 +5116,7 @@ One convention across every endpoint, so you can branch on the same fields every
         dispatchedAt: i.dispatchedAt,
         // resolvedAt = take/archive time; completedAt = real completion (null until terminal).
         resolvedAt: i.resolvedAt || null,
-        completedAt: deriveCompletedAt(i.feedback),
+        completedAt: deriveCompletedAt(i._terminalFeedback),
         feedbackCount: (i.feedback || []).length
       }));
 
