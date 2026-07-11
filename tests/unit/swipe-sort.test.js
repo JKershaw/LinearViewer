@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { sortIssuesForSwipe, applyBlockingOrder, clusterByParent, buildFilterGroups, flattenTrees, computeGraphFeatures, computeOffPageBlockers, buildWhy } from '../../lib/render-swipe.js';
+import { sortIssuesForSwipe, applyBlockingOrder, clusterByParent, buildFilterGroups, flattenTrees, computeGraphFeatures, computeOffPageBlockers, buildWhy, isBoostableBug } from '../../lib/render-swipe.js';
 
 // =============================================================================
 // Test Helpers
@@ -58,6 +58,41 @@ describe('sortIssuesForSwipe', () => {
     sortIssuesForSwipe(cards);
     assert.strictEqual(cards[0].id, 'bug');
     assert.strictEqual(cards[1].id, 'feature');
+  });
+
+  // LIN-1253: the bug boost is gated on isBoostableBug — backlog-state and
+  // low/no-priority bugs no longer jump the queue; normal bugs still do.
+  test('does NOT boost a backlog-state bug above a started higher-priority non-bug', () => {
+    const cards = [
+      createCard({ id: 'backlogBug', stateType: 'backlog', labels: ['bug'], priority: 1 }),
+      createCard({ id: 'startedFeature', stateType: 'started', labels: ['feature'], priority: 3 }),
+    ];
+    sortIssuesForSwipe(cards);
+    // started work outranks a backlog bug — the label no longer overrides state
+    assert.deepStrictEqual(cards.map(c => c.id), ['startedFeature', 'backlogBug']);
+  });
+
+  test('does NOT boost a Low(4) or None(0) priority bug above a same-state non-bug', () => {
+    const cards = [
+      createCard({ id: 'lowBug', stateType: 'unstarted', labels: ['bug'], priority: 4 }),
+      createCard({ id: 'noneBug', stateType: 'unstarted', labels: ['bug'], priority: 0 }),
+      createCard({ id: 'medFeature', stateType: 'unstarted', labels: ['feature'], priority: 3 }),
+    ];
+    sortIssuesForSwipe(cards);
+    // the higher-priority non-bug leads; the low/none bugs fall through to
+    // normal priority order (not boosted, but also not demoted below priority)
+    assert.deepStrictEqual(cards.map(c => c.id), ['medFeature', 'lowBug', 'noneBug']);
+  });
+
+  test('STILL boosts a normal Urgent/High/Medium non-backlog bug (no over-correction)', () => {
+    for (const priority of [1, 2, 3]) {
+      const cards = [
+        createCard({ id: 'feature', stateType: 'started', labels: ['feature'], priority: 1 }),
+        createCard({ id: 'bug', stateType: 'started', labels: ['bug'], priority }),
+      ];
+      sortIssuesForSwipe(cards);
+      assert.strictEqual(cards[0].id, 'bug', `priority ${priority} bug should still be boosted`);
+    }
   });
 
   test('sorts by state order: started > unstarted > backlog', () => {
@@ -656,5 +691,54 @@ describe('buildWhy', () => {
   test('collapses multiple held-by blockers with a +N suffix', () => {
     const issue = createCard({ labels: [], downstreamUnblocks: 2, criticalPathLen: 1 });
     assert.deepStrictEqual(buildWhy(issue, ['LIN-1', 'LIN-2', 'LIN-3']), ['unblocks 2', 'held by LIN-1 +2']);
+  });
+
+  // LIN-1253: the "bug" reason is gated on the same boostable predicate as the
+  // sort, so the digest never claims a boost the bug did not actually earn.
+  test('omits "bug" for a backlog bug that no longer earns the boost', () => {
+    const issue = createCard({ labels: ['bug'], stateType: 'backlog', priority: 1 });
+    assert.deepStrictEqual(buildWhy(issue), []);
+  });
+
+  test('omits "bug" for a low/none-priority bug that no longer earns the boost', () => {
+    const low = createCard({ labels: ['bug'], stateType: 'unstarted', priority: 4 });
+    const none = createCard({ labels: ['bug'], stateType: 'unstarted', priority: 0 });
+    assert.deepStrictEqual(buildWhy(low), []);
+    assert.deepStrictEqual(buildWhy(none), []);
+  });
+
+  test('keeps "bug" for a normal non-backlog bug', () => {
+    const issue = createCard({ labels: ['bug'], stateType: 'started', priority: 2 });
+    assert.deepStrictEqual(buildWhy(issue), ['bug']);
+  });
+});
+
+// =============================================================================
+// isBoostableBug (LIN-1253)
+// =============================================================================
+
+describe('isBoostableBug', () => {
+  test('true for a non-backlog Urgent/High/Medium bug', () => {
+    for (const priority of [1, 2, 3]) {
+      assert.strictEqual(isBoostableBug(createCard({ labels: ['bug'], stateType: 'started', priority })), true);
+    }
+  });
+
+  test('false when the bug is in the backlog state (even at Urgent priority)', () => {
+    assert.strictEqual(isBoostableBug(createCard({ labels: ['bug'], stateType: 'backlog', priority: 1 })), false);
+  });
+
+  test('false for Low(4) or None(0) priority bugs', () => {
+    assert.strictEqual(isBoostableBug(createCard({ labels: ['bug'], stateType: 'unstarted', priority: 4 })), false);
+    assert.strictEqual(isBoostableBug(createCard({ labels: ['bug'], stateType: 'unstarted', priority: 0 })), false);
+  });
+
+  test('false when there is no bug label', () => {
+    assert.strictEqual(isBoostableBug(createCard({ labels: ['feature'], stateType: 'started', priority: 1 })), false);
+  });
+
+  test('is case-insensitive on the bug label and tolerates missing labels', () => {
+    assert.strictEqual(isBoostableBug(createCard({ labels: ['Bug'], stateType: 'started', priority: 2 })), true);
+    assert.strictEqual(isBoostableBug({ stateType: 'started', priority: 2 }), false);
   });
 });
