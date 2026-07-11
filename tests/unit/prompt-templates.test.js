@@ -1055,6 +1055,34 @@ describe('triage template', () => {
     assert.ok(/present analysis as completed research/i.test(result.prompt),
       'should warn against presenting analysis as completed research');
   });
+
+  // LIN-1227: triage must not change task scope — no description/scope rewrite, no
+  // follow-up task/subtask creation. Both prompt paths must carry the prohibition
+  // (CLAUDE.md "two independent paths" rule), mirroring breakdown's scope guardrail.
+  test('(handwritten) forbids rewriting scope and creating follow-up tasks/subtasks', () => {
+    const result = generatePrompt('triage', mockIssue, mockContext);
+    assert.ok(/preserves? scope/i.test(result.prompt),
+      'handwritten triage should state that it preserves scope');
+    assert.ok(/rewrite the task's description/i.test(result.prompt),
+      'handwritten triage should forbid rewriting the task description');
+    assert.ok(/follow-up tasks or subtasks/i.test(result.prompt),
+      'handwritten triage should forbid creating follow-up tasks or subtasks');
+  });
+
+  test('(meta) mirrors the triage scope-preservation prohibition (both-paths rule)', () => {
+    const p = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-1227',
+      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'triage, plan, review',
+      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
+    });
+    assert.ok(/preserves? scope/i.test(p),
+      'meta-prompt triage rule should state that triage preserves scope');
+    assert.ok(/rewrite the task's description/i.test(p),
+      'meta-prompt triage rule should forbid rewriting the task description');
+    assert.ok(/follow-up tasks or subtasks/i.test(p),
+      'meta-prompt triage rule should forbid creating follow-up tasks or subtasks');
+  });
 });
 
 // =============================================================================
