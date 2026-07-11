@@ -25,7 +25,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
-import { parseTranscriptLines, sessionSpend, __internal } from '../lib/transcript-spend.js';
+import { parseTranscriptLines, sessionSpend, partitionByDispatchTime, __internal } from '../lib/transcript-spend.js';
 import { decomposeEffort } from '../lib/wall-clock-summary.js';
 
 const BASE = process.env.PROXY_BASE || 'https://projects.jkershaw.com/api/proxy';
@@ -36,6 +36,9 @@ const opt = (n, d) => { const i = argv.indexOf(n); return i >= 0 && argv[i + 1] 
 
 const AS_JSON = flag('--json');
 const SAMPLE = parseInt(opt('--sample', '0'), 10) || 0;
+// LIN-1241: --boundary <iso> splits joined sessions into before/after cohorts by
+// dispatch time (default '' = off, output byte-identical to the LIN-1235 report).
+const BOUNDARY = opt('--boundary', '');
 const PROJECTS = opt('--projects', join(homedir(), '.claude', 'projects'));
 const CACHE = opt('--cache', join(tmpdir(), 'harbour-spend-cache'));
 const USE_CACHE = !flag('--no-cache');
@@ -178,14 +181,17 @@ async function main() {
       const d2Denom = (d2.onboardingMs || 0) + (d2.activeMs || 0) + (d2.waitingMs || 0) + (d2.wrapupMs || 0);
       const d2OnboardShare = d2Denom > 0 ? (d2.onboardingMs || 0) / d2Denom : null;
       results.push({ ...spend, kind: j.kind, outcome: j.outcome, issue: j.issue,
+                     dispatchedAt: j.dispatchedAt || null, // LIN-1241: before/after key
                      d2OnboardShare, d2HasBeats: !!d2.hasBeats,
                      sizeKb: Math.round(statSync(j.path).size / 1024), subagentCount: j.subagents.length });
     } catch (e) { log(`  skip ${j.sessionId.slice(0, 8)}: ${e.message}`); }
   }
 
   const report = buildReport(results);
-  if (AS_JSON) { console.log(JSON.stringify({ sessions: results, report }, null, 2)); return; }
+  const beforeAfter = BOUNDARY ? buildBeforeAfter(results, BOUNDARY) : null;
+  if (AS_JSON) { console.log(JSON.stringify({ sessions: results, report, beforeAfter }, null, 2)); return; }
   printReport(results, report);
+  if (beforeAfter) printBeforeAfter(beforeAfter);
 }
 
 // ─── aggregation ─────────────────────────────────────────────────────────────
@@ -263,6 +269,73 @@ function buildReport(results) {
       withD2N: results.filter((r) => r.d2OnboardShare != null).length,
     },
   };
+}
+
+// ─── LIN-1241: before/after cohort comparison (the H3 falsifiable close) ─────
+// Re-measure orientation-by-bytes once the LIN-1240 grounding-suppression is live
+// and compare against the pre-feature cohort. A null/empty "after" cohort is a
+// valid, informative outcome (the feature only just landed) and is reported as
+// such — never silently treated as a delta.
+// A cohort needs at least this many edit-bearing sessions before its median
+// orientation-by-bytes is treated as a real number for the delta. A single
+// session (worse, an in-flight self-referential one) is noise, not a signal —
+// declaring `sufficient` on n=1 is exactly the over-claim this guards against.
+const MIN_COHORT_EDIT = 5;
+const orientMed = (set, lens) => med(set.map((r) => r.orientation[lens]));
+function cohortStats(set) {
+  const eb = set.filter((r) => r.editBearing);
+  const byKind = {};
+  for (const r of set) (byKind[r.kind] ||= []).push(r);
+  return {
+    n: set.length,
+    editBearingN: eb.length,
+    orientByBytesAll: orientMed(set, 'byResultBytes'),
+    orientByBytesEdit: orientMed(eb, 'byResultBytes'),
+    orientByCountEdit: orientMed(eb, 'byCount'),
+    byKind: Object.fromEntries(Object.entries(byKind).map(([k, s]) => [k, {
+      n: s.length, editBearing: s.filter((r) => r.editBearing).length,
+      orientByBytes: orientMed(s, 'byResultBytes'),
+    }])),
+  };
+}
+function buildBeforeAfter(results, boundaryIso) {
+  const { before, after, undated, boundaryMs } = partitionByDispatchTime(results, boundaryIso);
+  const b = cohortStats(before), a = cohortStats(after);
+  const delta = (x, y) => (x == null || y == null ? null : y - x);
+  return {
+    boundary: boundaryIso,
+    boundaryMs,
+    before: b,
+    after: a,
+    undatedN: undated.length,
+    // Only meaningful when BOTH cohorts have edit-bearing sessions; else null.
+    deltaOrientByBytesEdit: delta(b.orientByBytesEdit, a.orientByBytesEdit),
+    deltaOrientByBytesAll: delta(b.orientByBytesAll, a.orientByBytesAll),
+    minCohortEdit: MIN_COHORT_EDIT,
+    sufficient: b.editBearingN >= MIN_COHORT_EDIT && a.editBearingN >= MIN_COHORT_EDIT,
+  };
+}
+function printBeforeAfter(ba) {
+  const dpct = (x) => (x == null ? '—' : `${x >= 0 ? '+' : ''}${(x * 100).toFixed(0)}pp`);
+  console.log(`\n══ LIN-1241 — before/after orientation-by-bytes (boundary ${ba.boundary}) ══`);
+  console.log(`  cohorts: before n=${ba.before.n} (edit ${ba.before.editBearingN}) · after n=${ba.after.n} (edit ${ba.after.editBearingN}) · undated ${ba.undatedN}`);
+  console.log(`  orientation-by-bytes (median):`);
+  console.log(`    all sessions   before ${pct(ba.before.orientByBytesAll)} → after ${pct(ba.after.orientByBytesAll)}   Δ ${dpct(ba.deltaOrientByBytesAll)}`);
+  console.log(`    edit-bearing   before ${pct(ba.before.orientByBytesEdit)} → after ${pct(ba.after.orientByBytesEdit)}   Δ ${dpct(ba.deltaOrientByBytesEdit)}`);
+  if (!ba.sufficient) {
+    const short = ba.after.editBearingN < ba.minCohortEdit ? 'AFTER' : 'BEFORE';
+    console.log(`  ⚠ INSUFFICIENT DATA for a delta (need ≥${ba.minCohortEdit} edit-bearing per cohort; ${short} has too few).`);
+    console.log(`    The apparent Δ ${dpct(ba.deltaOrientByBytesEdit)} rests on after-edit n=${ba.after.editBearingN} — noise, not signal.`);
+    console.log(`    A null result is valid (LIN-1241): the post-landing corpus has not yet accrued`);
+    console.log(`    comparable edit-bearing sessions. Re-run this once more post-boundary sessions complete.`);
+    return;
+  }
+  console.log(`  BY KIND (orientation-by-bytes, before → after):`);
+  const kinds = new Set([...Object.keys(ba.before.byKind), ...Object.keys(ba.after.byKind)]);
+  for (const k of [...kinds].sort()) {
+    const bk = ba.before.byKind[k], ak = ba.after.byKind[k];
+    console.log(`    ${k.padEnd(16)} ${pct(bk?.orientByBytes).padStart(4)} (n=${bk?.n || 0}) → ${pct(ak?.orientByBytes).padStart(4)} (n=${ak?.n || 0})`);
+  }
 }
 
 function printReport(results, rep) {
