@@ -34,23 +34,35 @@ additive seam: `GET /api/dashboard/sessions` (the sessionId-grouped poll source)
 The old view shell/client (`render-dashboard.js`, `public/dashboard.{js,css}`)
 was deleted so there are not two equivalent views side by side (LIN-590).
 
-## 2. Experimental (Settings-only, flag-gated)
+## 2. Experimental (flag-gated; Settings + gated nav overflow)
 
 In-development or rough-draft views that are real and intentional, but not yet
 ready to advertise broadly. Each is:
 
 - a per-user feature flag (default **off**) in `lib/feature-defaults.js`,
-- listed in `EXPERIMENTAL_FEATURES` in `lib/render-settings.js`, where it gets a
-  toggle and — when on — a single discovery link **in Settings only** (no footer
-  link, no navbar entry),
+- a member of the shared ordered `EXPERIMENTAL_VIEWS` source of truth in
+  `lib/feature-defaults.js` (`{ flag, path }`), consumed by **both** surfaces
+  below so they cannot drift on membership or route,
+- surfaced when its flag is on in **two** places: a discovery link in Settings
+  (`lib/render-settings.js`, an "open the …" action phrase) **and** a gated
+  entry in the nav's `⋯ more` overflow (`getViewNavLinks` in
+  `lib/components/view-nav.js`, a short view label) — LIN-1247 reversed the
+  earlier Settings-only policy to this gated-nav-inclusion policy,
 - route-gated to redirect to `/settings` when the flag is off.
 
-Members:
+The nav gate is strict `flag === true` and emits the **kebab route** as the link
+text (`taskChat` → `task-chat`) so active-matching and active-hoist work; the
+camelCase flag is only the gate, never the emitted text.
 
-- **collective** — multi-workspace agent discussion via Yap (LIN-450)
-- **taskChat** — grounded multi-turn conversation with a task
-- **ship** — radial dependency view; in-progress work at the centre, everything
-  else orbiting by priority and sector (surfaced under this tier by LIN-496)
+Members (the shared `EXPERIMENTAL_VIEWS` list, in order):
+
+- **collective** (`collective`) — multi-workspace agent discussion via Yap (LIN-450)
+- **taskChat** (`task-chat`) — grounded multi-turn conversation with a task
+- **ship** (`ship`) — radial dependency view; in-progress work at the centre,
+  everything else orbiting by priority and sector (surfaced under this tier by LIN-496)
+- **nextRun** (`next-run`) — grounded goal options for the next autopilot run (LIN-603)
+- **flightCompanion** (`flight-companion`) — realtime chat with work in flight (LIN-922)
+- **shipBiscuit** (`ship-biscuit`) — LLM-set newspaper of autopilot activity (LIN-818)
 
 `/ship` is **not** a retirement candidate. It is a key experiment in active
 development — its (previous) lack of an inbound link reflected its in-dev status,
