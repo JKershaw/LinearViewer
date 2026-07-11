@@ -10,7 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { findTerminalFeedback, deriveTerminalStatus, deriveCompletedAt, isWakeEvent, findWakeEvent } from '../../lib/dispatch-terminal.js';
+import { findTerminalFeedback, deriveTerminalStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort } from '../../lib/dispatch-terminal.js';
 
 describe('deriveTerminalStatus', () => {
   test('null when feedback is missing or not an array', () => {
@@ -63,6 +63,85 @@ describe('findTerminalFeedback', () => {
     const entry = { message: '[failed] boom', timestamp: 't' };
     const res = findTerminalFeedback([{ message: 'x' }, entry]);
     assert.deepEqual(res, { entry, status: 'failed' });
+  });
+});
+
+/**
+ * Shared abort terminal-attribution rule (LIN-1257 A2 / LIN-1261 F1/F2) — the
+ * harvest half (`harvestAbortedTargets`) and the guarded-append half
+ * (`feedbackWithHarvestedAbort`) both pipeline reconstruction and the proxy read
+ * boundary consume, so the rule has ONE definition.
+ */
+describe('harvestAbortedTargets', () => {
+  test('maps each abort row to its own [aborted] entry keyed by abortTo', () => {
+    const abortEntry = { message: '[aborted] cancelled', timestamp: 't1' };
+    const map = harvestAbortedTargets([
+      { id: 'a1', abort: true, abortTo: 'tgt-1', feedback: [abortEntry] },
+      { id: 'tgt-1', feedback: [{ message: '[working] running' }] }
+    ]);
+    assert.strictEqual(map.size, 1);
+    assert.deepStrictEqual(map.get('tgt-1'), abortEntry);
+  });
+
+  test('ignores non-abort rows, abort rows without abortTo, and [skipped] refusals', () => {
+    const map = harvestAbortedTargets([
+      { id: 'a1', abort: false, abortTo: 'x', feedback: [{ message: '[aborted] x', timestamp: 't' }] },
+      { id: 'a2', abort: true, feedback: [{ message: '[aborted] no target', timestamp: 't' }] },
+      { id: 'a3', abort: true, abortTo: 'y', feedback: [{ message: '[skipped] human-continued session', timestamp: 't' }] }
+    ]);
+    assert.strictEqual(map.size, 0);
+  });
+
+  test('tolerates non-array input', () => {
+    assert.strictEqual(harvestAbortedTargets(undefined).size, 0);
+    assert.strictEqual(harvestAbortedTargets(null).size, 0);
+  });
+});
+
+describe('feedbackWithHarvestedAbort (F1 guard)', () => {
+  const abort = (ts) => ({ message: '[aborted] cancelled', timestamp: ts });
+
+  test('no abort entry → returns the same array reference unchanged', () => {
+    const fb = [{ message: '[working] running', timestamp: 't' }];
+    assert.strictEqual(feedbackWithHarvestedAbort(fb, undefined), fb);
+    assert.strictEqual(feedbackWithHarvestedAbort(fb, null), fb);
+  });
+
+  test('no pre-existing terminal → appends the abort (original A2 attribution)', () => {
+    const fb = [{ message: '[working] running', timestamp: '2026-06-22T11:00:00.000Z' }];
+    const out = feedbackWithHarvestedAbort(fb, abort('2026-06-22T11:30:00.000Z'));
+    assert.strictEqual(deriveTerminalStatus(out), 'aborted');
+    assert.strictEqual(deriveCompletedAt(out), '2026-06-22T11:30:00.000Z');
+    assert.notStrictEqual(out, fb, 'a new array is returned (non-mutating append)');
+    assert.strictEqual(fb.length, 1, 'the input array is not mutated');
+  });
+
+  test('EARLIER abort does NOT override a later [done] or rewind completedAt', () => {
+    const fb = [{ message: '[done] finished', timestamp: '2026-06-22T12:00:00.000Z' }];
+    const out = feedbackWithHarvestedAbort(fb, abort('2026-06-22T11:30:00.000Z'));
+    assert.strictEqual(out, fb, 'the same array is returned (no append)');
+    assert.strictEqual(deriveTerminalStatus(out), 'done');
+    assert.strictEqual(deriveCompletedAt(out), '2026-06-22T12:00:00.000Z');
+  });
+
+  test('EQUAL-time abort does not override the existing terminal (strictly-later only)', () => {
+    const ts = '2026-06-22T12:00:00.000Z';
+    const fb = [{ message: '[done] finished', timestamp: ts }];
+    assert.strictEqual(feedbackWithHarvestedAbort(fb, abort(ts)), fb);
+  });
+
+  test('STRICTLY-later abort wins (forward move, not a rewind)', () => {
+    const fb = [{ message: '[done] finished', timestamp: '2026-06-22T12:00:00.000Z' }];
+    const out = feedbackWithHarvestedAbort(fb, abort('2026-06-22T12:30:00.000Z'));
+    assert.strictEqual(deriveTerminalStatus(out), 'aborted');
+    assert.strictEqual(deriveCompletedAt(out), '2026-06-22T12:30:00.000Z');
+  });
+
+  test('unparseable timestamps on either side → keep the pre-existing terminal (never rewind on unknown order)', () => {
+    const fb = [{ message: '[done] finished', timestamp: '2026-06-22T12:00:00.000Z' }];
+    assert.strictEqual(feedbackWithHarvestedAbort(fb, abort(undefined)), fb);
+    const fbNoTs = [{ message: '[done] finished' }];
+    assert.strictEqual(feedbackWithHarvestedAbort(fbNoTs, abort('2026-06-22T12:30:00.000Z')), fbNoTs);
   });
 });
 

@@ -40,6 +40,12 @@ function heartbeat(ts) {
   return [{ message: '[working · running] 4 tools in 34s', url: null, urlLabel: null, timestamp: ts }];
 }
 
+// A genuine terminal marker the target posted for ITSELF (e.g. `[done]@12:00`) —
+// the F1 precondition: a target that already carries its own terminal outcome.
+function terminalMarker(marker, ts) {
+  return [{ message: `[${marker}] finished`, url: null, urlLabel: null, timestamp: ts }];
+}
+
 // The autopilot orchestrator (the session anchor): kind 'autopilot', its loopId
 // becomes the session's sessionId. Scoped to an issue, so it carries an
 // issueIdentifier and survives reconstruction. Still `taken` + running.
@@ -118,6 +124,63 @@ function sessionFor(sessionId, { liveItems = [], historyItems = [] }) {
   const sessions = _buildSessions(loops, { now: NOW });
   return { sessions, session: sessions.find(s => s.sessionId === sessionId) };
 }
+
+function loopsFor({ liveItems = [], historyItems = [] }) {
+  return _buildLoops({ liveItems, historyItems, now: NOW });
+}
+
+// ─── F1: an earlier abort must never override a later genuine terminal ─────────
+// (LIN-1261) The abort's synthetic `[aborted]` entry is appended LAST and
+// findTerminalFeedback is position-based (last-in-array wins). Before the F1 guard
+// a target that had already posted its own `[done]@12:00` would be relabeled
+// `aborted` and its completedAt rewound to the earlier abort time. The guard
+// appends only when the abort is STRICTLY later than any pre-existing terminal.
+
+describe('F1: abort vs a target that already carries its own terminal marker (LIN-1261)', () => {
+  const DONE_TS = '2026-06-22T12:00:00.000Z';       // the target's own [done]
+  const EARLIER_ABORT_TS = '2026-06-22T11:30:00.000Z';  // abort BEFORE the [done]
+  const LATER_ABORT_TS = '2026-06-22T12:30:00.000Z';    // abort AFTER the [done]
+
+  test('earlier abort does NOT override a later [done] or rewind completedAt', () => {
+    const loops = loopsFor({
+      liveItems: [orchestrator(), worker({ feedback: terminalMarker('done', DONE_TS) })],
+      historyItems: [abortRow('w1', { feedback: [{ message: '[aborted] cancelled', timestamp: EARLIER_ABORT_TS }] })]
+    });
+    const workerLoop = loops.find(l => l.loopId === 'w1');
+    assert.strictEqual(workerLoop.terminalStatus, 'done', 'genuine later [done] is preserved');
+    assert.strictEqual(workerLoop.terminalCompletedAt, DONE_TS, 'completedAt is NOT rewound to the earlier abort');
+  });
+
+  test('earlier abort does NOT override a later [failed]', () => {
+    const loops = loopsFor({
+      liveItems: [orchestrator(), worker({ feedback: terminalMarker('failed', DONE_TS) })],
+      historyItems: [abortRow('w1', { feedback: [{ message: '[aborted] cancelled', timestamp: EARLIER_ABORT_TS }] })]
+    });
+    const workerLoop = loops.find(l => l.loopId === 'w1');
+    assert.strictEqual(workerLoop.terminalStatus, 'failed');
+    assert.strictEqual(workerLoop.terminalCompletedAt, DONE_TS);
+  });
+
+  test('a genuinely LATER abort still wins (forward, not a rewind)', () => {
+    const loops = loopsFor({
+      liveItems: [orchestrator(), worker({ feedback: terminalMarker('done', DONE_TS) })],
+      historyItems: [abortRow('w1', { feedback: [{ message: '[aborted] cancelled', timestamp: LATER_ABORT_TS }] })]
+    });
+    const workerLoop = loops.find(l => l.loopId === 'w1');
+    assert.strictEqual(workerLoop.terminalStatus, 'aborted', 'the later abort is the real terminal event');
+    assert.strictEqual(workerLoop.terminalCompletedAt, LATER_ABORT_TS);
+  });
+
+  test('control: a running (non-terminal) target is still attributed aborted (A2 unchanged)', () => {
+    const loops = loopsFor({
+      liveItems: [orchestrator(), worker({ feedback: heartbeat('2026-06-22T11:00:00.000Z') })],
+      historyItems: [abortRow('w1')]
+    });
+    const workerLoop = loops.find(l => l.loopId === 'w1');
+    assert.strictEqual(workerLoop.terminalStatus, 'aborted');
+    assert.strictEqual(workerLoop.terminalCompletedAt, ABORT_TS);
+  });
+});
 
 // ─── Case 2: anchor abort flips the whole card ───────────────────────────────
 
