@@ -13,7 +13,8 @@ import assert from 'node:assert';
 import {
   TaskSnapshotStore,
   snapshotFromContext,
-  diffSnapshots
+  diffSnapshots,
+  resolveGroundingFreshness
 } from '../../lib/task-snapshot-store.js';
 import { hashContext } from '../../lib/recap-cache.js';
 
@@ -373,5 +374,127 @@ describe('TaskSnapshotStore.listByWorkspace (LIN-1197)', () => {
     assert.deepStrictEqual(await store.listByWorkspace('', { since: at(7) }), { items: [], total: 0 });
     const noColl = new TaskSnapshotStore({ collection: null });
     assert.deepStrictEqual(await noColl.listByWorkspace('ws-1', { since: at(7) }), { items: [], total: 0 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveGroundingFreshness (LIN-1240)
+// ---------------------------------------------------------------------------
+//
+// The resolver is `fresh` ONLY when every conservative check passes: two identical
+// latest snapshots (from && to && !changed), the latest slice-hash equals the current
+// one, and the latest stored worker HEAD equals the reported current HEAD. Everything
+// else — no store, no reported HEAD, <2 snapshots (a bare changed:false), a changed
+// slice, a hash mismatch, a HEAD move, a store error — falls back to full re-ground.
+//
+// Most cases stub `store.diffLatest` directly: the resolver's ONLY store dependency is
+// that method, so a stub is the precise unit boundary. One case drives the real store
+// (docs inserted directly) to prove the diffLatest interplay end-to-end.
+describe('resolveGroundingFreshness (LIN-1240)', () => {
+  const HEAD = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+  const HASH = 'deadbeefcafef00d';
+
+  // A store stub whose diffLatest returns a canned result.
+  function stubStore(diff) {
+    return { diffLatest: async () => diff };
+  }
+
+  // A two-identical-snapshot diff (changed:false with BOTH from and to present) whose
+  // latest snapshot carries the given inputHash + headSha.
+  function freshDiff({ inputHash = HASH, headSha = HEAD, capturedAt = '2026-07-11T00:00:00.000Z', id = 'snap-2' } = {}) {
+    const to = { id, inputHash, capturedAt, snapshot: { headSha } };
+    const from = { id: 'snap-1', inputHash: 'prior', capturedAt: '2026-07-10T00:00:00.000Z', snapshot: { headSha } };
+    return { changed: false, fields: [], from, to };
+  }
+
+  const base = { urlKey: 'ws-1', taskIdentifier: 'LIN-1240', currentHeadSha: HEAD, currentInputHash: HASH };
+
+  test('fresh: two identical snapshots, matching slice-hash and HEAD', async () => {
+    const res = await resolveGroundingFreshness({ ...base, store: stubStore(freshDiff()) });
+    assert.strictEqual(res.fresh, true);
+    assert.strictEqual(res.capturedAt, '2026-07-11T00:00:00.000Z');
+    assert.strictEqual(res.snapshotRef, 'snap-2');
+  });
+
+  test('NOT fresh from a bare changed:false — the <2-snapshot false-fresh collapse (LIN-735)', async () => {
+    // diffLatest with a single snapshot returns { changed:false, from:null, to:snap }.
+    // A bare changed:false must NEVER be read as fresh — the from&&to guard rejects it.
+    const single = { changed: false, fields: [], from: null, to: { id: 'snap-1', inputHash: HASH, capturedAt: 'x', snapshot: { headSha: HEAD } } };
+    const res = await resolveGroundingFreshness({ ...base, store: stubStore(single) });
+    assert.strictEqual(res.fresh, false);
+  });
+
+  test('NOT fresh when the latest two snapshots differ (changed:true)', async () => {
+    const diff = freshDiff();
+    diff.changed = true;
+    diff.fields = [{ field: 'description', before: 'a', after: 'b' }];
+    const res = await resolveGroundingFreshness({ ...base, store: stubStore(diff) });
+    assert.strictEqual(res.fresh, false);
+  });
+
+  test('NOT fresh when the current slice-hash differs from the latest snapshot', async () => {
+    const res = await resolveGroundingFreshness({ ...base, currentInputHash: 'a-different-hash', store: stubStore(freshDiff()) });
+    assert.strictEqual(res.fresh, false);
+  });
+
+  test('NOT fresh when HEAD has moved (stored HEAD ≠ reported HEAD)', async () => {
+    const res = await resolveGroundingFreshness({ ...base, currentHeadSha: 'ffffffffffffffffffffffffffffffffffffffff', store: stubStore(freshDiff()) });
+    assert.strictEqual(res.fresh, false);
+  });
+
+  test('NOT fresh when no HEAD was reported (currentHeadSha absent)', async () => {
+    const res = await resolveGroundingFreshness({ ...base, currentHeadSha: null, store: stubStore(freshDiff()) });
+    assert.strictEqual(res.fresh, false);
+  });
+
+  test('NOT fresh when the latest snapshot has no stored HEAD', async () => {
+    const res = await resolveGroundingFreshness({ ...base, store: stubStore(freshDiff({ headSha: null })) });
+    assert.strictEqual(res.fresh, false);
+  });
+
+  test('NOT fresh when currentInputHash is absent', async () => {
+    const res = await resolveGroundingFreshness({ ...base, currentInputHash: null, store: stubStore(freshDiff()) });
+    assert.strictEqual(res.fresh, false);
+  });
+
+  test('NOT fresh (never throws) when the store is absent or diffLatest throws', async () => {
+    assert.strictEqual((await resolveGroundingFreshness({ ...base, store: null })).fresh, false);
+    const throwing = { diffLatest: async () => { throw new Error('boom'); } };
+    assert.strictEqual((await resolveGroundingFreshness({ ...base, store: throwing })).fresh, false);
+  });
+
+  test('NOT fresh when urlKey or taskIdentifier is missing', async () => {
+    assert.strictEqual((await resolveGroundingFreshness({ ...base, urlKey: '', store: stubStore(freshDiff()) })).fresh, false);
+    assert.strictEqual((await resolveGroundingFreshness({ ...base, taskIdentifier: '', store: stubStore(freshDiff()) })).fresh, false);
+  });
+
+  test('integration: real store where a hash-only change (child title) leaves two identical snapshots', async () => {
+    // A change to a child's TITLE is part of the hashContext slice but NOT of the stored
+    // snapshot's diff slice (which compares children by identifier+state only). So it
+    // writes a second snapshot with a DIFFERENT inputHash whose CONTENT is identical to
+    // the first — exactly the shape that makes diffLatest report from && to && !changed.
+    const collection = createMockCollection();
+    const store = new TaskSnapshotStore({ collection });
+
+    const ctxV1 = sampleContext({ children: [{ id: 'k1', identifier: 'LIN-9', title: 'old title', state: { type: 'unstarted' } }] });
+    const ctxV2 = sampleContext({ children: [{ id: 'k1', identifier: 'LIN-9', title: 'new title', state: { type: 'unstarted' } }] });
+    const h1 = hashContext(ctxV1);
+    const h2 = hashContext(ctxV2);
+    assert.notStrictEqual(h1, h2, 'child-title change must move the hashContext digest');
+
+    await store.captureIfChanged({ urlKey: 'ws-1', taskIdentifier: 'LIN-1240', canonicalId: 'uuid', inputHash: h1, snapshot: snapshotFromContext(ctxV1, HEAD) });
+    await store.captureIfChanged({ urlKey: 'ws-1', taskIdentifier: 'LIN-1240', canonicalId: 'uuid', inputHash: h2, snapshot: snapshotFromContext(ctxV2, HEAD) });
+
+    const diff = await store.diffLatest('ws-1', 'LIN-1240');
+    assert.strictEqual(diff.changed, false, 'the two snapshots are content-identical (child title is not in the snapshot slice)');
+
+    // Current read matches the latest capture (h2) and the same HEAD → fresh.
+    const fresh = await resolveGroundingFreshness({ store, urlKey: 'ws-1', taskIdentifier: 'LIN-1240', currentHeadSha: HEAD, currentInputHash: h2 });
+    assert.strictEqual(fresh.fresh, true);
+    assert.strictEqual(fresh.snapshotRef, diff.to.id);
+
+    // A moved HEAD against the same store → not fresh.
+    const moved = await resolveGroundingFreshness({ store, urlKey: 'ws-1', taskIdentifier: 'LIN-1240', currentHeadSha: 'ffffffffffffffffffffffffffffffffffffffff', currentInputHash: h2 });
+    assert.strictEqual(moved.fresh, false);
   });
 });
