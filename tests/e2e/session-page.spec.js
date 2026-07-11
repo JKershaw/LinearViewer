@@ -91,6 +91,38 @@ async function seedBlockedSession(page) {
   expect(blocked.status(), `blocked feedback failed: ${await blocked.text()}`).toBe(200);
 }
 
+// Seed a WARM autopilot session: a worker taken and mid-run with only a plain
+// progress note — no terminal ([done]/[failed]) and no wait ([blocked]) marker —
+// so the session is non-terminal AND not waiting (the genuinely warm/EXECUTING
+// case that must still omit `force`, LIN-1252).
+async function seedWarmSession(page) {
+  const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-1252', issueTitle: 'Warm seed', target: 'cli' }
+  });
+  expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+  const anchorId = (await anchor.json()).item.id;
+
+  const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-1252', issueTitle: 'Warm worker', target: 'cli', sessionId: anchorId }
+  });
+  expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+  const workerId = (await worker.json()).item.id;
+
+  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+  const { token } = await tokenResp.json();
+  const take = await page.request.post(`/api/dispatch/take/${workerId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  expect(take.status(), `take failed: ${await take.text()}`).toBe(200);
+  // A plain progress note — no [done]/[failed]/[blocked]/[pending] marker — so the
+  // run stays warm (in-progress), neither terminal nor waiting.
+  const progress = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    data: { message: 'made progress on the refactor' }
+  });
+  expect(progress.status(), `progress feedback failed: ${await progress.text()}`).toBe(200);
+}
+
 // Seed a FINISHED autopilot session (anchor driven to [done]) that still has a
 // worker left in a [blocked] state — the LIN-1005 session-level terminal-gate
 // case: the session is terminal, so it must NOT surface as waiting even though a
@@ -228,7 +260,7 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await expect(page.locator('[data-testid="session-waiting-banner"]')).toHaveCount(0);
   });
 
-  test('the reply box POSTs a plain follow-up (no force) for a waiting session (LIN-1004)', async ({ page }) => {
+  test('the reply box sends force:true for a waiting (paused-on-human) session (LIN-1252)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
     await seedBlockedSession(page);
@@ -237,10 +269,12 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
     await page.waitForLoadState('networkidle');
 
-    // The box renders on a cli session and is tagged non-terminal (waiting → warm).
+    // The box renders on a cli session: non-terminal, but flagged waiting — the
+    // paused-on-human state the runner must kill-first to resume (LIN-1252).
     const box = page.locator('[data-testid="session-reply"]');
     await expect(box).toBeVisible();
     await expect(box).toHaveAttribute('data-session-terminal', 'false');
+    await expect(box).toHaveAttribute('data-session-waiting', 'true');
 
     // Capture the outbound dispatch POST to assert the wire shape.
     const [request] = await Promise.all([
@@ -251,15 +285,53 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
       })()
     ]);
     const payload = request.postDataJSON();
-    // Additive plain follow-up: followUpTo = the session's own id, cli target,
-    // NO force (warm/waiting), and crucially NO kind:'wake' (no wake collision).
+    // Additive follow-up: followUpTo = the session's own id, cli target, force:true
+    // (waiting → resume anyway / kill-first, LIN-1252/LIN-546), and crucially NO
+    // kind:'wake' (no wake collision).
+    expect(payload.followUpTo).toBe(sessionId);
+    expect(payload.target).toBe('cli');
+    expect(payload.force).toBe(true);
+    expect(payload.kind).toBeUndefined();
+    expect(payload.prompt).toContain('option A');
+
+    // The server accepts the forced follow-up (force + followUpTo is valid).
+    const resp = await request.response();
+    expect(resp.status()).toBe(201);
+
+    // The UI confirms QUEUED (not delivered) — honest about the async handoff.
+    await expect(page.locator('[data-testid="session-reply-feedback"]')).toContainText('queued');
+  });
+
+  test('the reply box omits force for a genuinely warm/executing session (LIN-1252)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    // A running worker with NO terminal/blocked marker → non-terminal AND not
+    // waiting: the warm/EXECUTING case that must still omit force.
+    await seedWarmSession(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const box = page.locator('[data-testid="session-reply"]');
+    await expect(box).toBeVisible();
+    await expect(box).toHaveAttribute('data-session-terminal', 'false');
+    await expect(box).toHaveAttribute('data-session-waiting', 'false');
+
+    const [request] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
+      (async () => {
+        await page.locator('[data-testid="session-reply-input"]').fill('a note for the warm session');
+        await page.locator('[data-testid="session-reply-send"]').click();
+      })()
+    ]);
+    const payload = request.postDataJSON();
+    // Warm/executing session: plain follow-up, NO force (don't kill a live writer).
     expect(payload.followUpTo).toBe(sessionId);
     expect(payload.target).toBe('cli');
     expect(payload.force).toBeUndefined();
     expect(payload.kind).toBeUndefined();
-    expect(payload.prompt).toContain('option A');
 
-    // The UI confirms QUEUED (not delivered) — honest about the async handoff.
     await expect(page.locator('[data-testid="session-reply-feedback"]')).toContainText('queued');
   });
 

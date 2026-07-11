@@ -134,13 +134,16 @@
       var urlKey = box.dataset.urlKey;
       var loopId = box.dataset.loopId;
       var target = box.dataset.target === 'web' ? 'web' : 'cli';
-      var terminal = box.dataset.terminal === 'true';
+      // Force when this run is terminal OR the session is paused-on-human/waiting
+      // (LIN-1252). `data-terminal` is the run's own status; `data-session-waiting`
+      // is the session-level waiting signal (keyed session-wide, not per-run).
+      var force = box.dataset.terminal === 'true' || box.dataset.sessionWaiting === 'true';
 
       btn.addEventListener('click', function (e) {
         e.preventDefault();
         var t = this.parentNode.parentNode.querySelector('.sess-inline-reply-input');
         var f = this.parentNode.parentNode.querySelector('.sess-reply-feedback');
-        sendReply({ urlKey: urlKey, followUpTo: loopId, target: target, force: terminal }, this, t, f);
+        sendReply({ urlKey: urlKey, followUpTo: loopId, target: target, force: force }, this, t, f);
       });
 
       (function (ta, b, opts) {
@@ -151,7 +154,7 @@
             sendReply(opts, b, ta, f);
           }
         });
-      })(textarea, btn, { urlKey: urlKey, followUpTo: loopId, target: target, force: terminal });
+      })(textarea, btn, { urlKey: urlKey, followUpTo: loopId, target: target, force: force });
     }
   }
 
@@ -192,17 +195,20 @@
     var urlKey = box.dataset.urlKey;
     var sessionId = box.dataset.sessionId;
     var target = box.dataset.target === 'web' ? 'web' : 'cli';
-    var terminal = box.dataset.sessionTerminal === 'true';
+    // Force a resume for a finalized session OR a paused-on-human/waiting one
+    // (LIN-1252): both are "not a live writer", so kill-first is safe and needed
+    // for the reply to land. A genuinely warm/EXECUTING session is neither.
+    var force = box.dataset.sessionTerminal === 'true' || box.dataset.sessionWaiting === 'true';
 
     btn.addEventListener('click', function (e) {
       e.preventDefault();
-      sendReply({ urlKey: urlKey, followUpTo: sessionId, target: target, force: terminal }, this, textarea, feedback);
+      sendReply({ urlKey: urlKey, followUpTo: sessionId, target: target, force: force }, this, textarea, feedback);
     });
 
     textarea.addEventListener('keydown', function (e) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        sendReply({ urlKey: urlKey, followUpTo: sessionId, target: target, force: terminal }, btn, textarea, feedback);
+        sendReply({ urlKey: urlKey, followUpTo: sessionId, target: target, force: force }, btn, textarea, feedback);
       }
     });
   }
