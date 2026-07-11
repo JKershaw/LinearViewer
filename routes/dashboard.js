@@ -85,13 +85,20 @@ const ARCHIVE_PAGE_SIZE = 30;
 // spike (LIN-622). Capping it keeps peak at ~this many workspaces, not all.
 const WORKSPACE_FANOUT_CONCURRENCY = 2;
 
-// Max touched-task done-state backend reads the Observation feed hydrates per
+// Max touched-task done-state backend READS the Observation feed hydrates per
 // poll (LIN-1258, Axis B). Only errored-terminal sessions can flip to
 // `done-with-warning`, and those are rare on a feed, so a small cap covers the
 // visible collapsed error cards while bounding the per-poll cost to N backend
 // reads regardless of feed size. Combined with the 60s task-done TTL cache this
 // keeps the no-Linear-read-per-poll contract: only cache MISSES count against
 // the cap, cached hits are free, and any overflow fills in over later polls.
+//
+// The cap counts READS, not sessions (LIN-1259). Since the feed now hydrates the
+// done-state of ANY touched task (not just the seed) to match the client's
+// any-touched drill-in, a single multi-task session can cost up to one read per
+// touched task; a per-session cap would let such a session multiply the per-poll
+// backend cost this bound exists to hold. Reads short-circuit on the first Done
+// touched task, so the common case (the seed is the done task) still costs one read.
 const FEED_HYDRATION_CAP = 5;
 
 /**
@@ -410,15 +417,17 @@ export function createDashboardRoutes({
   getDeployInfo,
   workspacePreferencesStore = null,
   recentLimit = 120,
-  sessionsFeedCache = createSessionsFeedCache()
+  sessionsFeedCache = createSessionsFeedCache(),
+  // Touched-task done-state TTL cache (LIN-1258): 60s, keyed `${wsUrlKey}::${identifier}`.
+  // Under the LIN-617 feed-output cache: when the feed refreshes and re-runs
+  // mergeSessions, an eligible session's touched tasks are served from here instead
+  // of re-reading the backend every ~5s. Injectable (like sessionsFeedCache) so a
+  // test can supply an injectable-clock cache and drive the cross-TTL boundary
+  // directly (LIN-1259, item 2 hardening).
+  taskDoneCache = createTaskDoneCache()
 }) {
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
-  // Touched-task done-state TTL cache (LIN-1258): 60s, keyed `${wsUrlKey}::${identifier}`.
-  // Under the LIN-617 feed-output cache: when the feed refreshes and re-runs
-  // mergeSessions, an eligible session's seed task is served from here instead of
-  // re-reading the backend every ~5s.
-  const taskDoneCache = createTaskDoneCache();
 
   /**
    * Merge Loops across every connected workspace, tagging each run with its
@@ -656,9 +665,9 @@ export function createDashboardRoutes({
       else console.error('Observation: session read failed for a workspace:', r.reason?.message);
     }
 
-    // Bounded, TTL-cached server-side hydration of the touched seed task's live
-    // done-state (LIN-1258, Axis B) — the only way the collapsed/feed card can
-    // reflect a `done-with-warning` without a per-poll Linear read. Mutates the
+    // Bounded, TTL-cached server-side hydration of the touched tasks' live
+    // done-state (LIN-1258/LIN-1259, Axis B) — the only way the collapsed/feed card
+    // can reflect a `done-with-warning` without a per-poll Linear read. Mutates the
     // eligible entries' `.payload` in place.
     await hydrateTouchedTaskDone(built);
 
@@ -668,20 +677,35 @@ export function createDashboardRoutes({
   }
 
   /**
-   * Bounded, TTL-cached server-side hydration of the touched seed task's live
-   * done-state for the Observation feed (LIN-1258, Axis B).
+   * Bounded, TTL-cached server-side hydration of a session's touched-task live
+   * done-state for the Observation feed (LIN-1258, extended to any-touched-task
+   * by LIN-1259, Axis B).
    *
    * `taskDone` only changes a session's derived status on the `terminal &&
    * hasError` branch of `deriveSessionStatus` (it upgrades `error` →
    * `done-with-warning`, LIN-749); a terminal non-error session is already
    * `done` and a non-terminal one never consults `taskDone`. So the ELIGIBLE set
    * is exactly the errored-terminal sessions — pre-hydration `payload.status ===
-   * 'error'`. For those:
+   * 'error'`.
    *
-   *   - a fresh cache HIT is applied for free (no backend read) — always;
+   * A session is upgraded when ANY touched task is Done, matching the client's
+   * `ensureHydration` any-touched OR (public/observation.js) — the seed-only
+   * server hydration LIN-1258 shipped disagreed with the client for a multi-task
+   * session whose seed is not done but a later touched task is (feed showed
+   * `error`, drill-in showed `done-with-warning`). `deriveSessionStatus` is
+   * unchanged: the OR-across-touched-tasks happens here and still passes a single
+   * boolean into `buildSessionPayload` (no signature change).
+   *
+   * Cost is bounded in two layers:
+   *   - a fresh cache HIT is applied for free (no backend read) — always; a
+   *     session with any cached-true touched task resolves for free, and one
+   *     whose touched tasks are all cached-false resolves (as not-done) for free;
    *   - cache MISSES are read from the backend, but only up to FEED_HYDRATION_CAP
-   *     per poll (cost bound); overflow keeps `taskDone=false` this poll and fills
-   *     in over later polls (logged, never silently dropped).
+   *     READS per poll (LIN-1259: the cap counts reads, not sessions, because a
+   *     multi-task session can now cost several reads). Reads SHORT-CIRCUIT on the
+   *     first Done touched task, so the common case (seed done) stays one read;
+   *     overflow keeps `taskDone=false` this poll and fills in over later polls
+   *     (logged, never silently dropped).
    *
    * Reads go through the same `getWorkspaceAccessToken` + `fetchIssueContext`
    * deps the drill-in hydrate route uses, so "Done" is the identical signal
@@ -695,49 +719,76 @@ export function createDashboardRoutes({
    * @returns {Promise<void>}
    */
   async function hydrateTouchedTaskDone(built) {
-    // Eligible = errored-terminal sessions with a seed task. `payload.status ===
-    // 'error'` is exactly `terminal && hasError` (deriveSessionStatus: `stale`
+    // Eligible = errored-terminal sessions with ≥1 touched task. `payload.status
+    // === 'error'` is exactly `terminal && hasError` (deriveSessionStatus: `stale`
     // only holds for non-terminal sessions, and taskDone is false at this point).
     const eligible = built.filter(b =>
-      b.payload.status === 'error' && b.payload.tasksTouched && b.payload.tasksTouched[0]);
+      b.payload.status === 'error' && Array.isArray(b.payload.tasksTouched) && b.payload.tasksTouched.length > 0);
     if (eligible.length === 0) return;
 
-    const misses = [];
+    // Phase 1 — free cache application (no backend read, no cap spend). For each
+    // eligible session, scan ALL its touched tasks: a cached-true task upgrades the
+    // session immediately (any-touched OR, short-circuit); otherwise the cache-MISS
+    // task keys are collected (in touched order) for phase 2. A session with no
+    // misses is fully resolved here — Done if any hit was true, left `error` if
+    // every touched task was a fresh cache-false.
+    const pending = []; // { b, misses: Array<{key, ident}> } — sessions still needing ≥1 read
     for (const b of eligible) {
-      const seed = b.payload.tasksTouched[0];
-      const key = `${b.ws.urlKey}::${seed}`;
-      const cached = taskDoneCache.peek(key);
-      if (cached !== undefined) {
-        // Free cache hit — apply immediately, no backend read, no cap spend.
-        if (cached) b.payload = buildSessionPayload(b.session, b.ws, true);
-      } else {
-        misses.push({ b, key, seed });
+      const misses = [];
+      let doneFromCache = false;
+      for (const ident of b.payload.tasksTouched) {
+        const key = `${b.ws.urlKey}::${ident}`;
+        const cached = taskDoneCache.peek(key);
+        if (cached === true) { doneFromCache = true; break; } // free hit → upgrade, short-circuit
+        if (cached === undefined) misses.push({ key, ident });
+        // cached === false: this task is not done; keep scanning the rest
       }
+      if (doneFromCache) b.payload = buildSessionPayload(b.session, b.ws, true);
+      else if (misses.length > 0) pending.push({ b, misses });
+      // else: every touched task was a fresh cache-false ⇒ resolved not-done, free
     }
+    if (pending.length === 0) return;
 
-    // Only cache misses cost a backend read; cap them per poll.
-    const selected = misses.slice(0, FEED_HYDRATION_CAP);
-    const overflow = misses.length - selected.length;
-    if (overflow > 0) {
-      console.log(`Observation: bounded feed hydration cap (${FEED_HYDRATION_CAP}) reached; deferring ${overflow} errored session(s) to a later poll (LIN-1258)`);
-    }
-
-    await Promise.all(selected.map(async ({ b, key, seed }) => {
-      try {
-        const taskDone = await taskDoneCache.get(key, async () => {
-          const token = await getWorkspaceAccessToken(b.ws.urlKey);
-          if (!token) return false;
-          const context = await fetchIssueContext(token, seed);
-          const issue = context?.issue || context || {};
-          // Same "Done" signal as the drill-in hydrate route (LIN-749).
-          return issue?.state?.type === 'completed';
-        });
-        if (taskDone) b.payload = buildSessionPayload(b.session, b.ws, true);
-      } catch {
-        // Best-effort: a hydration miss leaves the Mongo-sourced payload (error)
-        // untouched; the throw is not cached, so a later poll retries.
+    // Phase 2 — bounded backend reads under a shared READ budget (LIN-1259). Reads
+    // are issued concurrently across sessions; within a session the missed tasks are
+    // read in touched order and short-circuit on the first Done. `budget` is a plain
+    // counter reserved synchronously before each await — safe on the single JS
+    // thread — so total reads never exceed FEED_HYDRATION_CAP regardless of how many
+    // sessions or touched tasks are outstanding. A session that runs out of budget
+    // before finding a Done task keeps `taskDone=false` this poll and re-reads later.
+    let budget = FEED_HYDRATION_CAP;
+    let deferred = 0;
+    await Promise.all(pending.map(async ({ b, misses }) => {
+      for (const { key, ident } of misses) {
+        // Re-peek: a sibling session sharing this task key may have populated it
+        // since phase 1 (mild dedup; full in-flight dedup is LIN-1259 item 3, out
+        // of scope). A fresh answer here costs no read and no budget.
+        const fresh = taskDoneCache.peek(key);
+        if (fresh === true) { b.payload = buildSessionPayload(b.session, b.ws, true); return; }
+        if (fresh === false) continue;
+        if (budget <= 0) { deferred++; return; } // out of read budget this poll
+        budget--;
+        try {
+          const taskDone = await taskDoneCache.get(key, async () => {
+            const token = await getWorkspaceAccessToken(b.ws.urlKey);
+            if (!token) return false;
+            const context = await fetchIssueContext(token, ident);
+            const issue = context?.issue || context || {};
+            // Same "Done" signal as the drill-in hydrate route (LIN-749).
+            return issue?.state?.type === 'completed';
+          });
+          if (taskDone) { b.payload = buildSessionPayload(b.session, b.ws, true); return; } // short-circuit
+        } catch {
+          // Best-effort: a hydration miss leaves the Mongo-sourced payload (error)
+          // untouched; the throw is not cached, so a later poll retries. Keep
+          // scanning the session's remaining touched tasks under the same budget.
+        }
       }
     }));
+
+    if (deferred > 0) {
+      console.log(`Observation: bounded feed hydration read cap (${FEED_HYDRATION_CAP}) reached; deferring ${deferred} errored session(s) to a later poll (LIN-1258/LIN-1259)`);
+    }
   }
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
