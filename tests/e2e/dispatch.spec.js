@@ -258,6 +258,51 @@ test.describe('Dispatch Queue', () => {
     await expect(queueItem).toBeVisible();
   });
 
+  // LIN-1244: the nav-badge popover rows (the screenshot surface) show richer
+  // default content via the shared window.renderQueueRow helper — the same
+  // contract as the /dispatch Queue list.
+  test('queue panel rows show enriched default fields (issue link, snippet, model)', async ({ page }) => {
+    // Seed a queue item carrying the fields the enriched row surfaces. The
+    // session (with dispatch enabled) is already established in beforeEach.
+    await page.request.post(`${API_PREFIX}/api/dispatch`, {
+      data: {
+        prompt: 'Investigate the flaky login test\n\nSecond line must not appear.',
+        promptName: 'investigate',
+        issueId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        issueIdentifier: 'LIN-999',
+        issueTitle: 'Flaky login test',
+        issueUrl: 'https://linear.app/team/issue/LIN-999',
+        target: 'cli',
+        model: 'anthropic/claude-opus-4',
+      },
+    });
+
+    await page.goto(WORKSPACE_URL);
+    await page.waitForLoadState('networkidle');
+
+    const badge = page.locator('[data-queue-badge]');
+    await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
+    await badge.click();
+
+    const item = page.locator('.queue-panel .queue-item');
+    await expect(item).toBeVisible();
+
+    // Issue rendered as a link.
+    const issueLink = item.locator('.queue-item-issue');
+    await expect(issueLink).toHaveText('LIN-999');
+    await expect(issueLink).toHaveAttribute('href', 'https://linear.app/team/issue/LIN-999');
+
+    // First-line-only prompt snippet — the second line never leaks.
+    const snippet = item.locator('.queue-item-snippet');
+    await expect(snippet).toHaveText('Investigate the flaky login test');
+    await expect(snippet).not.toContainText('Second line');
+
+    // Model + prompt-name chips.
+    const chips = item.locator('.queue-item-chips');
+    await expect(chips).toContainText('anthropic/claude-opus-4');
+    await expect(chips).toContainText('investigate');
+  });
+
   test('can remove item from queue panel', async ({ page }) => {
     // First dispatch something
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');

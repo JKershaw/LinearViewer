@@ -708,6 +708,45 @@ test.describe('Dispatch Page', () => {
       const items = page.locator('.queue-list .queue-item');
       await expect(items).toHaveCount(1, { timeout: 5000 });
     });
+
+    // LIN-1244: queue rows show richer default content (issue link, one-line
+    // prompt snippet, model chip) via the shared window.renderQueueRow helper.
+    test('queue rows show enriched default fields (issue link, snippet, model)', async ({ page, request }) => {
+      await seedRequestSession(request);
+      await request.post(`${API_PREFIX}/api/dispatch`, {
+        data: {
+          prompt: 'Investigate the flaky login test\n\nSecond line must not appear.',
+          promptName: 'investigate',
+          issueId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+          issueIdentifier: 'LIN-999',
+          issueTitle: 'Flaky login test',
+          issueUrl: 'https://linear.app/team/issue/LIN-999',
+          target: 'cli',
+          model: 'anthropic/claude-opus-4',
+        },
+      });
+
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const item = page.locator('.queue-list .queue-item');
+      await expect(item).toHaveCount(1, { timeout: 5000 });
+
+      // Issue rendered as a link (not opaque text).
+      const issueLink = item.locator('.queue-item-issue');
+      await expect(issueLink).toHaveText('LIN-999');
+      await expect(issueLink).toHaveAttribute('href', 'https://linear.app/team/issue/LIN-999');
+
+      // First-line-only prompt snippet — the second line never leaks.
+      const snippet = item.locator('.queue-item-snippet');
+      await expect(snippet).toHaveText('Investigate the flaky login test');
+      await expect(snippet).not.toContainText('Second line');
+
+      // Model + prompt-name chips surface execution intent + real prompt identity.
+      const chips = item.locator('.queue-item-chips');
+      await expect(chips).toContainText('anthropic/claude-opus-4');
+      await expect(chips).toContainText('investigate');
+    });
   });
 
   test.describe('Token Management', () => {
