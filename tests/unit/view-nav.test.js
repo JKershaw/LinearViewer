@@ -3,7 +3,8 @@
  *
  * Pins the two contracts the keystone rests on:
  *   1. `getViewNavLinks` tier/flag gating — first-class always, power-user only
- *      when flagged, experimental NEVER here.
+ *      when flagged, experimental only when flagged (gated inclusion in the
+ *      `⋯ more` overflow, LIN-1247, reversing the earlier Settings-only policy).
  *   2. `renderViewNav` markup — single-source-of-truth list rendered into the
  *      nav bar with stable `nav-view-<text>` testids and key-equality active
  *      matching; the footer no longer carries these links.
@@ -49,13 +50,34 @@ test('getViewNavLinks adds power-user views ONLY when their flag is on', () => {
   assert.ok(!truthyButNotTrue.includes('dispatch'));
 });
 
-test('getViewNavLinks NEVER surfaces experimental views (Settings-only tier)', () => {
-  const texts = getViewNavLinks('acme', {
-    collective: true, taskChat: true, ship: true, nextRun: true, flightCompanion: true
-  }).map(l => l.text);
-  for (const experimental of ['collective', 'taskChat', 'ship', 'nextRun', 'flightCompanion', 'task-chat', 'next-run', 'flight-companion']) {
-    assert.ok(!texts.includes(experimental), `${experimental} must stay Settings-only`);
+test('getViewNavLinks surfaces experimental views ONLY when their flag is on (gated, LIN-1247)', () => {
+  // Policy reversal: experimental views used to be Settings-only and NEVER here.
+  // They are now gated-included — absent when off, present (as their kebab route
+  // key) when on, so they can land in the `⋯ more` overflow.
+  const experimentalPaths = ['collective', 'task-chat', 'ship', 'next-run', 'flight-companion', 'ship-biscuit'];
+
+  // Off / absent → none of the experimental views appear.
+  const off = getViewNavLinks('acme', {}).map(l => l.text);
+  for (const path of experimentalPaths) {
+    assert.ok(!off.includes(path), `${path} must be absent when its flag is off`);
   }
+
+  // Every flag on → each appears, emitted as its KEBAB route text.
+  const on = getViewNavLinks('acme', {
+    collective: true, taskChat: true, ship: true, nextRun: true, flightCompanion: true, shipBiscuit: true
+  }).map(l => l.text);
+  for (const path of experimentalPaths) {
+    assert.ok(on.includes(path), `${path} must appear when its flag is on`);
+  }
+  // The camelCase gating flag must NOT leak into the nav text (active-match key).
+  for (const flag of ['taskChat', 'nextRun', 'flightCompanion', 'shipBiscuit']) {
+    assert.ok(!on.includes(flag), `${flag} camelCase flag must not be used as nav text`);
+  }
+
+  // Strict `=== true` gate (same as the power-user tier): a truthy-but-not-true
+  // value does NOT enable the link.
+  const truthyButNotTrue = getViewNavLinks('acme', { taskChat: 1 }).map(l => l.text);
+  assert.ok(!truthyButNotTrue.includes('task-chat'));
 });
 
 // --- switcher markup --------------------------------------------------------
@@ -110,6 +132,29 @@ test('partitionViewLinks HOISTS the active overflow view inline (never hidden)',
   assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings', 'dispatch']);
   // …and removed from overflow so it is not rendered twice.
   assert.deepEqual(overflow.map(l => l.text), ['roadmap', 'proxy']);
+});
+
+test('partitionViewLinks HOISTS the active experimental overflow view inline (LIN-1247)', () => {
+  // An open experimental view must hoist inline exactly like a power-user view,
+  // so the active tab is never buried in the collapsed `⋯ more` expander.
+  const links = getViewNavLinks('acme', { taskChat: true, ship: true });
+  const { primary, overflow } = partitionViewLinks(links, 'task-chat');
+  // Active experimental view lifted onto the primary strip after the five, keyed
+  // on its kebab route (`task-chat`), matching the kebab `currentPage`.
+  assert.deepEqual(primary.map(l => l.text), ['projects', 'swipe', 'swim', 'observation', 'settings', 'task-chat']);
+  // …and removed from overflow so it is not rendered twice; ship stays behind ⋯ more.
+  assert.deepEqual(overflow.map(l => l.text), ['ship']);
+});
+
+test('renderViewNav shows a short experimental label but keeps the kebab route testid (LIN-1247)', () => {
+  const html = renderViewNav({ urlKey: 'acme', currentPage: 'observation', featureFlags: { taskChat: true } });
+  // Short view label in the strip — NOT Settings' "open the task chat page" phrase.
+  assert.match(html, />task chat</);
+  assert.doesNotMatch(html, /open the task chat page/);
+  // testid / active-match key stays the kebab route.
+  assert.match(html, /data-testid="nav-view-task-chat"/);
+  // It lives in the overflow group (non-first-class), behind the ⋯ more toggle.
+  assert.match(html, /<div class="nav-views-overflow"[^>]*>[\s\S]*data-testid="nav-view-task-chat"[\s\S]*<\/div>/);
 });
 
 test('renderViewNav emits the ⋯ more toggle + in-flow overflow group ONLY when flag-gated views exist', () => {
