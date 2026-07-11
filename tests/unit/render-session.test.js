@@ -257,23 +257,38 @@ describe('render-session: human reply box (LIN-1004)', () => {
     assert.ok(!html.includes('data-testid="session-inline-reply"'));
   });
 
-  test('a terminal session sends force (data-session-terminal="true") with an honest resume note', () => {
+  // Force is computed CLIENT-side (public/session.js) as `terminal || waiting`;
+  // these tests pin the two attributes that drive it (LIN-1252).
+  test('a terminal session sends force (data-session-terminal="true", waiting="false") with an honest resume note', () => {
     const html = renderSessionPage(
       { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: true },
       {}
     );
     assert.match(html, /data-testid="session-reply"[^>]*data-session-terminal="true"/);
+    assert.match(html, /data-testid="session-reply"[^>]*data-session-waiting="false"/);
     // The note surfaces the possible failed-resume honestly.
     assert.match(html, /data-testid="session-reply-note"[^>]*>[^<]*no live session to resume/);
   });
 
-  test('a waiting/non-terminal session omits force (data-session-terminal="false")', () => {
+  test('a waiting/non-terminal session sends force via data-session-waiting="true" (LIN-1252)', () => {
     const html = renderSessionPage(
       { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: false, waiting: true, waitingMessage: 'pick one' },
       {}
     );
+    // Non-terminal, but flagged waiting → the client ORs waiting into force.
     assert.match(html, /data-testid="session-reply"[^>]*data-session-terminal="false"/);
+    assert.match(html, /data-testid="session-reply"[^>]*data-session-waiting="true"/);
+    // The note stays the warm/queued wording (terminal-driven), not the resume caveat.
     assert.match(html, /data-testid="session-reply-note"[^>]*>[^<]*queued into this session/);
+  });
+
+  test('a genuinely warm/executing session omits force (terminal="false", waiting="false")', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: false, waiting: false },
+      {}
+    );
+    assert.match(html, /data-testid="session-reply"[^>]*data-session-terminal="false"/);
+    assert.match(html, /data-testid="session-reply"[^>]*data-session-waiting="false"/);
   });
 
   test('a web-target session threads data-target="web"', () => {
@@ -338,6 +353,23 @@ describe('render-session: per-run expand/collapse + inline reply (LIN-1133)', ()
     session.loops[0].terminalStatus = null; // running
     const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], canReply: true });
     assert.match(html, /data-testid="session-inline-reply"[^>]*data-loop-id="loop-1"[^>]*data-terminal="false"/);
+  });
+
+  // Inline boxes key `force` off the run's own terminal status OR the SESSION-level
+  // waiting signal (LIN-1252) — waiting is session-scoped, not per-run.
+  test('inline reply boxes carry data-session-waiting="true" when the session is waiting', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null; // a non-terminal run in a waiting session
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], canReply: true, waiting: true });
+    // Every inline box (even the non-terminal run) is flagged waiting → client forces.
+    assert.match(html, /data-testid="session-inline-reply"[^>]*data-loop-id="loop-1"[^>]*data-session-waiting="true"/);
+    assert.ok(!html.includes('data-session-waiting="false"'), 'no inline box is unflagged in a waiting session');
+  });
+
+  test('inline reply boxes carry data-session-waiting="false" when the session is not waiting', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, waiting: false });
+    assert.match(html, /data-testid="session-inline-reply"[^>]*data-loop-id="loop-1"[^>]*data-session-waiting="false"/);
+    assert.ok(!html.includes('data-session-waiting="true"'), 'no inline box is flagged waiting in a non-waiting session');
   });
 
   test('recipes are always loaded (common.js, marked, purify, brief, recap, session)', () => {
