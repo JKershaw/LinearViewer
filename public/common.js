@@ -124,6 +124,106 @@ window.renderChip = function renderChip({ label, className, attrs } = {}) {
 };
 
 // =============================================================================
+// Dispatch queue row (LIN-1244)
+// =============================================================================
+
+/**
+ * First non-empty line of a prompt, trimmed and length-capped.
+ *
+ * FIRST-LINE-ONLY is a security boundary, not just cosmetics (LIN-1244): the
+ * dispatch list payload's raw `prompt` may embed a multi-line single-use
+ * bootstrap proxy-token block, so collapsing to the first line ensures the row
+ * never dumps the token block into the UI. The cap bounds row height.
+ *
+ * @param {string} prompt - Raw prompt text (may be multi-line / undefined).
+ * @param {number} cap - Maximum characters before an ellipsis is appended.
+ * @returns {string} A single, capped line (empty string when nothing to show).
+ */
+function firstPromptLine(prompt, cap) {
+  if (!prompt || typeof prompt !== 'string') return '';
+  const line = prompt.split('\n').map(l => l.trim()).find(Boolean) || '';
+  if (line.length <= cap) return line;
+  return line.slice(0, cap - 1).trimEnd() + '…';
+}
+
+/**
+ * Shared dispatch queue-row renderer (LIN-1244). The single source of the
+ * `.queue-item*` markup for BOTH twin renderers — `app.js` `renderQueueItems()`
+ * (the nav-badge popover, loaded on every page) and `dispatch.js`
+ * `renderDispatchQueueList()` (the /dispatch Queue section) — so the two cannot
+ * drift apart again.
+ *
+ * Renders richer always-visible content from fields the list endpoint already
+ * returns (no server/store/API change): the prompt name/kind, the issue as a
+ * link, a one-line prompt snippet, execution model/harness chips, and
+ * follow-up/force flags. This is deliberately by-default content, NOT a hidden
+ * auto-expanding panel — the queue lists wholesale-replace `innerHTML` on poll,
+ * which would wipe any JS-toggled expand state.
+ *
+ * Security (LIN-1244): the raw `prompt` may embed a single-use bootstrap
+ * proxy-token block, so the snippet is first-line-only and length-capped (see
+ * `firstPromptLine`); the `bootstrapToken` field is never surfaced.
+ *
+ * @param {Object} item - A dispatch list item (from GET .../api/dispatch).
+ * @param {string} urlKey - Workspace url key (for the remove button).
+ * @param {{card?: boolean}} [opts] - `card:true` adds the `.card` wrapper class
+ *   the /dispatch page's list uses; the nav popover omits it.
+ * @global
+ * @returns {string} Queue-row HTML.
+ */
+window.renderQueueRow = function renderQueueRow(item, urlKey, { card = false } = {}) {
+  const esc = window.escapeHtml;
+  const time = new Date(item.dispatchedAt).toLocaleString();
+  const title = item.issueTitle || item.promptName || 'Prompt';
+  // Display the 'local' API value as the user-facing 'harbour' label on BOTH
+  // surfaces. app.js historically omitted this mapping that dispatch.js had —
+  // sharing this helper resolves that pre-existing drift.
+  const target = item.target === 'local' ? 'harbour' : (item.target || 'cli');
+
+  // Issue rendered as a link when a URL is present; plain identifier otherwise.
+  const issueHtml = item.issueIdentifier
+    ? (item.issueUrl
+        ? `<a class="queue-item-issue" href="${esc(item.issueUrl)}" target="_blank" rel="noopener">${esc(item.issueIdentifier)}</a>`
+        : `<span class="queue-item-issue">${esc(item.issueIdentifier)}</span>`)
+    : '';
+  const metaHtml = [issueHtml, ...[item.repo, target, time].filter(Boolean).map(esc)]
+    .filter(Boolean)
+    .join(' · ');
+
+  const snippet = firstPromptLine(item.prompt, 140);
+  const snippetHtml = snippet ? `<div class="queue-item-snippet">${esc(snippet)}</div>` : '';
+
+  // Field chips — surface the prompt's real identity + execution intent that the
+  // opaque title/meta hid. The kind chip is suppressed when it would just repeat
+  // the title (e.g. an issueless custom prompt whose title already IS its name).
+  const chip = (label, extra) =>
+    window.renderChip({ label, className: extra ? `queue-item-chip ${extra}` : 'queue-item-chip' });
+  const kindLabel = item.promptName && item.promptName !== 'Prompt'
+    ? item.promptName
+    : (item.kind && item.kind !== 'custom' ? item.kind : '');
+  const chips = [];
+  if (kindLabel && kindLabel !== title) chips.push(chip(kindLabel));
+  if (item.model) chips.push(chip(item.model));
+  if (item.harness) chips.push(chip(item.harness));
+  if (item.followUpTo) chips.push(chip('follow-up', 'queue-item-flag'));
+  if (item.force) chips.push(chip('force', 'queue-item-flag'));
+  const chipsHtml = chips.length ? `<div class="queue-item-chips">${chips.join('')}</div>` : '';
+
+  const wrapperClass = card ? 'card queue-item' : 'queue-item';
+  return `
+      <div class="${wrapperClass}" data-item-id="${esc(item.id)}">
+        <div class="queue-item-header">
+          <span class="queue-item-title">${esc(title)}</span>
+          <button class="queue-item-remove" data-item-id="${esc(item.id)}" data-url-key="${esc(urlKey)}">remove</button>
+        </div>
+        <div class="queue-item-meta">${metaHtml}</div>
+        ${snippetHtml}
+        ${chipsHtml}
+      </div>
+    `;
+};
+
+// =============================================================================
 // Markdown Rendering
 // =============================================================================
 

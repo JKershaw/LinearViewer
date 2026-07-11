@@ -708,6 +708,92 @@ test.describe('Dispatch Page', () => {
       const items = page.locator('.queue-list .queue-item');
       await expect(items).toHaveCount(1, { timeout: 5000 });
     });
+
+    // LIN-1244: queue rows show richer default content (issue link, one-line
+    // prompt snippet, model chip) via the shared window.renderQueueRow helper.
+    test('queue rows show enriched default fields (issue link, snippet, model)', async ({ page, request }) => {
+      await seedRequestSession(request);
+      await request.post(`${API_PREFIX}/api/dispatch`, {
+        data: {
+          prompt: 'Investigate the flaky login test\n\nSecond line must not appear.',
+          promptName: 'investigate',
+          issueId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+          issueIdentifier: 'LIN-999',
+          issueTitle: 'Flaky login test',
+          issueUrl: 'https://linear.app/team/issue/LIN-999',
+          target: 'cli',
+          model: 'anthropic/claude-opus-4',
+        },
+      });
+
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const item = page.locator('.queue-list .queue-item');
+      await expect(item).toHaveCount(1, { timeout: 5000 });
+
+      // Issue rendered as a link (not opaque text).
+      const issueLink = item.locator('.queue-item-issue');
+      await expect(issueLink).toHaveText('LIN-999');
+      await expect(issueLink).toHaveAttribute('href', 'https://linear.app/team/issue/LIN-999');
+
+      // First-line-only prompt snippet — the second line never leaks.
+      const snippet = item.locator('.queue-item-snippet');
+      await expect(snippet).toHaveText('Investigate the flaky login test');
+      await expect(snippet).not.toContainText('Second line');
+
+      // Model + prompt-name chips surface execution intent + real prompt identity.
+      const chips = item.locator('.queue-item-chips');
+      await expect(chips).toContainText('anthropic/claude-opus-4');
+      await expect(chips).toContainText('investigate');
+    });
+
+    // LIN-1244 close-out: the seeded specs above use target:'cli' and cover only
+    // issue-link/snippet/model/promptName. Cover the remaining renderQueueRow
+    // branches — the `local → harbour` label drift fix (the change's headline
+    // correctness claim) and the follow-up/force/harness chips + the kind
+    // fallback/suppress branches — by driving the shared pure helper directly.
+    // The dispatch POST path can't cheaply seed target:'local'/followUpTo/force
+    // (they carry spawn/session side-effects), so the helper seam is the right
+    // place: window.renderQueueRow is the single source of row markup both twins
+    // (public/app.js, public/dispatch.js) delegate to.
+    test('renderQueueRow: local→harbour label + follow-up/force/harness/kind chip branches', async ({ page }) => {
+      await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+      await page.goto(DISPATCH_URL);
+      await page.waitForLoadState('networkidle');
+
+      const rendered = await page.evaluate((urlKey) => {
+        const now = Date.now();
+        const r = (item) => window.renderQueueRow({ dispatchedAt: now, ...item }, urlKey);
+        return {
+          // Pre-existing app.js↔dispatch.js drift fixed by the shared helper:
+          // the 'local' API value must display as the 'harbour' label.
+          localTarget: r({ id: '1', promptName: 'Prompt', target: 'local' }),
+          // Follow-up / force / harness chips (untested by the seeded specs).
+          chips: r({ id: '2', promptName: 'Prompt', target: 'cli',
+                     harness: 'opencode', followUpTo: 'sess-abc', force: true }),
+          // kind fallback: no promptName identity → a non-'custom' kind surfaces.
+          kindFallback: r({ id: '3', promptName: 'Prompt', kind: 'autopilot', target: 'cli' }),
+          // kind chip suppressed when it would merely repeat the row title.
+          kindSuppressed: r({ id: '4', issueTitle: 'autopilot', promptName: 'Prompt',
+                              kind: 'autopilot', target: 'cli' }),
+        };
+      }, WS);
+
+      // 'local' is displayed as 'harbour' (first meta segment; never the raw value).
+      expect(rendered.localTarget).toContain('queue-item-meta">harbour');
+      expect(rendered.localTarget).not.toContain('queue-item-meta">local');
+
+      // follow-up, force, and harness each render as chips.
+      expect(rendered.chips).toContain('follow-up');
+      expect(rendered.chips).toContain('force');
+      expect(rendered.chips).toContain('opencode');
+
+      // kind fallback surfaces the kind as a chip; suppressed when it equals the title.
+      expect(rendered.kindFallback).toContain('queue-item-chips');
+      expect(rendered.kindFallback).toContain('autopilot');
+      expect(rendered.kindSuppressed).not.toContain('queue-item-chips');
+    });
   });
 
   test.describe('Token Management', () => {

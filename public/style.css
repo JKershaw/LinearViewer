@@ -761,6 +761,43 @@ a.wordmark:hover {
   margin-top: var(--space-1);
 }
 
+/* Richer default queue-row content (LIN-1244). Global file → both surfaces:
+   the nav-badge popover (app.js) and the /dispatch Queue list (dispatch.js). */
+.queue-item-issue {
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.queue-item-issue:hover {
+  text-decoration: underline;
+}
+
+.queue-item-snippet {
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  color: var(--fg-dim);
+  margin-top: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-item-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.queue-item-chip {
+  font-size: 0.7em;
+}
+
+.queue-item-flag {
+  color: var(--brand);
+  border-color: var(--brand);
+}
+
 .queue-panel-empty {
   padding: var(--space-5) var(--space-3);
   text-align: center;

@@ -553,24 +553,10 @@ function renderDispatchQueueList(container, items, urlKey) {
     return
   }
 
-  container.innerHTML = items.map(item => {
-    const time = new Date(item.dispatchedAt).toLocaleString()
-    const title = item.issueTitle || item.promptName || 'Prompt'
-    // Display 'local' API value as user-facing 'harbour' label
-    const target = item.target === 'local' ? 'harbour' : (item.target || 'cli')
-    const metaParts = [item.issueIdentifier, item.repo, target, time].filter(Boolean)
-    const meta = metaParts.join(' \u00b7 ')
-
-    return `
-      <div class="card queue-item" data-item-id="${escapeHtml(item.id)}">
-        <div class="queue-item-header">
-          <span class="queue-item-title">${escapeHtml(title)}</span>
-          <button class="queue-item-remove" data-item-id="${escapeHtml(item.id)}" data-url-key="${escapeHtml(urlKey)}">remove</button>
-        </div>
-        <div class="queue-item-meta">${escapeHtml(meta)}</div>
-      </div>
-    `
-  }).join('')
+  // Shared row markup (LIN-1244): identical `.queue-item*` rows to the nav-badge
+  // popover (app.js) via window.renderQueueRow, so the twins stay in lockstep.
+  // `card:true` keeps the /dispatch list's `.card` wrapper.
+  container.innerHTML = items.map(item => window.renderQueueRow(item, urlKey, { card: true })).join('')
 }
 
 /**

@@ -1364,23 +1364,10 @@ function renderQueueItems(panel, items, urlKey) {
     return
   }
 
-  container.innerHTML = items.map(item => {
-    const time = new Date(item.dispatchedAt).toLocaleString()
-    const title = item.issueTitle || item.promptName || 'Prompt'
-    const target = item.target || 'cli'
-    const metaParts = [item.issueIdentifier, item.repo, target, time].filter(Boolean)
-    const meta = metaParts.join(' \u00b7 ')
-
-    return `
-      <div class="queue-item" data-item-id="${escapeHtml(item.id)}">
-        <div class="queue-item-header">
-          <span class="queue-item-title">${escapeHtml(title)}</span>
-          <button class="queue-item-remove" data-item-id="${escapeHtml(item.id)}" data-url-key="${escapeHtml(urlKey)}">remove</button>
-        </div>
-        <div class="queue-item-meta">${escapeHtml(meta)}</div>
-      </div>
-    `
-  }).join('')
+  // Shared row markup (LIN-1244): the nav-badge popover and the /dispatch Queue
+  // list render identical `.queue-item*` rows via window.renderQueueRow so the
+  // two twin renderers cannot drift. The popover omits the `.card` wrapper.
+  container.innerHTML = items.map(item => window.renderQueueRow(item, urlKey)).join('')
 }
 
 
