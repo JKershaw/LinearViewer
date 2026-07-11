@@ -404,3 +404,100 @@ H4's share metric is inflated by small read-sets though its direction is robust.
 Result-bytes ≈ tokens×4, directional. This is correlation to steer priorities, not
 proof — but the top three shortlist moves now rest on measured load, and the
 calibration question (§15) is answered cleanly in the negative.
+
+---
+
+# Part IV — Synthesis: the three-dataset verdict & go/no-go (2026-07-11)
+
+> Closing capstone. Reads across the whole arc — Part I's audit, Part II's reframe,
+> Part III's measurement — and states what is now settled, what is still open, and
+> the one decision the research was run to make.
+
+## 18. Three datasets, one question
+
+The study was designed as a triangulation so no single lens could mislead us. Each
+saw the session from a different distance:
+
+| | Dataset | Distance | What it can see | What it can't |
+|---|---|---|---|---|
+| **D1** | LIN-824 busy-span (prior, Done) | *between* sessions | wall-clock dead air, wait latency | anything *inside* a running session |
+| **D2** | Track A heartbeat silhouette (§Appendix) | outside, *during* | tool **counts** by class | what a Bash call *did* (62% of calls) |
+| **D3** | Track B transcript spend (§12–17) | inside, *during* | tokens, bytes, file targets, per-turn structure | outcome contrast (no failures in-set) |
+
+**Where they agree:** all three point at the same villain — time and tokens leak to
+**re-grounding**, not to productive change. D1 saw it as dead air between sessions;
+D2 saw a read-heavy silhouette with the signal hidden in Bash; D3 opened the Bash
+box and put the number on it — **68% of context bytes, median edit-bearing worker.**
+
+**Where they disagree — and that disagreement is a finding:** the cheap signals do
+**not** predict the expensive truth (§15, r = −0.50). D2's "onboarding" is
+structurally blind to mid-session re-grounding, the exact cost that dominates. So
+the tidy hope — "run D2 continuously, recalibrate with D3 occasionally" — is dead.
+You cannot proxy the orientation tax from the outside; you must instrument the
+inside (LIN-817).
+
+**On the D1↔D3 leg specifically:** Part III did not compute it, and I'm recording
+the decision *not* to. D2 is a strictly finer outside signal than D1 (per-tool
+counts vs whole-session wall-clock), and it already failed decisively. A coarser
+signal cannot rescue a calibration the finer one lost — running D1↔D3 would spend
+effort to confirm a foregone negative. The three-way frame did its job by making
+the *shape* of the failure legible (outside-blind-to-mid-session); a third losing
+correlation adds no steering value. If we ever want it, it's a half-hour script,
+not a blocker.
+
+## 19. How the priority order moved — Part I → Part IV
+
+The arc's real output isn't any single number; it's that the **ranking changed as
+the evidence sharpened**, and it converged rather than scattered:
+
+- **Part I (audit, by intuition):** the eye goes to the biggest artifacts — the
+  15k-token meta-prompt, the 12–14k kickoff. "Trim the prompts."
+- **Part II (reframe):** tokens are cheap; the scarce currencies are *obligations
+  tracked* (correctness) and *spend trajectory* (efficiency). This demoted
+  prompt-size and promoted the orientation/rework tax — but on argument, not data.
+- **Part III/IV (measured):** the reframe was right and the magnitude favours it
+  harder than we guessed. Output tokens are **1%** of the budget (100:1 in:out);
+  the meta-prompt trim polishes that 1%. Orientation re-reads fill the **99%**, and
+  they're **100%-duplicated** across a task's session arc. The top move is no longer
+  "trim prose" — it's "stop re-grounding what hasn't changed."
+
+Same villain, three times, from three distances: **the tax is orientation, and its
+worst form is cross-session re-grounding of unchanged files.**
+
+## 20. Settled vs still open
+
+**Settled (enough to act):**
+- The orientation tax is real, large, and byte-dominated — **68%** median
+  edit-bearing (H2 ✅, front-loaded: 15 tools before first edit).
+- It is **100%-duplicated across a task's sessions** (H4 ✅) — every dispatch
+  re-grounds the same file-set from zero.
+- It **concentrates in exactly the kinds a snapshot-diff helps** — research 80%,
+  plan 60%, impl 57%; low where work is writing/coordinating (H3 ◐, mechanism
+  confirmed, outcome half pending).
+- The cheap outside signal **cannot** measure it (§15) → instrumentation is
+  necessary, not optional.
+
+**Still open (needs a different sample, not a different method):**
+- **H1 — correctness tracks complexity, not prompt size.** The joined set had
+  **zero failed transcripts**, so the outcome axis has no contrast. This is the
+  same confound Track A flagged, unresolved. Closing it needs a *deliberately
+  failure-seeded* sample (looping/aborted runs in-set), then measuring whether
+  orientation/complexity separates failed from done. Until then, the determinism
+  bet rests on the *spend* half (proven) not the *outcome* half (assumed).
+
+## 21. Go/no-go
+
+**Go.** The research was run to decide whether the determinism bet is worth
+building, and the answer is yes — with the target sharpened. The move is **LIN-1238:
+wire `task-snapshot-store.diffLatest` + a git-HEAD dimension into prompt-gen**, so an
+unchanged ticket-slice *and* unchanged HEAD suppress the full re-ground (conservative
+— full re-ground on any doubt). It is the only change that removes the re-grounding
+**obligation** (correctness) and the re-grounding **spend** (efficiency) in one edit,
+it sits on substrate that already exists (LIN-598), and it is now backed by a
+measured 68%, not an argument. Ship it **behind the Part III baseline** and re-measure
+orientation-by-bytes before/after on the same kinds — that before/after is the
+falsifiable close on the whole thesis.
+
+Sequenced behind it: the task-scoped ground manifest (the cross-session complement,
+elevated by H4) and LIN-817 token instrumentation (now the standing instrument that
+makes every future determinism change measurable rather than argued).
