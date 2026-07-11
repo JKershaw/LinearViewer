@@ -15,6 +15,7 @@ import {
   snapshotFromContext,
   diffSnapshots
 } from '../../lib/task-snapshot-store.js';
+import { hashContext } from '../../lib/recap-cache.js';
 
 // Minimal in-memory mock of the collection surface the store uses. Supports the
 // equality predicates the store issues: _id, urlKey, taskIdentifier, canonicalId.
@@ -111,6 +112,31 @@ describe('snapshotFromContext', () => {
     assert.equal(snap.children[0].identifier, 'LIN-599');
     assert.equal(snap.children[0].state.type, 'completed');
   });
+
+  test('emits the reported git HEAD as a separate headSha field (LIN-1239)', () => {
+    const head = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+    const snap = snapshotFromContext(sampleContext(), head);
+    assert.equal(snap.headSha, head);
+  });
+
+  test('headSha is null when no HEAD is reported', () => {
+    assert.equal(snapshotFromContext(sampleContext()).headSha, null);
+    assert.equal(snapshotFromContext(sampleContext(), '').headSha, null);
+    assert.equal(snapshotFromContext(sampleContext(), null).headSha, null);
+    // Non-string junk collapses to null rather than being stored verbatim.
+    assert.equal(snapshotFromContext(sampleContext(), 42).headSha, null);
+  });
+
+  test('headSha does NOT change the hashContext dedupe slice (LIN-1239)', () => {
+    // hashContext is computed over the context, never the snapshot, so a HEAD-only
+    // difference must not alter the hash the capture gate compares.
+    const ctx = sampleContext();
+    assert.equal(hashContext(ctx), hashContext(ctx));
+    // The two snapshots differ only by headSha, but the gate never reads the snapshot.
+    const a = snapshotFromContext(ctx, 'aaaaaaa');
+    const b = snapshotFromContext(ctx, 'bbbbbbb');
+    assert.notEqual(a.headSha, b.headSha);
+  });
 });
 
 describe('diffSnapshots', () => {
@@ -190,6 +216,26 @@ describe('TaskSnapshotStore.captureIfChanged', () => {
     assert.equal(total, 2);
     assert.equal(items[0].snapshot.description, 'Edited'); // newest first
     assert.equal(items[1].snapshot.description, 'Original description');
+  });
+
+  test('a pure-HEAD change writes no new snapshot (headSha is off the gate; LIN-1239)', async () => {
+    const ctx = sampleContext();
+    const inputHash = hashContext(ctx); // same slice → same gate hash on both reads
+    // First read reports HEAD abc; the task slice is unchanged so the gate keys on inputHash.
+    await store.captureIfChanged({
+      urlKey: 'ws', taskIdentifier: 'LIN-598', canonicalId: 'uuid-598',
+      inputHash, snapshot: snapshotFromContext(ctx, 'abcabca')
+    });
+    // Second read: identical slice (same inputHash) but a DIFFERENT reported HEAD.
+    // Because the gate reads inputHash only, this must NOT append a snapshot.
+    const second = await store.captureIfChanged({
+      urlKey: 'ws', taskIdentifier: 'LIN-598', canonicalId: 'uuid-598',
+      inputHash, snapshot: snapshotFromContext(ctx, 'defdefd')
+    });
+    assert.equal(second, null);
+    const { items, total } = await store.list('ws', 'LIN-598');
+    assert.equal(total, 1);
+    assert.equal(items[0].snapshot.headSha, 'abcabca'); // still the first read's HEAD
   });
 
   test('ignores writes missing required keys', async () => {

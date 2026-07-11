@@ -75,14 +75,21 @@ function buildApp(taskSnapshotStore) {
   return app;
 }
 
-async function call(app, method, path) {
+async function call(app, method, path, body) {
   const server = app.listen(0);
   await new Promise(resolve => server.once('listening', resolve));
   const { port } = server.address();
   try {
+    const headers = { Authorization: 'Bearer anything' };
+    let payload;
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      payload = JSON.stringify(body);
+    }
     const res = await fetch(`http://127.0.0.1:${port}${path}`, {
       method: method.toUpperCase(),
-      headers: { Authorization: 'Bearer anything' }
+      headers,
+      body: payload
     });
     const text = await res.text();
     let parsed; try { parsed = JSON.parse(text); } catch { parsed = text; }
@@ -154,5 +161,57 @@ describe('proxy brief read → task-snapshot capture (LIN-598)', () => {
   test('snapshots endpoint 400s on a malformed identifier', async () => {
     const res = await call(app, 'get', '/api/proxy/issues/not!valid/snapshots');
     assert.equal(res.status, 400);
+  });
+});
+
+describe('proxy grounding read → worker HEAD stored on snapshot.headSha (LIN-1239)', () => {
+  const HEAD = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+  let store;
+  let app;
+  beforeEach(() => {
+    store = new TaskSnapshotStore({ collection: createMockCollection() });
+    app = buildApp(store);
+  });
+
+  async function capturedHead(identifier) {
+    await waitForCount(store, identifier, 1);
+    const { items } = await store.list('acme', identifier);
+    return items[0].snapshot.headSha;
+  }
+
+  test('GET recap threads ?head into snapshot.headSha', async () => {
+    const res = await call(app, 'get', `/api/proxy/issues/${FIXTURE_ID}/recap?head=${HEAD}`);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(await capturedHead(FIXTURE_ID), HEAD);
+  });
+
+  test('GET brief threads ?head into snapshot.headSha', async () => {
+    const res = await call(app, 'get', `/api/proxy/issues/${FIXTURE_ID}/brief?head=${HEAD}`);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(await capturedHead(FIXTURE_ID), HEAD);
+  });
+
+  test('POST recap threads body.head into snapshot.headSha', async () => {
+    const res = await call(app, 'post', `/api/proxy/recap/${FIXTURE_ID}`, { head: HEAD });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(await capturedHead(FIXTURE_ID), HEAD);
+  });
+
+  test('POST brief threads body.head into snapshot.headSha', async () => {
+    const res = await call(app, 'post', `/api/proxy/brief/${FIXTURE_ID}`, { head: HEAD });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(await capturedHead(FIXTURE_ID), HEAD);
+  });
+
+  test('a read with no reported head stores headSha: null', async () => {
+    const res = await call(app, 'get', `/api/proxy/issues/${FIXTURE_ID}/brief`);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(await capturedHead(FIXTURE_ID), null);
+  });
+
+  test('a malformed head is discarded (stored null → treated as not fresh)', async () => {
+    const res = await call(app, 'get', `/api/proxy/issues/${FIXTURE_ID}/brief?head=not-a-real-sha`);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(await capturedHead(FIXTURE_ID), null);
   });
 });

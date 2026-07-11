@@ -546,7 +546,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * response path (mirrors agentStatusStore.onWrite, LIN-623), so a slow or
    * failing capture cannot affect proxy latency or the response.
    */
-  function captureTaskSnapshot({ urlKey, identifier, context, canonicalId, inputHash }) {
+  function captureTaskSnapshot({ urlKey, identifier, context, canonicalId, inputHash, headSha = null }) {
     if (!taskSnapshotStore) return;
     Promise.resolve()
       .then(() => taskSnapshotStore.captureIfChanged({
@@ -554,9 +554,25 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
         taskIdentifier: context?.issue?.identifier || identifier,
         canonicalId,
         inputHash,
-        snapshot: snapshotFromContext(context)
+        snapshot: snapshotFromContext(context, headSha)
       }))
       .catch(err => console.error('task-snapshot capture error:', err?.message || err));
+  }
+
+  /**
+   * Read the worker's self-reported git HEAD from a grounding read (LIN-1239).
+   * The worker reports its OWN clone's `git rev-parse HEAD` via `?head=<sha>` on the
+   * GET recap/brief paths or a `head` field in the JSON body on the POST paths. Returns
+   * a normalized lowercase hex SHA, or null when the report is absent or malformed.
+   * Null is the safe default: downstream freshness (LIN-1240) reads an absent HEAD as
+   * "never fresh" / fully re-ground. `headSha` is stored on the snapshot but stays out
+   * of the `hashContext` dedupe gate, so it can never churn a snapshot on its own.
+   */
+  function reportedHead(req) {
+    const raw = req?.query?.head ?? req?.body?.head;
+    if (typeof raw !== 'string') return null;
+    const trimmed = raw.trim().toLowerCase();
+    return /^[0-9a-f]{7,64}$/.test(trimmed) ? trimmed : null;
   }
 
   // =========================================================================
@@ -3382,7 +3398,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
-        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
+        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash, headSha: reportedHead(req) });
         const cached = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
 
         if (cached && cached.inputHash === inputHash) {
@@ -3542,7 +3558,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
-        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
+        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash, headSha: reportedHead(req) });
 
         const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'recap', forceDefault: isFreeTier });
         let recap;
@@ -3655,7 +3671,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
-        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
+        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash, headSha: reportedHead(req) });
         const cached = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
 
         if (cached && cached.inputHash === inputHash) {
@@ -3813,7 +3829,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
-        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
+        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash, headSha: reportedHead(req) });
 
         const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier });
         let brief;
