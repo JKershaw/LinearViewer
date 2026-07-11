@@ -308,105 +308,124 @@ function renderCard(direction) {
     </div>`;
   }
 
-  // Accordion sections (Description, Comments, Recap, Prompts)
-  let accordionHtml = '';
+  // Accordion sections, grouped for scannability (LIN-1224). Three intent groups
+  // replace the flat seven-row stack: Details (the task's own content), Insights
+  // (AI-derived recap/brief/context), and Work (dispatch history + prompt actions).
+  // Each accordion keeps its data-accordion hooks and its header->body adjacency,
+  // so the delegated toggle + lazy-load handlers are untouched. Group labels only
+  // appear when more than one group is present (the landing view, description-only,
+  // stays label-free).
+  const groups = { details: [], insights: [], work: [] };
 
   if (issue.description) {
-    accordionHtml += `
-    <div class="swipe-card-accordion">
-      <div class="swipe-accordion-header" data-accordion="description">
-        <span class="swipe-accordion-toggle">\u25B6</span> Description
-      </div>
-      <div class="swipe-accordion-body" data-accordion-body="description">
-        ${renderMarkdown(issue.description)}
-      </div>
-    </div>`;
+    groups.details.push(`
+      <div class="swipe-card-accordion">
+        <div class="swipe-accordion-header" data-accordion="description">
+          <span class="swipe-accordion-toggle">▶</span> Description
+        </div>
+        <div class="swipe-accordion-body" data-accordion-body="description">
+          ${renderMarkdown(issue.description)}
+        </div>
+      </div>`);
   }
 
-  // Comments accordion (lazy loaded) — only available when authenticated
+  // Comments accordion (lazy loaded) - only available when authenticated
   if (urlKey) {
-    accordionHtml += `
-  <div class="swipe-card-accordion">
-    <div class="swipe-accordion-header" data-accordion="comments">
-      <span class="swipe-accordion-toggle">\u25B6</span> Comments
-    </div>
-    <div class="swipe-accordion-body" data-accordion-body="comments">
-      <div class="swipe-comments-loading">Loading comments...</div>
-    </div>
-  </div>`;
+    groups.details.push(`
+      <div class="swipe-card-accordion">
+        <div class="swipe-accordion-header" data-accordion="comments">
+          <span class="swipe-accordion-toggle">▶</span> Comments
+        </div>
+        <div class="swipe-accordion-body" data-accordion-body="comments">
+          <div class="swipe-comments-loading">Loading comments...</div>
+        </div>
+      </div>`);
   }
 
-  // Recap accordion (lazy loaded) — only available when authenticated
+  // Recap accordion (lazy loaded) - only available when authenticated
   if (urlKey) {
-    accordionHtml += `
-  <div class="swipe-card-accordion">
-    <div class="swipe-accordion-header" data-accordion="recap">
-      <span class="swipe-accordion-toggle">\u25B6</span> Recap
-    </div>
-    <div class="swipe-accordion-body" data-accordion-body="recap">
-      <div class="recap-section" data-recap-placeholder="1"></div>
-    </div>
-  </div>`;
+    groups.insights.push(`
+      <div class="swipe-card-accordion">
+        <div class="swipe-accordion-header" data-accordion="recap">
+          <span class="swipe-accordion-toggle">▶</span> Recap
+        </div>
+        <div class="swipe-accordion-body" data-accordion-body="recap">
+          <div class="recap-section" data-recap-placeholder="1"></div>
+        </div>
+      </div>`);
   }
 
-  // Brief accordion (lazy loaded) — only available when authenticated
+  // Brief accordion (lazy loaded) - only available when authenticated
   if (urlKey) {
-    accordionHtml += `
-  <div class="swipe-card-accordion">
-    <div class="swipe-accordion-header" data-accordion="brief">
-      <span class="swipe-accordion-toggle">▶</span> Brief
-    </div>
-    <div class="swipe-accordion-body" data-accordion-body="brief">
-      <div class="brief-section" data-brief-placeholder="1"></div>
-    </div>
-  </div>`;
+    groups.insights.push(`
+      <div class="swipe-card-accordion">
+        <div class="swipe-accordion-header" data-accordion="brief">
+          <span class="swipe-accordion-toggle">▶</span> Brief
+        </div>
+        <div class="swipe-accordion-body" data-accordion-body="brief">
+          <div class="brief-section" data-brief-placeholder="1"></div>
+        </div>
+      </div>`);
   }
 
-  // Context accordion (lazy loaded) — relationship diagram, only when authenticated
+  // Context accordion (lazy loaded) - relationship diagram, only when authenticated
   if (urlKey) {
-    accordionHtml += `
-  <div class="swipe-card-accordion">
-    <div class="swipe-accordion-header" data-accordion="context">
-      <span class="swipe-accordion-toggle">▶</span> Context
-    </div>
-    <div class="swipe-accordion-body" data-accordion-body="context">
-      <div class="context-section" data-context-placeholder="1"></div>
-    </div>
-  </div>`;
+    groups.insights.push(`
+      <div class="swipe-card-accordion">
+        <div class="swipe-accordion-header" data-accordion="context">
+          <span class="swipe-accordion-toggle">▶</span> Context
+        </div>
+        <div class="swipe-accordion-body" data-accordion-body="context">
+          <div class="context-section" data-context-placeholder="1"></div>
+        </div>
+      </div>`);
   }
 
-  // Dispatched Sessions accordion (lazy loaded) — only when dispatch is enabled,
+  // Dispatched Sessions accordion (lazy loaded) - only when dispatch is enabled,
   // since no dispatch means no sessions can exist. Header shows the count baked
   // in server-side, so "[N]" is visible at a glance without opening.
   if (urlKey && dispatchEnabled) {
     const count = issue.sessionCount || 0;
-    accordionHtml += `
-  <div class="swipe-card-accordion">
-    <div class="swipe-accordion-header" data-accordion="sessions">
-      <span class="swipe-accordion-toggle">▶</span> Dispatched Sessions <span class="swipe-sessions-count">[${count}]</span>
-    </div>
-    <div class="swipe-accordion-body" data-accordion-body="sessions">
-      <div class="sessions-section" data-sessions-placeholder="1"></div>
-    </div>
-  </div>`;
+    groups.work.push(`
+      <div class="swipe-card-accordion">
+        <div class="swipe-accordion-header" data-accordion="sessions">
+          <span class="swipe-accordion-toggle">▶</span> Dispatched Sessions <span class="swipe-sessions-count">[${count}]</span>
+        </div>
+        <div class="swipe-accordion-body" data-accordion-body="sessions">
+          <div class="sessions-section" data-sessions-placeholder="1"></div>
+        </div>
+      </div>`);
   }
 
-  // Prompts accordion (lazy loaded, fifth position) — only available when authenticated
+  // Prompts accordion (lazy loaded) - the primary triage action, emphasised as
+  // the anchor of the Work group. Only available when authenticated.
   if (urlKey) {
     const cached = window.PromptSection && window.PromptSection.getCached
       ? window.PromptSection.getCached(issue.id)
       : null;
     const hint = cached ? ` <span class="swipe-prompts-cache-hint">· ${_esc(cached.name || cached.label)} cached</span>` : '';
-    accordionHtml += `
-  <div class="swipe-card-accordion">
-    <div class="swipe-accordion-header" data-accordion="prompts">
-      <span class="swipe-accordion-toggle">\u25B6</span> Prompts${hint}
-    </div>
-    <div class="swipe-accordion-body" data-accordion-body="prompts">
-      <div class="swipe-prompt-placeholder" data-prompt-placeholder="1"></div>
-    </div>
-  </div>`;
+    groups.work.push(`
+      <div class="swipe-card-accordion swipe-card-accordion--primary">
+        <div class="swipe-accordion-header" data-accordion="prompts">
+          <span class="swipe-accordion-toggle">▶</span> Prompts${hint}
+        </div>
+        <div class="swipe-accordion-body" data-accordion-body="prompts">
+          <div class="swipe-prompt-placeholder" data-prompt-placeholder="1"></div>
+        </div>
+      </div>`);
   }
+
+  const GROUP_LABELS = { details: 'Details', insights: 'Insights', work: 'Work' };
+  const activeGroups = ['details', 'insights', 'work'].filter(k => groups[k].length);
+  const showGroupLabels = activeGroups.length > 1;
+  const accordionHtml = activeGroups.map(key => {
+    const label = showGroupLabels
+      ? `<div class="swipe-accordion-group-label">${GROUP_LABELS[key]}</div>`
+      : '';
+    return `<div class="swipe-accordion-group swipe-accordion-group--${key}">
+      ${label}${groups[key].join('')}
+    </div>`;
+  }).join('');
 
   // Provider-aware "View in {provider}" link (LIN-177 S3)
   const providerName = data.providerDisplayName || 'Linear';
