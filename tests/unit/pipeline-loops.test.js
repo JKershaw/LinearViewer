@@ -438,6 +438,91 @@ describe('_buildLoops', () => {
   });
 });
 
+// ─── Abort terminal-attribution (LIN-1257) ───────────────────────────────────
+//
+// When Simple Dispatcher aborts a session it posts the terminal `[aborted]`
+// marker to the abort item's OWN dispatch row, which carries `issueIdentifier:
+// null` and is therefore dropped by reconstruction. The original target row
+// (named by `abortTo`) receives no terminal marker and keeps rendering its last
+// running heartbeat. `_buildLoops`' pre-pass harvests each abort row's `[aborted]`
+// entry BEFORE the drop and appends it to a LOCAL copy of the target loop's
+// feedback, so the existing terminal derivation yields `terminalStatus:'aborted'`.
+describe('_buildLoops abort attribution (LIN-1257)', () => {
+  const ABORT_TS = '2026-04-11T11:30:00.000Z';
+
+  function targetWorker(overrides = {}) {
+    // A surviving target: live row, has an issueIdentifier, last feedback a
+    // running heartbeat (would otherwise render in-progress forever).
+    return liveItem({
+      id: 'W',
+      issueIdentifier: ISSUE_A,
+      dispatchedAt: '2026-04-11T11:00:00.000Z',
+      feedback: [{ message: '[working · running] 4 tools in 34s', timestamp: '2026-04-11T11:20:00.000Z' }],
+      ...overrides
+    });
+  }
+
+  function abortRow(overrides = {}) {
+    // The abort item: no issueIdentifier (dropped by reconstruction), abort=true,
+    // abortTo = the target id, terminal `[aborted]` feedback carrying the timestamp.
+    return historyItem({
+      id: 'A',
+      issueIdentifier: null,
+      abort: true,
+      abortTo: 'W',
+      dispatchedAt: '2026-04-11T11:29:00.000Z',
+      resolvedAt: ABORT_TS,
+      feedback: [{ message: '[aborted] Cancelled running session 3e626118 (EXECUTING).', timestamp: ABORT_TS }],
+      ...overrides
+    });
+  }
+
+  test('worker-abort attributes terminalStatus:aborted (+ completedAt) to the target; the abort row yields no loop', () => {
+    const loops = _buildLoops({ liveItems: [targetWorker()], historyItems: [abortRow()], now: NOW });
+    // Exactly one loop — the surviving target. The abort row (issueIdentifier:null)
+    // is still dropped and produces no loop of its own.
+    assert.strictEqual(loops.length, 1);
+    assert.strictEqual(loops[0].loopId, 'W');
+    assert.strictEqual(loops.find(l => l.loopId === 'A'), undefined, 'abort row must not become a loop');
+    // The target is now terminal:aborted, timestamped from the abort row's entry.
+    assert.strictEqual(loops[0].terminalStatus, 'aborted');
+    assert.strictEqual(loops[0].terminalCompletedAt, ABORT_TS);
+  });
+
+  test('the synthesized [aborted] entry is a LOCAL copy — the stored dispatch record is not mutated', () => {
+    const storedFeedback = [{ message: '[working · running] alive', timestamp: '2026-04-11T11:20:00.000Z' }];
+    const target = targetWorker({ feedback: storedFeedback });
+    _buildLoops({ liveItems: [target], historyItems: [abortRow()], now: NOW });
+    // The original item.feedback array is untouched (no synthetic entry appended).
+    assert.strictEqual(storedFeedback.length, 1, 'stored feedback must not be mutated in place');
+    assert.strictEqual(storedFeedback[0].message, '[working · running] alive');
+  });
+
+  test('an abort with NO abortTo attributes to nothing (target keeps its running heartbeat)', () => {
+    const loops = _buildLoops({
+      liveItems: [targetWorker()],
+      historyItems: [abortRow({ abortTo: undefined })],
+      now: NOW
+    });
+    assert.strictEqual(loops.length, 1);
+    assert.strictEqual(loops[0].terminalStatus, null, 'no abortTo → no attribution');
+  });
+
+  test('[skipped] abort (human-continued, runner refused) must NOT attribute terminal to its target', () => {
+    // The runner posts `[skipped]` (not `[aborted]`) when it refuses a cascade
+    // abort because a human is still in the session — nothing ended there, so the
+    // target must stay non-terminal. This pins the `terminal.status === 'aborted'`
+    // gate: a blind "grab the abort row's last feedback" would mis-flip this.
+    const skippedAbort = abortRow({
+      feedback: [{ message: '[skipped] human-continued session 3e626118 (implementation).', timestamp: ABORT_TS }]
+    });
+    const loops = _buildLoops({ liveItems: [targetWorker()], historyItems: [skippedAbort], now: NOW });
+    assert.strictEqual(loops.length, 1);
+    assert.strictEqual(loops[0].loopId, 'W');
+    assert.strictEqual(loops[0].terminalStatus, null, 'a [skipped] abort must not flip the target terminal');
+  });
+});
+
 // ─── Public API with mock stores ─────────────────────────────────────────────
 
 // Mock stores that HONOUR the issue-scope filters (LIN-613). The real stores
