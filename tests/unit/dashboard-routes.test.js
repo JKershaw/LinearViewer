@@ -100,7 +100,12 @@ function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheSto
     sessionSummaryCacheStore: sessionSummaryCacheStore || new InMemorySessionSummaryCacheStore(),
     freeTierStore: { async tryUse() { return { allowed: true }; } },
     getWorkspaceAccessToken: async () => 'token',
-    fetchIssueContext: async () => ({ issue: { state: { name: 'Done', type: 'completed' }, labels: { nodes: [] } } }),
+    // Default touched-task state is NOT done, so the LIN-1258 bounded feed
+    // hydration leaves an eligible (terminal+error) session at 'error' — the
+    // pre-hydration feed behaviour these shared tests assert. Tests that want a
+    // task hydrated to Done (drill-in, or the done-with-warning upgrade) inject
+    // their own `fetchIssueContext` returning a `completed` state.
+    fetchIssueContext: async () => ({ issue: { state: { name: 'In Progress', type: 'started' }, labels: { nodes: [] } } }),
     fetchWorkspaceIssues: async () => issues || [],
     getOpenRouterSource: () => 'env',
     getDeployInfo: () => ({})
@@ -1811,5 +1816,169 @@ describe('sibling :id-keyed handlers are issue-scoped, no whole-workspace scan (
     await handler(req, res);
     assert.equal(res.statusCode, 404, 'non-peek miss → 404');
     assert.ok(stores.unscoped.length > 0, 'the whole-workspace fallback ran for the non-peek request');
+  });
+});
+
+// ─── Bounded server-side feed hydration (LIN-1258, Axis B) ───────────────────
+//
+// The feed now hydrates the touched SEED task's live done-state for eligible
+// sessions and feeds a real `taskDone` into `deriveSessionStatus`, so an errored
+// terminal session whose task is Done shows `done-with-warning` on the COLLAPSED
+// card without a drill-in — while honouring the no-Linear-read-per-poll contract
+// via a per-poll cap and a 60s TTL cache. These tests drive the real
+// `/api/dashboard/sessions` handler with a COUNTING fake `fetchIssueContext` and
+// a pass-through feed cache (so the LIN-617 output cache never masks a re-poll),
+// and assert the exact backend read COUNT — the falsifiable proof of the gate,
+// the cap, and the cache.
+
+describe('bounded feed hydration (LIN-1258)', () => {
+  // A worker run whose [failed] marker makes its session terminal + error — the
+  // sole eligibility class for a done-with-warning upgrade.
+  function failWorker(id, identifier, sessionId) {
+    return { id, sessionId, issueIdentifier: identifier, issueTitle: `T ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[failed] broke', timestamp: NOW_ISO }] };
+  }
+  // Autopilot anchor (agentStatus completed → session terminal) + a failed worker
+  // ⇒ a terminal, errored session seeded on `seedIdent`.
+  function errorSessionFixture(sessionId, seedIdent, workerIdent) {
+    return {
+      history: [autopilotHistoryItem(sessionId, seedIdent), failWorker(`${sessionId}-w`, workerIdent, sessionId)],
+      agentStatus: [agentStatusDone(sessionId, seedIdent)]
+    };
+  }
+  // Pass-through feed cache: always re-runs the producer, so a second poll really
+  // re-enters mergeSessions and the read count reflects the task-done cache alone.
+  function passThroughFeedCache() {
+    return { keyFor: () => 'k', get: async (_k, producer) => producer() };
+  }
+  function hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache }) {
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore,
+      agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext,
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      sessionsFeedCache
+    });
+  }
+  const doneCtx = { issue: { state: { name: 'Done', type: 'completed' } } };
+  const notDoneCtx = { issue: { state: { name: 'In Progress', type: 'started' } } };
+
+  async function poll(router, workspaces) {
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    return res.jsonBody;
+  }
+  function allSessions(body) {
+    return [...(body.active || []), ...(body.recent || [])];
+  }
+
+  test('the eligibility gate: ONLY terminal+error sessions are hydrated (non-error / non-terminal ⇒ zero reads)', async () => {
+    const perWorkspace = {
+      'ws-a': {
+        // Eligible: terminal + error, seed LIN-300.
+        ...errorSessionFixture('sess-err', 'LIN-300', 'LIN-301'),
+      },
+      'ws-b': {
+        // Clean terminal (done) — NOT eligible.
+        history: [autopilotHistoryItem('sess-done', 'LIN-400'), workerHistoryItem('w-done', 'LIN-401', 'sess-done')],
+        agentStatus: [agentStatusDone('sess-done', 'LIN-400'), agentStatusDone('w-done', 'LIN-401')]
+      },
+      'ws-c': {
+        // Live (non-terminal) — NOT eligible.
+        live: [autopilotLiveItem('sess-live', 'LIN-500')], history: [], agentStatus: []
+      }
+    };
+    let reads = 0;
+    const fetchIssueContext = async (_t, ident) => { reads++; assert.equal(ident, 'LIN-300', 'only the errored session seed is read'); return doneCtx; };
+    const router = hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache: passThroughFeedCache() });
+    const workspaces = [{ urlKey: 'ws-a', name: 'A' }, { urlKey: 'ws-b', name: 'B' }, { urlKey: 'ws-c', name: 'C' }];
+
+    const body = await poll(router, workspaces);
+    assert.equal(reads, 1, 'exactly ONE read — only the terminal+error session, never the done or live one');
+
+    const byId = Object.fromEntries(allSessions(body).map(s => [s.sessionId, s]));
+    assert.equal(byId['sess-err'].status, 'done-with-warning', 'errored+done session is upgraded server-side (collapsed-card fix)');
+    assert.equal(byId['sess-done'].status, 'done', 'clean terminal session unchanged, no read');
+    assert.equal(byId['sess-live'].status, 'in-progress', 'live session unchanged, no read');
+  });
+
+  test('the per-poll cap: at most N=5 reads even with 6 eligible sessions; the overflow keeps taskDone=false', async () => {
+    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] } };
+    for (let i = 1; i <= 6; i++) {
+      const f = errorSessionFixture(`sess-${i}`, `LIN-${600 + i}`, `LIN-${700 + i}`);
+      perWorkspace['ws-a'].history.push(...f.history);
+      perWorkspace['ws-a'].agentStatus.push(...f.agentStatus);
+    }
+    let reads = 0;
+    const fetchIssueContext = async () => { reads++; return doneCtx; };
+    const router = hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache: passThroughFeedCache() });
+
+    const body = await poll(router, [{ urlKey: 'ws-a', name: 'A' }]);
+    assert.equal(reads, 5, 'the cap bounds the poll to exactly 5 backend reads regardless of eligible count');
+
+    const statuses = allSessions(body).map(s => s.status);
+    assert.equal(statuses.filter(x => x === 'done-with-warning').length, 5, 'five eligible sessions were hydrated');
+    assert.equal(statuses.filter(x => x === 'error').length, 1, 'the overflow session keeps taskDone=false (still error) this poll');
+  });
+
+  test('the no-Linear-per-poll contract: a second poll within the TTL adds ZERO reads (cache hit)', async () => {
+    const perWorkspace = {
+      'ws-a': {
+        ...errorSessionFixture('sess-1', 'LIN-810', 'LIN-811'),
+      }
+    };
+    // Two eligible sessions in one workspace to make the count meaningful.
+    const f2 = errorSessionFixture('sess-2', 'LIN-820', 'LIN-821');
+    perWorkspace['ws-a'].history.push(...f2.history);
+    perWorkspace['ws-a'].agentStatus.push(...f2.agentStatus);
+
+    let reads = 0;
+    const fetchIssueContext = async () => { reads++; return doneCtx; };
+    const router = hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache: passThroughFeedCache() });
+    const workspaces = [{ urlKey: 'ws-a', name: 'A' }];
+
+    const first = await poll(router, workspaces);
+    assert.equal(reads, 2, 'first poll reads both eligible seed tasks once');
+    assert.equal(allSessions(first).filter(s => s.status === 'done-with-warning').length, 2);
+
+    // Second poll immediately after (well within the 60s TTL): the feed re-runs
+    // mergeSessions (pass-through cache) but every task is served from the 60s
+    // task-done cache — no additional backend reads.
+    const second = await poll(router, workspaces);
+    assert.equal(reads, 2, 'no additional Linear reads on the second poll within the TTL');
+    assert.equal(allSessions(second).filter(s => s.status === 'done-with-warning').length, 2, 'the upgrade still shows on the re-poll');
+  });
+
+  test('buildSessionPayload back-compat: an errored session whose task is NOT done stays "error" (default-false path unchanged)', async () => {
+    const perWorkspace = { 'ws-a': { ...errorSessionFixture('sess-1', 'LIN-900', 'LIN-901') } };
+    let reads = 0;
+    const fetchIssueContext = async () => { reads++; return notDoneCtx; };
+    const router = hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache: passThroughFeedCache() });
+
+    const body = await poll(router, [{ urlKey: 'ws-a', name: 'A' }]);
+    assert.equal(reads, 1, 'the eligible session is still read');
+    const s = allSessions(body).find(x => x.sessionId === 'sess-1');
+    assert.equal(s.status, 'error', 'a not-done task leaves the status byte-identical to the pre-LIN-1258 feed');
+  });
+
+  test('a hydration read that throws never breaks the feed (session degrades to error, not a 500)', async () => {
+    const perWorkspace = { 'ws-a': { ...errorSessionFixture('sess-1', 'LIN-950', 'LIN-951') } };
+    const fetchIssueContext = async () => { throw new Error('backend down'); };
+    const router = hydrationRouter(perWorkspace, { fetchIssueContext, sessionsFeedCache: passThroughFeedCache() });
+
+    const body = await poll(router, [{ urlKey: 'ws-a', name: 'A' }]);
+    const s = allSessions(body).find(x => x.sessionId === 'sess-1');
+    assert.ok(s, 'the feed still renders the session');
+    assert.equal(s.status, 'error', 'a hydration miss leaves the Mongo-sourced status untouched');
   });
 });

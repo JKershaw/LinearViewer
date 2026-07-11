@@ -78,9 +78,14 @@ const contextState = new Map();            // sessionId → { pending, graph, er
 const contextFetched = new Set();          // sessionId (context fetched once per drill-in)
 const hydrationState = new Map();          // `${wsUrlKey}::${identifier}` → { state, labels, url, hydrated }
 const hydrationFetched = new Set();        // `${wsUrlKey}::${identifier}` (one Linear hit per task per drill-in)
-// Terminal+error sessions upgraded to done-with-warning (LIN-749): the touched
-// task hydrated to a Done state on drill-down. Persisted so the upgrade survives
-// the next poll, which re-emits the marker-derived 'error' from the feed.
+// RESIDUAL drill-in fallback for the server-owned `done-with-warning` (LIN-749/
+// LIN-1258): terminal+error sessions the server did NOT hydrate this poll (cap-
+// overflow / hydration unavailable) still arrive as 'error'; a drill-down that
+// finds the touched task Done records the sessionId here so `displayStatus`
+// upgrades it. Persisted so the upgrade survives later polls that re-emit
+// 'error'. Sessions the server already resolved arrive as 'done-with-warning'
+// and never enter this set (the ensureHydration guard keys on 'error'), so the
+// two paths can't double-apply — the server value is the single source of truth.
 const warnedSessions = new Set();          // sessionId
 const runSummaryState = new Map();         // loopId → { pending, outcome, next, error }
 const runSummaryFetched = new Set();       // loopId (peeked once per run signature)
@@ -149,10 +154,20 @@ function isDoneState(state) {
   return !!state && state.type === 'completed';
 }
 
-// The status string actually rendered on a card. The server feed never carries
-// `done-with-warning` (its no-Linear cost contract leaves it emitting 'error'),
-// so the terminal-boundary upgrade is applied here from drill-down hydration
-// recorded in `warnedSessions`. Every other status passes through unchanged.
+// The status string actually rendered on a card — the SINGLE point where the
+// rendered status is resolved (every render site routes through it).
+//
+// The server now OWNS `done-with-warning` (LIN-1258): its bounded feed hydration
+// feeds a real `taskDone` into `deriveSessionStatus`, so an eligible errored-
+// terminal session already arrives as `status === 'done-with-warning'` on the
+// `/api/dashboard/sessions` payload — and it passes through here UNCHANGED (the
+// server value is authoritative; this function never downgrades or recomputes
+// it). The one client upgrade below is now a RESIDUAL FALLBACK only: it fires
+// solely for sessions the server did NOT hydrate this poll (cap-overflow beyond
+// FEED_HYDRATION_CAP, or hydration unavailable), which still arrive as 'error',
+// and only after a drill-in recorded the touched-task Done in `warnedSessions`.
+// Because that branch keys on `status === 'error'`, a server `done-with-warning`
+// skips it — so there is exactly one source of truth, never a double upgrade.
 function displayStatus(s) {
   if (s.terminal && s.status === 'error' && warnedSessions.has(s.sessionId)) {
     return 'done-with-warning';
@@ -910,10 +925,12 @@ async function ensureHydration(s) {
       const data = await res.json();
       if (data && data.hydrated) {
         hydrationState.set(key, { hydrated: true, state: data.state || null, labels: data.labels || [], url: data.url || null });
-        // Terminal-boundary upgrade (LIN-749): an errored terminal session whose
-        // touched task is now Done renders as done-with-warning. Sourced here from
-        // the drill-down hydration seam, never the per-poll feed. Refresh the card
-        // head/accent (not just the body) so the pill reflects the new status.
+        // Terminal-boundary upgrade (LIN-749) — now a RESIDUAL FALLBACK behind the
+        // server-owned feed hydration (LIN-1258): only sessions the server did not
+        // hydrate this poll still arrive as 'error', so this drill-down seam covers
+        // them. The `s.status === 'error'` guard means a session the server already
+        // resolved to 'done-with-warning' is skipped here (no double upgrade).
+        // Refresh the card head/accent (not just the body) so the pill updates.
         if (!warnedSessions.has(s.sessionId) && s.terminal && s.status === 'error' && isDoneState(data.state)) {
           warnedSessions.add(s.sessionId);
           refreshSessionCard(s.sessionId);

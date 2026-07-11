@@ -36,6 +36,7 @@ import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
+import { createTaskDoneCache } from '../lib/task-done-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { hasPaidEnvKey } from '../lib/openrouter.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
@@ -83,6 +84,15 @@ const ARCHIVE_PAGE_SIZE = 30;
 // materialised at once — the second amplifier behind the Observation memory
 // spike (LIN-622). Capping it keeps peak at ~this many workspaces, not all.
 const WORKSPACE_FANOUT_CONCURRENCY = 2;
+
+// Max touched-task done-state backend reads the Observation feed hydrates per
+// poll (LIN-1258, Axis B). Only errored-terminal sessions can flip to
+// `done-with-warning`, and those are rare on a feed, so a small cap covers the
+// visible collapsed error cards while bounding the per-poll cost to N backend
+// reads regardless of feed size. Combined with the 60s task-done TTL cache this
+// keeps the no-Linear-read-per-poll contract: only cache MISSES count against
+// the cap, cached hits are free, and any overflow fills in over later polls.
+const FEED_HYDRATION_CAP = 5;
 
 /**
  * Run `mapper` over `items` with at most `limit` in flight, returning
@@ -404,6 +414,11 @@ export function createDashboardRoutes({
 }) {
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
+  // Touched-task done-state TTL cache (LIN-1258): 60s, keyed `${wsUrlKey}::${identifier}`.
+  // Under the LIN-617 feed-output cache: when the feed refreshes and re-runs
+  // mergeSessions, an eligible session's seed task is served from here instead of
+  // re-reading the backend every ~5s.
+  const taskDoneCache = createTaskDoneCache();
 
   /**
    * Merge Loops across every connected workspace, tagging each run with its
@@ -465,7 +480,7 @@ export function createDashboardRoutes({
   // Shape one reconstructed session for the observation feed. Loops are enriched
   // (marker-aware agentState/completedAt) so a marker-done run doesn't look live
   // forever; terminality follows the ANCHOR loop (LIN-592), not completedAt.
-  function buildSessionPayload(session, ws) {
+  function buildSessionPayload(session, ws, taskDone = false) {
     const anchor = findAnchorLoop(session);
     const enriched = (Array.isArray(session.loops) ? session.loops : []).map(enrichLoop);
     const children = childLoops(session).map(enrichLoop);
@@ -498,16 +513,21 @@ export function createDashboardRoutes({
     const standalone = isStandaloneSession(session);
     const taken = enriched.some(l => l.agentState !== 'queued');
 
-    // The per-poll feed honours an explicit no-Linear cost contract, so it never
-    // looks up the touched task's current state — `taskDone` stays false here.
-    // The `done-with-warning` upgrade (LIN-749) is applied client-side from the
-    // existing drill-down hydration seam; `deriveSessionStatus` owns the status
-    // contract (and its `waiting` value) in one unit-tested place for both paths.
+    // `taskDone` is the touched seed task's live done-state. It defaults false so
+    // the per-poll feed still honours the no-Linear cost contract for every
+    // session, and every call site that omits it stays byte-identical. When the
+    // bounded feed hydration (LIN-1258) resolves a real done-state for an
+    // errored-terminal session, it re-invokes this with taskDone=true so
+    // `deriveSessionStatus` emits `done-with-warning` (LIN-749) server-side —
+    // making the server the single owner of that upgrade instead of the drill-in
+    // client seam. `deriveSessionStatus` owns the status contract (and its
+    // `waiting` value) in one unit-tested place for both paths.
     const status = deriveSessionStatus({
       terminal,
       stale,
       hasError: enriched.some(l => l.agentState === 'error'),
-      waiting
+      waiting,
+      taskDone
     });
 
     // One segment per worker run for the progress bar (state-colored; the live
@@ -621,20 +641,103 @@ export function createDashboardRoutes({
     };
 
     // Bounded fan-out so peak memory tracks a couple of workspaces, not all
-    // (LIN-622); the derived read makes each workspace cheap.
+    // (LIN-622); the derived read makes each workspace cheap. Each built entry
+    // keeps its source `session` + `ws` alongside the payload so the bounded feed
+    // hydration below can re-build a payload with a real `taskDone` (LIN-1258).
     const settled = await settleWithConcurrency(workspaces, WORKSPACE_FANOUT_CONCURRENCY,
       async (ws) => {
         const sessions = await sessionsForWorkspace(ws);
-        return sessions.map(s => buildSessionPayload(s, ws));
+        return sessions.map(s => ({ session: s, ws, payload: buildSessionPayload(s, ws) }));
       }
     );
-    const merged = [];
+    const built = [];
     for (const r of settled) {
-      if (r.status === 'fulfilled') merged.push(...r.value);
+      if (r.status === 'fulfilled') built.push(...r.value);
       else console.error('Observation: session read failed for a workspace:', r.reason?.message);
     }
+
+    // Bounded, TTL-cached server-side hydration of the touched seed task's live
+    // done-state (LIN-1258, Axis B) — the only way the collapsed/feed card can
+    // reflect a `done-with-warning` without a per-poll Linear read. Mutates the
+    // eligible entries' `.payload` in place.
+    await hydrateTouchedTaskDone(built);
+
+    const merged = built.map(b => b.payload);
     merged.sort((a, b) => (new Date(b.lastActivity || 0).getTime()) - (new Date(a.lastActivity || 0).getTime()));
     return merged;
+  }
+
+  /**
+   * Bounded, TTL-cached server-side hydration of the touched seed task's live
+   * done-state for the Observation feed (LIN-1258, Axis B).
+   *
+   * `taskDone` only changes a session's derived status on the `terminal &&
+   * hasError` branch of `deriveSessionStatus` (it upgrades `error` →
+   * `done-with-warning`, LIN-749); a terminal non-error session is already
+   * `done` and a non-terminal one never consults `taskDone`. So the ELIGIBLE set
+   * is exactly the errored-terminal sessions — pre-hydration `payload.status ===
+   * 'error'`. For those:
+   *
+   *   - a fresh cache HIT is applied for free (no backend read) — always;
+   *   - cache MISSES are read from the backend, but only up to FEED_HYDRATION_CAP
+   *     per poll (cost bound); overflow keeps `taskDone=false` this poll and fills
+   *     in over later polls (logged, never silently dropped).
+   *
+   * Reads go through the same `getWorkspaceAccessToken` + `fetchIssueContext`
+   * deps the drill-in hydrate route uses, so "Done" is the identical signal
+   * (`state.type === 'completed'`). A read that throws is swallowed (best-effort:
+   * a hydration miss never breaks the feed) and — because the cache does not
+   * store a thrown producer — is retried on a later poll. Mutates eligible
+   * entries' `.payload` in place by re-building with `taskDone=true`; nothing
+   * else in the payload changes.
+   *
+   * @param {Array<{session: Object, ws: {urlKey: string, name?: string}, payload: Object}>} built
+   * @returns {Promise<void>}
+   */
+  async function hydrateTouchedTaskDone(built) {
+    // Eligible = errored-terminal sessions with a seed task. `payload.status ===
+    // 'error'` is exactly `terminal && hasError` (deriveSessionStatus: `stale`
+    // only holds for non-terminal sessions, and taskDone is false at this point).
+    const eligible = built.filter(b =>
+      b.payload.status === 'error' && b.payload.tasksTouched && b.payload.tasksTouched[0]);
+    if (eligible.length === 0) return;
+
+    const misses = [];
+    for (const b of eligible) {
+      const seed = b.payload.tasksTouched[0];
+      const key = `${b.ws.urlKey}::${seed}`;
+      const cached = taskDoneCache.peek(key);
+      if (cached !== undefined) {
+        // Free cache hit — apply immediately, no backend read, no cap spend.
+        if (cached) b.payload = buildSessionPayload(b.session, b.ws, true);
+      } else {
+        misses.push({ b, key, seed });
+      }
+    }
+
+    // Only cache misses cost a backend read; cap them per poll.
+    const selected = misses.slice(0, FEED_HYDRATION_CAP);
+    const overflow = misses.length - selected.length;
+    if (overflow > 0) {
+      console.log(`Observation: bounded feed hydration cap (${FEED_HYDRATION_CAP}) reached; deferring ${overflow} errored session(s) to a later poll (LIN-1258)`);
+    }
+
+    await Promise.all(selected.map(async ({ b, key, seed }) => {
+      try {
+        const taskDone = await taskDoneCache.get(key, async () => {
+          const token = await getWorkspaceAccessToken(b.ws.urlKey);
+          if (!token) return false;
+          const context = await fetchIssueContext(token, seed);
+          const issue = context?.issue || context || {};
+          // Same "Done" signal as the drill-in hydrate route (LIN-749).
+          return issue?.state?.type === 'completed';
+        });
+        if (taskDone) b.payload = buildSessionPayload(b.session, b.ws, true);
+      } catch {
+        // Best-effort: a hydration miss leaves the Mongo-sourced payload (error)
+        // untouched; the throw is not cached, so a later poll retries.
+      }
+    }));
   }
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
