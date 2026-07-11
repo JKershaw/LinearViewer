@@ -36,6 +36,16 @@
   padding: 0 0.6rem 6rem;
 }
 
+/* Desktop composition (LIN-1225): the mobile-first feed is a single narrow
+   column, which on a wide viewport left an intentional-looking page adrift in
+   empty margins. Give desktop a deliberately wider reading column — echoing the
+   S6 Swipe brief ("intentional desktop composition; keep the mobile form") — so
+   the feed has presence and card titles get room to breathe without stretching
+   to an unreadable line length. The mobile form (480px basis) is unchanged. */
+@media (min-width: 720px) {
+  .obs-page { max-width: 620px; padding-left: 1rem; padding-right: 1rem; }
+}
+
 /* ─── View header — title fused with the live indicator (LIN-927) ───────────── */
 
 .obs-header {
@@ -192,9 +202,14 @@
   margin-bottom: 0.5rem;
   background: var(--raised);
   overflow: hidden;
+  /* Quiet affordance polish (LIN-1225): the whole card head is clickable, so a
+     hover lift on the top/right border edges signals it without disturbing the
+     status-coloured left accent. */
+  transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
 }
 
-.obs-session.is-open { border-color: var(--border-strong); }
+.obs-session:hover { border-top-color: var(--border-strong); border-right-color: var(--border-strong); border-bottom-color: var(--border-strong); }
+.obs-session.is-open { border-color: var(--border-strong); box-shadow: inset 0 0 0 1px var(--line-soft); }
 .obs-session[data-status="in-progress"] { border-left-color: var(--amber); }
 .obs-session[data-status="done"] { border-left-color: var(--green); }
 /* done-with-warning (LIN-749): green success base — it IS done; the ⚠ marker on

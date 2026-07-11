@@ -16,17 +16,54 @@
   overflow-x: hidden;
 }
 
+/* Breadcrumb back-link, promoted above the title (LIN-1225) so the page opens
+   with an orientation cue, matching the deliberate top-of-page rhythm of the
+   sibling glow-up pages. */
 .sess-back {
   display: inline-block;
-  margin: 0.25rem 0 1rem;
+  margin: 0.25rem 0 0.5rem;
   font-family: var(--font-content);
+  font-size: 0.85rem;
   color: var(--muted);
   text-decoration: none;
 }
-.sess-back:hover { color: var(--text); }
+.sess-back:hover { color: var(--brand); }
 
-.sess-section { margin-bottom: 1.5rem; }
+/* Page header (LIN-1225): left-aligned (override the global centered `header`)
+   with a hairline rule, so the session page leads with the same intentional
+   header rhythm as the Observation feed and Roadmap rather than a lonely
+   centered title. */
+.sess-header {
+  text-align: left;
+  padding: 0 0 0.7rem;
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.sess-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-family: var(--font-content);
+  overflow-wrap: anywhere;
+}
+
+.sess-section { margin-bottom: var(--space-5); }
 .sess-muted { color: var(--muted); font-family: var(--font-content); }
+
+/* Section heading rhythm (LIN-1225) — the S4 (LIN-1222) idiom: a brand-accent
+   tick on the left plus a hairline divider beneath, so the long scrolling page
+   reads as a sequence of intentional sections. `.sess-section` wraps the shared
+   `renderSection` `h2.section-header`. */
+.sess-section > .section-header {
+  font-family: var(--font-content);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  margin: 0 0 var(--space-3) 0;
+  padding: 0 0 0.4rem 0.7rem;
+  border-left: 3px solid var(--brand);
+  border-bottom: 1px solid var(--line);
+}
 
 /* ── "Waiting on you" alert banner (LIN-1005) ─────────────────────────────────
    Prominent, amber running-family (no new status colour). Shown at the top of a
@@ -64,27 +101,54 @@
 }
 
 /* ── Overview ─────────────────────────────────────────────────────────────── */
+/* A quiet "spec sheet" panel (LIN-1225): the flat key/value list gains a subtle
+   inset container with hairline-separated rows so the run summary reads as a
+   deliberate block rather than floating text. */
+.sess-kv-grid {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--inset);
+}
 .sess-kv {
-  display: flex;
+  display: grid;
+  grid-template-columns: 9rem 1fr;
   gap: 0.75rem;
-  padding: 0.15rem 0;
+  padding: 0.4rem 0.8rem;
+  border-top: 1px solid var(--line-soft);
   font-family: var(--font-structural);
   font-size: 0.85rem;
 }
+.sess-kv:first-child { border-top: none; }
 .sess-k {
-  min-width: 8rem;
   color: var(--muted);
   font-family: var(--font-content);
 }
-/* Flex child holding a machine fact (e.g. the 36-char session-id UUID): allow it
-   to shrink and break so it never overruns the row on a narrow screen. */
-.sess-v { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+/* Grid cell holding a machine fact (e.g. the 36-char session-id UUID): min-width
+   0 + break so it never overruns the row on a narrow screen. Timestamps and the
+   runtime read as figures → tabular numerals. */
+.sess-v {
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
 
+.sess-tasks-block { margin-top: var(--space-3); }
+.sess-tasks-label {
+  display: block;
+  font-family: var(--font-content);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 0.4rem;
+}
 .sess-tasks {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-top: 0.6rem;
 }
 .sess-task {
   font-family: var(--font-structural);
@@ -98,13 +162,23 @@
 
 /* ── Runs ─────────────────────────────────────────────────────────────────── */
 .sess-runs { list-style: none; margin: 0; padding: 0; }
+/* Each run card carries a status-coloured left accent (LIN-1225) so the runs
+   list speaks the Observation feed's green/amber/red status language at a
+   glance; the accent hue is driven by `data-status` from the run's terminal
+   state. */
 .sess-run {
   border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
   border-radius: var(--radius-md);
   padding: 0.6rem 0.75rem;
   margin-bottom: 0.6rem;
   background: var(--card-h, transparent);
+  transition: border-color var(--motion-fast) ease;
 }
+.sess-run[data-status="done"] { border-left-color: var(--green); }
+.sess-run[data-status="running"] { border-left-color: var(--amber); }
+.sess-run[data-status="error"] { border-left-color: var(--red); }
+.sess-run[data-status="queued"] { border-left-color: var(--slate); }
 .sess-run-head {
   display: flex;
   align-items: center;
@@ -120,12 +194,9 @@
   font-family: var(--font-content);
   font-size: 0.8rem;
 }
-.sess-run-status {
-  margin-left: auto;
-  font-size: 0.75rem;
-  color: var(--green);
-}
-.sess-run-status--live { color: var(--amber); }
+/* The per-run status is now a shared `.status-pill` (dot + AA-safe label); this
+   only positions it at the end of the head row. */
+.sess-run-status { margin-left: auto; }
 /* ── Expand/collapse toggle (LIN-1133) ────────────────────────────────── */
 .sess-run-head[role="button"] { cursor: pointer; user-select: none; }
 .sess-run-head[role="button"]:hover { color: var(--brand); }
@@ -161,12 +232,16 @@
   gap: 0.35rem;
   margin-top: 0.4rem;
 }
+/* Bordered rounded telemetry chips (LIN-1225) — the family's metric-chip idiom
+   (cf. `.obs-chip-metric`), replacing the filled inset fill for a lighter, more
+   deliberate read. */
 .sess-chip {
   font-family: var(--font-structural);
   font-size: 0.72rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: var(--radius-sm);
-  background: var(--inset);
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: transparent;
   color: var(--muted);
 }
 
@@ -391,7 +466,7 @@
    reply, and expanded transcript comfortable to read and tap. */
 @media (max-width: 480px) {
   .sess-page { padding: 0 0.75rem 2.5rem; }
-  .sess-k { min-width: 6rem; }
+  .sess-kv { grid-template-columns: 6.5rem 1fr; gap: 0.5rem; }
   .sess-waiting { padding: 0.75rem 0.85rem; }
   .sess-waiting-msg { line-height: 1.5; }
   .sess-reply-input { min-height: 5.5rem; }
