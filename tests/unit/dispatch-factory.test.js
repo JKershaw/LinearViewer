@@ -45,6 +45,15 @@ function capturingStore() {
   };
 }
 
+// A capturing store that also serves getItemStatus lookups from a fixed table of
+// prior dispatch items — the shape createDispatchItem's followUpTo inheritance
+// (LIN-1292) reads.
+function capturingStoreWithItems(items) {
+  const store = capturingStore();
+  store.getItemStatus = async (_urlKey, id) => items[id] || null;
+  return store;
+}
+
 async function prefsWith(defaults) {
   const store = new WorkspacePreferencesStore({ collection: createMockCollection() });
   if (defaults) await store.saveWorkspacePreferences('acme', { dispatchDefaults: defaults });
@@ -199,6 +208,62 @@ describe('createDispatchItem — finalizePrompt ordering', () => {
     await createDispatchItem({ store, urlKey: 'acme', kind: 'custom', prompt: 'plain body', fields: { target: 'cli' } });
     assert.equal(store.captured.item.prompt, 'plain body');
     assert.strictEqual(store.captured.item.bootstrapToken, null);
+  });
+});
+
+describe('createDispatchItem — followUpTo issue inheritance (LIN-1292)', () => {
+  // The reply-box producer (public/session.js) posts only { prompt, followUpTo,
+  // target } — no issue* fields. `_buildLoops` requires a truthy issueIdentifier
+  // to build a loop at all (its malformed-row guard), so an issue-less follow-up
+  // is invisible everywhere — not merely unstitched — unless something backfills
+  // it. The factory does that here, from the followUpTo target, without touching
+  // the producer.
+  test('an issue-less follow-up inherits issueId/issueIdentifier/issueTitle/issueUrl from its followUpTo target', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { id: 'anchor-1', issueId: 'uuid-1', issueIdentifier: 'LIN-1292', issueTitle: 'Standalone repro', issueUrl: 'https://linear.app/x/LIN-1292' }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'one more thing', fields: { followUpTo: 'anchor-1', target: 'cli' }
+    });
+    assert.equal(store.captured.item.issueId, 'uuid-1');
+    assert.equal(store.captured.item.issueIdentifier, 'LIN-1292');
+    assert.equal(store.captured.item.issueTitle, 'Standalone repro');
+    assert.equal(store.captured.item.issueUrl, 'https://linear.app/x/LIN-1292');
+  });
+
+  test('an explicit issueIdentifier on the follow-up is never overridden', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { id: 'anchor-1', issueIdentifier: 'LIN-1292', issueTitle: 'Anchor title' }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'x',
+      fields: { followUpTo: 'anchor-1', issueIdentifier: 'LIN-9999', target: 'cli' }
+    });
+    assert.equal(store.captured.item.issueIdentifier, 'LIN-9999');
+    // No inheritance was attempted at all once the caller supplied its own.
+    assert.strictEqual(store.captured.item.issueTitle, undefined);
+  });
+
+  test('a follow-up whose target has aged out / is unresolvable stays issue-less (unchanged behavior)', async () => {
+    const store = capturingStoreWithItems({});
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'x', fields: { followUpTo: 'ghost', target: 'cli' }
+    });
+    assert.strictEqual(store.captured.item.issueIdentifier, undefined);
+  });
+
+  test('a store without getItemStatus (test fakes) is a no-op, never throws', async () => {
+    const store = capturingStore(); // no getItemStatus method
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'x', fields: { followUpTo: 'anchor-1', target: 'cli' }
+    });
+    assert.strictEqual(store.captured.item.issueIdentifier, undefined);
+  });
+
+  test('no followUpTo: inheritance is never attempted (byte-identical to before)', async () => {
+    const store = capturingStoreWithItems({ 'anchor-1': { issueIdentifier: 'LIN-1' } });
+    await createDispatchItem({ store, urlKey: 'acme', prompt: 'x', fields: { target: 'cli' } });
+    assert.strictEqual(store.captured.item.issueIdentifier, undefined);
   });
 });
 

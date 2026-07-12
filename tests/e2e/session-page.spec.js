@@ -162,6 +162,29 @@ async function seedTerminalSessionWithBlockedWorker(page) {
   expect(aDone.status(), `anchor done feedback failed: ${await aDone.text()}`).toBe(200);
 }
 
+// Seed a STANDALONE (non-autopilot, no sessionId) warm cli session — the LIN-1194
+// human-dispatched case that reconstructs as its own single-loop session keyed by
+// its own dispatch id. Left non-terminal (a plain progress note, no [done]/
+// [blocked]) so the reply box omits force, isolating the LIN-1292 stitch from the
+// force/kill-first behavior already covered above.
+async function seedStandaloneWarm(page, { issueIdentifier, issueTitle }) {
+  const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'investigate the flake', promptName: 'implementation', kind: 'implementation', issueIdentifier, issueTitle, target: 'cli' }
+  });
+  expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
+  const item = (await res.json()).item;
+  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+  const { token } = await tokenResp.json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const take = await page.request.post(`/api/dispatch/take/${item.id}`, { headers: auth });
+  expect(take.status(), `take failed: ${await take.text()}`).toBe(200);
+  const progress = await page.request.post(`/api/dispatch/feedback/${item.id}`, {
+    headers: auth, data: { message: 'looked at the failing run' }
+  });
+  expect(progress.status(), `progress feedback failed: ${await progress.text()}`).toBe(200);
+  return { item, token };
+}
+
 // Read the sessions feed and return the first session's id.
 async function discoverSessionId(page) {
   const resp = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
@@ -410,6 +433,85 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     // On the swipe page the Observation tab is a clickable anchor (not active).
     const tabHref = await page.locator('[data-testid="nav-view-observation"]').getAttribute('href');
     expect(tabHref).toBe(`/workspace/${URL_KEY}/observation`);
+  });
+});
+
+// LIN-1292: the render-side follow-up thread stitch, driven through the REAL
+// producer path (the reply box in public/session.js posting {prompt, followUpTo,
+// target} with no sessionId) rather than a hand-built fixture — closing the
+// close-out ledger's "no test drives a real reply-box POST through the store and
+// asserts the follow-up renders inside the original session" gap. A standalone
+// (non-autopilot, no-sessionId) anchor is the exact reproduction the ticket
+// described: before the stitch, this follow-up fell into LIN-1194 pass 3 and
+// surfaced as its own separate session — "vanished discussion."
+test.describe('Follow-up thread stitching through the real reply-box path (LIN-1292)', () => {
+  test('a human reply to a standalone cli session stitches into the same session, not a new one', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const { item: anchor, token } = await seedStandaloneWarm(page, { issueIdentifier: 'LIN-1292', issueTitle: 'Standalone thread-split repro' });
+
+    // The standalone loop reconstructs as its own session keyed by its own dispatch id.
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(anchor.id)}`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
+    await expect(page.locator('[data-testid="session-run"]')).toHaveCount(1);
+
+    const box = page.locator('[data-testid="session-reply"]');
+    await expect(box).toBeVisible();
+    await expect(box).toHaveAttribute('data-session-terminal', 'false');
+
+    // Drive the REAL reply-box producer path: fill + send, exactly what a human does.
+    const [request] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
+      (async () => {
+        await page.locator('[data-testid="session-reply-input"]').fill('one more thing on the flake');
+        await page.locator('[data-testid="session-reply-send"]').click();
+      })()
+    ]);
+    const payload = request.postDataJSON();
+    // The exact wire shape a human reply sends: followUpTo pointing at the
+    // standalone anchor's own dispatch id, no sessionId.
+    expect(payload.followUpTo).toBe(anchor.id);
+    expect(payload.sessionId).toBeUndefined();
+    const resp = await request.response();
+    expect(resp.status()).toBe(201);
+    const followUp = (await resp.json()).item;
+
+    // Drive the follow-up to completion so it carries its own transcript.
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const take2 = await page.request.post(`/api/dispatch/take/${followUp.id}`, { headers: auth });
+    expect(take2.status(), `follow-up take failed: ${await take2.text()}`).toBe(200);
+    const done2 = await page.request.post(`/api/dispatch/feedback/${followUp.id}`, {
+      headers: auth, data: { message: '[done] fixed the flake' }
+    });
+    expect(done2.status(), `follow-up done feedback failed: ${await done2.text()}`).toBe(200);
+
+    // The live sessions feed: still ONE session at the anchor's id — the follow-up
+    // did NOT spawn a second standalone session (the LIN-1292 stitch engaging).
+    // Standalone sessions surface only under the Sessions tab (LIN-1194, `?view=sessions`).
+    const feed = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions?view=sessions`);
+    expect(feed.status()).toBe(200);
+    const body = await feed.json();
+    const all = [...(body.active || []), ...(body.recent || [])];
+    const matches = all.filter(s => s.sessionId === anchor.id || s.sessionId === followUp.id);
+    expect(matches.map(s => s.sessionId)).toEqual([anchor.id]);
+
+    // The per-session page — reloaded from the ORIGINAL anchor's own URL, the only
+    // one a human would have bookmarked — shows BOTH runs: the follow-up's own
+    // transcript is reachable from the original session, not vanished into a
+    // separate one.
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(anchor.id)}`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="session-run"]')).toHaveCount(2);
+    const loopIds = await page.locator('[data-testid="session-run"]').evaluateAll(els => els.map(el => el.getAttribute('data-loop-id')));
+    expect(loopIds).toContain(anchor.id);
+    expect(loopIds).toContain(followUp.id);
+    await expect(page.locator('[data-testid="session-page"]')).toContainText('fixed the flake');
+
+    // The follow-up's own dispatch id was never promoted to a session identity of
+    // its own — the only live view of it is nested inside the original session.
+    const directResp = await page.request.get(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(followUp.id)}`);
+    expect(directResp.status()).toBe(404);
   });
 });
 
