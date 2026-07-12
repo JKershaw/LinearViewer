@@ -477,6 +477,40 @@ describe('expandable row accessibility markup (LIN-566)', () => {
     assert.ok(lineMatch[0].includes('tabindex="0"'), 'periodical row is focusable');
     assert.ok(lineMatch[0].includes('aria-expanded="false"'), 'periodical row starts not-expanded');
   });
+
+  // LIN-1279: the "Mint + Autopilot" action is a SECOND dispatch container on each
+  // periodical row, gated behind the per-user `proxy` flag (load-bearing — its tail
+  // calls the workspace-API kickoff endpoint). The plain Mint container is always
+  // present; the variant appears only when proxy is on.
+  test('proxy flag OFF: only the plain Mint container renders, no autopilot variant', () => {
+    const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'test-workspace',
+      featureFlags: {}
+    });
+    // Plain periodical dispatch container is present (kind=periodical).
+    assert.ok(result.includes('data-kind="periodical"'), 'plain Mint container renders');
+    // No Mint + Autopilot variant when proxy is off.
+    assert.ok(!result.includes('periodical-autopilot-options-'), 'no autopilot options panel when proxy off');
+    assert.ok(!result.includes('+ Autopilot'), 'no "+ Autopilot" affordance when proxy off');
+    assert.ok(!result.includes('data-proxy-force'), 'no proxy-force container when proxy off');
+  });
+
+  test('proxy flag ON: a gated Mint + Autopilot container renders alongside plain Mint', () => {
+    const result = renderPage([testMockPeriodicalsTree], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'test-workspace',
+      featureFlags: { proxy: true }
+    });
+    // The plain container is still there (non-regression).
+    assert.ok(result.includes('periodical-options-'), 'plain Mint options panel still renders');
+    // The variant: its own disclosure id, a proxy-force container, and the "+ Autopilot" label.
+    assert.ok(result.includes('periodical-autopilot-options-'), 'autopilot options panel renders when proxy on');
+    assert.ok(result.includes('data-proxy-force="true"'), 'the variant forces proxy context on');
+    assert.ok(result.includes('+ Autopilot'), 'the "+ Autopilot" affordance is labelled');
+    // The variant carries the kickoff-endpoint tail (HTML-escaped in the container).
+    assert.ok(result.includes('/api/proxy/autopilot/kickoff'), 'the variant prompt names the kickoff endpoint');
+  });
 });
 
 // =============================================================================

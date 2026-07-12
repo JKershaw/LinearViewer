@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { PERIODICALS, getPeriodicals, buildPeriodicalNodes } from '../../lib/periodicals.js';
+import { PERIODICALS, getPeriodicals, buildPeriodicalNodes, withAutopilotTail, PERIODICAL_AUTOPILOT_TAIL } from '../../lib/periodicals.js';
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
@@ -164,6 +164,64 @@ describe('shared two-stage contract (all periodicals)', () => {
         assert.match(prompt, /broad in discovery but bounded in output/i);
         assert.match(prompt, /what you examine/i);
         assert.match(prompt, /stays within its existing bound/i);
+      });
+    });
+  }
+});
+
+// LIN-1279: the "Mint + Autopilot" variant. A second, gated action on each
+// periodical row dispatches the SAME prompt plus a handoff tail so the minting
+// agent chains a scoped autopilot run against the task it just created. The plain
+// Mint prompt must stay byte-identical (no tail, no proxy mechanics), and the tail
+// must appear ONLY on the variant, naming the kickoff endpoint + issueIdentifier
+// and forbidding the agent from running the review itself (double-execution guard).
+describe('Mint + Autopilot variant (LIN-1279)', () => {
+  test('the shared tail names the kickoff endpoint, issueIdentifier, and the no-self-run guard', () => {
+    assert.match(PERIODICAL_AUTOPILOT_TAIL, /POST \/api\/proxy\/autopilot\/kickoff/);
+    assert.match(PERIODICAL_AUTOPILOT_TAIL, /issueIdentifier/);
+    // The double-execution guard: mint + kick off autopilot, do NOT run the review.
+    assert.match(PERIODICAL_AUTOPILOT_TAIL, /do not run the review yourself/i);
+    assert.match(PERIODICAL_AUTOPILOT_TAIL, /double-execute/i);
+    // Names the affordance it belongs to.
+    assert.match(PERIODICAL_AUTOPILOT_TAIL, /Mint \+ Autopilot/);
+  });
+
+  test('withAutopilotTail appends the tail and preserves the base prompt verbatim', () => {
+    const base = '# Periodical: Example\n\nBody.';
+    const variant = withAutopilotTail(base);
+    assert.ok(variant.startsWith(base), 'base prompt is preserved verbatim at the head');
+    assert.ok(variant.endsWith(PERIODICAL_AUTOPILOT_TAIL), 'the tail is appended at the end');
+    assert.strictEqual(variant, `${base}\n\n${PERIODICAL_AUTOPILOT_TAIL}`);
+  });
+
+  const nodes = buildPeriodicalNodes();
+
+  test('every periodical node carries both a plain prompt and an autopilot variant', () => {
+    assert.strictEqual(nodes.length, PERIODICALS.length);
+    for (const { periodical } of nodes) {
+      assert.strictEqual(typeof periodical.prompt, 'string');
+      assert.strictEqual(typeof periodical.autopilotPrompt, 'string');
+    }
+  });
+
+  for (const template of PERIODICALS) {
+    describe(template.title, () => {
+      const node = nodes.find(n => n.periodical.id === template.id);
+      const { prompt, autopilotPrompt } = node.periodical;
+
+      test('plain Mint prompt is byte-identical to the untouched template (non-regression)', () => {
+        assert.strictEqual(prompt, template.generatePrompt());
+        // The plain prompt carries NO proxy mechanics — the shared-contract guard.
+        assert.doesNotMatch(prompt, /POST \/api\/proxy/);
+        assert.doesNotMatch(prompt, /issueIdentifier/);
+      });
+
+      test('autopilot variant = plain prompt + the handoff tail (tail only in the variant)', () => {
+        assert.strictEqual(autopilotPrompt, `${prompt}\n\n${PERIODICAL_AUTOPILOT_TAIL}`);
+        assert.ok(autopilotPrompt.startsWith(prompt), 'variant leads with the byte-identical plain prompt');
+        assert.match(autopilotPrompt, /POST \/api\/proxy\/autopilot\/kickoff/);
+        assert.match(autopilotPrompt, /issueIdentifier/);
+        assert.match(autopilotPrompt, /do not run the review yourself/i);
       });
     });
   }

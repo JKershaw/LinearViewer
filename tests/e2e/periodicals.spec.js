@@ -113,4 +113,78 @@ test.describe('Periodicals group', () => {
     expect(periodicalItem.promptName).toBe('Documentation Review');
     expect(periodicalItem.issueIdentifier ?? null).toBeNull();
   });
+
+  // LIN-1279: the "Mint + Autopilot" action is a SECOND dispatch container on each
+  // periodical row, gated behind BOTH the `periodicals` workspace flag (already
+  // required for the group to render) AND the per-user `proxy` flag (its tail calls
+  // the workspace-API kickoff endpoint, so it needs a proxy token). It must show
+  // ONLY when both are on.
+  test('proxy flag OFF: periodical row shows plain Mint only, no Mint + Autopilot', async ({ page, localWorkerUrlKey }) => {
+    // beforeEach seeded the session WITHOUT the proxy feature.
+    await setPeriodicalsFlag(page, localWorkerUrlKey, true);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    const group = page.locator('[data-project-type="periodicals"]');
+    const docNode = group.locator('.node', { has: page.locator('.line:has-text("Documentation Review")') });
+    await docNode.locator('.line:has-text("Documentation Review")').click();
+
+    // Exactly one dispatch container (plain Mint); no proxy-forced autopilot variant.
+    await expect(docNode.locator('[data-kind="periodical"]')).toHaveCount(1);
+    await expect(docNode.locator('[data-proxy-force="true"]')).toHaveCount(0);
+  });
+
+  test('proxy flag ON: periodical row also shows a proxy-forced Mint + Autopilot', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // Re-establish the session with the per-user proxy feature enabled.
+    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
+    await setPeriodicalsFlag(page, localWorkerUrlKey, true);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    const group = page.locator('[data-project-type="periodicals"]');
+    const docNode = group.locator('.node', { has: page.locator('.line:has-text("Documentation Review")') });
+    await docNode.locator('.line:has-text("Documentation Review")').click();
+
+    // Two dispatch containers now: plain Mint + the Mint + Autopilot variant.
+    await expect(docNode.locator('[data-kind="periodical"]')).toHaveCount(2);
+    // The variant forces proxy context on and is labelled "+ Autopilot".
+    const variant = docNode.locator('[data-proxy-force="true"]');
+    await expect(variant).toHaveCount(1);
+    await expect(variant.locator('.prompt-name')).toHaveText('Documentation Review + Autopilot');
+    // Its prompt carries the kickoff-endpoint handoff tail.
+    await expect(variant.locator('.prompt-text')).toContainText('/api/proxy/autopilot/kickoff');
+  });
+
+  test('proxy flag ON: dispatching Mint + Autopilot queues the variant prompt with proxy attached', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
+    await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
+    await setPeriodicalsFlag(page, localWorkerUrlKey, true);
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    const group = page.locator('[data-project-type="periodicals"]');
+    const docNode = group.locator('.node', { has: page.locator('.line:has-text("Documentation Review")') });
+    await docNode.locator('.line:has-text("Documentation Review")').click();
+
+    // Drive the VARIANT container's dispatch (the proxy-forced one), to the cli target.
+    const variant = docNode.locator('[data-proxy-force="true"]');
+    await variant.locator('.dispatch-disclosure').click();
+    const dispatchBtn = variant.locator('.prompt-dispatch[data-target="cli"]');
+    await dispatchBtn.click();
+
+    // Reaching 'dispatched!' is itself the proxy proof: proxyForce sends attachProxy,
+    // and a failed server-side mint/attach would 503 → 'failed'. So success means the
+    // workspace-API bootstrap was minted and the proxy context attached.
+    await expect(dispatchBtn).toHaveText('dispatched!');
+
+    // The queued item is the AUTOPILOT variant (its prompt carries the kickoff tail),
+    // still issueless + kind=periodical.
+    const { items } = await (await page.request.get(`/workspace/${localWorkerUrlKey}/api/dispatch`)).json();
+    const item = items.find(i => i.kind === 'periodical');
+    expect(item).toBeDefined();
+    expect(item.promptName).toBe('Documentation Review + Autopilot');
+    expect(item.issueIdentifier ?? null).toBeNull();
+    expect(item.prompt).toContain('/api/proxy/autopilot/kickoff');
+    expect(item.prompt).toContain('issueIdentifier');
+  });
 });
