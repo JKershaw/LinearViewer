@@ -162,7 +162,7 @@ test.describe('Desktop nav overflow (LIN-1286)', () => {
     await seedLocal(swimLocalSeed, { features: WIDE_FLAGS });
     // A narrow DESKTOP width (above the 640px mobile breakpoint) that cannot fit all
     // 14 tabs — so the measuring routine must collapse the excess.
-    await page.setViewportSize({ width: 720, height: 800 });
+    await page.setViewportSize({ width: 800, height: 800 });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
@@ -207,7 +207,7 @@ test.describe('Desktop nav overflow (LIN-1286)', () => {
 
   test('keeps the active overflow view inline on desktop (active-hoist invariant)', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(swimLocalSeed, { features: WIDE_FLAGS });
-    await page.setViewportSize({ width: 720, height: 800 });
+    await page.setViewportSize({ width: 800, height: 800 });
     // Dispatch is a flag-gated overflow view — but it is the current page here, so it
     // must be hoisted inline and NEVER hidden inside the collapsed `⋯ more`.
     await page.goto(`/workspace/${localWorkerUrlKey}/dispatch`);

@@ -1572,6 +1572,14 @@ function setupNavViewsOverflow(navBar) {
   mobileMq.addEventListener('change', () => { lastWidth = null; schedule() })
   window.addEventListener('resize', schedule)
 
+  // Re-measure once the self-hosted fonts finish loading. The first pass can run
+  // with fallback fonts (narrower), which mis-measures how many tabs fit; the font
+  // swap then widens the labels WITHOUT changing the strip's clientWidth, so the
+  // width guard would otherwise suppress the correcting relayout. Force it.
+  if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
+    document.fonts.ready.then(() => { lastWidth = null; schedule() })
+  }
+
   layout() // initial pass (before first paint settles, so no flash-of-collapsed)
   lastWidth = strip.clientWidth
 }
