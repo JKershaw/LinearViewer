@@ -1998,11 +1998,9 @@ app.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, asyn
   const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
 
   const readField = (key) => (req.body[key] || '').trim() || undefined;
-  const readHarness = (selectKey, customKey) => {
-    const custom = (req.body[customKey] || '').trim();
-    const select = (req.body[selectKey] || '').trim();
-    return custom || select || undefined;
-  };
+  // The free-text "custom harness" input was removed in LIN-1282; the harness is
+  // now only ever the select's value (one of the two real harnesses, or blank).
+  const readHarness = (selectKey) => (req.body[selectKey] || '').trim() || undefined;
 
   let hasFieldError = false;
   const validate = (value, name) => {
@@ -2012,7 +2010,7 @@ app.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, asyn
   };
 
   const model = readField('defaultModel');
-  const harness = readHarness('defaultHarnessSelect', 'defaultHarnessCustom');
+  const harness = readHarness('defaultHarnessSelect');
   validate(model, 'model');
   validate(harness, 'harness');
 
@@ -2023,7 +2021,7 @@ app.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, asyn
   const byKind = {};
   for (const kind of DISPATCH_DEFAULT_KINDS) {
     const kindModel = readField(`kind__${kind}__Model`);
-    const kindHarness = readHarness(`kind__${kind}__HarnessSelect`, `kind__${kind}__HarnessCustom`);
+    const kindHarness = readHarness(`kind__${kind}__HarnessSelect`);
     validate(kindModel, 'model');
     validate(kindHarness, 'harness');
     if (kindModel || kindHarness) {

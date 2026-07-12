@@ -99,7 +99,7 @@ test.describe('Feedback widget', () => {
 
     await page.getByTestId('feedback-message').fill('use a specific model')
     await exec.locator('.dispatch-exec-model').fill('anthropic/claude-opus-4')
-    await exec.locator('.dispatch-exec-harness-custom').fill('opencode')
+    await exec.locator('.dispatch-exec-harness-select').selectOption('opencode')
     await page.getByTestId('feedback-submit-triage').click()
 
     await expect(page.getByTestId('feedback-status')).toContainText('Filed LIN-778')

@@ -295,13 +295,28 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
     assert.match(html, /name="defaultHarnessSelect"[^>]*>[\s\S]*?<option value="opencode" selected>/);
   });
 
-  test('a custom (non-suggested) harness value renders in the custom text input, not the select', () => {
+  test('LIN-1282: the free-text custom harness input is gone; only the two-harness select remains', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.doesNotMatch(html, /name="defaultHarnessCustom"/);
+    assert.doesNotMatch(html, /class="harness-input"/);
+    assert.doesNotMatch(html, /kind__implementation__HarnessCustom/);
+    // The select still offers exactly the two real harnesses.
+    assert.match(html, /<option value="claude-code"/);
+    assert.match(html, /<option value="opencode"/);
+  });
+
+  test('LIN-1282: a legacy custom (non-suggested) harness value is dropped — no custom input holds it and no real harness is pre-selected', () => {
     const html = renderSettingsPage('Acme', {
       ...BASE,
       dispatchDefaults: { harness: 'my-bespoke-harness' }
     });
-    assert.match(html, /name="defaultHarnessCustom"[^>]*value="my-bespoke-harness"/);
-    assert.doesNotMatch(html, /<option value="my-bespoke-harness"/);
+    const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
+    const row = html.slice(rowStart, rowStart + 1200);
+    // The custom value has nowhere to live in the dispatch-defaults control anymore.
+    assert.doesNotMatch(row, /my-bespoke-harness/);
+    // Neither real harness is marked selected — the select falls to its blank default.
+    assert.doesNotMatch(row, /<option value="claude-code" selected>/);
+    assert.doesNotMatch(row, /<option value="opencode" selected>/);
   });
 
   test('populates a per-kind override row from dispatchDefaults.byKind', () => {
@@ -352,11 +367,56 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       assert.match(row, /<option value=""[^>]* selected>/);
     });
 
-    test('renders a shared recommended-models datalist referenced by every model input', () => {
+    test('renders both the OpenCode and Claude Code model datalists (LIN-1282)', () => {
       const html = renderSettingsPage('Acme', BASE);
       assert.match(html, /<datalist id="dispatch-model-suggestions">/);
-      assert.match(html, /name="defaultModel"[^>]*list="dispatch-model-suggestions"/);
-      assert.match(html, /name="kind__implementation__Model"[^>]*list="dispatch-model-suggestions"/);
+      assert.match(html, /<datalist id="dispatch-model-suggestions-claude">/);
+    });
+
+    test('LIN-1282: the Claude Code datalist offers exactly the three presets (haiku/sonnet/opus), no catalog', () => {
+      const html = renderSettingsPage('Acme', {
+        ...BASE,
+        dispatchModelCatalog: [{ id: 'mock-provider/catalog-model-one', name: 'Catalog Model One' }]
+      });
+      const start = html.indexOf('<datalist id="dispatch-model-suggestions-claude">');
+      const end = html.indexOf('</datalist>', start);
+      const datalist = html.slice(start, end);
+      assert.equal((datalist.match(/<option/g) || []).length, 3);
+      assert.match(datalist, /<option value="haiku">/);
+      assert.match(datalist, /<option value="sonnet">/);
+      assert.match(datalist, /<option value="opus">/);
+      // The live catalog is never merged into the Claude list.
+      assert.doesNotMatch(datalist, /catalog-model-one/);
+    });
+
+    test('LIN-1282: every model input names both datalists via data-model-list-claude/-opencode', () => {
+      const html = renderSettingsPage('Acme', BASE);
+      assert.match(html, /name="defaultModel"[^>]*data-model-list-claude="dispatch-model-suggestions-claude"[^>]*data-model-list-opencode="dispatch-model-suggestions"/);
+      assert.match(html, /name="kind__implementation__Model"[^>]*data-model-list-claude="dispatch-model-suggestions-claude"[^>]*data-model-list-opencode="dispatch-model-suggestions"/);
+    });
+
+    test('LIN-1282: a claude-code row starts on the Claude datalist; an opencode row on the OpenCode datalist', () => {
+      const html = renderSettingsPage('Acme', {
+        ...BASE,
+        dispatchDefaults: {
+          harness: 'claude-code',
+          byKind: { implementation: { harness: 'opencode' } }
+        }
+      });
+      const defStart = html.indexOf('data-testid="dispatch-default-row-default"');
+      const defRow = html.slice(defStart, defStart + 1200);
+      assert.match(defRow, /name="defaultModel"[^>]*list="dispatch-model-suggestions-claude"/);
+
+      const implStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
+      const implRow = html.slice(implStart, implStart + 1200);
+      assert.match(implRow, /name="kind__implementation__Model"[^>]*list="dispatch-model-suggestions"/);
+    });
+
+    test('LIN-1282: the workspace default row (pre-selecting claude-code) starts on the Claude datalist', () => {
+      const html = renderSettingsPage('Acme', BASE);
+      const defStart = html.indexOf('data-testid="dispatch-default-row-default"');
+      const defRow = html.slice(defStart, defStart + 1200);
+      assert.match(defRow, /name="defaultModel"[^>]*list="dispatch-model-suggestions-claude"/);
     });
 
     test('with no dispatchModelCatalog, the datalist is unchanged (static suggestions only)', () => {

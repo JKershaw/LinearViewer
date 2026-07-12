@@ -60,14 +60,36 @@ test.describe('Dispatch defaults settings', () => {
     await expect(bugRow).toBeVisible();
   });
 
-  test('model inputs offer recommended suggestions via a shared datalist (LIN-1111)', async ({ page, localWorkerUrlKey }) => {
+  test('model inputs offer recommended suggestions via the OpenCode and Claude datalists (LIN-1111 / LIN-1282)', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
-    const datalist = page.locator('#dispatch-model-suggestions');
-    await expect(datalist).toHaveCount(1);
-    await expect(datalist.locator('option')).not.toHaveCount(0);
-    await expect(page.locator('input[name="defaultModel"]')).toHaveAttribute('list', 'dispatch-model-suggestions');
+    const opencodeList = page.locator('#dispatch-model-suggestions');
+    const claudeList = page.locator('#dispatch-model-suggestions-claude');
+    await expect(opencodeList).toHaveCount(1);
+    await expect(opencodeList.locator('option')).not.toHaveCount(0);
+    // The Claude Code datalist holds exactly the three presets.
+    await expect(claudeList).toHaveCount(1);
+    await expect(claudeList.locator('option')).toHaveCount(3);
+    await expect(claudeList.locator('option[value="sonnet"]')).toHaveCount(1);
+  });
+
+  test('the model input is harness-aware: it swaps datalists when the harness changes (LIN-1282)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    const modelInput = page.locator('input[name="defaultModel"]');
+    // Workspace default pre-selects claude-code → starts on the Claude datalist.
+    await expect(page.locator('select[name="defaultHarnessSelect"]')).toHaveValue('claude-code');
+    await expect(modelInput).toHaveAttribute('list', 'dispatch-model-suggestions-claude');
+
+    // Switch to OpenCode → the input swaps to the full-list datalist.
+    await page.selectOption('select[name="defaultHarnessSelect"]', 'opencode');
+    await expect(modelInput).toHaveAttribute('list', 'dispatch-model-suggestions');
+
+    // Back to Claude Code → back to the three-preset datalist.
+    await page.selectOption('select[name="defaultHarnessSelect"]', 'claude-code');
+    await expect(modelInput).toHaveAttribute('list', 'dispatch-model-suggestions-claude');
   });
 
   test('the live OpenRouter catalog is merged into the shared datalist (LIN-1111 Session 2)', async ({ page, localWorkerUrlKey }) => {
@@ -111,22 +133,22 @@ test.describe('Dispatch defaults settings', () => {
     await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
     const row = page.locator('[data-testid="dispatch-default-row-implementation"]');
     await row.locator('input.dispatch-model-input').fill('anthropic/claude-sonnet-5');
-    await row.locator('input.harness-input').fill('my-custom-harness');
+    await row.locator('select.harness-select').selectOption('opencode');
     await page.locator('.dispatch-defaults-submit button[type="submit"]').click();
     await page.waitForLoadState('networkidle');
 
     const savedRow = page.locator('[data-testid="dispatch-default-row-implementation"]');
     await expect(savedRow.locator('input.dispatch-model-input')).toHaveValue('anthropic/claude-sonnet-5');
-    await expect(savedRow.locator('input.harness-input')).toHaveValue('my-custom-harness');
+    await expect(savedRow.locator('select.harness-select')).toHaveValue('opencode');
 
-    // Workspace-wide default row stays untouched.
+    // Workspace-wide default model row stays untouched.
     await expect(page.locator('input[name="defaultModel"]')).toHaveValue('');
 
     await page.reload();
     await page.waitForLoadState('networkidle');
     const reloadedRow = page.locator('[data-testid="dispatch-default-row-implementation"]');
     await expect(reloadedRow.locator('input.dispatch-model-input')).toHaveValue('anthropic/claude-sonnet-5');
-    await expect(reloadedRow.locator('input.harness-input')).toHaveValue('my-custom-harness');
+    await expect(reloadedRow.locator('select.harness-select')).toHaveValue('opencode');
   });
 
   test('saving the autopilot per-kind override round-trips through the real POST handler (LIN-1278)', async ({ page, localWorkerUrlKey }) => {
@@ -140,19 +162,19 @@ test.describe('Dispatch defaults settings', () => {
     await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
     const row = page.locator('[data-testid="dispatch-default-row-autopilot"]');
     await row.locator('input.dispatch-model-input').fill('anthropic/claude-sonnet-5');
-    await row.locator('input.harness-input').fill('my-autopilot-harness');
+    await row.locator('select.harness-select').selectOption('opencode');
     await page.locator('.dispatch-defaults-submit button[type="submit"]').click();
     await page.waitForLoadState('networkidle');
 
     const savedRow = page.locator('[data-testid="dispatch-default-row-autopilot"]');
     await expect(savedRow.locator('input.dispatch-model-input')).toHaveValue('anthropic/claude-sonnet-5');
-    await expect(savedRow.locator('input.harness-input')).toHaveValue('my-autopilot-harness');
+    await expect(savedRow.locator('select.harness-select')).toHaveValue('opencode');
 
     await page.reload();
     await page.waitForLoadState('networkidle');
     const reloadedRow = page.locator('[data-testid="dispatch-default-row-autopilot"]');
     await expect(reloadedRow.locator('input.dispatch-model-input')).toHaveValue('anthropic/claude-sonnet-5');
-    await expect(reloadedRow.locator('input.harness-input')).toHaveValue('my-autopilot-harness');
+    await expect(reloadedRow.locator('select.harness-select')).toHaveValue('opencode');
   });
 
   test('the workspace-wide harness select pre-selects claude-code when unconfigured (LIN-1111)', async ({ page, localWorkerUrlKey }) => {

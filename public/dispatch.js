@@ -245,7 +245,6 @@ function initDispatchPagePrompt() {
     const defaultHarness = execContainer.dataset.defaultHarness || ''
     execContainer.innerHTML = window.renderDispatchExecControls('dispatch-page', {
       modelPlaceholder: defaultModel ? `model (default: ${defaultModel})` : 'model',
-      harnessPlaceholder: defaultHarness ? `harness (default: ${defaultHarness})` : 'harness',
       harnessDefault: defaultHarness || undefined
     })
   }

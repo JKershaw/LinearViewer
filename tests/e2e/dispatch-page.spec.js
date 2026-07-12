@@ -487,8 +487,33 @@ test.describe('Dispatch Page', () => {
       const controls = page.locator('.dispatch-exec-controls');
       await expect(controls).toBeVisible();
       await expect(controls.locator('.dispatch-exec-harness-select')).toBeVisible();
-      await expect(controls.locator('.dispatch-exec-harness-custom')).toBeVisible();
       await expect(controls.locator('.dispatch-exec-model')).toBeVisible();
+      // The free-text custom harness input was removed in LIN-1282.
+      await expect(controls.locator('.dispatch-exec-harness-custom')).toHaveCount(0);
+    });
+
+    test('the model datalist is harness-aware: Claude Code offers only the three presets, OpenCode the full list (LIN-1282)', async ({ page }) => {
+      const controls = page.locator('.dispatch-exec-controls');
+      const modelInput = controls.locator('.dispatch-exec-model');
+
+      // Default harness is claude-code (pre-selected) → the model input points at
+      // the Claude datalist, which holds exactly haiku/sonnet/opus.
+      const claudeListId = await modelInput.getAttribute('data-model-list-claude');
+      const opencodeListId = await modelInput.getAttribute('data-model-list-opencode');
+      await expect(modelInput).toHaveAttribute('list', claudeListId);
+      const claudeList = page.locator(`#${claudeListId}`);
+      await expect(claudeList.locator('option')).toHaveCount(3);
+      await expect(claudeList.locator('option[value="haiku"]')).toHaveCount(1);
+      await expect(claudeList.locator('option[value="sonnet"]')).toHaveCount(1);
+      await expect(claudeList.locator('option[value="opus"]')).toHaveCount(1);
+      // The full OpenRouter list is never merged into the Claude datalist.
+      await expect(claudeList.locator('option[value="openai/gpt-5.4-mini"]')).toHaveCount(0);
+
+      // Switching to OpenCode swaps the input to the full-list datalist.
+      await controls.locator('.dispatch-exec-harness-select').selectOption('opencode');
+      await expect(modelInput).toHaveAttribute('list', opencodeListId);
+      const opencodeList = page.locator(`#${opencodeListId}`);
+      await expect(opencodeList.locator('option[value="openai/gpt-5.4-mini"]')).toHaveCount(1);
     });
 
     test('the live OpenRouter catalog enriches the model datalist after load (LIN-1111 Session 2)', async ({ page }) => {
@@ -545,20 +570,6 @@ test.describe('Dispatch Page', () => {
       expect(item.harness).toBeNull();
     });
 
-    test('a custom harness value wins over the select', async ({ page }) => {
-      await page.locator('.dispatch-prompt-input').fill('Custom harness wins');
-      await page.locator('.dispatch-exec-harness-select').selectOption('claude-code');
-      await page.locator('.dispatch-exec-harness-custom').fill('my-custom-harness');
-
-      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
-      await dispatchBtn.click();
-      await expect(dispatchBtn).toHaveText('dispatched!');
-
-      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
-      const { items } = await listResponse.json();
-      const item = items.find(i => i.prompt === 'Custom harness wins');
-      expect(item.harness).toBe('my-custom-harness');
-    });
   });
 
   // LIN-1162: a UI dispatch with +proxy ON now attaches the workspace-API block

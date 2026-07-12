@@ -555,6 +555,16 @@ const DISPATCH_MODEL_SUGGESTIONS = [
   'openai/gpt-5.5-pro'
 ];
 
+// Claude Code's three model presets (LIN-1282). Unlike OpenCode — which reaches
+// the full OpenRouter-derived DISPATCH_MODEL_SUGGESTIONS list above plus the live
+// catalog — Claude Code only offers Haiku / Sonnet / Opus. These are the Claude
+// Code `--model` aliases, so they stay stable across model generations (the
+// Simple Dispatcher launch-with-model wiring is a separate follow-up). The model
+// input's datalist swaps between this list and the OpenCode one based on the
+// selected harness (syncHarnessModelList, below); the live catalog is merged only
+// into the OpenCode datalist.
+const DISPATCH_CLAUDE_MODEL_SUGGESTIONS = ['haiku', 'sonnet', 'opus'];
+
 // =============================================================================
 // Live OpenRouter model catalog (LIN-1111 Session 2)
 // =============================================================================
@@ -606,7 +616,9 @@ function buildCatalogModelOptionsHtml(models) {
 function applyDispatchModelCatalogToPage(models) {
   const optionsHtml = buildCatalogModelOptionsHtml(models);
   if (!optionsHtml) return;
-  document.querySelectorAll('.dispatch-exec-model-datalist').forEach(dl => {
+  // Only the OpenCode datalists take the catalog (LIN-1282) — the Claude Code
+  // datalist stays fixed at its three presets.
+  document.querySelectorAll('.dispatch-exec-model-datalist-opencode').forEach(dl => {
     dl.insertAdjacentHTML('beforeend', optionsHtml);
   });
 }
@@ -640,19 +652,25 @@ window.fetchDispatchModelCatalog = function fetchDispatchModelCatalog(urlKey) {
 
 /**
  * Renders the shared dispatch-time model/harness control markup: a harness
- * select-or-custom pair plus a free-text model input, scoped under one
- * `idPrefix` so multiple instances can coexist on a page. Read the chosen
- * values back with `window.readDispatchExecControls`.
+ * select plus a free-text model input whose suggestion datalist is harness-aware
+ * (LIN-1282), scoped under one `idPrefix` so multiple instances can coexist on a
+ * page. Read the chosen values back with `window.readDispatchExecControls`.
+ *
+ * The free-text "custom harness" input was removed in LIN-1282 — there are only
+ * two real harnesses. The model input carries two datalists: the OpenCode one
+ * (full OpenRouter list + live catalog) and the Claude Code one (three presets).
+ * It starts on the datalist matching the pre-selected harness; the shared
+ * document-level `change` handler (`syncHarnessModelList`) swaps `list` between
+ * them when the harness select changes.
  * @global
  * @param {string} idPrefix - Unique prefix distinguishing this instance (e.g. an issue id)
  * @param {Object} [opts]
  * @param {string} [opts.modelPlaceholder] - Placeholder for the model input (UX-only resolved-default hint, LIN-1096)
- * @param {string} [opts.harnessPlaceholder] - Placeholder for the harness custom input (UX-only resolved-default hint)
- * @param {string} [opts.harnessDefault] - The workspace's actual resolved default harness, when the caller knows it (LIN-1111; only the Dispatch page threads this today, via data-default-harness). When given and it matches a known suggestion, it wins over the static DEFAULT_HARNESS so a configured non-Claude default (e.g. 'opencode') still pre-selects correctly instead of being silently shadowed. When given but NOT a known suggestion (a custom harness string), nothing is pre-selected — a `<select>` can't represent an arbitrary value, and auto-filling the custom text input would turn an untouched field into an explicit submission, defeating the point of leaving it blank.
+ * @param {string} [opts.harnessDefault] - The workspace's actual resolved default harness, when the caller knows it (LIN-1111; only the Dispatch page threads this today, via data-default-harness). When given and it matches a known suggestion, it wins over the static DEFAULT_HARNESS so a configured non-Claude default (e.g. 'opencode') still pre-selects correctly instead of being silently shadowed. When given but NOT a known suggestion, nothing is pre-selected — a `<select>` can't represent an arbitrary value.
  * @returns {string} HTML for the control pair
  */
 window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix, opts = {}) {
-  const { modelPlaceholder = 'model', harnessPlaceholder = 'harness', harnessDefault } = opts;
+  const { modelPlaceholder = 'model', harnessDefault } = opts;
   const prefix = window.escapeHtml(idPrefix || '');
   const preselectedHarness = harnessDefault === undefined
     ? DEFAULT_HARNESS
@@ -660,37 +678,42 @@ window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix
   const optionsHtml = DISPATCH_HARNESS_SUGGESTIONS
     .map(h => `<option value="${window.escapeHtml(h)}"${h === preselectedHarness ? ' selected' : ''}>${window.escapeHtml(h)}</option>`)
     .join('');
-  const modelListId = `dispatch-exec-model-list-${prefix}`;
-  const staticModelOptionsHtml = DISPATCH_MODEL_SUGGESTIONS
+  const opencodeListId = `dispatch-exec-model-list-${prefix}`;
+  const claudeListId = `dispatch-exec-model-list-claude-${prefix}`;
+  const opencodeOptionsHtml = DISPATCH_MODEL_SUGGESTIONS
+    .map(m => `<option value="${window.escapeHtml(m)}"></option>`)
+    .join('');
+  const claudeOptionsHtml = DISPATCH_CLAUDE_MODEL_SUGGESTIONS
     .map(m => `<option value="${window.escapeHtml(m)}"></option>`)
     .join('');
   // If the catalog already resolved (a prior control on this page kicked off
-  // the fetch), inline it now; otherwise kick off the fetch — it will patch
-  // this datalist (via applyDispatchModelCatalogToPage) once it resolves.
+  // the fetch), inline it now (OpenCode datalist only); otherwise kick off the
+  // fetch — it will patch this datalist (via applyDispatchModelCatalogToPage)
+  // once it resolves.
   const catalogModelOptionsHtml = _dispatchModelCatalog ? buildCatalogModelOptionsHtml(_dispatchModelCatalog) : '';
   if (!_dispatchModelCatalog) window.fetchDispatchModelCatalog();
+  const initialListId = preselectedHarness === 'claude-code' ? claudeListId : opencodeListId;
   return `<span class="dispatch-exec-controls" data-exec-prefix="${prefix}">
     <select class="dispatch-exec-harness-select" aria-label="Harness">
       <option value="">&mdash;</option>
       ${optionsHtml}
     </select>
-    <span class="dispatch-exec-or">or</span>
-    <input type="text" class="dispatch-exec-harness-custom" maxlength="200" placeholder="${window.escapeHtml(harnessPlaceholder)}" aria-label="Custom harness">
-    <input type="text" class="dispatch-exec-model" maxlength="200" list="${modelListId}" placeholder="${window.escapeHtml(modelPlaceholder)}" aria-label="Model">
-    <datalist id="${modelListId}" class="dispatch-exec-model-datalist">${staticModelOptionsHtml}${catalogModelOptionsHtml}</datalist>
+    <input type="text" class="dispatch-exec-model" maxlength="200" list="${initialListId}" data-model-list-claude="${claudeListId}" data-model-list-opencode="${opencodeListId}" placeholder="${window.escapeHtml(modelPlaceholder)}" aria-label="Model">
+    <datalist id="${opencodeListId}" class="dispatch-exec-model-datalist dispatch-exec-model-datalist-opencode">${opencodeOptionsHtml}${catalogModelOptionsHtml}</datalist>
+    <datalist id="${claudeListId}" class="dispatch-exec-model-datalist-claude">${claudeOptionsHtml}</datalist>
   </span>`;
 };
 
 /**
  * Reads the current `{model, harness}` values back out of a container holding
- * a `.dispatch-exec-controls` block (or that block itself). A custom harness
- * value wins over the select (mirrors the settings page's dispatch-defaults
- * precedence, LIN-1095). The harness select pre-selects `claude-code`
- * (LIN-1111), so an untouched control now reads back `harness: 'claude-code'`
- * rather than null — pick the blank "—" option to still send null explicitly.
- * The model field has no such default (only suggestions), so a blank model
- * still resolves to `null`, and `window.dispatchPrompt` omits it so the
- * consumer's own default resolution applies (LIN-1094).
+ * a `.dispatch-exec-controls` block (or that block itself). The harness is the
+ * select's value (the free-text "custom harness" input was removed in LIN-1282).
+ * The harness select pre-selects `claude-code` (LIN-1111), so an untouched
+ * control reads back `harness: 'claude-code'` rather than null — pick the blank
+ * "—" option to still send null explicitly. The model field has no such default
+ * (only suggestions), so a blank model still resolves to `null`, and
+ * `window.dispatchPrompt` omits it so the consumer's own default resolution
+ * applies (LIN-1094).
  * @global
  * @param {Element|null} [scopeEl]
  * @returns {{model: string|null, harness: string|null}}
@@ -701,12 +724,46 @@ window.readDispatchExecControls = function readDispatchExecControls(scopeEl) {
     : scopeEl.querySelector && scopeEl.querySelector('.dispatch-exec-controls'));
   if (!scope) return { model: null, harness: null };
   const select = scope.querySelector('.dispatch-exec-harness-select');
-  const custom = scope.querySelector('.dispatch-exec-harness-custom');
   const modelInput = scope.querySelector('.dispatch-exec-model');
-  const harness = (custom && custom.value.trim()) || (select && select.value) || '';
+  const harness = (select && select.value) || '';
   const model = modelInput ? modelInput.value.trim() : '';
   return { model: model || null, harness: harness || null };
 };
+
+/**
+ * Harness-aware model datalist sync (LIN-1282). Swaps a model input's `list`
+ * between its Claude Code and OpenCode datalists based on the sibling harness
+ * select's value: Claude Code exposes only its three presets, OpenCode the full
+ * OpenRouter list. Surface-agnostic — it works for both the Dispatch-page exec
+ * controls (`.dispatch-exec-*`, datalists inside the control) and the Settings
+ * dispatch-defaults rows (`.harness-select`/`.dispatch-model-input`, shared
+ * page-level datalists) because the model input names both datalist ids via
+ * `data-model-list-claude` / `data-model-list-opencode`.
+ * @param {Element} select - The harness `<select>` that changed
+ */
+function syncHarnessModelList(select) {
+  const row = select.closest('.dispatch-exec-controls, .dispatch-default-row');
+  if (!row) return;
+  const input = row.querySelector('.dispatch-exec-model, .dispatch-model-input');
+  if (!input) return;
+  const claudeId = input.getAttribute('data-model-list-claude');
+  const opencodeId = input.getAttribute('data-model-list-opencode');
+  if (!claudeId || !opencodeId) return;
+  input.setAttribute('list', select.value === 'claude-code' ? claudeId : opencodeId);
+}
+
+// One delegated listener drives every harness/model control on the page,
+// including any rendered after load (the Dispatch-page/feedback exec controls
+// are injected client-side). The initial `list` is set correctly at render time
+// on both surfaces, so only the change reaction needs wiring here.
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t && t.matches && t.matches('.dispatch-exec-harness-select, .harness-select')) {
+      syncHarnessModelList(t);
+    }
+  });
+}
 
 // =============================================================================
 // Dispatch Disclosure (shared dispatch toggle + options panel) — LIN-1137
