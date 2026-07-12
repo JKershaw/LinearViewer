@@ -236,6 +236,29 @@ test('style.css lays the switcher out as a single non-wrapping scrolling row', (
   assert.match(block, /white-space:\s*nowrap/);
 });
 
+test('style.css collapses desktop overflow only when JS marks the strip (LIN-1286)', () => {
+  const css = readFileSync(STYLE_CSS, 'utf8');
+  // The desktop collapse is GATED on the JS-added `.nav-views--collapsed` class, so
+  // the no-JS / everything-fits path keeps the inline `display:contents` fallback and
+  // never over-collapses.
+  assert.match(css, /\.nav-views--collapsed \.nav-views-overflow\s*\{\s*display:\s*none;/);
+  // …and reveals the `⋯ more` toggle in that same collapsed state (it is
+  // `display:none` at desktop by default).
+  assert.match(css, /\.nav-views--collapsed \.nav-more-toggle\s*\{\s*display:\s*inline-flex;/);
+  // The opened card wins over the collapse-hide (same specificity, later source) so
+  // clicking `⋯ more` shows the in-flow card on desktop too.
+  assert.match(css, /\.nav-views--collapsed \.nav-views-overflow--open\s*\{\s*display:\s*flex;/);
+});
+
+test('style.css desktop neutralizer no longer re-inlines a genuinely collapsed group (LIN-1286)', () => {
+  const css = readFileSync(STYLE_CSS, 'utf8');
+  // The min-width:641px neutralizer that forced `display:contents` on a persisted
+  // `--open` is now scoped to `:not(.nav-views--collapsed)`, so it can't fight the
+  // JS-managed desktop collapse (where an open group is a real card, not re-inlined).
+  const block = css.slice(css.indexOf('@media (min-width: 641px)'));
+  assert.match(block, /\.nav-views:not\(\.nav-views--collapsed\) \.nav-views-overflow--open\s*\{\s*display:\s*contents;/);
+});
+
 test('the shared nav is pinned (sticky/translucent) with the interception fix (LIN-984)', () => {
   // LIN-984 restored the retired obs-appbar treatment onto the shared header:
   // the nav pins to the top with a translucent wash. The pointer-interception

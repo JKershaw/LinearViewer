@@ -134,6 +134,94 @@ test.describe('Header view switcher (LIN-978)', () => {
   });
 });
 
+// LIN-1286: desktop nav overflow. Above the 640px mobile breakpoint the strip used
+// to inline every flag-gated view and rely on a horizontal scrollbar when many
+// experimental features were on. A JS width-measuring routine now collapses ONLY the
+// items that don't fit into the same `⋯ more` group (revealing the toggle only when
+// something is hidden), so desktop no longer horizontal-scrolls yet a strip that fits
+// never over-collapses — and the active-hoist invariant still holds.
+test.describe('Desktop nav overflow (LIN-1286)', () => {
+  // The widest possible switcher: 5 first-class + 3 power-user + 6 experimental.
+  const WIDE_FLAGS = {
+    roadmap: true, dispatch: true, proxy: true,
+    collective: true, taskChat: true, ship: true,
+    nextRun: true, flightCompanion: true, shipBiscuit: true
+  };
+  const FLAG_GATED = ['roadmap', 'dispatch', 'proxy', 'collective', 'task-chat', 'ship', 'next-run', 'flight-companion', 'ship-biscuit'];
+
+  const stripScrolls = (page) =>
+    page.locator('.nav-views').evaluate(el => el.scrollWidth > el.clientWidth + 1);
+
+  const countVisible = async (page, views) => {
+    let n = 0;
+    for (const v of views) if (await nav(page).getView(v).isVisible()) n++;
+    return n;
+  };
+
+  test('collapses the excess behind ⋯ more at a narrow desktop width, no horizontal scroll', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed, { features: WIDE_FLAGS });
+    // A narrow DESKTOP width (above the 640px mobile breakpoint) that cannot fit all
+    // 14 tabs — so the measuring routine must collapse the excess.
+    await page.setViewportSize({ width: 720, height: 800 });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    // The first-class five stay inline.
+    for (const view of ['observation', 'swipe', 'swim', 'projects', 'settings']) {
+      await expect(nav(page).getView(view)).toBeVisible();
+    }
+
+    // The toggle is revealed because something is genuinely hidden…
+    const more = page.locator('[data-testid="nav-more-toggle"]');
+    await expect(more).toBeVisible();
+    await expect(more).toHaveAttribute('aria-expanded', 'false');
+    // …and at least one flag-gated view is collapsed out of the inline strip.
+    expect(await countVisible(page, FLAG_GATED)).toBeLessThan(FLAG_GATED.length);
+
+    // The core defect is gone: the strip does not horizontally scroll.
+    expect(await stripScrolls(page)).toBe(false);
+
+    // Opening `⋯ more` reveals every collapsed view in the in-flow card.
+    await more.click();
+    await expect(more).toHaveAttribute('aria-expanded', 'true');
+    for (const view of FLAG_GATED) {
+      await expect(nav(page).getView(view)).toBeVisible();
+    }
+  });
+
+  test('does NOT collapse when the row already fits at a wide desktop width', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // Only the 3 power-user flags on → 8 tabs, comfortably fitting a wide desktop.
+    await seedLocal(swimLocalSeed, { features: { roadmap: true, dispatch: true, proxy: true } });
+    await page.setViewportSize({ width: 1400, height: 800 });
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    // Everything is inline (the over-collapse a pure breakpoint rule would cause is
+    // avoided) and the toggle stays hidden.
+    for (const view of ['observation', 'swipe', 'swim', 'projects', 'settings', 'roadmap', 'dispatch', 'proxy']) {
+      await expect(nav(page).getView(view)).toBeVisible();
+    }
+    await expect(page.locator('[data-testid="nav-more-toggle"]')).not.toBeVisible();
+    expect(await stripScrolls(page)).toBe(false);
+  });
+
+  test('keeps the active overflow view inline on desktop (active-hoist invariant)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed, { features: WIDE_FLAGS });
+    await page.setViewportSize({ width: 720, height: 800 });
+    // Dispatch is a flag-gated overflow view — but it is the current page here, so it
+    // must be hoisted inline and NEVER hidden inside the collapsed `⋯ more`.
+    await page.goto(`/workspace/${localWorkerUrlKey}/dispatch`);
+    await page.waitForLoadState('networkidle');
+
+    // The strip still collapses (many views) and does not scroll…
+    await expect(page.locator('[data-testid="nav-more-toggle"]')).toBeVisible();
+    expect(await stripScrolls(page)).toBe(false);
+    // …yet the active dispatch tab is visible inline while the card is closed.
+    await expect(page.locator('[data-testid="nav-more-toggle"]')).toHaveAttribute('aria-expanded', 'false');
+    await expect(nav(page).getView('dispatch')).toBeVisible();
+  });
+});
+
 // LIN-1149: nav-actions placement — the deliberate order of shared nav-chrome
 // actions. Search (projects-only) must precede the queue badge (feature-gated,
 // all pages), and the gating rules must not leak one onto the wrong page.

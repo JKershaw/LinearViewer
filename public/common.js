@@ -1330,22 +1330,12 @@ function initNavBar() {
     })
   }
 
-  // "⋯ more" view-overflow expander (LIN-1058). An IN-FLOW disclosure: it
-  // toggles the `.nav-views-overflow` block that sits below the tab strip in
-  // NORMAL FLOW — no floating panel, no backdrop, no click-catcher (LIN-984
-  // safe by construction). Deliberately NOT wired through the selector
-  // dropdown machinery above (no `.nav-dropdown-overlay`, no closeAllSelectors);
-  // it simply flips `aria-expanded` + an `--open` state class the CSS reads.
-  const moreToggle = navBar.querySelector('.nav-more-toggle')
-  const moreOverflow = navBar.querySelector('#nav-views-overflow')
-  if (moreToggle && moreOverflow) {
-    moreToggle.addEventListener('click', (e) => {
-      e.stopPropagation()
-      const isOpen = moreToggle.getAttribute('aria-expanded') === 'true'
-      moreToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true')
-      moreOverflow.classList.toggle('nav-views-overflow--open', !isOpen)
-    })
-  }
+  // "⋯ more" view-overflow — the shared, in-flow disclosure (LIN-1058 / LIN-1286),
+  // wired below. An IN-FLOW disclosure: the `.nav-views-overflow` block sits below
+  // the tab strip in NORMAL FLOW — no floating panel, no backdrop, no click-catcher
+  // (LIN-984 safe by construction). Deliberately NOT wired through the selector
+  // dropdown machinery above (no `.nav-dropdown-overlay`, no closeAllSelectors).
+  setupNavViewsOverflow(navBar)
 
   // Team option selection (workspace uses form submission)
   if (teamOptions) {
@@ -1464,6 +1454,126 @@ function initNavBar() {
     // Save current selection
     setTeamSelection(urlTeam || 'all', urlKey)
   }
+}
+
+// =============================================================================
+// Shared `⋯ more` view-overflow — mobile media query + desktop measured overflow
+// =============================================================================
+//
+// The overflow group (`#nav-views-overflow`), the `⋯ more` toggle, and the
+// `.nav-views-overflow--open` card are ONE shared mechanism across both viewports
+// (LIN-1058 / LIN-1286):
+//
+//   - Mobile (≤640px): pure CSS. The `@media (max-width:640px)` block collapses the
+//     whole group and reveals the toggle; JS only keeps the full group in the
+//     container and resets the open state.
+//   - Desktop (>640px): JS width-measured "priority+" overflow. Starting from the
+//     CSS default (all overflow links inline, horizontal-scroll fallback), a
+//     measuring loop collapses ONLY the items that don't fit into the SAME group and
+//     marks the strip `.nav-views--collapsed` — revealing the toggle only when
+//     something is actually hidden. A strip that already fits never collapses
+//     (avoids the over-collapse of a pure breakpoint rule) and the horizontal
+//     scrollbar disappears (the reported LIN-1286 defect).
+//
+// The active-hoisted current tab is a primary child of `.nav-views`, never inside
+// `#nav-views-overflow`, so it is structurally un-collapsible — the active-hoist
+// invariant holds for free. The disclosure a11y (aria-expanded/aria-controls) is
+// the same one toggle/one group on both viewports.
+function setupNavViewsOverflow(navBar) {
+  const strip = navBar.querySelector('.nav-views')
+  const toggle = navBar.querySelector('.nav-more-toggle')
+  const overflow = navBar.querySelector('#nav-views-overflow')
+  // No overflow group rendered (no flag-gated views) → nothing to manage.
+  if (!strip || !toggle || !overflow) return
+
+  // The collapsible set, captured once in server order. The active-hoisted tab is
+  // NOT among these (it lives inline in `.nav-views`), so it can never be collapsed.
+  const collapsible = Array.from(overflow.children)
+  const mobileMq = window.matchMedia('(max-width: 640px)')
+
+  function setOpen(open) {
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false')
+    overflow.classList.toggle('nav-views-overflow--open', open)
+    // Desktop: an open card needs the strip to wrap so the full-width card can drop
+    // to its own row (like mobile) instead of fighting the nowrap strip.
+    strip.classList.toggle('nav-views--open', open)
+  }
+
+  // One toggle, one group, both viewports: flip the shared open/closed card state.
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation()
+    setOpen(toggle.getAttribute('aria-expanded') !== 'true')
+  })
+
+  function moveAllToOverflow() {
+    for (const item of collapsible) {
+      if (item.parentElement !== overflow) overflow.appendChild(item)
+    }
+  }
+
+  // True when the strip is not horizontally overflowing (with a 1px sub-pixel
+  // tolerance). Valid because measurement runs with the strip nowrap and the
+  // collapsed group `display:none`, so only the inline items + toggle count.
+  const fits = () => strip.scrollWidth <= strip.clientWidth + 1
+
+  function layout() {
+    // Start from a known state every pass: card closed, full group re-collapsed.
+    setOpen(false)
+    moveAllToOverflow()
+
+    // Mobile: the media query owns the collapse entirely — leave the full group in
+    // the container and don't mark the desktop-managed state.
+    if (mobileMq.matches) {
+      strip.classList.remove('nav-views--collapsed')
+      return
+    }
+
+    // Desktop: collapse the group first (hidden items don't count toward width),
+    // then inline as many as fit, front-first (server order preserved).
+    strip.classList.add('nav-views--collapsed')
+    while (overflow.firstElementChild) {
+      const item = overflow.firstElementChild
+      strip.insertBefore(item, toggle) // tentatively inline it
+      if (!fits()) {
+        overflow.insertBefore(item, overflow.firstElementChild) // overshot — put it back
+        break
+      }
+    }
+    // Nothing left hidden → drop the managed state so the toggle hides and the strip
+    // is the plain inline row again (no toggle, no collapse when everything fits).
+    if (!overflow.firstElementChild) strip.classList.remove('nav-views--collapsed')
+  }
+
+  // Re-measure only when the strip's WIDTH actually changes. Opening/closing the
+  // card changes the strip's HEIGHT (the flex card drops to its own row), which the
+  // ResizeObserver also reports — re-running layout on that would immediately reset
+  // the open state the user just toggled (a feedback loop). Guarding on width breaks
+  // it: a viewport resize changes width and relayouts; a card toggle does not.
+  let lastWidth = null
+  let scheduled = false
+  function remeasure() {
+    scheduled = false
+    const w = strip.clientWidth
+    if (w === lastWidth) return
+    layout()
+    lastWidth = strip.clientWidth
+  }
+  function schedule() {
+    if (scheduled) return
+    scheduled = true
+    requestAnimationFrame(remeasure)
+  }
+
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(schedule).observe(strip)
+  }
+  // The media crossing (mobile⇄desktop) forces a relayout regardless of the width
+  // guard, and a window resize is the fallback for no-ResizeObserver environments.
+  mobileMq.addEventListener('change', () => { lastWidth = null; schedule() })
+  window.addEventListener('resize', schedule)
+
+  layout() // initial pass (before first paint settles, so no flash-of-collapsed)
+  lastWidth = strip.clientWidth
 }
 
 // =============================================================================
