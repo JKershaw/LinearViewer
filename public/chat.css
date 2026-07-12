@@ -1,0 +1,78 @@
+/**
+ * Shared conversational chat UI (LIN-1298).
+ *
+ * The Task Chat view (public/task-chat.*) pioneered a "conversation" idiom: each
+ * turn is a speaker pill (renderStatusPill) above a surface-wrapped message body
+ * (renderSurface), with a clean composer row for input. This file extracts that
+ * idiom into provider-neutral `.chat-*` primitives so it can be REUSED beyond the
+ * experimental Task Chat view.
+ *
+ * First consumer: the Observation session reply surface (public/session.*,
+ * lib/render-session.js) — a human reply into a running/finished agent session now
+ * reads as a chat turn (an echoed "you" bubble) instead of a bare textarea.
+ *
+ * Built entirely on the semantic token layer (--text/--muted/--line/--card/--brand,
+ * --space-*, --radius-*, --font-content) so it themes light/dark with the rest of
+ * the app and composes the shared .status-pill / .surface component chrome.
+ */
+
+/* ── Conversation thread ─────────────────────────────────────────────────── */
+
+.chat-thread {
+  list-style: none;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+/* `.chat-thread` sets display:flex, which would override the UA `hidden`
+   attribute — restate it at higher specificity so an empty thread stays hidden
+   until the first message is appended client-side. */
+.chat-thread[hidden] { display: none; }
+
+/* ── Message bubble ──────────────────────────────────────────────────────── */
+
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Speaker pill composes .status-pill; in the flex column it must hug its content
+   rather than stretch full width. */
+.chat-msg__who.status-pill { align-self: flex-start; }
+
+/* The human's own turn takes the brand accent on its pill label (2-class
+   specificity beats .status-pill--tag). */
+.chat-msg--you .chat-msg__who { color: var(--brand); }
+
+/* Body composes the shared .surface panel chrome; trim its default padding to the
+   tighter chat scale. */
+.chat-msg__body.surface { padding: var(--space-2); }
+
+.chat-msg__text {
+  display: block;
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-msg--you .chat-msg__text { color: var(--muted); }
+
+/* ── Composer ────────────────────────────────────────────────────────────── */
+
+/* A clean, stacked ask row: the input above its action bar. Consumers keep their
+   own input/button classes (e.g. .sess-reply-input) — this only owns the layout. */
+.chat-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+/* The composer's own gap owns the input→actions rhythm; neutralise any margin a
+   consumer's action row carried when it stood alone. */
+.chat-composer__actions { margin-top: 0; }

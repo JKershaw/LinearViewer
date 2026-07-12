@@ -298,6 +298,26 @@ describe('render-session: human reply box (LIN-1004)', () => {
     );
     assert.match(html, /data-testid="session-reply"[^>]*data-target="web"/);
   });
+
+  // LIN-1298: the reply surface reuses the shared Task Chat conversational UI — a
+  // chat composer with an echo thread that the client fills with a "you" bubble on
+  // send — and links the shared chat.css stylesheet.
+  test('the reply box adopts the shared chat UI (composer + echo thread) and links chat.css (LIN-1298)', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: false },
+      {}
+    );
+    assert.match(html, /<link[^>]*href="\/chat\.css"/, 'the shared chat stylesheet is linked');
+    assert.match(html, /class="chat-composer"/, 'the reply input sits in a chat composer');
+    assert.match(html, /data-testid="session-reply-thread"/, 'an echo thread container is present for client-appended "you" bubbles');
+    // The composer still carries the original interactive hooks (unchanged wire).
+    assert.match(html, /class="[^"]*chat-composer__input[^"]*"[^>]*data-testid="session-reply-input"/);
+  });
+
+  test('chat.css is linked even on the not-found body (LIN-1298)', () => {
+    const html = renderSessionPage({ session: null, sessionId: 'nope', urlKey: 'ws-a' });
+    assert.match(html, /<link[^>]*href="\/chat\.css"/);
+  });
 });
 
 describe('render-session: not-found body', () => {
@@ -341,6 +361,15 @@ describe('render-session: per-run expand/collapse + inline reply (LIN-1133)', ()
     assert.match(html, /data-testid="session-inline-reply-send"/);
     // Uses the visible-button class sess-reply-send.
     assert.match(html, /action-btn sess-reply-send/);
+  });
+
+  test('per-run inline reply adopts the chat composer + per-run echo thread (LIN-1298)', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true });
+    // One echo thread per inline reply box (two runs → two threads).
+    const threads = html.match(/data-testid="session-inline-reply-thread"/g) || [];
+    assert.equal(threads.length, 2);
+    // The inline input sits in a chat composer.
+    assert.match(html, /class="[^"]*chat-composer__input[^"]*"[^>]*class="sess-inline-reply-input"|class="sess-inline-reply-input[^"]*chat-composer__input"/);
   });
 
   test('no inline reply boxes when canReply is false', () => {
