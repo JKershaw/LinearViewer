@@ -42,6 +42,8 @@ test.describe('Dispatch defaults settings', () => {
     await expect(section.locator('[data-testid="dispatch-default-row-bug"]')).toBeVisible();
     await expect(section.locator('[data-testid="dispatch-default-row-implementation"]')).toBeVisible();
     await expect(section.locator('[data-testid="dispatch-default-row-close-out"]')).toBeVisible();
+    // autopilot is a configurable dispatch-default type too (LIN-1278).
+    await expect(section.locator('[data-testid="dispatch-default-row-autopilot"]')).toBeVisible();
   });
 
   test('the 15 per-kind rows are collapsed behind a closed toggle until expanded (LIN-1111)', async ({ page, localWorkerUrlKey }) => {

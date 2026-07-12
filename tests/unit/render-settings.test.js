@@ -272,6 +272,20 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
     assert.equal(Object.keys(PROMPT_TEMPLATES).length, 15);
   });
 
+  test('renders an autopilot override row (LIN-1278) and populates it from dispatchDefaults.byKind', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchDefaults: {
+        byKind: { autopilot: { model: 'anthropic/claude-sonnet-5', harness: 'claude-code' } }
+      }
+    });
+    assert.match(html, /data-testid="dispatch-default-row-autopilot"/, 'expected an autopilot per-type override row');
+    const rowStart = html.indexOf('data-testid="dispatch-default-row-autopilot"');
+    const row = html.slice(rowStart, rowStart + 1200);
+    assert.match(row, /name="kind__autopilot__Model"[^>]*value="anthropic\/claude-sonnet-5"/);
+    assert.match(row, /<option value="claude-code" selected>/);
+  });
+
   test('populates the workspace-wide row from dispatchDefaults.model/harness', () => {
     const html = renderSettingsPage('Acme', {
       ...BASE,

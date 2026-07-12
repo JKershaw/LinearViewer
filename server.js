@@ -103,7 +103,7 @@ import { renderProxyPage } from './lib/render-proxy.js'
 import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, hasPaidEnvKey } from './lib/openrouter.js'
 import { resolveWorkspaceModel, resolveAiOperationModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults, AI_OPERATION_KINDS } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
-import { PROMPT_TEMPLATES } from './lib/prompt-template-defs.js'
+import { DISPATCH_DEFAULT_KINDS } from './lib/prompt-templates.js'
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from './lib/dispatch-validation.js'
 
 // =============================================================================
@@ -2016,11 +2016,12 @@ app.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, asyn
   validate(model, 'model');
   validate(harness, 'harness');
 
-  // byKind is scoped to live PROMPT_TEMPLATES keys only, both by only ever
-  // reading these specific field names (any other posted field is simply
-  // never looked at) and defensively at read time in resolveDispatchDefaults.
+  // byKind is scoped to DISPATCH_DEFAULT_KINDS (the PROMPT_TEMPLATES step-kinds
+  // plus `autopilot`, LIN-1278), both by only ever reading these specific field
+  // names (any other posted field is simply never looked at) and defensively at
+  // read time in resolveDispatchDefaults.
   const byKind = {};
-  for (const kind of Object.keys(PROMPT_TEMPLATES)) {
+  for (const kind of DISPATCH_DEFAULT_KINDS) {
     const kindModel = readField(`kind__${kind}__Model`);
     const kindHarness = readHarness(`kind__${kind}__HarnessSelect`, `kind__${kind}__HarnessCustom`);
     validate(kindModel, 'model');

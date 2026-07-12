@@ -1,7 +1,8 @@
 /**
  * Unit tests for `resolveDispatchDefaults` (LIN-1094) — the storage-layer
  * read seam for workspace-scoped dispatch model/harness defaults, shaped as
- * `dispatchDefaults: { model, harness, byKind: { <PROMPT_TEMPLATES key>: { model, harness } } }`.
+ * `dispatchDefaults: { model, harness, byKind: { <DISPATCH_DEFAULT_KINDS key>: { model, harness } } }`
+ * (the PROMPT_TEMPLATES step-kinds plus `autopilot`, LIN-1278).
  *
  * Exercises the real WorkspacePreferencesStore against an in-memory mock of
  * the MongoDB/MangoDB collection surface (mirrors tests/unit/workspace-features.test.js).
@@ -110,20 +111,37 @@ describe('resolveDispatchDefaults — precedence', () => {
     assert.deepEqual(resolved, { model: 'anthropic/claude-opus-4.8', harness: 'claude-code' });
   });
 
-  test('byKind is scoped to PROMPT_TEMPLATES keys only — a non-PROMPT_TEMPLATES kind ignores byKind', async () => {
+  test('autopilot per-kind override is honored (LIN-1278) — autopilot is a configurable dispatch-default type', async () => {
     await store.saveWorkspacePreferences('ws-1', {
       dispatchDefaults: {
         model: 'anthropic/claude-opus-4.8',
         harness: 'opencode',
-        // Not a real PROMPT_TEMPLATES key, but stored data should still be
-        // ignored defensively rather than accidentally matched.
         byKind: {
-          autopilot: { model: 'should-never-be-read', harness: 'should-never-be-read' }
+          autopilot: { model: 'anthropic/claude-sonnet-5', harness: 'claude-code' }
         }
       }
     });
     const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', kind: 'autopilot', store });
-    // Falls through to the workspace-wide default, not the byKind.autopilot entry.
+    // autopilot now reads its byKind override instead of falling through to the
+    // workspace-wide default — DISPATCH_DEFAULT_KINDS includes it.
+    assert.deepEqual(resolved, { model: 'anthropic/claude-sonnet-5', harness: 'claude-code' });
+  });
+
+  test('byKind is still scoped to DISPATCH_DEFAULT_KINDS — a pass-through kind (custom) ignores byKind', async () => {
+    await store.saveWorkspacePreferences('ws-1', {
+      dispatchDefaults: {
+        model: 'anthropic/claude-opus-4.8',
+        harness: 'opencode',
+        // `custom` is the neutral fallback kind, not a configurable type, so a
+        // stored byKind.custom entry must be ignored defensively rather than
+        // accidentally matched.
+        byKind: {
+          custom: { model: 'should-never-be-read', harness: 'should-never-be-read' }
+        }
+      }
+    });
+    const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', kind: 'custom', store });
+    // Falls through to the workspace-wide default, not the byKind.custom entry.
     assert.deepEqual(resolved, { model: 'anthropic/claude-opus-4.8', harness: 'opencode' });
   });
 
