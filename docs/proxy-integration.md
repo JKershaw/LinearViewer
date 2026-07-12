@@ -505,14 +505,6 @@ the cached recap and auto-regenerates when it's missing or stale; pass `?noRefre
 to read without regenerating. `POST` force-regenerates (it keeps the flat form). Both
 accept a UUID or an identifier (e.g. `ENG-42`). Read scope is sufficient.
 
-Optionally report the **worker's own git HEAD** so the server can record where the
-task slice was last observed to change: pass `?head=<sha>` on the `GET` form or a
-`head` field in the `POST` body. The value must be your **own clone's**
-`git rev-parse HEAD` (a hex SHA, 7–64 chars), *not* the server's state; a missing or
-malformed value is simply ignored (and treated as "not fresh" downstream). When the
-read observes a task-slice change, the reported HEAD is stored as
-`snapshot.headSha` (see [Get Task History Snapshots](#get-task-history-snapshots)).
-
 Response:
 ```json
 {
@@ -544,10 +536,6 @@ trusting the raw description.
 `GET` returns the cached brief and auto-regenerates when missing or stale; pass
 `?noRefresh=1` to read without regenerating. `POST` force-regenerates (it keeps the
 flat form). Both accept a UUID or an identifier. Read scope is sufficient.
-
-Like recap, brief accepts an optional worker HEAD report — `?head=<sha>` on the `GET`
-form or a `head` field in the `POST` body — recorded as `snapshot.headSha` when the
-read observes a task-slice change. See the note under [Get Task Recap](#get-task-recap).
 
 Unlike the other endpoints, `brief` is **fixed-section Markdown**, not structured
 fields. The headings are stable, so a consumer can recover individual sections
@@ -610,19 +598,12 @@ Response:
         "state": { "name": "In Progress", "type": "started" },
         "labels": ["bug"], "priority": 2,
         "comments": [{ "id": "…", "body": "…", "createdAt": "…" }],
-        "parent": null, "children": [],
-        "headSha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+        "parent": null, "children": []
       }
     }
   ]
 }
 ```
-
-`snapshot.headSha` is the worker's self-reported git HEAD (from `?head=`/`head` on the
-recap or brief read that captured this snapshot), or `null` when none was reported. It
-is deliberately **outside** the capture hash (`inputHash`), so moving code HEAD alone
-never writes a new snapshot — the field therefore records "HEAD at the last observed
-task-slice change," not "HEAD of the most recent read."
 
 `/snapshots/diff` returns a read-time field-level diff of the two most recent snapshots:
 

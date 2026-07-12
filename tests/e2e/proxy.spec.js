@@ -659,67 +659,6 @@ test.describe('Proxy API - Route Aliases (LIN-528)', () => {
   }
 });
 
-// Grounding-freshness suppression (LIN-1240): when the ticket slice AND the worker's
-// reported git HEAD are unchanged since the last snapshot, GET /prompt collapses the
-// full "Re-ground the Ticket" staleness section (and, for the implement template, the
-// inline plan-fidelity section) to a short "grounding current" note. A moved HEAD, a
-// changed slice, or no snapshot history all fall back to today's full re-ground.
-test.describe('Proxy API - Grounding freshness (LIN-1240)', () => {
-  const HEAD = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
-  const MOVED_HEAD = 'ffffffffffffffffffffffffffffffffffffffff';
-  let readToken;
-
-  test.beforeEach(async ({ page }) => {
-    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
-    await page.goto(`/test/clear-task-snapshots?urlKey=${URL_KEY}`);
-    // Establish the workspace session so resolveWorkspaceAccess resolves a token.
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
-    const readResp = await page.goto(`/test/create-proxy-token?scope=read&label=fresh-test&urlKey=${URL_KEY}`);
-    readToken = (await readResp.json()).token;
-  });
-
-  test('fresh: matching HEAD + ≥2 identical-slice snapshots collapses staleness + plan-fidelity to a short note', async ({ page, request }) => {
-    const seed = await page.goto(`/test/seed-grounding-fresh?urlKey=${URL_KEY}&identifier=TEST-14&head=${HEAD}`);
-    expect(seed.status()).toBe(200);
-
-    const resp = await request.get(`/api/proxy/issues/TEST-14/prompt/implementation?head=${HEAD}`, {
-      headers: { Authorization: `Bearer ${readToken}` }
-    });
-    expect(resp.status()).toBe(200);
-    const { prompt } = await resp.json();
-    expect(prompt).toContain('Re-ground the Ticket (grounding current)');
-    expect(prompt).toContain('Re-ground the Plan (grounding current)');
-    expect(prompt).not.toContain('(staleness check)');
-    expect(prompt).not.toContain('(fidelity check)');
-    expect(prompt).not.toContain('git log --since');
-  });
-
-  test('moved HEAD falls back to the full re-ground', async ({ page, request }) => {
-    // Seed a snapshot at HEAD, then read reporting a DIFFERENT (moved) HEAD.
-    await page.goto(`/test/seed-grounding-fresh?urlKey=${URL_KEY}&identifier=TEST-14&head=${HEAD}`);
-
-    const resp = await request.get(`/api/proxy/issues/TEST-14/prompt/implementation?head=${MOVED_HEAD}`, {
-      headers: { Authorization: `Bearer ${readToken}` }
-    });
-    expect(resp.status()).toBe(200);
-    const { prompt } = await resp.json();
-    expect(prompt).toContain('Re-ground the Ticket (staleness check)');
-    expect(prompt).toContain('Re-ground the Plan (fidelity check)');
-    expect(prompt).not.toContain('grounding current');
-  });
-
-  test('no snapshot history falls back to the full re-ground even with a reported HEAD', async ({ request }) => {
-    // No seed this run (beforeEach cleared snapshots) — nothing to prove freshness against.
-    const resp = await request.get(`/api/proxy/issues/TEST-14/prompt/implementation?head=${HEAD}`, {
-      headers: { Authorization: `Bearer ${readToken}` }
-    });
-    expect(resp.status()).toBe(200);
-    const { prompt } = await resp.json();
-    expect(prompt).toContain('Re-ground the Ticket (staleness check)');
-    expect(prompt).not.toContain('grounding current');
-  });
-});
-
 test.describe('Proxy API - Single-Use Tokens', () => {
   test('single-use token is consumed after first use', async ({ page, request }) => {
     await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
