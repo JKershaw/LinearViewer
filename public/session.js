@@ -15,24 +15,12 @@
   'use strict';
 
   // ── Conversational "you" echo (LIN-1298) ─────────────────────────────────
-  // Mirror the Task Chat idiom (public/task-chat.js appendBubble): compose the
-  // shared renderStatusPill + renderSurface primitives into a "you" turn so the
+  // The shared ChatUI helper (public/chat.js) builds the "you" turn so the
   // reply reads as a chat message, not a vanished textarea. UI-only — the real
   // agent continuation still arrives on reload (the note says so).
   function appendYouBubble(thread, text) {
-    if (!thread || typeof window.renderStatusPill !== 'function' || typeof window.renderSurface !== 'function') return;
-    var whoPill = window.renderStatusPill({ label: 'you', variant: 'tag', className: 'chat-msg__who' });
-    var bodySurface = window.renderSurface({
-      body: '<span class="chat-msg__text">' + window.escapeHtml(text) + '</span>',
-      className: 'chat-msg__body'
-    });
-    var li = document.createElement('li');
-    li.className = 'chat-msg chat-msg--you';
-    li.setAttribute('data-testid', 'session-reply-you');
-    li.innerHTML = whoPill + bodySurface;
-    thread.appendChild(li);
-    thread.hidden = false;
-    thread.scrollTop = thread.scrollHeight;
+    if (!thread || typeof window.ChatUI === 'undefined') return;
+    window.ChatUI.appendMessage(thread, { who: 'you', self: true, text: text, testId: 'session-reply-you' });
   }
 
   // ── Shared reply helper (raw fetch, same pattern as the original global box) ──

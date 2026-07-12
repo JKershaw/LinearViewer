@@ -4,34 +4,66 @@
  * The Task Chat view (public/task-chat.*) pioneered a "conversation" idiom: each
  * turn is a speaker pill (renderStatusPill) above a surface-wrapped message body
  * (renderSurface), with a clean composer row for input. This file extracts that
- * idiom into provider-neutral `.chat-*` primitives so it can be REUSED beyond the
- * experimental Task Chat view.
+ * idiom into provider-neutral `.chat-*` primitives, paired with the shared
+ * client render helper in public/chat.js, so it can be REUSED across every
+ * front-end chat surface instead of forked per page.
  *
- * First consumer: the Observation session reply surface (public/session.*,
- * lib/render-session.js) — a human reply into a running/finished agent session now
- * reads as a chat turn (an echoed "you" bubble) instead of a bare textarea.
+ * Consumers: the Observation session reply surface (public/session.*,
+ * lib/render-session.js — the reference migration), the Task Chat view
+ * (public/task-chat.*, lib/render-task-chat.js — the idiom's source, now
+ * migrated onto these primitives instead of redefining its own `.chat-*`
+ * rules), and Collective (public/collective.*, lib/render-collective.js — the
+ * multi-participant, log-style variant).
+ *
+ * Per-surface variation is expressed as options here, never as forked CSS:
+ * - `--chat-thread-*` custom properties (max-height/gap/margin) let a page
+ *   retune the thread's density without redeclaring its structure.
+ * - `.chat-thread--log` / `.chat-msg--row` switch a thread from the default
+ *   stacked-bubble layout to a bordered, single-line-per-turn log (Collective's
+ *   multi-participant transcript).
+ * - `.chat-msg--you` (the current user's own turn), `.chat-msg--action` (an
+ *   IRC-`/me`-style turn), and `.chat-cursor` (a live-streaming placeholder)
+ *   are modifiers any surface can opt into.
+ * - `.chat-composer--inline` switches the composer from the stacked
+ *   textarea-then-actions layout to a single input+button row (Task Chat's
+ *   ask bar, Collective's say bar).
  *
  * Built entirely on the semantic token layer (--text/--muted/--line/--card/--brand,
- * --space-*, --radius-*, --font-content) so it themes light/dark with the rest of
- * the app and composes the shared .status-pill / .surface component chrome.
+ * --space-*, --radius-*, --font-content/--font-structural) so it themes light/dark
+ * with the rest of the app and composes the shared .status-pill / .surface
+ * component chrome.
  */
 
 /* ── Conversation thread ─────────────────────────────────────────────────── */
 
 .chat-thread {
+  --chat-thread-max-height: 40vh;
+  --chat-thread-gap: var(--space-2);
+  --chat-thread-margin: var(--space-2);
   list-style: none;
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--chat-thread-margin);
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  max-height: 40vh;
+  gap: var(--chat-thread-gap);
+  max-height: var(--chat-thread-max-height);
   overflow-y: auto;
 }
 /* `.chat-thread` sets display:flex, which would override the UA `hidden`
    attribute — restate it at higher specificity so an empty thread stays hidden
    until the first message is appended client-side. */
 .chat-thread[hidden] { display: none; }
+
+/* Multi-participant / log-style variant (Collective): a bordered box of
+   single-line turns divided by hairlines, instead of gapped stacked bubbles. */
+.chat-thread--log {
+  gap: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+}
+.chat-thread--log .chat-msg { border-bottom: 1px solid var(--line-soft); }
+.chat-thread--log .chat-msg:last-child { border-bottom: none; }
+.chat-thread--log:empty { display: none; }
 
 /* ── Message bubble ──────────────────────────────────────────────────────── */
 
@@ -64,6 +96,67 @@
 }
 .chat-msg--you .chat-msg__text { color: var(--muted); }
 
+/* Action-style turn (an IRC `/me`-equivalent): italicised, de-emphasised body. */
+.chat-msg--action .chat-msg__text {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Trailing timestamp, used by row/log-style turns. */
+.chat-msg__time {
+  color: var(--fg-vdim);
+  flex-shrink: 0;
+  font-size: var(--font-size-sm);
+}
+
+/* Row layout variant (Collective): speaker pill, body, and timestamp sit on one
+   line instead of the default stacked-bubble column. */
+.chat-msg--row {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+}
+.chat-msg--row .chat-msg__who.status-pill {
+  flex-shrink: 0;
+  min-width: 7rem;
+}
+.chat-msg--row .chat-msg__body.surface {
+  flex: 1;
+  padding: 0.1rem var(--space-2);
+}
+@media (max-width: 600px) {
+  .chat-msg--row { flex-wrap: wrap; }
+  .chat-msg--row .chat-msg__who.status-pill { min-width: 0; }
+}
+
+/* ── Breadcrumb / note row ───────────────────────────────────────────────── */
+
+/* A dim, non-bubble log line (e.g. a tool-call breadcrumb) — provenance, not a
+   conversational turn, so it is deliberately quieter than .chat-msg. */
+.chat-note {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-vdim);
+  padding-left: var(--space-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Streaming cursor ────────────────────────────────────────────────────── */
+
+/* A blinking block cursor for a message body still being streamed into. */
+.chat-cursor::after {
+  content: '▋';
+  color: var(--fg-vdim);
+  animation: chat-cursor-blink 1s step-start infinite;
+}
+@keyframes chat-cursor-blink {
+  50% { opacity: 0; }
+}
+
 /* ── Composer ────────────────────────────────────────────────────────────── */
 
 /* A clean, stacked ask row: the input above its action bar. Consumers keep their
@@ -76,3 +169,10 @@
 /* The composer's own gap owns the input→actions rhythm; neutralise any margin a
    consumer's action row carried when it stood alone. */
 .chat-composer__actions { margin-top: 0; }
+
+/* Single-line variant: input and its button share one row instead of stacking
+   (Task Chat's ask bar, Collective's say bar). */
+.chat-composer--inline {
+  flex-direction: row;
+  align-items: center;
+}

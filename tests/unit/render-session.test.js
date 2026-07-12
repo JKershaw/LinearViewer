@@ -301,13 +301,15 @@ describe('render-session: human reply box (LIN-1004)', () => {
 
   // LIN-1298: the reply surface reuses the shared Task Chat conversational UI — a
   // chat composer with an echo thread that the client fills with a "you" bubble on
-  // send — and links the shared chat.css stylesheet.
-  test('the reply box adopts the shared chat UI (composer + echo thread) and links chat.css (LIN-1298)', () => {
+  // send — and links the shared chat.css stylesheet + the shared chat.js render
+  // helper (ChatUI, LIN-1298 v2) that builds that bubble.
+  test('the reply box adopts the shared chat UI (composer + echo thread) and links chat.css + chat.js (LIN-1298)', () => {
     const html = renderSessionPage(
       { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: false },
       {}
     );
     assert.match(html, /<link[^>]*href="\/chat\.css"/, 'the shared chat stylesheet is linked');
+    assert.match(html, /<script src="\/chat\.js"><\/script>/, 'the shared chat render helper is loaded');
     assert.match(html, /class="chat-composer"/, 'the reply input sits in a chat composer');
     assert.match(html, /data-testid="session-reply-thread"/, 'an echo thread container is present for client-appended "you" bubbles');
     // The composer still carries the original interactive hooks (unchanged wire).

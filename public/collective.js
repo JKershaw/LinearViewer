@@ -216,30 +216,30 @@ function appendMessages(messages) {
     if (id != null && seenIds.has(id)) continue;
     if (id != null) seenIds.add(id);
 
-    const li = document.createElement('li');
-    li.className = 'collective-msg';
-    if (msg.type === 'action') li.classList.add('collective-msg-action');
-
     const nick = msg.nick || '?';
     const body = msg.text || '';
+    const isAction = msg.type === 'action';
     const time = relativeTime(msg.timestamp);
 
-    // Speaker → neutral role StatusPill; body → inset Surface (LIN-861). The old
-    // per-page hook classes ride along as `className` so the E2E selectors and the
-    // IRC label-column / action-time layout rules in collective.css still apply.
-    const nickPill = renderStatusPill({ label: nick, variant: 'tag', className: 'collective-msg-nick' });
-    const bodySurface = renderSurface({
-      body: escapeHtml(body),
-      variant: 'inset',
-      as: 'span',
-      className: 'collective-msg-body',
+    // Multi-participant row turn via the shared ChatUI helper (LIN-1298): the
+    // `collective-msg*` hooks ride along so the E2E selectors and the IRC
+    // nick-colour override in collective.css still apply; the row layout,
+    // inset body, and action italics are the shared `chat-msg--row`/
+    // `chat-msg--action` modifiers. `reveal: false` — this is a batch append,
+    // scrolling is decided once below.
+    window.ChatUI.appendMessage(list, {
+      who: nick,
+      whoClass: 'collective-msg-nick',
+      row: true,
+      action: isAction,
+      text: body,
+      bodyVariant: 'inset',
+      bodyAs: 'span',
+      bodyClass: 'collective-msg-body',
+      time,
+      liClass: 'collective-msg' + (isAction ? ' collective-msg-action' : ''),
+      reveal: false,
     });
-
-    li.innerHTML = `
-      ${nickPill}
-      ${bodySurface}
-      <span class="collective-msg-time">${escapeHtml(time)}</span>`;
-    list.appendChild(li);
     added += 1;
   }
 
