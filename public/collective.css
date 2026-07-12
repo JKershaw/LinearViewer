@@ -302,85 +302,35 @@
   color: var(--fg-dim);
 }
 
+/* The transcript's structure (list/scroll/border), each turn's row layout
+   (speaker pill + inset body + timestamp), and the action-message italics are
+   all the shared `chat-thread--log`/`chat-msg--row`/`chat-msg--action`
+   primitives (chat.css + public/chat.js, LIN-1298). This block only retunes
+   the shared thread's height for Collective's taller transcript, and the two
+   genuinely IRC-specific deltas: the nick pill's green label colour (vs. the
+   shared "you" brand accent, since no participant here is "the current user")
+   and the inset body's tighter corner radius for the dense row scale.
+   `collective-msg*` ride along on the elements purely as selector hooks. */
 .collective-transcript {
-  list-style: none;
-  margin: 0 0 var(--space-3);
-  padding: 0;
-  max-height: 60vh;
-  overflow-y: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  --chat-thread-max-height: 60vh;
+  --chat-thread-margin: var(--space-3);
 }
 
-.collective-transcript:empty {
-  display: none;
-}
-
-.collective-msg {
-  display: flex;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
-  border-bottom: 1px solid var(--border-subtle);
-  align-items: baseline;
-}
-
-.collective-msg:last-child {
-  border-bottom: none;
-}
-
-/* Speaker pill (LIN-861): composes the shared .status-pill chrome, but keeps the
-   IRC label-column look — green nick text, fixed-width column, no shrink. The
-   green overrides .status-pill--tag's --fg-dim (later stylesheet, equal
-   specificity). */
-.collective-msg-nick.status-pill {
+.collective-msg-nick {
   color: var(--green);
-  flex-shrink: 0;
-  min-width: 7rem;
   font-weight: 500;
 }
 
-/* Message body inset (LIN-861): composes .surface--inset, but trimmed to the
-   compact IRC-row scale — the primitive's --space-3 padding and --radius-md would
-   blow out the dense log, so tighten to a subtle inset well. */
-.collective-msg-body.surface {
-  color: var(--fg);
-  flex: 1;
-  padding: 0.1rem var(--space-2);
+.collective-msg-body {
   border-radius: var(--radius-sm);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
-.collective-msg-time {
-  color: var(--fg-vdim);
-  flex-shrink: 0;
-  font-size: var(--font-size-sm);
-}
-
-.collective-msg-action .collective-msg-body {
-  color: var(--fg-dim);
-  font-style: italic;
-}
-
-/* ── Say box ────────────────────────────────────────────────────────────── */
-
-.collective-say {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-}
+/* .collective-say's layout is the shared .chat-composer--inline (chat.css); the
+   class rides along on the element as a hook only. */
 
 @media (max-width: 600px) {
   .collective-label {
     min-width: 0;
     width: 100%;
-  }
-  .collective-msg {
-    flex-wrap: wrap;
-  }
-  .collective-msg-nick {
-    min-width: 0;
   }
 }

@@ -36,6 +36,17 @@ describe('renderCollectivePage', () => {
     assert.ok(html.includes('/collective.js'));
   });
 
+  // LIN-1298 v2: Collective's transcript + say box adopt the shared chat
+  // interface (chat.css primitives + the chat.js ChatUI render helper) — the
+  // log-style multi-participant thread and the inline composer variant.
+  test('the transcript and say box adopt the shared chat UI (LIN-1298 v2)', () => {
+    const html = render();
+    assert.ok(html.includes('/chat.css'), 'the shared chat stylesheet is linked');
+    assert.ok(html.includes('/chat.js'), 'the shared chat render helper is loaded');
+    assert.match(html, /class="collective-transcript chat-thread chat-thread--log"/, 'the transcript is a log-style shared thread');
+    assert.match(html, /class="collective-say chat-composer chat-composer--inline"/, 'the say box is an inline shared composer');
+  });
+
   test('offers a define-new character form grounded in each connected workspace', () => {
     const html = render();
     // The repo picker binds a new character to a connected workspace/repo.

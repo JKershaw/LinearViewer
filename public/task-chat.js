@@ -69,31 +69,27 @@
     if (emptyState) emptyState.classList.toggle('hidden', !visible);
   }
 
+  // Speaker → StatusPill: the user's "you" is a neutral tag chip that takes the
+  // shared self-turn accent (chat-msg--you); the task's own turn reads as
+  // in-progress (◐). Body → Surface, via the shared ChatUI helper (LIN-1298) —
+  // the `task-chat-msg-*` classes ride along as hooks so the per-role colour
+  // (now unified via chat.css) and E2E selectors still resolve. The streaming
+  // cursor MUST stay on the SSE text node (`.task-chat-msg-body`, the element
+  // send() writes textContent into), so it's the text span, not the wrapper,
+  // that toggles `.chat-cursor`.
   function appendBubble(role, text) {
-    var li = document.createElement('li');
-    li.className = 'task-chat-msg task-chat-msg-' + role;
-
-    // Speaker → StatusPill (LIN-861): the user's "you" is a neutral tag chip; the
-    // task's turn reads as in-progress (◐). The `task-chat-msg-who` hook rides
-    // along so the per-role colour rules + E2E selectors still resolve.
     var whoLabel = role === 'user' ? 'you' : (activeTask || 'task');
-    var whoPill = role === 'user'
-      ? window.renderStatusPill({ label: whoLabel, variant: 'tag', className: 'task-chat-msg-who' })
-      : window.renderStatusPill({ label: whoLabel, state: 'in-progress', className: 'task-chat-msg-who' });
-
-    // Body → Surface (LIN-861). The streaming cursor MUST stay on the SSE text
-    // node (`.task-chat-msg-body`, the element send() writes textContent into and
-    // toggles `.task-chat-streaming` on), so the Surface WRAPS that node — the
-    // streaming class never moves onto the wrapper.
-    var bodySurface = window.renderSurface({
-      body: '<span class="task-chat-msg-body">' + window.escapeHtml(text) + '</span>',
-      className: 'task-chat-msg-surface',
+    var li = window.ChatUI.appendMessage(transcript, {
+      who: whoLabel,
+      whoState: role === 'user' ? undefined : 'in-progress',
+      whoClass: 'task-chat-msg-who',
+      self: role === 'user',
+      text: text,
+      textClass: 'task-chat-msg-body',
+      bodyClass: 'task-chat-msg-surface',
+      liClass: 'task-chat-msg task-chat-msg-' + role,
     });
-
-    li.innerHTML = whoPill + bodySurface;
-    transcript.appendChild(li);
     setEmptyVisible(false);
-    transcript.scrollTop = transcript.scrollHeight;
     return li.querySelector('.task-chat-msg-body');
   }
 
@@ -138,16 +134,8 @@
   // reads: you → ↳ lookup → the task's answer.
   function appendToolBreadcrumb(label, beforeLi) {
     if (!label) return;
-    var li = document.createElement('li');
-    li.className = 'task-chat-tool';
-    li.textContent = '↳ ' + label;
-    if (beforeLi && beforeLi.parentNode === transcript) {
-      transcript.insertBefore(li, beforeLi);
-    } else {
-      transcript.appendChild(li);
-    }
+    window.ChatUI.appendNote(transcript, '↳ ' + label, { liClass: 'task-chat-tool', before: beforeLi });
     setEmptyVisible(false);
-    transcript.scrollTop = transcript.scrollHeight;
   }
 
   function resetConversation() {
@@ -287,7 +275,7 @@
     questionInput.value = '';
 
     var answerEl = appendBubble('assistant', '');
-    answerEl.classList.add('task-chat-streaming');
+    answerEl.classList.add('chat-cursor');
     var answerLi = answerEl.closest('li'); // tool breadcrumbs insert before this
     var answerText = '';
     setBusy(true);
@@ -304,12 +292,12 @@
     }).then(function (response) {
       if (!response.ok) {
         return response.json().then(function (body) {
-          answerEl.classList.remove('task-chat-streaming');
+          answerEl.classList.remove('chat-cursor');
           answerEl.textContent = '[error: ' + ((body && body.error) || ('request failed (' + response.status + ')')) + ']';
           chatHistory.pop(); // drop the unanswered question so retry is clean
           setBusy(false);
         }).catch(function () {
-          answerEl.classList.remove('task-chat-streaming');
+          answerEl.classList.remove('chat-cursor');
           answerEl.textContent = '[error: request failed (' + response.status + ')]';
           chatHistory.pop();
           setBusy(false);
@@ -326,7 +314,7 @@
           answerEl.textContent = answerText;
           transcript.scrollTop = transcript.scrollHeight;
         } else if (type === 'done') {
-          answerEl.classList.remove('task-chat-streaming');
+          answerEl.classList.remove('chat-cursor');
           if (answerText) {
             chatHistory.push({ role: 'assistant', content: answerText });
             if (chatHistory.length > 40) chatHistory.splice(0, chatHistory.length - 40);
@@ -336,14 +324,14 @@
           setBusy(false);
           questionInput.focus();
         } else if (type === 'error') {
-          answerEl.classList.remove('task-chat-streaming');
+          answerEl.classList.remove('chat-cursor');
           answerEl.textContent = answerText + '\n[error: ' + ((eventData && eventData.message) || 'failed') + ']';
           chatHistory.pop();
           setBusy(false);
         }
       });
     }).catch(function () {
-      answerEl.classList.remove('task-chat-streaming');
+      answerEl.classList.remove('chat-cursor');
       answerEl.textContent = '[error: network failure]';
       chatHistory.pop();
       setBusy(false);

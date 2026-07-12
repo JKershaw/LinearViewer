@@ -91,76 +91,18 @@
   color: var(--fg);
 }
 
+/* Structure (list/flex/scroll), the message bubble (speaker pill + surface
+   body), the tool breadcrumb, and the streaming cursor are all shared via
+   chat.css + public/chat.js (LIN-1298) — `chat-thread`/`chat-msg-*`/`chat-note`/
+   `chat-cursor` on the elements below. This block only retunes the shared
+   thread's density for Task Chat's taller transcript; `task-chat-msg-*` and
+   `task-chat-tool` ride along purely as selector hooks (no CSS of their own),
+   and the visual definitions (colour, padding, the "you" accent) live once in
+   chat.css instead of being redeclared per surface. */
 .task-chat-transcript {
-  list-style: none;
-  margin: 0 0 var(--space-3);
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  max-height: 55vh;
-  overflow-y: auto;
-}
-
-.task-chat-msg {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-/* Speaker pill (LIN-861): composes .status-pill chrome. In the flex-column
-   message it must hug its content rather than stretch to full width. The task's
-   turn keeps the in-progress ◐/colour from the pill; the user's "you" pill is
-   re-accented below (2-class specificity beats .status-pill--tag). */
-.task-chat-msg-who.status-pill {
-  align-self: flex-start;
-}
-
-.task-chat-msg-user .task-chat-msg-who {
-  color: var(--accent);
-}
-
-/* Body surface (LIN-861): the shared .surface supplies the panel chrome; trim its
-   default --space-3 padding to the tighter chat scale. The text node keeps its
-   mono/pre-wrap treatment so the streaming cursor still reads correctly. */
-.task-chat-msg-surface.surface {
-  padding: var(--space-2);
-}
-
-.task-chat-msg-body {
-  display: block;
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  color: var(--fg);
-  white-space: pre-wrap;
-  word-break: break-word;
-  line-height: 1.5;
-}
-
-.task-chat-msg-user .task-chat-msg-body {
-  color: var(--fg-dim);
-}
-
-.task-chat-streaming::after {
-  content: '▋';
-  color: var(--fg-vdim);
-  animation: task-chat-blink 1s step-start infinite;
-}
-
-@keyframes task-chat-blink {
-  50% { opacity: 0; }
-}
-
-/* Tool breadcrumb (LIN-990): a dim, ↳-marked log line noting a read-only lookup
-   the task made mid-turn. Deliberately quieter than a message bubble — it is
-   provenance, not conversation. */
-.task-chat-tool {
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
-  color: var(--fg-vdim);
-  padding-left: var(--space-2);
-  white-space: pre-wrap;
-  word-break: break-word;
+  --chat-thread-max-height: 55vh;
+  --chat-thread-gap: var(--space-3);
+  --chat-thread-margin: var(--space-3);
 }
 
 .task-chat-empty {
@@ -169,11 +111,8 @@
   font-size: var(--font-size-sm);
 }
 
-.task-chat-ask {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-}
+/* .task-chat-ask's layout is the shared .chat-composer--inline (chat.css); the
+   class rides along on the element as a hook only. */
 
 .hidden {
   display: none !important;
