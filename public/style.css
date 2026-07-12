@@ -529,14 +529,49 @@ h1 {
   box-shadow: var(--shadow-lg);
 }
 
-/* Neutralize a persisted open state above the mobile breakpoint (LIN-1058). The
-   `⋯ more` toggle only exists at ≤640px, so a `--open` class set on mobile can
-   survive a resize past 640px where the toggle is `display:none` and can't
-   re-close it — the card would then override the desktop `display:contents` and
-   render as a stuck-open panel. Forcing `display:contents` here re-inlines the
-   views (and, generating no box, drops the card's background/border/shadow). */
+/* Desktop measured overflow (LIN-1286). The `⋯ more` collapse machinery now also
+   serves desktop, but ONLY when the JS width-measuring routine (setupNavViewsOverflow
+   in common.js) marks the strip `.nav-views--collapsed` because the row does not fit
+   at this width. Absent JS — or when everything fits — the strip keeps the historical
+   inline `display:contents` + horizontal-scroll fallback above, so the no-JS first
+   paint is sane and a strip that fits never over-collapses. When collapsed, the group
+   hides behind the revealed toggle exactly like mobile; JS has already inlined the
+   items that fit, so only the genuine excess lives in the group. */
+.nav-views--collapsed .nav-views-overflow {
+  display: none;
+}
+
+.nav-views--collapsed .nav-more-toggle {
+  display: inline-flex;
+}
+
+/* The opened card must win over the collapse-hide above (equal specificity, later
+   source). Its card look (var(--card)/--line/--radius-md/--shadow-lg, column layout)
+   comes from the base `.nav-views-overflow--open` rule. */
+.nav-views--collapsed .nav-views-overflow--open {
+  display: flex;
+}
+
+/* When the desktop card is open, let the strip wrap so the full-width card drops to
+   its own row (like mobile) rather than fighting the nowrap strip. The collapsed
+   primary row already fits at this width, so enabling wrap only moves the
+   flex-basis:100% card below; `overflow-x:visible` drops the (now unneeded) scroll
+   fallback so the open card is not clipped. */
+.nav-views--collapsed.nav-views--open {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
+/* Neutralize a persisted open state above the mobile breakpoint (LIN-1058), EXCEPT
+   when the desktop measuring routine is managing a genuine collapse (LIN-1286). The
+   `⋯ more` toggle historically only existed at ≤640px, so a `--open` class set on
+   mobile could survive a resize past 640px where the toggle was `display:none` and
+   couldn't re-close it — the card would then override the desktop `display:contents`
+   and render as a stuck-open panel. Forcing `display:contents` here re-inlines the
+   views. Scoped to `:not(.nav-views--collapsed)` so it no longer fires when JS has
+   deliberately collapsed the desktop overflow, where an open group IS a real card. */
 @media (min-width: 641px) {
-  .nav-views-overflow--open {
+  .nav-views:not(.nav-views--collapsed) .nav-views-overflow--open {
     display: contents;
   }
 }
