@@ -105,6 +105,24 @@ describe('createDispatchItem — model/harness resolution', () => {
     assert.equal(store.captured.item.harness, 'kind-harness');
   });
 
+  test('a per-kind autopilot override is stamped onto the dispatched item (LIN-1278)', async () => {
+    // The end-to-end chain a real `kind:'autopilot'` dispatch takes: the factory
+    // keys resolveDispatchDefaults on the autopilot kind and stamps the resolved
+    // byKind.autopilot model/harness onto the enqueued item — so the dispatch
+    // carries the configured pair, on the identical rail already proven for the
+    // step-kind rows above. (Downstream execution of item.model/item.harness is
+    // the same consumption path as every other kind.)
+    const store = capturingStore();
+    const prefs = await prefsWith({
+      model: 'ws-model', harness: 'ws-harness',
+      byKind: { autopilot: { model: 'anthropic/claude-sonnet-5', harness: 'claude-code' } }
+    });
+    await createDispatchItem({ store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'autopilot', prompt: 'x' });
+    assert.equal(store.captured.item.kind, 'autopilot');
+    assert.equal(store.captured.item.model, 'anthropic/claude-sonnet-5');
+    assert.equal(store.captured.item.harness, 'claude-code');
+  });
+
   test('an explicit model/harness wins over configured defaults', async () => {
     const store = capturingStore();
     const prefs = await prefsWith({ model: 'ws-model', harness: 'ws-harness' });

@@ -46,7 +46,7 @@ test.describe('Dispatch defaults settings', () => {
     await expect(section.locator('[data-testid="dispatch-default-row-autopilot"]')).toBeVisible();
   });
 
-  test('the 15 per-kind rows are collapsed behind a closed toggle until expanded (LIN-1111)', async ({ page, localWorkerUrlKey }) => {
+  test('the per-kind rows are collapsed behind a closed toggle until expanded (LIN-1111)', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
@@ -127,6 +127,32 @@ test.describe('Dispatch defaults settings', () => {
     const reloadedRow = page.locator('[data-testid="dispatch-default-row-implementation"]');
     await expect(reloadedRow.locator('input.dispatch-model-input')).toHaveValue('anthropic/claude-sonnet-5');
     await expect(reloadedRow.locator('input.harness-input')).toHaveValue('my-custom-harness');
+  });
+
+  test('saving the autopilot per-kind override round-trips through the real POST handler (LIN-1278)', async ({ page, localWorkerUrlKey }) => {
+    // Ledger discharge (LIN-1278 close-out): drive the `autopilot` field through
+    // the actual `for (const kind of DISPATCH_DEFAULT_KINDS)` save loop in the
+    // POST handler — save → persist → re-render — for autopilot specifically,
+    // not by composition of the step-kind rows.
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
+    const row = page.locator('[data-testid="dispatch-default-row-autopilot"]');
+    await row.locator('input.dispatch-model-input').fill('anthropic/claude-sonnet-5');
+    await row.locator('input.harness-input').fill('my-autopilot-harness');
+    await page.locator('.dispatch-defaults-submit button[type="submit"]').click();
+    await page.waitForLoadState('networkidle');
+
+    const savedRow = page.locator('[data-testid="dispatch-default-row-autopilot"]');
+    await expect(savedRow.locator('input.dispatch-model-input')).toHaveValue('anthropic/claude-sonnet-5');
+    await expect(savedRow.locator('input.harness-input')).toHaveValue('my-autopilot-harness');
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    const reloadedRow = page.locator('[data-testid="dispatch-default-row-autopilot"]');
+    await expect(reloadedRow.locator('input.dispatch-model-input')).toHaveValue('anthropic/claude-sonnet-5');
+    await expect(reloadedRow.locator('input.harness-input')).toHaveValue('my-autopilot-harness');
   });
 
   test('the workspace-wide harness select pre-selects claude-code when unconfigured (LIN-1111)', async ({ page, localWorkerUrlKey }) => {
