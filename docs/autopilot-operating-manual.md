@@ -117,14 +117,6 @@ not you. A retry or two is fine; if it stays broken, **stop, say what failed and
 stands, and wait.** (Your briefing lists the specific instruments and their known quirks — a named
 quirk costs you a second to recognise; the halt is for the breakage that *isn't* on that list.)
 
-One small habit makes your grounding reads honest about *when* they were taken: on every recap or brief
-read, report your **own clone's** `git rev-parse HEAD` — `?head=<sha>` on the GET form, a `head` field
-in the POST body. It's the code you actually looked at, not the server's state, and it lets a later run
-tell whether the ground has shifted under a still-open task. Reporting it is cheap and always safe;
-*not* reporting it is safe too — an absent HEAD just means "assume nothing is fresh, re-ground fully,"
-which is the same conservative default you'd want anyway. So there's no downside to sending it and a
-real one to guessing at freshness you never measured.
-
 ## When the worker isn't cutting it
 
 Sometimes the task itself keeps stalling — not your instruments, the work. Re-dispatching the same

@@ -6,9 +6,6 @@
  */
 import { Router } from 'express';
 import { isValidFeatureKey, isValidWorkspaceFeatureKey } from '../lib/feature-defaults.js';
-import { hashContext } from '../lib/recap-cache.js';
-import { snapshotFromContext } from '../lib/task-snapshot-store.js';
-import { resolvePromptIssueContext } from './proxy.js';
 import { setWorkspaceFeature } from '../lib/workspace-preferences.js';
 import { getProvider } from '../lib/providers/registry.js';
 import { defaultLocalSeed, LOCAL_WORKSPACE_URL_KEY } from '../tests/fixtures/local-harness.js';
@@ -519,42 +516,6 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       const urlKey = req.query.urlKey || 'test-workspace'
       if (taskSnapshotStore) await taskSnapshotStore.clear(urlKey)
       res.send('ok')
-    } catch (err) {
-      res.status(500).json({ error: err.message })
-    }
-  })
-
-  // Seed a "grounding is current" snapshot history for a task (LIN-1240 E2E).
-  // Builds the SAME mock context /prompt + /recommend build (resolvePromptIssueContext
-  // in test mode), so the seeded `inputHash = hashContext(context)` matches what those
-  // routes compute at read time. Writes TWO content-identical snapshots (distinct
-  // inputHash so the second is not deduped away — the hash-only-field shape that makes
-  // diffLatest report from && to && !changed) whose stored `headSha` is the supplied
-  // `?head=`. So a subsequent GET .../prompt/<id>/<kind>?head=<same head> resolves fresh;
-  // a different head, or no seed, falls back to the full re-ground.
-  router.get('/test/seed-grounding-fresh', async (req, res) => {
-    try {
-      if (!taskSnapshotStore) return res.status(503).json({ error: 'no task snapshot store' })
-      const urlKey = req.query.urlKey || 'test-workspace'
-      const identifier = req.query.identifier
-      const head = req.query.head
-      if (!identifier || !head) return res.status(400).json({ error: 'identifier and head are required' })
-
-      const context = await resolvePromptIssueContext('test-token', identifier, true)
-      if (!context) return res.status(404).json({ error: 'issue not found' })
-
-      const taskIdentifier = context.issue?.identifier || identifier
-      const canonicalId = context.issue?.id || identifier
-      const snapshot = snapshotFromContext(context, head)
-      const inputHash = hashContext(context)
-
-      // First capture with a DIFFERENT (sentinel) hash but identical snapshot content,
-      // so the second real-hash capture is not deduped and the two newest snapshots are
-      // content-identical (changed:false), with the latest carrying the real inputHash.
-      await taskSnapshotStore.captureIfChanged({ urlKey, taskIdentifier, canonicalId, inputHash: `seed-prior:${inputHash}`, snapshot })
-      await taskSnapshotStore.captureIfChanged({ urlKey, taskIdentifier, canonicalId, inputHash, snapshot })
-
-      res.json({ ok: true, taskIdentifier, inputHash, head })
     } catch (err) {
       res.status(500).json({ error: err.message })
     }

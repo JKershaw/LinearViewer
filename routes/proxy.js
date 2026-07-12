@@ -49,7 +49,7 @@ import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
-import { snapshotFromContext, resolveGroundingFreshness } from '../lib/task-snapshot-store.js';
+import { snapshotFromContext } from '../lib/task-snapshot-store.js';
 import { isTerminalState, isBlocked } from '../lib/tree.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
@@ -117,7 +117,7 @@ async function getTestMockData() {
  * mode. In live mode fetchIssueContext throws on a missing issue; callers map
  * that to a 404.
  */
-export async function resolvePromptIssueContext(accessToken, identifier, isTestMode) {
+async function resolvePromptIssueContext(accessToken, identifier, isTestMode) {
   if (isTestMode) {
     const mockData = await getTestMockData();
     const mockIssue = mockData.issues.find(i =>
@@ -546,7 +546,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * response path (mirrors agentStatusStore.onWrite, LIN-623), so a slow or
    * failing capture cannot affect proxy latency or the response.
    */
-  function captureTaskSnapshot({ urlKey, identifier, context, canonicalId, inputHash, headSha = null }) {
+  function captureTaskSnapshot({ urlKey, identifier, context, canonicalId, inputHash }) {
     if (!taskSnapshotStore) return;
     Promise.resolve()
       .then(() => taskSnapshotStore.captureIfChanged({
@@ -554,65 +554,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
         taskIdentifier: context?.issue?.identifier || identifier,
         canonicalId,
         inputHash,
-        snapshot: snapshotFromContext(context, headSha)
+        snapshot: snapshotFromContext(context)
       }))
       .catch(err => console.error('task-snapshot capture error:', err?.message || err));
-  }
-
-  /**
-   * Read the worker's self-reported git HEAD from a grounding read (LIN-1239).
-   * The worker reports its OWN clone's `git rev-parse HEAD` via `?head=<sha>` on the
-   * GET recap/brief paths or a `head` field in the JSON body on the POST paths. Returns
-   * a normalized lowercase hex SHA, or null when the report is absent or malformed.
-   * Null is the safe default: downstream freshness (LIN-1240) reads an absent HEAD as
-   * "never fresh" / fully re-ground. `headSha` is stored on the snapshot but stays out
-   * of the `hashContext` dedupe gate, so it can never churn a snapshot on its own.
-   */
-  function reportedHead(req) {
-    const raw = req?.query?.head ?? req?.body?.head;
-    if (typeof raw !== 'string') return null;
-    const trimmed = raw.trim().toLowerCase();
-    return /^[0-9a-f]{7,64}$/.test(trimmed) ? trimmed : null;
-  }
-
-  /**
-   * Resolve grounding freshness (LIN-1240) and, when a read is provably fresh, ADD a
-   * `groundingFreshness` field to the `target` context object the prompt generator will
-   * receive. The formatters that consume it (`formatStalenessCheck`, the handwritten
-   * `implement` template's inline `formatPlanFidelityCheck`, and — via
-   * `applyGroundingToRecommendation` — the meta path) are pure and only READ this
-   * precomputed field, so all the async store work lives here at the route.
-   *
-   * `hashSource` is the object hashed to detect a slice change: it MUST carry `issue`
-   * (plus comments/children/parent) so `hashContext(hashSource)` produces the SAME digest
-   * the capture seam stored on the snapshot — no second hashing scheme. `target` is the
-   * (often issue-less) object actually threaded into generatePrompt/getRecommendation; it
-   * is the one we mutate. They differ because those generators take `issue` as a separate
-   * argument and their `context` deliberately omits it.
-   *
-   * Conservative by construction: no store, no reported HEAD, a moved HEAD, a changed
-   * slice, or a store error all leave `target` untouched, so the prompt keeps today's full
-   * re-ground. `target` is only MUTATED when `fresh` is true, so a not-fresh read stays
-   * byte-identical to pre-LIN-1240 and never perturbs the parity-pinned output.
-   *
-   * @param {Object} target - context object passed to the generator; mutated in place when fresh.
-   * @param {Object} params
-   * @param {string} params.urlKey
-   * @param {Object} params.hashSource - context carrying `issue` (+ comments/children/parent).
-   * @param {string|null} params.headSha - reportedHead(req) for this read.
-   */
-  async function resolveFreshnessInto(target, { urlKey, hashSource, headSha }) {
-    if (!taskSnapshotStore || !target) return;
-    const taskIdentifier = hashSource?.issue?.identifier;
-    if (!taskIdentifier) return;
-    const freshness = await resolveGroundingFreshness({
-      store: taskSnapshotStore,
-      urlKey,
-      taskIdentifier,
-      currentHeadSha: headSha,
-      currentInputHash: hashContext(hashSource)
-    });
-    if (freshness?.fresh) target.groundingFreshness = freshness;
   }
 
   // =========================================================================
@@ -2920,13 +2864,7 @@ One convention across every endpoint, so you can branch on the same fields every
       // formatAttachmentsSection post-pass surfaces the worker-facing Attachments
       // section (LIN-776) — fetchIssueContext now carries it at top-level (LIN-772),
       // and dropping it here is what silently hid the section on this route.
-      const promptContext = { parent, siblings, project, children, comments, attachments };
-      // Grounding-freshness suppression (LIN-1240): if the ticket slice + code HEAD are
-      // unchanged since the last snapshot, thread `groundingFreshness` so the staleness/
-      // plan-fidelity sections collapse to a short "current" note. `ctx` (which carries
-      // `issue`) is the hash source; not-fresh reads leave promptContext untouched.
-      await resolveFreshnessInto(promptContext, { urlKey: req.proxyUrlKey, hashSource: ctx, headSha: reportedHead(req) });
-      const result = generatePrompt(templateKey, issue, promptContext, {});
+      const result = generatePrompt(templateKey, issue, { parent, siblings, project, children, comments, attachments }, {});
 
       if (!result) {
         logEvent(req, '/api/proxy/prompt', 500);
@@ -3000,7 +2938,7 @@ One convention across every endpoint, so you can branch on the same fields every
    * with recommendErrorResponse(). `sessionApiKey` may be passed in to avoid a
    * second key lookup when the caller already resolved it for its precheck.
    */
-  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, isTestMode, sessionApiKey, deadline, noDescend = false, headSha = null }) {
+  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, isTestMode, sessionApiKey, deadline, noDescend = false }) {
     if (sessionApiKey === undefined) {
       sessionApiKey = await getWorkspaceOpenRouterKey(urlKey, createdBy);
     }
@@ -3086,16 +3024,6 @@ One convention across every endpoint, so you can branch on the same fields every
     // default model — a free-tier descent must never bill a workspace-preferred model.
     const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
     const selectedModel = await resolveAiOperationModel({ urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier });
-    // Grounding-freshness suppression (LIN-1240), resolved PER DESCENDED NODE here inside
-    // computeRecommendation (NOT once for the whole descent): each hop fetches its own
-    // context, so freshness must be judged against THIS node's slice + HEAD. When fresh,
-    // `groundingFreshness` is threaded into the context so the meta path's post-pass
-    // (applyGroundingToRecommendation → appendGroundingSections) emits the short staleness
-    // note instead of the full re-read. `context` (with `issue`) is the hash source; the
-    // issue-less `recommendContext` below is the mutate target.
-    const recommendContext = { parent, siblings, project, children, comments, focusedChild, attachments };
-    await resolveFreshnessInto(recommendContext, { urlKey, hashSource: context, headSha });
-
     // Cancel the in-flight LLM call when its deadline trips instead of racing and
     // leaving it running orphaned (fetchWithTimeout vs withTimeout, LIN-346 surface 5).
     // getRecommendation now honors options.signal (gap #2). The per-hop deadline guard
@@ -3113,7 +3041,7 @@ One convention across every endpoint, so you can branch on the same fields every
           // (LIN-772/773); dropping it here silently hid the section on the LLM
           // recommendation path autopilot drives by default — the sibling of the
           // deterministic LIN-776 fix. `focusedChild` stays (the meta path reads it).
-          recommendContext,
+          { parent, siblings, project, children, comments, focusedChild, attachments },
           {
             apiKey: resolvedApiKey,
             model: selectedModel,
@@ -3264,11 +3192,7 @@ One convention across every endpoint, so you can branch on the same fields every
             return notFound.json(res, 'Issue not found');
           }
           const { issue, parent, siblings, project, children, comments, attachments } = ctx;
-          const overrideContext = { parent, siblings, project, children, comments, attachments };
-          // Grounding-freshness suppression (LIN-1240) on the deterministic kind-override
-          // path — same seam as GET /prompt; conservative fallback leaves it untouched.
-          await resolveFreshnessInto(overrideContext, { urlKey: req.proxyUrlKey, hashSource: ctx, headSha: reportedHead(req) });
-          const generated = generatePrompt(kind, issue, overrideContext, {});
+          const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {});
           if (!generated) {
             keepalive.stop();
             logEvent(req, '/api/proxy/recommend', 500);
@@ -3301,10 +3225,7 @@ One convention across every endpoint, so you can branch on the same fields every
               isTestMode,
               sessionApiKey,
               deadline: recommendDeadline,
-              noDescend,
-              // Worker-reported HEAD for this read (LIN-1239/1240) — threaded so each
-              // descended node's freshness is judged against the current code HEAD.
-              headSha: reportedHead(req)
+              noDescend
             })
           }));
         }
@@ -3461,7 +3382,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
-        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash, headSha: reportedHead(req) });
+        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
         const cached = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
 
         if (cached && cached.inputHash === inputHash) {
@@ -3621,7 +3542,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
-        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash, headSha: reportedHead(req) });
+        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
 
         const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'recap', forceDefault: isFreeTier });
         let recap;
@@ -3734,7 +3655,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
-        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash, headSha: reportedHead(req) });
+        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
         const cached = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
 
         if (cached && cached.inputHash === inputHash) {
@@ -3892,7 +3813,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
-        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash, headSha: reportedHead(req) });
+        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
 
         const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier });
         let brief;
@@ -4731,11 +4652,7 @@ One convention across every endpoint, so you can branch on the same fields every
         // path, which already passes the full context. Keep `{}` for provider.ui —
         // the Attachments section emits no "Linear" literal, so Linear output stays
         // byte-identical.
-        const overrideContext = { parent, siblings, project, children, comments, attachments };
-        // Grounding-freshness suppression (LIN-1240) on the fused verb's deterministic
-        // kind-override path — same seam as GET /prompt; conservative fallback otherwise.
-        await resolveFreshnessInto(overrideContext, { urlKey: req.proxyUrlKey, hashSource: ctx, headSha: reportedHead(req) });
-        const generated = generatePrompt(kind, issue, overrideContext, {});
+        const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {});
         if (!generated) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
           return jsonError(res, 500, 'Failed to generate prompt');
@@ -4869,9 +4786,7 @@ One convention across every endpoint, so you can branch on the same fields every
             isTestMode,
             sessionApiKey,
             deadline: recommendDeadline,
-            noDescend: noDescend === true,
-            // Worker-reported HEAD (LIN-1239/1240) for per-node freshness on the fused verb.
-            headSha: reportedHead(req)
+            noDescend: noDescend === true
           })
         }));
       } catch (err) {

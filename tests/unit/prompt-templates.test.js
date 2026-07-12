@@ -1647,7 +1647,7 @@ describe('Scale to the task (handwritten path)', () => {
 // LIN-177 S4/S5: Capability-aware prompts (provider.ui threaded into both paths)
 // =============================================================================
 import { generateCustomPrompt } from '../../lib/prompt-templates.js';
-import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatPlanFidelityCheck, formatStalenessCheck, formatAttachmentsSection, formatAttachmentPerceptionCheck } from '../../lib/prompt-formatters.js';
+import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatPlanFidelityCheck, formatAttachmentsSection, formatAttachmentPerceptionCheck } from '../../lib/prompt-formatters.js';
 import { applyGroundingToRecommendation, formatIssueContext } from '../../lib/openrouter.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 
@@ -2496,82 +2496,6 @@ describe('plan-fidelity reconciliation + refactor-equivalence (LIN-698)', () => 
     assert.ok(/reconcile the plan against the research/.test(p), 'meta-prompt must require plan-vs-research reconciliation');
     assert.ok(/research's reasoning wins/.test(p), 'meta-prompt must give the research priority on conflict');
     assert.ok(/characterization test/.test(p), 'meta-prompt must require characterizing old behavior for refactor labels');
-  });
-});
-
-// =============================================================================
-// Grounding-freshness suppression (LIN-1240). When the proxy route has proven the
-// ticket slice + code HEAD are unchanged since the last snapshot, it threads
-// `context.groundingFreshness = { fresh: true, ... }` and the pure formatters emit a
-// short "grounding current" note instead of the full re-read. The load-bearing
-// invariant: ABSENT the field, output is byte-identical to pre-LIN-1240 (parity-pinned).
-// =============================================================================
-describe('grounding-freshness suppression (LIN-1240)', () => {
-  const issue = {
-    identifier: 'LIN-1240', title: 'T', description: 'd',
-    state: { name: 'In Progress', type: 'started' },
-    createdAt: '2026-07-11T00:00:00.000Z', labels: ['implementation']
-  };
-  const fresh = { fresh: true, capturedAt: '2026-07-11T07:54:19.054Z', snapshotRef: 'snap-2' };
-
-  test('formatStalenessCheck emits the full re-ground when freshness is absent (byte-identical)', () => {
-    const out = formatStalenessCheck(issue);
-    assert.strictEqual(out, formatStalenessCheck(issue, {}), 'absent context === empty context');
-    assert.ok(out.includes('Re-ground the Ticket (staleness check)'), 'full staleness section present');
-    assert.ok(out.includes('git log --since="2026-07-11T00:00:00.000Z"'), 'full section still injects the --since date');
-    assert.ok(!out.includes('grounding current'), 'no freshness note when absent');
-  });
-
-  test('formatStalenessCheck emits the short "grounding current" note when fresh', () => {
-    const out = formatStalenessCheck(issue, { groundingFreshness: fresh });
-    assert.ok(out.includes('Re-ground the Ticket (grounding current)'), 'fresh header present');
-    assert.ok(out.includes('2026-07-11T07:54:19.054Z'), 'note cites the snapshot capturedAt');
-    assert.ok(!out.includes('git log --since'), 'the full re-read directive is suppressed');
-  });
-
-  test('formatStalenessCheck: a fresh:false freshness object still yields the full re-ground', () => {
-    const out = formatStalenessCheck(issue, { groundingFreshness: { fresh: false } });
-    assert.strictEqual(out, formatStalenessCheck(issue), 'fresh:false === absent');
-  });
-
-  test('formatPlanFidelityCheck emits the full fidelity check when freshness is absent (byte-identical)', () => {
-    const out = formatPlanFidelityCheck();
-    assert.strictEqual(out, formatPlanFidelityCheck({}), 'absent context === empty context');
-    assert.ok(out.includes('Re-ground the Plan (fidelity check)'), 'full fidelity section present');
-    assert.ok(out.includes('distillation'), 'full section frames the plan as a distillation');
-    assert.ok(!out.includes('grounding current'), 'no freshness note when absent');
-  });
-
-  test('formatPlanFidelityCheck emits the short note when fresh', () => {
-    const out = formatPlanFidelityCheck({ groundingFreshness: fresh });
-    assert.ok(out.includes('Re-ground the Plan (grounding current)'), 'fresh header present');
-    assert.ok(!out.includes('research/exploration notes'), 'the full research-reconciliation directive is suppressed');
-    assert.ok(!out.includes('(fidelity check)'), 'the full fidelity-check header is gone');
-  });
-
-  test('generatePrompt(implementation) suppresses BOTH staleness + plan-fidelity when fresh', () => {
-    const ctx = { parent: null, siblings: [], project: null, children: [], comments: [], groundingFreshness: fresh };
-    const out = generatePrompt('implementation', issue, ctx).prompt;
-    assert.ok(out.includes('Re-ground the Ticket (grounding current)'), 'staleness collapses to the note');
-    assert.ok(out.includes('Re-ground the Plan (grounding current)'), 'plan-fidelity collapses to the note');
-    assert.ok(!out.includes('staleness check'), 'the full staleness directive is gone');
-    assert.ok(!out.includes('fidelity check'), 'the full plan-fidelity directive is gone');
-  });
-
-  test('generatePrompt(implementation) is byte-identical to today when freshness is absent', () => {
-    const ctx = { parent: null, siblings: [], project: null, children: [], comments: [] };
-    const withEmpty = generatePrompt('implementation', issue, ctx).prompt;
-    const withFalse = generatePrompt('implementation', issue, { ...ctx, groundingFreshness: { fresh: false } }).prompt;
-    assert.strictEqual(withFalse, withEmpty, 'a non-fresh freshness object never perturbs output');
-    assert.ok(withEmpty.includes('Re-ground the Ticket (staleness check)'));
-    assert.ok(withEmpty.includes('Re-ground the Plan (fidelity check)'));
-  });
-
-  test('the meta path also suppresses the staleness note when fresh (via applyGroundingToRecommendation)', () => {
-    const ctx = { children: [], comments: [], groundingFreshness: fresh };
-    const meta = applyGroundingToRecommendation({ prompt: 'BODY' }, issue, ctx);
-    assert.ok(meta.prompt.includes('Re-ground the Ticket (grounding current)'), 'meta staleness collapses to the note');
-    assert.ok(!meta.prompt.includes('git log --since'), 'meta full re-read is suppressed');
   });
 });
 
