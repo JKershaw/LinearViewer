@@ -300,6 +300,15 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
 
     // The UI confirms QUEUED (not delivered) — honest about the async handoff.
     await expect(page.locator('[data-testid="session-reply-feedback"]')).toContainText('queued');
+
+    // LIN-1298: the sent reply is echoed as a conversational "you" bubble in the
+    // reply thread — the shared Task Chat chat UI, reused on the session surface.
+    const youBubble = page.locator('[data-testid="session-reply-you"]');
+    await expect(youBubble).toHaveCount(1);
+    await expect(youBubble).toContainText('option A');
+    // It composes the shared speaker-pill + surface primitives.
+    await expect(youBubble.locator('.status-pill.chat-msg__who')).toContainText('you');
+    await expect(youBubble.locator('.surface.chat-msg__body')).toBeVisible();
   });
 
   test('the reply box omits force for a genuinely warm/executing session (LIN-1252)', async ({ page }) => {

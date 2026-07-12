@@ -14,8 +14,29 @@
 (function () {
   'use strict';
 
+  // ── Conversational "you" echo (LIN-1298) ─────────────────────────────────
+  // Mirror the Task Chat idiom (public/task-chat.js appendBubble): compose the
+  // shared renderStatusPill + renderSurface primitives into a "you" turn so the
+  // reply reads as a chat message, not a vanished textarea. UI-only — the real
+  // agent continuation still arrives on reload (the note says so).
+  function appendYouBubble(thread, text) {
+    if (!thread || typeof window.renderStatusPill !== 'function' || typeof window.renderSurface !== 'function') return;
+    var whoPill = window.renderStatusPill({ label: 'you', variant: 'tag', className: 'chat-msg__who' });
+    var bodySurface = window.renderSurface({
+      body: '<span class="chat-msg__text">' + window.escapeHtml(text) + '</span>',
+      className: 'chat-msg__body'
+    });
+    var li = document.createElement('li');
+    li.className = 'chat-msg chat-msg--you';
+    li.setAttribute('data-testid', 'session-reply-you');
+    li.innerHTML = whoPill + bodySurface;
+    thread.appendChild(li);
+    thread.hidden = false;
+    thread.scrollTop = thread.scrollHeight;
+  }
+
   // ── Shared reply helper (raw fetch, same pattern as the original global box) ──
-  function sendReply(opts, btn, textarea, feedback) {
+  function sendReply(opts, btn, textarea, feedback, thread) {
     var prompt = (textarea.value || '').trim();
     if (!prompt) {
       feedback.textContent = 'enter a reply';
@@ -44,6 +65,7 @@
         });
       })
       .then(function () {
+        appendYouBubble(thread, prompt);
         textarea.value = '';
         feedback.textContent = opts.force
           ? 'reply queued — if the session has ended you\'ll see "no live session to resume" in the transcript on reload'
@@ -121,40 +143,40 @@
     }
   }
 
-  // ── Per-run inline reply boxes (LIN-1133) ─────────────────────────────────
+  // ── Per-run inline reply boxes (LIN-1133; LIN-1298 echo thread) ───────────
   function initInlineReplies() {
     var boxes = document.querySelectorAll('[data-testid="session-inline-reply"]');
     for (var i = 0; i < boxes.length; i++) {
-      var box = boxes[i];
-      var textarea = box.querySelector('.sess-inline-reply-input');
-      var btn = box.querySelector('.sess-reply-send');
-      var feedback = box.querySelector('.sess-reply-feedback');
-      if (!textarea || !btn) continue;
+      // Per-box closure so each handler binds its OWN elements (no fragile
+      // parentNode walking) and its own echo thread (LIN-1298).
+      (function (box) {
+        var textarea = box.querySelector('.sess-inline-reply-input');
+        var btn = box.querySelector('.sess-reply-send');
+        var feedback = box.querySelector('.sess-reply-feedback');
+        var thread = box.querySelector('[data-testid="session-inline-reply-thread"]');
+        if (!textarea || !btn) return;
 
-      var urlKey = box.dataset.urlKey;
-      var loopId = box.dataset.loopId;
-      var target = box.dataset.target === 'web' ? 'web' : 'cli';
-      // Force when this run is terminal OR the session is paused-on-human/waiting
-      // (LIN-1252). `data-terminal` is the run's own status; `data-session-waiting`
-      // is the session-level waiting signal (keyed session-wide, not per-run).
-      var force = box.dataset.terminal === 'true' || box.dataset.sessionWaiting === 'true';
+        var opts = {
+          urlKey: box.dataset.urlKey,
+          followUpTo: box.dataset.loopId,
+          target: box.dataset.target === 'web' ? 'web' : 'cli',
+          // Force when this run is terminal OR the session is paused-on-human/waiting
+          // (LIN-1252). `data-terminal` is the run's own status; `data-session-waiting`
+          // is the session-level waiting signal (keyed session-wide, not per-run).
+          force: box.dataset.terminal === 'true' || box.dataset.sessionWaiting === 'true'
+        };
 
-      btn.addEventListener('click', function (e) {
-        e.preventDefault();
-        var t = this.parentNode.parentNode.querySelector('.sess-inline-reply-input');
-        var f = this.parentNode.parentNode.querySelector('.sess-reply-feedback');
-        sendReply({ urlKey: urlKey, followUpTo: loopId, target: target, force: force }, this, t, f);
-      });
-
-      (function (ta, b, opts) {
-        ta.addEventListener('keydown', function (e) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          sendReply(opts, btn, textarea, feedback, thread);
+        });
+        textarea.addEventListener('keydown', function (e) {
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
             e.preventDefault();
-            var f = ta.parentNode.querySelector('.sess-reply-feedback');
-            sendReply(opts, b, ta, f);
+            sendReply(opts, btn, textarea, feedback, thread);
           }
         });
-      })(textarea, btn, { urlKey: urlKey, followUpTo: loopId, target: target, force: force });
+      })(boxes[i]);
     }
   }
 
@@ -190,6 +212,7 @@
     var textarea = box.querySelector('.sess-reply-input');
     var btn = box.querySelector('.sess-reply-send');
     var feedback = box.querySelector('.sess-reply-feedback');
+    var thread = box.querySelector('[data-testid="session-reply-thread"]');
     if (!textarea || !btn) return;
 
     var urlKey = box.dataset.urlKey;
@@ -199,16 +222,17 @@
     // (LIN-1252): both are "not a live writer", so kill-first is safe and needed
     // for the reply to land. A genuinely warm/EXECUTING session is neither.
     var force = box.dataset.sessionTerminal === 'true' || box.dataset.sessionWaiting === 'true';
+    var opts = { urlKey: urlKey, followUpTo: sessionId, target: target, force: force };
 
     btn.addEventListener('click', function (e) {
       e.preventDefault();
-      sendReply({ urlKey: urlKey, followUpTo: sessionId, target: target, force: force }, this, textarea, feedback);
+      sendReply(opts, btn, textarea, feedback, thread);
     });
 
     textarea.addEventListener('keydown', function (e) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        sendReply({ urlKey: urlKey, followUpTo: sessionId, target: target, force: force }, btn, textarea, feedback);
+        sendReply(opts, btn, textarea, feedback, thread);
       }
     });
   }
