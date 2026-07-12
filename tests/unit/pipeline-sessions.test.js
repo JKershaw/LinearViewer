@@ -13,6 +13,9 @@
  *   - a worker stamped for another session is never stolen by inference
  *   - orphan sessionId group (orchestrator aged out) → anchorless session
  *   - completedAt derives from terminal feedback, never take-time resolvedAt
+ *   - follow-up thread stitching by followUpTo (LIN-1292): single follow-up,
+ *     chained follow-ups, stitching into an existing autopilot session,
+ *     aged-out anchor fallback, and no-double-claim
  *   - getSessionsForWorkspace public API with mock stores
  */
 import { test, describe } from 'node:test';
@@ -293,6 +296,96 @@ describe('standalone single-loop sessions (LIN-1194)', () => {
     const sessions = _buildSessions(loops, { now: NOW });
     assert.strictEqual(sessions.length, 1);
     assert.strictEqual(sessions[0].sessionId, SESSION_ID);
+  });
+});
+
+// ─── Follow-up thread stitching (LIN-1292) ────────────────────────────────────
+
+describe('followUpTo on the Loop record', () => {
+  test('_buildLoops carries followUpTo through from the dispatch item', () => {
+    const [loop] = loopsFrom([worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { followUpTo: 'w0' })]);
+    assert.strictEqual(loop.followUpTo, 'w0');
+  });
+
+  test('followUpTo defaults to null when absent', () => {
+    const [loop] = loopsFrom([worker('w1', CHILD, '2026-06-22T10:30:00.000Z')]);
+    assert.strictEqual(loop.followUpTo, null);
+  });
+});
+
+describe('follow-up thread stitching by followUpTo (LIN-1292)', () => {
+  test('a follow-up reply stitches into its anchor\'s standalone session', () => {
+    const loops = loopsFrom([
+      worker('orig', UNRELATED, '2026-06-22T11:00:00.000Z'),
+      // The reply box posts with no sessionId — only followUpTo pointing at the original.
+      worker('reply1', UNRELATED, '2026-06-22T11:30:00.000Z', { followUpTo: 'orig' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(sessions.length, 1);
+    const s = sessions[0];
+    assert.strictEqual(s.sessionId, 'orig'); // keyed by the root anchor's loopId, not the reply's
+    assert.deepStrictEqual(s.loops.map(l => l.loopId).sort(), ['orig', 'reply1']);
+  });
+
+  test('a chained follow-up thread (A <- B <- C) all stitches to the root', () => {
+    const loops = loopsFrom([
+      worker('a', UNRELATED, '2026-06-22T10:00:00.000Z'),
+      worker('b', UNRELATED, '2026-06-22T10:30:00.000Z', { followUpTo: 'a' }),
+      worker('c', UNRELATED, '2026-06-22T11:00:00.000Z', { followUpTo: 'b' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(sessions.length, 1);
+    const s = sessions[0];
+    assert.strictEqual(s.sessionId, 'a');
+    assert.deepStrictEqual(s.loops.map(l => l.loopId).sort(), ['a', 'b', 'c']);
+  });
+
+  test('a follow-up whose anchor has aged out of the window falls back to its own standalone session', () => {
+    const loops = loopsFrom([
+      // 'ghost-original' is not present in the loop set at all (outside the lookback window).
+      worker('reply1', UNRELATED, '2026-06-22T11:30:00.000Z', { followUpTo: 'ghost-original' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(sessions.length, 1);
+    assert.strictEqual(sessions[0].sessionId, 'reply1'); // pass 3 standalone, not silently dropped
+    assert.strictEqual(sessions[0].loops.length, 1);
+  });
+
+  test('a follow-up on an autopilot worker stitches into the existing autopilot session', () => {
+    const loops = loopsFrom([
+      orchestrator(),
+      worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
+      // A human follow-up reply to w1's dispatch: no sessionId of its own, so
+      // without the stitch it would fall to pass 3 as a standalone session.
+      worker('reply1', CHILD, '2026-06-22T11:00:00.000Z', { followUpTo: 'w1' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    const s = sessions.find(x => x.sessionId === SESSION_ID);
+    assert.deepStrictEqual(s.loops.map(l => l.loopId).sort(), ['ap-1', 'reply1', 'w1']);
+    assert.strictEqual(sessions.find(x => x.sessionId === 'reply1'), undefined, 'the follow-up must not also appear standalone');
+  });
+
+  test('a stitched loop is never double-emitted as its own standalone session', () => {
+    const loops = loopsFrom([
+      worker('orig', UNRELATED, '2026-06-22T11:00:00.000Z'),
+      worker('reply1', UNRELATED, '2026-06-22T11:30:00.000Z', { followUpTo: 'orig' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+    const allLoopIds = sessions.flatMap(s => s.loops.map(l => l.loopId));
+    assert.deepStrictEqual(allLoopIds.sort(), ['orig', 'reply1']);
+  });
+
+  test('a dash/local-target follow-up is not stitched or emitted (no live session identity, V1)', () => {
+    const loops = loopsFrom([
+      worker('orig', UNRELATED, '2026-06-22T11:00:00.000Z', { target: 'dash' }),
+      worker('reply1', UNRELATED, '2026-06-22T11:30:00.000Z', { target: 'dash', followUpTo: 'orig' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+    assert.strictEqual(sessions.length, 0);
   });
 });
 
