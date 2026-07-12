@@ -567,7 +567,7 @@ test.describe('Custom Prompts on Swipe Page', () => {
     const controls = section.locator('.dispatch-exec-controls');
     await expect(controls).toBeVisible();
 
-    await controls.locator('.dispatch-exec-harness-custom').fill('opencode');
+    await controls.locator('.dispatch-exec-harness-select').selectOption('opencode');
     await controls.locator('.dispatch-exec-model').fill('openrouter/anthropic/claude-opus-4.8');
 
     const dispatchReq = page.waitForRequest(req =>

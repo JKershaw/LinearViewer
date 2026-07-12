@@ -2401,7 +2401,6 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .dispatch-exec-harness-select,
-.dispatch-exec-harness-custom,
 .dispatch-exec-model {
   font-family: var(--font-content);
   font-size: 0.8em;
@@ -2412,8 +2411,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   color: var(--fg);
 }
 
-.dispatch-exec-harness-select,
-.dispatch-exec-harness-custom {
+.dispatch-exec-harness-select {
   min-width: 9ch;
 }
 
@@ -2421,19 +2419,12 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   min-width: 12ch;
 }
 
-.dispatch-exec-or {
-  color: var(--fg-dim);
-  font-size: 0.75em;
-}
-
 .dispatch-exec-harness-select:focus,
-.dispatch-exec-harness-custom:focus,
 .dispatch-exec-model:focus {
   outline: none;
   border-color: var(--blue);
 }
 
-.dispatch-exec-harness-custom::placeholder,
 .dispatch-exec-model::placeholder {
   color: var(--fg-dim);
 }
