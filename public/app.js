@@ -1125,6 +1125,12 @@ function initPrompts() {
     // kind from promptName.
     const kind = promptContainer.dataset.kind || undefined
 
+    // LIN-1279: surfaces whose prompt REQUIRES workspace-API proxy context (the
+    // Mint + Autopilot periodical variant, whose tail calls the kickoff endpoint)
+    // mark their container with data-proxy-force. It forces attachProxy on regardless
+    // of the +proxy toggle, so the dispatched agent always receives a proxy token.
+    const proxyForce = promptContainer.dataset.proxyForce === 'true'
+
     // LIN-345: some rows that share this handler are issue-less by design — the
     // synthetic Periodicals group (kind=periodical) dispatches a template prompt
     // with no Linear issue behind it, so no data-prompt-for / data-identifier is
@@ -1152,7 +1158,8 @@ function initPrompts() {
         repo: repo || undefined,
         kind,
         model,
-        harness
+        harness,
+        proxyForce
       })
 
       dispatchBtn.textContent = 'dispatched!'
