@@ -201,6 +201,61 @@ describe('ReportHistoryStore.getLatest', () => {
   });
 });
 
+describe('ReportHistoryStore.getLatestWithOrientation', () => {
+  let store;
+  beforeEach(() => { store = new ReportHistoryStore({ collection: createMockCollection() }); });
+
+  test('falls back to an older report when the newest has no bearings (LIN-1228)', async () => {
+    const a = await store.save('ws-1', {
+      model: 'm', northStar: 'old', narrative: sampleNarrative('a'),
+      orientation: [{ identifier: 'LIN-1', bearing: 'S', reason: 'r', archived: false }]
+    });
+    store.collection._docs.find(d => d._id === a.id).generatedAt = new Date(Date.now() - 10000);
+    // Newer report, but a degraded run (no north star / free tier / parse
+    // failure) that saved no bearings — getLatest() would return this one.
+    await store.save('ws-1', {
+      model: 'm', northStar: 'new', narrative: sampleNarrative('b'), orientation: []
+    });
+
+    const latest = await store.getLatestWithOrientation('ws-1');
+    assert.strictEqual(latest.id, a.id);
+    assert.strictEqual(latest.orientation[0].identifier, 'LIN-1');
+  });
+
+  test('returns the newest report when it does have bearings', async () => {
+    const a = await store.save('ws-1', {
+      model: 'm', northStar: 'old', narrative: sampleNarrative('a'),
+      orientation: [{ identifier: 'LIN-1', bearing: 'S', reason: 'r', archived: false }]
+    });
+    store.collection._docs.find(d => d._id === a.id).generatedAt = new Date(Date.now() - 10000);
+    const b = await store.save('ws-1', {
+      model: 'm', northStar: 'new', narrative: sampleNarrative('b'),
+      orientation: [{ identifier: 'LIN-2', bearing: 'N', reason: 'r', archived: false }]
+    });
+
+    const latest = await store.getLatestWithOrientation('ws-1');
+    assert.strictEqual(latest.id, b.id);
+  });
+
+  test('returns null when no report has ever had bearings (genuine no-data case)', async () => {
+    await store.save('ws-1', { model: 'm', narrative: sampleNarrative('a'), orientation: [] });
+    await store.save('ws-1', { model: 'm', narrative: sampleNarrative('b'), orientation: [] });
+    assert.strictEqual(await store.getLatestWithOrientation('ws-1'), null);
+  });
+
+  test('returns null when the workspace has no reports', async () => {
+    assert.strictEqual(await store.getLatestWithOrientation('ws-empty'), null);
+  });
+
+  test('scopes by workspace', async () => {
+    await store.save('ws-1', {
+      model: 'm', narrative: sampleNarrative(),
+      orientation: [{ identifier: 'LIN-1', bearing: 'N', reason: 'r', archived: false }]
+    });
+    assert.strictEqual(await store.getLatestWithOrientation('ws-2'), null);
+  });
+});
+
 describe('ReportHistoryStore capacity cap', () => {
   test('prunes to the newest N when the cap is exceeded', async () => {
     const store = new ReportHistoryStore({ collection: createMockCollection(), maxReports: 3 });

@@ -1560,10 +1560,15 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
     const { trees, inProgressTrees, recentActivityTrees, organizationName } =
       await fetchAndPrepareProjects(workspace, teamId, mockOverride);
 
-    // Orientation mode (LIN-301): a pure read of the latest saved roadmap report
-    // — no LLM call on the ship side (see LIN-298). The client maps these saved
-    // bearings to angles; absence (no report yet) just leaves the toggle inert.
-    const latestReport = await reportHistoryStore.getLatest(workspace.urlKey);
+    // Orientation mode (LIN-301): a pure read of the newest saved roadmap report
+    // that actually carries bearings (LIN-1228) — no LLM call on the ship side
+    // (see LIN-298). getLatest() would return the newest report regardless of
+    // whether it has orientation, which hides the last known-good bearings
+    // behind a degraded regenerated report (no north star / free tier / stream
+    // failure save orientation: []); getLatestWithOrientation() skips those.
+    // The client maps the saved bearings to angles; absence (no report has ever
+    // had bearings) just leaves the toggle inert.
+    const latestReport = await reportHistoryStore.getLatestWithOrientation(workspace.urlKey);
 
     const html = renderShipPage(
       { projectTrees: trees, inProgressTrees, recentActivityTrees, organizationName },

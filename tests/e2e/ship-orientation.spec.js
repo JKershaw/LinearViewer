@@ -72,6 +72,37 @@ test.describe('Ship orientation mode (LIN-301)', () => {
     await expect(page.locator('#ship-orbit [data-bearing]')).toHaveCount(0);
   });
 
+  test('orientation stays available when the newest saved report is degraded (LIN-1228)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed(localWorkerUrlKey), { features: { roadmap: true, ship: true } });
+
+    // Older good report: has bearings.
+    const goodResp = await page.request.post(`/workspace/${localWorkerUrlKey}/api/roadmap/reports`, {
+      data: {
+        northStar: 'Ship the orientation instrument',
+        narrative: { digest: 'x' },
+        orientation: [{ identifier: 'AUTH-3', bearing: 'N', reason: 'dead ahead', archived: false }]
+      }
+    });
+    expect(goodResp.ok()).toBeTruthy();
+
+    // Newer report, regenerated without bearings (e.g. no north star / free
+    // tier / stream failure) — this is the report getLatest() would pick.
+    const degradedResp = await page.request.post(`/workspace/${localWorkerUrlKey}/api/roadmap/reports`, {
+      data: { northStar: '', narrative: { digest: 'y' }, orientation: [] }
+    });
+    expect(degradedResp.ok()).toBeTruthy();
+
+    await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
+    await page.waitForLoadState('networkidle');
+
+    // The toggle must still be enabled, falling back to the older bearings.
+    const orientBtn = page.locator('#ship-mode-orientation');
+    await expect(orientBtn).toBeEnabled();
+    await orientBtn.click();
+    await expect(orientBtn).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#ship-orbit [data-bearing="N"]').first()).toBeVisible();
+  });
+
   test('orientation preference persists across reloads', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(swimLocalSeed(localWorkerUrlKey), { features: { roadmap: true, ship: true } });
     await page.request.post(`/workspace/${localWorkerUrlKey}/api/roadmap/reports`, {
