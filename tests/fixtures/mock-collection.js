@@ -11,18 +11,25 @@
  * before `.toArray()`, applied in Mongo's documented order (sort → skip → limit →
  * projection). This mirrors the real driver closely enough for the bounded
  * history read (LIN-1030) to be exercised in unit tests.
+ *
+ * Also supports `{ $in: [...] }` (used by the Observation materializer's
+ * followUpTo BFS batch lookups, LIN-1307).
  */
 export function createMockCollection() {
   const docs = [];
 
   const fieldMatches = (value, condition) => {
-    if (condition && typeof condition === 'object' &&
-        ('$gt' in condition || '$gte' in condition || '$lt' in condition || '$lte' in condition)) {
-      if ('$gt' in condition && !(value > condition.$gt)) return false;
-      if ('$gte' in condition && !(value >= condition.$gte)) return false;
-      if ('$lt' in condition && !(value < condition.$lt)) return false;
-      if ('$lte' in condition && !(value <= condition.$lte)) return false;
-      return true;
+    if (condition && typeof condition === 'object') {
+      if ('$gt' in condition || '$gte' in condition || '$lt' in condition || '$lte' in condition) {
+        if ('$gt' in condition && !(value > condition.$gt)) return false;
+        if ('$gte' in condition && !(value >= condition.$gte)) return false;
+        if ('$lt' in condition && !(value < condition.$lt)) return false;
+        if ('$lte' in condition && !(value <= condition.$lte)) return false;
+        return true;
+      }
+      if ('$in' in condition) {
+        return Array.isArray(condition.$in) && condition.$in.includes(value);
+      }
     }
     return value === condition;
   };

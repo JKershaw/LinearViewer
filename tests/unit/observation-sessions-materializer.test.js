@@ -36,7 +36,7 @@ function setup() {
 
 // Insert an archived dispatch row directly (bypassing the hooks) so we control the
 // exact cross-session fixture the equivalence spike needs.
-function archive(historyCollection, { id, issueIdentifier, sessionId = null, kind = 'implementation', dispatchedAtMs, resolvedAtMs, feedback = [] }) {
+function archive(historyCollection, { id, issueIdentifier, sessionId = null, kind = 'implementation', followUpTo = null, dispatchedAtMs, resolvedAtMs, feedback = [] }) {
   historyCollection._docs.push({
     _id: id,
     urlKey: URL_KEY,
@@ -51,7 +51,7 @@ function archive(historyCollection, { id, issueIdentifier, sessionId = null, kin
     dispatchedBy: null,
     target: 'cli',
     repo: null,
-    followUpTo: null,
+    followUpTo,
     sessionId,
     status: 'taken',
     resolvedAt: resolvedAtMs ? new Date(resolvedAtMs) : null,
@@ -139,6 +139,76 @@ test('rebuildForWrite by sessionId reconstructs that session\'s full closure (by
   const s1 = sessions.find(s => s.sessionId === 'S1');
   assert.deepEqual(s1, fullS1);
   assert.deepEqual(s1.tasksTouched.sort(), ['LIN-100', 'LIN-200', 'LIN-300'], 'full issue closure recovered');
+});
+
+// LIN-1307: autopilot session S, worker W (sessionId: S), and a reply-box
+// follow-up F that resumes W (followUpTo: W, sessionId: null, kind: 'custom',
+// target: 'cli') on its OWN distinct issue — the shape a human follow-up reply
+// to a worker inside an autopilot session actually takes.
+function seedFollowUpFixture({ historyCollection, statusCollection }) {
+  archive(historyCollection, { id: 'S', issueIdentifier: 'LIN-500', kind: 'autopilot', dispatchedAtMs: min(40), resolvedAtMs: min(41) });
+  archive(historyCollection, { id: 'W', issueIdentifier: 'LIN-501', sessionId: 'S', dispatchedAtMs: min(42), resolvedAtMs: min(45), feedback: [{ message: '[done] shipped W', tsMs: min(45) }] });
+  archive(historyCollection, { id: 'F', issueIdentifier: 'LIN-502', followUpTo: 'W', kind: 'custom', dispatchedAtMs: min(46), resolvedAtMs: min(49), feedback: [{ message: 'reply to W', tsMs: min(48) }] });
+
+  status(statusCollection, { id: 'AS-s-anchor', taskIdentifier: 'LIN-500', tsMs: min(40) + 30 * 1000 });
+  status(statusCollection, { id: 'AS-w', taskIdentifier: 'LIN-501', tsMs: min(43) });
+  status(statusCollection, { id: 'AS-f', taskIdentifier: 'LIN-502', tsMs: min(47) });
+}
+
+test('LIN-1307: rebuildForWrite by sessionId pulls in a followUpTo-linked reply (byte-identical)', async () => {
+  const ctx = setup();
+  seedFollowUpFixture(ctx);
+  const { dispatchStore, agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore, agentStatusStore, lean: true });
+  const fullS = full.find(s => s.sessionId === 'S');
+  assert.ok(fullS.loops.some(l => l.loopId === 'F'), 'the live build stitches F into S via the followUpTo chain (LIN-1292)');
+
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'S' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const s = sessions.find(x => x.sessionId === 'S');
+  assert.ok(s, 'S was materialized');
+  assert.deepEqual(s, fullS, 'materialized S is byte-identical to the live build, including the follow-up loop');
+  assert.deepEqual(s.tasksTouched.sort(), ['LIN-500', 'LIN-501', 'LIN-502'], 'the follow-up\'s own issue joined the closure');
+});
+
+test('LIN-1307: rebuildForWrite by the follow-up\'s OWN issueIdentifier resolves up to the owning session (byte-identical)', async () => {
+  const ctx = setup();
+  seedFollowUpFixture(ctx);
+  const { dispatchStore, agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore, agentStatusStore, lean: true });
+  const fullS = full.find(s => s.sessionId === 'S');
+
+  // A write on F's own issue (e.g. the reply's own addFeedback) must still find
+  // and rebuild S — this is the write-trigger gap (Gap 1) in materializer-test
+  // form: without the upward resolution in `_sessionsTouchingIssue`, this issue
+  // touches no known session and the rebuild would be a no-op.
+  await materializer.rebuildForWrite(URL_KEY, { issueIdentifier: 'LIN-502' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  assert.deepEqual(sessions.map(s => s.sessionId), ['S'], 'only S was materialized, resolved from the follow-up\'s own issue');
+  assert.deepEqual(sessions[0], fullS, 'byte-identical to the live build');
+});
+
+test('LIN-1307: a followUpTo chain rooted at a standalone/manual dispatch is never materialized (live-only preserved)', async () => {
+  const ctx = setup();
+  const { historyCollection, statusCollection, dispatchStore, agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  // M2 is a standalone manual dispatch (no sessionId, not autopilot) — same
+  // shape as the M1 case in the EQUIVALENCE spike above. F2 replies to it.
+  archive(historyCollection, { id: 'M2', issueIdentifier: 'LIN-503', dispatchedAtMs: min(50), resolvedAtMs: min(51) });
+  archive(historyCollection, { id: 'F2', issueIdentifier: 'LIN-504', followUpTo: 'M2', kind: 'custom', dispatchedAtMs: min(52), resolvedAtMs: min(53) });
+  status(statusCollection, { id: 'AS-m2', taskIdentifier: 'LIN-503', tsMs: min(50) + 15 * 1000 });
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore, agentStatusStore, lean: true });
+  assert.deepEqual(full.map(s => s.sessionId).sort(), ['M2'], 'the live build stitches F2 into M2\'s own standalone session (LIN-1292), never a separate one');
+
+  await materializer.rebuildForWrite(URL_KEY, { issueIdentifier: 'LIN-504' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  assert.deepEqual(sessions, [], 'a standalone chain root is skipped — stays live-only, matching the write-trigger gap-1 fix');
 });
 
 test('backfillWorkspace persists every full-build session and sets the marker', async () => {
