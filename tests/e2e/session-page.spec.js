@@ -231,6 +231,18 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     // The run has a body container for the transcript (initially hidden via CSS).
     await expect(page.locator('[data-testid="session-run-body"]').first()).toBeAttached();
 
+    // LIN-1309: the transcript is the shared chat.css thread, and each feedback
+    // entry client-renders as a chat bubble (speaker pill + surface body) —
+    // the same conversational idiom as Task Chat / the reply echo threads —
+    // rather than the old bespoke `.sess-run-tx-entry` list markup.
+    await expect(transcript).toHaveClass(/chat-thread/);
+    const entries = transcript.locator('[data-testid="session-transcript-entry"].chat-msg');
+    await expect(entries).toHaveCount(2);
+    await expect(entries.first().locator('.status-pill.chat-msg__who')).toContainText('agent');
+    await expect(entries.first().locator('.surface.chat-msg__body')).toContainText('opened the pull request');
+    await expect(entries.first().locator('.sess-tx-link')).toHaveAttribute('href', 'https://example.com/pr/42');
+    await expect(entries.last().locator('.surface.chat-msg__body')).toContainText('landed the change');
+
     // Back-to-feed link points at the observation feed.
     await expect(page.locator('[data-testid="session-back"]'))
       .toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);

@@ -73,6 +73,16 @@ describe('render-session: transcript', () => {
     assert.ok(!html.includes('data-testid="session-run-transcript"'));
     assert.ok(!html.includes('data-testid="session-run-body"'));
   });
+
+  test('LIN-1309: the transcript element is a shared chat.css thread, empty server-side (client-populated)', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    // The container carrying data-feedback is itself the `.chat-thread` element
+    // (mirrors Task Chat's `.task-chat-transcript.chat-thread` — no wrapper div,
+    // no server-rendered `.sess-run-tx-list`/`.sess-run-tx-entry` bubbles; those
+    // are built client-side by session.js via window.ChatUI.appendMessage).
+    assert.match(html, /<ul class="sess-run-tx chat-thread" data-testid="session-run-transcript" data-feedback="[^"]*"><\/ul>/);
+    assert.ok(!html.includes('sess-run-tx-list'));
+  });
 });
 
 describe('render-session: tasks + overview', () => {
