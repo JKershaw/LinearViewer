@@ -245,12 +245,18 @@
   color: var(--muted);
 }
 
-/* ── Per-run transcript (LIN-1133) ────────────────────────────────────────
-   Each run card contains its own scrollable transcript. Feedback entries are
-   rendered client-side as markdown. */
+/* ── Per-run transcript (LIN-1133; LIN-1309) ──────────────────────────────
+   Each run card contains its own scrollable transcript, now built from the
+   shared chat.css bubble primitives (`.chat-thread`/`.chat-msg`) — the same
+   conversational idiom as Task Chat — instead of the earlier bespoke
+   `.sess-run-tx-list`/`.sess-run-tx-entry` markup. This block only retunes
+   the shared thread's density/chrome for a boxed, scrollable inset (Task
+   Chat's own thread is borderless full-height); the bubble/pill/surface
+   visuals themselves live once in chat.css. */
 .sess-run-tx {
-  max-height: 360px;
-  overflow-y: auto;
+  --chat-thread-max-height: 360px;
+  --chat-thread-gap: var(--space-2);
+  --chat-thread-margin: 0;
   overflow-x: hidden;
   scrollbar-gutter: stable;
   margin-top: 0.5rem;
@@ -259,24 +265,15 @@
   border-radius: var(--radius-sm);
   background: var(--inset);
 }
-.sess-run-tx-list { list-style: none; margin: 0; padding: 0; }
-/* Client-rendered markdown transcript entry (LIN-1133). */
-.sess-run-tx-entry {
-  padding: 0.3rem 0;
-  border-bottom: 1px solid var(--line-soft);
-  font-family: var(--font-structural);
-  font-size: 0.82rem;
-  line-height: 1.5;
-  word-break: break-word;
-}
-.sess-run-tx-entry:last-child { border-bottom: none; }
-/* Markdown-rendered content within transcript entries — reuse the established
-   .markdown-content pattern from style.css for consistency. */
-.sess-run-tx-entry .markdown-content {
+.sess-run-tx-entry { word-break: break-word; }
+/* Markdown-rendered message body — reuses the established .markdown-content
+   sizing (marked + DOMPurify output, fed from the escaped data-feedback JSON). */
+.sess-tx-msg {
   font-family: var(--font-structural);
   font-size: 0.82rem;
   line-height: 1.5;
 }
+.sess-tx-link { font-size: 0.82rem; }
 
 /* ── Task context (brief / recap) ─────────────────────────────────────────── */
 .sess-ctx-issue {
@@ -471,5 +468,5 @@
   .sess-waiting-msg { line-height: 1.5; }
   .sess-reply-input { min-height: 5.5rem; }
   .sess-inline-reply-input { min-height: 4rem; }
-  .sess-run-tx { max-height: 280px; }
+  .sess-run-tx { --chat-thread-max-height: 280px; }
 }

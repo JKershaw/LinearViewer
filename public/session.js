@@ -1,15 +1,16 @@
 /**
- * Session Page Client (LIN-1004/LIN-1133).
+ * Session Page Client (LIN-1004/LIN-1133/LIN-1309).
  *
- * JS-enhanced session page: per-run expandable transcripts with client-side
- * markdown rendering, per-run inline reply boxes scoped to each run's loopId,
- * BriefSection/RecapSection widget init on context panels, and the preserved
- * global reply box fallback.
+ * JS-enhanced session page: per-run expandable transcripts rendered as shared
+ * chat bubbles (LIN-1309) with client-side markdown rendering, per-run inline
+ * reply boxes scoped to each run's loopId, BriefSection/RecapSection widget
+ * init on context panels, and the preserved global reply box fallback.
  *
- * Loaded AFTER common.js, marked.min.js, purify.min.js, brief.js, recap.js —
- * window.renderMarkdown, window.BriefSection, window.RecapSection ARE available.
- * Inline replies use the same raw-fetch dispatch as the global reply box
- * (window.dispatchPrompt does not support followUpTo).
+ * Loaded AFTER common.js, chat.js, marked.min.js, purify.min.js, brief.js,
+ * recap.js — window.ChatUI, window.renderMarkdown, window.BriefSection,
+ * window.RecapSection ARE available. Inline replies use the same raw-fetch
+ * dispatch as the global reply box (window.dispatchPrompt does not support
+ * followUpTo).
  */
 (function () {
   'use strict';
@@ -95,39 +96,42 @@
     }
   }
 
-  // ── Per-run transcript markdown rendering (LIN-1133) ───────────────────────
+  // ── Per-run transcript rendering (LIN-1133; LIN-1309 shared chat bubbles) ──
+  // Each transcript is a `.chat-thread` (see lib/render-session.js); one
+  // `.chat-msg` bubble per feedback entry, built via the shared ChatUI helper
+  // (public/chat.js) — same conversational idiom as Task Chat. The markdown
+  // render (marked + DOMPurify, with the escapeHtml fallback) and the evidence
+  // link both stay INSIDE the bubble body, fed from the escaped `data-feedback`
+  // JSON — that embed is still the one XSS boundary; nothing here moves to
+  // server-rendered message HTML.
   function renderRunTranscripts() {
-    var containers = document.querySelectorAll('[data-testid="session-run-transcript"]');
-    for (var i = 0; i < containers.length; i++) {
-      var container = containers[i];
-      var data = container.dataset.feedback;
+    var threads = document.querySelectorAll('[data-testid="session-run-transcript"]');
+    for (var i = 0; i < threads.length; i++) {
+      var thread = threads[i];
+      var data = thread.dataset.feedback;
       if (!data) continue;
       var entries;
       try { entries = JSON.parse(data); } catch (e) { continue; }
-      if (!entries || !entries.length) continue;
+      if (!entries || !entries.length || typeof window.ChatUI === 'undefined') continue;
 
-      var list = container.querySelector('.sess-run-tx-list');
-      if (!list) continue;
-
-      var html = '';
       for (var j = 0; j < entries.length; j++) {
         var entry = entries[j];
         var messageHtml = typeof window.renderMarkdown === 'function'
           ? window.renderMarkdown(entry.message || '', { breaks: true })
           : window.escapeHtml(entry.message || '');
-        var time = entry.timestamp
-          ? '<span class="sess-tx-time" data-testid="session-transcript-time">' + window.escapeHtml(String(entry.timestamp)) + '</span>'
-          : '';
         var link = entry.url
           ? ' <a class="sess-tx-link" data-testid="session-transcript-link" href="' + window.escapeHtml(entry.url) + '" target="_blank" rel="noopener noreferrer">' + window.escapeHtml(entry.urlLabel || entry.url) + '</a>'
           : '';
-        html += '<li class="sess-run-tx-entry" data-testid="session-transcript-entry">' +
-          time +
-          '<span class="sess-tx-msg markdown-content">' + messageHtml + '</span>' +
-          link +
-          '</li>';
+        window.ChatUI.appendMessage(thread, {
+          who: 'agent',
+          whoState: 'in-progress',
+          html: '<span class="sess-tx-msg markdown-content">' + messageHtml + '</span>' + link,
+          time: entry.timestamp ? String(entry.timestamp) : undefined,
+          liClass: 'sess-run-tx-entry',
+          testId: 'session-transcript-entry',
+          reveal: false
+        });
       }
-      list.innerHTML = html;
     }
   }
 
