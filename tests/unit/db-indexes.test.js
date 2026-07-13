@@ -91,6 +91,18 @@ describe('db-indexes', () => {
     assert.ok(hasIt, 'dispatch-history must have a {urlKey:1, resolvedAt:-1} index');
   });
 
+  test('declares the followUpTo BFS discovery index on both dispatch collections (LIN-1307)', () => {
+    // Backs the materializer's followUpTo BFS (_collectSessionIssues / _sessionsTouchingIssue)
+    // so a per-write chain-root resolution isn't an unindexed workspace-scoped scan.
+    for (const collection of ['dispatch-history', 'dispatch-queue']) {
+      const hasIt = INDEX_SPECS.some(s =>
+        s.collection === collection &&
+        JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, followUpTo: 1 })
+      );
+      assert.ok(hasIt, `${collection} must have a {urlKey:1, followUpTo:1} index`);
+    }
+  });
+
   test('unique option is honoured for tokenHash indexes', async () => {
     const db = freshDb();
     await ensureIndexes(db);
