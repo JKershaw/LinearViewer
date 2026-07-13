@@ -489,12 +489,19 @@ export function createDashboardRoutes({
   // Shape one reconstructed session for the observation feed. Loops are enriched
   // (marker-aware agentState/completedAt) so a marker-done run doesn't look live
   // forever; terminality follows the ANCHOR loop (LIN-592), not completedAt.
-  function buildSessionPayload(session, ws, taskDone = false) {
+  //
+  // `lastActivityOverrideMs` (LIN-1314) lets the post-build descendant rollup pass
+  // (`rollupDescendantActivity`) re-derive a session's payload with a subtree-wide
+  // recency value instead of its own-group `sessionActivityMs` — the same
+  // in-place-mutate-and-re-derive shape `hydrateTouchedTaskDone` already uses for
+  // `taskDone`, so `stale`/`status`/the emitted `lastActivity` stamp stay
+  // consistent with whichever value is authoritative.
+  function buildSessionPayload(session, ws, taskDone = false, lastActivityOverrideMs = null) {
     const anchor = findAnchorLoop(session);
     const enriched = (Array.isArray(session.loops) ? session.loops : []).map(enrichLoop);
     const children = childLoops(session).map(enrichLoop);
     const terminal = sessionIsTerminal(session);
-    const lastActivityMs = sessionActivityMs(enriched, session);
+    const lastActivityMs = lastActivityOverrideMs != null ? lastActivityOverrideMs : sessionActivityMs(enriched, session);
 
     // Derived staleness (Bug 3): a non-terminal session with no activity for >24h
     // is bucketed out of Active. Purely derived from lastActivityMs — never a
@@ -671,6 +678,13 @@ export function createDashboardRoutes({
     // eligible entries' `.payload` in place.
     await hydrateTouchedTaskDone(built);
 
+    // Descendant recency rollup (LIN-1314): fold each session's transitive
+    // child-autopilot sessions' activity into its own `lastActivity` hub field so
+    // an actively-working grandchild keeps the whole ancestor chain fresh. Must
+    // run AFTER hydrateTouchedTaskDone so a re-derive here preserves any taskDone
+    // upgrade already applied. Mutates the eligible entries' `.payload` in place.
+    rollupDescendantActivity(built);
+
     const merged = built.map(b => b.payload);
     merged.sort((a, b) => (new Date(b.lastActivity || 0).getTime()) - (new Date(a.lastActivity || 0).getTime()));
     return merged;
@@ -743,7 +757,7 @@ export function createDashboardRoutes({
         if (cached === undefined) misses.push({ key, ident });
         // cached === false: this task is not done; keep scanning the rest
       }
-      if (doneFromCache) b.payload = buildSessionPayload(b.session, b.ws, true);
+      if (doneFromCache) { b.payload = buildSessionPayload(b.session, b.ws, true); b.taskDone = true; }
       else if (misses.length > 0) pending.push({ b, misses });
       // else: every touched task was a fresh cache-false ⇒ resolved not-done, free
     }
@@ -764,7 +778,7 @@ export function createDashboardRoutes({
         // since phase 1 (mild dedup; full in-flight dedup is LIN-1259 item 3, out
         // of scope). A fresh answer here costs no read and no budget.
         const fresh = taskDoneCache.peek(key);
-        if (fresh === true) { b.payload = buildSessionPayload(b.session, b.ws, true); return; }
+        if (fresh === true) { b.payload = buildSessionPayload(b.session, b.ws, true); b.taskDone = true; return; }
         if (fresh === false) continue;
         if (budget <= 0) { deferred++; return; } // out of read budget this poll
         budget--;
@@ -777,7 +791,7 @@ export function createDashboardRoutes({
             // Same "Done" signal as the drill-in hydrate route (LIN-749).
             return issue?.state?.type === 'completed';
           });
-          if (taskDone) { b.payload = buildSessionPayload(b.session, b.ws, true); return; } // short-circuit
+          if (taskDone) { b.payload = buildSessionPayload(b.session, b.ws, true); b.taskDone = true; return; } // short-circuit
         } catch {
           // Best-effort: a hydration miss leaves the Mongo-sourced payload (error)
           // untouched; the throw is not cached, so a later poll retries. Keep
@@ -788,6 +802,80 @@ export function createDashboardRoutes({
 
     if (deferred > 0) {
       console.log(`Observation: bounded feed hydration read cap (${FEED_HYDRATION_CAP}) reached; deferring ${deferred} errored session(s) to a later poll (LIN-1258/LIN-1259)`);
+    }
+  }
+
+  /**
+   * Descendant recency rollup for the Observation feed (LIN-1314).
+   *
+   * "Sub-session" here means a descendant CHILD-AUTOPILOT session — a separate
+   * `sessionId` group fanned out from this one — not a worker loop within the
+   * same session (`sessionActivityMs` already maxes over those). A child
+   * autopilot dispatched with `sessionId=<parent>` sits in the parent's own
+   * `session.loops` as a `kind:'autopilot'` member (so its OWN activity already
+   * counts toward the parent), but it stamps ITS OWN workers with its OWN
+   * `loopId` — the same per-level lineage `collectCascadeTargets` walks
+   * (`lib/dispatch-store.js`) — so those grandchild workers form a separate
+   * session whose activity the parent's stamp never folds in.
+   *
+   * Rollup rule: each session's recency becomes the most-recent activity across
+   * itself and its whole transitive descendant subtree. The descendant graph is
+   * built entirely from loops already in `built` (no new store reads — the
+   * per-poll cost contract holds), and the walk is cycle-guarded with a visited
+   * set exactly like `collectCascadeTargets`. A descendant missing from `built`
+   * (materializer lag) degrades safely to today's own-group value.
+   *
+   * Only sessions whose rolled value beats their own are re-derived — via the
+   * same `buildSessionPayload` re-invocation `hydrateTouchedTaskDone` already
+   * uses for `taskDone` — so `stale`/`status`/the emitted `lastActivity` stamp
+   * (the hub field the sort + both Active/Archive splits read) all move
+   * together, and a session with no descendants is left byte-identical.
+   * Terminal precedence is preserved for free: `deriveSessionStatus` only reads
+   * `stale` for non-terminal sessions, so a finished parent stays `done` (or
+   * `error`/`done-with-warning`) even when a descendant is still active.
+   *
+   * @param {Array<{session: Object, ws: Object, payload: Object, taskDone?: boolean}>} built
+   * @returns {void}
+   */
+  function rollupDescendantActivity(built) {
+    const bySessionId = new Map();
+    for (const b of built) bySessionId.set(String(b.session.sessionId), b);
+
+    // A session's direct child-autopilot sessions: every `kind:'autopilot'` loop
+    // in its own loop set other than its own anchor (mirrors `childLoops`, but
+    // narrowed to autopilot members — the ones that anchor a session of their own).
+    const childSessionIdsOf = (b) => {
+      const ownId = String(b.session.sessionId);
+      const loops = Array.isArray(b.session.loops) ? b.session.loops : [];
+      const ids = [];
+      for (const l of loops) {
+        if (l && l.kind === 'autopilot' && String(l.loopId) !== ownId) ids.push(String(l.loopId));
+      }
+      return ids;
+    };
+
+    for (const b of built) {
+      const ownMs = Date.parse(b.payload.lastActivity || '') || 0;
+      let maxMs = ownMs;
+
+      const visited = new Set([String(b.session.sessionId)]);
+      const frontier = childSessionIdsOf(b);
+      while (frontier.length) {
+        const id = frontier.shift();
+        if (visited.has(id)) continue;
+        visited.add(id);
+
+        const descendant = bySessionId.get(id);
+        if (!descendant) continue; // missing (lag) → degrade safely, contributes nothing
+
+        const descendantMs = Date.parse(descendant.payload.lastActivity || '') || 0;
+        if (descendantMs > maxMs) maxMs = descendantMs;
+        frontier.push(...childSessionIdsOf(descendant));
+      }
+
+      if (maxMs > ownMs) {
+        b.payload = buildSessionPayload(b.session, b.ws, b.taskDone || false, maxMs);
+      }
     }
   }
 
