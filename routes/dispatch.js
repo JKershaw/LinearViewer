@@ -22,6 +22,7 @@ import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { isValidDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
+import { FEEDBACK_ENTRY_KINDS } from '../lib/dispatch-store.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateDispatchPayload } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
@@ -891,7 +892,14 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       return badRequest.json(res, 'Invalid item ID format');
     }
 
-    const { message, url, urlLabel } = req.body;
+    const { message, url, urlLabel, kind, rootItemId } = req.body;
+
+    // Additive, tolerant validation (LIN-1297): an invalid kind/rootItemId is
+    // silently dropped, never rejected — mirrors the existing tolerate-unknown-
+    // keys behavior for this route. `kind` here is the feedback-ENTRY vocabulary
+    // (FEEDBACK_ENTRY_KINDS), distinct from the dispatch-item DISPATCH_KINDS above.
+    const sanitizedKind = typeof kind === 'string' && FEEDBACK_ENTRY_KINDS.includes(kind) ? kind : undefined;
+    const sanitizedRootItemId = typeof rootItemId === 'string' && UUID_REGEX.test(rootItemId) ? rootItemId : undefined;
 
     // Validate required fields
     if (!message || typeof message !== 'string') {
@@ -933,7 +941,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const result = await dispatchQueueStore.addFeedback(
         itemId,
         req.dispatchUrlKey,
-        { message, url: url || null, urlLabel: urlLabel || null },
+        { message, url: url || null, urlLabel: urlLabel || null, kind: sanitizedKind, rootItemId: sanitizedRootItemId },
         req.dispatchTokenLabel
       );
 

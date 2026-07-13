@@ -1948,6 +1948,41 @@ test.describe('Consumer Feedback API', () => {
     expect(items[0].feedback[0].url).toBeNull();
     expect(items[0].feedback[0].urlLabel).toBeNull();
   });
+
+  // LIN-1297: Harbour persists the additive feedback-entry kind/rootItemId at
+  // ingest. The `/api/dispatch/history` read path (_formatHistoryItem) is a
+  // separate, out-of-scope projection that whitelists {message,url,urlLabel,
+  // timestamp} regardless of this change — it's not a useful place to assert
+  // the new fields landed, so these tests stick to what's observable at the
+  // route's own HTTP boundary (the tolerate-never-reject contract). The
+  // persisted-entry shape itself is covered at the store level in
+  // tests/unit/dispatch-store-feedback-kind.test.js.
+  test('feedback accepts a valid kind and rootItemId alongside message', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+    const rootItemId = '11111111-2222-3333-4444-555555555555';
+
+    const response = await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: 'Heartbeat', kind: 'heartbeat', rootItemId }
+    });
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(body.feedbackCount).toBe(1);
+  });
+
+  test('feedback tolerates an invalid kind and non-UUID rootItemId without rejecting the request', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+
+    const response = await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: 'Bad values', kind: 'not-a-real-kind', rootItemId: 'not-a-uuid' }
+    });
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(body.feedbackCount).toBe(1);
+  });
 });
 
 test.describe('Dispatch History UI', () => {
