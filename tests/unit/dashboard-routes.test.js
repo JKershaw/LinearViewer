@@ -120,11 +120,25 @@ function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheSto
 function autopilotHistoryItem(id, identifier, ts = NOW_ISO) {
   return { id, kind: 'autopilot', issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'autopilot', prompt: 'p', dispatchedAt: ts, resolvedAt: ts, status: 'taken' };
 }
-function autopilotLiveItem(id, identifier) {
-  return { id, kind: 'autopilot', issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'autopilot', prompt: 'p', dispatchedAt: NOW_ISO };
+function autopilotLiveItem(id, identifier, ts = NOW_ISO) {
+  return { id, kind: 'autopilot', issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'autopilot', prompt: 'p', dispatchedAt: ts };
 }
 function workerHistoryItem(id, identifier, sessionId, ts = NOW_ISO) {
   return { id, sessionId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: ts, resolvedAt: ts, status: 'taken', feedback: [{ message: 'pr opened' }] };
+}
+function workerLiveItem(id, identifier, sessionId, ts = NOW_ISO) {
+  return { id, sessionId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: ts };
+}
+// A child autopilot fanned out FROM another session (`parentSessionId` — LIN-1314):
+// it is a `kind:'autopilot'` member of its parent's loop set (so it stamps
+// `sessionId: parentSessionId`), but its own `id` also anchors its OWN separate
+// session (`_buildSessions` pass 1) — so its own workers ("grandchildren" of the
+// parent) never land in the parent's own-group `sessionActivityMs`.
+function childAutopilotLiveItem(id, identifier, parentSessionId, ts = NOW_ISO) {
+  return { id, kind: 'autopilot', sessionId: parentSessionId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'autopilot', prompt: 'p', dispatchedAt: ts };
+}
+function childAutopilotHistoryItem(id, identifier, parentSessionId, ts = NOW_ISO) {
+  return { id, kind: 'autopilot', sessionId: parentSessionId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'autopilot', prompt: 'p', dispatchedAt: ts, resolvedAt: ts, status: 'taken' };
 }
 
 // The page is first-class (LIN-595): no feature flag is required. ENABLED is kept
@@ -756,6 +770,125 @@ describe('GET /api/dashboard/sessions', () => {
       'second poll returns the same feed'
     );
     assert.equal(historyReads, 1, 'second poll within TTL is served from cache (no re-scan)');
+  });
+});
+
+// ─── Descendant recency rollup (LIN-1314) ─────────────────────────────────────
+// "Sub-session" = a descendant CHILD-AUTOPILOT session (its own separate
+// sessionId group), not a worker loop within one session — sessionActivityMs
+// already maxes over those. These fixtures nest a grandchild worker under a
+// child autopilot that is itself a member of the parent's session.
+describe('descendant recency rollup (LIN-1314)', () => {
+  test("a grandchild worker's activity rolls up through a child-autopilot session into the parent's stamp", async () => {
+    const PARENT_TS = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    const CHILD_TS = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const perWorkspace = {
+      'ws-a': {
+        live: [
+          autopilotLiveItem('sess-parent', 'LIN-900', PARENT_TS),
+          childAutopilotLiveItem('sess-child', 'LIN-901', 'sess-parent', CHILD_TS),
+          workerLiveItem('w-grand', 'LIN-902', 'sess-child', NOW_ISO)
+        ],
+        history: [],
+        agentStatus: []
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const parent = findSession(res.jsonBody, 'sess-parent');
+    assert.ok(parent, 'parent session present');
+    // Without the rollup, the parent's own group tops out at CHILD_TS (the child
+    // autopilot loop is a member of the parent's own session); the fix folds in
+    // the grandchild worker's NOW_ISO activity from the separate 'sess-child' session.
+    assert.equal(parent.lastActivity, NOW_ISO, "parent's stamp reflects the grandchild's activity");
+
+    const child = findSession(res.jsonBody, 'sess-child');
+    assert.ok(child, 'the child autopilot is also its own session');
+    assert.equal(child.lastActivity, NOW_ISO);
+  });
+
+  test('an active grandchild un-stales a stale parent and keeps it Active (status + bucket)', async () => {
+    const OLD_ISO = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const perWorkspace = {
+      'ws-a': {
+        live: [
+          autopilotLiveItem('sess-p2', 'LIN-910', OLD_ISO),
+          childAutopilotLiveItem('sess-c2', 'LIN-911', 'sess-p2', OLD_ISO),
+          workerLiveItem('w-grand2', 'LIN-912', 'sess-c2', NOW_ISO)
+        ],
+        history: [],
+        agentStatus: []
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const parent = res.jsonBody.active.find(s => s.sessionId === 'sess-p2');
+    assert.ok(parent, 'the parent stays in Active thanks to the active grandchild');
+    assert.equal(parent.stale, false);
+    assert.equal(parent.status, 'in-progress');
+    assert.ok(!res.jsonBody.recent.some(s => s.sessionId === 'sess-p2'), 'the parent is not archived');
+  });
+
+  test('a session with no descendant sessions is left byte-identical (no-op path)', async () => {
+    // Plain single-session fixture — no nested child autopilot — must resolve
+    // exactly as it did before the rollup pass existed.
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-plain', 'LIN-920'), workerHistoryItem('w-plain', 'LIN-921', 'sess-plain')],
+        agentStatus: [agentStatusDone('sess-plain', 'LIN-920'), agentStatusDone('w-plain', 'LIN-921')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-plain');
+    assert.ok(s, 'plain session present');
+    assert.equal(s.lastActivity, NOW_ISO);
+    assert.equal(s.status, 'done');
+    assert.equal(s.terminal, true);
+    assert.equal(s.stale, false);
+  });
+
+  test('a finished parent stays done even while a descendant child-autopilot session is still active', async () => {
+    const OLD_ISO = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const perWorkspace = {
+      'ws-a': {
+        live: [childAutopilotLiveItem('sess-c3', 'LIN-931', 'sess-p3', NOW_ISO)],
+        history: [autopilotHistoryItem('sess-p3', 'LIN-930', OLD_ISO)],
+        agentStatus: [agentStatusDone('sess-p3', 'LIN-930', OLD_ISO)]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const parent = findSession(res.jsonBody, 'sess-p3');
+    assert.ok(parent, 'terminal parent present');
+    assert.equal(parent.terminal, true);
+    assert.equal(parent.status, 'done', 'a finished parent stays done even though a descendant is still active');
+    assert.equal(parent.stale, false, 'terminal sessions are never derived stale');
+    // The stamp itself still advances to reflect the live descendant (the hub
+    // field the sort/Active-Archive splits read), even though status/terminal
+    // precedence is preserved.
+    assert.equal(parent.lastActivity, NOW_ISO);
   });
 });
 
