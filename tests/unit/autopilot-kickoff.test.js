@@ -469,6 +469,26 @@ describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
     // (it is shared prose), but the step-3 push-wake instruction is gone.
   });
 
+  test('standalone step 3 prescribes a single background, silent-until-terminal poll loop (LIN-1318)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
+    const step3 = text.split(/^3\. \*\*Poll for completion/m)[1].split(/^4\. \*\*Cross-check/m)[0];
+    // A single background loop, not one visible call per turn.
+    assert.ok(step3.includes('background loop'));
+    assert.ok(step3.includes('not one call per turn'));
+    // Skip timeout-only iterations; emit only status + newest feedback on a real change.
+    assert.ok(step3.includes('reason:"timeout"'));
+    assert.ok(step3.includes('newest'));
+    assert.ok(step3.includes('feedback[].message'));
+    // Print the final feedback tail on terminal.
+    assert.ok(step3.includes('final feedback'));
+    // Bounded: ~30-min silence ceiling and 60 req/min rate limit.
+    assert.ok(step3.includes('60 req/min'));
+    // Harness-neutral — no mandated tool, a wake-on-change tool is only an optional preference.
+    assert.ok(!step3.includes('run_in_background'));
+    assert.ok(!step3.includes('Monitor'));
+    assert.ok(step3.includes('bash'));
+  });
+
   test('standalone keeps waitForFollowUps and wedged-session ceiling', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
     assert.ok(text.includes('followUpTo'));
@@ -501,6 +521,14 @@ describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
     assert.ok(!stepperSection.includes("subscription: 'everything'"));
     // But waitForFollowUps is kept.
     assert.ok(text.includes('waitForFollowUps: true'));
+    // Beat 4 and the hard-rules bullet both carry the background-loop contract (LIN-1318) —
+    // all three standalone branches must move together.
+    const beat4Section = stepperSection.split(/^4\. \*\*Poll for completion/m)[1];
+    assert.ok(beat4Section && beat4Section.slice(0, 400).includes('background loop'));
+    const hardRulesSection = afterStepper.split('**Hard rules')[1];
+    assert.ok(hardRulesSection.includes('background'));
+    assert.ok(hardRulesSection.includes('reason:"timeout"'));
+    assert.ok(hardRulesSection.includes('60 req/min'));
   });
 
   test('standalone mode is orthogonal to mode — readonly composes with standalone', () => {
