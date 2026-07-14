@@ -37,6 +37,7 @@ import { FreeTierStore } from './lib/free-tier-store.js'
 import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
 import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
+import { AccountStore } from './lib/account-store.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
@@ -452,6 +453,12 @@ const promptTraceStore = new PromptTraceStore({
   collection: promptTraceCollection
 })
 setPromptTraceRecorder((trace) => promptTraceStore.record(trace))
+
+// Accounts (LIN-1327): the durable human-tied account record; identities attach
+// per (provider, scope). Phase A — INERT: deliberately passed to NO route
+// factory until LIN-1329 wires the auth paths to linkIdentity.
+const accountsCollection = db.collection('accounts')
+const accountStore = new AccountStore({ collection: accountsCollection })
 
 // =============================================================================
 // Process-level safety net (LIN-608)
