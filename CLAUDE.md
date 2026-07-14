@@ -338,6 +338,20 @@ When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection g
 - Uses atomic check-and-increment (`tryUse()`) to prevent race conditions
 - Footer shows `ai: ● free (N/20)` status; settings page shows usage info
 - Returns 429 with usage metadata when limits exceeded
+- Free-tier calls are **clamped to one model**, ignoring the workspace preference and any
+  per-request override, so a free user can never bill an arbitrary/expensive model against
+  the operator's shared key (LIN-513). The clamp lives in the `forceDefault` branches of
+  `resolveWorkspaceModel`/`resolveAiOperationModel` (`lib/workspace-preferences.js`) and
+  returns **before** the prefs lookup, so it fails closed. `resolveRoadmapModelOverride`
+  (`routes/workspace-api.js`) is the same gate on the LIN-819 per-request override path.
+- The **value** it clamps to is `resolveFreeTierModel()` (`lib/openrouter.js`, LIN-1333):
+  `OPENROUTER_FREE_TIER_MODEL` when set to a curated `AVAILABLE_MODELS` id, else
+  `DEFAULT_MODEL`. Only that value is configurable — the precedence above is unchanged.
+  It **fails closed**: an uncurated value is ignored (never passed unchecked to
+  OpenRouter) and warned about once at startup via `getFreeTierModelConfigWarning()`,
+  since a silent downgrade would otherwise hide the operator's typo. The var is scoped to
+  the free tier: workspaces with no stored preference keep getting `DEFAULT_MODEL`, so the
+  two can diverge (e.g. a cheaper free tier than the paid default).
 
 ## Environment Variables
 
@@ -352,6 +366,7 @@ MONGODB_URI             MongoDB connection string (optional, uses file storage i
 OPENROUTER_API_KEY      Server-side OpenRouter API key (optional, users can connect via OAuth)
 OPENROUTER_REDIRECT_URI Callback URL for OpenRouter OAuth (optional, defaults to /auth/openrouter/callback)
 OPENROUTER_FREE_TIER_KEY Server-side API key for free tier users (optional, enables rate-limited free prompts)
+OPENROUTER_FREE_TIER_MODEL  Model free-tier requests are clamped to (optional, default openai/gpt-5.4-mini). Must be a curated AVAILABLE_MODELS id; anything else is ignored (warned at startup) and the free tier stays on the default. Free-tier only — does not move the default for workspaces with no stored model preference
 FREE_TIER_DAILY_LIMIT   Per-workspace daily free-prompt limit (optional, default 20)
 FREE_TIER_HOURLY_LIMIT  Global hourly free-prompt limit across all workspaces (optional, default 50)
 GITHUB_CLIENT_ID        GitHub App user-to-server OAuth client ID (required for GitHub login/binding)
