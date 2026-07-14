@@ -38,6 +38,8 @@ import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
 import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
 import { AccountStore } from './lib/account-store.js'
+import { WorkspaceStore } from './lib/workspace-store.js'
+import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
@@ -459,6 +461,16 @@ setPromptTraceRecorder((trace) => promptTraceStore.record(trace))
 // factory until LIN-1329 wires the auth paths to linkIdentity.
 const accountsCollection = db.collection('accounts')
 const accountStore = new AccountStore({ collection: accountsCollection })
+
+// Durable workspaces + account↔workspace membership (LIN-1328, Phase B of
+// LIN-1326). Phase B — INERT: deliberately passed to NO route factory and no
+// session read site until LIN-1329/LIN-1330 wire them up. The durable
+// collection and the session `workspaces` blob coexist until then (Known
+// transient, closed by Phase D).
+const workspacesCollection = db.collection('workspaces')
+const workspaceStore = new WorkspaceStore({ collection: workspacesCollection })
+const accountWorkspacesCollection = db.collection('account-workspaces')
+const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWorkspacesCollection })
 
 // =============================================================================
 // Process-level safety net (LIN-608)
