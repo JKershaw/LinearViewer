@@ -99,10 +99,27 @@ describe('account-store', () => {
     assert.strictEqual(result.ok, true);
     assert.strictEqual(result.account.identities.length, 2);
 
-    // Regression guard for the dotted-path false-conflict bug: a lookup for an
-    // identity this account does NOT have must not match across array elements.
+    // Both identities here share the same provider ('github'), so this alone
+    // cannot detect a dotted-path cross-pair — see the dedicated test below
+    // for that guard.
     const owner = await store.findAccountByIdentity('github', 'org/999');
     assert.strictEqual(owner, null);
+  });
+
+  test('identity lookup must not cross-pair provider and scope across array elements', async () => {
+    const store = freshStore();
+    const account = await store.createAccount();
+
+    await store.linkIdentity(account._id, 'github', 'owner/repo', {});
+    await store.linkIdentity(account._id, 'linear', 'org-1', {});
+
+    // (github, org-1) is a pair this account does NOT hold — 'github' comes from
+    // one identity element, 'org-1' from another. A dotted-path query
+    // (`{'identities.provider': p, 'identities.scope': s}`) would match this
+    // account anyway by pairing across elements, producing a false conflict.
+    // `$elemMatch` must reject it.
+    const owner = await store.findAccountByIdentity('github', 'org-1');
+    assert.strictEqual(owner, null, 'must not match provider from one element against scope from another');
   });
 
   test('idempotent re-link: same (provider, scope) on the same account merges, does not duplicate or conflict', async () => {
