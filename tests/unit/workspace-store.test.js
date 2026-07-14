@@ -69,9 +69,10 @@ describe('workspace-store', () => {
     const ws = sampleWorkspace();
 
     const created = await store.createWorkspace(ws);
-    assert.strictEqual(created._id, ws.id);
-    assert.ok(created.createdAt instanceof Date);
-    assert.ok(created.updatedAt instanceof Date);
+    assert.strictEqual(created.ok, true);
+    assert.strictEqual(created.workspace._id, ws.id);
+    assert.ok(created.workspace.createdAt instanceof Date);
+    assert.ok(created.workspace.updatedAt instanceof Date);
 
     const fetched = await store.getWorkspace(ws.id);
     assert.ok(fetched, 'workspace should be retrievable after creation');
@@ -80,6 +81,26 @@ describe('workspace-store', () => {
   });
 
   // W2
+  test('createWorkspace rejects a duplicate id with an explicit result, never silently shadowing the original', async () => {
+    const store = freshStore();
+    const ws = sampleWorkspace();
+    await store.createWorkspace(ws);
+
+    const result = await store.createWorkspace({ ...ws, name: 'Impostor' });
+    assert.deepStrictEqual(result, { ok: false, reason: 'workspace-exists' });
+
+    // The original document must be untouched — this is what a real MongoDB
+    // tmpdir harness proves that a mock could not: MangoDB has no implicit
+    // unique index on _id, so only application-level check-then-insert
+    // stands between this and a silently shadowed duplicate.
+    const fetched = await store.getWorkspace(ws.id);
+    assert.strictEqual(fetched.name, 'Acme Inc');
+
+    const all = await store.collection.find({ _id: ws.id }).toArray();
+    assert.strictEqual(all.length, 1, 'exactly one document should exist under this _id');
+  });
+
+  // W3
   test('bindings[] survive byte-intact, including a two-binding workspace (same provider, two scopes)', async () => {
     const store = freshStore();
     const ws = sampleWorkspace({
@@ -96,7 +117,7 @@ describe('workspace-store', () => {
     assert.deepStrictEqual(fetched.bindings, ws.bindings);
   });
 
-  // W3
+  // W4
   test('getWorkspaceByUrlKey resolves the matching workspace', async () => {
     const store = freshStore();
     const ws = sampleWorkspace();
@@ -107,7 +128,7 @@ describe('workspace-store', () => {
     assert.strictEqual(fetched._id, ws.id);
   });
 
-  // W4 - durability, cross-instance
+  // W5 - durability, cross-instance
   test('durability: a new store instance over the same collection sees the written workspace', async () => {
     const db = client.db(`ws_${counter++}`);
     const storeA = new WorkspaceStore({ collection: db.collection('workspaces') });
@@ -120,7 +141,7 @@ describe('workspace-store', () => {
     assert.strictEqual(fetched._id, ws.id);
   });
 
-  // W5 - durability, cross-client (the real witness)
+  // W6 - durability, cross-client (the real witness)
   test('durability: survives closing and reopening a new MangoClient over the same dbDir', async () => {
     const reopenDir = mkdtempSync(join(tmpdir(), 'workspace-store-reopen-'));
     try {
@@ -143,7 +164,7 @@ describe('workspace-store', () => {
     }
   });
 
-  // W6 - regenerate, documentation only (NOT the durability proof)
+  // W7 - regenerate, documentation only (NOT the durability proof)
   test('regenerate documentation: session.workspaces is actually wiped, then the durable store still has the record', async () => {
     const store = freshStore();
     const ws = sampleWorkspace();
@@ -160,7 +181,7 @@ describe('workspace-store', () => {
     assert.ok(fetched, 'durable store record survives session.regenerate()');
   });
 
-  // W7
+  // W8
   test('updateWorkspace bumps updatedAt, preserves _id and bindings', async () => {
     const store = freshStore();
     const ws = sampleWorkspace();
@@ -173,13 +194,45 @@ describe('workspace-store', () => {
     assert.strictEqual(result.workspace._id, ws.id);
     assert.strictEqual(result.workspace.name, 'Acme Renamed');
     assert.deepStrictEqual(result.workspace.bindings, ws.bindings);
-    assert.ok(result.workspace.updatedAt.getTime() >= created.updatedAt.getTime());
+    assert.ok(result.workspace.updatedAt.getTime() > created.workspace.updatedAt.getTime());
 
+    // Re-read the persisted document rather than trusting the returned
+    // object — the write path, not just the return value, must be safe.
     const fetched = await store.getWorkspace(ws.id);
+    assert.strictEqual(fetched._id, ws.id);
     assert.strictEqual(fetched.name, 'Acme Renamed');
+    assert.deepStrictEqual(fetched.bindings, ws.bindings);
   });
 
-  // W8
+  // W9
+  test('updateWorkspace strips _id/createdAt from the write, so a patch cannot hijack identity or backdate creation', async () => {
+    const store = freshStore();
+    const ws = sampleWorkspace();
+    const created = await store.createWorkspace(ws);
+
+    const result = await store.updateWorkspace(ws.id, {
+      _id: 'HIJACKED',
+      createdAt: new Date('2000-01-01'),
+      name: 'Renamed'
+    });
+
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.workspace._id, ws.id);
+
+    // Prove the WRITE was safe, not just the returned object: the record
+    // must still be reachable under its original id, with its original
+    // createdAt, and no impostor document must exist under the hijacked id.
+    const fetched = await store.getWorkspace(ws.id);
+    assert.ok(fetched, 'record must still be reachable under its original id');
+    assert.strictEqual(fetched._id, ws.id);
+    assert.strictEqual(fetched.name, 'Renamed');
+    assert.strictEqual(fetched.createdAt.getTime(), created.workspace.createdAt.getTime());
+
+    const impostor = await store.getWorkspace('HIJACKED');
+    assert.strictEqual(impostor, null, 'no document should exist under the hijacked _id');
+  });
+
+  // W10
   test('unknown workspace reads/updates return explicit null/result, never throw', async () => {
     const store = freshStore();
 
