@@ -100,7 +100,7 @@ import { buildSessionCounts } from './lib/sessions-view.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
-import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, hasPaidEnvKey } from './lib/openrouter.js'
+import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, hasPaidEnvKey, getFreeTierModelConfigWarning } from './lib/openrouter.js'
 import { resolveWorkspaceModel, resolveAiOperationModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults, AI_OPERATION_KINDS } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 import { DISPATCH_DEFAULT_KINDS } from './lib/prompt-templates.js'
@@ -134,6 +134,14 @@ if (process.env.NODE_ENV !== 'test') {
   if (process.env.OPENROUTER_API_KEY !== undefined && !getPaidEnvKey()) {
     console.warn('Warning: OPENROUTER_API_KEY is set but empty/whitespace — it will be treated as unset.');
     console.warn('Proxy LLM calls will fall back to the free tier (OPENROUTER_FREE_TIER_KEY) if configured, else fail.');
+  }
+
+  // OPENROUTER_FREE_TIER_MODEL foot-gun (LIN-1333): the resolver fails closed, so an
+  // uncurated id degrades silently to DEFAULT_MODEL and the operator never learns
+  // their setting was ignored. Surface it at boot, where they'll see it.
+  const freeTierModelWarning = getFreeTierModelConfigWarning();
+  if (freeTierModelWarning) {
+    console.warn(`Warning: ${freeTierModelWarning}`);
   }
 }
 
