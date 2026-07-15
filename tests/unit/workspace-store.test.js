@@ -71,12 +71,18 @@ describe('workspace-store', () => {
     const created = await store.createWorkspace(ws);
     assert.strictEqual(created.ok, true);
     assert.strictEqual(created.workspace._id, ws.id);
+    // The model's own `id` field is intentionally persisted alongside `_id`
+    // (LIN-1337 review): the pre-hardening shape (`{...workspace, _id, ...}`)
+    // duplicated it, and this pins that it still round-trips through the
+    // atomic-upsert path rather than being silently dropped.
+    assert.strictEqual(created.workspace.id, ws.id);
     assert.ok(created.workspace.createdAt instanceof Date);
     assert.ok(created.workspace.updatedAt instanceof Date);
 
     const fetched = await store.getWorkspace(ws.id);
     assert.ok(fetched, 'workspace should be retrievable after creation');
     assert.strictEqual(fetched._id, ws.id);
+    assert.strictEqual(fetched.id, ws.id);
     assert.strictEqual(fetched.name, 'Acme Inc');
   });
 
@@ -241,5 +247,24 @@ describe('workspace-store', () => {
 
     const result = await store.updateWorkspace('does-not-exist', { name: 'x' });
     assert.deepStrictEqual(result, { ok: false, reason: 'unknown-workspace' });
+  });
+
+  // W11 (LIN-1337)
+  test('updateWorkspace return deep-equals a fresh re-read, including a dotted-path patch', async () => {
+    const store = freshStore();
+    const ws = sampleWorkspace({ prefs: { theme: 'light' } });
+    await store.createWorkspace(ws);
+
+    const result = await store.updateWorkspace(ws.id, { 'prefs.theme': 'dark' });
+    assert.strictEqual(result.ok, true);
+
+    const fresh = await store.getWorkspace(ws.id);
+    assert.deepStrictEqual(result.workspace, fresh);
+
+    // The regression this guards: a naive {...existing, ...patch} merge
+    // produces a literal "prefs.theme" key with prefs.theme still stale,
+    // instead of Mongo's $set correctly nesting the write.
+    assert.strictEqual(result.workspace.prefs.theme, 'dark');
+    assert.ok(!('prefs.theme' in result.workspace), 'must not carry a literal dotted-path key');
   });
 });

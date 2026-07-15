@@ -10,6 +10,22 @@ jobs:
   unit:
     name: Unit tests
     runs-on: ubuntu-latest
+    # Real-MongoDB smoke/concurrency coverage (LIN-1337, tests/unit/mongo-smoke.test.js)
+    # needs a real server — MangoDB never throws on a duplicate _id and its
+    # in-process mutex makes concurrent writers serialize for free, so it can't
+    # prove the properties that file exists to prove. A service container keeps
+    # the "PR runs need no repo secrets" property (8c405f0): no hosted cluster,
+    # no credentials, just localhost:27017.
+    services:
+      mongodb:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ping:1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +40,9 @@ jobs:
 
       - name: Run unit tests
         run: npm run test:unit
+        env:
+          CI: true
+          MONGODB_TEST_URI: mongodb://localhost:27017
 
   e2e:
     name: E2E shard ${{ matrix.shard }}/${{ strategy.job-total }}

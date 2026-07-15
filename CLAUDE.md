@@ -364,6 +364,7 @@ LINEAR_ACCESS_TOKEN     Personal API key for auto-authentication (optional, bypa
 SESSION_SECRET          Secret for signing session cookies
 PORT                    Server port (default: 3000)
 MONGODB_URI             MongoDB connection string (optional, uses file storage if not set)
+MONGODB_TEST_URI        Test-only: real MongoDB for tests/unit/mongo-smoke.test.js (LIN-1337). NOT a runtime var. Deliberately separate from MONGODB_URI so a developer's production URI can't be hit by the suite's concurrency probes. Unset locally skips the suite explicitly; CI sets it via a mongo:8.0 service container and hard-fails if missing
 OPENROUTER_API_KEY      Server-side OpenRouter API key (optional, users can connect via OAuth)
 OPENROUTER_REDIRECT_URI Callback URL for OpenRouter OAuth (optional, defaults to /auth/openrouter/callback)
 OPENROUTER_FREE_TIER_KEY Server-side API key for free tier users (optional, enables rate-limited free prompts)
