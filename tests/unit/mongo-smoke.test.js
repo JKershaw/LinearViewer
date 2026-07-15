@@ -24,6 +24,7 @@ import { MongoClient } from 'mongodb';
 import { INDEX_SPECS, ensureIndexes } from '../../lib/db-indexes.js';
 import { WorkspaceStore } from '../../lib/workspace-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
+import { AccountStore } from '../../lib/account-store.js';
 
 const uri = process.env.MONGODB_TEST_URI;
 if (!uri && process.env.CI) {
@@ -165,6 +166,163 @@ describe(
 
       const edges = await collection.find({ accountId, workspaceId }).toArray();
       assert.strictEqual(edges.length, 1, 'exactly one edge should exist for this pair');
+    });
+
+    // --- LIN-1338: linkIdentity cross-document race + unique backstop ---
+
+    test('the accounts_identity_unique index (LIN-1338) builds on real MongoDB with unique and sparse set', async () => {
+      const accountsSpec = INDEX_SPECS.find(
+        (s) => s.collection === 'accounts' && s.options.name === 'accounts_identity_unique'
+      );
+      assert.ok(accountsSpec, 'expected an accounts_identity_unique spec in db-indexes.js');
+
+      const { failed } = await ensureIndexes(db);
+      const accountsFailure = failed.find((f) => f.collection === 'accounts');
+      assert.strictEqual(
+        accountsFailure,
+        undefined,
+        'the accounts index build should not fail against a clean real-Mongo db'
+      );
+
+      const indexes = await db.collection('accounts').listIndexes().toArray();
+      const match = indexes.find((ix) => ix.name === 'accounts_identity_unique');
+      assert.ok(match, 'accounts_identity_unique index should exist');
+      assert.strictEqual(match.unique, true, 'accounts_identity_unique should be unique');
+      assert.strictEqual(match.sparse, true, 'accounts_identity_unique should be sparse');
+    });
+
+    test('linkIdentity: 400 parallel links of the same identity to different accounts produce exactly one winner', async () => {
+      const collection = freshCollection('accounts');
+      await collection.createIndex(
+        { 'identities.provider': 1, 'identities.scope': 1 },
+        { unique: true, sparse: true, name: 'accounts_identity_unique' }
+      );
+      const store = new AccountStore({ collection });
+
+      const accounts = await Promise.all(
+        Array.from({ length: CONCURRENCY }, () => store.createAccount())
+      );
+
+      const results = await Promise.allSettled(
+        accounts.map((account) => store.linkIdentity(account._id, 'github', 'shared/repo', {}))
+      );
+
+      const rejected = results.filter((r) => r.status === 'rejected');
+      assert.deepStrictEqual(
+        rejected,
+        [],
+        `linkIdentity must never throw under concurrency, got ${rejected.length} rejection(s): ${rejected[0]?.reason}`
+      );
+
+      const fulfilled = results.map((r) => r.value);
+      const winners = fulfilled.filter((r) => r.ok === true);
+      const conflicts = fulfilled.filter((r) => r.ok === false && r.conflict);
+
+      assert.strictEqual(winners.length, 1, 'exactly one concurrent linkIdentity call should win');
+      assert.strictEqual(
+        conflicts.length,
+        CONCURRENCY - 1,
+        'every other call should get an explicit conflict signal'
+      );
+
+      const winnerAccountId = winners[0].account._id;
+      for (const conflict of conflicts) {
+        assert.strictEqual(
+          conflict.conflict.accountId,
+          winnerAccountId,
+          'every conflict should name the actual winning account'
+        );
+      }
+
+      const holders = await collection
+        .find({ identities: { $elemMatch: { provider: 'github', scope: 'shared/repo' } } })
+        .toArray();
+      assert.strictEqual(holders.length, 1, 'exactly one account should hold the identity');
+      assert.strictEqual(holders[0]._id, winnerAccountId);
+    });
+
+    test('linkIdentity: conflict signal is correct for a non-first-element identity', async () => {
+      // MangoDB's unique index is not multikey-aware (only checks the first
+      // array element); real Mongo is. This pins the `$elemMatch` pre-check
+      // path, which is what covers that gap, on the engine that can actually
+      // prove it.
+      const collection = freshCollection('accounts');
+      await collection.createIndex(
+        { 'identities.provider': 1, 'identities.scope': 1 },
+        { unique: true, sparse: true, name: 'accounts_identity_unique' }
+      );
+      const store = new AccountStore({ collection });
+
+      const accountA = await store.createAccount();
+      const accountB = await store.createAccount();
+
+      await store.linkIdentity(accountA._id, 'linear', 'org-1', {});
+      await store.linkIdentity(accountA._id, 'github', 'owner/repo', {});
+
+      const result = await store.linkIdentity(accountB._id, 'github', 'owner/repo', {});
+
+      assert.strictEqual(result.ok, false);
+      assert.deepStrictEqual(result.conflict, { accountId: accountA._id });
+    });
+
+    test('linkIdentity: two identity-less accounts can be created with the unique sparse index present', async () => {
+      const collection = freshCollection('accounts');
+      await collection.createIndex(
+        { 'identities.provider': 1, 'identities.scope': 1 },
+        { unique: true, sparse: true, name: 'accounts_identity_unique' }
+      );
+      const store = new AccountStore({ collection });
+
+      const accountA = await store.createAccount();
+      const accountB = await store.createAccount();
+
+      assert.deepStrictEqual(accountA.identities, []);
+      assert.deepStrictEqual(accountB.identities, []);
+
+      assert.ok(await store.getAccount(accountA._id), 'account A should be retrievable');
+      assert.ok(await store.getAccount(accountB._id), 'account B should be retrievable');
+    });
+
+    test('linkIdentity: concurrent different identities on the same account all survive (no clobber)', async () => {
+      const collection = freshCollection('accounts');
+      await collection.createIndex(
+        { 'identities.provider': 1, 'identities.scope': 1 },
+        { unique: true, sparse: true, name: 'accounts_identity_unique' }
+      );
+      const store = new AccountStore({ collection });
+      const account = await store.createAccount();
+
+      const identities = [
+        ['linear', 'org-1'],
+        ['github', 'owner/repo-a'],
+        ['github', 'owner/repo-b']
+      ];
+
+      const results = await Promise.allSettled(
+        identities.map(([provider, scope]) => store.linkIdentity(account._id, provider, scope, {}))
+      );
+
+      const rejected = results.filter((r) => r.status === 'rejected');
+      assert.deepStrictEqual(
+        rejected,
+        [],
+        `linkIdentity must never throw under concurrency, got ${rejected.length} rejection(s): ${rejected[0]?.reason}`
+      );
+
+      const fulfilled = results.map((r) => r.value);
+      assert.ok(
+        fulfilled.every((r) => r.ok === true),
+        'every concurrent link to the same account should succeed'
+      );
+
+      const fetched = await store.getAccount(account._id);
+      assert.strictEqual(fetched.identities.length, identities.length, 'all identities should survive');
+      for (const [provider, scope] of identities) {
+        assert.ok(
+          fetched.identities.some((i) => i.provider === provider && i.scope === scope),
+          `expected (${provider}, ${scope}) to survive concurrent linking`
+        );
+      }
     });
   }
 );

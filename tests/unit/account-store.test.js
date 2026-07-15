@@ -144,4 +144,22 @@ describe('account-store', () => {
 
     assert.deepStrictEqual(result, { ok: false, reason: 'unknown-account' });
   });
+
+  test('sequential no-clobber: linking a second different identity preserves the first (LIN-1338)', async () => {
+    const store = freshStore();
+    const account = await store.createAccount();
+
+    await store.linkIdentity(account._id, 'linear', 'org-1', { token: 'linear-tok' });
+    const result = await store.linkIdentity(account._id, 'github', 'owner/repo', { token: 'github-tok' });
+
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.account.identities.length, 2);
+
+    const fetched = await store.getAccount(account._id);
+    assert.strictEqual(fetched.identities.length, 2);
+    const linear = fetched.identities.find(i => i.provider === 'linear' && i.scope === 'org-1');
+    const github = fetched.identities.find(i => i.provider === 'github' && i.scope === 'owner/repo');
+    assert.deepStrictEqual(linear.credentials, { token: 'linear-tok' });
+    assert.deepStrictEqual(github.credentials, { token: 'github-tok' });
+  });
 });
