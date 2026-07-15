@@ -9,19 +9,20 @@ import { PERIODICALS, getPeriodicals, buildPeriodicalNodes, withAutopilotTail, P
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
-  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, Design & Interface, Performance / Scale, and Data & Fetch Architecture (13 templates)', () => {
-    assert.strictEqual(PERIODICALS.length, 13);
+  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, Design & Interface, Performance / Scale, Data & Fetch Architecture, and Integration & Surface Maturity (14 templates)', () => {
+    assert.strictEqual(PERIODICALS.length, 14);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains the ten corrective reviews plus the advisory Stability Review and Recent Headwinds report', () => {
+  test('contains the 11 corrective reviews plus the advisory Stability Review, Recent Headwinds report, and Integration & Surface Maturity review', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
     // id -> [title, mode]. The code-surface / supply-chain / interface /
     // performance / data reviews are 'corrective' (they mint fix-tasks); the
-    // Stability Review (LIN-453) and the Recent Headwinds report (LIN-542) are
-    // the two 'advisory' entries — trajectory governors that report for a human
+    // Stability Review (LIN-453), the Recent Headwinds report (LIN-542), and
+    // Integration & Surface Maturity (LIN-1336) are the three 'advisory'
+    // entries — trajectory or portfolio governors that report for a human
     // to act on. The Design & Interface Review (LIN-520) is corrective with an
     // advisory tail: it mints fix-tasks for objective breakage only. The
     // Performance / Scale Review (LIN-1038) is corrective at the measured-symptom
@@ -40,7 +41,8 @@ describe('periodicals registry', () => {
       'recent-headwinds': ['Recent Headwinds', 'advisory'],
       'design-review': ['Design & Interface Review', 'corrective'],
       'performance-scale': ['Performance / Scale Review', 'corrective'],
-      'data-fetch-architecture': ['Data & Fetch Architecture', 'corrective']
+      'data-fetch-architecture': ['Data & Fetch Architecture', 'corrective'],
+      'integration-surface-maturity': ['Integration & Surface Maturity', 'advisory']
     };
 
     for (const [id, [title, mode]] of Object.entries(expected)) {
@@ -83,13 +85,14 @@ describe('periodicals registry', () => {
 // `review` forever (LIN-386), so the task now ends itself.
 //
 // One half of the Stage-2 contract — *minting a bounded set of follow-up tasks*
-// — is shared only by the seven CORRECTIVE reviews, which turn findings into
-// fix-work. The advisory Stability Review (LIN-453) deliberately mints NO
-// follow-ups: it is a governor that hands its read to a human. So the
-// follow-up-creation assertion is scoped to mode === 'corrective' below, while
-// everything else (mint-one-task, read-prior-runs + uncapped report,
-// self-conclude, review-only, stays-general) stays universal across the
-// registry and locks the contract for new periodicals of either mode.
+// — is shared only by the 11 CORRECTIVE reviews, which turn findings into
+// fix-work. The advisory reviews (Stability, Recent Headwinds, Integration &
+// Surface Maturity) deliberately mint NO follow-ups: each is a governor that
+// hands its read to a human. So the follow-up-creation assertion is scoped to
+// mode === 'corrective' below, while everything else (mint-one-task,
+// read-prior-runs + uncapped report, self-conclude, review-only,
+// stays-general) stays universal across the registry and locks the contract
+// for new periodicals of either mode.
 describe('shared two-stage contract (all periodicals)', () => {
   for (const template of PERIODICALS) {
     describe(template.title, () => {
@@ -867,6 +870,72 @@ describe('Data & Fetch Architecture specifics (LIN-1039)', () => {
     // store count, or ticket-specific symbol leaks (classes named conceptually).
     assert.doesNotMatch(prompt, /fetchProjects|local-store|dispatch-store|kpi-stats|session-telemetry/i);
     assert.doesNotMatch(prompt, /toArray|find\(\)|\.slice\(/);
+  });
+});
+
+describe('Integration & Surface Maturity specifics (LIN-1336)', () => {
+  const template = PERIODICALS.find(t => t.id === 'integration-surface-maturity');
+  const prompt = template.generatePrompt();
+
+  test('is the advisory portfolio/meta layer (mode + no-follow-up framing)', () => {
+    assert.strictEqual(template.mode, 'advisory');
+    assert.match(prompt, /advisory/i);
+    assert.match(prompt, /no follow-up|not create follow-up/i);
+  });
+
+  test('inventories surfaces with the MOD / API / FLOW / META taxonomy, FLOW gets extra scrutiny', () => {
+    assert.match(prompt, /\bMOD\b/);
+    assert.match(prompt, /\bAPI\b/);
+    assert.match(prompt, /\bFLOW\b/);
+    assert.match(prompt, /\bMETA\b/);
+    assert.match(prompt, /extra scrutiny/i);
+  });
+
+  test('flexible evidence: prefer existing sibling evidence, bounded first-party fallback, explicit confidence', () => {
+    assert.match(prompt, /prefer|preferred/i);
+    assert.match(prompt, /sibling|prior reports/i);
+    assert.match(prompt, /bounded first-party/i);
+    assert.match(prompt, /missing, stale, or shallow/i);
+    assert.match(prompt, /confidence/i);
+    assert.match(prompt, /High, Medium, or Low|High\/Medium\/Low/i);
+  });
+
+  test('altitude: names the owning review, never double-mints or re-homes a fix', () => {
+    assert.match(prompt, /name the owner/i);
+    assert.match(prompt, /do not (re-home|double-mint|mint or re-home)/i);
+    assert.match(prompt, /Reliability/);
+    assert.match(prompt, /Observability/);
+  });
+
+  test('first-party remit is FLOW / Core-happy-path / Configuration / the portfolio scorecard', () => {
+    assert.match(prompt, /FLOW surface type/i);
+    assert.match(prompt, /Core\/happy-path|Core \/ happy-path|happy path/i);
+    assert.match(prompt, /Configuration/);
+    assert.match(prompt, /portfolio\/meta scorecard|portfolio scorecard/i);
+  });
+
+  test('measurement discipline: ledger-first, Completeness % secondary/noisy, frozen+justified N/A, evidence on changed scores', () => {
+    assert.match(prompt, /ledger.*primary|primary signal/i);
+    assert.match(prompt, /Completeness %/);
+    assert.match(prompt, /secondary.*noisy|noisy/i);
+    assert.match(prompt, /N\/A/);
+    assert.match(prompt, /justification/i);
+    assert.match(prompt, /reportable delta/i);
+    assert.match(prompt, /every score that changed/i);
+  });
+
+  test('ranks recommendations for triage, caps the headline list at the top 5-10', () => {
+    assert.match(prompt, /triage/i);
+    assert.match(prompt, /top 5-10|top 5–10/i);
+    assert.match(prompt, /priority/i);
+    assert.match(prompt, /impact/i);
+    assert.match(prompt, /effort/i);
+  });
+
+  test('self-audits the framework as its own META surface', () => {
+    assert.match(prompt, /META surface/i);
+    assert.match(prompt, /self-audit/i);
+    assert.match(prompt, /Low confidence/i);
   });
 });
 
