@@ -459,7 +459,8 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('POST link (new) find-or-creates the GitHub account container and writes the LIN-711 binding', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const session = makeSession({
@@ -480,6 +481,77 @@ describe('GitHub Projects auth routes', () => {
     assert.equal(session.activeWorkspaceId, 'github:42');
     assert.equal(session.githubProjectsPending, undefined, 'pending cleared');
     assert.equal(res.redirectedTo, '/workspace/octocat/');
+
+    // LIN-1329: the 5th sign-in path's actual deliverable — session.accountId
+    // set, exactly one durable account minted, the sign-up provider (`github`,
+    // keyed on the human GitHub user id, never the installation account) linked
+    // as its first identity.
+    assert.ok(session.accountId, 'session.accountId set by establishAccount');
+    const account = await accountStore.getAccount(session.accountId);
+    assert.ok(account, 'account was actually persisted');
+    assert.deepEqual(account.identities, [{ provider: 'github', scope: 'human-42', credentials: { login: 'octocat' } }]);
+    const workspaces = await accountWorkspaceStore.listWorkspacesForAccount(session.accountId);
+    assert.deepEqual(workspaces, ['github:42']);
+  });
+
+  test('POST link (new) a returning GitHub Projects user (fresh session, previously-seen human id) lands on their EXISTING account, not a new one', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+
+    const firstSession = makeSession({
+      githubHumanId: 'human-42',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    await handler({ body: { board: 'octocat/5' } , session: firstSession }, makeRes());
+    const firstAccountId = firstSession.accountId;
+    assert.ok(firstAccountId);
+
+    // A brand-new session (logged out / new device) signing in with the SAME
+    // GitHub human identity.
+    const secondSession = makeSession({
+      githubHumanId: 'human-42',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    await handler({ body: { board: 'octocat/5' }, session: secondSession }, makeRes());
+
+    assert.strictEqual(secondSession.accountId, firstAccountId);
+    const account = await accountStore.getAccount(firstAccountId);
+    assert.equal(account.identities.length, 1, 'still exactly one identity, not re-minted');
+  });
+
+  // Mirrors tests/unit/github-auth.test.js's add-source conflict test — the
+  // GitHub Projects half of the LIN-1329 review's finding 2 (the auth-route.test.js
+  // note claims this file's add-source mode covers the conflict branch).
+  test('POST link (add-source) returns 409 Account Conflict when the GitHub identity already belongs to a DIFFERENT account, and writes nothing', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-42', {});
+    const myAccount = await accountStore.createAccount();
+
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+    const res = makeRes();
+    const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
+    const session = makeSession({
+      accountId: myAccount._id,
+      githubHumanId: 'human-42',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [linearWs],
+      activeWorkspaceId: 'org-1',
+    });
+    await handler({ body: { board: 'octocat/5' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Account Conflict/);
+    // No binding written, no pending cleared — the sign-in did not complete.
+    assert.equal(linearWs.bindings, undefined);
+    assert.ok(session.githubProjectsPending, 'pending NOT cleared on conflict');
+    // Neither account was mutated.
+    assert.strictEqual((await accountStore.getAccount(otherAccount._id)).identities.length, 1);
+    assert.strictEqual((await accountStore.getAccount(myAccount._id)).identities.length, 0);
   });
 
   test('POST link (new) adds a board as a binding onto an EXISTING GitHub account container (coexists with Issues)', async () => {

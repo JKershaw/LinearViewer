@@ -18,6 +18,7 @@ import { MangoClient } from '@jkershaw/mangodb';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { establishAccount } from '../../lib/account-session.js';
+import { ensureIndexes } from '../../lib/db-indexes.js';
 
 describe('establishAccount', () => {
   let client;
@@ -37,6 +38,20 @@ describe('establishAccount', () => {
 
   function freshStores() {
     const db = client.db(`acct_${counter++}`);
+    return {
+      accountStore: new AccountStore({ collection: db.collection('accounts') }),
+      accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
+    };
+  }
+
+  // The mint-branch race (below) is only actually racy with the
+  // `accounts_identity_unique` index built (lib/db-indexes.js) — that index is
+  // the SOLE cross-document enforcer (LIN-1338); without it two concurrent
+  // pushes both just succeed and no conflict is ever produced to reconcile.
+  // Mirrors real boot (server.js calls ensureIndexes) and the review's own repro.
+  async function freshIndexedStores() {
+    const db = client.db(`acct_${counter++}`);
+    await ensureIndexes(db);
     return {
       accountStore: new AccountStore({ collection: db.collection('accounts') }),
       accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
@@ -135,5 +150,37 @@ describe('establishAccount', () => {
 
     const workspaces = await accountWorkspaceStore.listWorkspacesForAccount(session.accountId);
     assert.deepStrictEqual(workspaces, ['ws-1']);
+  });
+
+  test('concurrent first sign-ins for the SAME identity: one real account, no false conflict for the loser, no orphan left behind (LIN-1329 review finding 1)', async () => {
+    const { accountStore, accountWorkspaceStore } = await freshIndexedStores();
+    const sessionA = {};
+    const sessionB = {};
+
+    const [resultA, resultB] = await Promise.all([
+      establishAccount(sessionA, accountStore, accountWorkspaceStore, 'github', 'human-race', { login: 'tabA' }, 'ws-a'),
+      establishAccount(sessionB, accountStore, accountWorkspaceStore, 'github', 'human-race', { login: 'tabB' }, 'ws-b'),
+    ]);
+
+    // Neither caller sees a conflict — both are the SAME human's own first sign-in.
+    assert.strictEqual(resultA.ok, true, 'tab A must not see a conflict');
+    assert.strictEqual(resultB.ok, true, 'tab B must not see a conflict against its own sign-in');
+    assert.strictEqual(resultA.accountId, resultB.accountId, 'both land on the SAME winning account');
+    assert.strictEqual(sessionA.accountId, resultA.accountId);
+    assert.strictEqual(sessionB.accountId, resultB.accountId);
+
+    // Exactly one account exists — no orphan left behind by the losing mint.
+    const winner = await accountStore.getAccount(resultA.accountId);
+    assert.ok(winner, 'the winning account exists');
+    assert.strictEqual(winner.identities.length, 1, 'exactly one identity, no duplicate');
+    assert.strictEqual(winner.identities[0].scope, 'human-race');
+
+    // The loser's freshly-minted, zero-identity account was deleted, not left behind.
+    const accounts = await accountStore.collection.find({}).toArray();
+    assert.strictEqual(accounts.length, 1, 'no zero-identity orphan account remains');
+
+    // Both callers' workspaces are bound to the one surviving account.
+    const workspaces = await accountWorkspaceStore.listWorkspacesForAccount(resultA.accountId);
+    assert.deepStrictEqual(workspaces.sort(), ['ws-a', 'ws-b']);
   });
 });
