@@ -21,6 +21,7 @@ import { defaultGitHubSeed, GITHUB_WORKSPACE_URL_KEY, GITHUB_REPO } from '../tes
 import '../lib/providers/github-projects/index.js';
 import { createFakeGitHubProjectsClient } from '../lib/providers/github-projects/fake-client.js';
 import { defaultGitHubProjectsSeed, GITHUB_PROJECTS_WORKSPACE_URL_KEY, GITHUB_PROJECTS_BOARD } from '../tests/fixtures/github-projects-harness.js';
+import { establishAccount } from '../lib/account-session.js';
 
 /**
  * Create test routes with required dependencies.
@@ -36,7 +37,7 @@ import { defaultGitHubProjectsSeed, GITHUB_PROJECTS_WORKSPACE_URL_KEY, GITHUB_PR
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -93,7 +94,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   //                               distinct per worker once workers>1 (S3); without
   //                               a `-wN` suffix the siblings stay second-workspace
   //                               / workspace-N, keeping the default byte-identical.
-  router.get('/test/set-session', (req, res) => {
+  router.get('/test/set-session', async (req, res) => {
     const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, shipSample, patMode, noLinearUser } = req.query
     // Per-worker key for the first workspace; same `?urlKey=` interface the
     // teardown endpoints already use, with the identical 'test-workspace' default.
@@ -161,6 +162,19 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       delete req.session.linearUserId
     } else {
       req.session.linearUserId = 'test-linear-user-id'
+    }
+
+    // LIN-1329 fixture re-point (Q4): establish a REAL accountId through the
+    // production seam rather than fabricating one, so specs exercising
+    // session.accountId run against the same code path production does.
+    // `linearUserId` is RETAINED (Phase D still reads it) — this adds an
+    // accountId alongside it, it doesn't replace it. Bound to the first
+    // workspace only; a real Linear sign-in would bind every workspace the
+    // human belongs to, but one binding is enough to prove the fixture goes
+    // through the real seam. Skipped for `noLinearUser` (mirrors having no
+    // identity to link).
+    if (!noLinearUser) {
+      await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', 'test-linear-user-id', {}, workspaces[0].id)
     }
 
     // Set or clear OpenRouter API key in session based on flag
@@ -727,6 +741,11 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       req.session.activeWorkspaceId = LOCAL_WS_UUID;
       req.session.linearUserId = 'test-local-user-id';
 
+      // LIN-1329 fixture re-point (Q4): local's identity scope is the urlKey
+      // itself (Q6 — freshly-unique per real create, never a false-conflict
+      // risk), mirroring routes/workspace.js's POST /workspace/new.
+      await establishAccount(req.session, accountStore, accountWorkspaceStore, 'local', urlKey, {}, LOCAL_WS_UUID);
+
       // Optionally provision a mock OpenRouter key, mirroring /test/set-session
       // (L93-97). Honored from query (GET) or body (POST). Superset/no-op by
       // default: absent → delete, so existing local specs are unchanged. This is
@@ -851,6 +870,11 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       req.session.activeWorkspaceId = GITHUB_WS_UUID;
       req.session.linearUserId = 'test-github-user-id';
 
+      // LIN-1329 fixture re-point (Q4): `github` identity scope is the human's
+      // GitHub user id (Q1), shared with GitHub Projects (Q3) — this fixture's
+      // simulated human is distinct from the Projects fixture's.
+      await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', 'test-github-user-id', {}, GITHUB_WS_UUID);
+
       req.session.save(() => res.json({ ok: true, urlKey: GITHUB_WORKSPACE_URL_KEY, repo: GITHUB_REPO }));
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -937,6 +961,11 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       }];
       req.session.activeWorkspaceId = GITHUB_PROJECTS_WS_UUID;
       req.session.linearUserId = 'test-github-projects-user-id';
+
+      // LIN-1329 fixture re-point (Q4): `github` identity scope is the human's
+      // GitHub user id (Q1) — SAME identity provider as GitHub Issues (Q3), but
+      // this fixture's simulated human is a distinct one from the Issues fixture.
+      await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', 'test-github-projects-user-id', {}, GITHUB_PROJECTS_WS_UUID);
 
       req.session.save(() => res.json({ ok: true, urlKey: GITHUB_PROJECTS_WORKSPACE_URL_KEY, board: GITHUB_PROJECTS_BOARD }));
     } catch (err) {

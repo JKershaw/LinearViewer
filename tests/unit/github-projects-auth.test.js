@@ -12,12 +12,19 @@
  *
  * Run with: node --test tests/unit/github-projects-auth.test.js
  */
-import { test, describe, beforeEach, afterEach } from 'node:test';
+import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import crypto from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MangoClient } from '@jkershaw/mangodb';
 import { GitHubProjectsProvider } from '../../lib/providers/github-projects/index.js';
 import { createGitHubProjectsAuthRoutes } from '../../routes/github-projects-auth.js';
 import { createFakeGitHubProjectsClient } from '../../lib/providers/github-projects/fake-client.js';
+import { createFakeGitHubClient } from '../../lib/providers/github/fake-client.js';
+import { AccountStore } from '../../lib/account-store.js';
+import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 
 // Ephemeral RSA keypair so completeInstallation's App-JWT signing runs for real
 // against a valid PEM — generated, never on disk.
@@ -165,6 +172,18 @@ describe('GitHubProjectsProvider auth primitives', () => {
       /missing installationId/
     );
   });
+
+  // LIN-1329: fetchViewer hoisted onto the Projects provider (it has no REST
+  // client of its own — GraphQL-only) so both GitHub doors resolve the same
+  // kind of human identity for account linking (Q3).
+  test('fetchViewer maps the GitHub shape through the plain REST client (LIN-1329)', async () => {
+    const provider = new GitHubProjectsProvider();
+    const fake = createFakeGitHubClient({ _user: { id: 42, login: 'octocat', name: 'The Octocat' } });
+    provider._restClientForToken = () => fake; // inject instead of a real HTTP call
+
+    const viewer = await provider.fetchViewer('gho_abc');
+    assert.deepEqual(viewer, { id: '42', login: 'octocat', name: 'The Octocat' });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -193,6 +212,10 @@ function fakeProvider() {
     listReboundableBoards: async () => ([
       { login: 'octocat', number: 5, title: 'Roadmap', url: 'u', shortDescription: null, closed: false, installationId: '77' },
     ]),
+    // LIN-1329: the human GitHub identity, resolved from the discovery user
+    // token — shared with GitHub Issues (Q3), distinct from the installation
+    // account (`userId` above).
+    fetchViewer: async () => ({ id: 'human-42', login: 'octocat', name: 'The Octocat' }),
   };
 }
 
@@ -248,9 +271,32 @@ describe('GitHub Projects auth routes', () => {
     }
   });
 
+  // LIN-1329: every route the router mounts now threads accountStore/
+  // accountWorkspaceStore into `establishAccount` — real MangoDB-backed
+  // stores (fresh per test), same precedent as tests/unit/account-store.test.js.
+  let dbClient;
+  let dbDir;
+  let acctCounter = 0;
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'github-projects-auth-route-'));
+    dbClient = new MangoClient(dbDir);
+    await dbClient.connect();
+  });
+  after(async () => {
+    if (dbClient?.close) await dbClient.close();
+    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+  });
+  function freshAccountStores() {
+    const db = dbClient.db(`acct_${acctCounter++}`);
+    return {
+      accountStore: new AccountStore({ collection: db.collection('accounts') }),
+      accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
+    };
+  }
+
   test('GET /auth/github-projects 503s when GitHub App env is not configured', async () => {
     delete process.env.GITHUB_APP_ID;
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects');
     const res = makeRes();
     await handler({ query: {}, session: makeSession() }, res);
@@ -262,7 +308,7 @@ describe('GitHub Projects auth routes', () => {
   // clean up-front 503, never hangs in beginAuth. Byte-symmetric with Issues.
   test('GET /auth/github-projects 503s (never hangs) on a partial config: App vars set, GITHUB_CLIENT_ID absent (LIN-761)', async () => {
     delete process.env.GITHUB_CLIENT_ID;
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects');
     const res = makeRes();
     const session = makeSession();
@@ -282,7 +328,7 @@ describe('GitHub Projects auth routes', () => {
       ...fakeProvider(),
       beginAuth: () => { throw new Error('boom from beginAuth'); },
     };
-    const router = createGitHubProjectsAuthRoutes({ provider: throwingProvider });
+    const router = createGitHubProjectsAuthRoutes({ provider: throwingProvider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects');
     const res = makeRes();
     const session = makeSession();
@@ -295,7 +341,7 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('GET /auth/github-projects mints state, stores intent server-side, and redirects', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects');
     const res = makeRes();
     const session = makeSession();
@@ -307,7 +353,7 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('GET /auth/github-projects (add-source) carries a validated viewed-workspace urlKey', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects');
     const res = makeRes();
     const session = makeSession();
@@ -317,7 +363,7 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('GET callback rejects a mismatched state (CSRF guard)', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects/callback');
     const res = makeRes();
     await handler({ query: { installation_id: '42', state: 'attacker' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -326,7 +372,7 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('GET callback mints from installation_id and renders the board picker, holding the token in session', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github-projects' } });
@@ -339,7 +385,7 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('GET callback (add-source) carries the viewed-workspace urlKey from intent into pending', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github-projects', workspaceUrlKey: 'acme' } });
@@ -348,7 +394,7 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('GET callback (re-bind) exchanges the code, enumerates boards, and stashes a rebind pending WITHOUT the user token (LIN-735)', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github-projects' } });
@@ -365,7 +411,7 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('GET callback (re-bind) carries the viewed-workspace urlKey from intent into the rebind pending (LIN-541 + LIN-735)', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github-projects', workspaceUrlKey: 'acme' } });
@@ -375,7 +421,7 @@ describe('GitHub Projects auth routes', () => {
 
   test('GET callback (re-bind) with NO installations falls through to the install URL (LIN-735)', async () => {
     const provider = { ...fakeProvider(), listReboundableBoards: async () => [] };
-    const router = createGitHubProjectsAuthRoutes({ provider });
+    const router = createGitHubProjectsAuthRoutes({ provider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } });
@@ -385,7 +431,7 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('GET callback (re-bind) surfaces a clean 400 when the code exchange fails (LIN-735)', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects/callback');
     const res = makeRes();
     await handler({ query: { code: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } }) }, res);
@@ -394,7 +440,7 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('GET callback 400s when installation_id is missing (setup_action=request)', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects/callback');
     const res = makeRes();
     await handler({ query: { setup_action: 'request', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -404,7 +450,7 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('GET callback surfaces a clean 400 when the installation-token mint fails', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects/callback');
     const res = makeRes();
     await handler({ query: { installation_id: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -413,10 +459,12 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('POST link (new) find-or-creates the GitHub account container and writes the LIN-711 binding', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [],
     });
@@ -433,10 +481,81 @@ describe('GitHub Projects auth routes', () => {
     assert.equal(session.activeWorkspaceId, 'github:42');
     assert.equal(session.githubProjectsPending, undefined, 'pending cleared');
     assert.equal(res.redirectedTo, '/workspace/octocat/');
+
+    // LIN-1329: the 5th sign-in path's actual deliverable — session.accountId
+    // set, exactly one durable account minted, the sign-up provider (`github`,
+    // keyed on the human GitHub user id, never the installation account) linked
+    // as its first identity.
+    assert.ok(session.accountId, 'session.accountId set by establishAccount');
+    const account = await accountStore.getAccount(session.accountId);
+    assert.ok(account, 'account was actually persisted');
+    assert.deepEqual(account.identities, [{ provider: 'github', scope: 'human-42', credentials: { login: 'octocat' } }]);
+    const workspaces = await accountWorkspaceStore.listWorkspacesForAccount(session.accountId);
+    assert.deepEqual(workspaces, ['github:42']);
+  });
+
+  test('POST link (new) a returning GitHub Projects user (fresh session, previously-seen human id) lands on their EXISTING account, not a new one', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+
+    const firstSession = makeSession({
+      githubHumanId: 'human-42',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    await handler({ body: { board: 'octocat/5' } , session: firstSession }, makeRes());
+    const firstAccountId = firstSession.accountId;
+    assert.ok(firstAccountId);
+
+    // A brand-new session (logged out / new device) signing in with the SAME
+    // GitHub human identity.
+    const secondSession = makeSession({
+      githubHumanId: 'human-42',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    await handler({ body: { board: 'octocat/5' }, session: secondSession }, makeRes());
+
+    assert.strictEqual(secondSession.accountId, firstAccountId);
+    const account = await accountStore.getAccount(firstAccountId);
+    assert.equal(account.identities.length, 1, 'still exactly one identity, not re-minted');
+  });
+
+  // Mirrors tests/unit/github-auth.test.js's add-source conflict test — the
+  // GitHub Projects half of the LIN-1329 review's finding 2 (the auth-route.test.js
+  // note claims this file's add-source mode covers the conflict branch).
+  test('POST link (add-source) returns 409 Account Conflict when the GitHub identity already belongs to a DIFFERENT account, and writes nothing', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-42', {});
+    const myAccount = await accountStore.createAccount();
+
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+    const res = makeRes();
+    const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
+    const session = makeSession({
+      accountId: myAccount._id,
+      githubHumanId: 'human-42',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [linearWs],
+      activeWorkspaceId: 'org-1',
+    });
+    await handler({ body: { board: 'octocat/5' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Account Conflict/);
+    // No binding written, no pending cleared — the sign-in did not complete.
+    assert.equal(linearWs.bindings, undefined);
+    assert.ok(session.githubProjectsPending, 'pending NOT cleared on conflict');
+    // Neither account was mutated.
+    assert.strictEqual((await accountStore.getAccount(otherAccount._id)).identities.length, 1);
+    assert.strictEqual((await accountStore.getAccount(myAccount._id)).identities.length, 0);
   });
 
   test('POST link (new) adds a board as a binding onto an EXISTING GitHub account container (coexists with Issues)', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     // A container already created by the GitHub Issues login for the same account.
@@ -445,6 +564,7 @@ describe('GitHub Projects auth routes', () => {
       bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho' } }],
     };
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [existing],
     });
@@ -456,12 +576,13 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('POST link (add-source) binds onto the VIEWED workspace without clobbering its primary', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const viewedWs = { id: 'org-a', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_a' };
     const activeWs = { id: 'org-b', name: 'Globex', urlKey: 'globex', provider: 'linear', accessToken: 'lin_b' };
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubProjectsPending: { token: 'ghs_inst', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z', workspaceUrlKey: 'acme' },
       workspaces: [viewedWs, activeWs],
       activeWorkspaceId: 'org-b',
@@ -475,10 +596,11 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('POST link (re-bind, new) mints the installation token for the chosen board and writes the LIN-711 binding (LIN-735)', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubProjectsPending: { rebind: true, mode: 'new', boardInstallations: { 'octocat/5': '77' } },
       workspaces: [],
     });
@@ -497,11 +619,12 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('POST link (re-bind, add-source) mints + binds onto the viewed workspace without clobbering its primary (LIN-735)', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubProjectsPending: { rebind: true, mode: 'add-source', boardInstallations: { 'octocat/5': '77' } },
       workspaces: [linearWs],
       activeWorkspaceId: 'org-1',
@@ -515,10 +638,11 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('POST link (re-bind) rejects a board that is not in the enumerated installation map (LIN-735)', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubProjectsPending: { rebind: true, mode: 'new', boardInstallations: { 'octocat/5': '77' } },
       workspaces: [],
     });
@@ -530,10 +654,10 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('POST link rejects a non-numeric board slug (must be org/projectNumber, not owner/repo)', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
-    const session = makeSession({ githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' }, workspaces: [] });
+    const session = makeSession({ githubHumanId: 'human-42', githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' }, workspaces: [] });
     await handler({ body: { board: 'octocat/hello-world' }, session }, res);
     assert.equal(res.statusCode, 400);
     assert.match(res.body, /Invalid Project Board/);
@@ -541,10 +665,11 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('POST link surfaces a clean error when the installation expiry is missing/unparseable', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99' },
       workspaces: [],
     });
@@ -555,7 +680,7 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('POST link rejects when there is no pending GitHub Projects session', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     await handler({ body: { board: 'octocat/5' }, session: makeSession() }, res);

@@ -13,6 +13,7 @@ import { renderErrorPage } from '../lib/render.js'
 import { upsertWorkspace, saveSession, linkProvider } from '../lib/workspace.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-preferences.js'
+import { establishAccount } from '../lib/account-session.js'
 
 /**
  * Create auth routes with required dependencies.
@@ -22,9 +23,11 @@ import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-prefe
  * @param {Object} [options.provider] - The provider this auth router serves. Injected by the
  *   mounting provider (LinearProvider.getAuthRouter passes `this`); falls back to the Linear
  *   provider as a documented legacy default for direct constructions (LIN-561).
+ * @param {import('../lib/account-store.js').AccountStore} options.accountStore - LIN-1329: find-or-create the durable account for the signing-in identity.
+ * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ sessionStore, userPreferencesStore, provider }) {
+export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore }) {
   const router = Router()
 
   const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
@@ -176,52 +179,76 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider 
       // Preserve existing workspaces before regenerating session
       const existingWorkspaces = req.session.workspaces || []
 
-      // Regenerate session ID to prevent session fixation attacks
-      req.session.regenerate(async (regenerateErr) => {
-        if (regenerateErr) {
-          console.error('Session regeneration error:', regenerateErr)
-          const html = renderErrorPage('Session Error', 'Could not create a secure session. Please try again.', {
-            action: 'Try again',
-            actionUrl: '/auth/linear'
-          })
-          return res.status(500).send(html)
-        }
+      // Regenerate session ID to prevent session fixation attacks. Awaited
+      // (LIN-1329): the callback now does real async I/O (establishAccount,
+      // preferences) before responding, and regenerate() itself doesn't await
+      // its callback — without this wrapper the handler could resolve, and a
+      // caller could observe the session, before the callback finishes.
+      await new Promise((resolve) => {
+        req.session.regenerate(async (regenerateErr) => {
+          try {
+            if (regenerateErr) {
+              console.error('Session regeneration error:', regenerateErr)
+              const html = renderErrorPage('Session Error', 'Could not create a secure session. Please try again.', {
+                action: 'Try again',
+                actionUrl: '/auth/linear'
+              })
+              return res.status(500).send(html)
+            }
 
-        // Restore preserved workspaces
-        req.session.workspaces = existingWorkspaces
+            // Restore preserved workspaces
+            req.session.workspaces = existingWorkspaces
 
-        // Store Linear user ID for preference persistence
-        req.session.linearUserId = viewer.id
+            // Store Linear user ID for preference persistence
+            req.session.linearUserId = viewer.id
 
-        // Load saved user preferences and apply to session.
-        // regenerate() wiped the session, so rehydrate every durable field
-        // session readers rely on — features, northStarByWorkspace, and the
-        // OpenRouter key (LIN-498: previously dropped here, wiping the user's
-        // OpenRouter connection on routine re-auth / account / workspace switch).
-        // modelId lives at the workspace level (LIN-283) — no session hydration here.
-        if (userPreferencesStore) {
-          const savedPrefs = await userPreferencesStore.getUserPreferences(viewer.id)
-          applyUserPreferencesToSession(req.session, savedPrefs)
-        }
+            // LIN-1329 (Phase C): establish the durable account for this identity —
+            // the single seam every sign-in path converges on. Identity scope is
+            // Linear's viewer.id (the human), never the org — regenerate() just
+            // wiped any prior session.accountId, so a returning user's existing
+            // account is found by identity lookup, not session continuity.
+            const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', String(viewer.id), {}, workspace.id)
+            if (!established.ok) {
+              const html = renderErrorPage('Account Conflict', 'This Linear account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
+                action: 'Go to homepage',
+                actionUrl: '/'
+              })
+              return res.status(409).send(html)
+            }
 
-        // Add/update workspace in session
-        try {
-          upsertWorkspace(req.session, workspace)
-        } catch (limitError) {
-          const html = renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
-            action: 'Go to dashboard',
-            actionUrl: '/'
-          })
-          return res.status(400).send(html)
-        }
+            // Load saved user preferences and apply to session.
+            // regenerate() wiped the session, so rehydrate every durable field
+            // session readers rely on — features, northStarByWorkspace, and the
+            // OpenRouter key (LIN-498: previously dropped here, wiping the user's
+            // OpenRouter connection on routine re-auth / account / workspace switch).
+            // modelId lives at the workspace level (LIN-283) — no session hydration here.
+            if (userPreferencesStore) {
+              const savedPrefs = await userPreferencesStore.getUserPreferences(viewer.id)
+              applyUserPreferencesToSession(req.session, savedPrefs)
+            }
 
-        req.session.activeWorkspaceId = workspace.id
-        await saveSession(req.session)
-        // LIN-785: seed the pre-paint theme cookie from the rehydrated durable
-        // preference so a returning/cross-device user's dark choice applies on the
-        // very first page after login (the cookie is this device's transport).
-        if (req.session.theme) setThemeCookie(res, req.session.theme)
-        res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
+            // Add/update workspace in session
+            try {
+              upsertWorkspace(req.session, workspace)
+            } catch (limitError) {
+              const html = renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
+                action: 'Go to dashboard',
+                actionUrl: '/'
+              })
+              return res.status(400).send(html)
+            }
+
+            req.session.activeWorkspaceId = workspace.id
+            await saveSession(req.session)
+            // LIN-785: seed the pre-paint theme cookie from the rehydrated durable
+            // preference so a returning/cross-device user's dark choice applies on the
+            // very first page after login (the cookie is this device's transport).
+            if (req.session.theme) setThemeCookie(res, req.session.theme)
+            res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
+          } finally {
+            resolve()
+          }
+        })
       })
     } catch (err) {
       console.error('OAuth callback error:', err)
