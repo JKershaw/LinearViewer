@@ -71,12 +71,18 @@ describe('workspace-store', () => {
     const created = await store.createWorkspace(ws);
     assert.strictEqual(created.ok, true);
     assert.strictEqual(created.workspace._id, ws.id);
+    // The model's own `id` field is intentionally persisted alongside `_id`
+    // (LIN-1337 review): the pre-hardening shape (`{...workspace, _id, ...}`)
+    // duplicated it, and this pins that it still round-trips through the
+    // atomic-upsert path rather than being silently dropped.
+    assert.strictEqual(created.workspace.id, ws.id);
     assert.ok(created.workspace.createdAt instanceof Date);
     assert.ok(created.workspace.updatedAt instanceof Date);
 
     const fetched = await store.getWorkspace(ws.id);
     assert.ok(fetched, 'workspace should be retrievable after creation');
     assert.strictEqual(fetched._id, ws.id);
+    assert.strictEqual(fetched.id, ws.id);
     assert.strictEqual(fetched.name, 'Acme Inc');
   });
 
