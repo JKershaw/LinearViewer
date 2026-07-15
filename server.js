@@ -67,6 +67,7 @@ import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
 import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential } from './lib/workspace.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
+import { createEnsurePATSession } from './lib/pat-session.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
 import { createProxyRoutes } from './routes/proxy.js'
@@ -457,16 +458,18 @@ const promptTraceStore = new PromptTraceStore({
 setPromptTraceRecorder((trace) => promptTraceStore.record(trace))
 
 // Accounts (LIN-1327): the durable human-tied account record; identities attach
-// per (provider, scope). Phase A — INERT: deliberately passed to NO route
-// factory until LIN-1329 wires the auth paths to linkIdentity.
+// per (provider, scope). Wired into every sign-in path's `establishAccount` call
+// as of LIN-1329 (Phase C) — see lib/account-session.js.
 const accountsCollection = db.collection('accounts')
 const accountStore = new AccountStore({ collection: accountsCollection })
 
-// Durable workspaces + account↔workspace membership (LIN-1328, Phase B of
-// LIN-1326). Phase B — INERT: deliberately passed to NO route factory and no
-// session read site until LIN-1329/LIN-1330 wire them up. The durable
-// collection and the session `workspaces` blob coexist until then (Known
-// transient, closed by Phase D).
+// Durable workspaces (LIN-1328, Phase B). `workspaceStore` itself stays INERT —
+// deliberately passed to NO route factory and no session read site — until
+// LIN-1330 (Phase D) moves reads off the session `workspaces` blob onto it.
+// `accountWorkspaceStore` (the account↔workspace membership edge) is DIFFERENT:
+// LIN-1329 (Phase C) wires every sign-in path to bind the account to the
+// session workspace's existing id via `establishAccount`, independent of
+// whether a durable `Workspace` document exists yet.
 const workspacesCollection = db.collection('workspaces')
 const workspaceStore = new WorkspaceStore({ collection: workspacesCollection })
 const accountWorkspacesCollection = db.collection('account-workspaces')
@@ -535,7 +538,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore }))
 }
 
 // =============================================================================
@@ -566,59 +569,7 @@ function getOpenRouterSource(req) {
 // =============================================================================
 // When LINEAR_ACCESS_TOKEN is set and the user has no session, auto-create one.
 
-async function ensurePATSession(req, res, next) {
-  const pat = process.env.LINEAR_ACCESS_TOKEN;
-  if (!pat) return next();
-  if (req.session.workspaces?.length > 0) return next();
-
-  // Skip routes that don't need auth
-  if (req.path.startsWith('/auth/') || req.path === '/logout' ||
-      req.path.startsWith('/test/') || req.path === '/privacy' ||
-      req.path === '/terms' || req.path === '/styleguide') {
-    return next();
-  }
-
-  try {
-    const provider = getProvider('linear');
-    const [org, viewer] = await Promise.all([
-      provider.fetchOrganization(pat),
-      provider.fetchViewer(pat)
-    ]);
-
-    // PAT is the third identity-creation site (alongside OAuth login and local
-    // create). It converges on the same linkProvider seam (LIN-562) so PAT
-    // workspaces carry bindings[] for the downstream fan-out (LIN-544) instead
-    // of being a divergent branch. Identity stays org-derived for back-compat
-    // (session-ephemeral, nothing persisted to migrate); only the credential
-    // attachment routes through linkProvider, which writes the legacy scalar
-    // mirror (accessToken/credentials) so all existing PAT readers stay green.
-    const workspace = {
-      id: org.id,
-      name: org.name,
-      urlKey: org.urlKey || org.name,
-      addedAt: Date.now(),
-      isPAT: true,
-      tokenExpiresAt: Number.MAX_SAFE_INTEGER
-    };
-    linkProvider(workspace, 'linear', org.id, {
-      token: pat,
-      tokenExpiresAt: Number.MAX_SAFE_INTEGER, // PAT never expires; refresh middleware skips on isPAT
-    });
-
-    req.session.workspaces = [workspace];
-    req.session.activeWorkspaceId = workspace.id;
-    req.session.linearUserId = viewer.id;
-
-    await saveSession(req.session);
-    console.log(`PAT session created for workspace: ${org.name} (${org.urlKey})`);
-    next();
-  } catch (error) {
-    console.error('PAT auto-login failed:', error.message);
-    next();
-  }
-}
-
-app.use(ensurePATSession);
+app.use(createEnsurePATSession({ accountStore, accountWorkspaceStore }));
 
 // =============================================================================
 // Token Refresh Middleware
@@ -701,14 +652,14 @@ app.use((req, res, next) => {
 for (const provider of getAllProviders()) {
   let authRouter
   try {
-    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore })
+    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore })
   } catch (err) {
     if (err instanceof NotImplementedError) continue
     throw err
   }
   app.use(authRouter)
 }
-app.use(createWorkspaceRoutes({ localStore }))
+app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
 

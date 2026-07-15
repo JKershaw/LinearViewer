@@ -30,7 +30,8 @@ import crypto from 'crypto'
 import { Router } from 'express'
 import { renderErrorPage, renderGitHubProjectSelectPage } from '../lib/render-pages.js'
 import { githubErrorDiagnostic } from '../lib/errors.js'
-import { getMissingGitHubConfig } from '../lib/providers/github/app-auth.js'
+import { getMissingGitHubConfig, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../lib/providers/github/app-auth.js'
+import { establishAccount } from '../lib/account-session.js'
 import {
   upsertWorkspace,
   saveSession,
@@ -66,9 +67,11 @@ function installationExpiryMs(expiresAt) {
  * @param {Object} options
  * @param {Object} [options.sessionStore] - Session store with cleanup() (optional).
  * @param {Object} options.provider - The GitHubProjects provider (injected by getAuthRouter).
+ * @param {import('../lib/account-store.js').AccountStore} options.accountStore - LIN-1329: find-or-create the durable account for the signing-in identity.
+ * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
  * @returns {Router} Express router
  */
-export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) {
+export function createGitHubProjectsAuthRoutes({ sessionStore, provider, accountStore, accountWorkspaceStore } = {}) {
   const router = Router()
 
   // The complete config gate (LIN-761) — byte-symmetric with routes/github-auth.js:
@@ -169,6 +172,21 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
         }))
       }
 
+      // Resolve the human GitHub identity NOW, from the discovery user token, while
+      // it's in hand — mirrors routes/github-auth.js (LIN-1329). `github` is ONE
+      // identity provider shared with GitHub Issues (Q3): stashed on the session so
+      // it survives the separate fresh-install round trip (installation_id, no code).
+      let viewer
+      try {
+        viewer = await withTimeout(provider.fetchViewer(userToken), GITHUB_VIEWER_TIMEOUT_MS, 'GitHub viewer lookup')
+      } catch (viewerError) {
+        console.error('GitHub Projects viewer lookup error:', viewerError)
+        return res.status(400).send(renderErrorPage('Authentication Failed', 'Could not verify your GitHub account. Please try again.', {
+          action: 'Try again', actionUrl: '/auth/github-projects', diagnostic: githubErrorDiagnostic(viewerError)
+        }))
+      }
+      req.session.githubHumanId = String(viewer.id)
+
       let reboundable
       try {
         reboundable = await provider.listReboundableBoards(userToken)
@@ -267,10 +285,13 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
    */
   router.post('/auth/github-projects/link', async (req, res) => {
     const pending = req.session.githubProjectsPending
+    // The human identity resolved at callback time (LIN-1329), captured now
+    // (before any session.regenerate below wipes it).
+    const humanId = req.session.githubHumanId
     // Two pending shapes converge here: the install branch already minted an
     // installation `token`; the re-bind branch (LIN-735) carries only a
     // board->installationId map (`rebind`) and mints the token at link time.
-    if (!pending || (!pending.token && !pending.rebind)) {
+    if (!pending || (!pending.token && !pending.rebind) || !humanId) {
       return res.status(400).send(renderErrorPage('Session Expired', 'Your GitHub sign-in session expired. Please start again.', {
         action: 'Connect GitHub Projects', actionUrl: '/auth/github-projects'
       }))
@@ -322,8 +343,20 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
             action: 'Go to homepage', actionUrl: '/'
           }))
         }
+
+        // LIN-1329 (Phase C): establish the durable account for this identity —
+        // `github` is ONE identity provider shared with GitHub Issues (Q3): the
+        // human's GitHub user id, never the installation account (`creds.userId`).
+        const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', humanId, { login: creds.login }, workspace.id)
+        if (!established.ok) {
+          return res.status(409).send(renderErrorPage('Account Conflict', 'This GitHub account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
+            action: 'Go to homepage', actionUrl: '/'
+          }))
+        }
+
         linkProvider(workspace, provider.name, board, credentials)
         delete req.session.githubProjectsPending
+        delete req.session.githubHumanId
         await saveSession(req.session)
         return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?provider_ok=github-projects`)
       }
@@ -334,9 +367,16 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
       const workspaceId = `github:${creds.userId}`
       const existing = (req.session.workspaces || []).find(w => w.id === workspaceId)
       if (existing) {
+        const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', humanId, { login: creds.login }, existing.id)
+        if (!established.ok) {
+          return res.status(409).send(renderErrorPage('Account Conflict', 'This GitHub account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
+            action: 'Go to homepage', actionUrl: '/'
+          }))
+        }
         linkProvider(existing, provider.name, board, credentials)
         req.session.activeWorkspaceId = existing.id
         delete req.session.githubProjectsPending
+        delete req.session.githubHumanId
         await saveSession(req.session)
         return res.redirect(`/workspace/${encodeURIComponent(existing.urlKey)}/`)
       }
@@ -352,24 +392,45 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider } = {}) 
       linkProvider(workspace, provider.name, board, credentials)
 
       const existingWorkspaces = req.session.workspaces || []
-      req.session.regenerate(async (regenerateErr) => {
-        if (regenerateErr) {
-          console.error('GitHub Projects session regeneration error:', regenerateErr)
-          return res.status(500).send(renderErrorPage('Session Error', 'Could not create a secure session. Please try again.', {
-            action: 'Try again', actionUrl: '/auth/github-projects'
-          }))
-        }
-        req.session.workspaces = existingWorkspaces
-        try {
-          upsertWorkspace(req.session, workspace)
-        } catch (limitError) {
-          return res.status(400).send(renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
-            action: 'Go to dashboard', actionUrl: '/'
-          }))
-        }
-        req.session.activeWorkspaceId = workspace.id
-        await saveSession(req.session)
-        res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
+      // Awaited (LIN-1329): establishAccount below does real async I/O, so the
+      // handler must not resolve before the callback finishes — regenerate()
+      // itself doesn't await its callback, so without this wrapper the response
+      // (and the session mutations it depends on) could race the caller.
+      await new Promise((resolve) => {
+        req.session.regenerate(async (regenerateErr) => {
+          try {
+            if (regenerateErr) {
+              console.error('GitHub Projects session regeneration error:', regenerateErr)
+              return res.status(500).send(renderErrorPage('Session Error', 'Could not create a secure session. Please try again.', {
+                action: 'Try again', actionUrl: '/auth/github-projects'
+              }))
+            }
+            req.session.workspaces = existingWorkspaces
+
+            // LIN-1329 (Phase C): regenerate() just wiped session.accountId (if
+            // any), so a returning user's existing account is found by identity
+            // lookup.
+            const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', humanId, { login: creds.login }, workspace.id)
+            if (!established.ok) {
+              return res.status(409).send(renderErrorPage('Account Conflict', 'This GitHub account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
+                action: 'Go to homepage', actionUrl: '/'
+              }))
+            }
+
+            try {
+              upsertWorkspace(req.session, workspace)
+            } catch (limitError) {
+              return res.status(400).send(renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
+                action: 'Go to dashboard', actionUrl: '/'
+              }))
+            }
+            req.session.activeWorkspaceId = workspace.id
+            await saveSession(req.session)
+            res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
+          } finally {
+            resolve()
+          }
+        })
       })
     } catch (err) {
       console.error('GitHub Projects link error:', err)

@@ -5,7 +5,8 @@
 import { Router } from 'express'
 import { randomUUID } from 'node:crypto'
 import { removeWorkspace, upsertWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, URL_KEY_REGEX, linkProvider } from '../lib/workspace.js'
-import { badRequest, notFound } from '../lib/errors.js'
+import { badRequest, notFound, serverError } from '../lib/errors.js'
+import { establishAccount } from '../lib/account-session.js'
 
 /**
  * Slugify a workspace name into the urlKey body (alphanumeric + hyphens).
@@ -46,9 +47,11 @@ function starterSeed(urlKey) {
  * Create workspace management routes.
  * @param {Object} [deps]
  * @param {import('../lib/local-store.js').LocalStore} [deps.localStore] - Local provider store, used to seed starter content for new local workspaces.
+ * @param {import('../lib/account-store.js').AccountStore} [deps.accountStore] - LIN-1329: find-or-create the durable account for a new local workspace.
+ * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} [deps.accountWorkspaceStore] - LIN-1329: bind the account to the workspace.
  * @returns {Router} Express router
  */
-export function createWorkspaceRoutes({ localStore } = {}) {
+export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore } = {}) {
   const router = Router()
 
   /**
@@ -99,6 +102,16 @@ export function createWorkspaceRoutes({ localStore } = {}) {
       return badRequest.html(res, err.message)
     }
     req.session.activeWorkspaceId = workspace.id
+
+    // LIN-1329 (Phase C): establish the durable account for this identity —
+    // the single seam every sign-in path converges on. Local has no human
+    // credential to identify by (Q6), so the identity scope is the urlKey
+    // itself: freshly random per create, so it can never false-conflict
+    // across two humans the way a shared resource address would.
+    const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'local', urlKey, {}, workspace.id)
+    if (!established.ok) {
+      return serverError.html(res, 'Could not set up your workspace account. Please try again.')
+    }
 
     if (localStore) {
       await localStore.seed(urlKey, starterSeed(urlKey))

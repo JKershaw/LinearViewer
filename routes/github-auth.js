@@ -23,7 +23,8 @@ import { Router } from 'express'
 import { getProvider } from '../lib/providers/registry.js'
 import { renderErrorPage, renderGitHubRepoSelectPage } from '../lib/render-pages.js'
 import { githubErrorDiagnostic } from '../lib/errors.js'
-import { getMissingGitHubConfig } from '../lib/providers/github/app-auth.js'
+import { getMissingGitHubConfig, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../lib/providers/github/app-auth.js'
+import { establishAccount } from '../lib/account-session.js'
 import {
   upsertWorkspace,
   saveSession,
@@ -64,9 +65,11 @@ function installationExpiryMs(expiresAt) {
  * @param {Object} options
  * @param {Object} [options.sessionStore] - Session store with cleanup() (optional; mirrors Linear router shape).
  * @param {Object} options.provider - The GitHub provider instance (injected by GitHubProvider.getAuthRouter).
+ * @param {import('../lib/account-store.js').AccountStore} options.accountStore - LIN-1329: find-or-create the durable account for the signing-in identity.
+ * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
  * @returns {Router} Express router
  */
-export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
+export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, accountWorkspaceStore } = {}) {
   const router = Router()
 
   // The complete config gate (LIN-761): validate the FULL env set the flow
@@ -189,6 +192,25 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
         }))
       }
 
+      // Resolve the human GitHub identity NOW, from the discovery user token, while
+      // it's in hand — this branch is the ONLY place either flow (re-bind or
+      // fresh-install) ever holds a user-to-server token. A fresh install redirects
+      // to beginInstall below and returns on a SEPARATE round trip carrying only an
+      // installation_id (no code), so the human id is stashed on the session here to
+      // survive that hop (LIN-1329 Q1/Q2: identity scope is the human's GitHub user
+      // id, never the installation account). Budgeted with a timeout — this callback
+      // path has a history of hangs (LIN-761).
+      let viewer
+      try {
+        viewer = await withTimeout(provider.fetchViewer(userToken), GITHUB_VIEWER_TIMEOUT_MS, 'GitHub viewer lookup')
+      } catch (viewerError) {
+        console.error('GitHub viewer lookup error:', viewerError)
+        return res.status(400).send(renderErrorPage('Authentication Failed', 'Could not verify your GitHub account. Please try again.', {
+          action: 'Try again', actionUrl: '/auth/github', diagnostic: githubErrorDiagnostic(viewerError)
+        }))
+      }
+      req.session.githubHumanId = String(viewer.id)
+
       let reboundable
       try {
         reboundable = await provider.listReboundableRepos(userToken)
@@ -295,10 +317,15 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
    */
   router.post('/auth/github/link', async (req, res) => {
     const pending = req.session.githubPending
+    // The human identity resolved at callback time (LIN-1329), captured now
+    // (before any session.regenerate below wipes it) so every branch — add-source,
+    // existing container, or a fresh regenerate — establishes the account against
+    // the same value.
+    const humanId = req.session.githubHumanId
     // Two pending shapes converge here: the install branch already minted an
     // installation `token`; the re-bind branch (LIN-728) carries only a
     // repo->installationId map (`rebind`) and mints the token at link time.
-    if (!pending || (!pending.token && !pending.rebind)) {
+    if (!pending || (!pending.token && !pending.rebind) || !humanId) {
       return res.status(400).send(renderErrorPage('Session Expired', 'Your GitHub sign-in session expired. Please start again.', {
         action: 'Sign in with GitHub', actionUrl: '/auth/github'
       }))
@@ -362,8 +389,21 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
             action: 'Go to homepage', actionUrl: '/'
           }))
         }
+
+        // LIN-1329 (Phase C): establish the durable account for this identity —
+        // the single seam every sign-in path converges on. `github` is ONE
+        // identity provider shared with GitHub Projects (Q3): the human's GitHub
+        // user id, never the installation account (`creds.userId`).
+        const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', humanId, { login: creds.login }, workspace.id)
+        if (!established.ok) {
+          return res.status(409).send(renderErrorPage('Account Conflict', 'This GitHub account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
+            action: 'Go to homepage', actionUrl: '/'
+          }))
+        }
+
         linkProvider(workspace, provider.name, repo, credentials)
         delete req.session.githubPending
+        delete req.session.githubHumanId
         await saveSession(req.session)
         return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?provider_ok=github`)
       }
@@ -375,9 +415,16 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
       const workspaceId = `github:${creds.userId}`
       const existing = (req.session.workspaces || []).find(w => w.id === workspaceId)
       if (existing) {
+        const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', humanId, { login: creds.login }, existing.id)
+        if (!established.ok) {
+          return res.status(409).send(renderErrorPage('Account Conflict', 'This GitHub account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
+            action: 'Go to homepage', actionUrl: '/'
+          }))
+        }
         linkProvider(existing, provider.name, repo, credentials)
         req.session.activeWorkspaceId = existing.id
         delete req.session.githubPending
+        delete req.session.githubHumanId
         await saveSession(req.session)
         return res.redirect(`/workspace/${encodeURIComponent(existing.urlKey)}/`)
       }
@@ -399,24 +446,45 @@ export function createGitHubAuthRoutes({ sessionStore, provider } = {}) {
       // Preserve existing workspaces across the fixation-preventing regenerate
       // (mirrors the Linear callback).
       const existingWorkspaces = req.session.workspaces || []
-      req.session.regenerate(async (regenerateErr) => {
-        if (regenerateErr) {
-          console.error('GitHub session regeneration error:', regenerateErr)
-          return res.status(500).send(renderErrorPage('Session Error', 'Could not create a secure session. Please try again.', {
-            action: 'Try again', actionUrl: '/auth/github'
-          }))
-        }
-        req.session.workspaces = existingWorkspaces
-        try {
-          upsertWorkspace(req.session, workspace)
-        } catch (limitError) {
-          return res.status(400).send(renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
-            action: 'Go to dashboard', actionUrl: '/'
-          }))
-        }
-        req.session.activeWorkspaceId = workspace.id
-        await saveSession(req.session)
-        res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
+      // Awaited (LIN-1329): establishAccount below does real async I/O, so the
+      // handler must not resolve before the callback finishes — regenerate()
+      // itself doesn't await its callback, so without this wrapper the response
+      // (and the session mutations it depends on) could race the caller.
+      await new Promise((resolve) => {
+        req.session.regenerate(async (regenerateErr) => {
+          try {
+            if (regenerateErr) {
+              console.error('GitHub session regeneration error:', regenerateErr)
+              return res.status(500).send(renderErrorPage('Session Error', 'Could not create a secure session. Please try again.', {
+                action: 'Try again', actionUrl: '/auth/github'
+              }))
+            }
+            req.session.workspaces = existingWorkspaces
+
+            // LIN-1329 (Phase C): regenerate() just wiped session.accountId (if
+            // any), so a returning user's existing account is found by identity
+            // lookup, not session continuity — same as the Linear OAuth callback.
+            const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', humanId, { login: creds.login }, workspace.id)
+            if (!established.ok) {
+              return res.status(409).send(renderErrorPage('Account Conflict', 'This GitHub account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
+                action: 'Go to homepage', actionUrl: '/'
+              }))
+            }
+
+            try {
+              upsertWorkspace(req.session, workspace)
+            } catch (limitError) {
+              return res.status(400).send(renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
+                action: 'Go to dashboard', actionUrl: '/'
+              }))
+            }
+            req.session.activeWorkspaceId = workspace.id
+            await saveSession(req.session)
+            res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
+          } finally {
+            resolve()
+          }
+        })
       })
     } catch (err) {
       console.error('GitHub link error:', err)

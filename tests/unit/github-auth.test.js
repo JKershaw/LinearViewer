@@ -10,15 +10,21 @@
  *
  * Run with: node --test tests/unit/github-auth.test.js
  */
-import { test, describe, beforeEach, afterEach } from 'node:test';
+import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import crypto from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MangoClient } from '@jkershaw/mangodb';
 import { GitHubProvider } from '../../lib/providers/github/index.js';
 import { AuthExchangeError } from '../../lib/providers/interface.js';
 import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
 import { createFakeGitHubClient } from '../../lib/providers/github/fake-client.js';
 import { githubErrorDiagnostic } from '../../lib/errors.js';
 import { getMissingGitHubConfig, isGitHubConfigured } from '../../lib/providers/github/app-auth.js';
+import { AccountStore } from '../../lib/account-store.js';
+import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 
 // Ephemeral RSA keypair so completeInstallation's App-JWT signing (mintAppJwt)
 // runs for real against a valid PEM — generated, never on disk.
@@ -254,6 +260,9 @@ function fakeProvider() {
     listReboundableRepos: async () => ([
       { slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false, installationId: '77' },
     ]),
+    // LIN-1329: the human GitHub identity, resolved from the discovery user
+    // token — distinct from the installation account (`userId` above).
+    fetchViewer: async () => ({ id: 'human-42', login: 'octocat', name: 'The Octocat' }),
   };
 }
 
@@ -312,9 +321,33 @@ describe('GitHub auth routes', () => {
     }
   });
 
+  // LIN-1329: every route the router mounts now threads accountStore/
+  // accountWorkspaceStore into `establishAccount` — real MangoDB-backed
+  // stores (fresh per test) rather than a hand-rolled fake, same precedent
+  // as tests/unit/account-store.test.js.
+  let dbClient;
+  let dbDir;
+  let acctCounter = 0;
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'github-auth-route-'));
+    dbClient = new MangoClient(dbDir);
+    await dbClient.connect();
+  });
+  after(async () => {
+    if (dbClient?.close) await dbClient.close();
+    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+  });
+  function freshAccountStores() {
+    const db = dbClient.db(`acct_${acctCounter++}`);
+    return {
+      accountStore: new AccountStore({ collection: db.collection('accounts') }),
+      accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
+    };
+  }
+
   test('GET /auth/github 503s when GitHub App env is not configured', async () => {
     delete process.env.GITHUB_APP_ID;
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     await handler({ query: {}, session: makeSession() }, res);
@@ -328,7 +361,7 @@ describe('GitHub auth routes', () => {
   // (getMissingGitHubConfig over the full set) now returns a clean 503 up front.
   test('GET /auth/github 503s (never hangs) on a partial config: App vars set, GITHUB_CLIENT_ID absent (LIN-761)', async () => {
     delete process.env.GITHUB_CLIENT_ID;
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -351,7 +384,7 @@ describe('GitHub auth routes', () => {
       ...fakeProvider(),
       beginAuth: () => { throw new Error('boom from beginAuth'); },
     };
-    const router = createGitHubAuthRoutes({ provider: throwingProvider });
+    const router = createGitHubAuthRoutes({ provider: throwingProvider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -366,7 +399,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET /auth/github mints state, stores intent server-side, and redirects', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -379,7 +412,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback rejects a mismatched state (CSRF guard)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { installation_id: '42', state: 'attacker' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -388,7 +421,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback 400s when installation_id is missing (setup_action=request)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { setup_action: 'request', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -398,7 +431,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET /auth/github (add-source) carries a validated viewed-workspace urlKey in the intent', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -409,7 +442,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET /auth/github (add-source) ignores a malformed workspace query param', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -418,7 +451,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback mints from installation_id and renders the repo picker, holding the token in session', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
@@ -431,7 +464,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback (add-source) carries the viewed-workspace urlKey from intent into pending', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' } });
@@ -440,7 +473,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback surfaces a clean 400 when the installation-token mint fails', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { installation_id: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -456,7 +489,7 @@ describe('GitHub auth routes', () => {
   // ---------------------------------------------------------------------------
 
   test('GET callback (re-bind) exchanges the code, enumerates repos, and stashes a rebind pending WITHOUT the user token (LIN-728)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
@@ -473,7 +506,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback (re-bind) carries the viewed-workspace urlKey from intent into the rebind pending (LIN-541 + LIN-728)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' } });
@@ -482,7 +515,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback (re-bind) keeps the CSRF state guard (mismatched state rejected before code exchange)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { code: 'oauth-code', state: 'attacker' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -491,7 +524,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback (re-bind) surfaces a clean 400 when the code exchange fails', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { code: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } }) }, res);
@@ -504,7 +537,7 @@ describe('GitHub auth routes', () => {
     // the App, so enumeration is empty. Rather than the old dead-end empty picker,
     // send them to installations/new (reusing the CSRF nonce) to install + pick.
     const provider = { ...fakeProvider(), listReboundableRepos: async () => [] };
-    const router = createGitHubAuthRoutes({ provider });
+    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
@@ -514,10 +547,11 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (re-bind, new) mints the installation token for the chosen repo and writes the LIN-711 binding (LIN-728)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubPending: { rebind: true, mode: 'new', repoInstallations: { 'octocat/hello-world': '77' } },
       workspaces: [],
     });
@@ -537,11 +571,12 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (re-bind, add-source) mints + binds onto the active workspace without clobbering its primary (LIN-717 + LIN-728)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubPending: { rebind: true, mode: 'add-source', repoInstallations: { 'octocat/hello-world': '77' } },
       workspaces: [linearWs],
       activeWorkspaceId: 'org-1',
@@ -557,10 +592,11 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (re-bind) rejects a repo that is not in the enumerated installation map (LIN-728)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubPending: { rebind: true, mode: 'new', repoInstallations: { 'octocat/hello-world': '77' } },
       workspaces: [],
     });
@@ -572,10 +608,11 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (new) find-or-creates the GitHub account container and writes the binding', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [],
     });
@@ -598,7 +635,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (new) adds a second repo as a binding on the existing account container', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const existing = {
@@ -606,6 +643,7 @@ describe('GitHub auth routes', () => {
       bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho_token' } }],
     };
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [existing],
     });
@@ -616,11 +654,12 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (add-source) links onto the active workspace without creating a new one', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [linearWs],
       activeWorkspaceId: 'org-1',
@@ -633,14 +672,48 @@ describe('GitHub auth routes', () => {
     assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github');
   });
 
+  // LIN-1329: add-source is the one GitHub mode that does NOT regenerate the
+  // session, so a pre-existing session.accountId survives into establishAccount
+  // — the realistic path to the strict conflict signal (an identity already
+  // owned by a DIFFERENT account than the one currently signed in).
+  test('POST link (add-source) returns 409 Account Conflict when the GitHub identity already belongs to a DIFFERENT account, and writes nothing', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-42', {});
+    const myAccount = await accountStore.createAccount();
+
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
+    const session = makeSession({
+      accountId: myAccount._id,
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [linearWs],
+      activeWorkspaceId: 'org-1',
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Account Conflict/);
+    // No binding written, no pending cleared — the sign-in did not complete.
+    assert.equal(linearWs.bindings, undefined);
+    assert.ok(session.githubPending, 'pending NOT cleared on conflict');
+    // Neither account was mutated.
+    assert.strictEqual((await accountStore.getAccount(otherAccount._id)).identities.length, 1);
+    assert.strictEqual((await accountStore.getAccount(myAccount._id)).identities.length, 0);
+  });
+
   test('POST link (add-source) binds onto the VIEWED workspace, not the active one (LIN-541)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     // User is viewing workspace A (acme) but B (globex) is the active one.
     const viewedWs = { id: 'org-a', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_a' };
     const activeWs = { id: 'org-b', name: 'Globex', urlKey: 'globex', provider: 'linear', accessToken: 'lin_b' };
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z', workspaceUrlKey: 'acme' },
       workspaces: [viewedWs, activeWs],
       activeWorkspaceId: 'org-b',
@@ -654,11 +727,12 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (add-source) falls back to the active workspace when no target urlKey was carried', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const activeWs = { id: 'org-b', name: 'Globex', urlKey: 'globex', provider: 'linear', accessToken: 'lin_b' };
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [activeWs],
       activeWorkspaceId: 'org-b',
@@ -670,11 +744,12 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (add-source) falls back to active when the carried urlKey no longer resolves', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const activeWs = { id: 'org-b', name: 'Globex', urlKey: 'globex', provider: 'linear', accessToken: 'lin_b' };
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z', workspaceUrlKey: 'gone' },
       workspaces: [activeWs],
       activeWorkspaceId: 'org-b',
@@ -686,7 +761,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link rejects when there is no pending GitHub session', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     await handler({ body: { repo: 'octocat/hello-world' }, session: makeSession() }, res);
@@ -695,11 +770,12 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (add-source) writes the LIN-711 binding shape: installationId + real ms expiry', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubPending: { token: 'ghs_inst', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [linearWs],
       activeWorkspaceId: 'org-1',
@@ -718,11 +794,12 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link surfaces a clean error when the installation expiry is missing/unparseable (LIN-711)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     // No tokenExpiresAt carried — must NOT silently fall back to a never-expires stamp.
     const session = makeSession({
+      githubHumanId: 'human-42',
       githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99' },
       workspaces: [],
     });
@@ -734,10 +811,10 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link rejects a malformed repo slug', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
-    const session = makeSession({ githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42' }, workspaces: [] });
+    const session = makeSession({ githubHumanId: 'human-42', githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42' }, workspaces: [] });
     await handler({ body: { repo: 'not-a-repo' }, session }, res);
     assert.equal(res.statusCode, 400);
     assert.match(res.body, /Invalid Repository/);
@@ -754,7 +831,7 @@ describe('GitHub auth routes', () => {
     const err = new Error('GitHub API POST /app/installations/99/access_tokens failed: Resource not accessible by integration');
     err.status = 403;
     const provider = { ...fakeProvider(), completeInstallation: async () => { throw err; } };
-    const router = createGitHubAuthRoutes({ provider });
+    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { installation_id: '99', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -766,7 +843,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback (re-bind) surfaces the OAuth error detail in the diagnostic (LIN-746)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider() });
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     // fakeProvider.completeAuth('bad') throws AuthExchangeError('bad_verification_code').
