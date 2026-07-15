@@ -20,6 +20,7 @@ import { MangoClient } from '@jkershaw/mangodb'
 import { ensureIndexes } from './lib/db-indexes.js'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
+import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -1267,31 +1268,18 @@ function resolveWorkspaceTitles(urlKey) {
   return _workspaceTitleResolver.resolveWorkspaceTitles(urlKey);
 }
 
-// getWorkspaceOpenRouterKey: resolves the token creator's OpenRouter API key for
-// proxy consumers. The key is read directly from the durable per-user preferences
-// store (LIN-498), keyed by the token creator's linearUserId — the single source
-// of truth. This replaced a DB-wide scan of all sessions plus a 30s cache, which
-// became stale after session.regenerate() (the proxy would find the new, keyless
-// session and report "AI not configured"). Only the creator's own key is returned,
-// so one user's proxy token can't consume another user's OpenRouter quota.
-// urlKey is retained for signature compatibility/logging; authorization is already
-// enforced by the workspace-scoped proxy token's creator binding.
+// getWorkspaceOpenRouterKey: thin server-env wrapper around the extracted resolver
+// (lib/openrouter-key-resolver.js, LIN-1352). The `urlKey === 'test-workspace'`
+// short-circuit is a server/test-env concern, not part of the resolver's identity,
+// so it stays here rather than in the injectable seam (whose mandated signature
+// omits urlKey). Authorization is already enforced by the workspace-scoped proxy
+// token's creator binding.
 async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
     return null;
   }
 
-  // Without a creator user ID, we can't safely resolve a personal OAuth key
-  if (!linearUserId) {
-    return null;
-  }
-
-  try {
-    return await userPreferencesStore.getOpenRouterApiKey(linearUserId);
-  } catch (err) {
-    console.error('Error looking up workspace OpenRouter key:', err);
-    return null;
-  }
+  return resolveOpenRouterKey(userPreferencesStore, linearUserId);
 }
 
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore }))
