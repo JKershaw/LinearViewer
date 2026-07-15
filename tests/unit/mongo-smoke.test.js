@@ -25,6 +25,7 @@ import { INDEX_SPECS, ensureIndexes } from '../../lib/db-indexes.js';
 import { WorkspaceStore } from '../../lib/workspace-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { AccountStore } from '../../lib/account-store.js';
+import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 
 const uri = process.env.MONGODB_TEST_URI;
 if (!uri && process.env.CI) {
@@ -323,6 +324,82 @@ describe(
           `expected (${provider}, ${scope}) to survive concurrent linking`
         );
       }
+    });
+
+    // --- LIN-1343: addFeedback atomic $push + terminalWakeEnqueued CAS ---
+    //
+    // account-store.test.js's concurrency pins run only against MangoDB (a
+    // mock's findOneAndUpdate is atomic by construction there, so it never
+    // vacuously "proves" real-engine correctness). Two things about this fix
+    // are unproven against production MongoDB specifically: (1) the $push +
+    // findOneAndUpdate/returnDocument:'after' shape actually appends under
+    // concurrency there, and (2) $ne:true matches an ABSENT field there too
+    // (the one genuinely new filter operator this ticket introduces —
+    // terminalWakeEnqueued is absent-or-true, never false).
+
+    function freshDispatchStore(name) {
+      const collection = freshCollection(`${name}-queue`);
+      const historyCollection = freshCollection(`${name}-history`);
+      return new DispatchQueueStore({ collection, historyCollection });
+    }
+
+    test('addFeedback: 20 concurrent calls on one item all persist on real MongoDB (LIN-1343)', async () => {
+      const store = freshDispatchStore('feedback-append');
+      const item = await store.addItem('acme', {
+        prompt: 'do the thing',
+        kind: 'implementation',
+        issueIdentifier: 'LIN-42'
+      });
+      await store.takeItem(item._id, 'acme', 'token-a');
+
+      const N = 20;
+      const results = await Promise.all(
+        Array.from({ length: N }, (_, i) =>
+          store.addFeedback(item._id, 'acme', { message: `heartbeat ${i}` }, 'token-a')
+        )
+      );
+
+      assert.ok(results.every((r) => r && r.success), 'every concurrent caller still reports success');
+      const stored = await store.historyCollection.findOne({ _id: item._id });
+      assert.strictEqual(
+        stored.feedback.length,
+        N,
+        `all ${N} concurrent entries must be stored on real MongoDB, not just the last writer`
+      );
+    });
+
+    test('addFeedback: terminalWakeEnqueued $ne:true CAS matches an absent field and enqueues exactly one wake on real MongoDB (LIN-1343)', async () => {
+      const store = freshDispatchStore('feedback-wake');
+      const child = await store.addItem('acme', {
+        prompt: 'do the thing',
+        kind: 'implementation',
+        issueIdentifier: 'LIN-42',
+        sessionId: 'parent-S1',
+        subscription: 'everything'
+      });
+      await store.takeItem(child._id, 'acme', 'token-a');
+
+      // child.terminalWakeEnqueued is ABSENT at this point (never initialised —
+      // the ticket forbids a migration). If $ne:true failed to match an absent
+      // field on real MongoDB, every one of these CAS attempts would report
+      // matchedCount 0 and silently suppress the wake (LIN-1355's live failure
+      // mode) instead of racing to exactly one winner.
+      const N = 20;
+      await Promise.all(
+        Array.from({ length: N }, () =>
+          store.addFeedback(child._id, 'acme', { message: '[done] shipped' }, 'token-a')
+        )
+      );
+
+      const queued = await store.collection.find({ urlKey: 'acme', kind: 'wake' }).toArray();
+      assert.strictEqual(
+        queued.length,
+        1,
+        `exactly one wake must be enqueued for ${N} concurrent duplicate terminals on real MongoDB`
+      );
+
+      const edge = await store.historyCollection.findOne({ _id: child._id });
+      assert.strictEqual(edge.terminalWakeEnqueued, true, 'the witness is durably set on the edge');
     });
   }
 );

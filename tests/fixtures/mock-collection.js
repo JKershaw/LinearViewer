@@ -1,10 +1,12 @@
 /**
  * Minimal in-memory mock of the MongoDB/MangoDB collection surface, shared by
  * store unit tests. Supports the operators the local-store relies on:
- * insertOne, findOne, find().toArray(), updateOne ($set + upsert), deleteOne,
- * deleteMany, findOneAndDelete, countDocuments. Query matching is top-level field
- * equality, plus a `{ $gt: value }` operator (used by the dispatch store's
- * expiresAt filter) — enough for the scope/kind/_id/identifier/parentId filters
+ * insertOne, findOne, find().toArray(), updateOne ($set + $push + upsert),
+ * findOneAndUpdate ($push + returnDocument), deleteOne, deleteMany,
+ * findOneAndDelete, countDocuments. Query matching is top-level field equality,
+ * plus `{ $gt/$gte/$lt/$lte: value }` and `{ $ne: value }` operators (used by
+ * the dispatch store's expiresAt filter and LIN-1343's terminalWakeEnqueued
+ * once-only guard) — enough for the scope/kind/_id/identifier/parentId filters
  * the stores use.
  *
  * `find()` returns a chainable cursor supporting `.sort()/.skip()/.limit()`
@@ -14,6 +16,11 @@
  *
  * Also supports `{ $in: [...] }` (used by the Observation materializer's
  * followUpTo BFS batch lookups, LIN-1307).
+ *
+ * This mock's single-body-per-call design means every op below is atomic BY
+ * CONSTRUCTION — it cannot reproduce the interleavings a real engine can
+ * (see LIN-1343: concurrency pins for `addFeedback` run against a real
+ * MangoDB tmpdir instance instead, since a mock would pass vacuously).
  */
 export function createMockCollection() {
   const docs = [];
@@ -30,8 +37,32 @@ export function createMockCollection() {
       if ('$in' in condition) {
         return Array.isArray(condition.$in) && condition.$in.includes(value);
       }
+      // $ne: value !== condition — absent-field semantics matter here
+      // (LIN-1343's terminalWakeEnqueued is absent-or-true, never false), so
+      // `undefined !== true` correctly matches an absent field.
+      if ('$ne' in condition) {
+        return value !== condition.$ne;
+      }
     }
     return value === condition;
+  };
+
+  // Applies $set/$push update operators to a doc, returning a NEW object
+  // (never mutates the input) so callers holding the pre-update doc (e.g. a
+  // findOneAndUpdate caller reading the stored array reference) are unaffected.
+  // Shared by updateOne and findOneAndUpdate so both operators behave
+  // identically regardless of which method applies them.
+  const applyUpdate = (doc, update) => {
+    let next = doc;
+    if (update.$set) next = { ...next, ...update.$set };
+    if (update.$push) {
+      next = { ...next };
+      for (const [field, value] of Object.entries(update.$push)) {
+        const existing = Array.isArray(next[field]) ? next[field] : [];
+        next[field] = [...existing, value];
+      }
+    }
+    return next;
   };
 
   const matches = (doc, query) =>
@@ -118,8 +149,20 @@ export function createMockCollection() {
         }
         return { matchedCount: 0, upsertedCount: 0 };
       }
-      if (update.$set) docs[idx] = { ...docs[idx], ...update.$set };
+      docs[idx] = applyUpdate(docs[idx], update);
       return { matchedCount: 1, modifiedCount: 1 };
+    },
+
+    // findOneAndUpdate with $push + returnDocument ('before'|'after'), added
+    // for LIN-1343's atomic addFeedback append. No upsert support — nothing in
+    // this codebase's addFeedback-class callers needs it.
+    async findOneAndUpdate(query, update, opts = {}) {
+      const idx = docs.findIndex(d => matches(d, query));
+      if (idx === -1) return null;
+      const before = docs[idx];
+      const after = applyUpdate(before, update);
+      docs[idx] = after;
+      return { ...(opts.returnDocument === 'before' ? before : after) };
     },
 
     async deleteOne(query) {
