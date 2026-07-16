@@ -26,6 +26,7 @@ import { WorkspaceStore } from '../../lib/workspace-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { establishAccount } from '../../lib/account-session.js';
 
 const uri = process.env.MONGODB_TEST_URI;
 if (!uri && process.env.CI) {
@@ -324,6 +325,97 @@ describe(
           `expected (${provider}, ${scope}) to survive concurrent linking`
         );
       }
+    });
+
+    // --- LIN-1348: establishAccount mint-race orchestration (real MongoDB) ---
+    //
+    // linkIdentity's own cross-document race is already proven above
+    // (:195-243). This proves the ORCHESTRATION layered on top in
+    // lib/account-session.js: mint (:55-59) -> linkIdentity (:63) -> E11000
+    // conflict (:64-76) -> deleteAccount orphan (:77) -> adopt winner (:78).
+    // A naive witness (all ok:true, one holder, zero orphans) can false-green
+    // on a schedule that happens to serialize into the existingOwner-reuse
+    // branch and never actually reaches the E11000/adopt path at all — so
+    // this also spies createAccount/deleteAccount call counts:
+    // createAccountCalls>1 proves a genuine mint collision occurred, and
+    // deleteAccountCalls===createAccountCalls-1 proves every losing minter's
+    // orphan was cleaned up. A serialized schedule can't satisfy both (later
+    // calls would see existingOwner and skip minting entirely, collapsing
+    // createAccountCalls toward 1 and deleteAccountCalls toward 0).
+
+    test('establishAccount: 400 concurrent first sign-ins for the SAME identity mint-race, conflict, and adopt on real MongoDB (LIN-1348)', async () => {
+      const collection = freshCollection('accounts');
+      await collection.createIndex(
+        { 'identities.provider': 1, 'identities.scope': 1 },
+        { unique: true, sparse: true, name: 'accounts_identity_unique' }
+      );
+      const accountStore = new AccountStore({ collection });
+      const accountWorkspaceStore = new AccountWorkspaceStore({
+        collection: freshCollection('account-workspaces')
+      });
+
+      let createAccountCalls = 0;
+      let deleteAccountCalls = 0;
+      const spiedStore = {
+        createAccount: (...args) => {
+          createAccountCalls++;
+          return accountStore.createAccount(...args);
+        },
+        deleteAccount: (...args) => {
+          deleteAccountCalls++;
+          return accountStore.deleteAccount(...args);
+        },
+        findAccountByIdentity: (...args) => accountStore.findAccountByIdentity(...args),
+        linkIdentity: (...args) => accountStore.linkIdentity(...args)
+      };
+
+      const results = await Promise.allSettled(
+        Array.from({ length: CONCURRENCY }, () =>
+          establishAccount({}, spiedStore, accountWorkspaceStore, 'github', 'race-identity', {}, 'ws-race')
+        )
+      );
+
+      const rejected = results.filter((r) => r.status === 'rejected');
+      assert.deepStrictEqual(
+        rejected,
+        [],
+        `establishAccount must never throw under concurrency, got ${rejected.length} rejection(s): ${rejected[0]?.reason}`
+      );
+
+      const fulfilled = results.map((r) => r.value);
+      assert.ok(
+        fulfilled.every((r) => r.ok === true),
+        'every concurrent first sign-in for the same identity must succeed, no false conflict for a loser'
+      );
+
+      const winnerAccountId = fulfilled[0].accountId;
+      assert.ok(
+        fulfilled.every((r) => r.accountId === winnerAccountId),
+        'every caller must land on the SAME winning account'
+      );
+
+      const holders = await collection
+        .find({ identities: { $elemMatch: { provider: 'github', scope: 'race-identity' } } })
+        .toArray();
+      assert.strictEqual(holders.length, 1, 'exactly one account should hold the identity');
+      assert.strictEqual(holders[0]._id, winnerAccountId);
+
+      const allAccounts = await collection.find({}).toArray();
+      assert.strictEqual(
+        allAccounts.length,
+        1,
+        'no zero-identity orphan account should remain from a losing mint'
+      );
+
+      assert.ok(
+        createAccountCalls > 1,
+        `expected a genuine mint collision (multiple concurrent createAccount calls), got ${createAccountCalls}`
+      );
+      assert.strictEqual(
+        deleteAccountCalls,
+        createAccountCalls - 1,
+        'every losing minter must clean up its own orphan (adoption path), and only the losers'
+      );
     });
 
     // --- LIN-1343/LIN-1357: addFeedback atomic $push + terminal-wake CAS ---
