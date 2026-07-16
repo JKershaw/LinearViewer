@@ -15,7 +15,7 @@
 import { test, describe, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import crypto from 'node:crypto'
-import { mintAppJwt, mintInstallationToken, fetchInstallation, getAppConfig } from '../../lib/providers/github/app-auth.js'
+import { mintAppJwt, mintInstallationToken, fetchInstallation, getAppConfig, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../../lib/providers/github/app-auth.js'
 
 // One ephemeral RSA keypair for the whole suite — generated, never on disk.
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
@@ -234,5 +234,45 @@ describe('GitHub App auth primitives (LIN-707)', () => {
   test('fetchInstallation requires an installationId', async () => {
     await assert.rejects(() => fetchInstallation('', { fetchImpl: async () => ({}) }), /installationId is required/)
     await assert.rejects(() => fetchInstallation(null, { fetchImpl: async () => ({}) }), /installationId is required/)
+  })
+})
+
+// -------------------------------------------------------------------------
+// withTimeout() (LIN-1348) — the generic race-a-promise-against-a-timeout
+// helper backing the GET /user viewer lookup's 8s budget (LIN-761 hang
+// history). NOTE: routes/proxy.js has its own SEPARATE private `withTimeout`
+// with its own budgets — out of scope here, do not conflate.
+// -------------------------------------------------------------------------
+
+describe('withTimeout (LIN-1348)', () => {
+  test('resolves with the value when the promise settles within budget, no timeout fires', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] })
+    const result = await withTimeout(Promise.resolve('viewer-data'), GITHUB_VIEWER_TIMEOUT_MS)
+    assert.equal(result, 'viewer-data')
+  })
+
+  test('rejects with ETIMEDOUT and the budget in the message once the timer fires at exactly the budget', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] })
+    const hang = new Promise(() => {}) // never settles on its own
+    const promise = withTimeout(hang, GITHUB_VIEWER_TIMEOUT_MS)
+    const assertion = assert.rejects(promise, (err) => {
+      assert.equal(err.code, 'ETIMEDOUT')
+      assert.match(err.message, /8000ms/)
+      return true
+    })
+    t.mock.timers.tick(GITHUB_VIEWER_TIMEOUT_MS)
+    await assertion
+  })
+
+  test('has not rejected yet at 7999ms, one ms short of the budget', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] })
+    const hang = new Promise(() => {})
+    const promise = withTimeout(hang, GITHUB_VIEWER_TIMEOUT_MS)
+    let settled = false
+    promise.then(() => { settled = true }, () => { settled = true })
+
+    t.mock.timers.tick(GITHUB_VIEWER_TIMEOUT_MS - 1)
+    await Promise.resolve() // flush microtasks queued by the (non-firing) tick
+    assert.equal(settled, false, 'must not reject before the full budget has elapsed')
   })
 })
