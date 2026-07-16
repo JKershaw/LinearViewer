@@ -25,6 +25,7 @@ import { renderErrorPage, renderGitHubRepoSelectPage } from '../lib/render-pages
 import { githubErrorDiagnostic } from '../lib/errors.js'
 import { getMissingGitHubConfig, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../lib/providers/github/app-auth.js'
 import { establishAccount } from '../lib/account-session.js'
+import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 import {
   upsertWorkspace,
   saveSession,
@@ -67,9 +68,10 @@ function installationExpiryMs(expiresAt) {
  * @param {Object} options.provider - The GitHub provider instance (injected by GitHubProvider.getAuthRouter).
  * @param {import('../lib/account-store.js').AccountStore} options.accountStore - LIN-1329: find-or-create the durable account for the signing-in identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
+ * @param {Object} [options.userPreferencesStore] - LIN-1353: rehydrates durable preferences (features, theme, OpenRouter key, north star) onto the fresh-login regenerated session, mirroring routes/auth.js.
  * @returns {Router} Express router
  */
-export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, accountWorkspaceStore } = {}) {
+export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, accountWorkspaceStore, userPreferencesStore } = {}) {
   const router = Router()
 
   // The complete config gate (LIN-761): validate the FULL env set the flow
@@ -469,6 +471,15 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
               return res.status(409).send(renderErrorPage('Account Conflict', 'This GitHub account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
                 action: 'Go to homepage', actionUrl: '/'
               }))
+            }
+
+            // LIN-1353 S9: regenerate() wiped the session, so rehydrate durable
+            // preferences (features, theme, OpenRouter key, north star) the same
+            // way routes/auth.js's Linear callback does — strictly after
+            // established.accountId is populated, before upsertWorkspace.
+            if (userPreferencesStore) {
+              const savedPrefs = await userPreferencesStore.getUserPreferences(established.accountId)
+              applyUserPreferencesToSession(req.session, savedPrefs)
             }
 
             try {

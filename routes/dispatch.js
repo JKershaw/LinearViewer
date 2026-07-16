@@ -554,8 +554,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * Fetch recent custom prompts for the current user and workspace.
    */
   router.get('/workspace/:urlKey/api/dispatch/recent-prompts', workspaceFromUrl, async (req, res) => {
-    const linearUserId = req.session.linearUserId;
-    if (!linearUserId) {
+    const accountId = req.session.accountId;
+    if (!accountId) {
       return unauthorized.json(res, 'Authentication required');
     }
     if (!userPreferencesStore) {
@@ -563,7 +563,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     }
 
     try {
-      const prefs = await userPreferencesStore.getUserPreferences(linearUserId);
+      const prefs = await userPreferencesStore.getUserPreferences(accountId);
       const recentByWorkspace = prefs.recentCustomPrompts || {};
       const prompts = recentByWorkspace[req.workspace.urlKey] || [];
       res.json({ prompts });
@@ -578,8 +578,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * Save a custom prompt to the recent list for the current user and workspace.
    */
   router.post('/workspace/:urlKey/api/dispatch/recent-prompts', workspaceFromUrl, async (req, res) => {
-    const linearUserId = req.session.linearUserId;
-    if (!linearUserId) {
+    const accountId = req.session.accountId;
+    if (!accountId) {
       return unauthorized.json(res, 'Authentication required');
     }
     if (!userPreferencesStore) {
@@ -599,7 +599,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     }
 
     try {
-      const prefs = await userPreferencesStore.getUserPreferences(linearUserId);
+      const prefs = await userPreferencesStore.getUserPreferences(accountId);
       const recentByWorkspace = prefs.recentCustomPrompts || {};
       const urlKey = req.workspace.urlKey;
       let list = recentByWorkspace[urlKey] || [];
@@ -609,7 +609,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       list.unshift(prompt);
       list = list.slice(0, MAX_RECENT_PROMPTS);
 
-      await userPreferencesStore.saveUserPreferences(linearUserId, {
+      await userPreferencesStore.saveUserPreferences(accountId, {
         ...prefs,
         recentCustomPrompts: {
           ...recentByWorkspace,
@@ -629,7 +629,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   //
   // A durable, user-curated list on top of the rolling recents window: a
   // starred prompt survives the recents cap instead of rolling off. Mirrors the
-  // recents endpoints (session-auth, linearUserId gate, same validation) plus a
+  // recents endpoints (session-auth, accountId gate, same validation) plus a
   // DELETE (un-star) — the one path recents has no equivalent of. The cap is
   // owned by the store (MAX_FAVORITE_PROMPTS); identity is the exact string, so
   // a favourite and its recent counterpart stay in sync by value.
@@ -640,8 +640,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * Fetch favourite custom prompts for the current user and workspace.
    */
   router.get('/workspace/:urlKey/api/dispatch/favorite-prompts', workspaceFromUrl, async (req, res) => {
-    const linearUserId = req.session.linearUserId;
-    if (!linearUserId) {
+    const accountId = req.session.accountId;
+    if (!accountId) {
       return unauthorized.json(res, 'Authentication required');
     }
     if (!userPreferencesStore) {
@@ -649,7 +649,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     }
 
     try {
-      const prompts = await userPreferencesStore.getFavoritePrompts(linearUserId, req.workspace.urlKey);
+      const prompts = await userPreferencesStore.getFavoritePrompts(accountId, req.workspace.urlKey);
       res.json({ prompts });
     } catch (err) {
       console.error('Failed to fetch favorite prompts:', err.message);
@@ -664,8 +664,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * recent counterpart accept/reject the same strings (and stay in sync by value).
    */
   router.post('/workspace/:urlKey/api/dispatch/favorite-prompts', workspaceFromUrl, async (req, res) => {
-    const linearUserId = req.session.linearUserId;
-    if (!linearUserId) {
+    const accountId = req.session.accountId;
+    if (!accountId) {
       return unauthorized.json(res, 'Authentication required');
     }
     if (!userPreferencesStore) {
@@ -685,7 +685,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     }
 
     try {
-      const prompts = await userPreferencesStore.addFavoritePrompt(linearUserId, req.workspace.urlKey, prompt);
+      const prompts = await userPreferencesStore.addFavoritePrompt(accountId, req.workspace.urlKey, prompt);
       res.json({ success: true, prompts });
     } catch (err) {
       console.error('Failed to save favorite prompt:', err.message);
@@ -699,8 +699,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * the body `{ prompt }` (or `?prompt=`). Same auth gate as the add path.
    */
   router.delete('/workspace/:urlKey/api/dispatch/favorite-prompts', workspaceFromUrl, async (req, res) => {
-    const linearUserId = req.session.linearUserId;
-    if (!linearUserId) {
+    const accountId = req.session.accountId;
+    if (!accountId) {
       return unauthorized.json(res, 'Authentication required');
     }
     if (!userPreferencesStore) {
@@ -714,7 +714,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     }
 
     try {
-      const prompts = await userPreferencesStore.removeFavoritePrompt(linearUserId, req.workspace.urlKey, prompt);
+      const prompts = await userPreferencesStore.removeFavoritePrompt(accountId, req.workspace.urlKey, prompt);
       res.json({ success: true, prompts });
     } catch (err) {
       console.error('Failed to remove favorite prompt:', err.message);

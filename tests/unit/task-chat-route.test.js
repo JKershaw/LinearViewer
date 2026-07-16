@@ -17,11 +17,31 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { createTaskChatRoutes } from '../../routes/task-chat.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROUTE_SRC = readFileSync(join(__dirname, '../../routes/task-chat.js'), 'utf8');
 const CATALOG_SRC = readFileSync(join(__dirname, '../../lib/chat-tools.js'), 'utf8');
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+
+function getHandler(router, method, path) {
+  const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
+  assert.ok(layer, `${method.toUpperCase()} ${path} route is registered`);
+  return layer.route.stack[layer.route.stack.length - 1].handle;
+}
+
+function fakeSavedChatStore() {
+  return { list: async () => [] };
+}
+
+function makeRes() {
+  return {
+    statusCode: 200,
+    jsonBody: null,
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.jsonBody = body; return this; },
+  };
+}
 
 describe('task-chat route tool-calling wiring (LIN-990)', () => {
   test('calls freeTierStore.tryUse exactly once — one quota unit per turn, not per hop', () => {
@@ -71,12 +91,57 @@ describe('task-chat saved-chats wiring (LIN-1008)', () => {
     }
   });
 
-  test('the identity gate returns 401 when linearUserId is absent (no fabricated id)', () => {
-    // The shared gate reads req.session.linearUserId and 401s when missing.
-    assert.match(ROUTE_SRC, /req\.session\.linearUserId/);
-    assert.match(ROUTE_SRC, /res\.status\(401\)/);
+  test('the identity gate keys on accountId, not linearUserId (LIN-1353)', () => {
+    // Isolate resolveSavedChatUser's OWN body (not the whole file — the file also
+    // has an unrelated, explicitly out-of-scope req.session.linearUserId at the
+    // dispatchedBy attribution line) and assert the gate reads accountId, never
+    // linearUserId.
+    const start = ROUTE_SRC.indexOf('const resolveSavedChatUser');
+    assert.ok(start > 0, 'expected resolveSavedChatUser to be defined');
+    const end = ROUTE_SRC.indexOf('\n  };', start);
+    const gateSrc = ROUTE_SRC.slice(start, end);
+    assert.match(gateSrc, /req\.session\.accountId/);
+    assert.doesNotMatch(gateSrc, /linearUserId/);
+    assert.match(gateSrc, /res\.status\(401\)/);
     // …and it is gated on the taskChat feature flag like the rest of the surface.
-    assert.match(ROUTE_SRC, /getFeatureFlags\(req\.session\)\.taskChat\s*!==\s*true/);
+    assert.match(gateSrc, /getFeatureFlags\(req\.session\)\.taskChat\s*!==\s*true/);
+  });
+
+  test('the saved-chats gate 401s a session with linearUserId but NO accountId (proves the gate really switched keys)', async () => {
+    // A regex over the whole file can be fooled by an unrelated linearUserId
+    // elsewhere (routes/task-chat.js:455's out-of-scope dispatchedBy attribution
+    // line) — this drives the REAL live handler with the one input that
+    // discriminates old vs new behavior.
+    const router = createTaskChatRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      savedChatStore: fakeSavedChatStore(),
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/task-chat/saved');
+    const req = { session: { features: { taskChat: true }, linearUserId: 'legacy-linear-id' } };
+    const res = makeRes();
+
+    await handler(req, res);
+
+    assert.strictEqual(res.statusCode, 401);
+    assert.strictEqual(res.jsonBody.error, 'Authentication required to use saved chats');
+  });
+
+  test('the saved-chats gate allows a session with accountId and NO linearUserId (GitHub/local users)', async () => {
+    const router = createTaskChatRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      savedChatStore: fakeSavedChatStore(),
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/task-chat/saved');
+    const req = {
+      session: { features: { taskChat: true }, accountId: 'account-123' },
+      workspace: { urlKey: 'acme' },
+    };
+    const res = makeRes();
+
+    await handler(req, res);
+
+    assert.strictEqual(res.statusCode, 200);
+    assert.deepStrictEqual(res.jsonBody, { chats: [] });
   });
 
   test('the save endpoint reuses the shared sanitizeHistory shape', () => {

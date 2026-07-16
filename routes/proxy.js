@@ -886,7 +886,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       const result = await proxyTokenStore.createToken(workspace.urlKey, {
         label: label || 'default',
         scope: scope || 'read',
-        createdBy: req.session?.linearUserId || null,
+        createdBy: req.session?.accountId || null,
         ...(wantBootstrap
           ? { kind: 'bootstrap', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS }
           : {

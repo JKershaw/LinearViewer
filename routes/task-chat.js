@@ -196,10 +196,11 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     try {
       const rawTask = typeof req.query.task === 'string' ? req.query.task.trim().slice(0, 64) : '';
       const aiConfigured = isRecommendationEnabled(req.session.openRouterApiKey) || !!process.env.OPENROUTER_FREE_TIER_KEY;
-      // Saved chats require a user identity (linearUserId). When absent (local /
-      // GitHub / anonymous sessions), the feature is unavailable — the page
-      // renders an explicit empty-state and omits the save affordance (LIN-1008).
-      const savedChatsAvailable = !!req.session.linearUserId;
+      // Saved chats require a user identity (accountId). Absent only for a
+      // genuinely anonymous session — local/GitHub sessions carry an accountId
+      // via establishAccount same as Linear (LIN-1353) — the page renders an
+      // explicit empty-state and omits the save affordance when it is (LIN-1008).
+      const savedChatsAvailable = !!req.session.accountId;
       const html = renderTaskChatPage(
         { defaultTask: rawTask, aiConfigured, savedChatsAvailable },
         {
@@ -224,10 +225,12 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
   // ─── Saved chats (LIN-1008) ──────────────────────────────────────────────────
   //
   // Durable, private-per-user transcript CRUD. Every endpoint is gated on the
-  // `taskChat` flag AND a present `linearUserId` (the only accepted identity);
-  // an absent identity returns 401 rather than fabricating a fallback id (mirrors
-  // dispatch recents). These literal `/saved` routes MUST be registered BEFORE
-  // the `/:issueId` turn route below, or Express matches `saved` as an issue id.
+  // `taskChat` flag AND a present `accountId` (the only accepted identity, LIN-1353
+  // — was `linearUserId`, which excluded GitHub/local users even though they carry
+  // a real accountId via establishAccount); an absent identity returns 401 rather
+  // than fabricating a fallback id (mirrors dispatch recents). These literal
+  // `/saved` routes MUST be registered BEFORE the `/:issueId` turn route below, or
+  // Express matches `saved` as an issue id.
   //
   // Session-auth only: this is content-bearing and is never wired onto the proxy
   // token-auth or /kpis surfaces (the prompt-trace privacy boundary).
@@ -241,20 +244,20 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       res.status(403).json({ error: 'Task chat feature is not enabled' });
       return null;
     }
-    const linearUserId = req.session.linearUserId;
-    if (!linearUserId) {
+    const accountId = req.session.accountId;
+    if (!accountId) {
       res.status(401).json({ error: 'Authentication required to use saved chats' });
       return null;
     }
-    return linearUserId;
+    return accountId;
   };
 
   // List the current user's saved chats (metadata only, newest-first).
   router.get('/workspace/:urlKey/api/task-chat/saved', workspaceFromUrl, async (req, res) => {
-    const linearUserId = resolveSavedChatUser(req, res);
-    if (!linearUserId) return;
+    const accountId = resolveSavedChatUser(req, res);
+    if (!accountId) return;
     try {
-      const chats = await savedChatStore.list(req.workspace.urlKey, linearUserId);
+      const chats = await savedChatStore.list(req.workspace.urlKey, accountId);
       res.json({ chats });
     } catch (error) {
       console.error('Saved chat list error:', error);
@@ -264,8 +267,8 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
 
   // Save the current transcript as a new saved chat.
   router.post('/workspace/:urlKey/api/task-chat/saved', workspaceFromUrl, async (req, res) => {
-    const linearUserId = resolveSavedChatUser(req, res);
-    if (!linearUserId) return;
+    const accountId = resolveSavedChatUser(req, res);
+    if (!accountId) return;
 
     const body = req.body || {};
     const taskIdentifier = typeof body.taskIdentifier === 'string'
@@ -276,7 +279,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     const transcript = sanitizeHistory(body.transcript || body.history);
 
     try {
-      const chat = await savedChatStore.create(req.workspace.urlKey, linearUserId, { taskIdentifier, transcript });
+      const chat = await savedChatStore.create(req.workspace.urlKey, accountId, { taskIdentifier, transcript });
       res.status(201).json({ chat });
     } catch (error) {
       // Validation failures (e.g. empty transcript) are a 400; anything else 500.
@@ -289,10 +292,10 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
 
   // Full transcript for one saved chat (for re-hydration / resume).
   router.get('/workspace/:urlKey/api/task-chat/saved/:id', workspaceFromUrl, async (req, res) => {
-    const linearUserId = resolveSavedChatUser(req, res);
-    if (!linearUserId) return;
+    const accountId = resolveSavedChatUser(req, res);
+    if (!accountId) return;
     try {
-      const chat = await savedChatStore.get(req.workspace.urlKey, linearUserId, req.params.id);
+      const chat = await savedChatStore.get(req.workspace.urlKey, accountId, req.params.id);
       if (!chat) return res.status(404).json({ error: 'Saved chat not found' });
       res.json({ chat });
     } catch (error) {
@@ -303,10 +306,10 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
 
   // Hard-delete a saved chat.
   router.delete('/workspace/:urlKey/api/task-chat/saved/:id', workspaceFromUrl, async (req, res) => {
-    const linearUserId = resolveSavedChatUser(req, res);
-    if (!linearUserId) return;
+    const accountId = resolveSavedChatUser(req, res);
+    if (!accountId) return;
     try {
-      const deleted = await savedChatStore.delete(req.workspace.urlKey, linearUserId, req.params.id);
+      const deleted = await savedChatStore.delete(req.workspace.urlKey, accountId, req.params.id);
       if (!deleted) return res.status(404).json({ error: 'Saved chat not found' });
       res.json({ ok: true });
     } catch (error) {
