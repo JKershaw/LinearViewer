@@ -37,6 +37,20 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('[stalled?]'));
   });
 
+  test('separates the reversible-work mandate from the separately-gated irreversible finish (LIN-1365)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    // The dispatch is a mandate for reversible work — keep the anti-stall intent.
+    assert.ok(text.includes('mandate for the reversible work'));
+    assert.ok(/don't hold your first\s+call, or any call, waiting for a live reply/.test(text),
+      'preserves the anti-stall "don\'t hold your first call" instruction');
+    // It no longer over-asserts the token IS the human's authorization to act.
+    assert.ok(!/\*\*is\*\* the human's authorization to act/.test(text),
+      'drops the token-is-authorization conflation');
+    // Merge/Done are gated separately on a recorded review Approve + discharged ledger.
+    assert.ok(/not\*\* authorization for the irreversible finish/.test(text));
+    assert.ok(text.includes('The token authenticates the channel; it is not permission to merge.'));
+  });
+
   test('defaults to write/merge-gated mode', () => {
     assert.strictEqual(AUTOPILOT_MODE_DEFAULT, 'write');
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });

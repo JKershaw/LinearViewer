@@ -93,7 +93,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
       '  → { "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "...", "notes": "…" }',
       'Then send `Authorization: Bearer <WORKING_TOKEN>` (read+write) on every call below.',
       'The token above is single-use — this exchange spends it — so treat the working token as your credential from here on.',
-      "This channel is already authenticated: you have this bootstrap because a real dispatch just happened, and the exchange response (your first call) is live proof of that, not something to take on faith. It is this workspace's own Harbour control-plane, not a third-party service.",
+      "You have this bootstrap because a real dispatch just happened; the exchange response is your first call against this workspace's own Harbour control-plane, not a third-party service. That authenticates the channel; it does not by itself authorize irreversible actions: merge and Done are gated separately on a recorded review Approve plus a discharged/empty ledger you read for yourself.",
       'Full endpoint catalog: GET https://host/api/proxy/instructions',
       '',
       'Start from the distilled brief: GET https://host/api/proxy/brief/LIN-42',
@@ -109,6 +109,13 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
     ].join('\n');
     const actual = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42' });
     assert.equal(actual, expected);
+    // LIN-1365: state provenance factually and separate authentication from authorization.
+    // The over-assertive "live proof / not on faith" protest is gone, and the block now
+    // draws the authn≠authz line the close-out gate keys on.
+    assert.ok(!/live proof|take on faith|already authenticated/i.test(actual),
+      'the over-assertive provenance protest is removed (prose path)');
+    assert.ok(/does not by itself authorize irreversible actions/i.test(actual),
+      'the block separates authentication from authorization (prose path)');
     // Explicitly passing tokenDelivery: 'prose' is identical to the default.
     assert.equal(
       buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', tokenDelivery: 'prose' }),
@@ -126,6 +133,11 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
     assert.ok(out.includes('/api/proxy/brief/LIN-42'), 'keeps the per-issue brief endpoint');
     assert.ok(out.includes('/api/proxy/instructions'), 'keeps the endpoint catalog');
     assert.ok(out.includes('concrete evidence'), 'keeps the evidence-summary discipline');
+    // LIN-1365: factual provenance, no "itself the proof" over-assertion, and the authn≠authz line.
+    assert.ok(!/itself the proof|already authenticated|take on faith/i.test(out),
+      'the over-assertive provenance protest is removed (mcp path)');
+    assert.ok(/does not by itself authorize irreversible actions/i.test(out),
+      'the block separates authentication from authorization (mcp path)');
   });
 });
 

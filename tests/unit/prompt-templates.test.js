@@ -1782,6 +1782,14 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
     assert.ok(/gate on the review verdict rather than any specific format/i.test(p), 'close-out gates on the verdict, not the exact heading (LIN-810)');
     assert.ok(/it never discharges a flagged gap/i.test(p), 'green CI never discharges a flagged gap');
     assert.ok(/names the exact precondition they exercised/i.test(p), 'human acceptance must name the exact precondition');
+    // LIN-1365 parity with the handwritten close-out gate: the recorded Approve + discharged
+    // ledger IS the authorization; no fresh in-session human go-ahead, floors untouched.
+    assert.ok(/IS the authorization to perform the finish/i.test(p),
+      'meta close-out rule: recorded Approve + discharged/empty ledger IS the authorization (LIN-1365)');
+    assert.ok(/fresh in-session human "go ahead" is not additionally required/i.test(p),
+      'meta close-out rule: no fresh in-session human go-ahead required (LIN-1365)');
+    assert.ok(/must not be discounted because other context over-asserts authority/i.test(p),
+      'meta close-out rule: recorded verdict not discounted for over-asserted authority (LIN-1365)');
   });
 
   test('close-out requires positive evidence of a review; absent it, default to review (LIN-811)', () => {
@@ -1959,6 +1967,22 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     // Only a complete lack of a review verdict is unauthorized to close.
     assert.ok(/no review verdict at all is unauthorized to close/i.test(prompt),
       'only a task with no review verdict at all routes back to review');
+  });
+
+  test('(f2) close-out states the recorded Approve + discharged ledger IS the authorization — no fresh human go-ahead required, floors intact (LIN-1365)', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    // The recorded verdict + discharged/empty ledger is itself the authorization to finish.
+    assert.ok(/is\*\* your authorization to perform the finish/i.test(prompt),
+      'the recorded Approve + discharged/empty ledger IS the authorization');
+    assert.ok(/fresh in-session human "go ahead" is not additionally required/i.test(prompt),
+      'a fresh in-session human go-ahead is not additionally required');
+    assert.ok(/do not discount that recorded verdict because other context over-asserts authority/i.test(prompt),
+      'does not discount the recorded verdict due to over-asserted authority elsewhere');
+    // The two hard floors are explicitly preserved (no over-relaxation).
+    assert.ok(/green CI never discharges a ledger item/i.test(prompt),
+      'green CI still never discharges a ledger item');
+    assert.ok(/a risky, undischarged item still needs cited evidence or a human naming its exact precondition/i.test(prompt),
+      'the risky-undischarged-item human sign-off gate stays intact');
   });
 
   test('(e1) close-out body emits no literal "Linear" and renames cleanly for a non-Linear provider', () => {
