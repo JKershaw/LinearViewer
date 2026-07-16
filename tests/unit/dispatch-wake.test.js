@@ -11,9 +11,11 @@
  *    from the ROOT subscribed dispatch (walking followUpTo) — NOT the possibly
  *    repointed / kind:'wake' feedback item (LIN-1059) — fires once per NEW wake
  *    event (each beat + the terminal), holds a terminal-scoped durable witness
- *    (`terminalWakeEnqueued`) so a terminal wakes at most once, and a wake
- *    follow-up never begets another wake (the structural kind:'wake' loop guard,
- *    trap #1).
+ *    (`terminalWakeItems`, a per-edge SET keyed by the producing beat item's
+ *    `doc._id` — LIN-1357) so a given beat item's terminal wakes at most once
+ *    while a DISTINCT beat item sharing the same edge (a multi-beat stepper's
+ *    `followUpTo`+`force` drip) still wakes again, and a wake follow-up never
+ *    begets another wake (the structural kind:'wake' loop guard, trap #1).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -238,9 +240,10 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
 
     // The durable terminal witness is on the edge (here == child) history doc — a
     // terminal-scoped signal ("the parent WAS told the child terminated"), NOT the
-    // old generic one-wake-ever `wakeEnqueued`.
+    // old generic one-wake-ever `wakeEnqueued`. It is a SET keyed by the producing
+    // item id (LIN-1357), so re-reports from the same item are what suppress here.
     const childDoc = await store.historyCollection.findOne({ _id: child._id });
-    assert.equal(childDoc.terminalWakeEnqueued, true);
+    assert.ok((childDoc.terminalWakeItems || []).includes(child._id));
   });
 
   test('a terminal-only child DOES wake on a terminal (previously-silent edge now wakes, §5)', async () => {
@@ -326,7 +329,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     assert.equal(wakeItems(collection, historyCollection).length, 0, 'no wake for a heartbeat');
 
     const childDoc = await store.historyCollection.findOne({ _id: child._id });
-    assert.notEqual(childDoc.terminalWakeEnqueued, true, 'terminal witness not set by a non-terminal event');
+    assert.ok(!(childDoc.terminalWakeItems || []).includes(child._id), 'terminal witness not set by a non-terminal event');
 
     // A later terminal event still wakes once.
     await store.addFeedback(child._id, URL_KEY, { message: '[done] now done' }, 'token-a');
@@ -408,11 +411,13 @@ describe('addFeedback wake — edge ownership across a follow-up repoint (LIN-10
     assert.equal(wakes[0].sessionId, grandparent);
     assert.ok(wakes[0].prompt.includes('LIN-1046'), 'carries the stepper child identifier from the root dispatch');
 
-    // The honest terminal witness lands on the EDGE (root) doc, not the repoint item.
+    // The honest terminal witness lands on the EDGE (root) doc, not the repoint item
+    // — keyed by the PRODUCING item id (the repointed item that actually received
+    // this feedback), not a bare boolean (LIN-1357).
     const rootDoc = await store.historyCollection.findOne({ _id: rootId });
-    assert.equal(rootDoc.terminalWakeEnqueued, true, 'the terminal-delivered witness is on the root edge doc');
+    assert.ok((rootDoc.terminalWakeItems || []).includes(repointId), 'the terminal-delivered witness is on the root edge doc, keyed by the producing (repointed) item');
     const repointDoc = await store.historyCollection.findOne({ _id: repointId });
-    assert.notEqual(repointDoc.terminalWakeEnqueued, true, 'not marked on the repointed feedback item');
+    assert.ok(!repointDoc.terminalWakeItems, 'not marked on the repointed feedback item itself');
   });
 
   test('pre-repoint vs post-repoint ownership: a beat on the root, then the terminal on the repoint, both reach the grandparent', async () => {
@@ -512,7 +517,7 @@ describe('addFeedback wake — LIN-1165 self-loop guard', () => {
       'no fresh wake is minted back into the producing wake item');
   });
 
-  test('CASE 2 — a stale/superseded terminal on an already-handled edge does NOT re-deliver a wake (terminalWakeEnqueued one-shot)', async () => {
+  test('CASE 2 — a stale/superseded terminal on an already-handled edge does NOT re-deliver a wake (same-item one-shot, LIN-1357)', async () => {
     const { store, collection, historyCollection } = makeStore();
     const child = await takenChild(store, { kind: 'implementation', subscription: 'terminal-only' });
 
@@ -520,14 +525,17 @@ describe('addFeedback wake — LIN-1165 self-loop guard', () => {
     await drain();
     assert.equal(wakeItems(collection, historyCollection).length, 1, 'the terminal fires exactly one wake');
 
-    // A stale / superseded re-report of the same terminal on the already-witnessed edge.
+    // A stale / superseded re-report from the SAME producing item on the
+    // already-witnessed edge — this is the case the per-item witness must still
+    // suppress (distinguishing it from a DISTINCT item on the same edge, which
+    // must wake — see the LIN-1357 regression block below).
     await store.addFeedback(child._id, URL_KEY, { message: '[done] merged abc123 (re-reported)' }, 'token-a');
     await drain();
     assert.equal(wakeItems(collection, historyCollection).length, 1,
-      'no second wake for the already-handled edge (stale re-delivery suppressed)');
+      'no second wake for the same item re-reporting on the already-handled edge');
 
     const childDoc = await store.historyCollection.findOne({ _id: child._id });
-    assert.equal(childDoc.terminalWakeEnqueued, true, 'the edge carries the one-shot terminal witness');
+    assert.ok((childDoc.terminalWakeItems || []).includes(child._id), 'the edge carries the one-shot terminal witness for this producing item');
   });
 
   test('LIN-1059 PIN — a genuine NON-wake child terminal (kind:implementation) STILL bubbles a wake to the parent (fix is selective, not blanket kind:wake suppression)', async () => {
@@ -571,5 +579,99 @@ describe('addFeedback wake — LIN-1165 self-loop guard', () => {
     const wakes = wakesTo(collection, historyCollection, GP);
     assert.equal(wakes.length, 1, 'the PENDING beat still bubbles to the grandparent via the resolved root edge');
     assert.match(wakes[0].prompt, /paused \(pending\), not done/i, 'and is a labelled pause, not a terminal');
+  });
+});
+
+// ── LIN-1357: distinct beat items sharing one edge must EACH wake ────────────
+//
+// The confirmed incident: a multi-beat stepper resumes ONE warm session
+// repeatedly via `followUpTo`+`force`, so several DISTINCT dispatch items
+// (beat 1, beat 2, …) all resolve to the SAME edge doc. The old per-edge
+// BOOLEAN witness (`terminalWakeEnqueued`) treated "one edge → at most one
+// terminal wake, ever" — so beat 1's terminal burned the witness and every
+// later beat's terminal on that edge was silently dropped before a wake was
+// even built, permanently stalling the held parent. A single-terminal test is
+// a FALSE GREEN here (the witness starts empty, so it wakes on the first
+// terminal even with the bug fully present) — the real regression pin is a
+// SECOND terminal from a DISTINCT item on the SAME edge.
+describe('addFeedback wake — LIN-1357 per-(edge, producing item) terminal witness', () => {
+  const wakesTo = (collection, historyCollection, target) =>
+    wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
+
+  // beat1 IS the edge (no followUpTo, subscribed up to PARENT). beat2 is a
+  // DISTINCT dispatch resumed into the same warm session via followUpTo+force,
+  // so _resolveEdgeDoc walks it back to beat1 — mirroring the real LIN-1316
+  // incident topology (93efbea2 / c0282b75).
+  async function seedStepperEdgeTopology(store, { subscription = 'everything' } = {}) {
+    const PARENT = 'parent-S1';
+    const beat1 = await store.addItem(URL_KEY, {
+      prompt: 'stepper beat 1', kind: 'research', issueIdentifier: 'LIN-1357',
+      sessionId: PARENT, subscription
+    });
+    await store.takeItem(beat1._id, URL_KEY, 'token-1');
+
+    const beat2 = await store.addItem(URL_KEY, {
+      prompt: 'stepper beat 2', kind: 'research', issueIdentifier: 'LIN-1357',
+      followUpTo: beat1._id, sessionId: PARENT, subscription, force: true
+    });
+    await store.takeItem(beat2._id, URL_KEY, 'token-2');
+
+    return { beat1Id: beat1._id, beat2Id: beat2._id, parent: PARENT };
+  }
+
+  test('THE REGRESSION PIN — a SECOND [done] terminal from a DISTINCT beat item resolving to the same edge wakes the parent AGAIN', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const { beat1Id, beat2Id, parent } = await seedStepperEdgeTopology(store);
+
+    await store.addFeedback(beat1Id, URL_KEY, { message: '[done] beat 1 complete' }, 'token-1');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, parent).length, 1, "beat 1's terminal wakes the parent once");
+
+    await store.addFeedback(beat2Id, URL_KEY, { message: '[done] beat 2 complete' }, 'token-2');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, parent).length, 2,
+      'beat 2 — a DISTINCT item on the SAME edge — wakes the parent a SECOND time. Fails on the old per-edge boolean witness, passes on the per-item set.');
+  });
+
+  test('the [blocked] sibling: a SECOND [blocked] from a distinct beat item on the same edge also wakes again', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const { beat1Id, beat2Id, parent } = await seedStepperEdgeTopology(store);
+
+    await store.addFeedback(beat1Id, URL_KEY, { message: '[blocked] beat 1 needs input' }, 'token-1');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, parent).length, 1, "beat 1's [blocked] wakes the parent once");
+
+    await store.addFeedback(beat2Id, URL_KEY, { message: '[blocked] beat 2 needs input' }, 'token-2');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, parent).length, 2,
+      '[blocked] shares the terminal path with [done]/[failed], so a distinct beat item wakes again the same way');
+  });
+
+  test('a re-report of beat 2\'s OWN terminal does not enqueue a THIRD wake (same-item suppression holds under the new witness)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const { beat1Id, beat2Id, parent } = await seedStepperEdgeTopology(store);
+
+    await store.addFeedback(beat1Id, URL_KEY, { message: '[done] beat 1 complete' }, 'token-1');
+    await store.addFeedback(beat2Id, URL_KEY, { message: '[done] beat 2 complete' }, 'token-2');
+    await store.addFeedback(beat2Id, URL_KEY, { message: '[done] beat 2 complete (re-reported)' }, 'token-2');
+    await drain();
+
+    assert.equal(wakesTo(collection, historyCollection, parent).length, 2,
+      'still exactly two wakes — beat 1 + beat 2 — the re-report of beat 2 is suppressed');
+  });
+
+  test('the edge doc records BOTH producing item ids in its terminal witness set', async () => {
+    const { store } = makeStore();
+    const { beat1Id, beat2Id } = await seedStepperEdgeTopology(store);
+
+    await store.addFeedback(beat1Id, URL_KEY, { message: '[done] beat 1 complete' }, 'token-1');
+    await store.addFeedback(beat2Id, URL_KEY, { message: '[done] beat 2 complete' }, 'token-2');
+    await drain();
+
+    const edgeDoc = await store.historyCollection.findOne({ _id: beat1Id });
+    assert.ok(Array.isArray(edgeDoc.terminalWakeItems), 'the witness is a set, not a boolean');
+    assert.ok(edgeDoc.terminalWakeItems.includes(beat1Id), 'records beat 1 as a producing item');
+    assert.ok(edgeDoc.terminalWakeItems.includes(beat2Id), 'records beat 2 as a producing item');
+    assert.equal(edgeDoc.terminalWakeItems.length, 2, 'exactly the two distinct producing items, no duplicates');
   });
 });

@@ -326,16 +326,18 @@ describe(
       }
     });
 
-    // --- LIN-1343: addFeedback atomic $push + terminalWakeEnqueued CAS ---
+    // --- LIN-1343/LIN-1357: addFeedback atomic $push + terminal-wake CAS ---
     //
     // account-store.test.js's concurrency pins run only against MangoDB (a
     // mock's findOneAndUpdate is atomic by construction there, so it never
-    // vacuously "proves" real-engine correctness). Two things about this fix
-    // are unproven against production MongoDB specifically: (1) the $push +
-    // findOneAndUpdate/returnDocument:'after' shape actually appends under
-    // concurrency there, and (2) $ne:true matches an ABSENT field there too
-    // (the one genuinely new filter operator this ticket introduces —
-    // terminalWakeEnqueued is absent-or-true, never false).
+    // vacuously "proves" real-engine correctness). Things unproven against
+    // production MongoDB specifically: (1) the $push + findOneAndUpdate/
+    // returnDocument:'after' shape actually appends under concurrency there,
+    // (2) $ne:true matches an ABSENT field there too (terminalWakeEnqueued was
+    // absent-or-true, never false), and (3, LIN-1357) the re-keyed witness —
+    // `terminalWakeItems: { $ne: docId }` / `$addToSet` — CASes correctly per
+    // producing item on real MongoDB, including two DISTINCT beat items on one
+    // edge each winning their own slot under concurrent writers.
 
     function freshDispatchStore(name) {
       const collection = freshCollection(`${name}-queue`);
@@ -368,7 +370,7 @@ describe(
       );
     });
 
-    test('addFeedback: terminalWakeEnqueued $ne:true CAS matches an absent field and enqueues exactly one wake on real MongoDB (LIN-1343)', async () => {
+    test('addFeedback: terminalWakeItems $ne CAS matches an absent field and enqueues exactly one wake on real MongoDB (LIN-1343/LIN-1357)', async () => {
       const store = freshDispatchStore('feedback-wake');
       const child = await store.addItem('acme', {
         prompt: 'do the thing',
@@ -379,8 +381,8 @@ describe(
       });
       await store.takeItem(child._id, 'acme', 'token-a');
 
-      // child.terminalWakeEnqueued is ABSENT at this point (never initialised —
-      // the ticket forbids a migration). If $ne:true failed to match an absent
+      // child.terminalWakeItems is ABSENT at this point (never initialised —
+      // the ticket forbids a migration). If array-$ne failed to match an absent
       // field on real MongoDB, every one of these CAS attempts would report
       // matchedCount 0 and silently suppress the wake (LIN-1355's live failure
       // mode) instead of racing to exactly one winner.
@@ -399,7 +401,45 @@ describe(
       );
 
       const edge = await store.historyCollection.findOne({ _id: child._id });
-      assert.strictEqual(edge.terminalWakeEnqueued, true, 'the witness is durably set on the edge');
+      assert.ok(
+        (edge.terminalWakeItems || []).includes(child._id),
+        'the witness set durably records the producing item on the edge'
+      );
+      assert.strictEqual(edge.terminalWakeItems.length, 1, 'one producing item, one slot — no duplicates from the N racers');
+    });
+
+    test('addFeedback: TWO DISTINCT beat items sharing one edge each win their own terminalWakeItems CAS slot on real MongoDB (LIN-1357)', async () => {
+      // The regression this ticket fixes, proven against real MongoDB: a
+      // multi-beat stepper's beat 1 and beat 2 are distinct dispatch ids that
+      // both resolve to the SAME edge. Under the old per-edge boolean, beat 1's
+      // terminal would burn the witness and beat 2's terminal would be silently
+      // dropped before ever reaching the CAS. Each must now enqueue its own wake.
+      const store = freshDispatchStore('feedback-wake-multibeat');
+      const beat1 = await store.addItem('acme', {
+        prompt: 'stepper beat 1', kind: 'research', issueIdentifier: 'LIN-1357',
+        sessionId: 'parent-S1', subscription: 'everything'
+      });
+      await store.takeItem(beat1._id, 'acme', 'token-1');
+      const beat2 = await store.addItem('acme', {
+        prompt: 'stepper beat 2', kind: 'research', issueIdentifier: 'LIN-1357',
+        followUpTo: beat1._id, sessionId: 'parent-S1', subscription: 'everything', force: true
+      });
+      await store.takeItem(beat2._id, 'acme', 'token-2');
+
+      const N = 10;
+      await Promise.all([
+        ...Array.from({ length: N }, () =>
+          store.addFeedback(beat1._id, 'acme', { message: '[done] beat 1 complete' }, 'token-1')),
+        ...Array.from({ length: N }, () =>
+          store.addFeedback(beat2._id, 'acme', { message: '[done] beat 2 complete' }, 'token-2'))
+      ]);
+
+      const queued = await store.collection.find({ urlKey: 'acme', kind: 'wake' }).toArray();
+      assert.strictEqual(queued.length, 2, 'beat 1 and beat 2 each enqueue exactly one wake on real MongoDB');
+
+      const edge = await store.historyCollection.findOne({ _id: beat1._id });
+      assert.ok(edge.terminalWakeItems.includes(beat1._id) && edge.terminalWakeItems.includes(beat2._id));
+      assert.strictEqual(edge.terminalWakeItems.length, 2, 'exactly the two distinct producing items');
     });
   }
 );
