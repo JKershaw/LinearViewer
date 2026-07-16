@@ -9,13 +9,16 @@
  * `{success:true}`. The fix replaces that with one atomic
  * `findOneAndUpdate({...}, {$push:{feedback:entry}}, {returnDocument:'after'})`,
  * folding the ownership/status/token/workspace checks into the filter, and
- * guards the once-only terminal-wake witness with its own CAS
- * (`updateOne({_id, terminalWakeEnqueued:{$ne:true}}, {$set:{...:true}})`).
+ * guards the once-only terminal-wake witness with its own CAS. LIN-1357 re-keyed
+ * that witness from a per-edge boolean to a per-(edge, producing item) SET
+ * (`updateOne({_id, terminalWakeItems:{$ne:docId}}, {$addToSet:{terminalWakeItems:docId}})`)
+ * so a multi-beat stepper's distinct terminal beats sharing one edge each still
+ * wake the parent, while the SAME item re-reporting stays suppressed.
  *
  * Three layers, per the plan's test strategy:
- *  - Mock-fidelity: the new operators (`$push`, `findOneAndUpdate`, `$ne`) added
- *    to tests/fixtures/mock-collection.js behave as the real engines do —
- *    otherwise the mock becomes the next false witness.
+ *  - Mock-fidelity: the new operators (`$push`, `$addToSet`, `findOneAndUpdate`,
+ *    array-aware `$ne`) added to tests/fixtures/mock-collection.js behave as
+ *    the real engines do — otherwise the mock becomes the next false witness.
  *  - Rejection regressions (mock): wrong token / wrong urlKey / non-taken
  *    status / unknown item all return `null` and write nothing — asserted on
  *    the STORED document, never the response, per the ticket's acceptance rule.
@@ -106,12 +109,45 @@ describe('mock-collection: additive LIN-1343 operator support', () => {
   test('$ne matches an absent field and a false field, but not a true field', async () => {
     const collection = createMockCollection();
     await collection.insertOne({ _id: 'absent' });
-    await collection.insertOne({ _id: 'false-val', terminalWakeEnqueued: false });
-    await collection.insertOne({ _id: 'true-val', terminalWakeEnqueued: true });
+    await collection.insertOne({ _id: 'false-val', someFlag: false });
+    await collection.insertOne({ _id: 'true-val', someFlag: true });
 
-    assert.ok(await collection.findOne({ _id: 'absent', terminalWakeEnqueued: { $ne: true } }));
-    assert.ok(await collection.findOne({ _id: 'false-val', terminalWakeEnqueued: { $ne: true } }));
-    assert.equal(await collection.findOne({ _id: 'true-val', terminalWakeEnqueued: { $ne: true } }), null);
+    assert.ok(await collection.findOne({ _id: 'absent', someFlag: { $ne: true } }));
+    assert.ok(await collection.findOne({ _id: 'false-val', someFlag: { $ne: true } }));
+    assert.equal(await collection.findOne({ _id: 'true-val', someFlag: { $ne: true } }), null);
+  });
+
+  test('$ne on an array field is membership: matches unless the value is an element (LIN-1357)', async () => {
+    const collection = createMockCollection();
+    await collection.insertOne({ _id: 'absent' });
+    await collection.insertOne({ _id: 'empty', terminalWakeItems: [] });
+    await collection.insertOne({ _id: 'other-member', terminalWakeItems: ['beat-2'] });
+    await collection.insertOne({ _id: 'has-member', terminalWakeItems: ['beat-1', 'beat-2'] });
+
+    assert.ok(await collection.findOne({ _id: 'absent', terminalWakeItems: { $ne: 'beat-1' } }), 'absent field matches');
+    assert.ok(await collection.findOne({ _id: 'empty', terminalWakeItems: { $ne: 'beat-1' } }), 'empty array matches');
+    assert.ok(await collection.findOne({ _id: 'other-member', terminalWakeItems: { $ne: 'beat-1' } }), 'array with a DIFFERENT member matches');
+    assert.equal(await collection.findOne({ _id: 'has-member', terminalWakeItems: { $ne: 'beat-1' } }), null, 'array containing the value does not match');
+  });
+
+  test('$addToSet adds a new value and is a no-op for an existing one', async () => {
+    const collection = createMockCollection();
+    await collection.insertOne({ _id: 'a', terminalWakeItems: ['beat-1'] });
+
+    await collection.updateOne({ _id: 'a' }, { $addToSet: { terminalWakeItems: 'beat-2' } });
+    assert.deepEqual((await collection.findOne({ _id: 'a' })).terminalWakeItems, ['beat-1', 'beat-2']);
+
+    await collection.updateOne({ _id: 'a' }, { $addToSet: { terminalWakeItems: 'beat-1' } });
+    assert.deepEqual((await collection.findOne({ _id: 'a' })).terminalWakeItems, ['beat-1', 'beat-2'], 'a duplicate value is not added again');
+  });
+
+  test('$addToSet creates the field when absent (no migration needed)', async () => {
+    const collection = createMockCollection();
+    await collection.insertOne({ _id: 'a' });
+
+    await collection.updateOne({ _id: 'a' }, { $addToSet: { terminalWakeItems: 'beat-1' } });
+
+    assert.deepEqual((await collection.findOne({ _id: 'a' })).terminalWakeItems, ['beat-1']);
   });
 });
 
@@ -256,6 +292,40 @@ describe('addFeedback concurrency (real MangoDB tmpdir, LIN-1343)', () => {
     assert.equal(queued.length, 1, `exactly one wake must be enqueued for ${N} concurrent duplicate terminals`);
 
     const edge = await store.historyCollection.findOne({ _id: child._id });
-    assert.equal(edge.terminalWakeEnqueued, true, 'the witness is durably set on the edge');
+    assert.ok((edge.terminalWakeItems || []).includes(child._id), 'the witness set durably records the producing item on the edge');
+    assert.equal(edge.terminalWakeItems.length, 1, 'only one entry — the N callers are the SAME producing item, so they CAS-race for one slot');
+  });
+
+  test('N concurrent terminals from TWO DISTINCT beat items on one edge each enqueue exactly one wake (LIN-1357)', async () => {
+    // The regression this ticket fixes, under real concurrency: a multi-beat
+    // stepper's beat 1 and beat 2 are DISTINCT dispatch ids sharing one edge.
+    // Each must win its own CAS slot and enqueue its own wake, independent of
+    // the other's race.
+    const store = freshStore();
+    const beat1 = await store.addItem(URL_KEY, {
+      prompt: 'stepper beat 1', kind: 'research', issueIdentifier: 'LIN-1357',
+      sessionId: 'parent-S1', subscription: 'everything'
+    });
+    await store.takeItem(beat1._id, URL_KEY, 'token-1');
+    const beat2 = await store.addItem(URL_KEY, {
+      prompt: 'stepper beat 2', kind: 'research', issueIdentifier: 'LIN-1357',
+      followUpTo: beat1._id, sessionId: 'parent-S1', subscription: 'everything', force: true
+    });
+    await store.takeItem(beat2._id, URL_KEY, 'token-2');
+
+    const N = 10;
+    await Promise.all([
+      ...Array.from({ length: N }, () =>
+        store.addFeedback(beat1._id, URL_KEY, { message: '[done] beat 1 complete' }, 'token-1')),
+      ...Array.from({ length: N }, () =>
+        store.addFeedback(beat2._id, URL_KEY, { message: '[done] beat 2 complete' }, 'token-2'))
+    ]);
+
+    const queued = await store.collection.find({ urlKey: URL_KEY, kind: 'wake' }).toArray();
+    assert.equal(queued.length, 2, 'beat 1 and beat 2 each enqueue exactly one wake despite concurrent duplicate terminals');
+
+    const edge = await store.historyCollection.findOne({ _id: beat1._id });
+    assert.ok(edge.terminalWakeItems.includes(beat1._id) && edge.terminalWakeItems.includes(beat2._id));
+    assert.equal(edge.terminalWakeItems.length, 2, 'exactly the two distinct producing items');
   });
 });

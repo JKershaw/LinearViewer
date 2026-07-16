@@ -1,13 +1,15 @@
 /**
  * Minimal in-memory mock of the MongoDB/MangoDB collection surface, shared by
  * store unit tests. Supports the operators the local-store relies on:
- * insertOne, findOne, find().toArray(), updateOne ($set + $push + upsert),
- * findOneAndUpdate ($push + returnDocument), deleteOne, deleteMany,
+ * insertOne, findOne, find().toArray(), updateOne ($set + $push + $addToSet +
+ * upsert), findOneAndUpdate ($push + returnDocument), deleteOne, deleteMany,
  * findOneAndDelete, countDocuments. Query matching is top-level field equality,
  * plus `{ $gt/$gte/$lt/$lte: value }` and `{ $ne: value }` operators (used by
- * the dispatch store's expiresAt filter and LIN-1343's terminalWakeEnqueued
- * once-only guard) — enough for the scope/kind/_id/identifier/parentId filters
- * the stores use.
+ * the dispatch store's expiresAt filter and LIN-1357's terminalWakeItems
+ * per-item once-only guard) — enough for the scope/kind/_id/identifier/parentId
+ * filters the stores use. `$ne` on an array-valued field is array-membership
+ * (mirrors Mongo: matches unless some element equals the value), used by
+ * LIN-1357's `terminalWakeItems: { $ne: doc._id }` CAS filter.
  *
  * `find()` returns a chainable cursor supporting `.sort()/.skip()/.limit()`
  * before `.toArray()`, applied in Mongo's documented order (sort → skip → limit →
@@ -38,20 +40,24 @@ export function createMockCollection() {
         return Array.isArray(condition.$in) && condition.$in.includes(value);
       }
       // $ne: value !== condition — absent-field semantics matter here
-      // (LIN-1343's terminalWakeEnqueued is absent-or-true, never false), so
-      // `undefined !== true` correctly matches an absent field.
+      // (LIN-1343's terminalWakeEnqueued was absent-or-true, never false), so
+      // `undefined !== true` correctly matches an absent field. For an
+      // array-valued field (LIN-1357's terminalWakeItems), Mongo's $ne checks
+      // membership across the array rather than comparing the array itself —
+      // matches unless SOME element equals the value.
       if ('$ne' in condition) {
+        if (Array.isArray(value)) return !value.includes(condition.$ne);
         return value !== condition.$ne;
       }
     }
     return value === condition;
   };
 
-  // Applies $set/$push update operators to a doc, returning a NEW object
-  // (never mutates the input) so callers holding the pre-update doc (e.g. a
-  // findOneAndUpdate caller reading the stored array reference) are unaffected.
-  // Shared by updateOne and findOneAndUpdate so both operators behave
-  // identically regardless of which method applies them.
+  // Applies $set/$push/$addToSet update operators to a doc, returning a NEW
+  // object (never mutates the input) so callers holding the pre-update doc
+  // (e.g. a findOneAndUpdate caller reading the stored array reference) are
+  // unaffected. Shared by updateOne and findOneAndUpdate so both operators
+  // behave identically regardless of which method applies them.
   const applyUpdate = (doc, update) => {
     let next = doc;
     if (update.$set) next = { ...next, ...update.$set };
@@ -60,6 +66,16 @@ export function createMockCollection() {
       for (const [field, value] of Object.entries(update.$push)) {
         const existing = Array.isArray(next[field]) ? next[field] : [];
         next[field] = [...existing, value];
+      }
+    }
+    // $addToSet: like $push, but a value already present is not duplicated
+    // (LIN-1357's terminalWakeItems — same producing item re-reporting its
+    // terminal must not grow the set).
+    if (update.$addToSet) {
+      next = { ...next };
+      for (const [field, value] of Object.entries(update.$addToSet)) {
+        const existing = Array.isArray(next[field]) ? next[field] : [];
+        next[field] = existing.includes(value) ? existing : [...existing, value];
       }
     }
     return next;
