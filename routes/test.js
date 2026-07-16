@@ -157,9 +157,15 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     req.session.activeWorkspaceId = workspaces[0].id
     // `noLinearUser` simulates a session with no user identity (local/GitHub App
     // link path), so specs can exercise the "saved chats unavailable" boundary
-    // (LIN-1008). Default sets the id, so existing specs are unchanged.
+    // (LIN-1008). Default sets the id, so existing specs are unchanged. Also
+    // clears any pre-existing `accountId` (LIN-1353) — a prior `/test/set-session`
+    // in the same test session (e.g. a beforeEach chain) may have already
+    // established one, and the saved-chat/prompt gates now key on `accountId`, not
+    // `linearUserId`; leaving a stale accountId behind would make "no identity at
+    // all" unfalsifiable.
     if (noLinearUser) {
       delete req.session.linearUserId
+      delete req.session.accountId
     } else {
       req.session.linearUserId = 'test-linear-user-id'
     }
@@ -294,16 +300,31 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   })
 
+  // Resolve the accountId to clear preferences for: the CURRENT session's
+  // account when one is already established, else fall back to the test-token
+  // Linear identity's account (LIN-1353 — was a fixed 'test-linear-user-id'
+  // string; the store key is now a real minted UUID, so callers that clear
+  // BEFORE calling /test/set-session — e.g. dispatch.spec.js's recent/favorite
+  // prompts blocks, which pre-clear to purge a prior test's leftovers under the
+  // same deterministic Linear identity — must resolve that identity's account
+  // through the real seam instead of assuming the old fixed string was the key).
+  async function resolveTestPrefsAccountId(req) {
+    if (req.session.accountId) return req.session.accountId;
+    const account = await accountStore.findAccountByIdentity('linear', 'test-linear-user-id');
+    return account?._id || null;
+  }
+
   // Endpoint to clear recent custom prompts for testing.
-  // Recents are stored per user (req.session.linearUserId), so clear the CURRENT
-  // session's user when one exists — a local session uses 'test-local-user-id',
-  // not the 'test-linear-user-id' the test-token path uses (LIN-425). Falls back
-  // to the test-token user for callers that clear before establishing a session.
+  // Recents are stored per user (req.session.accountId), so clear the CURRENT
+  // session's user when one exists — a local session establishes its own
+  // distinct account (LIN-425/LIN-1353). Falls back to the test-token user's
+  // account for callers that clear before establishing a session.
   router.get('/test/clear-recent-prompts', async (req, res) => {
     try {
-      const userId = req.session.linearUserId || 'test-linear-user-id';
-      const prefs = await userPreferencesStore.getUserPreferences(userId);
-      await userPreferencesStore.saveUserPreferences(userId, {
+      const accountId = await resolveTestPrefsAccountId(req);
+      if (!accountId) return res.send('ok');
+      const prefs = await userPreferencesStore.getUserPreferences(accountId);
+      await userPreferencesStore.saveUserPreferences(accountId, {
         ...prefs,
         recentCustomPrompts: {}
       });
@@ -318,9 +339,10 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // so clear the CURRENT session's user when one exists, else the test-token user.
   router.get('/test/clear-favorite-prompts', async (req, res) => {
     try {
-      const userId = req.session.linearUserId || 'test-linear-user-id';
-      const prefs = await userPreferencesStore.getUserPreferences(userId);
-      await userPreferencesStore.saveUserPreferences(userId, {
+      const accountId = await resolveTestPrefsAccountId(req);
+      if (!accountId) return res.send('ok');
+      const prefs = await userPreferencesStore.getUserPreferences(accountId);
+      await userPreferencesStore.saveUserPreferences(accountId, {
         ...prefs,
         favoriteCustomPrompts: {}
       });
@@ -739,7 +761,6 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       }
       req.session.workspaces = [localWorkspace];
       req.session.activeWorkspaceId = LOCAL_WS_UUID;
-      req.session.linearUserId = 'test-local-user-id';
 
       // LIN-1329 fixture re-point (Q4): local's identity scope is the urlKey
       // itself (Q6 — freshly-unique per real create, never a false-conflict
@@ -868,7 +889,6 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         addedAt: Date.now(),
       }];
       req.session.activeWorkspaceId = GITHUB_WS_UUID;
-      req.session.linearUserId = 'test-github-user-id';
 
       // LIN-1329 fixture re-point (Q4): `github` identity scope is the human's
       // GitHub user id (Q1), shared with GitHub Projects (Q3) — this fixture's
@@ -960,7 +980,6 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         addedAt: Date.now(),
       }];
       req.session.activeWorkspaceId = GITHUB_PROJECTS_WS_UUID;
-      req.session.linearUserId = 'test-github-projects-user-id';
 
       // LIN-1329 fixture re-point (Q4): `github` identity scope is the human's
       // GitHub user id (Q1) — SAME identity provider as GitHub Issues (Q3), but

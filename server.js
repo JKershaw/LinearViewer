@@ -430,7 +430,7 @@ const taskSnapshotStore = new TaskSnapshotStore({
 })
 
 // Saved chats (LIN-1008): durable, resumable task-chat transcripts, private per
-// {urlKey, linearUserId}. Content-bearing → session-auth only: deliberately NOT
+// {urlKey, accountId}. Content-bearing → session-auth only: deliberately NOT
 // passed to createProxyRoutes / createWorkspaceApiRoutes / kpi-stats below (the
 // prompt-trace privacy boundary), only into the task-chat + test route factories.
 const savedChatsCollection = db.collection('saved-chats')
@@ -1274,12 +1274,12 @@ function resolveWorkspaceTitles(urlKey) {
 // so it stays here rather than in the injectable seam (whose mandated signature
 // omits urlKey). Authorization is already enforced by the workspace-scoped proxy
 // token's creator binding.
-async function getWorkspaceOpenRouterKey(urlKey, linearUserId) {
+async function getWorkspaceOpenRouterKey(urlKey, accountId) {
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
     return null;
   }
 
-  return resolveOpenRouterKey(userPreferencesStore, linearUserId);
+  return resolveOpenRouterKey(userPreferencesStore, accountId);
 }
 
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore }))
@@ -1329,14 +1329,14 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
   // param (including 'all') is the source of truth and is persisted; when the
   // param is absent we restore the prior selection so leaving a workspace and
   // returning preserves the filter. Best-effort: persistence never blocks the page.
-  const linearUserId = req.session.linearUserId;
-  if (linearUserId) {
+  const accountId = req.session.accountId;
+  if (accountId) {
     if (rawTeam !== undefined) {
-      userPreferencesStore.setSelectedTeam(linearUserId, workspace.urlKey, teamId)
+      userPreferencesStore.setSelectedTeam(accountId, workspace.urlKey, teamId)
         .catch(err => console.error('Failed to persist team selection:', err));
     } else {
       try {
-        const remembered = await userPreferencesStore.getSelectedTeam(linearUserId, workspace.urlKey);
+        const remembered = await userPreferencesStore.getSelectedTeam(accountId, workspace.urlKey);
         if (remembered && UUID_REGEX.test(remembered)) teamId = remembered;
       } catch (err) {
         console.error('Failed to read remembered team selection:', err);
@@ -2172,11 +2172,11 @@ app.post('/workspace/:urlKey/settings/features', workspaceFromUrl, async (req, r
   // Best-effort persist to user preferences store for cross-device sync.
   // Non-fatal: session is the authoritative source; preferences are for convenience
   // across devices. If this fails, the toggle still works for the current session.
-  if (req.session.linearUserId) {
+  if (req.session.accountId) {
     try {
-      const existingPrefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+      const existingPrefs = await userPreferencesStore.getUserPreferences(req.session.accountId);
       const existingFeatures = existingPrefs.features || {};
-      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
+      await userPreferencesStore.saveUserPreferences(req.session.accountId, {
         ...existingPrefs,
         features: {
           ...existingFeatures,
@@ -2224,10 +2224,10 @@ app.post('/workspace/:urlKey/settings/theme', workspaceFromUrl, async (req, res)
 
   // Best-effort durable persist for cross-device sync (non-fatal: the cookie +
   // session already carry the choice for this device/session).
-  if (req.session.linearUserId) {
+  if (req.session.accountId) {
     try {
-      const existingPrefs = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
-      await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
+      const existingPrefs = await userPreferencesStore.getUserPreferences(req.session.accountId);
+      await userPreferencesStore.saveUserPreferences(req.session.accountId, {
         ...existingPrefs,
         theme
       });

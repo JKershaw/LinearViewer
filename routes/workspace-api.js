@@ -2603,11 +2603,11 @@ ${goal}`
 
     // Best-effort write-through to user preferences for cross-device sync.
     // Non-fatal: session is authoritative.
-    if (userPreferencesStore && req.session.linearUserId) {
+    if (userPreferencesStore && req.session.accountId) {
       try {
-        const existing = await userPreferencesStore.getUserPreferences(req.session.linearUserId);
+        const existing = await userPreferencesStore.getUserPreferences(req.session.accountId);
         const existingMap = existing.northStarByWorkspace || {};
-        await userPreferencesStore.saveUserPreferences(req.session.linearUserId, {
+        await userPreferencesStore.saveUserPreferences(req.session.accountId, {
           ...existing,
           northStarByWorkspace: {
             ...existingMap,

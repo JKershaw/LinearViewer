@@ -221,9 +221,11 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
             // session readers rely on — features, northStarByWorkspace, and the
             // OpenRouter key (LIN-498: previously dropped here, wiping the user's
             // OpenRouter connection on routine re-auth / account / workspace switch).
-            // modelId lives at the workspace level (LIN-283) — no session hydration here.
+            // Keyed by accountId (LIN-1353) — established.accountId was just set by
+            // establishAccount above. modelId lives at the workspace level (LIN-283)
+            // — no session hydration here.
             if (userPreferencesStore) {
-              const savedPrefs = await userPreferencesStore.getUserPreferences(viewer.id)
+              const savedPrefs = await userPreferencesStore.getUserPreferences(established.accountId)
               applyUserPreferencesToSession(req.session, savedPrefs)
             }
 

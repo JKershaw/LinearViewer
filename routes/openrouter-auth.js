@@ -34,7 +34,7 @@ async function createCodeChallenge(verifier) {
  * Create OpenRouter auth routes.
  * @param {Object} [options]
  * @param {Object} [options.userPreferencesStore] - Durable per-user store. The
- *   OpenRouter key is persisted here (keyed by linearUserId) as the single
+ *   OpenRouter key is persisted here (keyed by accountId) as the single
  *   source of truth (LIN-498); the session field is only a request-scoped
  *   mirror rehydrated after Linear's session.regenerate(). Optional so the
  *   routes degrade to session-only when no store is wired.
@@ -143,10 +143,10 @@ export function createOpenRouterAuthRoutes({ userPreferencesStore } = {}) {
       }
 
       // Persist the key durably as the source of truth (LIN-498), keyed by the
-      // Linear user, so it survives session.regenerate() on later re-auth. The
+      // account, so it survives session.regenerate() on later re-auth. The
       // session field is just a request-scoped mirror for existing readers.
-      if (userPreferencesStore && req.session.linearUserId) {
-        await userPreferencesStore.setOpenRouterApiKey(req.session.linearUserId, data.key)
+      if (userPreferencesStore && req.session.accountId) {
+        await userPreferencesStore.setOpenRouterApiKey(req.session.accountId, data.key)
       }
 
       // Store API key in session (permanent key, no expiry)
@@ -182,8 +182,8 @@ export function createOpenRouterAuthRoutes({ userPreferencesStore } = {}) {
 
     // Clear from BOTH the durable store (source of truth) and the session
     // mirror, so the disconnect is not silently undone on the next re-auth.
-    if (userPreferencesStore && req.session.linearUserId) {
-      await userPreferencesStore.clearOpenRouterApiKey(req.session.linearUserId)
+    if (userPreferencesStore && req.session.accountId) {
+      await userPreferencesStore.clearOpenRouterApiKey(req.session.accountId)
     }
     delete req.session.openRouterApiKey
     await saveSession(req.session)

@@ -85,36 +85,39 @@ describe('routes/test.js — LIN-1329 fixture re-point', () => {
     assert.strictEqual(req.session.accountId, undefined);
   });
 
-  test('/test/set-local-session establishes a real account scoped to the urlKey (Q6)', async () => {
+  test('/test/set-local-session establishes a real account scoped to the urlKey (Q6), with no fake linearUserId (LIN-1353 S10)', async () => {
     const router = createTestRoutes(freshDeps());
     const handler = getHandler(router, 'get', '/test/set-local-session');
     const { req, res } = makeReqRes();
 
     await handler(req, res);
 
-    assert.strictEqual(req.session.linearUserId, 'test-local-user-id');
+    // Production never sets linearUserId for the local provider — the fixture
+    // used to fake one; LIN-1353 dropped it so the fixture stops asserting an
+    // identity shape production never produces.
+    assert.strictEqual(req.session.linearUserId, undefined);
     assert.ok(req.session.accountId, 'session.accountId set through the real seam');
   });
 
-  test('/test/set-github-session establishes a real account under the shared `github` identity provider', async () => {
+  test('/test/set-github-session establishes a real account under the shared `github` identity provider, with no fake linearUserId (LIN-1353 S10)', async () => {
     const router = createTestRoutes(freshDeps());
     const handler = getHandler(router, 'get', '/test/set-github-session');
     const { req, res } = makeReqRes();
 
     await handler(req, res);
 
-    assert.strictEqual(req.session.linearUserId, 'test-github-user-id');
+    assert.strictEqual(req.session.linearUserId, undefined);
     assert.ok(req.session.accountId, 'session.accountId set through the real seam');
   });
 
-  test('/test/set-github-projects-session establishes a real account under the shared `github` identity provider', async () => {
+  test('/test/set-github-projects-session establishes a real account under the shared `github` identity provider, with no fake linearUserId (LIN-1353 S10)', async () => {
     const router = createTestRoutes(freshDeps());
     const handler = getHandler(router, 'get', '/test/set-github-projects-session');
     const { req, res } = makeReqRes();
 
     await handler(req, res);
 
-    assert.strictEqual(req.session.linearUserId, 'test-github-projects-user-id');
+    assert.strictEqual(req.session.linearUserId, undefined);
     assert.ok(req.session.accountId, 'session.accountId set through the real seam');
   });
 

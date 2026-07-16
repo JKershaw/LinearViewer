@@ -14,13 +14,13 @@ import assert from 'node:assert';
 import { SavedChatStore } from '../../lib/saved-chat-store.js';
 
 // Minimal in-memory mock of the collection surface the store uses. Supports the
-// equality predicates the store issues: _id, urlKey, linearUserId.
+// equality predicates the store issues: _id, urlKey, accountId.
 function createMockCollection() {
   const docs = [];
   function matches(doc, query) {
     if (query._id !== undefined && doc._id !== query._id) return false;
     if (query.urlKey !== undefined && doc.urlKey !== query.urlKey) return false;
-    if (query.linearUserId !== undefined && doc.linearUserId !== query.linearUserId) return false;
+    if (query.accountId !== undefined && doc.accountId !== query.accountId) return false;
     return true;
   }
   return {
@@ -192,8 +192,8 @@ describe('SavedChatStore (LIN-1008)', () => {
     assert.strictEqual(collection._docs.length, 0);
   });
 
-  test('create requires urlKey and linearUserId', async () => {
+  test('create requires urlKey and accountId', async () => {
     await assert.rejects(() => store.create('', USER_A, { transcript: sampleTranscript() }), /urlKey is required/);
-    await assert.rejects(() => store.create(URL_KEY, '', { transcript: sampleTranscript() }), /linearUserId is required/);
+    await assert.rejects(() => store.create(URL_KEY, '', { transcript: sampleTranscript() }), /accountId is required/);
   });
 });
