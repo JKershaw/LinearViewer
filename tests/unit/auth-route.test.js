@@ -15,6 +15,7 @@ import { MangoClient } from '@jkershaw/mangodb';
 import { createAuthRoutes } from '../../routes/auth.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
+import { getWorkspaceByUrlKey } from '../../lib/workspace.js';
 
 function fakeProvider(overrides = {}) {
   return {
@@ -257,6 +258,45 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.deepStrictEqual(await accountWorkspaceStore.listAccountsForWorkspace('org-2'), []);
     assert.strictEqual(session.accountId, myAccount._id);
     assert.strictEqual(saveCount, 0, 'no session save on the strict-conflict path');
+  });
+
+  test('add-source: a strict 409 leaves NO org-2 workspace in session.workspaces — the refused org cannot authorize /workspace/:urlKey/* (LIN-1351 review regression)', async () => {
+    // Regression for the MEDIUM-HIGH review finding: before the fix, org-2 (which
+    // carries a LIVE OAuth token) was pushed into session.workspaces BEFORE
+    // establishAccount and left there on the strict conflict. Because the session
+    // is resave:false on a persistent store, it persisted cross-request, and
+    // workspaceFromUrl (server.js) authorizes /workspace/:urlKey/* SOLELY from
+    // session.workspaces — so the user gained access to a workspace whose
+    // connection was just refused. This asserts the ACTUAL leaked state (org-2
+    // absent from session.workspaces + the exploited authorization lookup denied),
+    // NOT the weak saveCount===0 proxy the review called out.
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'linear', 'viewer-2', {}); // Y already owns the 2nd org's identity
+    const myAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});    // X owns only its first org
+
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = addSourceSession(myAccount._id);
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 409);
+    // The exact thing that was leaking: org-2 must NOT be in session.workspaces at
+    // response end — by id AND by its urlKey ('beta', from org2Provider).
+    assert.ok(!session.workspaces.some(w => w.id === 'org-2'), 'org-2 must NOT remain in session.workspaces after a refused connection');
+    assert.ok(!session.workspaces.some(w => w.urlKey === 'beta'), 'org-2 urlKey "beta" must NOT remain in session.workspaces');
+    // Only the pre-existing first org survives.
+    assert.deepStrictEqual(session.workspaces.map(w => w.id), ['org-1']);
+    // The authorization path the finding exploited: workspaceFromUrl resolves the
+    // workspace via getWorkspaceByUrlKey(session, urlKey). It must find nothing for
+    // org-2, so a subsequent GET /workspace/beta/... would NOT be authorized.
+    assert.strictEqual(getWorkspaceByUrlKey(session, 'beta'), null, 'refused org "beta" must not be resolvable/authorizable from the session');
+    // And no OAuth intent/state leaks across the failed round-trip.
+    assert.strictEqual(session.oauthState, undefined);
+    assert.strictEqual(session.oauthIntent, undefined);
   });
 
   test('add-source: two Linear orgs with DISTINCT org-scoped viewer.ids coexist on ONE account (LIN-1351)', async () => {
