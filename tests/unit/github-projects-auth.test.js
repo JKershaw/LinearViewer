@@ -494,6 +494,29 @@ describe('GitHub Projects auth routes', () => {
     assert.deepEqual(workspaces, ['github:42']);
   });
 
+  // LIN-1349: at MAX_WORKSPACES, the upsertWorkspace limit check must run BEFORE
+  // establishAccount, so a refused new-container sign-in never gets a durable
+  // account↔workspace binding written for it.
+  test('POST link (new), at the workspace limit, is rejected 400 and writes NO account↔workspace binding (LIN-1349)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+    const res = makeRes();
+    const existingWorkspaces = Array.from({ length: 10 }, (_, i) => ({ id: `ws-${i}`, name: `Workspace ${i}`, urlKey: `ws-${i}` }));
+    const session = makeSession({
+      githubHumanId: 'human-42',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: existingWorkspaces,
+    });
+    await handler({ body: { board: 'octocat/5' }, session }, res);
+
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body, /Workspace Limit Reached/);
+    // The crux: establishAccount never ran, so no binding exists for the refused workspace.
+    assert.deepEqual(await accountWorkspaceStore.listAccountsForWorkspace('github:42'), []);
+    assert.equal(session.accountId, undefined);
+  });
+
   test('POST link (new) a returning GitHub Projects user (fresh session, previously-seen human id) lands on their EXISTING account, not a new one', async () => {
     const { accountStore, accountWorkspaceStore } = freshAccountStores();
     const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
