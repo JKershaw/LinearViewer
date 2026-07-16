@@ -144,6 +144,27 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.strictEqual(session.accountId, undefined);
   });
 
+  // LIN-1349: at MAX_WORKSPACES, the upsertWorkspace limit check must run BEFORE
+  // establishAccount, so a refused workspace never gets a durable account↔workspace
+  // binding written for it (previously establishAccount ran first and left a
+  // binding in place even though the user was shown a 400).
+  test('at the workspace limit, sign-in is rejected 400 and writes NO account↔workspace binding (LIN-1349)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const existingWorkspaces = Array.from({ length: 10 }, (_, i) => ({ id: `ws-${i}`, name: `Workspace ${i}`, urlKey: `ws-${i}`, addedAt: Date.now() }));
+    const session = makeSession({ oauthState: 'real', workspaces: existingWorkspaces });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 400);
+    assert.match(res.body, /Workspace Limit Reached/);
+    // The crux: establishAccount never ran, so no binding exists for the refused workspace.
+    assert.deepEqual(await accountWorkspaceStore.listAccountsForWorkspace('org-1'), []);
+    assert.strictEqual(session.accountId, undefined);
+  });
+
   // LIN-1350: a throw inside the post-regenerate callback (e.g. the prefs
   // store down) used to resolve the wrapper promise via `finally` with no
   // response ever sent, surfacing only as an unhandledRejection. The new

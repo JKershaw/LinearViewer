@@ -412,6 +412,14 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider, account
             // LIN-1329 (Phase C): regenerate() just wiped session.accountId (if
             // any), so a returning user's existing account is found by identity
             // lookup.
+            try {
+              upsertWorkspace(req.session, workspace)
+            } catch (limitError) {
+              return res.status(400).send(renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
+                action: 'Go to dashboard', actionUrl: '/'
+              }))
+            }
+
             const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', humanId, { login: creds.login }, workspace.id)
             if (!established.ok) {
               return res.status(409).send(renderErrorPage('Account Conflict', 'This GitHub account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
@@ -428,13 +436,6 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider, account
               applyUserPreferencesToSession(req.session, savedPrefs)
             }
 
-            try {
-              upsertWorkspace(req.session, workspace)
-            } catch (limitError) {
-              return res.status(400).send(renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
-                action: 'Go to dashboard', actionUrl: '/'
-              }))
-            }
             req.session.activeWorkspaceId = workspace.id
             await saveSession(req.session)
             res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)

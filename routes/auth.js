@@ -207,6 +207,17 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
             // Linear's viewer.id (the human), never the org — regenerate() just
             // wiped any prior session.accountId, so a returning user's existing
             // account is found by identity lookup, not session continuity.
+            // Add/update workspace in session
+            try {
+              upsertWorkspace(req.session, workspace)
+            } catch (limitError) {
+              const html = renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
+                action: 'Go to dashboard',
+                actionUrl: '/'
+              })
+              return res.status(400).send(html)
+            }
+
             const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', String(viewer.id), {}, workspace.id)
             if (!established.ok) {
               const html = renderErrorPage('Account Conflict', 'This Linear account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
@@ -227,17 +238,6 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
             if (userPreferencesStore) {
               const savedPrefs = await userPreferencesStore.getUserPreferences(established.accountId)
               applyUserPreferencesToSession(req.session, savedPrefs)
-            }
-
-            // Add/update workspace in session
-            try {
-              upsertWorkspace(req.session, workspace)
-            } catch (limitError) {
-              const html = renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
-                action: 'Go to dashboard',
-                actionUrl: '/'
-              })
-              return res.status(400).send(html)
             }
 
             req.session.activeWorkspaceId = workspace.id
