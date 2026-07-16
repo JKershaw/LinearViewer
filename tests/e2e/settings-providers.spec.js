@@ -47,13 +47,15 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     await expect(projectsAdd.locator('button')).toHaveCount(0)
   })
 
-  test('disables the Linear add source as a stopgap (blocked on LIN-544, LIN-735)', async ({ page }) => {
+  test('offers a LIVE Linear add-source affordance with honest copy (LIN-1351)', async ({ page }) => {
     const linearAdd = page.locator('[data-testid="settings-provider-add-linear"]')
     await expect(linearAdd).toBeVisible()
-    // Blocked, not a live add button — it used to silently create/switch to a
-    // separate workspace, which is the LIN-735 Symptom 1 bug.
-    await expect(linearAdd).toContainText('blocked on LIN-544')
-    await expect(linearAdd.locator('button')).toHaveCount(0)
+    // Live add-source (not the old LIN-544 stopgap): a real add button that begins
+    // mode:'add-source', plus honest copy that a 2nd Linear org is its own workspace.
+    await expect(linearAdd).not.toHaveClass(/provider-add-blocked/)
+    await expect(linearAdd).not.toContainText('blocked on LIN-544')
+    await expect(linearAdd).toContainText('connects another Linear organization')
+    await expect(linearAdd.locator('button')).toHaveCount(1)
   })
 
   test('refresh / test validates the binding and reports success', async ({ page }) => {
