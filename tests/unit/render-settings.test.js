@@ -192,10 +192,11 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.match(html, /data-testid="settings-provider-add-github-projects"/);
     const reasonCount = (html.match(/GitHub is not configured on this server/g) || []).length;
     assert.strictEqual(reasonCount, 2);
-    // Each GitHub row uses the blocked presentation, and NEITHER offers a live add
-    // button (the add button only renders on unblocked rows; Linear is separately
-    // blocked on LIN-544, so with GitHub disabled there is no live add button left).
-    assert.doesNotMatch(html, /settings-provider-add-btn/);
+    // Each GitHub row uses the blocked presentation. Linear is NOT gated by the
+    // GitHub config flag (LIN-1351 made its add-source live), so with GitHub
+    // disabled the ONLY live add button left is Linear's.
+    assert.match(html, /class="line provider-add" data-testid="settings-provider-add-linear"/);
+    assert.match(html, /settings-provider-add-btn/);
     // Honest reason, not a stale ticket-blocked message.
     assert.doesNotMatch(html, /blocked on LIN-541/);
   });
@@ -207,13 +208,17 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.doesNotMatch(html, /GitHub is not configured on this server/);
   });
 
-  test('disables the Linear add affordance as a stopgap until per-workspace binding lands (LIN-735/LIN-544)', () => {
+  test('renders a LIVE Linear add-source affordance with honest copy (LIN-1351)', () => {
     const html = renderSettingsPage('Acme', BASE);
-    // The row still renders, but as a blocked affordance naming LIN-544 — not a
-    // live "add" button that would silently create/switch to a separate workspace.
-    assert.match(html, /data-testid="settings-provider-add-linear"/);
-    assert.match(html, /blocked on LIN-544/);
-    assert.match(html, /provider-add-blocked/);
+    // Linear add-source is live: the row renders a real "add" form (POSTing to the
+    // providers/add action → /auth/linear?mode=add-source), NOT the LIN-544 stopgap.
+    assert.match(html, /class="line provider-add" data-testid="settings-provider-add-linear"/);
+    assert.match(html, /settings-provider-add-btn/);
+    assert.doesNotMatch(html, /blocked on LIN-544/);
+    // Honest copy: "+ Linear" connects another organization as its own workspace,
+    // not a source onto THIS workspace (unlike GitHub).
+    assert.match(html, /connects another Linear organization as its own workspace/);
+    assert.match(html, /data-testid="settings-provider-add-hint-linear"/);
   });
 
   test('shows an empty state when there are no bindings', () => {
