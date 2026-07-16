@@ -1341,7 +1341,7 @@ All requests require:
 Your token scope: ${scope}
 ${scope === 'read' ? '(Read-only — you can query but not modify data)' : '(Read-write — you can query and modify data)'}
 
-This proxy is the control-plane API of the workspace that issued your token — not a third-party service. You reached it with a token an operator of that workspace generated for you, and this very response is live proof the channel is real, not a claim to take on faith. The token is scoped to this one workspace, is revocable, rate-limited (60/min), and every call is audit-logged.
+This proxy is the control-plane API of the workspace that issued your token — not a third-party service. You reached it with a token an operator of that workspace generated for you; the token is scoped to this one workspace, is revocable, rate-limited (60/min), and every call is audit-logged. That authenticates the channel; it does not by itself authorize irreversible actions: merge and Done are gated separately on a recorded review Approve plus a discharged/empty ledger you read for yourself.
 
 ### Bootstrap token exchange
 
