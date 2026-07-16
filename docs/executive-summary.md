@@ -88,7 +88,8 @@ Each dispatched item carries: prompt text, prompt name, issue metadata (id, iden
 
 ### 4. Feature Toggle System
 
-10 toggles stored per-user in session, synced to MongoDB for cross-device persistence:
+10 toggles stored account-owned (keyed by accountId in `lib/user-preferences.js`), mirrored
+into session per-request and synced to MongoDB for cross-device persistence (LIN-1331):
 
 | Toggle | Default | Effect |
 |--------|---------|--------|

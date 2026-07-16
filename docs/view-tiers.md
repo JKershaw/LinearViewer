@@ -17,7 +17,7 @@ authenticated user; no flag, no gate.
   Promoted from the experimental `dashboard` tier (see retirement note below).
 - **swipe** — mobile-first task triage
 - **swim** — dependency swim lanes
-- **settings** — per-user configuration
+- **settings** — account-owned configuration, cross-device (LIN-1331)
 
 Wired in `lib/components/footer.js` (`getFooterLinks` base links).
 
@@ -39,7 +39,7 @@ was deleted so there are not two equivalent views side by side (LIN-590).
 In-development or rough-draft views that are real and intentional, but not yet
 ready to advertise broadly. Each is:
 
-- a per-user feature flag (default **off**) in `lib/feature-defaults.js`,
+- a per-user (account-owned, LIN-1331) feature flag (default **off**) in `lib/feature-defaults.js`,
 - a member of the shared ordered `EXPERIMENTAL_VIEWS` source of truth in
   `lib/feature-defaults.js` (`{ flag, path }`), consumed by **both** surfaces
   below so they cannot drift on membership or route,
