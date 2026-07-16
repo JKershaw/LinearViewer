@@ -21,6 +21,7 @@ import { ensureIndexes } from './lib/db-indexes.js'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
+import { UNSCOPED, selectOwnerWorkspaceToken } from './lib/workspace-token-resolver.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -1156,16 +1157,26 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 // In test mode, returns { token: 'test-token', reason: 'ok' } for 'test-workspace'.
 // Uses a short-lived cache (30s) to avoid scanning sessions on every proxy request.
 // The cache only ever holds successes, so it never masks a failure reason.
-const _tokenCache = new Map(); // urlKey -> { token, expiresAt, cachedAt, provider }
+//
+// ownerAccountId (LIN-1366) scopes token selection to a single account — pass the
+// UNSCOPED sentinel (the default) for the legacy owner-blind selection
+// getWorkspaceAccessToken/routes/test.js still rely on. An explicit owner (incl.
+// null, for a legacy proxy token with no creator) is forwarded verbatim to the
+// pure selector in lib/workspace-token-resolver.js, which never lets one account
+// borrow another's token. The cache is owner-keyed so a scoped lookup can never
+// return a different owner's cached token.
+const _tokenCache = new Map(); // "urlKey::owner" -> { token, expiresAt, cachedAt, provider }
 const TOKEN_CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
-async function resolveWorkspaceAccess(urlKey) {
+async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
     return { token: 'test-token', reason: 'ok', provider: 'linear' };
   }
 
+  const cacheKey = `${urlKey}::${ownerAccountId === UNSCOPED ? '*' : ownerAccountId}`;
+
   // Check cache first
-  const cached = _tokenCache.get(urlKey);
+  const cached = _tokenCache.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < TOKEN_CACHE_TTL_MS) {
     // Only return if the token hasn't expired
     if (cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
@@ -1173,41 +1184,20 @@ async function resolveWorkspaceAccess(urlKey) {
     }
   }
 
-  // Look up the access token from the sessions collection
-  // Find the workspace with the latest-expiring token
+  // Look up the access token from the sessions collection, scoped to
+  // ownerAccountId (or owner-blind for UNSCOPED) via the pure selector.
   try {
     const sessions = await sessionsCollection.find({}).toArray();
-    let bestToken = null;
-    let bestExpiry = 0;
-    let bestProvider = null;   // provider of the latest-expiring usable workspace
-    let seenProvider = null;   // provider of any workspace that referenced this urlKey
-    let sawUrlKey = false; // did any session reference this workspace at all?
+    const selected = selectOwnerWorkspaceToken(sessions, urlKey, ownerAccountId);
 
-    for (const s of sessions) {
-      const data = typeof s.session === 'string' ? JSON.parse(s.session) : s.session;
-      const ws = data?.workspaces?.find(w => w.urlKey === urlKey);
-      if (!ws) continue;
-      sawUrlKey = true;
-      if (seenProvider === null && ws.provider) seenProvider = ws.provider;
-      if (ws.accessToken && ws.tokenExpiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
-        if (ws.tokenExpiresAt > bestExpiry) {
-          bestToken = ws.accessToken;
-          bestExpiry = ws.tokenExpiresAt;
-          bestProvider = ws.provider || null;
-        }
-      }
+    if (selected.token) {
+      _tokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, cachedAt: Date.now(), provider: selected.provider });
+      return { token: selected.token, reason: 'ok', provider: selected.provider };
     }
 
-    if (bestToken) {
-      _tokenCache.set(urlKey, { token: bestToken, expiresAt: bestExpiry, cachedAt: Date.now(), provider: bestProvider });
-      return { token: bestToken, reason: 'ok', provider: bestProvider };
-    }
-
-    // No usable token. A row referenced this workspace but its token was expired
-    // (auth / needs re-auth) vs no row referenced it at all (never connected).
-    // Still surface the provider we saw so the proxy's pre-token capability gate
-    // can resolve the right provider on a write.
-    return { token: null, reason: sawUrlKey ? 'session_expired' : 'not_connected', provider: seenProvider };
+    // No usable token. reason/provider are already the right shape for the
+    // workspaceUnavailable 503 envelope — see lib/workspace-token-resolver.js.
+    return { token: selected.token, reason: selected.reason, provider: selected.provider };
   } catch (err) {
     console.error('Error looking up workspace access token:', err);
     return { token: null, reason: 'store_unreachable', provider: null };

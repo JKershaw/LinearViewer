@@ -466,7 +466,20 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         label,
         scope,
         kind,
-        singleUse: req.query.singleUse === 'true'
+        singleUse: req.query.singleUse === 'true',
+        // LIN-1366: the real mint route (POST .../api/proxy/tokens) stamps
+        // createdBy from the authenticated session; most specs in this suite
+        // mint a proxy token WITHOUT first calling /test/set-session on the
+        // same request, so req.session.accountId is often unset here. Before
+        // this fix, resolveWorkspaceAccess was owner-blind, so those tokens
+        // coincidentally worked by picking up whichever session (e.g. one
+        // established by an earlier, unrelated test on the same worker)
+        // referenced the target urlKey. Now that resolution is owner-scoped,
+        // this must resolve to the SAME canonical test identity those earlier
+        // set-session calls establish, via the existing fallback this file
+        // already uses for the identical problem (see resolveTestPrefsAccountId
+        // below) — never a fabricated or arbitrary id.
+        createdBy: await resolveTestPrefsAccountId(req)
       })
       res.json({ tokenId: result.tokenId, token: result.token, scope: result.scope, kind: result.kind })
     } catch (err) {
