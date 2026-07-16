@@ -875,6 +875,31 @@ describe('GitHub auth routes', () => {
     assert.match(res.body, /Authentication Failed/);
     assert.match(res.body, /bad_verification_code/, 'AuthExchangeError.detail surfaced to the user');
   });
+
+  // LIN-1350: a throw inside the post-regenerate callback (e.g. the prefs
+  // store down) used to resolve the wrapper promise via `finally` with no
+  // response ever sent, surfacing only as an unhandledRejection. The new
+  // `catch` arm must render this route's own 500 page (with the GitHub
+  // diagnostic threaded in) instead of hanging.
+  test('POST link: a throw inside the post-regenerate callback (prefs store down) responds 500, not a hang (LIN-1350)', async () => {
+    const router = createGitHubAuthRoutes({
+      provider: fakeProvider(),
+      userPreferencesStore: { getUserPreferences: async () => { throw new Error('prefs store down') } },
+      ...freshAccountStores(),
+    });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const session = makeSession({
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 500);
+    assert.ok(res.body && /Could not link your GitHub repository/.test(res.body));
+    assert.strictEqual(res.redirectedTo, null);
+  });
 });
 
 describe('githubErrorDiagnostic (LIN-746)', () => {

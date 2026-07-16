@@ -247,6 +247,14 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
             // very first page after login (the cookie is this device's transport).
             if (req.session.theme) setThemeCookie(res, req.session.theme)
             res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
+          } catch (err) {
+            console.error('Post-regenerate callback error:', err)
+            if (!res.headersSent) {
+              res.status(500).send(renderErrorPage('Something Went Wrong', 'An unexpected error occurred during authentication. Please try again.', {
+                action: 'Try again',
+                actionUrl: '/auth/linear'
+              }))
+            }
           } finally {
             resolve()
           }
