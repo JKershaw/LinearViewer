@@ -438,6 +438,13 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider, account
             req.session.activeWorkspaceId = workspace.id
             await saveSession(req.session)
             res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
+          } catch (err) {
+            console.error('GitHub Projects post-regenerate callback error:', err)
+            if (!res.headersSent) {
+              res.status(500).send(renderErrorPage('Something Went Wrong', 'Could not link your GitHub project board. Please try again.', {
+                action: 'Try again', actionUrl: '/auth/github-projects', diagnostic: githubErrorDiagnostic(err)
+              }))
+            }
           } finally {
             resolve()
           }
