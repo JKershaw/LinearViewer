@@ -143,4 +143,26 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.strictEqual(res.statusCode, 400);
     assert.strictEqual(session.accountId, undefined);
   });
+
+  // LIN-1350: a throw inside the post-regenerate callback (e.g. the prefs
+  // store down) used to resolve the wrapper promise via `finally` with no
+  // response ever sent, surfacing only as an unhandledRejection. The new
+  // `catch` arm must render this route's own 500 page instead of hanging.
+  test('a throw inside the post-regenerate callback (prefs store down) responds 500, not a hang (LIN-1350)', async () => {
+    const router = createAuthRoutes({
+      provider: fakeProvider(),
+      sessionStore: { cleanup: async () => {} },
+      userPreferencesStore: { getUserPreferences: async () => { throw new Error('prefs store down') } },
+      ...freshAccountStores(),
+    });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real' });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 500);
+    assert.ok(res.body && /Something Went Wrong/.test(res.body));
+    assert.strictEqual(res.redirectedTo, null);
+  });
 });
