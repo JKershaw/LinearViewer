@@ -10,7 +10,7 @@ import { Router } from 'express'
 import { getProvider } from '../lib/providers/registry.js'
 import { AuthExchangeError } from '../lib/providers/interface.js'
 import { renderErrorPage } from '../lib/render.js'
-import { upsertWorkspace, saveSession, linkProvider } from '../lib/workspace.js'
+import { upsertWorkspace, saveSession, linkProvider, getActiveWorkspace, validateWorkspaceUrlKey } from '../lib/workspace.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-preferences.js'
 import { establishAccount } from '../lib/account-session.js'
@@ -65,8 +65,30 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
     // always the new-container case today; add-source is LIN-541/544.
     const state = crypto.randomUUID()
     const authProvider = provider || getProvider('linear')
+
+    // Intent (new container vs. add-source) lives server-side in the session,
+    // never encoded into the opaque CSRF `state`. `mode:'add-source'` (LIN-1351)
+    // starts connecting an ADDITIONAL Linear org for an already signed-in user:
+    // its callback links the new org's org-scoped identity onto the LIVE account
+    // WITHOUT regenerating, mirroring the GitHub add-source begin (github-auth.js).
+    const mode = req.query.mode === 'add-source' ? 'add-source' : 'new'
+
+    // Add-source only makes sense while signed in — the live session.accountId is
+    // the mechanism that targets the current account. Without one, fall back to a
+    // normal login rather than linking against nothing.
+    if (mode === 'add-source' && !req.session.accountId) {
+      return res.redirect('/auth/linear')
+    }
+
     req.session.oauthState = state
-    req.session.oauthIntent = { mode: 'new', provider: authProvider.name }
+    const intent = { mode, provider: authProvider.name }
+    // For add-source, carry the initiating (VIEWED) workspace's urlKey through the
+    // OAuth round-trip so the post-link redirect returns to its settings page
+    // (LIN-1351, mirroring github-auth.js). Only attach a validated urlKey.
+    if (mode === 'add-source' && validateWorkspaceUrlKey(req.query.workspace)) {
+      intent.workspaceUrlKey = req.query.workspace
+    }
+    req.session.oauthIntent = intent
 
     req.session.save(() => {
       res.redirect(authProvider.beginAuth({ state }))
@@ -176,6 +198,65 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
         tokenExpiresAt: calculateExpiresAt(data.expires_in || 86400)
       })
 
+      // Intent (new container vs. add-source) is carried server-side in the
+      // session (LIN-562). LIN-1351: an add-source callback links a SECOND Linear
+      // org's org-scoped identity onto the CURRENT signed-in account WITHOUT
+      // regenerating, so the live session.accountId survives and targets that
+      // account — mirroring GitHub add-source. FORK here, before the regenerate
+      // wrapper; the default mode:'new' login path below is byte-identical.
+      const intent = req.session.oauthIntent || {}
+      const mode = intent.mode === 'add-source' ? 'add-source' : 'new'
+
+      if (mode === 'add-source') {
+        // === Linear add-source (LIN-1351): NON-regenerating link onto the live account ===
+        // Order per LIN-1349: workspace limit-check → establishAccount → bind. The
+        // 2nd org IS its own workspace (unlike GitHub, which binds a source onto the
+        // already-viewed workspace), so upsert it here; the durable account↔workspace
+        // edge is written by bindAccountToWorkspace INSIDE establishAccount on success.
+        try {
+          upsertWorkspace(req.session, workspace)
+        } catch (limitError) {
+          const html = renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
+            action: 'Go to dashboard',
+            actionUrl: '/'
+          })
+          return res.status(400).send(html)
+        }
+
+        // Link the 2nd org's org-scoped viewer.id onto the LIVE account. A live
+        // session.accountId takes establishAccount's `else if (session.accountId)`
+        // branch, linking (linear, viewer.id_org2) onto the current account and
+        // binding it to the new workspace. The seam is reused INLINE, UNMODIFIED.
+        const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', String(viewer.id), {}, workspace.id)
+        if (!established.ok) {
+          // Strict conflict (LIN-1326, no auto-merge): the 2nd org's identity is
+          // already owned by a DIFFERENT account. 409 with NOTHING written —
+          // establishAccount returns before bindAccountToWorkspace, so no binding,
+          // no account mutation, session.accountId unchanged, and NO session save on
+          // this path. This 409 IS reachable (accountId is live) — the point of the
+          // branch, unlike the login path's deliberately-unreachable 409 below.
+          const html = renderErrorPage('Account Conflict', 'This Linear account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
+            action: 'Go to homepage',
+            actionUrl: '/'
+          })
+          return res.status(409).send(html)
+        }
+
+        // Success: clear the OAuth state/intent, save the session, and return to
+        // the initiating workspace's settings. Do NOT set activeWorkspaceId — the
+        // user stays on their current workspace (plan UX (b), mirroring GitHub
+        // add-source); the newly connected org is available in the switcher.
+        delete req.session.oauthState
+        delete req.session.oauthIntent
+        await saveSession(req.session)
+        const returnUrlKey =
+          intent.workspaceUrlKey ||
+          (getActiveWorkspace(req.session) || {}).urlKey ||
+          workspace.urlKey
+        return res.redirect(`/workspace/${encodeURIComponent(returnUrlKey)}/settings?provider_ok=linear`)
+      }
+
+      // === Normal Linear login (mode:'new') — BYTE-IDENTICAL to the pre-LIN-1351 path ===
       // Preserve existing workspaces before regenerating session
       const existingWorkspaces = req.session.workspaces || []
 
