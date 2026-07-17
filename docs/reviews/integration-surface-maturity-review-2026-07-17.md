@@ -86,27 +86,37 @@ named here, as the prompt requires, rather than absorbed or silently scored arou
 Ranked by impact × inverse effort, highest first. Impact/Effort are H/M/L. This is advisory — **no
 task is minted for any of these**; each is a pointer for a human to triage.
 
-### R1 — `flow-periodicals-two-stage`: Stage-2 completion is entirely unenforced · **Impact: H · Effort: M · new (baseline)**
+### R1 — `flow-periodicals-two-stage`: Stage-2 completion is entirely unenforced · **Impact: H · Effort: M · named, not new**
 
 *Surface: FLOW · Dimensions: core/happy-path, configuration (both first-party) · Confidence: High*
 
 `lastRunAt` and `cadence` exist on every one of the 14 registry entries (`lib/periodicals.js:702-812`)
-but are, by the module's own comment, "carried but not yet consumed" (`lib/periodicals.js:49`) and
-"Autopilot is not yet wired to dispatch periodicals" (`:31`). A repo-wide search finds no writer for
-`lastRunAt` anywhere outside `lib/periodicals.js` and its own unit test. Concretely: **Stage 1** (mint
-a review task) is real, tested code; **Stage 2** (the actual review + self-conclude) is pure prose
-inside the minted task's description, with zero code checking it ever happened. A periodical can be
-minted, ignored indefinitely, and nothing in the system will surface that as stale or overdue.
+but are, by the module's own comment, "carried but not yet consumed (autopilot scheduling remains
+deferred)" (`lib/periodicals.js:49`) and "Autopilot is not yet wired to dispatch periodicals" (`:31`).
+A repo-wide search finds no writer for `lastRunAt` anywhere outside `lib/periodicals.js` and its own
+unit test. Concretely: **Stage 1** (mint a review task) is real, tested code; **Stage 2** (the actual
+review + self-conclude) is pure prose inside the minted task's description, with zero code checking it
+ever happened. A periodical can be minted, ignored indefinitely, and nothing in the system will surface
+that as stale or overdue.
 
-LIN-1336 is the literal proof: Stage 1 merged 2026-07-15/16, and this Stage-2 run only happened
-because a human re-opened the ticket and noticed it was still owed — exactly the failure mode a
-closed loop would have caught automatically.
+**[LIN-373](https://linear.app/linearviewer/issue/LIN-373)** already owns this exact gap —
+"Periodicals cadence: consume cadence/lastRunAt, surface due-state in kickoff": persist `lastRunAt` on
+Stage-1 mint, compute due-state against `cadence`, and expose it where the orchestrator already looks,
+explicitly with **no new scheduler process** ("the autopilot run *is* the scheduler," per
+`docs/autopilot.md:131-135`). LIN-373 also carries a gate: it stays blocked until each periodical has
+been run once and its output verified — this Stage-2 run is one of those verifying runs, so the honest
+read is not "nobody owns this," it's "LIN-373 owns this, is gated on runs like this one, and that gate
+is a loop this report is itself evidence for."
 
-**Action (for a human to weigh):** have the Stage-2 conclude step (or the dispatcher that runs it)
-persist a `lastRunAt` write — a small durable store keyed by periodical id would mirror the existing
-`lib/report-history-store.js` pattern — and surface periodicals whose `lastRunAt` is older than their
-`cadence` as a due/overdue signal in the renderer, the same way the rest of the workspace surfaces
-staleness elsewhere.
+LIN-1336 is the literal proof of the underlying gap: Stage 1 merged 2026-07-15/16, and this Stage-2 run
+only happened because a human re-opened the ticket and noticed it was still owed — exactly the failure
+mode a closed loop would have caught automatically.
+
+**Action (for a human to weigh):** progress LIN-373 rather than opening a parallel mechanism — its
+settled design (no new durable store; due-state computed into the existing kickoff snapshot) is not
+something this review has grounds to re-open. The Stage-2 conclude step (or the dispatcher that runs
+it) should persist the `lastRunAt` write LIN-373 specifies, and surface overdue periodicals via the
+kickoff path it names, not a bespoke renderer signal.
 
 ### R2 — `flow-dispatch-lifecycle`: a claimed-but-never-fed-back dispatch item has no timeout · **Impact: M · Effort: M · new (baseline)**
 
@@ -135,12 +145,17 @@ error handling, resilience, rate limits/pagination, idempotency/consistency (Rel
 whether a gap is visible or observable (Observability) at six locations
 (`:538-539, :561, :618, :643, :677-678, :691`), and `tests/unit/periodicals.test.js:794-801,906-907`
 pins those names into the prompt text. Neither exists in the 14-entry registry, and no
-`docs/reviews/reliability-*` or `observability-*` report has ever been produced. That means **ten of
-this review's twelve dimensions** have no dedicated, systematic owner across the whole portfolio —
-what little evidence exists for them arrives only incidentally, via Security/API-Quality/Recent-
-Headwinds findings that happen to touch those concerns. This review does not build them (out of
-remit, and explicitly not this review's job per its own contract) — it names the gap, as instructed,
-so it stops being silently absorbed or forgotten.
+`docs/reviews/reliability-*` or `observability-*` report has ever been produced. That leaves **five of
+this review's twelve dimensions** — error handling, resilience, rate limits & pagination, and
+idempotency & consistency (Reliability's remit), plus observability (Observability's remit) — with no
+dedicated, systematic owner anywhere in the portfolio. The other five dimensions this pair of missing
+reviews would otherwise touch (auth & credentials, security, input & schema validation, testing,
+documentation) *do* have dedicated owners — Security, API Quality, Test Coverage Gap, Documentation —
+so their evidence isn't incidental, only 22 days stale (see R6). Combined, that's the headline above:
+ten of twelve dimensions have, at best, thin or stale sibling coverage — five genuinely unowned, five
+owned but stale. This review does not build the missing two (out of remit, and explicitly not this
+review's job per its own contract) — it names the gap, as instructed, so it stops being silently
+absorbed or forgotten.
 
 ### R4 — Security H1 (stored XSS in the feedback-widget image proxy) is 22 days stale with no confirmed fix · **Impact: M · Effort: — (Security Review's to re-run) · sibling-owned, cited only**
 
@@ -237,7 +252,7 @@ it's cited; where it doesn't, that's stated plainly rather than guessed.
 | Observability | **Observability — not yet built** | no report exists | — | No dedicated review anywhere in the portfolio |
 
 Named explicitly per the contract: **Reliability** and **Observability** are the natural home for
-deeper follow-up on the eight dimension-rows above with no owning review — this report mints nothing
+deeper follow-up on the five dimension-rows above with no owning review — this report mints nothing
 into that territory.
 
 ---
@@ -264,13 +279,14 @@ Required self-checks this run:
   correct" are different claims, and this report should be read as making the first claim, not the
   second, wherever a sibling dimension hasn't independently confirmed the latter.
 - **Is any dimension consistently N/A (dead weight) or consistently 0 (unmeasurable)?** Configuration
-  is N/A for 7 of 25 surfaces (pure-compute modules and pure in-process flows with no environment
-  surface — `mod-prompt-template-system`, `mod-render-layer`, `mod-kpi-audit`,
-  `mod-observation-materializer`, `flow-dispatch-lifecycle`, `flow-followup-resume`,
-  `flow-bootstrap-token-exchange`) — checked and it's a legitimate architectural pattern (deterministic
-  modules genuinely have no env surface to score), not dead weight to prune. No dimension scored 0
-  across more than one surface; the single 0 (`flow-periodicals-two-stage` configuration) is isolated,
-  not systemic.
+  is N/A for 9 of 25 surfaces (pure-compute modules, pure in-process flows, and the review's own
+  methodology, all with no environment surface — `mod-provider-abstraction`,
+  `mod-prompt-template-system`, `mod-render-layer`, `mod-kpi-audit`, `mod-observation-materializer`,
+  `flow-dispatch-lifecycle`, `flow-followup-resume`, `flow-bootstrap-token-exchange`,
+  `meta-integration-surface-maturity-review`) — checked and it's a legitimate architectural pattern
+  (deterministic modules genuinely have no env surface to score), not dead weight to prune. No
+  dimension scored 0 across more than one surface; the single 0 (`flow-periodicals-two-stage`
+  configuration) is isolated, not systemic.
 - **Are past top recommendations getting acted on?** Not applicable — this is the baseline run; there
   is no prior recommendation set to check. The next run should answer this question directly against
   R1-R6 above.
@@ -279,8 +295,9 @@ Required self-checks this run:
 
 ## Completeness % (secondary, noisy — read with care)
 
-Portfolio core/happy-path average across all 24 non-META surfaces: **≈89%** (raw scores sum to
-85.5/96 possible points, using the midpoint for the two split MOD scores). **This number is
+Portfolio core/happy-path average across all 24 non-META surfaces: **≈88%** (raw scores sum to
+84.75/96 possible points: the 22 unsplit rows sum to 78, plus the midpoint of each split MOD score —
+`mod-render-layer`'s 4 / (2-3) → 3.25, `mod-kpi-audit`'s 4 / 3 → 3.5). **This number is
 explicitly noisy and is reported only as a secondary signal, never as the outcome:** it is an
 unweighted average that treats `flow-periodicals-two-stage`'s 1/4 identically to
 `api-workspace-proxy`'s 4/4, so a single severe FLOW gap barely moves it. The primary signal for this
