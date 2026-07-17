@@ -60,6 +60,11 @@ async function prefsWith(defaults) {
   return store;
 }
 
+// A minimal dispatch presets store fake: a fixed id -> { id, name, config } table.
+function presetsStoreWith(presets) {
+  return { get: async (_urlKey, id) => presets[id] || null };
+}
+
 describe('createDispatchItem — guards', () => {
   test('throws without a store', async () => {
     await assert.rejects(() => createDispatchItem({ urlKey: 'acme', prompt: 'x' }), /requires a dispatch store/);
@@ -351,7 +356,215 @@ describe('createDispatchItem — field passthrough', () => {
       promptName: 'Triage', issueIdentifier: 'LIN-9', target: 'cli',
       dispatchedBy: 'u1', force: true, waitForFollowUps: true,
       prompt: 'x', kind: 'triage', model: null, harness: 'claude-code', bootstrapToken: null,
+      presetConfig: null, presetName: null,
     });
     assert.equal(store.captured.urlKey, 'acme');
+  });
+});
+
+describe('createDispatchItem — dispatch preset routing precedence (LIN-1390)', () => {
+  test('explicit incoming model/harness beats a selected preset', async () => {
+    const store = capturingStore();
+    const presetsStore = presetsStoreWith({
+      p1: { id: 'p1', name: 'P', config: { model: 'preset-model', harness: 'preset-harness' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      model: 'explicit-model', harness: 'explicit-harness',
+      dispatchPresetsStore: presetsStore, presetId: 'p1'
+    });
+    assert.equal(store.captured.item.model, 'explicit-model');
+    assert.equal(store.captured.item.harness, 'explicit-harness');
+  });
+
+  test('a selected preset beats workspace dispatchDefaults', async () => {
+    const store = capturingStore();
+    const prefs = await prefsWith({ model: 'ws-model', harness: 'ws-harness' });
+    const presetsStore = presetsStoreWith({
+      p1: { id: 'p1', name: 'P', config: { model: 'preset-model', harness: 'preset-harness' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      workspacePreferencesStore: prefs, dispatchPresetsStore: presetsStore, presetId: 'p1'
+    });
+    assert.equal(store.captured.item.model, 'preset-model');
+    assert.equal(store.captured.item.harness, 'preset-harness');
+  });
+
+  test('a selected preset blends its own byKind override with its top-level default', async () => {
+    const store = capturingStore();
+    const presetsStore = presetsStoreWith({
+      p1: { id: 'p1', name: 'P', config: { model: 'top-model', byKind: { implementation: { harness: 'kind-harness' } } } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      dispatchPresetsStore: presetsStore, presetId: 'p1'
+    });
+    assert.equal(store.captured.item.model, 'top-model');
+    assert.equal(store.captured.item.harness, 'kind-harness');
+  });
+
+  test('an unknown/invalid presetId resolves to no preset rather than throwing', async () => {
+    const store = capturingStore();
+    const prefs = await prefsWith({ model: 'ws-model', harness: 'ws-harness' });
+    const presetsStore = presetsStoreWith({});
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      workspacePreferencesStore: prefs, dispatchPresetsStore: presetsStore, presetId: 'ghost'
+    });
+    assert.equal(store.captured.item.model, 'ws-model');
+    assert.equal(store.captured.item.harness, 'ws-harness');
+  });
+
+  test('inherited anchor presetConfig beats workspace defaults when no preset is selected', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { issueIdentifier: 'LIN-1', presetConfig: { model: 'anchor-model', harness: 'anchor-harness' }, presetName: 'Anchor Preset' }
+    });
+    const prefs = await prefsWith({ model: 'ws-model', harness: 'ws-harness' });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'autopilot', prompt: 'x',
+      workspacePreferencesStore: prefs, fields: { followUpTo: 'anchor-1' }
+    });
+    assert.equal(store.captured.item.model, 'anchor-model');
+    assert.equal(store.captured.item.harness, 'anchor-harness');
+  });
+
+  test('a selected preset beats an inherited anchor presetConfig', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { issueIdentifier: 'LIN-1', presetConfig: { model: 'anchor-model', harness: 'anchor-harness' } }
+    });
+    const presetsStore = presetsStoreWith({
+      p1: { id: 'p1', name: 'P', config: { model: 'preset-model', harness: 'preset-harness' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'autopilot', prompt: 'x',
+      dispatchPresetsStore: presetsStore, presetId: 'p1', fields: { followUpTo: 'anchor-1' }
+    });
+    assert.equal(store.captured.item.model, 'preset-model');
+    assert.equal(store.captured.item.harness, 'preset-harness');
+  });
+
+  test('an anchor with no explicit preset marker falls through to workspace defaults (byte-identical to pre-LIN-1390)', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { issueIdentifier: 'LIN-1' } // no presetConfig — no marker
+    });
+    const prefs = await prefsWith({ model: 'ws-model', harness: 'ws-harness' });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'autopilot', prompt: 'x',
+      workspacePreferencesStore: prefs, fields: { followUpTo: 'anchor-1' }
+    });
+    assert.equal(store.captured.item.model, 'ws-model');
+    assert.equal(store.captured.item.harness, 'ws-harness');
+    assert.strictEqual(store.captured.item.presetConfig, null);
+  });
+
+  test('a standalone (non-followUpTo) autopilot dispatch degrades to workspace defaults — no anchor to inherit from', async () => {
+    const store = capturingStore();
+    const prefs = await prefsWith({ model: 'ws-model', harness: 'ws-harness' });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'autopilot', prompt: 'x', workspacePreferencesStore: prefs
+    });
+    assert.equal(store.captured.item.model, 'ws-model');
+    assert.equal(store.captured.item.harness, 'ws-harness');
+    assert.strictEqual(store.captured.item.presetConfig, null);
+  });
+});
+
+describe('createDispatchItem — presetConfig/presetName stamping (LIN-1390)', () => {
+  test('a selected preset stamps presetConfig/presetName on an autopilot row', async () => {
+    const store = capturingStore();
+    const presetsStore = presetsStoreWith({
+      p1: { id: 'p1', name: 'My Preset', config: { model: 'preset-model' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'autopilot', prompt: 'x',
+      dispatchPresetsStore: presetsStore, presetId: 'p1'
+    });
+    assert.deepEqual(store.captured.item.presetConfig, { model: 'preset-model' });
+    assert.equal(store.captured.item.presetName, 'My Preset');
+  });
+
+  test('an inherited anchor presetConfig is stamped on the child autopilot row (transitivity)', async () => {
+    // Preset P dispatched on the anchor; a child-autopilot follow-up with no
+    // explicit presetId still carries P's config forward, so ITS OWN children
+    // (asserted on the child's row, never the parent's) inherit it too.
+    const store = capturingStoreWithItems({
+      'anchor-1': { issueIdentifier: 'LIN-1', presetConfig: { model: 'preset-model', harness: 'preset-harness' }, presetName: 'P' }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'autopilot', prompt: 'x', fields: { followUpTo: 'anchor-1' }
+    });
+    assert.deepEqual(store.captured.item.presetConfig, { model: 'preset-model', harness: 'preset-harness' });
+    assert.equal(store.captured.item.presetName, 'P');
+  });
+
+  test('a selected preset on a non-autopilot kind resolves routing but does NOT stamp presetConfig', async () => {
+    const store = capturingStore();
+    const presetsStore = presetsStoreWith({
+      p1: { id: 'p1', name: 'My Preset', config: { model: 'preset-model', harness: 'preset-harness' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      dispatchPresetsStore: presetsStore, presetId: 'p1'
+    });
+    assert.equal(store.captured.item.model, 'preset-model', 'routing still resolves through the preset');
+    assert.strictEqual(store.captured.item.presetConfig, null, 'non-autopilot rows never stamp presetConfig');
+    assert.strictEqual(store.captured.item.presetName, null);
+  });
+
+  test('an inherited anchor presetConfig is NOT stamped on a non-autopilot follow-up', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { issueIdentifier: 'LIN-1', presetConfig: { model: 'preset-model' }, presetName: 'P' }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x', fields: { followUpTo: 'anchor-1' }
+    });
+    assert.strictEqual(store.captured.item.presetConfig, null);
+    assert.strictEqual(store.captured.item.presetName, null);
+  });
+
+  test('a selected preset beats an inherited anchor for STAMPING too (not just routing)', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { issueIdentifier: 'LIN-1', presetConfig: { model: 'anchor-model' }, presetName: 'Anchor Preset' }
+    });
+    const presetsStore = presetsStoreWith({
+      p1: { id: 'p1', name: 'Selected Preset', config: { model: 'preset-model' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'autopilot', prompt: 'x',
+      dispatchPresetsStore: presetsStore, presetId: 'p1', fields: { followUpTo: 'anchor-1' }
+    });
+    assert.deepEqual(store.captured.item.presetConfig, { model: 'preset-model' });
+    assert.equal(store.captured.item.presetName, 'Selected Preset');
+  });
+});
+
+describe('createDispatchItem — presetConfig snapshot semantics (LIN-1390)', () => {
+  test('the stamped presetConfig is a deep copy — mutating the store-returned preset never reaches the dispatched item', async () => {
+    const store = capturingStore();
+    const livePreset = { id: 'p1', name: 'P', config: { model: 'X', byKind: { autopilot: { harness: 'h1' } } } };
+    const presetsStore = { get: async () => livePreset };
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'autopilot', prompt: 'x',
+      dispatchPresetsStore: presetsStore, presetId: 'p1'
+    });
+    // Mutate the "live" preset object after dispatch (simulating an update to
+    // the store) — the already-dispatched item's snapshot must be unaffected.
+    livePreset.config.model = 'Y';
+    livePreset.config.byKind.autopilot.harness = 'h2';
+    assert.equal(store.captured.item.presetConfig.model, 'X');
+    assert.equal(store.captured.item.presetConfig.byKind.autopilot.harness, 'h1');
+  });
+
+  test('the stamped presetConfig is not the same object reference as the source config', async () => {
+    const store = capturingStore();
+    const sourceConfig = { model: 'X' };
+    const presetsStore = presetsStoreWith({ p1: { id: 'p1', name: 'P', config: sourceConfig } });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'autopilot', prompt: 'x',
+      dispatchPresetsStore: presetsStore, presetId: 'p1'
+    });
+    assert.notStrictEqual(store.captured.item.presetConfig, sourceConfig);
+    assert.deepEqual(store.captured.item.presetConfig, sourceConfig);
   });
 });

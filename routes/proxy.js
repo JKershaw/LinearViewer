@@ -469,6 +469,9 @@ function formatDispatchWatch(item, meta = null) {
     issueIdentifier: item.issueIdentifier,
     issueUrl: item.issueUrl,
     target: item.target,
+    model: item.model || null,
+    harness: item.harness || null,
+    presetName: item.presetName || null,
     followUpTo: item.followUpTo || null,
     force: item.force === true,
     abort: item.abort === true,
@@ -526,6 +529,9 @@ function dispatchWatchChanged(baseline, item) {
  * @param {Function} options.getWorkspaceAccessToken - Function to get workspace access token by urlKey (token-only)
  * @param {Function} options.resolveWorkspaceAccess - Function returning { token, reason } for actionable error envelopes (LIN-417)
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
+ * @param {Object} [options.dispatchPresetsStore] - Dispatch presets store (LIN-1390), used by the
+ *   autopilot kickoff route to validate an incoming `presetId` and resolve its config's routing
+ *   precedence over workspace dispatchDefaults. Absent → `presetId` is accepted but has no effect.
  * @param {Object} [options.provider] - TEST-ONLY provider override (LIN-581). In production this is
  *   unset and the active provider is resolved per-workspace via getProviderForWorkspace inside
  *   resolveProviderAccess. Tests that need a non-registered fake provider (e.g. to observe ref
@@ -534,7 +540,7 @@ function dispatchWatchChanged(baseline, item) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, freeTierStore, provider: injectedProvider = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null }) {
   const router = Router();
 
   /**
@@ -4062,7 +4068,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness } = req.body || {};
+      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness, presetId } = req.body || {};
 
       // Validate caller-supplied inputs. (The composed body is server-generated
       // and trusted, so only these raw inputs are checked — same split as the
@@ -4120,6 +4126,23 @@ One convention across every endpoint, so you can branch on the same fields every
       if (kickoffHarnessValidationError) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, kickoffHarnessValidationError.error);
+      }
+      // Selected dispatch preset (LIN-1390): an unknown/invalid id is rejected
+      // here, up front — the factory treats a presetId it can't resolve as "no
+      // preset" (a defensive fallback for this seam's own store lookup below),
+      // not a validation gate, so this is the one place that contract is enforced.
+      if (presetId !== undefined && presetId !== null) {
+        if (typeof presetId !== 'string' || !presetId.trim()) {
+          logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+          return badRequest.json(res, 'presetId must be a non-empty string');
+        }
+        if (dispatchPresetsStore) {
+          const preset = await dispatchPresetsStore.get(req.proxyUrlKey, presetId);
+          if (!preset) {
+            logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+            return badRequest.json(res, 'Invalid or unknown presetId');
+          }
+        }
       }
 
       // Subscription is DECLARED on the edge (LIN-900 §6), never reconstructed from
@@ -4181,6 +4204,8 @@ One convention across every endpoint, so you can branch on the same fields every
         store: dispatchQueueStore,
         urlKey: req.proxyUrlKey,
         workspacePreferencesStore,
+        dispatchPresetsStore,
+        presetId: presetId || null,
         kind: 'autopilot',
         model,
         harness,
