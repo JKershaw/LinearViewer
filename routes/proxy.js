@@ -4197,7 +4197,8 @@ One convention across every endpoint, so you can branch on the same fields every
               issueIdentifier: issueIdentifier || null,
               prompt: kickoff,
               label: 'kickoff-bootstrap',
-              harness: resolvedHarness
+              harness: resolvedHarness,
+              createdBy: req.proxyCreatedBy || null
             });
           }
           return { prompt: kickoff, bootstrapToken: null };
@@ -4451,7 +4452,8 @@ One convention across every endpoint, so you can branch on the same fields every
               issueIdentifier: issueIdentifier || null,
               prompt,
               label: 'dispatch-bootstrap',
-              harness: resolvedHarness
+              harness: resolvedHarness,
+              createdBy: req.proxyCreatedBy || null
             });
           }
           return { prompt: finalPrompt, bootstrapToken: null };
@@ -4693,7 +4695,8 @@ One convention across every endpoint, so you can branch on the same fields every
                   issueIdentifier,
                   prompt: generated.prompt,
                   label: 'dispatch-bootstrap',
-                  harness: resolvedHarness
+                  harness: resolvedHarness,
+                  createdBy: req.proxyCreatedBy || null
                 });
               }
               return { prompt: generated.prompt, bootstrapToken: null };
@@ -4858,7 +4861,8 @@ One convention across every endpoint, so you can branch on the same fields every
                 issueIdentifier: terminalIdentifier,
                 prompt: rec.prompt,
                 label: 'dispatch-bootstrap',
-                harness: resolvedHarness
+                harness: resolvedHarness,
+                createdBy: req.proxyCreatedBy || null
               });
             }
             return { prompt: rec.prompt, bootstrapToken: null };

@@ -336,6 +336,10 @@ export function createCollectiveRoutes({
                 prompt: buildPrompt({ proxyBaseUrl: null, proxyToken: null }),
                 label: 'collective',
                 harness: resolvedHarness,
+                // LIN-1376: stamp the initiating account so the exchanged token
+                // resolves under LIN-1366 owner-scoping (token ownership keys on
+                // accountId, not linearUserId).
+                createdBy: req.session?.accountId || null,
               });
             }
             // Prose harnesses: byte-identical bespoke Linear-access block. Mint a
@@ -344,7 +348,7 @@ export function createCollectiveRoutes({
             let proxyToken = null;
             if (proxyTokenStore) {
               try {
-                const minted = await proxyTokenStore.createToken(ws.urlKey, { kind: 'bootstrap', scope: 'readWrite', label: 'collective', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS });
+                const minted = await proxyTokenStore.createToken(ws.urlKey, { kind: 'bootstrap', scope: 'readWrite', label: 'collective', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy: req.session?.accountId || null });
                 proxyToken = minted?.token || null;
               } catch (err) {
                 console.error(`Collective: proxy token mint failed for ${ws.urlKey}:`, err.message);
