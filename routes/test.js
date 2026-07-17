@@ -37,7 +37,7 @@ import { establishAccount } from '../lib/account-session.js';
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -407,6 +407,32 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       if (!collectivePresetsStore) return res.status(503).json({ error: 'no collective presets store' });
       const urlKey = req.query.urlKey || 'test-workspace';
       const created = await collectivePresetsStore.createCustom(urlKey, req.body || {});
+      res.json(created);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Clear all dispatch presets for a workspace (LIN-1390). Mirrors
+  // clear-collective-presets: the store is partitioned by workspace urlKey and
+  // has no builtin half, so a full clear leaves nothing behind.
+  router.get('/test/clear-dispatch-presets', async (req, res) => {
+    try {
+      if (dispatchPresetsStore) await dispatchPresetsStore.deleteAll(req.query.urlKey || 'test-workspace');
+      res.send('ok');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Seed one dispatch preset for a workspace so E2E can exercise preset
+  // selection without going through a save flow (LIN-1390). Body is
+  // { name, config }; ?urlKey=<workspace> selects the partition.
+  router.post('/test/seed-dispatch-preset', async (req, res) => {
+    try {
+      if (!dispatchPresetsStore) return res.status(503).json({ error: 'no dispatch presets store' });
+      const urlKey = req.query.urlKey || 'test-workspace';
+      const created = await dispatchPresetsStore.createCustom(urlKey, req.body || {});
       res.json(created);
     } catch (err) {
       res.status(500).json({ error: err.message });

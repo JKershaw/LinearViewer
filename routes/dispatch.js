@@ -109,6 +109,9 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  * @param {Object} [options.harbourFeedbackTokenStore] - Short-TTL feedback token store for Harbour OS dispatches
  * @param {Object} [options.workspacePreferencesStore] - Workspace preferences store, used to
  *   resolve dispatchDefaults (model/harness) for blank incoming values (LIN-1094)
+ * @param {Object} [options.dispatchPresetsStore] - Dispatch presets store (LIN-1390), used to
+ *   validate an incoming `presetId` and resolve its config's routing precedence over
+ *   workspace dispatchDefaults. Absent → `presetId` is accepted but has no effect.
  * @param {Object} [options.proxyTokenStore] - Proxy token store, used to mint the single-use
  *   bootstrap and attach the workspace-API proxy-context block server-side when the client
  *   requests it (`attachProxy:true`), so a claude-code dispatch carries the token as the
@@ -116,7 +119,7 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  *   attach degrades to a no-op (attachProxyContext returns the prompt unchanged).
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, proxyTokenStore }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore }) {
   const router = Router();
 
   // =========================================================================
@@ -208,7 +211,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription, attachProxy } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -286,6 +289,22 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
       }
 
+      // Selected dispatch preset (LIN-1390): an unknown/invalid id is rejected
+      // here, up front — the factory treats a presetId it can't resolve as "no
+      // preset" (a defensive fallback for this seam's own store lookup below),
+      // not a validation gate, so this is the one place that contract is enforced.
+      if (presetId !== undefined && presetId !== null) {
+        if (typeof presetId !== 'string' || !presetId.trim()) {
+          return badRequest.json(res, 'presetId must be a non-empty string');
+        }
+        if (dispatchPresetsStore) {
+          const preset = await dispatchPresetsStore.get(workspace.urlKey, presetId);
+          if (!preset) {
+            return badRequest.json(res, 'Invalid or unknown presetId');
+          }
+        }
+      }
+
       // Server-side proxy-context attach (LIN-1162). The dispatch UI used to mint a
       // bootstrap token and append the "+proxy" access block IN THE BROWSER, then POST
       // the finished prompt here — so this route never reached attachProxyContext and
@@ -360,6 +379,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
+        dispatchPresetsStore,
+        presetId: presetId || null,
         applyDefaultHarness: false,
         kind,
         model,
