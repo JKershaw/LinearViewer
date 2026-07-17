@@ -1,0 +1,570 @@
+<title>Harbour — Road to Cheap Models, Reliably</title>
+<style>
+  :root {
+    --ground: #f6f8fa;
+    --panel: #ffffff;
+    --panel-2: #eef2f6;
+    --ink: #16222e;
+    --muted: #5c6f80;
+    --faint: #8fa1b1;
+    --line: #dbe3ea;
+    --line-strong: #c3d0db;
+    --brand: #1f7a8c;        /* harbour teal */
+    --brand-soft: #d7ebef;
+    --amber: #c07a17;        /* critical path */
+    --amber-soft: #f6e6c8;
+    --done: #2f8f5b;
+    --done-soft: #d5ead d;
+    --done-soft: #d8ecdf;
+    --prog: #b9791a;
+    --prog-soft: #f4e5c6;
+    --todo: #6a7c8b;
+    --todo-soft: #e4ebf0;
+    --back: #93a3b1;
+    --back-soft: #e9edf1;
+    --block: #c0483f;
+    --block-soft: #f4dcd9;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Inter", "Segoe UI", Roboto, sans-serif;
+    --radius: 9px;
+    --shadow: 0 1px 2px rgba(22,34,46,.05), 0 6px 20px rgba(22,34,46,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0e161d;
+      --panel: #16212b;
+      --panel-2: #1c2933;
+      --ink: #e7eef4;
+      --muted: #9db0c0;
+      --faint: #66798a;
+      --line: #263640;
+      --line-strong: #33495700;
+      --line-strong: #35505f;
+      --brand: #49b3c6;
+      --brand-soft: #163842;
+      --amber: #e0a24a;
+      --amber-soft: #3a2e15;
+      --done: #55c489;
+      --done-soft: #16351f;
+      --prog: #e0a24a;
+      --prog-soft: #382b12;
+      --todo: #9db0c0;
+      --todo-soft: #22313b;
+      --back: #7f93a2;
+      --back-soft: #1d2a33;
+      --block: #e2726a;
+      --block-soft: #3a1f1c;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0e161d; --panel: #16212b; --panel-2: #1c2933; --ink: #e7eef4;
+    --muted: #9db0c0; --faint: #66798a; --line: #263640; --line-strong: #35505f;
+    --brand: #49b3c6; --brand-soft: #163842; --amber: #e0a24a; --amber-soft: #3a2e15;
+    --done: #55c489; --done-soft: #16351f; --prog: #e0a24a; --prog-soft: #382b12;
+    --todo: #9db0c0; --todo-soft: #22313b; --back: #7f93a2; --back-soft: #1d2a33;
+    --block: #e2726a; --block-soft: #3a1f1c;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --ground: #f6f8fa; --panel: #ffffff; --panel-2: #eef2f6; --ink: #16222e;
+    --muted: #5c6f80; --faint: #8fa1b1; --line: #dbe3ea; --line-strong: #c3d0db;
+    --brand: #1f7a8c; --brand-soft: #d7ebef; --amber: #c07a17; --amber-soft: #f6e6c8;
+    --done: #2f8f5b; --done-soft: #d8ecdf; --prog: #b9791a; --prog-soft: #f4e5c6;
+    --todo: #6a7c8b; --todo-soft: #e4ebf0; --back: #93a3b1; --back-soft: #e9edf1;
+    --block: #c0483f; --block-soft: #f4dcd9;
+    --shadow: 0 1px 2px rgba(22,34,46,.05), 0 6px 20px rgba(22,34,46,.05);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--sans); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ---- header ---- */
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--brand); margin: 0 0 10px;
+  }
+  h1 {
+    font-size: clamp(28px, 4vw, 42px); line-height: 1.08; margin: 0 0 14px;
+    letter-spacing: -.02em; text-wrap: balance; font-weight: 680;
+  }
+  .lede { font-size: 17px; color: var(--muted); max-width: 68ch; margin: 0; }
+  .lede b { color: var(--ink); font-weight: 620; }
+
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 22px;
+    font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+  }
+  .stat {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+    padding: 5px 12px; display: inline-flex; align-items: center; gap: 7px;
+  }
+  .stat b { color: var(--ink); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .d-done { background: var(--done); }
+  .d-prog { background: var(--prog); }
+  .d-todo { background: var(--todo); }
+  .d-back { background: var(--back); }
+  .d-block { background: var(--block); }
+
+  /* ---- section scaffolding ---- */
+  section { margin-top: 52px; }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .sec-num {
+    font-family: var(--mono); font-size: 13px; color: var(--faint);
+    border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px;
+  }
+  h2 { font-size: 21px; margin: 0; letter-spacing: -.01em; font-weight: 640; }
+  .sec-sub { color: var(--muted); margin: 8px 0 22px; max-width: 74ch; font-size: 15px; }
+
+  /* ---- the spine ---- */
+  .spine {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 26px 24px; box-shadow: var(--shadow); overflow-x: auto;
+  }
+  .spine-flow { display: flex; align-items: stretch; gap: 0; min-width: 720px; }
+  .node {
+    flex: 1; background: var(--panel-2); border: 1px solid var(--line-strong);
+    border-radius: 8px; padding: 13px 14px; position: relative; min-width: 150px;
+  }
+  .node.root { border-color: var(--amber); background: var(--amber-soft); }
+  .node.goal {
+    border-style: dashed; border-color: var(--brand); background: var(--brand-soft);
+  }
+  .node .id { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+  .node .id .st { font-weight: 400; color: var(--muted); }
+  .node .nt { font-size: 13px; color: var(--ink); margin-top: 5px; }
+  .node .role {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--amber); margin-top: 8px; font-weight: 600;
+  }
+  .node.goal .role { color: var(--brand); }
+  .branch { display: flex; flex-direction: column; gap: 12px; flex: 1.15; }
+  .arrow {
+    align-self: center; display: flex; align-items: center; padding: 0 4px;
+    color: var(--line-strong); flex: 0 0 auto;
+  }
+  .arrow svg { width: 30px; height: 20px; }
+  .arrow.stack { flex-direction: column; justify-content: center; gap: 34px; }
+
+  /* ---- pillars ---- */
+  .pillars { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+  @media (max-width: 760px) { .pillars { grid-template-columns: 1fr; } }
+  .pillar {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 18px 8px; box-shadow: var(--shadow);
+  }
+  .pillar > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+  .pillar h3 { font-size: 15.5px; margin: 0; font-weight: 640; letter-spacing: -.01em; }
+  .pillar .tag {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--brand); background: var(--brand-soft); padding: 2px 8px; border-radius: 5px; font-weight: 600;
+  }
+  .pillar .pdesc { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  ul.rows { list-style: none; margin: 0; padding: 0; }
+  ul.rows li {
+    display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 9px;
+    padding: 8px 0; border-top: 1px solid var(--line);
+  }
+  ul.rows li:first-child { border-top: none; }
+  .chip {
+    font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .04em;
+    text-transform: uppercase; padding: 2px 6px; border-radius: 4px; white-space: nowrap;
+    margin-top: 1px;
+  }
+  .c-prog { background: var(--prog-soft); color: var(--prog); }
+  .c-todo { background: var(--todo-soft); color: var(--todo); }
+  .c-back { background: var(--back-soft); color: var(--back); }
+  .c-done { background: var(--done-soft); color: var(--done); }
+  .rid { font-family: var(--mono); font-size: 12.5px; }
+  .rtitle { font-size: 13.5px; color: var(--ink); }
+  .rtitle .note { color: var(--muted); font-size: 12px; }
+  .prio {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    text-align: right; white-space: nowrap; margin-top: 2px;
+  }
+  .prio.hot { color: var(--block); font-weight: 700; }
+  .badge-blocked {
+    font-family: var(--mono); font-size: 10px; color: var(--block);
+    background: var(--block-soft); padding: 1px 5px; border-radius: 4px; margin-left: 4px;
+  }
+  .badge-bug {
+    font-family: var(--mono); font-size: 10px; color: var(--block); border: 1px solid var(--block);
+    padding: 0 4px; border-radius: 4px; margin-left: 4px;
+  }
+  .badge-key {
+    font-family: var(--mono); font-size: 10px; color: var(--amber); background: var(--amber-soft);
+    padding: 1px 5px; border-radius: 4px; margin-left: 4px; font-weight: 600;
+  }
+
+  /* ---- waves ---- */
+  .waves { display: flex; flex-direction: column; gap: 14px; }
+  .wave {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); display: grid; grid-template-columns: 150px 1fr;
+  }
+  @media (max-width: 680px) { .wave { grid-template-columns: 1fr; } }
+  .wave-label {
+    padding: 18px; border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 6px; background: var(--panel-2);
+    border-radius: var(--radius) 0 0 var(--radius);
+  }
+  @media (max-width: 680px) { .wave-label { border-right: none; border-bottom: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0; } }
+  .wave-label .wn { font-family: var(--mono); font-size: 12px; color: var(--brand); letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+  .wave-label .wt { font-size: 15px; font-weight: 620; letter-spacing: -.01em; }
+  .wave-label .wgoal { font-size: 12px; color: var(--muted); }
+  .wave-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .lane { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .lane-tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--faint); flex: 0 0 92px;
+  }
+  .tk {
+    display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono);
+    font-size: 12px; border: 1px solid var(--line-strong); border-radius: 6px;
+    padding: 4px 9px; background: var(--panel);
+  }
+  .tk .tkt { font-family: var(--sans); font-size: 12px; color: var(--muted); }
+  .tk.hot { border-color: var(--amber); }
+  .tk .mini { width: 7px; height: 7px; border-radius: 50%; }
+
+  /* ---- reprioritise ---- */
+  .reprios { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .reprios { grid-template-columns: 1fr; } }
+  .rp {
+    background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--amber);
+    border-radius: 8px; padding: 15px 16px; box-shadow: var(--shadow);
+  }
+  .rp.wip { border-left-color: var(--brand); }
+  .rp h4 { margin: 0 0 6px; font-size: 14px; font-weight: 640; display: flex; align-items: center; gap: 8px; }
+  .rp .move {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px;
+  }
+  .rp .move b { color: var(--block); }
+  .rp .move .to { color: var(--done); }
+  .rp p { margin: 0; font-size: 13px; color: var(--muted); }
+  .rp p b { color: var(--ink); font-weight: 600; }
+
+  .callout {
+    margin-top: 20px; background: var(--brand-soft); border: 1px solid var(--brand);
+    border-radius: var(--radius); padding: 18px 20px;
+  }
+  .callout h4 { margin: 0 0 6px; font-size: 14px; color: var(--brand); font-family: var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+  .callout p { margin: 0; font-size: 14px; color: var(--ink); }
+
+  footer {
+    margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 12px; color: var(--faint);
+    display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: space-between;
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Harbour · delivery roadmap</p>
+    <h1>The road to cheap models, reliably</h1>
+    <p class="lede">
+      One goal: run <b>a range of model setups per task</b> — Opus for research &amp; review,
+      cheaper models for everything else — and <b>trust the result</b>. That needs four things to land:
+      the account foundation that unlocks <b>presets</b>, the OpenRouter plumbing that bills cheap
+      models to your key, the <b>stepper</b> that lets a smart model supervise a cheap one, and the
+      <b>observability</b> to see it working — transcripts, token spend, wall-clock.
+    </p>
+    <div class="meta-row">
+      <span class="stat"><span class="dot d-prog"></span> <b>7</b> in progress (goal-relevant)</span>
+      <span class="stat"><span class="dot d-todo"></span> <b>18</b> todo</span>
+      <span class="stat"><span class="dot d-back"></span> <b>14</b> backlog</span>
+      <span class="stat"><span class="dot d-done"></span> foundation children <b>done</b></span>
+      <span class="stat">blocking edges: <b>sparse</b> — order is the missing piece</span>
+    </div>
+  </header>
+
+  <!-- ============ SPINE ============ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>The critical path</h2></div>
+    <p class="sec-sub">
+      Almost every ticket sits at <span class="rid">unblocks 0 / path 1</span> — the backlog is really a
+      flat priority list, not a dependency web. The one real spine is short, and it's the whole goal:
+      the account model gates both presets and reliable key-billing. Finish the amber node and the
+      goal opens up.
+    </p>
+    <div class="spine">
+      <div class="spine-flow">
+        <div class="node root">
+          <div class="id">LIN-1326 <span class="st">· in progress</span></div>
+          <div class="nt">Human-tied account model</div>
+          <div class="role">Root blocker — finish first</div>
+        </div>
+        <div class="arrow stack">
+          <svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          <svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        </div>
+        <div class="branch">
+          <div class="node">
+            <div class="id">LIN-1321 <span class="st">· in progress</span></div>
+            <div class="nt">Save dispatch defaults as reusable presets</div>
+            <div class="role" style="color:var(--brand)">The per-task setup mechanism</div>
+          </div>
+          <div class="node">
+            <div class="id">LIN-1204 <span class="st">· in progress · bug</span></div>
+            <div class="nt">Agents fall back to free tier, not the project OpenRouter key</div>
+            <div class="role" style="color:var(--brand)">Bills cheap models correctly</div>
+          </div>
+        </div>
+        <div class="arrow stack">
+          <svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          <svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        </div>
+        <div class="branch">
+          <div class="node goal">
+            <div class="id">GOAL</div>
+            <div class="nt">Opus for research &amp; review · cheap models for the rest · billed &amp; trusted</div>
+            <div class="role">Cheap models, reliably</div>
+          </div>
+          <div class="node">
+            <div class="id">LIN-1345 <span class="st">· backlog</span></div>
+            <div class="nt">Lower the shared free-key limit once dispatch uses project keys</div>
+            <div class="role" style="color:var(--muted)">Cleanup, unblocked by 1204</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="callout">
+      <h4>The stall to fix today</h4>
+      <p>
+        LIN-1321 and LIN-1204 are <b>both already “In Progress”</b> — but both are blocked by LIN-1326,
+        which is <b>also “In Progress.”</b> Three concurrent items in a straight line means the two
+        downstream ones can't actually finish. Converge effort on <b>LIN-1326</b> (its schema/wiring
+        children LIN-1327–1331 are already done, so it's close), then let 1321 and 1204 run.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ PILLARS ============ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>Four pillars of the goal</h2></div>
+    <p class="sec-sub">
+      Everything goal-relevant clusters into four workstreams. Foundation is the prerequisite;
+      the other three can largely run in parallel once it lands.
+    </p>
+    <div class="pillars">
+
+      <!-- Foundation -->
+      <div class="pillar">
+        <header><h3>Foundation — account &amp; credentials</h3><span class="tag">prerequisite</span></header>
+        <p class="pdesc">Durable accounts → presets → per-task setups. Also: keys that resolve off-session so cheap models never silently fall back.</p>
+        <ul class="rows">
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1326</span> Human-tied account model <span class="badge-key">root</span></span><span class="prio hot">p1 ✓</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1321</span> Dispatch presets <span class="badge-key">enabler</span></span><span class="prio hot">p1 ✓</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1367</span> Off-session credential durability + refresh <span class="badge-key">ready</span></span><span class="prio">p0</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1332</span> Remove legacy linearUserId assumptions <span class="badge-blocked">← 1349, 1351</span></span><span class="prio">p0</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1327–31</span> Schema · bindings · auth wiring · re-key</span><span class="prio">p0</span></li>
+        </ul>
+      </div>
+
+      <!-- OpenRouter -->
+      <div class="pillar">
+        <header><h3>OpenRouter — cheap-model plumbing</h3><span class="tag">bill it right</span></header>
+        <p class="pdesc">The wiring that makes a cheap model actually run, on your key, per task and per kind.</p>
+        <ul class="rows">
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1204</span> Free-tier fallback bug <span class="badge-bug">bug</span><span class="badge-blocked">← 1326</span></span><span class="prio hot">p1 ✓</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1129</span> Choose OpenRouter models</span><span class="prio">p2</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1250</span> Factor shared OpenRouter request/finish helpers</span><span class="prio">p0</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1281</span> Confirm autopilot honors byKind model/harness</span><span class="prio">p4</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1345</span> Lower shared-key limit <span class="badge-blocked">← 1204</span></span><span class="prio">p3</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1183</span> Collective fan-out model/harness select · <span class="rid">LIN-1184</span> per-op override</span><span class="prio">p3/4</span></li>
+        </ul>
+      </div>
+
+      <!-- Stepper -->
+      <div class="pillar">
+        <header><h3>Stepper — smart supervises cheap</h3><span class="tag">spend control</span></header>
+        <p class="pdesc">Opus drip-feeds &amp; challenges a cheaper model beat by beat. Plus the determinism work that cuts what you pay a model to re-derive.</p>
+        <ul class="rows">
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1269</span> Review stepper/beats vs obligation-load</span><span class="prio">p2</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1236</span> Prompt determinism &amp; session-spend audit</span><span class="prio">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1237</span> Act on determinism shortlist <span class="note">(1235 done → unblocked)</span></span><span class="prio">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1242</span> Prompt-obligation lift-docket · <span class="rid">LIN-1277</span> cheap deterministic guards · <span class="rid">LIN-1153</span> deterministic prompt content</span><span class="prio">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1152</span> Autopilot unblock child sessions · <span class="rid">LIN-1150</span> roll-on sessions</span><span class="prio">p2</span></li>
+        </ul>
+      </div>
+
+      <!-- Observability -->
+      <div class="pillar">
+        <header><h3>Observability — see it working</h3><span class="tag">the instruments</span></header>
+        <p class="pdesc">You can't call a cheap model “reliable” without watching it: transcripts, token spend, wall-clock. This is how you'll judge the rollout.</p>
+        <ul class="rows">
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1287</span> Richer claude-code telemetry to Harbour <span class="badge-key">core</span></span><span class="prio">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1294</span> OpenCode telemetry parity · <span class="rid">LIN-1144</span> tool-level heartbeat</span><span class="prio">p2/0</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1341</span> Follow-ups as continuations <span class="badge-bug">bug</span> · <span class="rid">LIN-1181</span> Dash cost tracking</span><span class="prio">p2</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1334</span> Dispatch sessions in list · <span class="rid">LIN-1311</span> transcript migration</span><span class="prio">p0</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1215</span> Local-tz second precision · <span class="rid">LIN-1163</span> runs-page layout</span><span class="prio">p3</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1288/89</span> Telemetry truncation fix · feedback tagging</span><span class="prio">p1/2</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout" style="background:var(--panel);border-color:var(--line)">
+      <h4 style="color:var(--muted)">Cross-cutting: reliability bugs</h4>
+      <p style="color:var(--muted)">
+        A thin band of friction bugs rides across all four pillars and directly threatens “reliably”:
+        <span class="rid">LIN-1375</span> credential-proxy token leak (p1, in prog) ·
+        <span class="rid">LIN-1373</span> proxy-token needs creator's live session (p1) ·
+        <span class="rid">LIN-1355</span> beat-2 suppression in the stepper (p1, backlog) ·
+        <span class="rid">LIN-1358</span> resume worker wedged 195m (p1) ·
+        <span class="rid">LIN-1323/1324</span> autopilot poll defeats follow-ups (bugs).
+        Fold these into the wave that touches their subsystem — don't leave the p1s in the backlog.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ WAVES ============ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>Execution order — 2–3 in parallel</h2></div>
+    <p class="sec-sub">
+      Sequenced for a small operator running a few agents at once. Each wave has a converge-first item;
+      the parallel lanes fill the remaining slots. Observability runs alongside the plumbing on purpose —
+      it's how you'll know the cheap models are behaving before you widen the rollout.
+    </p>
+    <div class="waves">
+
+      <div class="wave">
+        <div class="wave-label">
+          <span class="wn">Wave 1 · now</span>
+          <span class="wt">Land the root</span>
+          <span class="wgoal">Stop starting; finish the account spine.</span>
+        </div>
+        <div class="wave-body">
+          <div class="lane"><span class="lane-tag">Converge</span>
+            <span class="tk hot"><span class="mini d-prog"></span>LIN-1326 <span class="tkt">account model</span></span>
+          </div>
+          <div class="lane"><span class="lane-tag">Parallel</span>
+            <span class="tk"><span class="mini d-prog"></span>LIN-1367 <span class="tkt">credential durability</span></span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1332 <span class="tkt">drop legacy user assumption</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="wave">
+        <div class="wave-label">
+          <span class="wn">Wave 2 · next</span>
+          <span class="wt">Turn on cheap models</span>
+          <span class="wgoal">Presets + correct billing, with instruments live.</span>
+        </div>
+        <div class="wave-body">
+          <div class="lane"><span class="lane-tag">Unlocked</span>
+            <span class="tk hot"><span class="mini d-prog"></span>LIN-1321 <span class="tkt">presets</span></span>
+            <span class="tk hot"><span class="mini d-prog"></span>LIN-1204 <span class="tkt">key-billing bug</span></span>
+          </div>
+          <div class="lane"><span class="lane-tag">Then</span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1129 <span class="tkt">choose models</span></span>
+            <span class="tk"><span class="mini d-back"></span>LIN-1250 <span class="tkt">factor OR helpers</span></span>
+            <span class="tk"><span class="mini d-back"></span>LIN-1345 <span class="tkt">restore limits</span></span>
+          </div>
+          <div class="lane"><span class="lane-tag">Instruments</span>
+            <span class="tk"><span class="mini d-prog"></span>LIN-1287 <span class="tkt">telemetry: tokens + wall-clock</span></span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1341 <span class="tkt">follow-up continuity</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="wave">
+        <div class="wave-label">
+          <span class="wn">Wave 3 · then</span>
+          <span class="wt">Make it trustworthy</span>
+          <span class="wgoal">Stepper supervision + kill the reliability bugs.</span>
+        </div>
+        <div class="wave-body">
+          <div class="lane"><span class="lane-tag">Ready now</span>
+            <span class="tk"><span class="mini d-prog"></span>LIN-1269 <span class="tkt">beats disposition</span></span>
+            <span class="tk"><span class="mini d-prog"></span>LIN-1236 <span class="tkt">spend audit</span></span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1237 <span class="tkt">determinism shortlist · unblocked</span></span>
+          </div>
+          <div class="lane"><span class="lane-tag">Do first</span>
+            <span class="tk hot"><span class="mini d-todo"></span>LIN-1271 <span class="tkt">GitHub reads → unblocks 1272, 1275</span></span>
+            <span class="tk hot"><span class="mini d-todo"></span>LIN-575 <span class="tkt">→ 1274</span></span>
+            <span class="tk hot"><span class="mini d-todo"></span>LIN-551 <span class="tkt">→ 1276</span></span>
+            <span class="tk hot"><span class="mini d-todo"></span>LIN-1246 <span class="tkt">→ 1273</span></span>
+          </div>
+          <div class="lane"><span class="lane-tag">Reliability</span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1355 <span class="tkt">beat-2 suppression</span></span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1373 <span class="tkt">proxy-token session dep</span></span>
+            <span class="tk"><span class="mini d-prog"></span>LIN-1375 <span class="tkt">token-leak proxy</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="wave">
+        <div class="wave-label">
+          <span class="wn">Wave 4 · later</span>
+          <span class="wt">Parity &amp; polish</span>
+          <span class="wgoal">OpenCode parity + observation UI depth.</span>
+        </div>
+        <div class="wave-body">
+          <div class="lane"><span class="lane-tag">OpenCode</span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1146</span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1154</span>
+            <span class="tk"><span class="mini d-back"></span>LIN-1193</span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1294</span>
+          </div>
+          <div class="lane"><span class="lane-tag">Obs UI</span>
+            <span class="tk"><span class="mini d-back"></span>LIN-1334</span>
+            <span class="tk"><span class="mini d-back"></span>LIN-1311</span>
+            <span class="tk"><span class="mini d-back"></span>LIN-1215</span>
+            <span class="tk"><span class="mini d-back"></span>LIN-1163</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REPRIORITISE ============ -->
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>Re-prioritisation — applied ✓</h2></div>
+    <p class="sec-sub">
+      The three priority lifts and the stepper-bug promotion below are <b>written to Linear</b> (p1 = Urgent).
+      The WIP-discipline move is the one judgement call left to you. Edges were <b>already correct</b> — nothing fabricated.
+    </p>
+    <div class="reprios">
+      <div class="rp">
+        <h4>Raise the two enablers ✓</h4>
+        <div class="move"><span class="rid">LIN-1204</span> p2 → <span class="to">p1</span> &nbsp;·&nbsp; <span class="rid">LIN-1321</span> p3 → <span class="to">p1</span></div>
+        <p>Both are the literal mechanism for “cheap models per task,” both in progress, both on the critical path — yet were priced below routine work. <b>Now Urgent.</b></p>
+      </div>
+      <div class="rp">
+        <h4>Mark the root as the root ✓</h4>
+        <div class="move"><span class="rid">LIN-1326</span> p2 → <span class="to">p1</span></div>
+        <p>It gates the entire goal and its children are done. Now visibly the one item to finish next, instead of one of thirteen equal in-progress cards.</p>
+      </div>
+      <div class="rp">
+        <h4>Pull the stepper bug out of backlog ✓</h4>
+        <div class="move"><span class="rid">LIN-1355</span> backlog → <span class="to">todo</span></div>
+        <p>A p1 “beat-2 silently suppressed” bug in backlog directly undermines the stepper you're counting on to supervise cheap models. Promoted into Wave 3.</p>
+      </div>
+      <div class="rp wip">
+        <h4>Cut work-in-progress</h4>
+        <div class="move">13 in progress → <span class="to">~4 focused</span></div>
+        <p>Thirteen concurrent in-progress items on a solo cadence is why there's “no order.” Hold WIP at the account spine + telemetry; move the rest back to <b>todo</b> without losing them.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Harbour · LinearViewer (LIN) · 392 open · goal-relevant slice mapped</span>
+    <span class="legend">
+      <span><span class="dot d-prog"></span>in progress</span>
+      <span><span class="dot d-todo"></span>todo</span>
+      <span><span class="dot d-back"></span>backlog</span>
+      <span><span class="dot d-done"></span>done</span>
+      <span><span class="dot d-block"></span>blocked / bug</span>
+    </span>
+  </footer>
+</div>
