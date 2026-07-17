@@ -338,7 +338,7 @@ export function createCollectiveRoutes({
                 harness: resolvedHarness,
                 // LIN-1376: stamp the initiating account so the exchanged token
                 // resolves under LIN-1366 owner-scoping (token ownership keys on
-                // accountId, not linearUserId).
+                // accountId).
                 createdBy: req.session?.accountId || null,
               });
             }
@@ -362,7 +362,7 @@ export function createCollectiveRoutes({
           fields: {
             promptName: isFacilitator ? 'collective-facilitator' : 'collective-participant',
             target,
-            dispatchedBy: req.session.linearUserId || null,
+            dispatchedBy: req.session?.accountId || null,
           }
         });
         dispatched.push({ urlKey: ws.urlKey, name: ws.name, nick, id: item._id, ok: true });

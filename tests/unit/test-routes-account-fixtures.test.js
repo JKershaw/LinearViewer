@@ -4,7 +4,8 @@
  * `/test/set-github-session`, `/test/set-github-projects-session`) establish
  * a real `session.accountId` through the production `establishAccount` seam,
  * rather than fabricating one — the exact gap the ticket's Q4 ruling closes
- * (retain `linearUserId` for Phase D, but stop bypassing `linkIdentity`).
+ * (stop bypassing `linkIdentity`). `linearUserId` is no longer written to the
+ * session at all (LIN-1332): `accountId` is the only identity.
  *
  * Run with: node --test tests/unit/test-routes-account-fixtures.test.js
  */
@@ -63,14 +64,14 @@ describe('routes/test.js — LIN-1329 fixture re-point', () => {
     };
   }
 
-  test('/test/set-session establishes a real account, keeping linearUserId', async () => {
+  test('/test/set-session establishes a real account, with no session.linearUserId (LIN-1332)', async () => {
     const router = createTestRoutes(freshDeps());
     const handler = getHandler(router, 'get', '/test/set-session');
     const { req, res } = makeReqRes();
 
     await handler(req, res);
 
-    assert.strictEqual(req.session.linearUserId, 'test-linear-user-id', 'retained for Phase D');
+    assert.strictEqual(req.session.linearUserId, undefined);
     assert.ok(req.session.accountId, 'session.accountId set through the real seam');
   });
 

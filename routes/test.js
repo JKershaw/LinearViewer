@@ -157,28 +157,25 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     req.session.activeWorkspaceId = workspaces[0].id
     // `noLinearUser` simulates a session with no user identity (local/GitHub App
     // link path), so specs can exercise the "saved chats unavailable" boundary
-    // (LIN-1008). Default sets the id, so existing specs are unchanged. Also
-    // clears any pre-existing `accountId` (LIN-1353) — a prior `/test/set-session`
-    // in the same test session (e.g. a beforeEach chain) may have already
-    // established one, and the saved-chat/prompt gates now key on `accountId`, not
-    // `linearUserId`; leaving a stale accountId behind would make "no identity at
-    // all" unfalsifiable.
+    // (LIN-1008). Default establishes an account below, so existing specs are
+    // unchanged. Also clears any pre-existing `accountId` (LIN-1353) — a prior
+    // `/test/set-session` in the same test session (e.g. a beforeEach chain) may
+    // have already established one, and the saved-chat/prompt gates key on
+    // `accountId`; leaving a stale accountId behind would make "no identity at
+    // all" unfalsifiable. The flag name is retained even though it only clears
+    // `accountId` now — it is consumed by test-routes-account-fixtures.test.js
+    // and tests/e2e/task-chat.spec.js.
     if (noLinearUser) {
-      delete req.session.linearUserId
       delete req.session.accountId
-    } else {
-      req.session.linearUserId = 'test-linear-user-id'
     }
 
     // LIN-1329 fixture re-point (Q4): establish a REAL accountId through the
     // production seam rather than fabricating one, so specs exercising
-    // session.accountId run against the same code path production does.
-    // `linearUserId` is RETAINED (Phase D still reads it) — this adds an
-    // accountId alongside it, it doesn't replace it. Bound to the first
-    // workspace only; a real Linear sign-in would bind every workspace the
-    // human belongs to, but one binding is enough to prove the fixture goes
-    // through the real seam. Skipped for `noLinearUser` (mirrors having no
-    // identity to link).
+    // session.accountId run against the same code path production does. Bound
+    // to the first workspace only; a real Linear sign-in would bind every
+    // workspace the human belongs to, but one binding is enough to prove the
+    // fixture goes through the real seam. Skipped for `noLinearUser` (mirrors
+    // having no identity to link).
     if (!noLinearUser) {
       await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', 'test-linear-user-id', {}, workspaces[0].id)
     }

@@ -97,7 +97,7 @@ Authorization: Bearer <token>
         "urlKey": "workspace-key"
       },
       "dispatchedAt": "2024-01-15T10:30:00.000Z",
-      "dispatchedBy": "linear-user-id",
+      "dispatchedBy": "account-id",
       "expiresAt": "2024-01-16T10:30:00.000Z"
     }
   ]
@@ -129,7 +129,7 @@ Authorization: Bearer <token>
       "urlKey": "workspace-key"
     },
     "dispatchedAt": "2024-01-15T10:30:00.000Z",
-    "dispatchedBy": "linear-user-id",
+    "dispatchedBy": "account-id",
     "expiresAt": "2024-01-16T10:30:00.000Z"
   },
   "dispatchId": "uuid"
@@ -287,7 +287,7 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `waitForFollowUps` | boolean | Opt-in completion hold (default `false`). When `true`, the consumer should hold the session open at completion to receive in-session follow-ups instead of finalizing. See [Completion hold](#completion-hold-waitforfollowups). |
 | `workspace.urlKey` | string | Workspace identifier |
 | `dispatchedAt` | string | ISO 8601 timestamp when item was queued |
-| `dispatchedBy` | string | Linear user ID who dispatched (nullable) |
+| `dispatchedBy` | string | Account ID of who dispatched (nullable) |
 | `expiresAt` | string | ISO 8601 timestamp when item expires |
 
 ## Follow-ups

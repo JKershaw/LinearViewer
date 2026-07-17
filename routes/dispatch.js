@@ -330,7 +330,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (cascade === true) {
         const result = await dispatchQueueStore.expandCascadeAborts(workspace.urlKey, abortTo, {
           target: target || 'cli',
-          dispatchedBy: req.session.linearUserId || null
+          dispatchedBy: req.session?.accountId || null
         });
         return res.status(201).json({ success: true, cascade: true, ...result });
       }
@@ -401,7 +401,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           issueIdentifier: issueIdentifier || null,
           issueTitle: issueTitle || null,
           issueUrl: issueUrl || null,
-          dispatchedBy: req.session.linearUserId || null,
+          dispatchedBy: req.session?.accountId || null,
           target: target || 'cli',
           repo: repo || null,
           followUpTo: followUpTo || null,
