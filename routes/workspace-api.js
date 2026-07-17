@@ -2196,7 +2196,10 @@ ${goal}`
           issueIdentifier: issue.identifier,
           prompt: basePrompt,
           label: 'feedback-triage',
-          harness: resolvedHarness
+          harness: resolvedHarness,
+          // LIN-1376: stamp the launching account so the dispatched session's
+          // token resolves under LIN-1366 owner-scoping.
+          createdBy: session?.accountId || null
         }),
         fields: {
           promptName: 'Triage',
@@ -2267,7 +2270,10 @@ ${goal}`
           issueIdentifier: issue.identifier,
           prompt: kickoff,
           label: 'feedback-autopilot',
-          harness: resolvedHarness
+          harness: resolvedHarness,
+          // LIN-1376: stamp the launching account so the dispatched session's
+          // token resolves under LIN-1366 owner-scoping.
+          createdBy: session?.accountId || null
         }),
         fields: {
           promptName: `Autopilot — ${issue.identifier}`,
