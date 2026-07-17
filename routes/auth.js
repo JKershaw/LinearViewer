@@ -308,9 +308,6 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
             // Restore preserved workspaces
             req.session.workspaces = existingWorkspaces
 
-            // Store Linear user ID for preference persistence
-            req.session.linearUserId = viewer.id
-
             // LIN-1329 (Phase C): establish the durable account for this identity —
             // the single seam every sign-in path converges on. Identity scope is
             // Linear's viewer.id (the human), never the org — regenerate() just

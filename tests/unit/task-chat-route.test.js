@@ -92,10 +92,10 @@ describe('task-chat saved-chats wiring (LIN-1008)', () => {
   });
 
   test('the identity gate keys on accountId, not linearUserId (LIN-1353)', () => {
-    // Isolate resolveSavedChatUser's OWN body (not the whole file — the file also
-    // has an unrelated, explicitly out-of-scope req.session.linearUserId at the
-    // dispatchedBy attribution line) and assert the gate reads accountId, never
-    // linearUserId.
+    // Isolate resolveSavedChatUser's OWN body and assert the gate reads
+    // accountId, never linearUserId (LIN-1332 removed the field from the
+    // session entirely, including the dispatchedBy attribution line elsewhere
+    // in this file).
     const start = ROUTE_SRC.indexOf('const resolveSavedChatUser');
     assert.ok(start > 0, 'expected resolveSavedChatUser to be defined');
     const end = ROUTE_SRC.indexOf('\n  };', start);
@@ -108,10 +108,9 @@ describe('task-chat saved-chats wiring (LIN-1008)', () => {
   });
 
   test('the saved-chats gate 401s a session with linearUserId but NO accountId (proves the gate really switched keys)', async () => {
-    // A regex over the whole file can be fooled by an unrelated linearUserId
-    // elsewhere (routes/task-chat.js:455's out-of-scope dispatchedBy attribution
-    // line) — this drives the REAL live handler with the one input that
-    // discriminates old vs new behavior.
+    // A stray legacy linearUserId (no longer written anywhere in production,
+    // LIN-1332) must not satisfy the gate — this drives the REAL live handler
+    // with the one input that discriminates old vs new behavior.
     const router = createTaskChatRoutes({
       workspaceFromUrl: (req, res, next) => next(),
       savedChatStore: fakeSavedChatStore(),

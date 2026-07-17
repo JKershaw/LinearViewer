@@ -98,7 +98,7 @@ describe('createEnsurePATSession', () => {
     assert.strictEqual(req.session.workspaces.length, 1, 'existing workspace untouched');
   });
 
-  test('creates a PAT workspace, sets linearUserId, and establishes a durable account', async () => {
+  test('creates a PAT workspace and establishes a durable account (LIN-1332: no session.linearUserId)', async () => {
     const middleware = createEnsurePATSession(freshStores());
     const { req, res } = makeReqRes();
     let nextCalled = false;
@@ -110,7 +110,7 @@ describe('createEnsurePATSession', () => {
     assert.strictEqual(ws.isPAT, true);
     assert.strictEqual(ws.id, 'org-1');
     assert.strictEqual(req.session.activeWorkspaceId, 'org-1');
-    assert.strictEqual(req.session.linearUserId, 'viewer-1');
+    assert.strictEqual(req.session.linearUserId, undefined);
     // LIN-1329: the account seam ran for real.
     assert.ok(req.session.accountId, 'session.accountId set by establishAccount');
   });

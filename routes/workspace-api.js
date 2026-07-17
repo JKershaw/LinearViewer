@@ -2207,7 +2207,7 @@ ${goal}`
           issueIdentifier: issue.identifier,
           issueTitle: issue.title || null,
           issueUrl: issue.url || null,
-          dispatchedBy: session?.linearUserId || null,
+          dispatchedBy: session?.accountId || null,
           target: 'cli'
         }
       });
@@ -2281,7 +2281,7 @@ ${goal}`
           issueIdentifier: issue.identifier,
           issueTitle: issue.title || null,
           issueUrl: issue.url || null,
-          dispatchedBy: session?.linearUserId || null,
+          dispatchedBy: session?.accountId || null,
           target: 'cli'
         }
       });

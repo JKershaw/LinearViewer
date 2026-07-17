@@ -226,7 +226,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
   //
   // Durable, private-per-user transcript CRUD. Every endpoint is gated on the
   // `taskChat` flag AND a present `accountId` (the only accepted identity, LIN-1353
-  // — was `linearUserId`, which excluded GitHub/local users even though they carry
+  // — the prior session field excluded GitHub/local users even though they carry
   // a real accountId via establishAccount); an absent identity returns 401 rather
   // than fabricating a fallback id (mirrors dispatch recents). These literal
   // `/saved` routes MUST be registered BEFORE the `/:issueId` turn route below, or
@@ -452,7 +452,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           agentStatusStore,
           sessionIsTerminal,
           followUpEnabled: true,
-          dispatchedBy: req.session.linearUserId || null,
+          dispatchedBy: req.session?.accountId || null,
           // LIN-1139: thread the workspace prefs store so a tool-driven follow-up
           // resolves model/harness through the shared dispatch factory.
           workspacePreferencesStore,

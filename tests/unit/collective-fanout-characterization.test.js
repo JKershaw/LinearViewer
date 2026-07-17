@@ -96,7 +96,7 @@ function buildApp(captured) {
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey };
       req.session = {
-        linearUserId: 'u1',
+        accountId: 'u1',
         features: { collective: true },
         workspaces: WORKSPACES,
       };
@@ -295,7 +295,7 @@ describe('POST /collective/start — persona threading + recent recording (LIN-1
       getDeployInfo: () => ({}),
       workspaceFromUrl: (req, res, next) => {
         req.workspace = { urlKey: req.params.urlKey };
-        req.session = { linearUserId: 'u1', features: { collective: true }, workspaces: WORKSPACES };
+        req.session = { accountId: 'u1', features: { collective: true }, workspaces: WORKSPACES };
         next();
       },
     }));
@@ -379,7 +379,7 @@ describe('POST /collective/start — persona threading + recent recording (LIN-1
       getDeployInfo: () => ({}),
       workspaceFromUrl: (req, res, next) => {
         req.workspace = { urlKey: req.params.urlKey };
-        req.session = { linearUserId: 'u1', features: { collective: true }, workspaces: WORKSPACES };
+        req.session = { accountId: 'u1', features: { collective: true }, workspaces: WORKSPACES };
         next();
       },
     }));

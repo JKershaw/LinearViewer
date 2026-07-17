@@ -100,7 +100,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
 
     assert.strictEqual(res.redirectedTo, '/workspace/acme/');
     assert.strictEqual(session.workspaces.length, 1);
-    assert.strictEqual(session.linearUserId, 'viewer-1');
+    assert.strictEqual(session.linearUserId, undefined);
     assert.ok(session.accountId, 'session.accountId set by establishAccount');
   });
 
