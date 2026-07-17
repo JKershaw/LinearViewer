@@ -196,6 +196,11 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
         urlKey: org.urlKey || org.name,
         addedAt: Date.now()
       }
+      // Linear documents expires_in as 86399 — one second off the 86400 fallback
+      // below, so the stored tokenExpiresAt cannot tell a real value from a
+      // substituted default after the fact. Only the raw field can (LIN-1367).
+      console.log(`Linear OAuth callback; expires_in=${JSON.stringify(data.expires_in)} (present=${data.expires_in !== undefined})`)
+
       linkProvider(workspace, authProvider.name, org.id, {
         token: data.access_token,
         refreshToken: data.refresh_token,
