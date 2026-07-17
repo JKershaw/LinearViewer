@@ -524,6 +524,24 @@ describe('deploy-boundary straddle merge (LIN-1393)', () => {
     assert.strictEqual(sessions[0].sessionId, 'a');
     assert.deepStrictEqual(sessions[0].loops.map(l => l.loopId).sort(), ['a', 'b', 'b2', 'd']);
   });
+
+  test('a straddle whose true root is already owned by an existing pass-1 session (rootOwnerSessionId branch) merges into that session rather than seeding a new one', () => {
+    // Unlike the two tests above (root unclaimed when 2.5a runs), here root 'a'
+    // is claimed in pass 1 via its explicit sessionId, so sessionIdByLoopId.get(root.loopId)
+    // is already truthy by the time 2.5a resolves group 'b' to its root.
+    const loops = loopsFrom([
+      orchestrator(),
+      worker('a', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
+      worker('b', UNRELATED, '2026-06-22T11:00:00.000Z', { followUpTo: 'a' }),
+      worker('c', UNRELATED, '2026-06-22T11:30:00.000Z', { followUpTo: 'b', sessionGroupId: 'b' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(sessions.length, 1, 'no separate session should be seeded at root a');
+    const s = sessions.find(x => x.sessionId === SESSION_ID);
+    assert.ok(s, 'the straddle must merge into the existing autopilot session');
+    assert.deepStrictEqual(s.loops.map(l => l.loopId).sort(), ['a', 'ap-1', 'b', 'c']);
+  });
 });
 
 // ─── Public API ───────────────────────────────────────────────────────────────
