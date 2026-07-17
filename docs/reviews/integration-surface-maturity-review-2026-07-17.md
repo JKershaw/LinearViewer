@@ -90,7 +90,7 @@ task is minted for any of these**; each is a pointer for a human to triage.
 
 *Surface: FLOW · Dimensions: core/happy-path, configuration (both first-party) · Confidence: High*
 
-`lastRunAt` and `cadence` exist on every one of the 15 registry entries (`lib/periodicals.js:702-812`)
+`lastRunAt` and `cadence` exist on every one of the 14 registry entries (`lib/periodicals.js:702-812`)
 but are, by the module's own comment, "carried but not yet consumed" (`lib/periodicals.js:49`) and
 "Autopilot is not yet wired to dispatch periodicals" (`:31`). A repo-wide search finds no writer for
 `lastRunAt` anywhere outside `lib/periodicals.js` and its own unit test. Concretely: **Stage 1** (mint
@@ -134,7 +134,7 @@ pattern, which exists to solve exactly this class of problem in the sibling proj
 error handling, resilience, rate limits/pagination, idempotency/consistency (Reliability) and
 whether a gap is visible or observable (Observability) at six locations
 (`:538-539, :561, :618, :643, :677-678, :691`), and `tests/unit/periodicals.test.js:794-801,906-907`
-pins those names into the prompt text. Neither exists in the 15-entry registry, and no
+pins those names into the prompt text. Neither exists in the 14-entry registry, and no
 `docs/reviews/reliability-*` or `observability-*` report has ever been produced. That means **ten of
 this review's twelve dimensions** have no dedicated, systematic owner across the whole portfolio —
 what little evidence exists for them arrives only incidentally, via Security/API-Quality/Recent-
@@ -302,7 +302,7 @@ Confidence is this run's own honesty check, not a maturity score.
 | id | What it is | CHP | CFG | Confidence | Delta |
 |---|---|---|---|---|---|
 | `mod-provider-abstraction` | Name→instance registry decoupling Linear specifics from render/route surfaces | 4 | N/A* (pure in-memory registry) | High | n/a (baseline) |
-| `mod-periodicals` | Registry of 15 recurring review templates; two-stage mint/self-conclude contract | 3 | 3 | High | n/a (baseline) |
+| `mod-periodicals` | Registry of 14 recurring review templates; two-stage mint/self-conclude contract | 3 | 3 | High | n/a (baseline) |
 | `mod-prompt-template-system` | Deterministic + AI-generated prompt system, shared grounding post-pass | 4 | N/A* (pure compute/template) | High | n/a (baseline) |
 | `mod-roadmap-trajectory` | Deterministic velocity/execution-order/milestone layer + narrative pipeline | 3 | 3 | Medium/Low | n/a (baseline) |
 | `mod-render-layer` | ~20 server-side page renderers, tiered first-class/experimental/power-user | 4 / 2-3 (experimental) | N/A* (pure templating) | Medium | n/a (baseline) |
