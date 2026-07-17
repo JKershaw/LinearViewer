@@ -454,12 +454,13 @@ window.api = async function api(url, opts = {}) {
  * @param {boolean} [opts.proxyForce=false]         Force `attachProxy:true` regardless of the toggle (LIN-645) — for surfaces whose prompt requires the proxy (e.g. next-run kickoff)
  * @param {string} [opts.followUpTo]                Resume a prior session (cli/web only); forwarded to the server as an opaque id
  * @param {boolean} [opts.force]                    Whether to force-follow-up even into a terminal session
+ * @param {string} [opts.presetId]                  Selected dispatch preset id (LIN-1391); blank/omitted sends no presetId, so the consumer's own default resolution applies unchanged (LIN-1094/1390)
  * @returns {Promise<Object>} Parsed JSON response body
  * @throws {Error} on missing required args or a non-ok response. The thrown
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -499,6 +500,7 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   if (harness) payload.harness = harness;
   if (followUpTo) payload.followUpTo = followUpTo;
   if (force !== undefined) payload.force = force;
+  if (presetId) payload.presetId = presetId;
 
   // on401:false — dispatch surfaces (swipe etc.) branch on err.status rather
   // than redirecting, so the 401 is thrown like any other error.

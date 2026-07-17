@@ -140,7 +140,7 @@ async function refreshDispatchPromptLists(favoritesContainer, recentsContainer, 
 /**
  * Dispatch a custom prompt and update UI feedback
  */
-async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer, execScope }) {
+async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer, execScope, presetScope }) {
   const originalText = btn.textContent
   btn.textContent = 'sending...'
   btn.disabled = true
@@ -151,6 +151,7 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
     // separate append call are no longer needed.
 
     const { model, harness } = window.readDispatchExecControls(execScope)
+    const presetId = readDispatchPresetPicker(presetScope)
 
     // Custom prompts are not anchored to a Linear issue — opt out of the
     // issue-link contract explicitly. A loaded Autopilot kickoff carries an
@@ -164,7 +165,8 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
       repo: repo || undefined,
       issueless: true,
       model,
-      harness
+      harness,
+      presetId
     })
 
     btn.textContent = 'dispatched!'
@@ -218,6 +220,50 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
   }, 1500)
 }
 
+// =============================================================================
+// Preset Picker (LIN-1391 S9)
+// =============================================================================
+
+/**
+ * Fetch the workspace's saved dispatch presets and render a `<select>` picker
+ * into the given container. Non-fatal on failure: an empty/failed fetch just
+ * leaves the picker with only the "— none —" option, same as an empty preset
+ * list — Settings (LIN-1391 S7) is where presets are actually managed.
+ */
+async function loadDispatchPresetPicker(container) {
+  const urlKey = container.dataset.urlKey
+  let presets = []
+  try {
+    // on401:false — this is a background enrichment fetch on a page whose
+    // primary content already loaded; it must not bounce the page to /logout.
+    const data = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/presets`, { on401: false })
+    presets = (data && data.presets) || []
+  } catch (e) {
+    // Non-fatal: picker just offers "none"
+  }
+
+  const optionsHtml = presets.map(p =>
+    `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`
+  ).join('')
+  container.innerHTML = `<select class="dispatch-preset-select" aria-label="Preset">
+    <option value="">&mdash; none &mdash;</option>
+    ${optionsHtml}
+  </select>`
+}
+
+/**
+ * Read the selected preset id back out of a preset-picker container (or the
+ * select itself). Blank selection reads back `undefined` (never sent), same
+ * blank-omitted contract as readDispatchExecControls' model field.
+ */
+function readDispatchPresetPicker(scopeEl) {
+  if (!scopeEl) return undefined
+  const select = scopeEl.matches && scopeEl.matches('.dispatch-preset-select')
+    ? scopeEl
+    : scopeEl.querySelector && scopeEl.querySelector('.dispatch-preset-select')
+  return (select && select.value) || undefined
+}
+
 /**
  * Initialize dispatch prompt on dispatch page.
  */
@@ -247,6 +293,15 @@ function initDispatchPagePrompt() {
       modelPlaceholder: defaultModel ? `model (default: ${defaultModel})` : 'model',
       harnessDefault: defaultHarness || undefined
     })
+  }
+
+  // Inject the preset picker (LIN-1391 S9) into its server-rendered placeholder,
+  // alongside the exec controls above. A selected preset's id rides the
+  // dispatch POST as `presetId` (routes/dispatch.js already resolves it,
+  // LIN-1390 S6); routing/precedence itself is not this page's concern.
+  const presetContainer = section.querySelector('.dispatch-preset-picker-container')
+  if (presetContainer) {
+    loadDispatchPresetPicker(presetContainer)
   }
 
   // Load favourites + recent prompts (favourite membership drives the ⭐ state
@@ -390,7 +445,7 @@ function initDispatchPagePrompt() {
       // A loaded Autopilot kickoff sets these; hand-typed prompts leave them undefined.
       const kind = textarea.dataset.kind || undefined
       const promptName = textarea.dataset.promptName || undefined
-      await dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer, execScope: execContainer })
+      await dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer, execScope: execContainer, presetScope: presetContainer })
       return
     }
 

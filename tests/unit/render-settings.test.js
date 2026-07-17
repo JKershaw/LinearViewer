@@ -498,3 +498,87 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
     assert.doesNotThrow(() => renderSettingsPage('Acme', BASE));
   });
 });
+
+describe('renderSettingsPage — Dispatch presets section (LIN-1391 S7)', () => {
+  test('always renders the section header as a sibling of Dispatch defaults, not nested inside it', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.match(html, /data-testid="settings-section-dispatch-presets"/);
+    assert.match(html, />Dispatch presets</);
+    const ddIdx = html.indexOf('data-testid="settings-section-dispatch-defaults"');
+    const ddSectionEnd = html.indexOf('</section>', ddIdx);
+    const dpIdx = html.indexOf('data-testid="settings-section-dispatch-presets"');
+    assert.ok(ddIdx > -1 && ddSectionEnd > -1 && dpIdx > -1);
+    assert.ok(dpIdx > ddSectionEnd, 'dispatch-presets section must not be nested inside dispatch-defaults');
+  });
+
+  test('shows an empty state when there are no saved presets', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.match(html, /data-testid="dispatch-presets-empty"/);
+    assert.match(html, />No saved presets yet</);
+  });
+
+  test('renders one row per saved preset, populated from its name/config', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchPresets: [
+        { id: 'p1', name: 'Claude preset', config: { model: 'anthropic/claude-opus-4.8', harness: 'claude-code' } },
+        { id: 'p2', name: 'OpenCode preset', config: { harness: 'opencode' } }
+      ]
+    });
+    assert.doesNotMatch(html, /data-testid="dispatch-presets-empty"/);
+
+    const p1Start = html.indexOf('data-testid="dispatch-preset-item-p1"');
+    const p1 = html.slice(p1Start, p1Start + 1500);
+    assert.match(p1, /class="dispatch-preset-name-input"[^>]*value="Claude preset"/);
+    assert.match(p1, /name="preset__p1__Model"[^>]*value="anthropic\/claude-opus-4\.8"/);
+    assert.match(p1, /<option value="claude-code" selected>/);
+    assert.match(p1, /data-preset-id="p1"/);
+
+    const p2Start = html.indexOf('data-testid="dispatch-preset-item-p2"');
+    const p2 = html.slice(p2Start, p2Start + 1500);
+    assert.match(p2, /class="dispatch-preset-name-input"[^>]*value="OpenCode preset"/);
+    assert.match(p2, /name="preset__p2__Model"[^>]*value=""/);
+    assert.match(p2, /<option value="opencode" selected>/);
+  });
+
+  test('a preset with a blank harness does NOT pre-select claude-code — blank must stay meaningfully blank', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchPresets: [{ id: 'p1', name: 'Blank harness preset', config: { model: 'anthropic/claude-opus-4.8' } }]
+    });
+    const rowStart = html.indexOf('data-testid="dispatch-preset-item-p1"');
+    const row = html.slice(rowStart, rowStart + 1500);
+    assert.doesNotMatch(row, /<option value="claude-code" selected>/);
+    assert.doesNotMatch(row, /<option value="opencode" selected>/);
+    assert.match(row, /<option value=""[^>]* selected>/);
+  });
+
+  test('the "new preset" row never pre-selects claude-code either (LIN-1111 hazard applies here too)', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    const rowStart = html.indexOf('data-testid="dispatch-preset-new-row"');
+    assert.ok(rowStart > -1, 'expected a new-preset config row');
+    const row = html.slice(rowStart, rowStart + 1200);
+    assert.doesNotMatch(row, /<option value="claude-code" selected>/);
+    assert.match(row, /<option value=""[^>]* selected>/);
+  });
+
+  test('each preset config row reuses the shared harness-aware model datalists (LIN-1282)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchPresets: [{ id: 'p1', name: 'Claude preset', config: { harness: 'claude-code' } }]
+    });
+    const rowStart = html.indexOf('data-testid="dispatch-preset-item-p1"');
+    const row = html.slice(rowStart, rowStart + 1500);
+    assert.match(row, /name="preset__p1__Model"[^>]*data-model-list-claude="dispatch-model-suggestions-claude"[^>]*data-model-list-opencode="dispatch-model-suggestions"/);
+    assert.match(row, /list="dispatch-model-suggestions-claude"/);
+  });
+
+  test('loads /settings.js so the preset CRUD handlers are wired', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.match(html, /<script src="\/settings\.js">/);
+  });
+
+  test('does not throw when dispatchPresets is omitted', () => {
+    assert.doesNotThrow(() => renderSettingsPage('Acme', BASE));
+  });
+});

@@ -2464,6 +2464,24 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   color: var(--fg-dim);
 }
 
+/* Preset picker (LIN-1391 S9) — same control shape as the exec controls above,
+   rendered client-side into .dispatch-preset-picker-container. */
+.dispatch-preset-select {
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 12ch;
+}
+
+.dispatch-preset-select:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
 /* Prompt text - monospace, preserves formatting */
 .prompt-text {
   font-family: var(--font-structural);

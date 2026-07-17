@@ -8,6 +8,8 @@
  *    - DELETE /workspace/:urlKey/api/dispatch/:itemId - Remove item
  *    - GET /workspace/:urlKey/api/dispatch/count - Get queue count
  *    - Token management endpoints
+ *    - Dispatch presets CRUD (LIN-1391): GET/POST /workspace/:urlKey/api/dispatch/presets,
+ *      PATCH/DELETE /workspace/:urlKey/api/dispatch/presets/:presetId
  *
  * 2. Consumer API (token auth):
  *    - GET /api/dispatch/poll - Poll for available items
@@ -24,7 +26,7 @@ import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { isValidDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { FEEDBACK_ENTRY_KINDS } from '../lib/dispatch-store.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
-import { validateDispatchPayload } from '../lib/dispatch-validation.js';
+import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { attachProxyContext } from '../lib/proxy-preamble.js';
 
@@ -111,7 +113,8 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  *   resolve dispatchDefaults (model/harness) for blank incoming values (LIN-1094)
  * @param {Object} [options.dispatchPresetsStore] - Dispatch presets store (LIN-1390), used to
  *   validate an incoming `presetId` and resolve its config's routing precedence over
- *   workspace dispatchDefaults. Absent → `presetId` is accepted but has no effect.
+ *   workspace dispatchDefaults. Absent → `presetId` is accepted but has no effect. Also
+ *   backs the preset CRUD API below (LIN-1391 S7) — absent → CRUD routes 503.
  * @param {Object} [options.proxyTokenStore] - Proxy token store, used to mint the single-use
  *   bootstrap and attach the workspace-API proxy-context block server-side when the client
  *   requests it (`attachProxy:true`), so a claude-code dispatch carries the token as the
@@ -847,6 +850,124 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     } catch (err) {
       console.error('Revoke token error:', err.message);
       jsonError(res, 500, 'Failed to revoke token');
+    }
+  });
+
+  // =========================================================================
+  // Dispatch Presets CRUD API (Session Auth) — LIN-1391 S7
+  //
+  // Named, workspace-scoped, reusable dispatch routing configs
+  // (dispatchPresetsStore, LIN-1390). Follows the routes/collective.js
+  // preset-CRUD convention (POST create / DELETE) plus an update route,
+  // rather than the single-form dispatch-defaults POST above — a preset list
+  // grows/shrinks, so it doesn't fit one fixed-shape form. Config authoring
+  // here is top-level model/harness ONLY (LIN-1391 scope; byKind authoring is
+  // out of scope) — an update therefore preserves any existing `byKind` on
+  // the preset verbatim rather than silently dropping it, since this route
+  // never has an opinion on it.
+  // =========================================================================
+
+  function buildDispatchPresetConfig({ model, harness, byKind }) {
+    const config = {};
+    const trimmedModel = typeof model === 'string' ? model.trim() : '';
+    const trimmedHarness = typeof harness === 'string' ? harness.trim() : '';
+    if (trimmedModel) config.model = trimmedModel;
+    if (trimmedHarness) config.harness = trimmedHarness;
+    if (byKind && typeof byKind === 'object') config.byKind = byKind;
+    return config;
+  }
+
+  // Preset store validation errors (name/config shape, custom cap) are the
+  // only ones this route can cause; anything else is a genuine 500. Mirrors
+  // the same status-by-message-pattern convention routes/collective.js uses
+  // for its own preset store.
+  function dispatchPresetErrorStatus(message) {
+    return /required|characters or less|must be|maximum of/.test(message) ? 400 : 500;
+  }
+
+  /**
+   * GET /workspace/:urlKey/api/dispatch/presets
+   * List saved dispatch presets for this workspace.
+   */
+  router.get('/workspace/:urlKey/api/dispatch/presets', workspaceFromUrl, async (req, res) => {
+    if (!dispatchPresetsStore) return res.json({ presets: [] });
+    try {
+      const presets = await dispatchPresetsStore.list(req.workspace.urlKey);
+      res.json({ presets });
+    } catch (err) {
+      console.error('List dispatch presets error:', err.message);
+      jsonError(res, 500, 'Failed to list dispatch presets');
+    }
+  });
+
+  /**
+   * POST /workspace/:urlKey/api/dispatch/presets
+   * Create a new dispatch preset. Body: { name, model?, harness? }.
+   */
+  router.post('/workspace/:urlKey/api/dispatch/presets', workspaceFromUrl, async (req, res) => {
+    if (!dispatchPresetsStore) return jsonError(res, 503, 'Preset storage is not configured');
+
+    const { name, model, harness } = req.body || {};
+    const modelError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
+    if (modelError) return badRequest.json(res, modelError.error);
+    const harnessError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+    if (harnessError) return badRequest.json(res, harnessError.error);
+
+    try {
+      const preset = await dispatchPresetsStore.createCustom(req.workspace.urlKey, {
+        name,
+        config: buildDispatchPresetConfig({ model, harness })
+      });
+      res.status(201).json({ success: true, preset });
+    } catch (error) {
+      console.error('Create dispatch preset error:', error.message);
+      jsonError(res, dispatchPresetErrorStatus(error.message), error.message || 'Failed to create preset');
+    }
+  });
+
+  /**
+   * PATCH /workspace/:urlKey/api/dispatch/presets/:presetId
+   * Update an existing dispatch preset in place. Body: { name?, model?, harness? }.
+   */
+  router.patch('/workspace/:urlKey/api/dispatch/presets/:presetId', workspaceFromUrl, async (req, res) => {
+    if (!dispatchPresetsStore) return jsonError(res, 503, 'Preset storage is not configured');
+
+    const { name, model, harness } = req.body || {};
+    const modelError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
+    if (modelError) return badRequest.json(res, modelError.error);
+    const harnessError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+    if (harnessError) return badRequest.json(res, harnessError.error);
+
+    try {
+      const existing = await dispatchPresetsStore.get(req.workspace.urlKey, req.params.presetId);
+      if (!existing) return notFound.json(res, 'Preset not found');
+
+      const config = buildDispatchPresetConfig({ model, harness, byKind: existing.config?.byKind });
+      const preset = await dispatchPresetsStore.update(req.workspace.urlKey, req.params.presetId, {
+        name: name !== undefined ? name : existing.name,
+        config
+      });
+      if (!preset) return notFound.json(res, 'Preset not found');
+      res.json({ success: true, preset });
+    } catch (error) {
+      console.error('Update dispatch preset error:', error.message);
+      jsonError(res, dispatchPresetErrorStatus(error.message), error.message || 'Failed to update preset');
+    }
+  });
+
+  /**
+   * DELETE /workspace/:urlKey/api/dispatch/presets/:presetId
+   * Delete a saved dispatch preset.
+   */
+  router.delete('/workspace/:urlKey/api/dispatch/presets/:presetId', workspaceFromUrl, async (req, res) => {
+    if (!dispatchPresetsStore) return jsonError(res, 503, 'Preset storage is not configured');
+    try {
+      const deleted = await dispatchPresetsStore.delete(req.workspace.urlKey, req.params.presetId);
+      if (!deleted) return notFound.json(res, 'Preset not found');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete dispatch preset error:', error.message);
+      jsonError(res, 500, 'Failed to delete preset');
     }
   });
 
