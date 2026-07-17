@@ -497,6 +497,35 @@ describe('durable-group follow-up stitch by sessionGroupId (LIN-1341)', () => {
   });
 });
 
+describe('deploy-boundary straddle merge (LIN-1393)', () => {
+  test('a chain unstamped at deploy time (A <- B) whose first post-deploy reply (C, grp=B) merges ALL THREE into one session, not {A} and {B,C}', () => {
+    const loops = loopsFrom([
+      worker('a', UNRELATED, '2026-06-22T10:00:00.000Z'),
+      worker('b', UNRELATED, '2026-06-22T10:30:00.000Z', { followUpTo: 'a' }),
+      worker('c', UNRELATED, '2026-06-22T11:00:00.000Z', { followUpTo: 'b', sessionGroupId: 'b' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(sessions.length, 1, 'the whole chain must land in ONE session, not split into {a} and {b,c}');
+    assert.strictEqual(sessions[0].sessionId, 'a');
+    assert.deepStrictEqual(sessions[0].loops.map(l => l.loopId).sort(), ['a', 'b', 'c']);
+  });
+
+  test('a deeper straddle (A <- B <- B2, all unstamped at deploy) merges once B2\'s reply (D, grp=B2) is stamped', () => {
+    const loops = loopsFrom([
+      worker('a', UNRELATED, '2026-06-22T10:00:00.000Z'),
+      worker('b', UNRELATED, '2026-06-22T10:20:00.000Z', { followUpTo: 'a' }),
+      worker('b2', UNRELATED, '2026-06-22T10:40:00.000Z', { followUpTo: 'b' }),
+      worker('d', UNRELATED, '2026-06-22T11:00:00.000Z', { followUpTo: 'b2', sessionGroupId: 'b2' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(sessions.length, 1);
+    assert.strictEqual(sessions[0].sessionId, 'a');
+    assert.deepStrictEqual(sessions[0].loops.map(l => l.loopId).sort(), ['a', 'b', 'b2', 'd']);
+  });
+});
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 describe('getSessionsForWorkspace', () => {
