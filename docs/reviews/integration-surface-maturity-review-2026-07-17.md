@@ -75,9 +75,13 @@ dimension exists to watch for: this review's first-party read of the free-tier r
 defect in the same code that breaks it functionally. Both are true at once — "wired" is not "correct" —
 and that tension is itself the finding (R5).
 
-No Reliability or Observability review exists in the registry yet, so ten of this report's twelve
-dimensions have, at best, thin or stale sibling coverage across the whole portfolio. That gap is
-named here, as the prompt requires, rather than absorbed or silently scored around.
+No Reliability ([LIN-1040](https://linear.app/linearviewer/issue/LIN-1040)) or Observability
+([LIN-1041](https://linear.app/linearviewer/issue/LIN-1041)) review exists in the registry yet.
+That leaves this report's twelve dimensions split two ways: **five** — error handling, resilience,
+rate limits & pagination, idempotency & consistency, and observability — have no owner at all until
+those two reviews are built, while the other **five** already have dedicated owners (Security, API
+Quality, Test Coverage Gap, Documentation) whose evidence has simply gone stale (see R6). Both
+halves are named here, as the prompt requires, rather than absorbed or silently scored around.
 
 ---
 
@@ -145,17 +149,21 @@ error handling, resilience, rate limits/pagination, idempotency/consistency (Rel
 whether a gap is visible or observable (Observability) at six locations
 (`:538-539, :561, :618, :643, :677-678, :691`), and `tests/unit/periodicals.test.js:794-801,906-907`
 pins those names into the prompt text. Neither exists in the 14-entry registry, and no
-`docs/reviews/reliability-*` or `observability-*` report has ever been produced. That leaves **five of
+`docs/reviews/reliability-*` or `observability-*` report has ever been produced — but neither is
+unowned in the ticket-tracking sense: **[LIN-1040](https://linear.app/linearviewer/issue/LIN-1040)**
+(Backlog) owns building the Reliability review and **[LIN-1041](https://linear.app/linearviewer/issue/LIN-1041)**
+(Backlog) owns building the Observability review; both are the unbuilt owners this report defers to,
+not gaps with no named owner at all. That leaves **five of
 this review's twelve dimensions** — error handling, resilience, rate limits & pagination, and
 idempotency & consistency (Reliability's remit), plus observability (Observability's remit) — with no
 dedicated, systematic owner anywhere in the portfolio. The other five dimensions this pair of missing
 reviews would otherwise touch (auth & credentials, security, input & schema validation, testing,
 documentation) *do* have dedicated owners — Security, API Quality, Test Coverage Gap, Documentation —
-so their evidence isn't incidental, only 22 days stale (see R6). Combined, that's the headline above:
-ten of twelve dimensions have, at best, thin or stale sibling coverage — five genuinely unowned, five
-owned but stale. This review does not build the missing two (out of remit, and explicitly not this
-review's job per its own contract) — it names the gap, as instructed, so it stops being silently
-absorbed or forgotten.
+so their evidence isn't incidental, only 22 days stale (see R6). Combined, that's the split named in
+the headline above: five dimensions genuinely have no owner pending LIN-1040/LIN-1041, five have
+owners whose evidence is merely stale. This review does not build the missing two (out of remit, and
+explicitly not this review's job per its own contract) — it names the gap, as instructed, so it stops
+being silently absorbed or forgotten.
 
 ### R4 — Security H1 (stored XSS in the feedback-widget image proxy) is 22 days stale with no confirmed fix · **Impact: M · Effort: — (Security Review's to re-run) · sibling-owned, cited only**
 
@@ -245,15 +253,16 @@ it's cited; where it doesn't, that's stated plainly rather than guessed.
 | Input & schema validation | API Quality Review | 2026-06-25, 22d stale | Medium | Rated clean on trust boundaries at the time; one finding (H3) already known-stale (file deleted 6 days later) |
 | Testing | Test Coverage Gap Review | 2026-06-25, 22d stale, BASELINE | Low-Medium | 82.80% line coverage; **Critical**, still-open free-tier defect (R5); High: `dispatch-tokens.js` (auth boundary) 0% covered |
 | Documentation | Documentation Review | 2026-06-25, 22d stale | Medium | GitHub-auth surface was undocumented at the time (since closed per CLAUDE.md's current GitHub App section — spot-checked as part of this run and now present); periodicals.js stale-count prose (LIN-687) since fixed inline in the same PR that landed this review |
-| Error handling | **Reliability — not yet built** | no report exists | — | Only incidental coverage via API Quality (M1/M2/M4 error-envelope/status-code findings) — no systematic pass |
-| Resilience | **Reliability — not yet built** | no report exists | — | No dedicated review; this run's own FLOW traces found real retry/backoff/fail-closed patterns (`lib/linear-fetch.js`, `lib/openrouter-catalog.js`) but that was incidental to core/happy-path scoring, not a resilience-dimension pass |
-| Rate limits & pagination | **Reliability — not yet built** | no report exists | — | API Quality's L4 (proxy `/search` ignores `limit`) is the only known finding; no systematic pass |
-| Idempotency & consistency | **Reliability — not yet built** | no report exists | — | API Quality's M3 (dispatch `take` not retry-safe) is the only known finding; no systematic pass |
-| Observability | **Observability — not yet built** | no report exists | — | No dedicated review anywhere in the portfolio |
+| Error handling | **Reliability — not yet built ([LIN-1040](https://linear.app/linearviewer/issue/LIN-1040))** | no report exists | — | Only incidental coverage via API Quality (M1/M2/M4 error-envelope/status-code findings) — no systematic pass |
+| Resilience | **Reliability — not yet built ([LIN-1040](https://linear.app/linearviewer/issue/LIN-1040))** | no report exists | — | No dedicated review; this run's own FLOW traces found real retry/backoff/fail-closed patterns (`lib/linear-fetch.js`, `lib/openrouter-catalog.js`) but that was incidental to core/happy-path scoring, not a resilience-dimension pass |
+| Rate limits & pagination | **Reliability — not yet built ([LIN-1040](https://linear.app/linearviewer/issue/LIN-1040))** | no report exists | — | API Quality's L4 (proxy `/search` ignores `limit`) is the only known finding; no systematic pass |
+| Idempotency & consistency | **Reliability — not yet built ([LIN-1040](https://linear.app/linearviewer/issue/LIN-1040))** | no report exists | — | API Quality's M3 (dispatch `take` not retry-safe) is the only known finding; no systematic pass |
+| Observability | **Observability — not yet built ([LIN-1041](https://linear.app/linearviewer/issue/LIN-1041))** | no report exists | — | No dedicated review anywhere in the portfolio |
 
-Named explicitly per the contract: **Reliability** and **Observability** are the natural home for
-deeper follow-up on the five dimension-rows above with no owning review — this report mints nothing
-into that territory.
+Named explicitly per the contract: **Reliability** ([LIN-1040](https://linear.app/linearviewer/issue/LIN-1040))
+and **Observability** ([LIN-1041](https://linear.app/linearviewer/issue/LIN-1041)) are the natural
+home for deeper follow-up on the five dimension-rows above with no owning review — this report mints
+nothing into that territory.
 
 ---
 
@@ -395,11 +404,14 @@ cap. Both are true — the plumbing is connected, and it's still broken — and 
 not to read "wired" as "working" anywhere in this report either.
 
 Finally, two review types this codebase clearly wants — one for reliability (timeouts, retries,
-handling failure gracefully) and one for observability (can you tell when something's wrong) — have
-been named as future work for over three weeks but still don't exist. Ten of this review's twelve
-scoring categories lean on those two, so until they're built, this portfolio's read on "does it fail
-gracefully" and "can you see when it doesn't" will stay thin no matter how many times this review
-runs.
+handling failure gracefully, tracked as [LIN-1040](https://linear.app/linearviewer/issue/LIN-1040))
+and one for observability (can you tell when something's wrong, tracked as
+[LIN-1041](https://linear.app/linearviewer/issue/LIN-1041)) — have been named as future work for
+over three weeks but still don't exist. Five of this review's twelve scoring categories have no
+owner at all until those two are built; the other five already have owners (Security, API Quality,
+Test Coverage Gap, Documentation) whose evidence has simply gone stale (see R6). So until Reliability
+and Observability exist, this portfolio's read on "does it fail gracefully" and "can you see when it
+doesn't" will stay thin no matter how many times this review runs.
 
 **If you act on one thing:** close the loop on the periodical mechanism itself (Stage 2 completion
 tracking) — it's this review's own reliability, and the fix is small. **If you act on two:** the five
