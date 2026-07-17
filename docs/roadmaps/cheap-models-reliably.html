@@ -282,10 +282,10 @@
       <b>observability</b> to see it working — transcripts, token spend, wall-clock.
     </p>
     <div class="meta-row">
-      <span class="stat" style="border-color:var(--done)"><span class="dot d-done"></span> <b>root LIN-1326 done</b> — spine cleared</span>
-      <span class="stat"><span class="dot d-prog"></span> <b>2</b> enablers finishing (1321, 1204)</span>
+      <span class="stat" style="border-color:var(--done)"><span class="dot d-done"></span> <b>spine done</b> — 1326 + 1204 landed</span>
+      <span class="stat" style="border-color:var(--amber)"><span class="dot d-prog"></span> <b>1</b> enabler left: LIN-1321 presets</span>
       <span class="stat"><span class="dot d-todo"></span> stepper + observability next</span>
-      <span class="stat">updated <b>17 Jul</b> · <span class="rid">rev 2</span></span>
+      <span class="stat">updated <b>17 Jul</b> · <span class="rid">rev 3</span></span>
       <span class="stat">blocking edges: <b>sparse</b> — order is the missing piece</span>
     </div>
   </header>
@@ -296,8 +296,8 @@
     <p class="sec-sub">
       Almost every ticket sits at <span class="rid">unblocks 0 / path 1</span> — the backlog is really a
       flat priority list, not a dependency web. The one real spine is short, and it's the whole goal:
-      the account model gated both presets and reliable key-billing. <b>That root just landed</b> — the
-      green node is Done, and the two enablers are now unblocked and running.
+      the account model gated both presets and reliable key-billing. <b>The root and the key-billing
+      enabler have both landed</b> — only presets (LIN-1321) is left, and then the goal is reached.
     </p>
     <div class="spine">
       <div class="spine-flow">
@@ -314,12 +314,12 @@
           <div class="node">
             <div class="id">LIN-1321 <span class="st">· in progress · unblocked</span></div>
             <div class="nt">Save dispatch defaults as reusable presets</div>
-            <div class="role" style="color:var(--brand)">The per-task setup mechanism</div>
+            <div class="role" style="color:var(--brand)">Last enabler standing</div>
           </div>
-          <div class="node">
-            <div class="id">LIN-1204 <span class="st">· in progress · unblocked · bug</span></div>
+          <div class="node cleared">
+            <div class="id"><span class="strike">LIN-1204</span> <span class="st">· done ✓</span></div>
             <div class="nt">Agents fall back to free tier, not the project OpenRouter key</div>
-            <div class="role" style="color:var(--brand)">Bills cheap models correctly</div>
+            <div class="role">Cheap models now billed correctly</div>
           </div>
         </div>
         <div class="arrow stack">
@@ -333,20 +333,20 @@
             <div class="role">Cheap models, reliably</div>
           </div>
           <div class="node">
-            <div class="id">LIN-1345 <span class="st">· backlog</span></div>
+            <div class="id">LIN-1345 <span class="st">· backlog · unblocked</span></div>
             <div class="nt">Lower the shared free-key limit once dispatch uses project keys</div>
-            <div class="role" style="color:var(--muted)">Cleanup, unblocked by 1204</div>
+            <div class="role" style="color:var(--muted)">Cleanup — 1204 done, ready when you are</div>
           </div>
         </div>
       </div>
     </div>
     <div class="callout" style="background:var(--done-soft);border-color:var(--done)">
-      <h4 style="color:var(--done)">The stall cleared ✓</h4>
+      <h4 style="color:var(--done)">Down to the last enabler ✓</h4>
       <p>
-        The straight-line stall is resolved: <b>LIN-1326 is Done</b>, so LIN-1321 (presets) and
-        LIN-1204 (key-billing) are no longer waiting on anything — both are In Progress with every
-        blocker cleared. The one job now is to <b>finish those two</b>; the moment they land, per-task
-        model setups become real. Don't start new fronts until they close.
+        The spine is nearly closed: <b>LIN-1326</b> (root) and <b>LIN-1204</b> (key-billing) are both
+        <b>Done</b> — cheap models now bill to the project key. Only <b>LIN-1321 (presets)</b> remains
+        in progress. Land that single ticket and per-task model setups — Opus for research/review,
+        cheap for the rest — go live. Everything else is downstream of a done spine.
       </p>
     </div>
   </section>
@@ -378,7 +378,7 @@
         <header><h3>OpenRouter — cheap-model plumbing</h3><span class="tag">bill it right</span></header>
         <p class="pdesc">The wiring that makes a cheap model actually run, on your key, per task and per kind.</p>
         <ul class="rows">
-          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1204</span> Free-tier fallback bug <span class="badge-bug">bug</span> <span class="badge-key">unblocked</span></span><span class="prio hot">p1</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1204</span> Free-tier fallback bug — bills project key now</span><span class="prio">p1 ✓</span></li>
           <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1129</span> Choose OpenRouter models</span><span class="prio">p2</span></li>
           <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1250</span> Factor shared OpenRouter request/finish helpers</span><span class="prio">p0</span></li>
           <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1281</span> Confirm autopilot honors byKind model/harness</span><span class="prio">p4</span></li>
@@ -407,7 +407,7 @@
         <ul class="rows">
           <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1287</span> Richer claude-code telemetry to Harbour <span class="badge-key">core</span></span><span class="prio">p2</span></li>
           <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1294</span> OpenCode telemetry parity · <span class="rid">LIN-1144</span> tool-level heartbeat</span><span class="prio">p2/0</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1341</span> Follow-ups as continuations <span class="badge-bug">bug</span> · <span class="rid">LIN-1181</span> Dash cost tracking</span><span class="prio">p2</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1341</span> Follow-ups as continuations <span class="badge-bug">bug</span> · <span class="rid">LIN-1181</span> Dash cost tracking</span><span class="prio">p2</span></li>
           <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1334</span> Dispatch sessions in list · <span class="rid">LIN-1311</span> transcript migration</span><span class="prio">p0</span></li>
           <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1215</span> Local-tz second precision · <span class="rid">LIN-1163</span> runs-page layout</span><span class="prio">p3</span></li>
           <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1288/89</span> Telemetry truncation fix · feedback tagging</span><span class="prio">p1/2</span></li>
@@ -464,17 +464,17 @@
         </div>
         <div class="wave-body">
           <div class="lane"><span class="lane-tag">Finish now</span>
-            <span class="tk hot"><span class="mini d-prog"></span>LIN-1321 <span class="tkt">presets</span></span>
-            <span class="tk hot"><span class="mini d-prog"></span>LIN-1204 <span class="tkt">key-billing bug</span></span>
+            <span class="tk hot"><span class="mini d-prog"></span>LIN-1321 <span class="tkt">presets — the last one</span></span>
+            <span class="tk"><span class="mini d-done"></span>LIN-1204 <span class="tkt">key-billing · done</span></span>
           </div>
           <div class="lane"><span class="lane-tag">Then</span>
             <span class="tk"><span class="mini d-todo"></span>LIN-1129 <span class="tkt">choose models</span></span>
             <span class="tk"><span class="mini d-back"></span>LIN-1250 <span class="tkt">factor OR helpers</span></span>
-            <span class="tk"><span class="mini d-back"></span>LIN-1345 <span class="tkt">restore limits</span></span>
+            <span class="tk"><span class="mini d-back"></span>LIN-1345 <span class="tkt">restore limits · unblocked</span></span>
           </div>
           <div class="lane"><span class="lane-tag">Instruments</span>
             <span class="tk"><span class="mini d-prog"></span>LIN-1287 <span class="tkt">telemetry: tokens + wall-clock</span></span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1341 <span class="tkt">follow-up continuity</span></span>
+            <span class="tk"><span class="mini d-prog"></span>LIN-1341 <span class="tkt">follow-up continuity</span></span>
           </div>
         </div>
       </div>
