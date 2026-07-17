@@ -153,6 +153,7 @@ lib/
   http-keepalive.js    Defuses Heroku H12 30s router timeout on long handlers
   errors.js            Error response helpers
   parse-landing.js     Parses markdown content for landing page
+  deploy-info.js       Footer deploy info (LIN-1385): neutral DEPLOY_* env vars first, RAILWAY_GIT_COMMIT_SHA fallback for commit; version/createdAt have no Railway analog and stay null unless DEPLOY_VERSION/DEPLOY_CREATED_AT are set
   utils/html.js        HTML utility functions
   components/
     navbar.js          Nav bar with workspace/team selectors, queue badge
