@@ -290,6 +290,47 @@
 }
 
 /* =============================================================================
+   Dispatch presets (LIN-1391 S7)
+
+   Reuses .dispatch-default-row/.harness-select/.dispatch-model-input above for
+   each preset's config row (renderDispatchDefaultRow) — only the name line and
+   list/create wrapper need their own rules.
+   ============================================================================= */
+.dispatch-preset-name-line {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dispatch-preset-name-input {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 16ch;
+  flex: 1 1 16ch;
+}
+
+.dispatch-preset-name-input:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.dispatch-preset-empty {
+  color: var(--fg-dim);
+}
+
+.dispatch-preset-create {
+  margin-top: var(--space-3);
+}
+
+.dispatch-preset-create-submit {
+  margin-top: var(--space-2);
+}
+
+/* =============================================================================
    Feature Toggles
    ============================================================================= */
 .feature-toggle {

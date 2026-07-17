@@ -1715,6 +1715,16 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   const dispatchDefaults = dispatchDefaultsPrefs.dispatchDefaults || {};
   const dispatchDefaultsError = req.query.dispatchDefaultsError || null;
 
+  // Dispatch presets (LIN-1391 S7): named, workspace-scoped saved routing
+  // configs, listed beside Dispatch defaults. Non-fatal on failure — the
+  // section just renders empty, mirroring the dispatchDefaults read above.
+  let dispatchPresets = [];
+  try {
+    dispatchPresets = dispatchPresetsStore ? await dispatchPresetsStore.list(workspace.urlKey) : [];
+  } catch (e) {
+    // Non-fatal
+  }
+
   // AI model overrides (LIN-1145): per-operation model overrides read from the
   // same prefs object as dispatchDefaults, keyed under aiModelOverrides.
   const aiModelOverrides = dispatchDefaultsPrefs.aiModelOverrides || {};
@@ -1748,6 +1758,7 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     dispatchModelCatalog,
     aiModelOverrides,
     aiOverridesError,
+    dispatchPresets,
     // Gate the GitHub add affordance on the SAME shared predicate the /auth/github
     // route guard and landing hero use (LIN-761), so the settings page never offers
     // an add that would 503/hang on a server where GitHub isn't fully configured.
