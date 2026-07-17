@@ -111,6 +111,7 @@ import { resolveWorkspaceModel, resolveAiOperationModel, getWorkspaceFeatures, i
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 import { DISPATCH_DEFAULT_KINDS } from './lib/prompt-templates.js'
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from './lib/dispatch-validation.js'
+import { getDeployInfo } from './lib/deploy-info.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -162,19 +163,6 @@ if (process.env.LINEAR_ACCESS_TOKEN) {
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const SESSION_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes before expiry
-
-/**
- * Get Heroku deploy information from environment variables.
- * Requires `heroku labs:enable runtime-dyno-metadata` to be enabled.
- * @returns {Object} Deploy info object with version, createdAt, commit
- */
-function getDeployInfo() {
-  return {
-    version: process.env.HEROKU_RELEASE_VERSION || null,
-    createdAt: process.env.HEROKU_RELEASE_CREATED_AT || null,
-    commit: process.env.HEROKU_BUILD_COMMIT || null
-  }
-}
 
 // =============================================================================
 // Landing Page Setup
