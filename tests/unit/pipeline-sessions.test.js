@@ -389,6 +389,114 @@ describe('follow-up thread stitching by followUpTo (LIN-1292)', () => {
   });
 });
 
+// ─── Durable session-group stitch (LIN-1341) ───────────────────────────────────
+
+describe('sessionGroupId on the Loop record', () => {
+  test('_buildLoops carries sessionGroupId through from the dispatch item', () => {
+    const [loop] = loopsFrom([worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionGroupId: 'grp-1' })]);
+    assert.strictEqual(loop.sessionGroupId, 'grp-1');
+  });
+
+  test('sessionGroupId defaults to null when absent', () => {
+    const [loop] = loopsFrom([worker('w1', CHILD, '2026-06-22T10:30:00.000Z')]);
+    assert.strictEqual(loop.sessionGroupId, null);
+  });
+});
+
+describe('durable-group follow-up stitch by sessionGroupId (LIN-1341)', () => {
+  test('a stamped follow-up stitches into its anchor session by group id, O(1)', () => {
+    const loops = loopsFrom([
+      worker('orig', UNRELATED, '2026-06-22T11:00:00.000Z'),
+      worker('reply1', UNRELATED, '2026-06-22T11:30:00.000Z', { followUpTo: 'orig', sessionGroupId: 'orig' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(sessions.length, 1);
+    const s = sessions[0];
+    assert.strictEqual(s.sessionId, 'orig');
+    assert.deepStrictEqual(s.loops.map(l => l.loopId).sort(), ['orig', 'reply1']);
+  });
+
+  test('a chained, stepper/drip-fed thread (A <- B <- C), all stamped with the root\'s group id, stitches to the root', () => {
+    const loops = loopsFrom([
+      worker('a', UNRELATED, '2026-06-22T10:00:00.000Z'),
+      worker('b', UNRELATED, '2026-06-22T10:30:00.000Z', { followUpTo: 'a', sessionGroupId: 'a' }),
+      worker('c', UNRELATED, '2026-06-22T11:00:00.000Z', { followUpTo: 'b', sessionGroupId: 'a' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(sessions.length, 1);
+    const s = sessions[0];
+    assert.strictEqual(s.sessionId, 'a');
+    assert.deepStrictEqual(s.loops.map(l => l.loopId).sort(), ['a', 'b', 'c']);
+  });
+
+  test('a stamped follow-up on an autopilot worker composes with sessionId grouping (group id == the autopilot session id)', () => {
+    const loops = loopsFrom([
+      orchestrator(),
+      worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
+      // The worker's own group id is its sessionId (dispatch-store.js addItem
+      // precedence); the reply inherits it, so it lands in the SAME autopilot
+      // session without any special-casing in the stitch pass.
+      worker('reply1', CHILD, '2026-06-22T11:00:00.000Z', { followUpTo: 'w1', sessionGroupId: SESSION_ID })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    const s = sessions.find(x => x.sessionId === SESSION_ID);
+    assert.deepStrictEqual(s.loops.map(l => l.loopId).sort(), ['ap-1', 'reply1', 'w1']);
+    assert.strictEqual(sessions.find(x => x.sessionId === 'reply1'), undefined, 'the follow-up must not also appear standalone');
+  });
+
+  test('two stamped follow-ups whose root aged out of the window coalesce into ONE anchorless continuation (approved "root aged out" behavior)', () => {
+    // 'ghost-original' is not present in the loop set (outside the lookback
+    // window), but both replies still carry its id as their durable group —
+    // the group outlives the window even though the root loop no longer does.
+    const loops = loopsFrom([
+      worker('reply1', UNRELATED, '2026-06-22T11:30:00.000Z', { followUpTo: 'ghost-original', sessionGroupId: 'ghost-original' }),
+      worker('reply2', UNRELATED, '2026-06-22T12:00:00.000Z', { followUpTo: 'ghost-original', sessionGroupId: 'ghost-original' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(sessions.length, 1, 'both followers coalesce into one session, not two standalone ones');
+    assert.strictEqual(sessions[0].sessionId, 'ghost-original');
+    assert.strictEqual(sessions[0].seedIssue, null, 'anchorless — the root loop itself is not present');
+    assert.deepStrictEqual(sessions[0].loops.map(l => l.loopId).sort(), ['reply1', 'reply2']);
+  });
+
+  test('a lone follow-up whose UNSTAMPED anchor aged out still falls back to its own standalone session (fallback unchanged)', () => {
+    // Same shape as the stamped test above, but with no sessionGroupId — pins
+    // that the legacy fallback (today's behavior) is untouched for pre-field rows.
+    const loops = loopsFrom([
+      worker('reply1', UNRELATED, '2026-06-22T11:30:00.000Z', { followUpTo: 'ghost-original' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(sessions.length, 1);
+    assert.strictEqual(sessions[0].sessionId, 'reply1');
+    assert.strictEqual(sessions[0].loops.length, 1);
+  });
+
+  test('stamped-vs-fallback parity: a stamped row and an equivalent un-stamped row group identically', () => {
+    const stamped = _buildSessions(loopsFrom([
+      worker('orig', UNRELATED, '2026-06-22T11:00:00.000Z'),
+      worker('reply1', UNRELATED, '2026-06-22T11:30:00.000Z', { followUpTo: 'orig', sessionGroupId: 'orig' })
+    ]), { now: NOW });
+    const unstamped = _buildSessions(loopsFrom([
+      worker('orig', UNRELATED, '2026-06-22T11:00:00.000Z'),
+      worker('reply1', UNRELATED, '2026-06-22T11:30:00.000Z', { followUpTo: 'orig' })
+    ]), { now: NOW });
+
+    // Strip the field the fixtures deliberately differ on before comparing —
+    // every other derived field (sessionId, loop set, tasksTouched, telemetry
+    // shape) must be byte-identical.
+    const strip = (sessions) => sessions.map(s => ({
+      ...s,
+      loops: s.loops.map(({ sessionGroupId, ...rest }) => rest)
+    }));
+    assert.deepStrictEqual(strip(stamped), strip(unstamped));
+  });
+});
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 describe('getSessionsForWorkspace', () => {

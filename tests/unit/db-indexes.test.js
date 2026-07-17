@@ -103,6 +103,19 @@ describe('db-indexes', () => {
     }
   });
 
+  test('declares the durable session-group discovery index on both dispatch collections (LIN-1341)', () => {
+    // Backs the materializer's group-keyed discovery (_collectSessionIssues /
+    // _sessionsTouchingIssue) so a stamped follow-up's session is one indexed
+    // read, not a followUpTo chain-walk.
+    for (const collection of ['dispatch-history', 'dispatch-queue']) {
+      const hasIt = INDEX_SPECS.some(s =>
+        s.collection === collection &&
+        JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, sessionGroupId: 1 })
+      );
+      assert.ok(hasIt, `${collection} must have a {urlKey:1, sessionGroupId:1} index`);
+    }
+  });
+
   test('unique option is honoured for tokenHash indexes', async () => {
     const db = freshDb();
     await ensureIndexes(db);

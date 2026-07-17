@@ -240,7 +240,9 @@ describe('createDispatchItem — followUpTo issue inheritance (LIN-1292)', () =>
       fields: { followUpTo: 'anchor-1', issueIdentifier: 'LIN-9999', target: 'cli' }
     });
     assert.equal(store.captured.item.issueIdentifier, 'LIN-9999');
-    // No inheritance was attempted at all once the caller supplied its own.
+    // No ISSUE-field inheritance was attempted once the caller supplied its own
+    // issueIdentifier (the anchor lookup itself still runs — LIN-1341's session-
+    // group inheritance rides the same lookup regardless of issueIdentifier).
     assert.strictEqual(store.captured.item.issueTitle, undefined);
   });
 
@@ -264,6 +266,74 @@ describe('createDispatchItem — followUpTo issue inheritance (LIN-1292)', () =>
     const store = capturingStoreWithItems({ 'anchor-1': { issueIdentifier: 'LIN-1' } });
     await createDispatchItem({ store, urlKey: 'acme', prompt: 'x', fields: { target: 'cli' } });
     assert.strictEqual(store.captured.item.issueIdentifier, undefined);
+  });
+});
+
+describe('createDispatchItem — sessionGroupId inheritance (LIN-1341)', () => {
+  test('a follow-up inherits its anchor\'s own sessionGroupId', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { id: 'anchor-1', issueIdentifier: 'LIN-1', sessionGroupId: 'grp-root' }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'one more thing', fields: { followUpTo: 'anchor-1', target: 'cli' }
+    });
+    assert.equal(store.captured.item.sessionGroupId, 'grp-root');
+  });
+
+  test('a follow-up to an autopilot worker inherits the worker\'s sessionId as the group (composes with sessionId grouping)', async () => {
+    // The worker itself predates a followUpTo of its own, so it carries no
+    // sessionGroupId yet — the anchor's own sessionId is the next fallback,
+    // which equals the orchestrator's session id.
+    const store = capturingStoreWithItems({
+      'w1': { id: 'w1', issueIdentifier: 'LIN-1', sessionId: 'ap-1', sessionGroupId: null }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'reply', fields: { followUpTo: 'w1', target: 'cli' }
+    });
+    assert.equal(store.captured.item.sessionGroupId, 'ap-1');
+  });
+
+  test('a follow-up to a pre-field (un-stamped) anchor self-heals onto the anchor\'s own dispatch id', async () => {
+    const store = capturingStoreWithItems({
+      'orig': { id: 'orig', issueIdentifier: 'LIN-1' } // no sessionGroupId, no sessionId — legacy row
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'reply', fields: { followUpTo: 'orig', target: 'cli' }
+    });
+    assert.equal(store.captured.item.sessionGroupId, 'orig');
+  });
+
+  test('session-group inheritance still runs even when the caller supplies its own issueIdentifier', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { id: 'anchor-1', issueIdentifier: 'LIN-1292', sessionGroupId: 'grp-root' }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'x',
+      fields: { followUpTo: 'anchor-1', issueIdentifier: 'LIN-9999', target: 'cli' }
+    });
+    assert.equal(store.captured.item.sessionGroupId, 'grp-root');
+  });
+
+  test('a follow-up whose anchor is unresolvable (aged out) inherits no group — the store mints its own root', async () => {
+    const store = capturingStoreWithItems({});
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'x', fields: { followUpTo: 'ghost', target: 'cli' }
+    });
+    assert.strictEqual(store.captured.item.sessionGroupId, undefined);
+  });
+
+  test('a store without getItemStatus (test fakes) is a no-op, never throws', async () => {
+    const store = capturingStore(); // no getItemStatus method
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'x', fields: { followUpTo: 'anchor-1', target: 'cli' }
+    });
+    assert.strictEqual(store.captured.item.sessionGroupId, undefined);
+  });
+
+  test('no followUpTo: no group id is inherited (the store mints its own root)', async () => {
+    const store = capturingStoreWithItems({ 'anchor-1': { issueIdentifier: 'LIN-1', sessionGroupId: 'grp-root' } });
+    await createDispatchItem({ store, urlKey: 'acme', prompt: 'x', fields: { target: 'cli' } });
+    assert.strictEqual(store.captured.item.sessionGroupId, undefined);
   });
 });
 
