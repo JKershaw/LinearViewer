@@ -604,6 +604,36 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(s.waitingMessage, null, 'no lingering blocked message on a done session');
   });
 
+  test('a reply after a [blocked] worker clears the session-level waiting state (LIN-1341 RC2)', async () => {
+    // The block-then-replied bug: a worker posts [blocked], then a human follow-up
+    // reply (no sessionId of its own, only followUpTo) resumes and completes
+    // cleanly. Before RC2, deriveSessionWaiting unioned across ALL loops, so the
+    // superseded [blocked] loop kept the whole session waiting forever.
+    const blockedWorker = {
+      id: 'w-br', sessionId: 'sess-br', issueIdentifier: 'LIN-451', issueTitle: 'Blocked worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [{ message: '[blocked] need your decision on the auth flow', timestamp: NOW_ISO }]
+    };
+    const REPLY_TS = new Date(Date.now() + 60000).toISOString();
+    const replyWorker = {
+      id: 'w-br-reply', followUpTo: 'w-br', target: 'cli', issueIdentifier: 'LIN-451', issueTitle: 'Blocked worker',
+      promptName: 'implementation', prompt: 'reply', dispatchedAt: REPLY_TS, resolvedAt: REPLY_TS, status: 'taken',
+      feedback: [{ message: '[done] resolved after your input', timestamp: REPLY_TS }]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [autopilotLiveItem('sess-br', 'LIN-450')], history: [blockedWorker, replyWorker], agentStatus: [] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-br');
+    assert.ok(s, 'session is present');
+    assert.equal(s.waiting, false, 'the reply clears the stale [blocked] on the loop it replied to');
+    assert.notEqual(s.status, 'waiting');
+  });
+
   test('a non-terminal session idle > 24h is derived stale and bucketed out of Active', async () => {
     // Worker that died without a terminal marker, last seen 2 days ago (Bug 3).
     const OLD_ISO = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
@@ -933,6 +963,50 @@ describe('GET /api/dashboard/sessions — materialized read-model (LIN-623)', ()
     const all = [...res.jsonBody.active, ...res.jsonBody.recent];
     assert.equal(all[0].sessionId, 'sess-a');
     assert.equal(all[0].workspaceUrlKey, 'ws-a');
+  });
+
+  test('LIN-1341: a stamped, drip-fed (stepper) follow-up thread renders as ONE continuation on the default Autopilot feed, not N cards', async () => {
+    // Autopilot orchestrator + worker, then two drip-fed follow-up beats resuming
+    // the worker in turn — each stamped with the group id a real dispatch would
+    // inherit (the worker's own sessionId, i.e. the orchestrator's id).
+    const orchestrator = autopilotHistoryItem('ap-1', 'LIN-900');
+    const w1 = workerHistoryItem('w1', 'LIN-901', 'ap-1');
+    const T1 = new Date(Date.now() + 60000).toISOString();
+    const beat2 = {
+      id: 'beat-2', followUpTo: 'w1', target: 'cli', sessionGroupId: 'ap-1', issueIdentifier: 'LIN-901', issueTitle: 'Title LIN-901',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: T1, resolvedAt: T1, status: 'taken',
+      feedback: [{ message: '[pending] beat 2 done', timestamp: T1 }]
+    };
+    const T2 = new Date(Date.now() + 120000).toISOString();
+    const beat3 = {
+      id: 'beat-3', followUpTo: 'beat-2', target: 'cli', sessionGroupId: 'ap-1', issueIdentifier: 'LIN-901', issueTitle: 'Title LIN-901',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: T2, resolvedAt: T2, status: 'taken',
+      feedback: [{ message: '[done] all beats complete', timestamp: T2 }]
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [orchestrator, w1, beat2, beat3], agentStatus: [agentStatusDone('ap-1', 'LIN-900')] } };
+
+    const sessions = await realSessions(perWorkspace, 'ws-a');
+    assert.equal(sessions.length, 1, 'the real builder grouped the orchestrator, worker, and both drip-fed beats into ONE session');
+    assert.deepEqual(sessions[0].loops.map(l => l.loopId).sort(), ['ap-1', 'beat-2', 'beat-3', 'w1']);
+
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      ...throwingStores, // proves the Autopilot feed reads the materialized store, not live
+      observationSessionsStore: { async findByWorkspace(urlKey) { return urlKey === 'ws-a' ? { sessions, backfilledAt: new Date() } : { sessions: [], backfilledAt: null }; } },
+      observationMaterializer: { backfillWorkspace() { throw new Error('no backfill on a hit'); } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token', fetchIssueContext: async () => ({}), fetchWorkspaceIssues: async () => [], getOpenRouterSource: () => 'env', getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const all = [...res.jsonBody.active, ...res.jsonBody.recent];
+    assert.equal(all.length, 1, 'the default Autopilot feed renders the drip-fed thread as one card, not three');
+    assert.equal(all[0].sessionId, 'ap-1');
   });
 
   test('read-miss falls back to the live path AND kicks a one-time background backfill', async () => {
@@ -1701,6 +1775,42 @@ describe('GET /observation/session/:sessionId — brief/recap join (LIN-1003)', 
     assert.ok(html.includes('session-brief-generate'), 'cache miss shows the brief generate affordance');
     assert.ok(html.includes('session-recap-generate'), 'cache miss shows the recap generate affordance');
     assert.ok(!html.includes('sess-ctx-panel--present'), 'no present panel when both caches miss');
+  });
+});
+
+describe('GET /observation/session/:sessionId — waiting banner clears after a reply (LIN-1341 RC2)', () => {
+  test('a reply after a [blocked] worker clears the session-page waiting banner', async () => {
+    // Same scenario as the feed-level RC2 test, driven through the per-session
+    // page instead — `deriveSessionWaiting` is the single shared truth for both
+    // surfaces (routes/dashboard.js), so this pins that the fix composes there too.
+    const blockedWorker = {
+      id: 'w-sp', sessionId: 'sess-sp', issueIdentifier: 'LIN-461', issueTitle: 'Blocked worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [{ message: '[blocked] need your decision', timestamp: NOW_ISO }]
+    };
+    const REPLY_TS = new Date(Date.now() + 60000).toISOString();
+    const replyWorker = {
+      id: 'w-sp-reply', followUpTo: 'w-sp', target: 'cli', issueIdentifier: 'LIN-461', issueTitle: 'Blocked worker',
+      promptName: 'implementation', prompt: 'reply', dispatchedAt: REPLY_TS, resolvedAt: REPLY_TS, status: 'taken',
+      feedback: [{ message: '[done] resolved after your input', timestamp: REPLY_TS }]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [autopilotLiveItem('sess-sp', 'LIN-460')], history: [blockedWorker, replyWorker], agentStatus: [] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: 'sess-sp' }
+    });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const html = res.sentBody;
+    assert.ok(html, 'the page rendered');
+    assert.ok(!html.includes('session-waiting-banner'), 'no waiting banner once the reply cleared the block');
+    assert.ok(html.includes('data-session-waiting="false"'), 'the waiting flag threaded to the client is false');
   });
 });
 

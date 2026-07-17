@@ -281,19 +281,33 @@ function loopIsWaiting(loop) {
 
 /**
  * Roll a session's ENRICHED loops up to a session-level waiting signal (LIN-1005):
- * `{ waiting, message }`. `waiting` is true when any loop is waiting on a human;
- * `message` is the first available blocked/pending text (falling back to the
- * waiting run's agent summary) so the UI can show the actual message rather than a
- * manufactured taxonomy. Pure; the single truth shared by the feed payload and the
- * session-page banner so they can never disagree.
+ * `{ waiting, message }`. `waiting` is true when a chain TAIL loop is waiting on a
+ * human; `message` is the first available blocked/pending text (falling back to
+ * the waiting run's agent summary) so the UI can show the actual message rather
+ * than a manufactured taxonomy. Pure; the single truth shared by the feed payload
+ * and the session-page banner so they can never disagree.
+ *
+ * LIN-1341 (RC2, block-then-replied): a loop that has since been followed up on
+ * WITHIN THIS SESSION is superseded by its follower and excluded from the
+ * rollup — otherwise a reply that resolves a `[blocked]` loop would leave the
+ * session waiting forever, since feedback is append-only per loop and the
+ * original loop's last marker never changes. A loop nothing in the session
+ * resumes (the common case, and every chain's tail) still counts, so an
+ * ordinary standalone block is unaffected; a session with several independent
+ * chains/workers evaluates each chain's own tail.
  *
  * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
  * @returns {{waiting: boolean, message: string|null}}
  */
 function deriveSessionWaiting(enrichedLoops) {
+  const supersededLoopIds = new Set();
+  for (const l of enrichedLoops) {
+    if (l && l.followUpTo) supersededLoopIds.add(l.followUpTo);
+  }
   let waiting = false;
   let message = null;
   for (const l of enrichedLoops) {
+    if (!l || supersededLoopIds.has(l.loopId)) continue;
     if (!loopIsWaiting(l)) continue;
     waiting = true;
     if (!message) message = l.waitingMessage || l.agentSummary || null;

@@ -36,7 +36,7 @@ function setup() {
 
 // Insert an archived dispatch row directly (bypassing the hooks) so we control the
 // exact cross-session fixture the equivalence spike needs.
-function archive(historyCollection, { id, issueIdentifier, sessionId = null, kind = 'implementation', followUpTo = null, dispatchedAtMs, resolvedAtMs, feedback = [] }) {
+function archive(historyCollection, { id, issueIdentifier, sessionId = null, sessionGroupId = null, kind = 'implementation', followUpTo = null, dispatchedAtMs, resolvedAtMs, feedback = [] }) {
   historyCollection._docs.push({
     _id: id,
     urlKey: URL_KEY,
@@ -53,6 +53,7 @@ function archive(historyCollection, { id, issueIdentifier, sessionId = null, kin
     repo: null,
     followUpTo,
     sessionId,
+    sessionGroupId,
     status: 'taken',
     resolvedAt: resolvedAtMs ? new Date(resolvedAtMs) : null,
     takenByTokenLabel: null,
@@ -209,6 +210,51 @@ test('LIN-1307: a followUpTo chain rooted at a standalone/manual dispatch is nev
 
   const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
   assert.deepEqual(sessions, [], 'a standalone chain root is skipped — stays live-only, matching the write-trigger gap-1 fix');
+});
+
+test('LIN-1341: a STAMPED followUpTo chain rooted at a standalone/manual dispatch IS materialized under the durable group id (closes the old skip)', async () => {
+  const ctx = setup();
+  const { historyCollection, statusCollection, dispatchStore, agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  // Same shape as the M2/F2 case above, but F3 carries a stamped sessionGroupId
+  // equal to M3's own dispatch id — exactly what createDispatchItem's follow-up
+  // inheritance seam would stamp (LIN-1341).
+  archive(historyCollection, { id: 'M3', issueIdentifier: 'LIN-505', dispatchedAtMs: min(54), resolvedAtMs: min(55) });
+  archive(historyCollection, { id: 'F3', issueIdentifier: 'LIN-506', followUpTo: 'M3', sessionGroupId: 'M3', kind: 'custom', dispatchedAtMs: min(56), resolvedAtMs: min(57) });
+  status(statusCollection, { id: 'AS-m3', taskIdentifier: 'LIN-505', tsMs: min(54) + 15 * 1000 });
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore, agentStatusStore, lean: true });
+  assert.deepEqual(full.map(s => s.sessionId).sort(), ['M3'], 'the live build still stitches F3 into M3\'s standalone session');
+
+  await materializer.rebuildForWrite(URL_KEY, { issueIdentifier: 'LIN-506' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  assert.deepEqual(sessions.map(s => s.sessionId), ['M3'], 'the durable group id resolves the target session directly — unlike the unstamped case above, this is no longer skipped');
+  assert.deepEqual(sessions[0], full.find(s => s.sessionId === 'M3'), 'byte-identical to the live build');
+});
+
+test('LIN-1341: a STAMPED followUpTo reply closure is discovered via the direct sessionGroupId query (byte-identical to the live build)', async () => {
+  const ctx = setup();
+  seedFollowUpFixture(ctx);
+  const { historyCollection, dispatchStore, agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  // Re-seed F with a stamped sessionGroupId equal to W's own sessionId (the
+  // group a reply to an autopilot worker inherits) — mirrors the fixture at
+  // seedFollowUpFixture, but the row is now stamped so _collectSessionIssues's
+  // new {sessionGroupId} query (not just the followUpTo BFS) must gather it.
+  const f = historyCollection._docs.find(d => d._id === 'F');
+  f.sessionGroupId = 'S';
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore, agentStatusStore, lean: true });
+  const fullS = full.find(s => s.sessionId === 'S');
+
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'S' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const s = sessions.find(x => x.sessionId === 'S');
+  assert.ok(s, 'S was materialized');
+  assert.deepEqual(s, fullS, 'materialized S is byte-identical to the live build, including the stamped follow-up loop');
+  assert.deepEqual(s.tasksTouched.sort(), ['LIN-500', 'LIN-501', 'LIN-502'], 'the follow-up\'s own issue joined the closure via the group query');
 });
 
 test('backfillWorkspace persists every full-build session and sets the marker', async () => {
