@@ -374,7 +374,10 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
                   issueIdentifier: issueIdentifier || null,
                   prompt,
                   label: 'dispatch-bootstrap',
-                  harness: resolvedHarness
+                  harness: resolvedHarness,
+                  // LIN-1376: stamp the launching account so the dispatched
+                  // session's token resolves under LIN-1366 owner-scoping.
+                  createdBy: req.session?.accountId || null
                 });
                 // "Surface, don't silently drop" (LIN-525): the client dropped its
                 // own mint+append and trusted the server to attach the block. If the
