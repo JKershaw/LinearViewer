@@ -16,7 +16,16 @@ test.describe('Settings Page', () => {
 
   test('renders settings page with title and sections', async ({ page }) => {
     await expect(page.locator('h1')).toContainText('Settings')
-    await expect(settings(page).section('ai')).toContainText('AI')
+    await expect(settings(page).section('ai-user')).toContainText('AI')
+  })
+
+  test('splits settings into User Settings and Workspace Settings groups (LIN-1399)', async ({ page }) => {
+    await expect(page.locator('[data-testid="settings-group-user"]')).toContainText('User Settings')
+    await expect(page.locator('[data-testid="settings-group-workspace"]')).toContainText('Workspace Settings')
+    // AI is decomposed: the OpenRouter connection + AI toggles live in User,
+    // the workspace model selector + per-operation overrides live in Workspace.
+    await expect(page.locator('[data-testid="settings-group-user"]')).toContainText('AI')
+    await expect(page.locator('[data-testid="settings-group-workspace"]')).toContainText('AI Model')
   })
 
   test('has header view-switcher links', async ({ page }) => {

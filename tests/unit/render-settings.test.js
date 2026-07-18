@@ -254,16 +254,16 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
 });
 
 describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
-  test('always renders the section header as a sibling of the AI section', () => {
+  test('always renders the section header as a sibling of the AI Model section', () => {
     const html = renderSettingsPage('Acme', BASE);
     assert.match(html, /data-testid="settings-section-dispatch-defaults"/);
     assert.match(html, />Dispatch defaults</);
     // Two independent <section> blocks, not one nested inside the other.
-    const aiIdx = html.indexOf('data-testid="settings-section-ai"');
+    const aiModelIdx = html.indexOf('data-testid="settings-section-ai-model"');
     const ddIdx = html.indexOf('data-testid="settings-section-dispatch-defaults"');
-    const aiSectionEnd = html.indexOf('</section>', aiIdx);
-    assert.ok(aiIdx > -1 && ddIdx > -1 && aiSectionEnd > -1);
-    assert.ok(ddIdx > aiSectionEnd, 'dispatch-defaults section must not be nested inside the AI section');
+    const aiModelSectionEnd = html.indexOf('</section>', aiModelIdx);
+    assert.ok(aiModelIdx > -1 && ddIdx > -1 && aiModelSectionEnd > -1);
+    assert.ok(ddIdx > aiModelSectionEnd, 'dispatch-defaults section must not be nested inside the AI Model section');
   });
 
   test('renders one row for the workspace-wide default plus one per live PROMPT_TEMPLATES key', () => {
@@ -580,5 +580,85 @@ describe('renderSettingsPage — Dispatch presets section (LIN-1391 S7)', () => 
 
   test('does not throw when dispatchPresets is omitted', () => {
     assert.doesNotThrow(() => renderSettingsPage('Acme', BASE));
+  });
+});
+
+describe('renderSettingsPage — User/Workspace Settings groups (LIN-1399)', () => {
+  // Group membership per control, not mere presence — a control can render
+  // correctly but land in the wrong group, which a presence-only assertion
+  // would miss entirely.
+  function groupBoundaries(html) {
+    const userIdx = html.indexOf('data-testid="settings-group-user"');
+    const workspaceIdx = html.indexOf('data-testid="settings-group-workspace"');
+    assert.ok(userIdx > -1 && workspaceIdx > -1 && userIdx < workspaceIdx, 'expected both group containers, User before Workspace');
+    return { userIdx, workspaceIdx };
+  }
+
+  function groupOf(html, testid) {
+    const { userIdx, workspaceIdx } = groupBoundaries(html);
+    const idx = html.indexOf(`data-testid="${testid}"`);
+    assert.ok(idx > -1, `expected to find data-testid="${testid}"`);
+    if (idx < userIdx) return null;
+    return idx < workspaceIdx ? 'user' : 'workspace';
+  }
+
+  test('renders both group headings with their subtitles', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.match(html, /data-testid="settings-group-user"[\s\S]*?>User Settings</);
+    assert.match(html, /Only affects you, across all your workspaces/);
+    assert.match(html, /data-testid="settings-group-workspace"[\s\S]*?>Workspace Settings</);
+    assert.match(html, /Applies to everyone in this workspace/);
+  });
+
+  test('the old undifferentiated AI section is retired; it is decomposed into ai-user and ai-model', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.ok(!html.includes('data-testid="settings-section-ai"'), 'the old undifferentiated AI section testid must be retired');
+    assert.equal(groupOf(html, 'settings-section-ai-user'), 'user');
+    assert.equal(groupOf(html, 'settings-section-ai-model'), 'workspace');
+  });
+
+  test('every settings section lands in its correct group', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    const expectations = {
+      'settings-section-ai-user': 'user',
+      'settings-section-workflow': 'user',
+      'settings-section-experimental': 'user',
+      'settings-section-account': 'user',
+      'settings-section-ai-model': 'workspace',
+      'settings-section-dispatch-defaults': 'workspace',
+      'settings-section-dispatch-presets': 'workspace',
+      'settings-section-ai-usage': 'workspace',
+      'settings-section-workspace-features': 'workspace',
+      'settings-section-providers': 'workspace',
+    };
+    for (const [testid, expected] of Object.entries(expectations)) {
+      assert.equal(groupOf(html, testid), expected, `expected ${testid} in the ${expected} group`);
+    }
+  });
+
+  test('the OpenRouter connection control lands in the User group (account-owned, LIN-1331)', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth' });
+    const { userIdx, workspaceIdx } = groupBoundaries(html);
+    const connectIdx = html.indexOf('disconnect');
+    assert.ok(connectIdx > userIdx && connectIdx < workspaceIdx, 'expected the OpenRouter connection control inside the User group');
+  });
+
+  test('the per-user AI feature toggles land in the User group', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    for (const key of ['aiRecommendations', 'promptButtons', 'roadmap']) {
+      assert.equal(groupOf(html, `settings-toggle-${key}`), 'user', `expected settings-toggle-${key} in the user group`);
+    }
+  });
+
+  test('Dispatch defaults still renders before Dispatch presets inside the Workspace group (shared datalist dependency)', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    const ddIdx = html.indexOf('data-testid="settings-section-dispatch-defaults"');
+    const dpIdx = html.indexOf('data-testid="settings-section-dispatch-presets"');
+    assert.ok(ddIdx > -1 && dpIdx > -1 && ddIdx < dpIdx, 'dispatch defaults must render before dispatch presets');
+  });
+
+  test('does not invent a Theme control on the settings page', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.doesNotMatch(html, /data-testid="settings-(section|toggle)-theme"/i);
   });
 });

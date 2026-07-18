@@ -13,6 +13,31 @@
    assert on `.settings-section` / `.settings-header`. */
 
 /* =============================================================================
+   Settings Groups (LIN-1399)
+   The page-level "User Settings" / "Workspace Settings" wrappers — unboxed
+   (each inner .settings-section keeps its own box), just a heading + generous
+   bottom margin to read as two distinct zones on the same /settings page.
+   ============================================================================= */
+.settings-group {
+  margin-bottom: var(--space-5);
+}
+
+.settings-group-header {
+  font-family: var(--font-content);
+  font-size: 1.2em;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0 0 var(--space-1) 0;
+}
+
+.settings-group-subtitle {
+  color: var(--fg-dim);
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  margin: 0 0 var(--space-3) 0;
+}
+
+/* =============================================================================
    Settings Nodes (tree items)
    ============================================================================= */
 
