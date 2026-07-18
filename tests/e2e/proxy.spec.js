@@ -1291,7 +1291,7 @@ test.describe('Proxy API - Dispatch', () => {
     expect(typeof item.bootstrapToken).toBe('string');
     expect(item.bootstrapToken.length).toBeGreaterThan(0);
     expect(item.bootstrapToken).not.toBe(writeToken);
-    expect(item.prompt).toContain('MCP tool');
+    expect(item.prompt).toContain('HARBOUR_LOCAL_BASE');
     expect(item.prompt).not.toContain('curl -X POST');
     expect(item.prompt).not.toContain('/api/proxy/token');
     // LIN-376: the caller's own standing token is NEVER replayed into the prompt,
@@ -1332,7 +1332,7 @@ test.describe('Proxy API - Dispatch', () => {
     // The prompt keeps the access guidance but carries NO token / curl exchange.
     expect(item.prompt).toContain('fix the bug');
     expect(item.prompt).toContain('Workspace API access');
-    expect(item.prompt).toContain('MCP tool');
+    expect(item.prompt).toContain('HARBOUR_LOCAL_BASE');
     expect(item.prompt).not.toContain('curl -X POST');
     expect(item.prompt).not.toContain(item.bootstrapToken);
     expect(item.prompt).not.toContain(writeToken);

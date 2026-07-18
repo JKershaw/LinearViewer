@@ -136,7 +136,7 @@ describe('LIN-1173 — Collective fan-out token delivery via attachProxyContext'
     assert.ok(!item.prompt.includes('FIRST, exchange your single-use bootstrap token'), 'no bespoke inline exchange prose');
     assert.ok(!item.prompt.includes('curl -X POST -H "Authorization: Bearer'), 'no curl exchange in prompt');
     // The shared MCP access block is what got appended instead.
-    assert.ok(item.prompt.includes('Obtain your working token from your configured dispatch MCP tool'), 'MCP access block present');
+    assert.ok(item.prompt.includes('HARBOUR_LOCAL_BASE'), 'MCP access block present (local-broker framing)');
     // A single-use bootstrap was minted for the participant workspace.
     assert.ok(minted.some(m => m.urlKey === 'alpha' && m.opts.kind === 'bootstrap' && m.opts.scope === 'readWrite'));
   });
@@ -162,7 +162,7 @@ describe('LIN-1173 — Collective fan-out token delivery via attachProxyContext'
     assert.ok(item.prompt.includes('FIRST, exchange your single-use bootstrap token for a working token:'), 'inline exchange prose present');
     assert.ok(item.prompt.includes('boot_alpha'), 'token embedded inline for a prose harness');
     // NOT the MCP block.
-    assert.ok(!item.prompt.includes('Obtain your working token from your configured dispatch MCP tool'), 'no MCP block on the prose path');
+    assert.ok(!item.prompt.includes('HARBOUR_LOCAL_BASE'), 'no MCP block on the prose path');
   });
 
   test('claude-code fail-closed: an un-mintable token marks the participant ok:false, never dispatches credential-less', async () => {
@@ -240,7 +240,7 @@ describe('LIN-1189 — facilitator seat token delivery via attachProxyContext', 
     assert.ok(!item.prompt.includes('FIRST, exchange your single-use bootstrap token'), 'no bespoke inline exchange prose');
     assert.ok(!item.prompt.includes('curl -X POST -H "Authorization: Bearer'), 'no curl exchange in prompt');
     // The shared MCP access block is what got appended instead.
-    assert.ok(item.prompt.includes('Obtain your working token from your configured dispatch MCP tool'), 'MCP access block present');
+    assert.ok(item.prompt.includes('HARBOUR_LOCAL_BASE'), 'MCP access block present (local-broker framing)');
     // A single-use bootstrap was minted for the facilitator's workspace.
     assert.ok(minted.some(m => m.urlKey === 'alpha' && m.opts.kind === 'bootstrap' && m.opts.scope === 'readWrite'));
   });
@@ -269,7 +269,7 @@ describe('LIN-1189 — facilitator seat token delivery via attachProxyContext', 
     assert.ok(item.prompt.includes('FIRST, exchange your single-use bootstrap token for a working token:'), 'inline exchange prose present');
     assert.ok(item.prompt.includes('boot_alpha'), 'token embedded inline for a prose harness');
     // NOT the MCP block.
-    assert.ok(!item.prompt.includes('Obtain your working token from your configured dispatch MCP tool'), 'no MCP block on the prose path');
+    assert.ok(!item.prompt.includes('HARBOUR_LOCAL_BASE'), 'no MCP block on the prose path');
 
     // The prose access block is byte-identical to the participant seat's — both
     // builders share buildLinearAccessBlock, so the facilitator's appended block
