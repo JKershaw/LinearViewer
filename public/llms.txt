@@ -367,4 +367,4 @@ main.flight-companion-page[data-url-key]  - page container
 - Logout requires re-authentication via Linear OAuth
 - Expand/collapse state persists in localStorage (reset restores defaults)
 - Team filter selection persists in localStorage across sessions
-- Landing page (`/`, unauthenticated) is a bespoke Harbour showcase — a brand hero, fake-data glimpses of real surfaces (observation feed, swim board, grounded prompt), a providers strip, and a distinct Harbour OS section. It is NOT the project-tree renderer; section blocks carry `[data-testid="landing-{loop,observation,swim,prompt,providers,os}"]`. The `/swipe` and `/swim` unauthenticated previews still render sample tree data.
+- Landing page (`/`, unauthenticated) is a bespoke Harbour showcase — a brand hero, fake-data glimpses of real surfaces (observation feed, swim board, grounded prompt), a "try it yourself" low-cost trial callout, a providers strip, and a distinct Harbour OS section. It is NOT the project-tree renderer; section blocks carry `[data-testid="landing-{loop,observation,swim,prompt,try,providers,os}"]`. The `/swipe` and `/swim` unauthenticated previews still render sample tree data.
