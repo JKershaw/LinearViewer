@@ -306,6 +306,9 @@
   .step .sh { font-size: 13.5px; font-weight: 620; letter-spacing: -.01em; }
   .step .sd { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .step .sids { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-top: 8px; }
+  a.tlink { color: inherit; text-decoration: none; border-bottom: 1px dotted color-mix(in srgb, currentColor 35%, transparent); }
+  a.tlink:hover { color: var(--brand); border-bottom-color: var(--brand); }
+  a.tlink:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 2px; }
 </style>
 
 <div class="wrap">
@@ -332,10 +335,10 @@
     </div>
     <div class="ribbon">
       <span class="rlab">already shipped</span>
-      <span class="ritem"><span class="dot d-done"></span><span class="rid">LIN-1326</span> account model</span>
-      <span class="ritem"><span class="dot d-done"></span><span class="rid">LIN-1204</span> project-key billing</span>
-      <span class="ritem"><span class="dot d-done"></span><span class="rid">LIN-1321</span> presets <span class="rid">(1390 · 1391)</span></span>
-      <span class="ritem"><span class="dot d-done"></span><span class="rid">LIN-1375</span> token-leak proxy</span>
+      <span class="ritem"><span class="dot d-done"></span><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1326">LIN-1326</a></span> account model</span>
+      <span class="ritem"><span class="dot d-done"></span><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1204">LIN-1204</a></span> project-key billing</span>
+      <span class="ritem"><span class="dot d-done"></span><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1321">LIN-1321</a></span> presets <span class="rid">(1390 · 1391)</span></span>
+      <span class="ritem"><span class="dot d-done"></span><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1375">LIN-1375</a></span> token-leak proxy</span>
     </div>
   </header>
 
@@ -355,17 +358,17 @@
       <div class="acc-item">
         <h4><span class="k">B</span> You can see what it cost</h4>
         <p>Token spend, wall-clock, and the full transcript are visible per run — so “cheaper” is a measured fact, not a hope.</p>
-        <p class="proves">proven by: Instrument (LIN-1287)</p>
+        <p class="proves">proven by: Instrument (<a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a>)</p>
       </div>
       <div class="acc-item">
         <h4><span class="k">C</span> The smart model catches the cheap one</h4>
         <p>When a cheap model goes wrong, the stepper flags or corrects it before the work is trusted — supervision actually works.</p>
-        <p class="proves">proven by: Supervise (LIN-1269 / 1236)</p>
+        <p class="proves">proven by: Supervise (<a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1269">LIN-1269</a> / 1236)</p>
       </div>
       <div class="acc-item">
         <h4><span class="k">D</span> An unattended run survives a hiccup</h4>
         <p>A session wobble (logout, stall, dropped follow-up) doesn't wedge or silently lose the run. No known unattended-run bugs open.</p>
-        <p class="proves">proven by: Harden (LIN-1373 / 1355 / 1358 …)</p>
+        <p class="proves">proven by: Harden (<a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a> / 1355 / 1358 …)</p>
       </div>
     </div>
   </section>
@@ -384,40 +387,40 @@
         <div class="step">
           <span class="n">1</span><div class="sh">Choose &amp; route</div>
           <div class="sd">Pick the cheap models; wire per-kind presets (Opus→review, cheap→impl).</div>
-          <div class="sids">LIN-1129</div>
+          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a></div>
         </div>
         <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
         <div class="step active">
           <span class="n">2</span><div class="sh">Instrument</div>
           <div class="sd">Telemetry: tokens, wall-clock, transcript — so a run is legible.</div>
-          <div class="sids">LIN-1287 · in progress</div>
+          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a> · in progress</div>
         </div>
         <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
         <div class="step active">
           <span class="n">3</span><div class="sh">Run &amp; supervise</div>
           <div class="sd">Dispatch real tasks to cheap models under the stepper; watch beat-by-beat.</div>
-          <div class="sids">LIN-1269 · 1236 · in progress</div>
+          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1269">LIN-1269</a> · 1236 · in progress</div>
         </div>
         <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
         <div class="step">
           <span class="n">4</span><div class="sh">Harden</div>
           <div class="sd">Kill the friction that breaks unattended runs before trusting them.</div>
-          <div class="sids">LIN-1373 · 1355 · 1397 …</div>
+          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a> · 1355 · 1397 …</div>
         </div>
         <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
         <div class="step">
           <span class="n">5</span><div class="sh">Tune spend</div>
           <div class="sd">Determinism work — cut what you pay a model to re-derive each run.</div>
-          <div class="sids">LIN-1237 · 1242 · 1277</div>
+          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1237">LIN-1237</a> · 1242 · 1277</div>
         </div>
       </div>
     </div>
     <div class="callout">
       <h4>Where the effort already is</h4>
       <p>
-        Of 8 in-progress tickets, the load-bearing three are steps 2–3: <b>LIN-1287</b> (telemetry),
-        <b>LIN-1269</b> (beats disposition), <b>LIN-1236</b> (spend audit). The instinct is right —
-        instrument and supervise first. The gap is step&nbsp;1: <b>LIN-1129 (choose models)</b> is still
+        Of 8 in-progress tickets, the load-bearing three are steps 2–3: <b><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a></b> (telemetry),
+        <b><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1269">LIN-1269</a></b> (beats disposition), <b><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1236">LIN-1236</a></b> (spend audit). The instinct is right —
+        instrument and supervise first. The gap is step&nbsp;1: <b><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a> (choose models)</b> is still
         Todo, yet nothing downstream is real until the cheap models are actually picked and routed.
       </p>
     </div>
@@ -432,41 +435,41 @@
         <header><h3>Route — pick &amp; wire the models</h3><span class="tag">step 1</span></header>
         <p class="pdesc">Turn the presets mechanism into an actual policy: which cheap model for which kind of task.</p>
         <ul class="rows">
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1129</span> Choose OpenRouter models <span class="badge-key">start here</span></span><span class="prio hot">p2 → p1?</span></li>
-          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1250</span> Factor shared OpenRouter request/finish helpers</span><span class="prio">p0</span></li>
-          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1345</span> Lower shared-key limit <span class="note">(unblocked)</span> · <span class="rid">LIN-1183/1184</span> fan-out + per-op override</span><span class="prio">p3</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a></span> Choose OpenRouter models <span class="badge-key">start here</span></span><span class="prio hot">p2 → p1?</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1250">LIN-1250</a></span> Factor shared OpenRouter request/finish helpers</span><span class="prio">p0</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1345">LIN-1345</a></span> Lower shared-key limit <span class="note">(unblocked)</span> · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1183">LIN-1183</a>/1184</span> fan-out + per-op override</span><span class="prio">p3</span></li>
         </ul>
       </div>
       <div class="pillar">
         <header><h3>Instrument — see the run</h3><span class="tag">step 2 · hot</span></header>
         <p class="pdesc">The dial that turns “cheaper” into a measured fact and “reliable” into something you can check.</p>
         <ul class="rows">
-          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1287</span> Richer claude-code telemetry — tokens + wall-clock <span class="badge-key">core</span></span><span class="prio">p2</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1294</span> OpenCode telemetry parity <span class="note">(unblocked)</span> · <span class="rid">LIN-1144</span> tool-level heartbeat</span><span class="prio">p2/0</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1181</span> Track Dash invocations, outcomes, cost</span><span class="prio">p2</span></li>
-          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1334</span> Dispatch sessions in list · <span class="rid">LIN-1311</span> transcript migration</span><span class="prio">p0</span></li>
-          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1288/89</span> truncation fix · <span class="rid">LIN-1341</span> continuity · <span class="rid">LIN-1163</span> runs layout</span><span class="prio">✓</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a></span> Richer claude-code telemetry — tokens + wall-clock <span class="badge-key">core</span></span><span class="prio">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1294">LIN-1294</a></span> OpenCode telemetry parity <span class="note">(unblocked)</span> · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1144">LIN-1144</a></span> tool-level heartbeat</span><span class="prio">p2/0</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1181">LIN-1181</a></span> Track Dash invocations, outcomes, cost</span><span class="prio">p2</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1334">LIN-1334</a></span> Dispatch sessions in list · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1311">LIN-1311</a></span> transcript migration</span><span class="prio">p0</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1288">LIN-1288</a>/89</span> truncation fix · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1341">LIN-1341</a></span> continuity · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1163">LIN-1163</a></span> runs layout</span><span class="prio">✓</span></li>
         </ul>
       </div>
       <div class="pillar">
         <header><h3>Supervise — smart watches cheap</h3><span class="tag">step 3 · hot</span></header>
         <p class="pdesc">The stepper is what makes a cheap model trustworthy: Opus drip-feeds &amp; challenges it beat by beat.</p>
         <ul class="rows">
-          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1269</span> Review stepper/beats vs obligation-load</span><span class="prio">p2</span></li>
-          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1236</span> Prompt determinism &amp; session-spend audit</span><span class="prio">p2</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1237</span> Determinism shortlist <span class="note">(unblocked)</span> · <span class="rid">LIN-1242</span> obligation lift · <span class="rid">LIN-1277</span> cheap guards</span><span class="prio">p2</span></li>
-          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1153</span> deterministic prompt content ✓ · <span class="rid">LIN-1152</span> <span class="note">(canceled)</span></span><span class="prio">—</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1269">LIN-1269</a></span> Review stepper/beats vs obligation-load</span><span class="prio">p2</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1236">LIN-1236</a></span> Prompt determinism &amp; session-spend audit</span><span class="prio">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1237">LIN-1237</a></span> Determinism shortlist <span class="note">(unblocked)</span> · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1242">LIN-1242</a></span> obligation lift · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1277">LIN-1277</a></span> cheap guards</span><span class="prio">p2</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1153">LIN-1153</a></span> deterministic prompt content ✓ · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1152">LIN-1152</a></span> <span class="note">(canceled)</span></span><span class="prio">—</span></li>
         </ul>
       </div>
       <div class="pillar">
         <header><h3>Harden — survive unattended</h3><span class="tag">step 4 · the gate</span></header>
         <p class="pdesc">Every bug here is a way an autonomous cheap-model run silently fails. This is the gate before you trust it running alone.</p>
         <ul class="rows">
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1373</span> Proxy-token needs creator's live session <span class="badge-bug">hit live 2×</span></span><span class="prio hot">p1</span></li>
-          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1397</span> Stall-failsafe refire · <span class="rid">LIN-1360</span> trustworthy session setup</span><span class="prio">p2</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1355</span> beat-2 suppression · <span class="rid">LIN-1358</span> wedged 195m resume</span><span class="prio">p1</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1323/1324</span> poll defeats follow-ups · <span class="rid">LIN-1395</span> OpenCode credential parity</span><span class="prio">p2</span></li>
-          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1375</span> token-leak ✓ · <span class="rid">LIN-1393</span> deploy chain-split ✓</span><span class="prio">✓</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a></span> Proxy-token needs creator's live session <span class="badge-bug">hit live 2×</span></span><span class="prio hot">p1</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1397">LIN-1397</a></span> Stall-failsafe refire · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1360">LIN-1360</a></span> trustworthy session setup</span><span class="prio">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a></span> beat-2 suppression · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1358">LIN-1358</a></span> wedged 195m resume</span><span class="prio">p1</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1323">LIN-1323</a>/1324</span> poll defeats follow-ups · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1395">LIN-1395</a></span> OpenCode credential parity</span><span class="prio">p2</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1375">LIN-1375</a></span> token-leak ✓ · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1393">LIN-1393</a></span> deploy chain-split ✓</span><span class="prio">✓</span></li>
         </ul>
       </div>
     </div>
@@ -481,8 +484,8 @@
         <div class="wave-label"><span class="wn">Wave 1 · now</span><span class="wt">Make a run legible</span><span class="wgoal">Pick the models; get spend + time on screen. → test B</span></div>
         <div class="wave-body">
           <div class="lane"><span class="lane-tag">Start here</span>
-            <span class="tk hot"><span class="mini d-todo"></span>LIN-1129 <span class="tkt">choose models &amp; route</span></span>
-            <span class="tk hot"><span class="mini d-prog"></span>LIN-1287 <span class="tkt">telemetry: tokens + wall-clock</span></span>
+            <span class="tk hot"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a> <span class="tkt">choose models &amp; route</span></span>
+            <span class="tk hot"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a> <span class="tkt">telemetry: tokens + wall-clock</span></span>
           </div>
         </div>
       </div>
@@ -490,13 +493,13 @@
         <div class="wave-label"><span class="wn">Wave 2 · next</span><span class="wt">Run cheap, supervised</span><span class="wgoal">Real tasks on cheap models under the stepper. → test C</span></div>
         <div class="wave-body">
           <div class="lane"><span class="lane-tag">Supervise</span>
-            <span class="tk"><span class="mini d-prog"></span>LIN-1269 <span class="tkt">beats disposition</span></span>
-            <span class="tk"><span class="mini d-prog"></span>LIN-1236 <span class="tkt">spend audit</span></span>
+            <span class="tk"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1269">LIN-1269</a> <span class="tkt">beats disposition</span></span>
+            <span class="tk"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1236">LIN-1236</a> <span class="tkt">spend audit</span></span>
           </div>
           <div class="lane"><span class="lane-tag">Harden top bugs</span>
-            <span class="tk hot"><span class="mini d-todo"></span>LIN-1373 <span class="tkt">proxy session dep</span></span>
-            <span class="tk"><span class="mini d-prog"></span>LIN-1397 <span class="tkt">stall-failsafe</span></span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1355 <span class="tkt">beat-2 suppression</span></span>
+            <span class="tk hot"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a> <span class="tkt">proxy session dep</span></span>
+            <span class="tk"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1397">LIN-1397</a> <span class="tkt">stall-failsafe</span></span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a> <span class="tkt">beat-2 suppression</span></span>
           </div>
         </div>
       </div>
@@ -504,13 +507,13 @@
         <div class="wave-label"><span class="wn">Wave 3 · then</span><span class="wt">Trust it alone</span><span class="wgoal">Close the unattended-run bugs; run one hands-off. → tests A + D</span></div>
         <div class="wave-body">
           <div class="lane"><span class="lane-tag">Harden rest</span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1358 <span class="tkt">wedged resume</span></span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1323/1324 <span class="tkt">poll vs follow-ups</span></span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1360 <span class="tkt">session trust</span></span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1358">LIN-1358</a> <span class="tkt">wedged resume</span></span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1323">LIN-1323</a>/1324 <span class="tkt">poll vs follow-ups</span></span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1360">LIN-1360</a> <span class="tkt">session trust</span></span>
           </div>
           <div class="lane"><span class="lane-tag">Parity</span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1395 <span class="tkt">OpenCode credential parity</span></span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1294 <span class="tkt">OpenCode telemetry</span></span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1395">LIN-1395</a> <span class="tkt">OpenCode credential parity</span></span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1294">LIN-1294</a> <span class="tkt">OpenCode telemetry</span></span>
           </div>
         </div>
       </div>
@@ -518,15 +521,15 @@
         <div class="wave-label"><span class="wn">Wave 4 · tune</span><span class="wt">Make it cheaper still</span><span class="wgoal">Determinism — cut re-derivation spend. Ongoing.</span></div>
         <div class="wave-body">
           <div class="lane"><span class="lane-tag">Ready</span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1237</span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1242</span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1277</span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1237">LIN-1237</a></span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1242">LIN-1242</a></span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1277">LIN-1277</a></span>
           </div>
           <div class="lane"><span class="lane-tag">Deeper (has blockers)</span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1271 <span class="tkt">→ 1272, 1275</span></span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-575 <span class="tkt">→ 1274</span></span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-551 <span class="tkt">→ 1276</span></span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1246 <span class="tkt">→ 1273</span></span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1271">LIN-1271</a> <span class="tkt">→ 1272, 1275</span></span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-575">LIN-575</a> <span class="tkt">→ 1274</span></span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-551">LIN-551</a> <span class="tkt">→ 1276</span></span>
+            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1246">LIN-1246</a> <span class="tkt">→ 1273</span></span>
           </div>
         </div>
       </div>
@@ -540,12 +543,12 @@
     <div class="reprios">
       <div class="rp">
         <h4>Promote the step that gates everything</h4>
-        <div class="move"><span class="rid">LIN-1129</span> choose models · <b>Todo p2</b> → <span class="to">p1, in progress</span></div>
+        <div class="move"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a></span> choose models · <b>Todo p2</b> → <span class="to">p1, in progress</span></div>
         <p>Instrument + supervise are already hot, but they're proving a rollout that hasn't been chosen yet. <b>Picking + routing the cheap models is step 1</b> of the whole loop and it's the one nobody's started.</p>
       </div>
       <div class="rp">
         <h4>Treat Harden as a release gate, not backlog</h4>
-        <div class="move"><span class="rid">LIN-1373</span> + <span class="rid">LIN-1355</span> + <span class="rid">LIN-1358</span> · keep <span class="to">p1, scheduled</span></div>
+        <div class="move"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a></span> + <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a></span> + <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1358">LIN-1358</a></span> · keep <span class="to">p1, scheduled</span></div>
         <p>These are the exact failures that make an unattended cheap-model run untrustworthy — and 1373 bit us live twice this session. They're acceptance test D; don't let them drift in backlog while the rollout proceeds.</p>
       </div>
     </div>
