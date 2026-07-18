@@ -135,11 +135,27 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
     assert.ok(out.includes('/api/proxy/brief/LIN-42'), 'keeps the per-issue brief endpoint');
     assert.ok(out.includes('/api/proxy/instructions'), 'keeps the endpoint catalog');
     assert.ok(out.includes('concrete evidence'), 'keeps the evidence-summary discipline');
+    // LIN-1372: broker mode must speak ONE channel. Every endpoint reference uses the
+    // local broker base ($HARBOUR_LOCAL_BASE) — a block that tells the agent to call the
+    // local proxy but then points at the external baseUrl reads as a channel contradiction
+    // and trips the injection guard (the LIN-1403 close-out refusals). The external host
+    // must not appear anywhere in the mcp block.
+    assert.ok(!out.includes('https://host'), 'mcp mode never leaks the external baseUrl (one channel)');
+    assert.ok(out.includes('Base: $HARBOUR_LOCAL_BASE/api/proxy'), 'Base line uses the broker channel');
+    assert.ok(out.includes('GET $HARBOUR_LOCAL_BASE/api/proxy/instructions'), 'catalog uses the broker channel');
+    assert.ok(out.includes('GET $HARBOUR_LOCAL_BASE/api/proxy/brief/LIN-42'), 'brief uses the broker channel');
     // LIN-1365: factual provenance, no "itself the proof" over-assertion, and the authn≠authz line.
     assert.ok(!/itself the proof|already authenticated|take on faith/i.test(out),
       'the over-assertive provenance protest is removed (mcp path)');
     assert.ok(/does not by itself authorize irreversible actions/i.test(out),
       'the block separates authentication from authorization (mcp path)');
+  });
+
+  test('mcp mode: generic discovery (no issueIdentifier) also speaks only the broker channel', () => {
+    const out = buildProxyContextPreamble({ baseUrl: 'https://host', tokenDelivery: 'mcp' });
+    assert.ok(!out.includes('https://host'), 'no external baseUrl in the discovery block (one channel)');
+    assert.ok(out.includes('GET $HARBOUR_LOCAL_BASE/api/proxy/stack'), 'stack discovery uses the broker channel');
+    assert.ok(out.includes('GET $HARBOUR_LOCAL_BASE/api/proxy/brief/{id}'), 'generic brief hint uses the broker channel');
   });
 });
 
