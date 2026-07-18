@@ -306,7 +306,8 @@
   color: var(--fg);
 }
 
-.dispatch-kind-overrides .children {
+.dispatch-kind-overrides .children,
+.dispatch-preset-kind-overrides .children {
   margin-top: var(--space-2);
 }
 

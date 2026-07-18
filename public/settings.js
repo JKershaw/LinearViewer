@@ -14,20 +14,50 @@
  * (provides window.api / window.toast / window.escapeHtml).
  */
 
+// Matches a per-kind row's harness-select/model-input `name` attribute, e.g.
+// `preset__<id>__kind__review__HarnessSelect` or
+// `newDispatchPreset__kind__review__Model` — captures the kind in between.
+const DISPATCH_PRESET_KIND_FIELD_RE = /__kind__(.+)__(?:HarnessSelect|Model)$/
+
 /**
- * Read a preset row's { name, model, harness } out of its DOM. Works for both
- * an existing preset's row (`.dispatch-preset-item`) and the "new preset"
- * create block (`.dispatch-preset-create`) — both carry the same
- * name-input + renderDispatchDefaultRow config-row shape.
+ * Read a preset row's `{ name, model, harness, byKind }` out of its DOM.
+ * Works for both an existing preset's row (`.dispatch-preset-item`) and the
+ * "new preset" create block (`.dispatch-preset-create`) — both carry the
+ * same name-input + top-level config row + per-kind overrides shape
+ * (LIN-1400).
+ *
+ * The top-level read is scoped to `.dispatch-preset-toplevel-config` — once
+ * per-kind rows exist in the same container, an unscoped first-match
+ * `.harness-select`/`.dispatch-model-input` query would read a per-kind row
+ * by accident instead of the row's own top-level fields.
  */
 function readDispatchPresetRow(container) {
   const nameInput = container.querySelector('.dispatch-preset-name-input')
-  const harnessSelect = container.querySelector('.harness-select')
-  const modelInput = container.querySelector('.dispatch-model-input')
+  const topLevel = container.querySelector('.dispatch-preset-toplevel-config')
+  const harnessSelect = topLevel ? topLevel.querySelector('.harness-select') : null
+  const modelInput = topLevel ? topLevel.querySelector('.dispatch-model-input') : null
+
+  const byKind = {}
+  container.querySelectorAll('.dispatch-preset-kind-overrides .harness-select').forEach((select) => {
+    const match = select.name.match(DISPATCH_PRESET_KIND_FIELD_RE)
+    if (!match) return
+    const kind = match[1]
+    const row = select.closest('.dispatch-default-row')
+    const modelField = row ? row.querySelector('.dispatch-model-input') : null
+    const model = modelField ? modelField.value.trim() : ''
+    const harness = select.value
+    if (model || harness) {
+      byKind[kind] = {}
+      if (model) byKind[kind].model = model
+      if (harness) byKind[kind].harness = harness
+    }
+  })
+
   return {
     name: nameInput ? nameInput.value.trim() : '',
     harness: harnessSelect ? harnessSelect.value : '',
-    model: modelInput ? modelInput.value.trim() : ''
+    model: modelInput ? modelInput.value.trim() : '',
+    byKind
   }
 }
 
@@ -38,7 +68,7 @@ function readDispatchPresetRow(container) {
 async function createDispatchPreset(urlKey, createBlock, btn) {
   const originalText = btn ? btn.textContent : null
 
-  const { name, model, harness } = readDispatchPresetRow(createBlock)
+  const { name, model, harness, byKind } = readDispatchPresetRow(createBlock)
   if (!name) {
     toast('Preset name is required', { type: 'error' })
     return
@@ -49,7 +79,12 @@ async function createDispatchPreset(urlKey, createBlock, btn) {
     await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/presets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, model: model || undefined, harness: harness || undefined }),
+      body: JSON.stringify({
+        name,
+        model: model || undefined,
+        harness: harness || undefined,
+        byKind: Object.keys(byKind).length ? byKind : undefined
+      }),
       on401: false
     })
     window.location.reload()
@@ -67,7 +102,7 @@ async function saveDispatchPreset(urlKey, presetId, row) {
   const btn = row.querySelector('.dispatch-preset-save-btn')
   const originalText = btn ? btn.textContent : null
 
-  const { name, model, harness } = readDispatchPresetRow(row)
+  const { name, model, harness, byKind } = readDispatchPresetRow(row)
   if (!name) {
     toast('Preset name is required', { type: 'error' })
     return
@@ -75,10 +110,13 @@ async function saveDispatchPreset(urlKey, presetId, row) {
 
   try {
     if (btn) { btn.textContent = 'saving...'; btn.disabled = true }
+    // byKind is always sent (even {}) so the editor is authoritative and
+    // clearing a preset's per-kind overrides works — the route preserves
+    // existing byKind only when the field is absent from the body (LIN-1400).
     await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/presets/${encodeURIComponent(presetId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, model: model || undefined, harness: harness || undefined }),
+      body: JSON.stringify({ name, model: model || undefined, harness: harness || undefined, byKind }),
       on401: false
     })
     window.location.reload()
