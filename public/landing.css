@@ -308,6 +308,34 @@
 .lx-c-key { color: var(--brand); }
 .lx-c-path { color: var(--amber-dim); }
 
+/* ---- "Try it yourself" callout (LIN-1161) --------------------------------- */
+.lx-try__inner {
+  padding: var(--space-4);
+  border: 1px solid var(--green);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+
+.lx-try .lx-eyebrow {
+  color: var(--green-dim);
+}
+
+.lx-try__pricing {
+  font-family: var(--font-content);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--text);
+  margin: 0 0 var(--space-2);
+}
+
+.lx-try__scope {
+  font-family: var(--font-content);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0;
+}
+
 /* ---- Providers strip ----------------------------------------------------- */
 .lx-provider-list {
   list-style: none;

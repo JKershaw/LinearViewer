@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderLandingPage } from '../../lib/render-landing.js';
+import { DEFAULT_MODEL, AVAILABLE_MODELS, formatModelPricing } from '../../lib/openrouter.js';
 
 // LIN-980: the bespoke Harbour showcase landing. These lock the composition
 // contract — the top area, the fake-data glimpses of real surfaces, the distinct
@@ -31,7 +32,7 @@ test('consumes D’s shared header nav rather than bespoke chrome', () => {
 
 test('features fake-data glimpses of real surfaces', () => {
   const html = renderLandingPage({});
-  for (const id of ['landing-loop', 'landing-observation', 'landing-swim', 'landing-prompt', 'landing-providers', 'landing-os']) {
+  for (const id of ['landing-loop', 'landing-observation', 'landing-swim', 'landing-prompt', 'landing-try', 'landing-providers', 'landing-os']) {
     assert.match(html, new RegExp(`data-testid="${id}"`), `has ${id}`);
   }
   // Observation glimpse mirrors the real run-status vocabulary.
@@ -65,4 +66,47 @@ test('gates the GitHub hero CTA on githubEnabled', () => {
 test('shows the localhost setup notice only when requested', () => {
   assert.match(renderLandingPage({ setupNotice: 'setup' }), /Getting started/);
   assert.ok(!renderLandingPage({}).includes('Getting started'));
+});
+
+// LIN-1161: "try it for well under $1" — the honest low-cost trial hook. These
+// pin the section's placement, that its dollar figure is derived from the
+// pricing rate card (never a second hardcoded price), and both branches of the
+// free-tier-vs-BYOK copy fork.
+
+test('places the "try it" section after grounded prompts and before providers', () => {
+  const html = renderLandingPage({});
+  const tryIdx = html.indexOf('data-testid="landing-try"');
+  const promptIdx = html.indexOf('data-testid="landing-prompt"');
+  const providersIdx = html.indexOf('data-testid="landing-providers"');
+  assert.ok(promptIdx < tryIdx && tryIdx < providersIdx, 'landing-try sits between landing-prompt and landing-providers');
+});
+
+test('grounds the dollar claim in formatModelPricing(DEFAULT_MODEL), not a second hardcoded price', () => {
+  const html = renderLandingPage({});
+  const expectedPricing = formatModelPricing(AVAILABLE_MODELS.find((m) => m.id === DEFAULT_MODEL));
+  assert.ok(expectedPricing, 'sanity: DEFAULT_MODEL has a known rate card entry');
+  assert.ok(html.includes(expectedPricing), 'renders the live pricing hint verbatim');
+});
+
+test('scopes the cheap-try claim to AI Generated Prompts, never the whole product', () => {
+  const html = renderLandingPage({});
+  const section = html.slice(html.indexOf('data-testid="landing-try"'), html.indexOf('data-testid="landing-providers"'));
+  assert.match(section, /AI Generated Prompts/);
+  assert.match(section, /under \$1/);
+  assert.match(section, /pricier model/); // full dispatch/autopilot caveat
+  assert.ok(!section.includes('run Harbour for'), 'never implies the whole product runs for under $1');
+});
+
+test('freeTierEnabled leads with the free path and never demands payment to try', () => {
+  const html = renderLandingPage({ freeTierEnabled: true });
+  const section = html.slice(html.indexOf('data-testid="landing-try"'), html.indexOf('data-testid="landing-providers"'));
+  assert.match(section, /free/i);
+  assert.ok(!/must pay/i.test(section), 'never says a user must pay to try');
+});
+
+test('defaults to the BYOK lead line when freeTierEnabled is false', () => {
+  const html = renderLandingPage({});
+  const section = html.slice(html.indexOf('data-testid="landing-try"'), html.indexOf('data-testid="landing-providers"'));
+  assert.match(section, /connect OpenRouter/i);
+  assert.match(section, /own OpenRouter tokens/);
 });

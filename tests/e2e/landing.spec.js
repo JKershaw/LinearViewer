@@ -45,9 +45,26 @@ test.describe('Landing Page (bespoke showcase)', () => {
 
   test('shows the showcase sections', async ({ page }) => {
     await page.goto('/');
-    for (const id of ['landing-loop', 'landing-observation', 'landing-swim', 'landing-prompt', 'landing-providers', 'landing-os']) {
+    for (const id of ['landing-loop', 'landing-observation', 'landing-swim', 'landing-prompt', 'landing-try', 'landing-providers', 'landing-os']) {
       await expect(page.locator(`[data-testid="${id}"]`)).toBeVisible();
     }
+  });
+
+  test('"try it yourself" section grounds its claim in the pricing rate card, scoped to AI Generated Prompts (LIN-1161)', async ({ page }) => {
+    await page.goto('/');
+    const tryIt = page.locator('[data-testid="landing-try"]');
+    await expect(tryIt).toBeVisible();
+    // Not a hardcoded second price: the section renders the live per-1M-token
+    // rate from formatModelPricing(DEFAULT_MODEL), the same figure Settings shows.
+    await expect(tryIt).toContainText(/\$\d+\.\d{2} in \/ \$\d+\.\d{2} out per 1M tokens/);
+    await expect(tryIt).toContainText(/OpenRouter/);
+    await expect(tryIt).toContainText(/AI Generated Prompts/);
+    await expect(tryIt).toContainText(/under \$1/);
+    // Honesty guardrail: never claims the whole product runs for under $1, and
+    // never says a user must pay to try (the playwright env unsets the free-tier
+    // key, so this exercises the BYOK-lead copy fork).
+    await expect(tryIt).not.toContainText(/run Harbour for/i);
+    await expect(tryIt).not.toContainText(/must pay/i);
   });
 
   test('observation glimpse renders run-status pills of real surfaces', async ({ page }) => {
@@ -107,13 +124,17 @@ test.describe('Landing Page (dark scheme)', () => {
 
   test('section titles remain light on the dark background', async ({ page }) => {
     await page.goto('/');
-    const title = page.locator('[data-testid="landing-loop"] .lx-section__title');
-    await expect(title).toBeVisible();
-    const luminance = await title.evaluate((el) => {
-      const m = getComputedStyle(el).color.match(/\d+/g).map(Number);
-      // Rec. 601 luma — high ⇒ light text (readable on dark).
-      return 0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2];
-    });
-    expect(luminance).toBeGreaterThan(160);
+    // landing-try (LIN-1161) introduces its own text-on-surface pairing
+    // (the --green-dim eyebrow), so it is checked alongside landing-loop.
+    for (const id of ['landing-loop', 'landing-try']) {
+      const title = page.locator(`[data-testid="${id}"] .lx-section__title`);
+      await expect(title).toBeVisible();
+      const luminance = await title.evaluate((el) => {
+        const m = getComputedStyle(el).color.match(/\d+/g).map(Number);
+        // Rec. 601 luma — high ⇒ light text (readable on dark).
+        return 0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2];
+      });
+      expect(luminance).toBeGreaterThan(160);
+    }
   });
 });

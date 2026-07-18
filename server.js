@@ -833,7 +833,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res) {
   return new Promise((resolve) => {
     session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      const html = renderLandingPage({ deployInfo, githubEnabled: isGitHubConfigured() });
+      const html = renderLandingPage({ deployInfo, githubEnabled: isGitHubConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY });
       res.send(html);
       resolve();
     });
@@ -921,7 +921,7 @@ app.get('/', (req, res) => {
   const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
 
   // Unauthenticated users see the bespoke Harbour showcase landing (LIN-980).
-  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: isGitHubConfigured() })
+  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: isGitHubConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY })
   res.send(html)
 })
 
