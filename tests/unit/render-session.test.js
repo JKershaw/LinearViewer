@@ -494,6 +494,28 @@ describe('render-session: collapsed-run waiting flag (LIN-1163 item 5)', () => {
     const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
     assert.ok(!html.includes('data-testid="session-run-waiting-flag"'));
   });
+
+  test('a run superseded by a follow-up loop does not render the flag, even though its own last feedback is [blocked]', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null;
+    session.loops[0].feedback = [{ message: '[blocked] need a decision', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:00.000Z' }];
+    // The follow-up reply spawned a NEW loop pointing back at loop-1 (LIN-1341) —
+    // the original loop's own feedback never changes, so without the supersession
+    // exclusion it would stay flagged "waiting for input" forever.
+    session.loops.push({
+      loopId: 'loop-3',
+      followUpTo: 'loop-1',
+      issueIdentifier: 'LIN-900',
+      issueId: 'uuid-900',
+      iteration: 3,
+      kind: 'autopilot',
+      dispatchedAt: '2026-07-04T10:03:00.000Z',
+      terminalStatus: null,
+      feedback: [{ message: 'resuming after reply', url: null, urlLabel: null, timestamp: '2026-07-04T10:03:01.000Z' }]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('data-testid="session-run-waiting-flag"'));
+  });
 });
 
 describe('render-session: blocked/pending transcript marker (LIN-1163 item 6)', () => {
