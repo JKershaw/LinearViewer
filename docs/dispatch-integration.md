@@ -193,6 +193,48 @@ Content-Type: application/json
 
 Feedback entries are displayed in the dispatch history UI and inherit the 30-day history TTL.
 
+### Minting a Broker Bootstrap Token
+
+```
+POST /api/dispatch/broker-token
+Authorization: Bearer <token>
+```
+
+Mints a fresh, single-use `kind:'bootstrap'`/`scope:'readWrite'` proxy token scoped to the
+calling dispatch token's own workspace. This is a narrow, internal-use endpoint — it exists so
+a consumer that already holds a live dispatch token but has lost its working proxy credential
+(for example, Simple Dispatcher's stall-failsafe reaper re-arming a broker-armed session at
+refire time, which has no fresh `item.bootstrapToken` to reuse) can obtain a new one without a
+human re-dispatching. Exchange the minted token via `POST /api/proxy/token` exactly like any
+other bootstrap (see the Workspace API Proxy integration guide).
+
+**Success Response (201):**
+```json
+{
+  "token": "base64url-encoded-bootstrap-token",
+  "expiresAt": "2024-01-17T10:30:00.000Z"
+}
+```
+
+**Error Response (503) — dispatch token has no resolvable owner:**
+```json
+{
+  "error": "Workspace not available",
+  "code": "WORKSPACE_NOT_CONNECTED",
+  "category": "config",
+  "retryable": false,
+  "detail": "No active session for this workspace; it is not connected.",
+  "context": { "workspaceUrlKey": "workspace-key" }
+}
+```
+
+Every dispatch token now carries a `createdBy` (the account that created it), stamped at
+creation. A dispatch token created before this field existed has `createdBy: null`; this
+endpoint refuses to mint against a null owner rather than hand back a bootstrap that would
+only fail later at exchange time — re-create the dispatch token to pick up an owner. Callers
+should treat any non-2xx response from this endpoint (including this one) as "mint failed" and
+fall back to their own degraded-but-safe behavior.
+
 ### Signaling Completion (terminal markers)
 
 A taken item's lifecycle `status` stays `'taken'` while the consumer runs — there is no

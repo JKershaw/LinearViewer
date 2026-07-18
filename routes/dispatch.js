@@ -17,7 +17,7 @@
  */
 
 import { Router } from 'express';
-import { badRequest, jsonError, notFound, unauthorized, serviceUnavailable } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, unauthorized, serviceUnavailable, workspaceUnavailableEnvelope } from '../lib/errors.js';
 import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 import path from 'path';
@@ -29,6 +29,7 @@ import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '
 import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { attachProxyContext } from '../lib/proxy-preamble.js';
+import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -156,6 +157,10 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       req.dispatchUrlKey = result.urlKey;
       req.dispatchTokenLabel = result.label;
+      // LIN-1397: the dispatch token's creating account, if any — null for
+      // tokens minted before createdBy existed. Consumed by the broker-token
+      // mint endpoint below, which must not stamp a null owner onto a bootstrap.
+      req.dispatchTokenOwner = result.createdBy ?? null;
       next();
     } catch (err) {
       console.error('Token validation error:', err.message);
@@ -796,7 +801,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return badRequest.json(res, `label exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
 
-      const result = await dispatchTokenStore.createToken(workspace.urlKey, label || 'default');
+      const result = await dispatchTokenStore.createToken(workspace.urlKey, label || 'default', req.session?.accountId || null);
 
       res.status(201).json({
         tokenId: result.tokenId,
@@ -1035,6 +1040,54 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       console.error('Poll error:', err.message);
       jsonError(res, 500, 'Failed to poll dispatch queue');
     }
+  });
+
+  /**
+   * POST /api/dispatch/broker-token
+   * Mint a fresh single-use bootstrap token for the caller's own workspace
+   * (LIN-1397). Consumed by Simple Dispatcher's stall-failsafe reaper to
+   * re-arm a broker-armed session's local credential broker at refire time,
+   * when it has no fresh `item.bootstrapToken` to reuse (a failsafe refire is
+   * reaper-initiated, not a follow-up dispatch).
+   *
+   * Mirrors attachProxyContext's mint args (kind/scope/ttl) for parity with
+   * the existing dispatch-bootstrap mint. `createdBy` is stamped from the
+   * calling dispatch token's own owner (req.dispatchTokenOwner, set by
+   * authenticateDispatchToken) — never fabricated — so the exchanged working
+   * token resolves under LIN-1366's owner-scoped selection. A dispatch token
+   * with no owner (minted before LIN-1397, or never re-minted) fails closed
+   * here rather than minting a bootstrap that would only fail later at
+   * exchange time — the caller (the reaper) treats any failure from this
+   * endpoint as "mint failed" and falls through to a token-less refire.
+   */
+  router.post('/api/dispatch/broker-token', authenticateDispatchToken, async (req, res) => {
+    if (!req.dispatchTokenOwner) {
+      return res.status(503).json(workspaceUnavailableEnvelope('not_connected', req.dispatchUrlKey));
+    }
+
+    if (!proxyTokenStore) {
+      return serviceUnavailable.json(res, 'Broker token minting is not configured');
+    }
+
+    let minted;
+    try {
+      minted = await proxyTokenStore.createToken(req.dispatchUrlKey, {
+        kind: 'bootstrap',
+        scope: 'readWrite',
+        label: 'refire-broker',
+        ttl: BOOTSTRAP_TOKEN_TTL_SECONDS,
+        createdBy: req.dispatchTokenOwner
+      });
+    } catch (err) {
+      console.error('Broker-token mint failed:', err.message);
+      return serviceUnavailable.json(res, 'Could not mint a broker bootstrap token');
+    }
+
+    if (!minted?.token) {
+      return serviceUnavailable.json(res, 'Could not mint a broker bootstrap token');
+    }
+
+    res.status(201).json({ token: minted.token, expiresAt: minted.expiresAt });
   });
 
   /**
