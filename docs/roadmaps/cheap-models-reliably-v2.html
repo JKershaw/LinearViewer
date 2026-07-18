@@ -1,0 +1,563 @@
+<title>Cheap Models, Reliably — v2 (Proving Phase)</title>
+<style>
+  :root {
+    --ground: #f6f8fa;
+    --panel: #ffffff;
+    --panel-2: #eef2f6;
+    --ink: #16222e;
+    --muted: #5c6f80;
+    --faint: #8fa1b1;
+    --line: #dbe3ea;
+    --line-strong: #c3d0db;
+    --brand: #1f7a8c;        /* harbour teal */
+    --brand-soft: #d7ebef;
+    --amber: #c07a17;        /* critical path */
+    --amber-soft: #f6e6c8;
+    --done: #2f8f5b;
+    --done-soft: #d5ead d;
+    --done-soft: #d8ecdf;
+    --prog: #b9791a;
+    --prog-soft: #f4e5c6;
+    --todo: #6a7c8b;
+    --todo-soft: #e4ebf0;
+    --back: #93a3b1;
+    --back-soft: #e9edf1;
+    --block: #c0483f;
+    --block-soft: #f4dcd9;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Inter", "Segoe UI", Roboto, sans-serif;
+    --radius: 9px;
+    --shadow: 0 1px 2px rgba(22,34,46,.05), 0 6px 20px rgba(22,34,46,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0e161d;
+      --panel: #16212b;
+      --panel-2: #1c2933;
+      --ink: #e7eef4;
+      --muted: #9db0c0;
+      --faint: #66798a;
+      --line: #263640;
+      --line-strong: #33495700;
+      --line-strong: #35505f;
+      --brand: #49b3c6;
+      --brand-soft: #163842;
+      --amber: #e0a24a;
+      --amber-soft: #3a2e15;
+      --done: #55c489;
+      --done-soft: #16351f;
+      --prog: #e0a24a;
+      --prog-soft: #382b12;
+      --todo: #9db0c0;
+      --todo-soft: #22313b;
+      --back: #7f93a2;
+      --back-soft: #1d2a33;
+      --block: #e2726a;
+      --block-soft: #3a1f1c;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0e161d; --panel: #16212b; --panel-2: #1c2933; --ink: #e7eef4;
+    --muted: #9db0c0; --faint: #66798a; --line: #263640; --line-strong: #35505f;
+    --brand: #49b3c6; --brand-soft: #163842; --amber: #e0a24a; --amber-soft: #3a2e15;
+    --done: #55c489; --done-soft: #16351f; --prog: #e0a24a; --prog-soft: #382b12;
+    --todo: #9db0c0; --todo-soft: #22313b; --back: #7f93a2; --back-soft: #1d2a33;
+    --block: #e2726a; --block-soft: #3a1f1c;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --ground: #f6f8fa; --panel: #ffffff; --panel-2: #eef2f6; --ink: #16222e;
+    --muted: #5c6f80; --faint: #8fa1b1; --line: #dbe3ea; --line-strong: #c3d0db;
+    --brand: #1f7a8c; --brand-soft: #d7ebef; --amber: #c07a17; --amber-soft: #f6e6c8;
+    --done: #2f8f5b; --done-soft: #d8ecdf; --prog: #b9791a; --prog-soft: #f4e5c6;
+    --todo: #6a7c8b; --todo-soft: #e4ebf0; --back: #93a3b1; --back-soft: #e9edf1;
+    --block: #c0483f; --block-soft: #f4dcd9;
+    --shadow: 0 1px 2px rgba(22,34,46,.05), 0 6px 20px rgba(22,34,46,.05);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--sans); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ---- header ---- */
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--brand); margin: 0 0 10px;
+  }
+  h1 {
+    font-size: clamp(28px, 4vw, 42px); line-height: 1.08; margin: 0 0 14px;
+    letter-spacing: -.02em; text-wrap: balance; font-weight: 680;
+  }
+  .lede { font-size: 17px; color: var(--muted); max-width: 68ch; margin: 0; }
+  .lede b { color: var(--ink); font-weight: 620; }
+
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 22px;
+    font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+  }
+  .stat {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+    padding: 5px 12px; display: inline-flex; align-items: center; gap: 7px;
+  }
+  .stat b { color: var(--ink); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .d-done { background: var(--done); }
+  .d-prog { background: var(--prog); }
+  .d-todo { background: var(--todo); }
+  .d-back { background: var(--back); }
+  .d-block { background: var(--block); }
+
+  /* ---- section scaffolding ---- */
+  section { margin-top: 52px; }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .sec-num {
+    font-family: var(--mono); font-size: 13px; color: var(--faint);
+    border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px;
+  }
+  h2 { font-size: 21px; margin: 0; letter-spacing: -.01em; font-weight: 640; }
+  .sec-sub { color: var(--muted); margin: 8px 0 22px; max-width: 74ch; font-size: 15px; }
+
+  /* ---- the spine ---- */
+  .spine {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 26px 24px; box-shadow: var(--shadow); overflow-x: auto;
+  }
+  .spine-flow { display: flex; align-items: stretch; gap: 0; min-width: 720px; }
+  .node {
+    flex: 1; background: var(--panel-2); border: 1px solid var(--line-strong);
+    border-radius: 8px; padding: 13px 14px; position: relative; min-width: 150px;
+  }
+  .node.root { border-color: var(--amber); background: var(--amber-soft); }
+  .node.cleared { border-color: var(--done); background: var(--done-soft); }
+  .node.cleared .role { color: var(--done); }
+  .node .strike { text-decoration: line-through; text-decoration-color: var(--done); }
+  .node.goal {
+    border-style: dashed; border-color: var(--brand); background: var(--brand-soft);
+  }
+  .node .id { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+  .node .id .st { font-weight: 400; color: var(--muted); }
+  .node .nt { font-size: 13px; color: var(--ink); margin-top: 5px; }
+  .node .role {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--amber); margin-top: 8px; font-weight: 600;
+  }
+  .node.goal .role { color: var(--brand); }
+  .branch { display: flex; flex-direction: column; gap: 12px; flex: 1.15; }
+  .arrow {
+    align-self: center; display: flex; align-items: center; padding: 0 4px;
+    color: var(--line-strong); flex: 0 0 auto;
+  }
+  .arrow svg { width: 30px; height: 20px; }
+  .arrow.stack { flex-direction: column; justify-content: center; gap: 34px; }
+
+  /* ---- pillars ---- */
+  .pillars { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+  @media (max-width: 760px) { .pillars { grid-template-columns: 1fr; } }
+  .pillar {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 18px 8px; box-shadow: var(--shadow);
+  }
+  .pillar > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+  .pillar h3 { font-size: 15.5px; margin: 0; font-weight: 640; letter-spacing: -.01em; }
+  .pillar .tag {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--brand); background: var(--brand-soft); padding: 2px 8px; border-radius: 5px; font-weight: 600;
+  }
+  .pillar .pdesc { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  ul.rows { list-style: none; margin: 0; padding: 0; }
+  ul.rows li {
+    display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 9px;
+    padding: 8px 0; border-top: 1px solid var(--line);
+  }
+  ul.rows li:first-child { border-top: none; }
+  .chip {
+    font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .04em;
+    text-transform: uppercase; padding: 2px 6px; border-radius: 4px; white-space: nowrap;
+    margin-top: 1px;
+  }
+  .c-prog { background: var(--prog-soft); color: var(--prog); }
+  .c-todo { background: var(--todo-soft); color: var(--todo); }
+  .c-back { background: var(--back-soft); color: var(--back); }
+  .c-done { background: var(--done-soft); color: var(--done); }
+  .rid { font-family: var(--mono); font-size: 12.5px; }
+  .rtitle { font-size: 13.5px; color: var(--ink); }
+  .rtitle .note { color: var(--muted); font-size: 12px; }
+  .prio {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    text-align: right; white-space: nowrap; margin-top: 2px;
+  }
+  .prio.hot { color: var(--block); font-weight: 700; }
+  .badge-blocked {
+    font-family: var(--mono); font-size: 10px; color: var(--block);
+    background: var(--block-soft); padding: 1px 5px; border-radius: 4px; margin-left: 4px;
+  }
+  .badge-bug {
+    font-family: var(--mono); font-size: 10px; color: var(--block); border: 1px solid var(--block);
+    padding: 0 4px; border-radius: 4px; margin-left: 4px;
+  }
+  .badge-key {
+    font-family: var(--mono); font-size: 10px; color: var(--amber); background: var(--amber-soft);
+    padding: 1px 5px; border-radius: 4px; margin-left: 4px; font-weight: 600;
+  }
+
+  /* ---- waves ---- */
+  .waves { display: flex; flex-direction: column; gap: 14px; }
+  .wave {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); display: grid; grid-template-columns: 150px 1fr;
+  }
+  @media (max-width: 680px) { .wave { grid-template-columns: 1fr; } }
+  .wave-label {
+    padding: 18px; border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 6px; background: var(--panel-2);
+    border-radius: var(--radius) 0 0 var(--radius);
+  }
+  @media (max-width: 680px) { .wave-label { border-right: none; border-bottom: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0; } }
+  .wave-label .wn { font-family: var(--mono); font-size: 12px; color: var(--brand); letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+  .wave-label .wt { font-size: 15px; font-weight: 620; letter-spacing: -.01em; }
+  .wave-label .wgoal { font-size: 12px; color: var(--muted); }
+  .wave-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .lane { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .lane-tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--faint); flex: 0 0 92px;
+  }
+  .tk {
+    display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono);
+    font-size: 12px; border: 1px solid var(--line-strong); border-radius: 6px;
+    padding: 4px 9px; background: var(--panel);
+  }
+  .tk .tkt { font-family: var(--sans); font-size: 12px; color: var(--muted); }
+  .tk.hot { border-color: var(--amber); }
+  .tk .mini { width: 7px; height: 7px; border-radius: 50%; }
+
+  /* ---- reprioritise ---- */
+  .reprios { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .reprios { grid-template-columns: 1fr; } }
+  .rp {
+    background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--amber);
+    border-radius: 8px; padding: 15px 16px; box-shadow: var(--shadow);
+  }
+  .rp.wip { border-left-color: var(--brand); }
+  .rp h4 { margin: 0 0 6px; font-size: 14px; font-weight: 640; display: flex; align-items: center; gap: 8px; }
+  .rp .move {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px;
+  }
+  .rp .move b { color: var(--block); }
+  .rp .move .to { color: var(--done); }
+  .rp p { margin: 0; font-size: 13px; color: var(--muted); }
+  .rp p b { color: var(--ink); font-weight: 600; }
+
+  .callout {
+    margin-top: 20px; background: var(--brand-soft); border: 1px solid var(--brand);
+    border-radius: var(--radius); padding: 18px 20px;
+  }
+  .callout h4 { margin: 0 0 6px; font-size: 14px; color: var(--brand); font-family: var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+  .callout p { margin: 0; font-size: 14px; color: var(--ink); }
+
+  footer {
+    margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 12px; color: var(--faint);
+    display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: space-between;
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* v2 additions */
+  .supersede-note { font-family: var(--mono); font-size: 12px; color: var(--faint); margin-top: 6px; }
+  .supersede-note a { color: var(--brand); }
+  .ribbon {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+    background: var(--done-soft); border: 1px solid var(--done); border-radius: var(--radius);
+    padding: 13px 18px; margin-top: 26px;
+  }
+  .ribbon .rlab { font-family: var(--mono); font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--done); font-weight: 700; }
+  .ribbon .ritem { font-family: var(--mono); font-size: 12.5px; color: var(--ink); display: inline-flex; gap: 6px; align-items: center; }
+  .ribbon .ritem .rid { color: var(--muted); }
+  /* acceptance */
+  .acc { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; }
+  @media (max-width:760px){ .acc { grid-template-columns: 1fr; } }
+  .acc-item {
+    background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--brand);
+    border-radius: 8px; padding: 14px 16px; box-shadow: var(--shadow);
+  }
+  .acc-item h4 { margin: 0 0 5px; font-size: 13.5px; font-weight: 640; display:flex; gap:8px; align-items:baseline; }
+  .acc-item h4 .k { font-family: var(--mono); font-size: 11px; color: var(--brand); }
+  .acc-item p { margin: 0; font-size: 13px; color: var(--muted); }
+  .acc-item .proves { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-top: 7px; }
+  /* validation loop */
+  .loop { display: flex; align-items: stretch; gap: 0; min-width: 760px; }
+  .step {
+    flex: 1; background: var(--panel-2); border: 1px solid var(--line-strong);
+    border-radius: 8px; padding: 13px 13px 14px; position: relative; min-width: 130px;
+  }
+  .step.active { border-color: var(--amber); background: var(--amber-soft); }
+  .step .n {
+    font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--brand);
+    border: 1px solid var(--line-strong); border-radius: 5px; padding: 0 6px; display: inline-block; margin-bottom: 7px;
+  }
+  .step.active .n { color: var(--amber); border-color: var(--amber); }
+  .step .sh { font-size: 13.5px; font-weight: 620; letter-spacing: -.01em; }
+  .step .sd { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .step .sids { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-top: 8px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Harbour · delivery roadmap · lineage v2</p>
+    <h1>Cheap models, reliably — now prove it</h1>
+    <p class="lede">
+      The build is done. The account model, correct project-key billing, and reusable per-task
+      <b>presets</b> all shipped — so routing Opus to research &amp; review and cheaper models to
+      everything else is now <b>mechanically possible</b>. This roadmap is about the half that a
+      mechanism can't settle on its own: <b>does it actually hold up</b> when you run cheap models on
+      real work, unattended? That's a proving problem, not a building one — so this is a validation
+      loop, not a dependency spine.
+    </p>
+    <p class="supersede-note">
+      Supersedes <a href="https://claude.ai/code/artifact/b6836604-d7d0-4e23-811e-46346d333be6">the build-phase roadmap (v1)</a>, retired at rev 6 once its
+      spine completed. v1 is kept frozen as the historical record of how the mechanism got built.
+    </p>
+    <div class="meta-row">
+      <span class="stat" style="border-color:var(--done)"><span class="dot d-done"></span> <b>mechanism built</b> — spine complete</span>
+      <span class="stat"><span class="dot d-prog"></span> WIP <b>8</b> — already on the proving edge</span>
+      <span class="stat"><span class="dot d-todo"></span> remaining work is <b>unblocked</b> — order is logical, not forced</span>
+      <span class="stat">generated <b>17 Jul</b> · <span class="rid">v2.0</span></span>
+    </div>
+    <div class="ribbon">
+      <span class="rlab">already shipped</span>
+      <span class="ritem"><span class="dot d-done"></span><span class="rid">LIN-1326</span> account model</span>
+      <span class="ritem"><span class="dot d-done"></span><span class="rid">LIN-1204</span> project-key billing</span>
+      <span class="ritem"><span class="dot d-done"></span><span class="rid">LIN-1321</span> presets <span class="rid">(1390 · 1391)</span></span>
+      <span class="ritem"><span class="dot d-done"></span><span class="rid">LIN-1375</span> token-leak proxy</span>
+    </div>
+  </header>
+
+  <!-- 01 — definition of reliable -->
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>What “reliably” has to mean</h2></div>
+    <p class="sec-sub">
+      A proving-phase roadmap needs a finish line you can actually check. These four are the
+      acceptance tests — the goal is reached when all four hold, on real work, not a demo.
+    </p>
+    <div class="acc">
+      <div class="acc-item">
+        <h4><span class="k">A</span> A cheap model finishes a real task, unattended</h4>
+        <p>An implementation ticket runs end-to-end on a cheaper model with no babysitting, and lands correct.</p>
+        <p class="proves">proven by: Harden + a live run</p>
+      </div>
+      <div class="acc-item">
+        <h4><span class="k">B</span> You can see what it cost</h4>
+        <p>Token spend, wall-clock, and the full transcript are visible per run — so “cheaper” is a measured fact, not a hope.</p>
+        <p class="proves">proven by: Instrument (LIN-1287)</p>
+      </div>
+      <div class="acc-item">
+        <h4><span class="k">C</span> The smart model catches the cheap one</h4>
+        <p>When a cheap model goes wrong, the stepper flags or corrects it before the work is trusted — supervision actually works.</p>
+        <p class="proves">proven by: Supervise (LIN-1269 / 1236)</p>
+      </div>
+      <div class="acc-item">
+        <h4><span class="k">D</span> An unattended run survives a hiccup</h4>
+        <p>A session wobble (logout, stall, dropped follow-up) doesn't wedge or silently lose the run. No known unattended-run bugs open.</p>
+        <p class="proves">proven by: Harden (LIN-1373 / 1355 / 1358 …)</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 — validation loop -->
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>The validation loop</h2></div>
+    <p class="sec-sub">
+      With the spine done, no hard blocking edges remain — every task below is unblocked. So the order
+      isn't forced by dependencies; it's the logic of proving something: you can't judge what you can't
+      measure, and you can't trust unattended what still breaks unattended. Five steps, looping until
+      the four tests above hold.
+    </p>
+    <div class="spine">
+      <div class="loop">
+        <div class="step">
+          <span class="n">1</span><div class="sh">Choose &amp; route</div>
+          <div class="sd">Pick the cheap models; wire per-kind presets (Opus→review, cheap→impl).</div>
+          <div class="sids">LIN-1129</div>
+        </div>
+        <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
+        <div class="step active">
+          <span class="n">2</span><div class="sh">Instrument</div>
+          <div class="sd">Telemetry: tokens, wall-clock, transcript — so a run is legible.</div>
+          <div class="sids">LIN-1287 · in progress</div>
+        </div>
+        <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
+        <div class="step active">
+          <span class="n">3</span><div class="sh">Run &amp; supervise</div>
+          <div class="sd">Dispatch real tasks to cheap models under the stepper; watch beat-by-beat.</div>
+          <div class="sids">LIN-1269 · 1236 · in progress</div>
+        </div>
+        <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
+        <div class="step">
+          <span class="n">4</span><div class="sh">Harden</div>
+          <div class="sd">Kill the friction that breaks unattended runs before trusting them.</div>
+          <div class="sids">LIN-1373 · 1355 · 1397 …</div>
+        </div>
+        <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
+        <div class="step">
+          <span class="n">5</span><div class="sh">Tune spend</div>
+          <div class="sd">Determinism work — cut what you pay a model to re-derive each run.</div>
+          <div class="sids">LIN-1237 · 1242 · 1277</div>
+        </div>
+      </div>
+    </div>
+    <div class="callout">
+      <h4>Where the effort already is</h4>
+      <p>
+        Of 8 in-progress tickets, the load-bearing three are steps 2–3: <b>LIN-1287</b> (telemetry),
+        <b>LIN-1269</b> (beats disposition), <b>LIN-1236</b> (spend audit). The instinct is right —
+        instrument and supervise first. The gap is step&nbsp;1: <b>LIN-1129 (choose models)</b> is still
+        Todo, yet nothing downstream is real until the cheap models are actually picked and routed.
+      </p>
+    </div>
+  </section>
+
+  <!-- 03 — pillars -->
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>Workstreams</h2></div>
+    <p class="sec-sub">Four streams carry the loop. Route kicks it off; Instrument + Supervise run hot now; Harden is the gate before you trust anything unattended.</p>
+    <div class="pillars">
+      <div class="pillar">
+        <header><h3>Route — pick &amp; wire the models</h3><span class="tag">step 1</span></header>
+        <p class="pdesc">Turn the presets mechanism into an actual policy: which cheap model for which kind of task.</p>
+        <ul class="rows">
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1129</span> Choose OpenRouter models <span class="badge-key">start here</span></span><span class="prio hot">p2 → p1?</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1250</span> Factor shared OpenRouter request/finish helpers</span><span class="prio">p0</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1345</span> Lower shared-key limit <span class="note">(unblocked)</span> · <span class="rid">LIN-1183/1184</span> fan-out + per-op override</span><span class="prio">p3</span></li>
+        </ul>
+      </div>
+      <div class="pillar">
+        <header><h3>Instrument — see the run</h3><span class="tag">step 2 · hot</span></header>
+        <p class="pdesc">The dial that turns “cheaper” into a measured fact and “reliable” into something you can check.</p>
+        <ul class="rows">
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1287</span> Richer claude-code telemetry — tokens + wall-clock <span class="badge-key">core</span></span><span class="prio">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1294</span> OpenCode telemetry parity <span class="note">(unblocked)</span> · <span class="rid">LIN-1144</span> tool-level heartbeat</span><span class="prio">p2/0</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1181</span> Track Dash invocations, outcomes, cost</span><span class="prio">p2</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1334</span> Dispatch sessions in list · <span class="rid">LIN-1311</span> transcript migration</span><span class="prio">p0</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1288/89</span> truncation fix · <span class="rid">LIN-1341</span> continuity · <span class="rid">LIN-1163</span> runs layout</span><span class="prio">✓</span></li>
+        </ul>
+      </div>
+      <div class="pillar">
+        <header><h3>Supervise — smart watches cheap</h3><span class="tag">step 3 · hot</span></header>
+        <p class="pdesc">The stepper is what makes a cheap model trustworthy: Opus drip-feeds &amp; challenges it beat by beat.</p>
+        <ul class="rows">
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1269</span> Review stepper/beats vs obligation-load</span><span class="prio">p2</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1236</span> Prompt determinism &amp; session-spend audit</span><span class="prio">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1237</span> Determinism shortlist <span class="note">(unblocked)</span> · <span class="rid">LIN-1242</span> obligation lift · <span class="rid">LIN-1277</span> cheap guards</span><span class="prio">p2</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1153</span> deterministic prompt content ✓ · <span class="rid">LIN-1152</span> <span class="note">(canceled)</span></span><span class="prio">—</span></li>
+        </ul>
+      </div>
+      <div class="pillar">
+        <header><h3>Harden — survive unattended</h3><span class="tag">step 4 · the gate</span></header>
+        <p class="pdesc">Every bug here is a way an autonomous cheap-model run silently fails. This is the gate before you trust it running alone.</p>
+        <ul class="rows">
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1373</span> Proxy-token needs creator's live session <span class="badge-bug">hit live 2×</span></span><span class="prio hot">p1</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1397</span> Stall-failsafe refire · <span class="rid">LIN-1360</span> trustworthy session setup</span><span class="prio">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1355</span> beat-2 suppression · <span class="rid">LIN-1358</span> wedged 195m resume</span><span class="prio">p1</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1323/1324</span> poll defeats follow-ups · <span class="rid">LIN-1395</span> OpenCode credential parity</span><span class="prio">p2</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1375</span> token-leak ✓ · <span class="rid">LIN-1393</span> deploy chain-split ✓</span><span class="prio">✓</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 — waves -->
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>Execution order — 2–3 in parallel</h2></div>
+    <p class="sec-sub">No hard edges remain, so these waves are sequenced by proving-logic, not blockers. Each wave ends at one of the four acceptance tests, so “done” is checkable.</p>
+    <div class="waves">
+      <div class="wave">
+        <div class="wave-label"><span class="wn">Wave 1 · now</span><span class="wt">Make a run legible</span><span class="wgoal">Pick the models; get spend + time on screen. → test B</span></div>
+        <div class="wave-body">
+          <div class="lane"><span class="lane-tag">Start here</span>
+            <span class="tk hot"><span class="mini d-todo"></span>LIN-1129 <span class="tkt">choose models &amp; route</span></span>
+            <span class="tk hot"><span class="mini d-prog"></span>LIN-1287 <span class="tkt">telemetry: tokens + wall-clock</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="wave">
+        <div class="wave-label"><span class="wn">Wave 2 · next</span><span class="wt">Run cheap, supervised</span><span class="wgoal">Real tasks on cheap models under the stepper. → test C</span></div>
+        <div class="wave-body">
+          <div class="lane"><span class="lane-tag">Supervise</span>
+            <span class="tk"><span class="mini d-prog"></span>LIN-1269 <span class="tkt">beats disposition</span></span>
+            <span class="tk"><span class="mini d-prog"></span>LIN-1236 <span class="tkt">spend audit</span></span>
+          </div>
+          <div class="lane"><span class="lane-tag">Harden top bugs</span>
+            <span class="tk hot"><span class="mini d-todo"></span>LIN-1373 <span class="tkt">proxy session dep</span></span>
+            <span class="tk"><span class="mini d-prog"></span>LIN-1397 <span class="tkt">stall-failsafe</span></span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1355 <span class="tkt">beat-2 suppression</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="wave">
+        <div class="wave-label"><span class="wn">Wave 3 · then</span><span class="wt">Trust it alone</span><span class="wgoal">Close the unattended-run bugs; run one hands-off. → tests A + D</span></div>
+        <div class="wave-body">
+          <div class="lane"><span class="lane-tag">Harden rest</span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1358 <span class="tkt">wedged resume</span></span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1323/1324 <span class="tkt">poll vs follow-ups</span></span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1360 <span class="tkt">session trust</span></span>
+          </div>
+          <div class="lane"><span class="lane-tag">Parity</span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1395 <span class="tkt">OpenCode credential parity</span></span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1294 <span class="tkt">OpenCode telemetry</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="wave">
+        <div class="wave-label"><span class="wn">Wave 4 · tune</span><span class="wt">Make it cheaper still</span><span class="wgoal">Determinism — cut re-derivation spend. Ongoing.</span></div>
+        <div class="wave-body">
+          <div class="lane"><span class="lane-tag">Ready</span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1237</span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1242</span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1277</span>
+          </div>
+          <div class="lane"><span class="lane-tag">Deeper (has blockers)</span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1271 <span class="tkt">→ 1272, 1275</span></span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-575 <span class="tkt">→ 1274</span></span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-551 <span class="tkt">→ 1276</span></span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1246 <span class="tkt">→ 1273</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 — reprioritise -->
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>Re-prioritisation — proposed</h2></div>
+    <p class="sec-sub">Two moves the fresh read surfaces. Nothing written to Linear — proposals only.</p>
+    <div class="reprios">
+      <div class="rp">
+        <h4>Promote the step that gates everything</h4>
+        <div class="move"><span class="rid">LIN-1129</span> choose models · <b>Todo p2</b> → <span class="to">p1, in progress</span></div>
+        <p>Instrument + supervise are already hot, but they're proving a rollout that hasn't been chosen yet. <b>Picking + routing the cheap models is step 1</b> of the whole loop and it's the one nobody's started.</p>
+      </div>
+      <div class="rp">
+        <h4>Treat Harden as a release gate, not backlog</h4>
+        <div class="move"><span class="rid">LIN-1373</span> + <span class="rid">LIN-1355</span> + <span class="rid">LIN-1358</span> · keep <span class="to">p1, scheduled</span></div>
+        <p>These are the exact failures that make an unattended cheap-model run untrustworthy — and 1373 bit us live twice this session. They're acceptance test D; don't let them drift in backlog while the rollout proceeds.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Harbour · LinearViewer (LIN) · lineage v2 · proving phase · generated from live state 17 Jul</span>
+    <span class="legend">
+      <span><span class="dot d-prog"></span>in progress</span>
+      <span><span class="dot d-todo"></span>todo</span>
+      <span><span class="dot d-back"></span>backlog</span>
+      <span><span class="dot d-done"></span>done</span>
+    </span>
+  </footer>
+</div>
