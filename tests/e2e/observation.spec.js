@@ -470,11 +470,15 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await expect(reply).toHaveAttribute('href', sessionPathRe);
 
       // The link actually lands on the dedicated session page — and that page is
-      // the one that renders the reply box (LIN-1004).
+      // the one that renders the reply surface (LIN-1004; LIN-1163 moved it from
+      // a page-level box to the per-run inline reply, which lives inside a
+      // collapsed run card until expanded — the whole-card click, item 3).
       await reply.click();
       await page.waitForLoadState('networkidle');
       expect(page.url()).toMatch(sessionPathRe);
-      await expect(page.locator('[data-testid="session-reply"]')).toBeVisible();
+      const run = page.locator('[data-testid="session-run"]').first();
+      await run.click();
+      await expect(run.locator('[data-testid="session-inline-reply"]')).toBeVisible();
     });
   });
 });

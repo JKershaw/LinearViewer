@@ -102,6 +102,16 @@
   font-style: italic;
 }
 
+/* Blocked/pending turn (LIN-1163, opt-in): a `[blocked]`/`[pending]`-marked
+   feedback entry gets an amber accent on its surface body — same running-
+   family vocabulary as the session waiting banner/flag. Additive only; no
+   consumer emits this class unless it detects the marker itself, so Task
+   Chat/Collective/the reply echo threads are unaffected. */
+.chat-msg--blocked .chat-msg__body.surface {
+  border-color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 10%, var(--card));
+}
+
 /* Trailing timestamp, used by row/log-style turns. */
 .chat-msg__time {
   color: var(--fg-vdim);
