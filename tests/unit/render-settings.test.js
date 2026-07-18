@@ -582,3 +582,57 @@ describe('renderSettingsPage — Dispatch presets section (LIN-1391 S7)', () => 
     assert.doesNotThrow(() => renderSettingsPage('Acme', BASE));
   });
 });
+
+describe('renderSettingsPage — Dispatch preset per-kind (byKind) overrides (LIN-1400)', () => {
+  test('the top-level config row is wrapped in a scoping marker distinct from per-kind rows', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchPresets: [{ id: 'p1', name: 'Blend', config: { model: 'top-model' } }]
+    });
+    assert.match(html, /<div class="dispatch-preset-toplevel-config">[\s\S]{0,700}name="preset__p1__Model"/);
+  });
+
+  test('a preset with no byKind renders a collapsed (closed) per-kind block', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchPresets: [{ id: 'p1', name: 'No blend', config: { model: 'top-model' } }]
+    });
+    assert.match(html, /<details class="dispatch-preset-kind-overrides" data-testid="dispatch-preset-row-p1-kind-overrides">/);
+  });
+
+  test('a preset with a byKind entry renders per-kind rows pre-filled and auto-opens the <details>', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchPresets: [{
+        id: 'p1',
+        name: 'Blend',
+        config: { model: 'top-model', byKind: { review: { model: 'opus-model', harness: 'claude-code' } } }
+      }]
+    });
+    assert.match(html, /<details class="dispatch-preset-kind-overrides" open data-testid="dispatch-preset-row-p1-kind-overrides">/);
+    assert.match(html, /name="preset__p1__kind__review__Model"[^>]*value="opus-model"/);
+    assert.match(html, /name="preset__p1__kind__review__HarnessSelect"[\s\S]{0,200}<option value="claude-code" selected>/);
+  });
+
+  test('per-kind field names are namespaced distinctly from the top-level row', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchPresets: [{
+        id: 'p1',
+        name: 'Blend',
+        config: { model: 'top-model', byKind: { plan: { model: 'plan-model' } } }
+      }]
+    });
+    // Top-level field name has no __kind__ segment; the per-kind row does.
+    assert.match(html, /name="preset__p1__Model"/);
+    assert.match(html, /name="preset__p1__kind__plan__Model"/);
+  });
+
+  test('the "new preset" create block also renders a (collapsed, empty) per-kind editor', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    const rowStart = html.indexOf('data-testid="dispatch-preset-new-row"');
+    assert.ok(rowStart > -1);
+    assert.match(html, /name="newDispatchPreset__kind__review__Model"/);
+    assert.match(html, /<details class="dispatch-preset-kind-overrides" data-testid="dispatch-preset-new-row-kind-overrides">/);
+  });
+});

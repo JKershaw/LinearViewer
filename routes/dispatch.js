@@ -23,7 +23,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
-import { isValidDispatchKind, DISPATCH_KINDS } from '../lib/prompt-templates.js';
+import { isValidDispatchKind, DISPATCH_KINDS, DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
 import { FEEDBACK_ENTRY_KINDS } from '../lib/dispatch-store.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
@@ -854,18 +854,58 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   });
 
   // =========================================================================
-  // Dispatch Presets CRUD API (Session Auth) — LIN-1391 S7
+  // Dispatch Presets CRUD API (Session Auth) — LIN-1391 S7, byKind authoring LIN-1400
   //
   // Named, workspace-scoped, reusable dispatch routing configs
   // (dispatchPresetsStore, LIN-1390). Follows the routes/collective.js
   // preset-CRUD convention (POST create / DELETE) plus an update route,
   // rather than the single-form dispatch-defaults POST above — a preset list
   // grows/shrinks, so it doesn't fit one fixed-shape form. Config authoring
-  // here is top-level model/harness ONLY (LIN-1391 scope; byKind authoring is
-  // out of scope) — an update therefore preserves any existing `byKind` on
-  // the preset verbatim rather than silently dropping it, since this route
-  // never has an opinion on it.
+  // covers both the top-level model/harness AND per-kind (`byKind`)
+  // overrides (LIN-1400) — an update replaces `byKind` when the body
+  // includes it (even `{}`, which clears it) and preserves the existing
+  // `byKind` verbatim only when the body omits the field entirely, so an API
+  // caller that never mentions `byKind` keeps today's preserve behavior.
   // =========================================================================
+
+  /**
+   * Normalize + validate a `byKind` map from a preset CRUD request body,
+   * mirroring the `server.js` dispatch-defaults per-kind loop: only known
+   * `DISPATCH_DEFAULT_KINDS` keys are read, each entry is trimmed to
+   * `{ model?, harness? }`, and a kind with neither field set is dropped.
+   * Throws `{ error }` (via `badRequest`-shaped return, not an exception) on
+   * the first invalid field, same convention as the top-level model/harness
+   * checks below.
+   *
+   * @param {*} byKind - Caller-supplied byKind value (any shape)
+   * @returns {{ error: string }|{ byKind: Object }}
+   */
+  function normalizeDispatchPresetByKind(byKind) {
+    if (byKind === undefined) return { byKind: undefined };
+    if (typeof byKind !== 'object' || byKind === null || Array.isArray(byKind)) {
+      return { error: 'byKind must be an object' };
+    }
+    const normalized = {};
+    for (const kind of DISPATCH_DEFAULT_KINDS) {
+      const entry = byKind[kind];
+      if (entry === undefined) continue;
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        return { error: `byKind.${kind} must be an object` };
+      }
+      const model = typeof entry.model === 'string' ? entry.model.trim() : '';
+      const harness = typeof entry.harness === 'string' ? entry.harness.trim() : '';
+      const modelError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
+      if (modelError) return { error: modelError.error };
+      const harnessError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+      if (harnessError) return { error: harnessError.error };
+      if (model || harness) {
+        normalized[kind] = {};
+        if (model) normalized[kind].model = model;
+        if (harness) normalized[kind].harness = harness;
+      }
+    }
+    return { byKind: normalized };
+  }
 
   function buildDispatchPresetConfig({ model, harness, byKind }) {
     const config = {};
@@ -873,7 +913,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const trimmedHarness = typeof harness === 'string' ? harness.trim() : '';
     if (trimmedModel) config.model = trimmedModel;
     if (trimmedHarness) config.harness = trimmedHarness;
-    if (byKind && typeof byKind === 'object') config.byKind = byKind;
+    if (byKind && typeof byKind === 'object' && Object.keys(byKind).length) config.byKind = byKind;
     return config;
   }
 
@@ -902,21 +942,23 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
   /**
    * POST /workspace/:urlKey/api/dispatch/presets
-   * Create a new dispatch preset. Body: { name, model?, harness? }.
+   * Create a new dispatch preset. Body: { name, model?, harness?, byKind? }.
    */
   router.post('/workspace/:urlKey/api/dispatch/presets', workspaceFromUrl, async (req, res) => {
     if (!dispatchPresetsStore) return jsonError(res, 503, 'Preset storage is not configured');
 
-    const { name, model, harness } = req.body || {};
+    const { name, model, harness, byKind } = req.body || {};
     const modelError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
     if (modelError) return badRequest.json(res, modelError.error);
     const harnessError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
     if (harnessError) return badRequest.json(res, harnessError.error);
+    const byKindResult = normalizeDispatchPresetByKind(byKind);
+    if (byKindResult.error) return badRequest.json(res, byKindResult.error);
 
     try {
       const preset = await dispatchPresetsStore.createCustom(req.workspace.urlKey, {
         name,
-        config: buildDispatchPresetConfig({ model, harness })
+        config: buildDispatchPresetConfig({ model, harness, byKind: byKindResult.byKind })
       });
       res.status(201).json({ success: true, preset });
     } catch (error) {
@@ -927,22 +969,27 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
   /**
    * PATCH /workspace/:urlKey/api/dispatch/presets/:presetId
-   * Update an existing dispatch preset in place. Body: { name?, model?, harness? }.
+   * Update an existing dispatch preset in place. Body: { name?, model?, harness?, byKind? }.
+   * `byKind` present in the body (even `{}`) replaces/clears the stored value;
+   * `byKind` absent from the body preserves the existing stored value (LIN-1400).
    */
   router.patch('/workspace/:urlKey/api/dispatch/presets/:presetId', workspaceFromUrl, async (req, res) => {
     if (!dispatchPresetsStore) return jsonError(res, 503, 'Preset storage is not configured');
 
-    const { name, model, harness } = req.body || {};
+    const { name, model, harness, byKind } = req.body || {};
     const modelError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
     if (modelError) return badRequest.json(res, modelError.error);
     const harnessError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
     if (harnessError) return badRequest.json(res, harnessError.error);
+    const byKindResult = normalizeDispatchPresetByKind(byKind);
+    if (byKindResult.error) return badRequest.json(res, byKindResult.error);
 
     try {
       const existing = await dispatchPresetsStore.get(req.workspace.urlKey, req.params.presetId);
       if (!existing) return notFound.json(res, 'Preset not found');
 
-      const config = buildDispatchPresetConfig({ model, harness, byKind: existing.config?.byKind });
+      const effectiveByKind = byKind !== undefined ? byKindResult.byKind : existing.config?.byKind;
+      const config = buildDispatchPresetConfig({ model, harness, byKind: effectiveByKind });
       const preset = await dispatchPresetsStore.update(req.workspace.urlKey, req.params.presetId, {
         name: name !== undefined ? name : existing.name,
         config
