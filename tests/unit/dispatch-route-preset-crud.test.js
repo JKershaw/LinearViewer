@@ -174,11 +174,59 @@ describe('LIN-1391 S7 — POST /workspace/:urlKey/api/dispatch/presets', () => {
     assert.equal(res.status, 503);
   });
 
-  test('never authoring byKind from this route (LIN-1391 scope: top-level model/harness only)', async () => {
+  test('authors a per-kind (byKind) blend preset (LIN-1400)', async () => {
     const app = buildApp({ dispatchPresetsStore: new DispatchPresetsStore({ collection: createMockCollection() }) });
-    const res = await call(app, 'post', BASE, { name: 'X', model: 'm1', byKind: { review: { model: 'sneaky' } } });
-    assert.equal(res.status, 201);
-    assert.deepEqual(res.body.preset.config, { model: 'm1' });
+    const res = await call(app, 'post', BASE, {
+      name: 'Blend',
+      model: 'm1',
+      byKind: { review: { model: 'opus' }, implementation: { harness: 'opencode' } }
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(res.body.preset.config, {
+      model: 'm1',
+      byKind: { review: { model: 'opus' }, implementation: { harness: 'opencode' } }
+    });
+  });
+
+  test('drops a byKind entry whose model/harness are both blank/whitespace', async () => {
+    const app = buildApp({ dispatchPresetsStore: new DispatchPresetsStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', BASE, {
+      name: 'Blend',
+      byKind: { review: { model: '   ' }, plan: { model: 'sonnet' } }
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(res.body.preset.config, { byKind: { plan: { model: 'sonnet' } } });
+  });
+
+  test('ignores an unknown byKind key (not a DISPATCH_DEFAULT_KINDS value)', async () => {
+    const app = buildApp({ dispatchPresetsStore: new DispatchPresetsStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', BASE, {
+      name: 'Blend',
+      byKind: { 'not-a-real-kind': { model: 'sonnet' } }
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(res.body.preset.config, {});
+  });
+
+  test('rejects a non-object byKind (400)', async () => {
+    const app = buildApp({ dispatchPresetsStore: new DispatchPresetsStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', BASE, { name: 'X', byKind: 'not-an-object' });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /byKind/i);
+  });
+
+  test('rejects an oversized model inside byKind (400, before the store is called)', async () => {
+    const app = buildApp({ dispatchPresetsStore: new DispatchPresetsStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', BASE, { name: 'X', byKind: { review: { model: 'a'.repeat(1001) } } });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /model/i);
+  });
+
+  test('top-level-only preset (no byKind) round-trips byte-identical to before LIN-1400', async () => {
+    const app = buildApp({ dispatchPresetsStore: new DispatchPresetsStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', BASE, { name: 'My preset', model: 'anthropic/claude-opus-4.8', harness: 'claude-code' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(res.body.preset.config, { model: 'anthropic/claude-opus-4.8', harness: 'claude-code' });
   });
 });
 
@@ -194,7 +242,7 @@ describe('LIN-1391 S7 — PATCH /workspace/:urlKey/api/dispatch/presets/:presetI
     assert.deepEqual(res.body.preset.config, { model: 'new-model', harness: 'opencode' });
   });
 
-  test('preserves an existing byKind blend the UI never authors (out of S7 scope)', async () => {
+  test('preserves an existing byKind blend when the PATCH body omits the field entirely (LIN-1400)', async () => {
     const store = new DispatchPresetsStore({ collection: createMockCollection() });
     const created = await store.createCustom('acme', {
       name: 'Blend',
@@ -202,13 +250,57 @@ describe('LIN-1391 S7 — PATCH /workspace/:urlKey/api/dispatch/presets/:presetI
     });
     const app = buildApp({ dispatchPresetsStore: store });
 
-    // Settings only ever posts top-level model/harness — never byKind.
+    // A caller (e.g. a raw API client) that never mentions byKind keeps the
+    // existing value untouched — only the Settings editor sends byKind on
+    // every save, so this covers callers that predate LIN-1400.
     const res = await call(app, 'patch', `${BASE}/${created.id}`, { name: 'Blend', model: 'top-model-2' });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.deepEqual(res.body.preset.config, {
       model: 'top-model-2',
       byKind: { review: { model: 'review-model' } }
     });
+  });
+
+  test('replaces an existing byKind when the PATCH body includes a new one (LIN-1400)', async () => {
+    const store = new DispatchPresetsStore({ collection: createMockCollection() });
+    const created = await store.createCustom('acme', {
+      name: 'Blend',
+      config: { model: 'top-model', byKind: { review: { model: 'review-model' } } }
+    });
+    const app = buildApp({ dispatchPresetsStore: store });
+
+    const res = await call(app, 'patch', `${BASE}/${created.id}`, {
+      name: 'Blend',
+      model: 'top-model',
+      byKind: { implementation: { model: 'cheap-model' } }
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(res.body.preset.config, {
+      model: 'top-model',
+      byKind: { implementation: { model: 'cheap-model' } }
+    });
+  });
+
+  test('clears an existing byKind when the PATCH body sends an explicit empty object (LIN-1400)', async () => {
+    const store = new DispatchPresetsStore({ collection: createMockCollection() });
+    const created = await store.createCustom('acme', {
+      name: 'Blend',
+      config: { model: 'top-model', byKind: { review: { model: 'review-model' } } }
+    });
+    const app = buildApp({ dispatchPresetsStore: store });
+
+    const res = await call(app, 'patch', `${BASE}/${created.id}`, { name: 'Blend', model: 'top-model', byKind: {} });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(res.body.preset.config, { model: 'top-model' });
+  });
+
+  test('rejects an invalid byKind entry on PATCH (400, store never called)', async () => {
+    const store = new DispatchPresetsStore({ collection: createMockCollection() });
+    const created = await store.createCustom('acme', { name: 'X', config: {} });
+    const app = buildApp({ dispatchPresetsStore: store });
+
+    const res = await call(app, 'patch', `${BASE}/${created.id}`, { byKind: { review: { harness: 'bad\x00harness' } } });
+    assert.equal(res.status, 400);
   });
 
   test('404s an unknown preset id', async () => {
