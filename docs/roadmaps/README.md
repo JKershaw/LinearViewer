@@ -9,12 +9,23 @@ parallelism budget, and a short list of re-prioritisation moves. They are meant 
 kept and reviewed later against what actually shipped (the retro-accuracy loop,
 LIN-1384).
 
-## Contents
+## Lineage: cheap models, reliably
 
-- **`cheap-models-reliably.html`** — road to running cheap models reliably (Opus for
-  research & review, cheaper models elsewhere, billed & trusted). Critical path:
-  `LIN-1326` (account model) → {`LIN-1321` presets, `LIN-1204` key-billing} → goal.
-  Self-contained, theme-aware page; open it directly in a browser.
+A roadmap degrades as it's patched — it accumulates strike-throughs and "done" markers
+and drifts from "what's the plan now?" toward "what changed since last time?" So instead
+of patching forever, we **regenerate** from current state as a fresh lineage and freeze
+the old one as a historical record (the reset/supersede idea; a candidate Critical Path
+subtask).
+
+- **`cheap-models-reliably.html`** — **v1, build phase** (frozen at rev 6, superseded).
+  How the mechanism got built. Critical path `LIN-1326` → {`LIN-1321` presets,
+  `LIN-1204` key-billing} → goal. All three spine tasks completed; presets shipped via
+  `LIN-1390`/`LIN-1391`. Carries a banner pointing forward to v2.
+- **`cheap-models-reliably-v2.html`** — **v2, proving phase** (current). Regenerated once
+  the build spine completed and the frontier moved from "build the mechanism" to "prove
+  cheap models are reliable in use." Not a dependency spine — a **validation loop**
+  (choose & route → instrument → run & supervise → harden → tune) anchored on four
+  explicit acceptance tests. Points back to v1 as its origin.
 
 ## How these are generated
 

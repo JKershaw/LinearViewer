@@ -133,6 +133,9 @@
     border-radius: 8px; padding: 13px 14px; position: relative; min-width: 150px;
   }
   .node.root { border-color: var(--amber); background: var(--amber-soft); }
+  .node.cleared { border-color: var(--done); background: var(--done-soft); }
+  .node.cleared .role { color: var(--done); }
+  .node .strike { text-decoration: line-through; text-decoration-color: var(--done); }
   .node.goal {
     border-style: dashed; border-color: var(--brand); background: var(--brand-soft);
   }
@@ -268,8 +271,12 @@
 </style>
 
 <div class="wrap">
+  <div style="background:var(--amber-soft);border:1px solid var(--amber);border-radius:9px;padding:13px 18px;margin-bottom:26px;font-family:var(--mono);font-size:13px;color:var(--ink);display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between">
+    <span><b style="color:var(--amber)">SUPERSEDED</b> · This is the build-phase roadmap (v1), frozen at rev 6 once its spine completed.</span>
+    <a href="https://claude.ai/code/artifact/37179775-f6f9-4b85-a639-79197c0b3c18" style="color:var(--brand);font-weight:600;white-space:nowrap">→ Current roadmap (v2, proving phase)</a>
+  </div>
   <header>
-    <p class="eyebrow">Harbour · delivery roadmap</p>
+    <p class="eyebrow">Harbour · delivery roadmap · <span style="color:var(--faint)">v1 (archived)</span></p>
     <h1>The road to cheap models, reliably</h1>
     <p class="lede">
       One goal: run <b>a range of model setups per task</b> — Opus for research &amp; review,
@@ -279,10 +286,10 @@
       <b>observability</b> to see it working — transcripts, token spend, wall-clock.
     </p>
     <div class="meta-row">
-      <span class="stat"><span class="dot d-prog"></span> <b>7</b> in progress (goal-relevant)</span>
-      <span class="stat"><span class="dot d-todo"></span> <b>18</b> todo</span>
-      <span class="stat"><span class="dot d-back"></span> <b>14</b> backlog</span>
-      <span class="stat"><span class="dot d-done"></span> foundation children <b>done</b></span>
+      <span class="stat" style="border-color:var(--done)"><span class="dot d-done"></span> <b>spine complete</b> — 1326 · 1204 · 1321 done</span>
+      <span class="stat"><span class="dot d-prog"></span> next: <b>prove it</b> — telemetry (LIN-1287)</span>
+      <span class="stat"><span class="dot d-done"></span> presets shipped: LIN-1390 + 1391</span>
+      <span class="stat">updated <b>17 Jul</b> · <span class="rid">rev 6</span></span>
       <span class="stat">blocking edges: <b>sparse</b> — order is the missing piece</span>
     </div>
   </header>
@@ -293,30 +300,31 @@
     <p class="sec-sub">
       Almost every ticket sits at <span class="rid">unblocks 0 / path 1</span> — the backlog is really a
       flat priority list, not a dependency web. The one real spine is short, and it's the whole goal:
-      the account model gates both presets and reliable key-billing. Finish the amber node and the
-      goal opens up.
+      the account model gated both presets and reliable key-billing. <b>All three spine tasks are now
+      Done</b> — 1326, 1204, and 1321. The mechanism exists; the goal has shifted from "build it" to
+      "use it and prove it works."
     </p>
     <div class="spine">
       <div class="spine-flow">
-        <div class="node root">
-          <div class="id">LIN-1326 <span class="st">· in progress</span></div>
+        <div class="node cleared">
+          <div class="id"><span class="strike">LIN-1326</span> <span class="st">· done ✓</span></div>
           <div class="nt">Human-tied account model</div>
-          <div class="role">Root blocker — finish first</div>
+          <div class="role">Root cleared — spine open</div>
         </div>
         <div class="arrow stack">
           <svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
           <svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
         </div>
         <div class="branch">
-          <div class="node">
-            <div class="id">LIN-1321 <span class="st">· in progress</span></div>
+          <div class="node cleared">
+            <div class="id"><span class="strike">LIN-1321</span> <span class="st">· done ✓</span></div>
             <div class="nt">Save dispatch defaults as reusable presets</div>
-            <div class="role" style="color:var(--brand)">The per-task setup mechanism</div>
+            <div class="role">Per-task setups now real</div>
           </div>
-          <div class="node">
-            <div class="id">LIN-1204 <span class="st">· in progress · bug</span></div>
+          <div class="node cleared">
+            <div class="id"><span class="strike">LIN-1204</span> <span class="st">· done ✓</span></div>
             <div class="nt">Agents fall back to free tier, not the project OpenRouter key</div>
-            <div class="role" style="color:var(--brand)">Bills cheap models correctly</div>
+            <div class="role">Cheap models now billed correctly</div>
           </div>
         </div>
         <div class="arrow stack">
@@ -324,26 +332,28 @@
           <svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
         </div>
         <div class="branch">
-          <div class="node goal">
-            <div class="id">GOAL</div>
+          <div class="node goal" style="border-style:solid;border-color:var(--done);background:var(--done-soft)">
+            <div class="id">GOAL <span class="st" style="color:var(--done)">· reachable ✓</span></div>
             <div class="nt">Opus for research &amp; review · cheap models for the rest · billed &amp; trusted</div>
-            <div class="role">Cheap models, reliably</div>
+            <div class="role" style="color:var(--done)">Spine complete — now use it</div>
           </div>
           <div class="node">
-            <div class="id">LIN-1345 <span class="st">· backlog</span></div>
+            <div class="id">LIN-1345 <span class="st">· backlog · unblocked</span></div>
             <div class="nt">Lower the shared free-key limit once dispatch uses project keys</div>
-            <div class="role" style="color:var(--muted)">Cleanup, unblocked by 1204</div>
+            <div class="role" style="color:var(--muted)">Cleanup — 1204 done, ready when you are</div>
           </div>
         </div>
       </div>
     </div>
-    <div class="callout">
-      <h4>The stall to fix today</h4>
+    <div class="callout" style="background:var(--done-soft);border-color:var(--done)">
+      <h4 style="color:var(--done)">Spine complete — goal reachable ✓</h4>
       <p>
-        LIN-1321 and LIN-1204 are <b>both already “In Progress”</b> — but both are blocked by LIN-1326,
-        which is <b>also “In Progress.”</b> Three concurrent items in a straight line means the two
-        downstream ones can't actually finish. Converge effort on <b>LIN-1326</b> (its schema/wiring
-        children LIN-1327–1331 are already done, so it's close), then let 1321 and 1204 run.
+        <b>LIN-1326, LIN-1204, and LIN-1321 are all Done.</b> The account model, correct key-billing,
+        and reusable presets are in place — per-task model routing (Opus for research/review, cheap for
+        the rest) is now mechanically possible. The goal flips from a <i>build</i> problem to a
+        <i>proof</i> problem: actually run cheap models on real tasks and confirm they hold up. That's
+        what makes the <b>Observability</b> pillar (LIN-1287 telemetry) the real next move — it's the
+        instrument that turns "possible" into "reliable."
       </p>
     </div>
   </section>
@@ -352,8 +362,8 @@
   <section>
     <div class="sec-head"><span class="sec-num">02</span><h2>Four pillars of the goal</h2></div>
     <p class="sec-sub">
-      Everything goal-relevant clusters into four workstreams. Foundation is the prerequisite;
-      the other three can largely run in parallel once it lands.
+      Everything goal-relevant clusters into four workstreams. Foundation was the prerequisite —
+      and its root just landed, so the other three can now run in parallel.
     </p>
     <div class="pillars">
 
@@ -362,10 +372,10 @@
         <header><h3>Foundation — account &amp; credentials</h3><span class="tag">prerequisite</span></header>
         <p class="pdesc">Durable accounts → presets → per-task setups. Also: keys that resolve off-session so cheap models never silently fall back.</p>
         <ul class="rows">
-          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1326</span> Human-tied account model <span class="badge-key">root</span></span><span class="prio hot">p1 ✓</span></li>
-          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1321</span> Dispatch presets <span class="badge-key">enabler</span></span><span class="prio hot">p1 ✓</span></li>
-          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1367</span> Off-session credential durability + refresh <span class="badge-key">ready</span></span><span class="prio">p0</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1332</span> Remove legacy linearUserId assumptions <span class="badge-blocked">← 1349, 1351</span></span><span class="prio">p0</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1326</span> Human-tied account model <span class="badge-key">root</span></span><span class="prio">p1 ✓</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1321</span> Dispatch presets <span class="badge-key">enabler</span> — shipped via <span class="rid">LIN-1390</span> (storage/routing) + <span class="rid">LIN-1391</span> (authoring UI)</span><span class="prio">p1 ✓</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1367</span> Off-session credential durability + refresh</span><span class="prio">p2</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1332</span> Remove legacy linearUserId assumptions</span><span class="prio">p0 ✓</span></li>
           <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1327–31</span> Schema · bindings · auth wiring · re-key</span><span class="prio">p0</span></li>
         </ul>
       </div>
@@ -375,7 +385,7 @@
         <header><h3>OpenRouter — cheap-model plumbing</h3><span class="tag">bill it right</span></header>
         <p class="pdesc">The wiring that makes a cheap model actually run, on your key, per task and per kind.</p>
         <ul class="rows">
-          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1204</span> Free-tier fallback bug <span class="badge-bug">bug</span><span class="badge-blocked">← 1326</span></span><span class="prio hot">p1 ✓</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1204</span> Free-tier fallback bug — bills project key now</span><span class="prio">p1 ✓</span></li>
           <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1129</span> Choose OpenRouter models</span><span class="prio">p2</span></li>
           <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1250</span> Factor shared OpenRouter request/finish helpers</span><span class="prio">p0</span></li>
           <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1281</span> Confirm autopilot honors byKind model/harness</span><span class="prio">p4</span></li>
@@ -392,8 +402,8 @@
           <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1269</span> Review stepper/beats vs obligation-load</span><span class="prio">p2</span></li>
           <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1236</span> Prompt determinism &amp; session-spend audit</span><span class="prio">p2</span></li>
           <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1237</span> Act on determinism shortlist <span class="note">(1235 done → unblocked)</span></span><span class="prio">p2</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1242</span> Prompt-obligation lift-docket · <span class="rid">LIN-1277</span> cheap deterministic guards · <span class="rid">LIN-1153</span> deterministic prompt content</span><span class="prio">p2</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1152</span> Autopilot unblock child sessions · <span class="rid">LIN-1150</span> roll-on sessions</span><span class="prio">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1242</span> Prompt-obligation lift-docket · <span class="rid">LIN-1277</span> cheap deterministic guards · <span class="rid">LIN-1153</span> deterministic prompt content <span class="note">(1153 done ✓)</span></span><span class="prio">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1152</span> Autopilot unblock child sessions <span class="note">(canceled)</span> · <span class="rid">LIN-1150</span> roll-on sessions</span><span class="prio">p2</span></li>
         </ul>
       </div>
 
@@ -404,9 +414,9 @@
         <ul class="rows">
           <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid">LIN-1287</span> Richer claude-code telemetry to Harbour <span class="badge-key">core</span></span><span class="prio">p2</span></li>
           <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1294</span> OpenCode telemetry parity · <span class="rid">LIN-1144</span> tool-level heartbeat</span><span class="prio">p2/0</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid">LIN-1341</span> Follow-ups as continuations <span class="badge-bug">bug</span> · <span class="rid">LIN-1181</span> Dash cost tracking</span><span class="prio">p2</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1341</span> Follow-ups as continuations ✓ · <span class="rid">LIN-1181</span> Dash cost tracking <span class="note">(todo)</span></span><span class="prio">p2</span></li>
           <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1334</span> Dispatch sessions in list · <span class="rid">LIN-1311</span> transcript migration</span><span class="prio">p0</span></li>
-          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1215</span> Local-tz second precision · <span class="rid">LIN-1163</span> runs-page layout</span><span class="prio">p3</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid">LIN-1215</span> Local-tz second precision · <span class="rid">LIN-1163</span> runs-page layout <span class="note">(1163 done ✓)</span></span><span class="prio">p3</span></li>
           <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid">LIN-1288/89</span> Telemetry truncation fix · feedback tagging</span><span class="prio">p1/2</span></li>
         </ul>
       </div>
@@ -416,8 +426,8 @@
       <h4 style="color:var(--muted)">Cross-cutting: reliability bugs</h4>
       <p style="color:var(--muted)">
         A thin band of friction bugs rides across all four pillars and directly threatens “reliably”:
-        <span class="rid">LIN-1375</span> credential-proxy token leak (p1, in prog) ·
-        <span class="rid">LIN-1373</span> proxy-token needs creator's live session (p1) ·
+        <span class="rid">LIN-1375</span> credential-proxy token leak (<b>done ✓</b>) ·
+        <span class="rid">LIN-1373</span> proxy-token needs creator's live session (p1 — we hit this live twice) ·
         <span class="rid">LIN-1355</span> beat-2 suppression in the stepper (p1, backlog) ·
         <span class="rid">LIN-1358</span> resume worker wedged 195m (p1) ·
         <span class="rid">LIN-1323/1324</span> autopilot poll defeats follow-ups (bugs).
@@ -436,54 +446,54 @@
     </p>
     <div class="waves">
 
-      <div class="wave">
+      <div class="wave" style="opacity:.72">
         <div class="wave-label">
-          <span class="wn">Wave 1 · now</span>
-          <span class="wt">Land the root</span>
-          <span class="wgoal">Stop starting; finish the account spine.</span>
+          <span class="wn">Wave 1 · done ✓</span>
+          <span class="wt">Root landed</span>
+          <span class="wgoal">Account spine cleared — the goal is open.</span>
         </div>
         <div class="wave-body">
-          <div class="lane"><span class="lane-tag">Converge</span>
-            <span class="tk hot"><span class="mini d-prog"></span>LIN-1326 <span class="tkt">account model</span></span>
+          <div class="lane"><span class="lane-tag">Converged</span>
+            <span class="tk"><span class="mini d-done"></span>LIN-1326 <span class="tkt">account model · done</span></span>
+            <span class="tk"><span class="mini d-done"></span>LIN-1332 <span class="tkt">legacy user assumption · done</span></span>
           </div>
-          <div class="lane"><span class="lane-tag">Parallel</span>
-            <span class="tk"><span class="mini d-prog"></span>LIN-1367 <span class="tkt">credential durability</span></span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1332 <span class="tkt">drop legacy user assumption</span></span>
+          <div class="lane"><span class="lane-tag">Carried over</span>
+            <span class="tk"><span class="mini d-todo"></span>LIN-1367 <span class="tkt">credential durability · now p2/Todo</span></span>
           </div>
         </div>
       </div>
 
-      <div class="wave">
+      <div class="wave" style="opacity:.72">
         <div class="wave-label">
-          <span class="wn">Wave 2 · next</span>
-          <span class="wt">Turn on cheap models</span>
-          <span class="wgoal">Presets + correct billing, with instruments live.</span>
+          <span class="wn">Wave 2 · mostly done ✓</span>
+          <span class="wt">Cheap models turned on</span>
+          <span class="wgoal">Presets + billing landed; a few follow-ons remain.</span>
         </div>
         <div class="wave-body">
-          <div class="lane"><span class="lane-tag">Unlocked</span>
-            <span class="tk hot"><span class="mini d-prog"></span>LIN-1321 <span class="tkt">presets</span></span>
-            <span class="tk hot"><span class="mini d-prog"></span>LIN-1204 <span class="tkt">key-billing bug</span></span>
+          <div class="lane"><span class="lane-tag">Landed</span>
+            <span class="tk"><span class="mini d-done"></span>LIN-1321 <span class="tkt">presets · done</span></span>
+            <span class="tk"><span class="mini d-done"></span>LIN-1204 <span class="tkt">key-billing · done</span></span>
+            <span class="tk"><span class="mini d-done"></span>LIN-1341 <span class="tkt">follow-up continuity · done</span></span>
           </div>
-          <div class="lane"><span class="lane-tag">Then</span>
+          <div class="lane"><span class="lane-tag">Follow-on</span>
             <span class="tk"><span class="mini d-todo"></span>LIN-1129 <span class="tkt">choose models</span></span>
             <span class="tk"><span class="mini d-back"></span>LIN-1250 <span class="tkt">factor OR helpers</span></span>
-            <span class="tk"><span class="mini d-back"></span>LIN-1345 <span class="tkt">restore limits</span></span>
-          </div>
-          <div class="lane"><span class="lane-tag">Instruments</span>
-            <span class="tk"><span class="mini d-prog"></span>LIN-1287 <span class="tkt">telemetry: tokens + wall-clock</span></span>
-            <span class="tk"><span class="mini d-todo"></span>LIN-1341 <span class="tkt">follow-up continuity</span></span>
+            <span class="tk"><span class="mini d-back"></span>LIN-1345 <span class="tkt">restore limits · unblocked</span></span>
           </div>
         </div>
       </div>
 
       <div class="wave">
         <div class="wave-label">
-          <span class="wn">Wave 3 · then</span>
-          <span class="wt">Make it trustworthy</span>
-          <span class="wgoal">Stepper supervision + kill the reliability bugs.</span>
+          <span class="wn">Wave 3 · now</span>
+          <span class="wt">Prove it's reliable</span>
+          <span class="wgoal">Instrument the rollout, then stepper supervision.</span>
         </div>
         <div class="wave-body">
-          <div class="lane"><span class="lane-tag">Ready now</span>
+          <div class="lane"><span class="lane-tag">Instrument</span>
+            <span class="tk hot"><span class="mini d-prog"></span>LIN-1287 <span class="tkt">telemetry: tokens + wall-clock — see the cheap models work</span></span>
+          </div>
+          <div class="lane"><span class="lane-tag">Stepper</span>
             <span class="tk"><span class="mini d-prog"></span>LIN-1269 <span class="tkt">beats disposition</span></span>
             <span class="tk"><span class="mini d-prog"></span>LIN-1236 <span class="tkt">spend audit</span></span>
             <span class="tk"><span class="mini d-todo"></span>LIN-1237 <span class="tkt">determinism shortlist · unblocked</span></span>
@@ -497,7 +507,7 @@
           <div class="lane"><span class="lane-tag">Reliability</span>
             <span class="tk"><span class="mini d-todo"></span>LIN-1355 <span class="tkt">beat-2 suppression</span></span>
             <span class="tk"><span class="mini d-todo"></span>LIN-1373 <span class="tkt">proxy-token session dep</span></span>
-            <span class="tk"><span class="mini d-prog"></span>LIN-1375 <span class="tkt">token-leak proxy</span></span>
+            <span class="tk"><span class="mini d-done"></span>LIN-1375 <span class="tkt">token-leak proxy · done</span></span>
           </div>
         </div>
       </div>
