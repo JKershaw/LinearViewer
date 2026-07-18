@@ -269,7 +269,9 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await expect(banner).toBeVisible();
     await expect(banner).toContainText('Waiting on you');
     await expect(page.locator('[data-testid="session-waiting-message"]')).toContainText('need your decision on the auth flow');
-    await expect(page.locator('[data-testid="session-waiting-cta"]')).toContainText('follow-up box');
+    // LIN-1163: the page-level box the banner used to point at is gone; the
+    // copy now points at the per-run reply box.
+    await expect(page.locator('[data-testid="session-waiting-cta"]')).toContainText('own reply box');
   });
 
   test('a finished session with a lingering blocked worker is NOT waiting — no banner (LIN-1005 terminal gate)', async ({ page }) => {
@@ -295,7 +297,17 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await expect(page.locator('[data-testid="session-waiting-banner"]')).toHaveCount(0);
   });
 
-  test('the reply box sends force:true for a waiting (paused-on-human) session (LIN-1252)', async ({ page }) => {
+  // LIN-1163: the page-level reply box was removed — every reply now goes
+  // through a run's own inline box, which must be expanded first (the
+  // whole-card click, item 3) before its textarea/send button are interactable.
+  async function expandRun(page, textFilter) {
+    const run = page.locator('[data-testid="session-run"]').filter({ hasText: textFilter });
+    await run.click();
+    await expect(run.locator('[data-testid="session-inline-reply"]')).toBeVisible();
+    return run;
+  }
+
+  test('the inline reply sends force:true for a run whose session is waiting (paused-on-human) (LIN-1252)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
     await seedBlockedSession(page);
@@ -304,26 +316,28 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
     await page.waitForLoadState('networkidle');
 
-    // The box renders on a cli session: non-terminal, but flagged waiting — the
-    // paused-on-human state the runner must kill-first to resume (LIN-1252).
-    const box = page.locator('[data-testid="session-reply"]');
-    await expect(box).toBeVisible();
-    await expect(box).toHaveAttribute('data-session-terminal', 'false');
+    // The blocked worker's own run: non-terminal itself, but the SESSION is
+    // waiting — the paused-on-human state the runner must kill-first to resume
+    // (LIN-1252) still forces via data-session-waiting.
+    const run = await expandRun(page, 'Waiting worker');
+    const box = run.locator('[data-testid="session-inline-reply"]');
+    await expect(box).toHaveAttribute('data-terminal', 'false');
     await expect(box).toHaveAttribute('data-session-waiting', 'true');
+    const loopId = await box.getAttribute('data-loop-id');
 
     // Capture the outbound dispatch POST to assert the wire shape.
     const [request] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
       (async () => {
-        await page.locator('[data-testid="session-reply-input"]').fill('please continue with option A');
-        await page.locator('[data-testid="session-reply-send"]').click();
+        await box.locator('textarea').fill('please continue with option A');
+        await box.locator('[data-testid="session-inline-reply-send"]').click();
       })()
     ]);
     const payload = request.postDataJSON();
-    // Additive follow-up: followUpTo = the session's own id, cli target, force:true
-    // (waiting → resume anyway / kill-first, LIN-1252/LIN-546), and crucially NO
-    // kind:'wake' (no wake collision).
-    expect(payload.followUpTo).toBe(sessionId);
+    // Additive follow-up: followUpTo = the RUN's own loopId (per-run, not the
+    // session id), cli target, force:true (waiting → resume anyway / kill-first,
+    // LIN-1252/LIN-546), and crucially NO kind:'wake' (no wake collision).
+    expect(payload.followUpTo).toBe(loopId);
     expect(payload.target).toBe('cli');
     expect(payload.force).toBe(true);
     expect(payload.kind).toBeUndefined();
@@ -334,11 +348,11 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     expect(resp.status()).toBe(201);
 
     // The UI confirms QUEUED (not delivered) — honest about the async handoff.
-    await expect(page.locator('[data-testid="session-reply-feedback"]')).toContainText('queued');
+    await expect(box.locator('.sess-reply-feedback')).toContainText('queued');
 
     // LIN-1298: the sent reply is echoed as a conversational "you" bubble in the
     // reply thread — the shared Task Chat chat UI, reused on the session surface.
-    const youBubble = page.locator('[data-testid="session-reply-you"]');
+    const youBubble = box.locator('[data-testid="session-reply-you"]');
     await expect(youBubble).toHaveCount(1);
     await expect(youBubble).toContainText('option A');
     // It composes the shared speaker-pill + surface primitives.
@@ -346,7 +360,7 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await expect(youBubble.locator('.surface.chat-msg__body')).toBeVisible();
   });
 
-  test('the reply box omits force for a genuinely warm/executing session (LIN-1252)', async ({ page }) => {
+  test('the inline reply omits force for a run in a genuinely warm/executing session (LIN-1252)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
     // A running worker with NO terminal/blocked marker → non-terminal AND not
@@ -357,29 +371,30 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
     await page.waitForLoadState('networkidle');
 
-    const box = page.locator('[data-testid="session-reply"]');
-    await expect(box).toBeVisible();
-    await expect(box).toHaveAttribute('data-session-terminal', 'false');
+    const run = await expandRun(page, 'Warm worker');
+    const box = run.locator('[data-testid="session-inline-reply"]');
+    await expect(box).toHaveAttribute('data-terminal', 'false');
     await expect(box).toHaveAttribute('data-session-waiting', 'false');
+    const loopId = await box.getAttribute('data-loop-id');
 
     const [request] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
       (async () => {
-        await page.locator('[data-testid="session-reply-input"]').fill('a note for the warm session');
-        await page.locator('[data-testid="session-reply-send"]').click();
+        await box.locator('textarea').fill('a note for the warm session');
+        await box.locator('[data-testid="session-inline-reply-send"]').click();
       })()
     ]);
     const payload = request.postDataJSON();
-    // Warm/executing session: plain follow-up, NO force (don't kill a live writer).
-    expect(payload.followUpTo).toBe(sessionId);
+    // Warm/executing run: plain follow-up, NO force (don't kill a live writer).
+    expect(payload.followUpTo).toBe(loopId);
     expect(payload.target).toBe('cli');
     expect(payload.force).toBeUndefined();
     expect(payload.kind).toBeUndefined();
 
-    await expect(page.locator('[data-testid="session-reply-feedback"]')).toContainText('queued');
+    await expect(box.locator('.sess-reply-feedback')).toContainText('queued');
   });
 
-  test('the reply box sends force:true for a finalized (terminal) session (LIN-1004)', async ({ page }) => {
+  test('the inline reply sends force:true for a finalized (terminal) run (LIN-1004)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
     await seedTerminalSessionWithBlockedWorker(page);
@@ -388,20 +403,22 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
     await page.waitForLoadState('networkidle');
 
-    const box = page.locator('[data-testid="session-reply"]');
-    await expect(box).toBeVisible();
-    // A finished session is terminal → the reply asserts "resume anyway".
-    await expect(box).toHaveAttribute('data-session-terminal', 'true');
+    // The anchor run itself was driven to [done] — terminal — so ITS OWN inline
+    // box forces to "resume anyway", independent of the still-blocked worker.
+    const run = await expandRun(page, 'Done seed');
+    const box = run.locator('[data-testid="session-inline-reply"]');
+    await expect(box).toHaveAttribute('data-terminal', 'true');
+    const loopId = await box.getAttribute('data-loop-id');
 
     const [request] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
       (async () => {
-        await page.locator('[data-testid="session-reply-input"]').fill('one more thing');
-        await page.locator('[data-testid="session-reply-send"]').click();
+        await box.locator('textarea').fill('one more thing');
+        await box.locator('[data-testid="session-inline-reply-send"]').click();
       })()
     ]);
     const payload = request.postDataJSON();
-    expect(payload.followUpTo).toBe(sessionId);
+    expect(payload.followUpTo).toBe(loopId);
     expect(payload.target).toBe('cli');
     expect(payload.force).toBe(true);
 
@@ -468,16 +485,21 @@ test.describe('Follow-up thread stitching through the real reply-box path (LIN-1
     await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
     await expect(page.locator('[data-testid="session-run"]')).toHaveCount(1);
 
-    const box = page.locator('[data-testid="session-reply"]');
+    // LIN-1163: reply is driven through the (single) run's own inline box —
+    // the page-level box this test used to drive is gone. Expand the card
+    // first (whole-card click, item 3) to reach the now-collapsed reply.
+    const run = page.locator('[data-testid="session-run"]');
+    await run.click();
+    const box = run.locator('[data-testid="session-inline-reply"]');
     await expect(box).toBeVisible();
-    await expect(box).toHaveAttribute('data-session-terminal', 'false');
+    await expect(box).toHaveAttribute('data-terminal', 'false');
 
     // Drive the REAL reply-box producer path: fill + send, exactly what a human does.
     const [request] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
       (async () => {
-        await page.locator('[data-testid="session-reply-input"]').fill('one more thing on the flake');
-        await page.locator('[data-testid="session-reply-send"]').click();
+        await box.locator('textarea').fill('one more thing on the flake');
+        await box.locator('[data-testid="session-inline-reply-send"]').click();
       })()
     ]);
     const payload = request.postDataJSON();

@@ -971,19 +971,17 @@ export function createDashboardRoutes({
       const waiting = !sessionTerminal && rawWaiting;
       const waitingMessage = waiting ? rawWaitingMessage : null;
 
-      // Phase 2 human reply box (LIN-1004): gated to cli/web sessions (never
-      // dash/local — the dispatch route rejects followUpTo for those anyway). The
-      // reply is a plain follow-up to `session.sessionId` (the root dispatch id);
-      // its `force` is conditional on the session's OWN terminal state (research:
-      // terminal → force to bypass the busy-guard, waiting/warm → omit). Target is
-      // taken from the anchor run so a `web`-dispatched session replies via `web`.
+      // Per-run inline reply (LIN-1004/LIN-1133; LIN-1163 removed the page-level
+      // box): gated to cli/web sessions (never dash/local — the dispatch route
+      // rejects followUpTo for those anyway). Each run's own box replies via its
+      // own `loop.target`, so the session-wide target no longer needs deriving
+      // here — only the gate (from the anchor run) is still needed.
       const anchorLoop = findAnchorLoop(session) || (session.loops && session.loops[0]) || null;
       const anchorTarget = (anchorLoop && anchorLoop.target) || null;
       const canReply = anchorTarget !== 'dash' && anchorTarget !== 'local';
-      const replyTarget = anchorTarget === 'web' ? 'web' : 'cli';
 
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, urlKey: workspace.urlKey, canReply, replyTarget, sessionTerminal },
+        { session, sessionId, issueContext, waiting, waitingMessage, urlKey: workspace.urlKey, canReply, sessionTerminal },
         pageOptions
       );
       res.send(html);

@@ -1,16 +1,17 @@
 /**
- * Session Page Client (LIN-1004/LIN-1133/LIN-1309).
+ * Session Page Client (LIN-1004/LIN-1133/LIN-1309/LIN-1163).
  *
  * JS-enhanced session page: per-run expandable transcripts rendered as shared
  * chat bubbles (LIN-1309) with client-side markdown rendering, per-run inline
- * reply boxes scoped to each run's loopId, BriefSection/RecapSection widget
- * init on context panels, and the preserved global reply box fallback.
+ * reply boxes scoped to each run's loopId (the ONE reply surface — the
+ * page-level global box was removed in LIN-1163), and BriefSection/RecapSection
+ * widget init on context panels.
  *
  * Loaded AFTER common.js, chat.js, marked.min.js, purify.min.js, brief.js,
  * recap.js — window.ChatUI, window.renderMarkdown, window.BriefSection,
  * window.RecapSection ARE available. Inline replies use the same raw-fetch
- * dispatch as the global reply box (window.dispatchPrompt does not support
- * followUpTo).
+ * dispatch as the original global reply box (window.dispatchPrompt does not
+ * support followUpTo).
  */
 (function () {
   'use strict';
@@ -77,22 +78,35 @@
       });
   }
 
-  // ── Per-run expand/collapse toggle (LIN-1133) ──────────────────────────────
+  // ── Per-run expand/collapse toggle (LIN-1133; LIN-1163 whole-card click) ───
+  // Clicking anywhere on the card toggles it (mirrors the Observation-page
+  // model, observation.js's makeSessionCard), not just the head — but a click
+  // on an interactive descendant (reply textarea/send button, transcript link)
+  // must not collapse the card out from under the user. The head stays the
+  // keyboard affordance (role="button", tabindex, Enter/Space) and owns
+  // aria-expanded.
+  function toggleRun(run, head) {
+    var expanded = run.classList.toggle('sess-run--expanded');
+    head.setAttribute('aria-expanded', String(expanded));
+  }
+
   function initRunToggles() {
-    var toggles = document.querySelectorAll('[data-testid="session-run-toggle"]');
-    for (var i = 0; i < toggles.length; i++) {
-      toggles[i].addEventListener('click', function () {
-        var run = this.closest('.sess-run');
-        if (!run) return;
-        var expanded = run.classList.toggle('sess-run--expanded');
-        this.setAttribute('aria-expanded', String(expanded));
-      });
-      toggles[i].addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          this.click();
-        }
-      });
+    var runs = document.querySelectorAll('.sess-run');
+    for (var i = 0; i < runs.length; i++) {
+      (function (run) {
+        var head = run.querySelector('[data-testid="session-run-toggle"]');
+        if (!head) return;
+        run.addEventListener('click', function (e) {
+          if (e.target.closest('button, a[href], textarea, .chat-composer, .sess-inline-reply')) return;
+          toggleRun(run, head);
+        });
+        head.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleRun(run, head);
+          }
+        });
+      })(runs[i]);
     }
   }
 
@@ -122,12 +136,17 @@
         var link = entry.url
           ? ' <a class="sess-tx-link" data-testid="session-transcript-link" href="' + window.escapeHtml(entry.url) + '" target="_blank" rel="noopener noreferrer">' + window.escapeHtml(entry.urlLabel || entry.url) + '</a>'
           : '';
+        // LIN-1163 item 6: a [blocked]/[pending] entry (flagged server-side,
+        // lib/render-session.js's encodeFeedbackJSON) gets the opt-in
+        // .chat-msg--blocked highlight — additive, no other chat.css consumer
+        // ever emits this class.
+        var liClass = 'sess-run-tx-entry' + (entry.blocked ? ' chat-msg--blocked' : '');
         window.ChatUI.appendMessage(thread, {
           who: 'agent',
           whoState: 'in-progress',
           html: '<span class="sess-tx-msg markdown-content">' + messageHtml + '</span>' + link,
           time: entry.timestamp ? String(entry.timestamp) : undefined,
-          liClass: 'sess-run-tx-entry',
+          liClass: liClass,
           testId: 'session-transcript-entry',
           reveal: false
         });
@@ -196,37 +215,35 @@
     }
   }
 
-  // ── Global reply box (preserved from LIN-1004) ────────────────────────────
-  function initGlobalReply() {
-    var box = document.querySelector('[data-testid="session-reply"]');
-    if (!box) return;
+  // ── In-progress elapsed time (LIN-1163 item 4) ─────────────────────────────
+  // A non-terminal run/session renders a static "in progress" placeholder
+  // server-side (lib/render-session.js); this fills in the elapsed time since
+  // dispatchedAt, computed client-side (one-time, on load — matches the
+  // ticket's "elapsed time can be derived client-side" assumption; it does not
+  // live-tick).
+  function formatElapsed(ms) {
+    if (!(ms >= 0)) return null;
+    var totalSec = Math.round(ms / 1000);
+    if (totalSec < 60) return totalSec + 's';
+    var m = Math.floor(totalSec / 60);
+    var s = totalSec % 60;
+    if (m < 60) return s ? m + 'm ' + s + 's' : m + 'm';
+    var h = Math.floor(m / 60);
+    var rm = m % 60;
+    return rm ? h + 'h ' + rm + 'm' : h + 'h';
+  }
 
-    var textarea = box.querySelector('.sess-reply-input');
-    var btn = box.querySelector('.sess-reply-send');
-    var feedback = box.querySelector('.sess-reply-feedback');
-    var thread = box.querySelector('[data-testid="session-reply-thread"]');
-    if (!textarea || !btn) return;
-
-    var urlKey = box.dataset.urlKey;
-    var sessionId = box.dataset.sessionId;
-    var target = box.dataset.target === 'web' ? 'web' : 'cli';
-    // Force a resume for a finalized session OR a paused-on-human/waiting one
-    // (LIN-1252): both are "not a live writer", so kill-first is safe and needed
-    // for the reply to land. A genuinely warm/EXECUTING session is neither.
-    var force = box.dataset.sessionTerminal === 'true' || box.dataset.sessionWaiting === 'true';
-    var opts = { urlKey: urlKey, followUpTo: sessionId, target: target, force: force };
-
-    btn.addEventListener('click', function (e) {
-      e.preventDefault();
-      sendReply(opts, btn, textarea, feedback, thread);
-    });
-
-    textarea.addEventListener('keydown', function (e) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault();
-        sendReply(opts, btn, textarea, feedback, thread);
-      }
-    });
+  function fillElapsedTimes() {
+    var els = document.querySelectorAll('[data-testid="session-run-elapsed"], [data-testid="session-elapsed"]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var dispatchedAt = el.dataset.dispatchedAt;
+      if (!dispatchedAt) continue;
+      var dispatchedMs = Date.parse(dispatchedAt);
+      if (isNaN(dispatchedMs)) continue;
+      var elapsed = formatElapsed(Date.now() - dispatchedMs);
+      if (elapsed) el.textContent = 'in progress · ' + elapsed;
+    }
   }
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
@@ -236,6 +253,6 @@
     initRunToggles();
     initInlineReplies();
     initContextWidgets();
-    initGlobalReply();
+    fillElapsedTimes();
   });
 })();

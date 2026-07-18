@@ -110,8 +110,9 @@ describe('render-session: waiting banner (LIN-1005)', () => {
     assert.match(html, /role="alert"/);
     assert.match(html, /Waiting on you/);
     assert.match(html, /data-testid="session-waiting-message"[^>]*>need your decision on the auth flow</);
-    // The banner steers the human to the Phase 2 follow-up box.
-    assert.match(html, /data-testid="session-waiting-cta"[^>]*>[^<]*follow-up box/);
+    // The banner steers the human to the per-run reply box (LIN-1163 — the
+    // page-level box it used to point at was removed).
+    assert.match(html, /data-testid="session-waiting-cta"[^>]*>[^<]*own reply box/);
   });
 
   test('no banner when the session is not waiting', () => {
@@ -239,91 +240,32 @@ describe('render-session: brief/recap context branches', () => {
   });
 });
 
-describe('render-session: human reply box (LIN-1004)', () => {
-  test('renders the reply box + loads scripts when canReply', () => {
+describe('render-session: reply surface (LIN-1004; LIN-1163 removed the page-level box)', () => {
+  test('no page-level reply box, even when canReply is true — the per-run inline reply is the only reply surface', () => {
     const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: false },
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, sessionTerminal: false },
       {}
     );
-    assert.match(html, /data-testid="session-reply"/);
-    assert.match(html, /data-testid="session-reply-input"/);
-    assert.match(html, /data-testid="session-reply-send"/);
-    assert.match(html, /data-testid="session-reply"[^>]*data-session-id="sess-abc"/);
-    assert.match(html, /data-testid="session-reply"[^>]*data-target="cli"/);
+    assert.ok(!html.includes('data-testid="session-reply"'), 'no global reply box even when canReply is true');
+    assert.ok(!html.includes('data-testid="session-reply-input"'));
+    assert.ok(!html.includes('data-testid="session-reply-send"'));
+    assert.ok(!html.includes('data-testid="session-reply-note"'));
+    // The per-run inline reply IS present (unaffected by the removal).
+    assert.match(html, /data-testid="session-inline-reply"/);
     // Scripts always load (transcripts, widgets, expand/collapse, reply).
     assert.match(html, /<script src="\/session\.js"><\/script>/);
   });
 
-  test('NO reply box when canReply is false (scripts still loaded for transcripts + widgets)', () => {
+  test('NO reply box of any kind when canReply is false (scripts still loaded for transcripts + widgets)', () => {
     const html = renderSessionPage(
       { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: false },
       {}
     );
-    assert.ok(!html.includes('data-testid="session-reply"'), 'no reply box when canReply is false');
+    assert.ok(!html.includes('data-testid="session-reply"'), 'no page-level reply box when canReply is false');
+    assert.ok(!html.includes('data-testid="session-inline-reply"'), 'no inline reply boxes when canReply is false');
     // Scripts are always loaded — they handle transcripts, context widgets, and expand/collapse.
     assert.match(html, /script src="\/common\.js/);
     assert.match(html, /script src="\/session\.js/);
-    // NO inline reply boxes when canReply is false.
-    assert.ok(!html.includes('data-testid="session-inline-reply"'));
-  });
-
-  // Force is computed CLIENT-side (public/session.js) as `terminal || waiting`;
-  // these tests pin the two attributes that drive it (LIN-1252).
-  test('a terminal session sends force (data-session-terminal="true", waiting="false") with an honest resume note', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: true },
-      {}
-    );
-    assert.match(html, /data-testid="session-reply"[^>]*data-session-terminal="true"/);
-    assert.match(html, /data-testid="session-reply"[^>]*data-session-waiting="false"/);
-    // The note surfaces the possible failed-resume honestly.
-    assert.match(html, /data-testid="session-reply-note"[^>]*>[^<]*no live session to resume/);
-  });
-
-  test('a waiting/non-terminal session sends force via data-session-waiting="true" (LIN-1252)', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: false, waiting: true, waitingMessage: 'pick one' },
-      {}
-    );
-    // Non-terminal, but flagged waiting → the client ORs waiting into force.
-    assert.match(html, /data-testid="session-reply"[^>]*data-session-terminal="false"/);
-    assert.match(html, /data-testid="session-reply"[^>]*data-session-waiting="true"/);
-    // The note stays the warm/queued wording (terminal-driven), not the resume caveat.
-    assert.match(html, /data-testid="session-reply-note"[^>]*>[^<]*queued into this session/);
-  });
-
-  test('a genuinely warm/executing session omits force (terminal="false", waiting="false")', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: false, waiting: false },
-      {}
-    );
-    assert.match(html, /data-testid="session-reply"[^>]*data-session-terminal="false"/);
-    assert.match(html, /data-testid="session-reply"[^>]*data-session-waiting="false"/);
-  });
-
-  test('a web-target session threads data-target="web"', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'web', sessionTerminal: false },
-      {}
-    );
-    assert.match(html, /data-testid="session-reply"[^>]*data-target="web"/);
-  });
-
-  // LIN-1298: the reply surface reuses the shared Task Chat conversational UI — a
-  // chat composer with an echo thread that the client fills with a "you" bubble on
-  // send — and links the shared chat.css stylesheet + the shared chat.js render
-  // helper (ChatUI, LIN-1298 v2) that builds that bubble.
-  test('the reply box adopts the shared chat UI (composer + echo thread) and links chat.css + chat.js (LIN-1298)', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, replyTarget: 'cli', sessionTerminal: false },
-      {}
-    );
-    assert.match(html, /<link[^>]*href="\/chat\.css"/, 'the shared chat stylesheet is linked');
-    assert.match(html, /<script src="\/chat\.js"><\/script>/, 'the shared chat render helper is loaded');
-    assert.match(html, /class="chat-composer"/, 'the reply input sits in a chat composer');
-    assert.match(html, /data-testid="session-reply-thread"/, 'an echo thread container is present for client-appended "you" bubbles');
-    // The composer still carries the original interactive hooks (unchanged wire).
-    assert.match(html, /class="[^"]*chat-composer__input[^"]*"[^>]*data-testid="session-reply-input"/);
   });
 
   test('chat.css is linked even on the not-found body (LIN-1298)', () => {
@@ -424,10 +366,10 @@ describe('render-session: per-run expand/collapse + inline reply (LIN-1133)', ()
     assert.match(html, /script src="\/session\.js"/);
   });
 
-  test('global reply box is still rendered as fallback when canReply', () => {
+  test('LIN-1163: no global reply box is rendered even when canReply — the per-run inline reply is the only surface', () => {
     const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true });
-    assert.match(html, /data-testid="session-reply"/);
-    assert.match(html, /data-testid="session-reply-input"/);
+    assert.ok(!html.includes('data-testid="session-reply"'));
+    assert.ok(!html.includes('data-testid="session-reply-input"'));
   });
 
   test('context panels carry widget data attributes for BriefSection/RecapSection', () => {
@@ -463,5 +405,142 @@ describe('render-session: escaping', () => {
     assert.ok(!html.includes('<script>alert(1)</script>'), 'raw script tag must not appear');
     assert.match(html, /&lt;script&gt;/);
     assert.match(html, /&lt;b&gt;lbl&lt;\/b&gt;/);
+  });
+});
+
+describe('render-session: section order (LIN-1163 item 2)', () => {
+  test('Task context renders between Overview and Runs', () => {
+    const issueContext = [{ issueIdentifier: 'LIN-900', issueId: 'uuid-900', brief: 'A brief.', recap: null }];
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext });
+    const overviewIdx = html.indexOf('sess-overview');
+    const contextIdx = html.indexOf('sess-context-section');
+    const runsIdx = html.indexOf('sess-runs-section');
+    assert.ok(overviewIdx > -1 && contextIdx > -1 && runsIdx > -1, 'all three sections render');
+    assert.ok(overviewIdx < contextIdx, 'Overview renders before Task context');
+    assert.ok(contextIdx < runsIdx, 'Task context renders before Runs');
+  });
+});
+
+describe('render-session: in-progress status (LIN-1163 item 4)', () => {
+  test('a non-terminal run never shows "completed —"; it shows an in-progress element instead', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null;
+    session.loops[0].terminalCompletedAt = null;
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('completed —'), 'never renders the misleading "completed —"');
+    assert.match(html, /data-testid="session-run-elapsed"[^>]*data-dispatched-at="2026-07-04T10:00:00\.000Z"[^>]*>in progress</);
+    // The OTHER (terminal) run still renders its real completion time.
+    assert.match(html, /data-testid="session-run-completed"[^>]*>completed 2026-07-04T10:05:00\.000Z</);
+  });
+
+  test('a terminal run still renders its completed timestamp, not the in-progress element', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-testid="session-run-completed"[^>]*>completed 2026-07-04T10:02:00\.000Z</);
+  });
+
+  test('the session-level Overview "completed" row gets the same treatment when the session is non-terminal', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], sessionTerminal: false });
+    assert.ok(!html.includes('completed —'));
+    assert.match(html, /data-testid="session-elapsed"[^>]*data-dispatched-at="2026-07-04T10:00:00\.000Z"[^>]*>in progress</);
+  });
+
+  test('the session-level Overview "completed" row shows the real timestamp when the session is terminal', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], sessionTerminal: true });
+    assert.ok(!html.includes('data-testid="session-elapsed"'));
+    assert.match(html, /<span class="sess-k">completed<\/span><span class="sess-v">2026-07-04T10:05:00\.000Z</);
+  });
+});
+
+describe('render-session: collapsed-run waiting flag (LIN-1163 item 5)', () => {
+  test('a non-terminal run whose last feedback entry is [blocked] renders the waiting flag', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null;
+    session.loops[0].feedback = [
+      { message: 'made some progress', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:00.000Z' },
+      { message: '[blocked] need a decision', url: null, urlLabel: null, timestamp: '2026-07-04T10:02:00.000Z' }
+    ];
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-testid="session-run-waiting-flag"/);
+  });
+
+  test('a non-terminal run whose last feedback entry is [pending] renders the waiting flag', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null;
+    session.loops[0].feedback = [{ message: '[pending] stepper beat done', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:00.000Z' }];
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-testid="session-run-waiting-flag"/);
+  });
+
+  test('a run whose [blocked] entry is NOT the last one does not render the flag', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null;
+    session.loops[0].feedback = [
+      { message: '[blocked] need a decision', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:00.000Z' },
+      { message: 'human replied, back to work', url: null, urlLabel: null, timestamp: '2026-07-04T10:02:00.000Z' }
+    ];
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('data-testid="session-run-waiting-flag"'));
+  });
+
+  test('a TERMINAL run does not render the flag even if its last entry looks like [blocked]', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = 'done'; // already fixtureSession default, kept explicit
+    session.loops[0].feedback = [{ message: '[blocked] stale marker from earlier', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:00.000Z' }];
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('data-testid="session-run-waiting-flag"'));
+  });
+
+  test('an ordinary running run with no blocked marker does not render the flag', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('data-testid="session-run-waiting-flag"'));
+  });
+
+  test('a run superseded by a follow-up loop does not render the flag, even though its own last feedback is [blocked]', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null;
+    session.loops[0].feedback = [{ message: '[blocked] need a decision', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:00.000Z' }];
+    // The follow-up reply spawned a NEW loop pointing back at loop-1 (LIN-1341) —
+    // the original loop's own feedback never changes, so without the supersession
+    // exclusion it would stay flagged "waiting for input" forever.
+    session.loops.push({
+      loopId: 'loop-3',
+      followUpTo: 'loop-1',
+      issueIdentifier: 'LIN-900',
+      issueId: 'uuid-900',
+      iteration: 3,
+      kind: 'autopilot',
+      dispatchedAt: '2026-07-04T10:03:00.000Z',
+      terminalStatus: null,
+      feedback: [{ message: 'resuming after reply', url: null, urlLabel: null, timestamp: '2026-07-04T10:03:01.000Z' }]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('data-testid="session-run-waiting-flag"'));
+  });
+});
+
+describe('render-session: blocked/pending transcript marker (LIN-1163 item 6)', () => {
+  test('a [blocked] feedback entry is flagged blocked:true in the embedded data-feedback JSON', () => {
+    const session = fixtureSession({
+      loops: [{
+        loopId: 'l', issueIdentifier: 'LIN-900', issueId: 'u', iteration: 1,
+        feedback: [
+          { message: 'ordinary progress note', url: null, urlLabel: null, timestamp: null },
+          { message: '[blocked] need your decision', url: null, urlLabel: null, timestamp: null },
+          { message: '[pending] beat done, task continues', url: null, urlLabel: null, timestamp: null }
+        ],
+        telemetry: null
+      }]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    const match = html.match(/data-feedback="([^"]*)"/);
+    assert.ok(match, 'transcript container with data-feedback renders');
+    const decoded = match[1]
+      .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    const entries = JSON.parse(decoded);
+    assert.equal(entries.length, 3);
+    assert.equal(entries[0].blocked, false, 'an ordinary entry is not flagged blocked');
+    assert.equal(entries[1].blocked, true, 'a [blocked] entry is flagged');
+    assert.equal(entries[2].blocked, true, 'a [pending] entry is flagged');
   });
 });
