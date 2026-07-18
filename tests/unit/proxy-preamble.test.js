@@ -128,7 +128,9 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
     assert.ok(!out.includes('TOK123'), 'no token in prompt text');
     assert.ok(!out.includes('curl -X POST'), 'no curl token-exchange command');
     assert.ok(!out.includes('single-use bootstrap token for a working token'), 'no bootstrap-exchange line');
-    assert.ok(out.includes('MCP tool'), 'points at the configured MCP tool');
+    assert.ok(!out.includes('MCP tool'), 'no longer points at a dispatch MCP tool (LIN-1375 removed it)');
+    assert.ok(!out.includes('Authorization: Bearer'), 'no Bearer-auth instruction for the local-broker path');
+    assert.ok(out.includes('HARBOUR_LOCAL_BASE'), 'points the agent at the local unauthenticated broker');
     assert.ok(out.includes(MARKER), 'still carries the access marker');
     assert.ok(out.includes('/api/proxy/brief/LIN-42'), 'keeps the per-issue brief endpoint');
     assert.ok(out.includes('/api/proxy/instructions'), 'keeps the endpoint catalog');
