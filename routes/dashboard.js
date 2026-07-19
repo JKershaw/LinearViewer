@@ -34,6 +34,7 @@ import { renderSessionPage } from '../lib/render-session.js';
 import { getLoopsForWorkspace, getLoopsForIssue, getSessionsForWorkspace, getSessionsForIssues, deriveIssueGraph } from '../lib/pipeline-loops.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
+import { isStale, loopLastActivityMs } from '../lib/staleness.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { createTaskDoneCache } from '../lib/task-done-cache.js';
@@ -67,11 +68,13 @@ const TERMINAL_AGENT_STATES = new Set(['complete', 'error']);
 // never rendered as an errored/aborted session.
 const MARKER_TO_AGENT_STATE = { done: 'complete', failed: 'error', aborted: 'error', skipped: 'complete' };
 
-// A non-terminal session whose last activity is older than this is considered
-// "stale" — a worker that died without emitting a terminal marker would otherwise
-// sit in the Active feed forever (Bug 3, LIN-608). Derived only: the stored record
-// is never mutated, so a later heartbeat (which advances lastActivity) un-stales it.
-const STALE_AFTER_MS = 24 * 60 * 60 * 1000; // 24h ("after a day")
+// Archive recency: how much history the Active feed keeps before a run drops to
+// the collapsible Completed archive. This is DISTINCT from staleness (LIN-1445):
+// staleness ("this run went quiet") is the shorter, shared STALE_AFTER_MS (1h,
+// heartbeat-aware) imported below; archive recency is this longer window. Both
+// are derived-only — the stored record is never mutated, so a later heartbeat
+// un-stales a run and pulls it back toward Active.
+const ARCHIVE_AFTER_MS = 24 * 60 * 60 * 1000; // 24h ("after a day")
 
 // Default archive page size for the observation /sessions feed (LIN-631). The
 // client requests this many archived sessions per "load more"; the server caps
@@ -517,10 +520,17 @@ export function createDashboardRoutes({
     const terminal = sessionIsTerminal(session);
     const lastActivityMs = lastActivityOverrideMs != null ? lastActivityOverrideMs : sessionActivityMs(enriched, session);
 
-    // Derived staleness (Bug 3): a non-terminal session with no activity for >24h
-    // is bucketed out of Active. Purely derived from lastActivityMs — never a
-    // mutation — so a later heartbeat advances lastActivity and un-stales it.
-    const stale = !terminal && lastActivityMs > 0 && (Date.now() - lastActivityMs) > STALE_AFTER_MS;
+    // Derived staleness (Bug 3, unified in LIN-1445): a non-terminal session with
+    // no activity for longer than the SHARED STALE_AFTER_MS (1h) is flagged stale
+    // — the same definition the Live Console uses. Heartbeat-aware: a run that is
+    // heartbeating (but hasn't posted an agent-status update) is NOT stale, so the
+    // activity floor unions the session's own recency with each loop's latest
+    // heartbeat (`loopLastActivityMs`). Purely derived — a later heartbeat
+    // advances activity and un-stales it. Note this is decoupled from archive
+    // recency (ARCHIVE_AFTER_MS, 24h): a stale run stays visible in Active,
+    // flagged, until it also crosses the archive window.
+    const activityForStaleMs = Math.max(lastActivityMs || 0, ...enriched.map(loopLastActivityMs));
+    const stale = !terminal && isStale(activityForStaleMs, Date.now());
 
     // Session-level "waiting on user" rollup (LIN-1005): unions any agent-status
     // `blocked` run and any latest `[blocked]`/`[pending]` feedback marker across
@@ -1184,7 +1194,7 @@ export function createDashboardRoutes({
         const now = Date.now();
         const recentlyActive = (s) => {
           const t = Date.parse(s.lastActivity);
-          return Number.isFinite(t) && (now - t) <= STALE_AFTER_MS;
+          return Number.isFinite(t) && (now - t) <= ARCHIVE_AFTER_MS;
         };
         const feed = merged.filter(s => !s.standalone);
         active = feed.filter(recentlyActive);

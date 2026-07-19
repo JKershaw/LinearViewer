@@ -38,9 +38,10 @@ const POLL_MS = 5000;
 const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // Active vs Archive split (LIN-631): recency-only, mirrored EXACTLY from the
-// server (routes/dashboard.js — STALE_AFTER_MS + the recentlyActive predicate),
-// so both sides bucket a session the same way.
-const STALE_AFTER_MS = 24 * 60 * 60 * 1000; // 24h
+// server (routes/dashboard.js — ARCHIVE_AFTER_MS + the recentlyActive predicate),
+// so both sides bucket a session the same way. Distinct from staleness, which is
+// the shorter, shared 1h window owned server-side (LIN-1445).
+const ARCHIVE_AFTER_MS = 24 * 60 * 60 * 1000; // 24h
 const ARCHIVE_PAGE_SIZE = 30;               // archive "load more" page size
 
 // Filter state.
@@ -193,7 +194,7 @@ function passesFilter(session) {
 // regardless of terminal state.
 function isRecentlyActive(session) {
   const t = Date.parse(session.lastActivity);
-  return Number.isFinite(t) && (Date.now() - t) <= STALE_AFTER_MS;
+  return Number.isFinite(t) && (Date.now() - t) <= ARCHIVE_AFTER_MS;
 }
 
 // Sessions-view in-flight predicate (LIN-1194) — mirrors the server's running-only
