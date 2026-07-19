@@ -54,7 +54,7 @@ import { isTerminalState, isBlocked } from '../lib/tree.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { parseRepoFromDescription, resolveDispatchRepo, buildPromptFilename } from '../lib/prompt-formatters.js';
-import { attachProxyContext } from '../lib/proxy-preamble.js';
+import { attachProxyContext, shouldUseMcpTokenField, provisionBootstrapToken } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS, WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
@@ -4444,10 +4444,23 @@ One convention across every endpoint, so you can branch on the same fields every
       // appendProxyContext:false). This is the systemic fix — every follow-up
       // consumer benefits, not just one orchestrator. (`/recommend-and-dispatch`
       // accepts no followUpTo, so it needs no equivalent suppression.)
+      //
+      // LIN-1429: this suppression governs the PROSE APPEND only. Whether a
+      // credential is PROVISIONED is now a separate decision, keyed on the resolved
+      // harness (see finalizePrompt below) — the follow-up default here means "don't
+      // repeat the prose", never "don't mint a credential". Conflating the two was
+      // the LIN-1429 bug: a broker-dependent (claude-code/MCP) follow-up needs a
+      // live credential even when the prose is (correctly) suppressed, because the
+      // original credential died with the window that held it (LIN-1375/1362).
       const isFollowUp = followUpTo !== undefined && followUpTo !== null;
+      // The caller's own explicit instruction. Distinct from isFollowUp: an opt-out
+      // means "I don't want proxy context"; a follow-up default means only "I
+      // already have it".
+      const explicitOptOut = appendProxyContext === false;
+      // Prose append: unchanged (LIN-805).
       const shouldAppendProxyContext = isFollowUp
         ? appendProxyContext === true
-        : appendProxyContext !== false;
+        : !explicitOptOut;
 
       // Create the dispatch item through the shared factory (LIN-1139): it
       // resolves kind, fills blank model/harness from workspace dispatchDefaults
@@ -4466,8 +4479,8 @@ One convention across every endpoint, so you can branch on the same fields every
         model,
         harness,
         finalizePrompt: async (resolvedHarness) => {
+          const baseUrl = `${req.protocol}://${req.get('host')}`;
           if (prompt && shouldAppendProxyContext) {
-            const baseUrl = `${req.protocol}://${req.get('host')}`;
             // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
             // LIN-1155: claude-code harness -> token stripped from prose, returned here.
             return attachProxyContext({
@@ -4480,6 +4493,22 @@ One convention across every endpoint, so you can branch on the same fields every
               harness: resolvedHarness,
               createdBy: req.proxyCreatedBy || null
             });
+          }
+          // LIN-1429: the prose block may be suppressed for a warm follow-up
+          // (LIN-805), but a broker-dependent harness still needs a LIVE
+          // credential — the original died with the window that held it
+          // (LIN-1375/1362). Provision without appending. Keyed on the RESOLVED
+          // harness, never on isFollowUp.
+          if (prompt && !explicitOptOut && shouldUseMcpTokenField(resolvedHarness)) {
+            const bootstrapToken = await provisionBootstrapToken({
+              proxyTokenStore,
+              urlKey: req.proxyUrlKey,
+              baseUrl,
+              label: 'dispatch-bootstrap',
+              harness: resolvedHarness,
+              createdBy: req.proxyCreatedBy || null
+            });
+            return { prompt: finalPrompt, bootstrapToken };
           }
           return { prompt: finalPrompt, bootstrapToken: null };
         },
