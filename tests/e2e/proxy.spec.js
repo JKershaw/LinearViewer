@@ -1369,6 +1369,11 @@ test.describe('Proxy API - Dispatch', () => {
     const { item } = await take.json();
     expect(item.prompt).toBe('self-contained prompt');
     expect(item.prompt).not.toContain('Workspace API access');
+    // LIN-1429 (cell #5, the near-drift): no `harness` here defaults to
+    // claude-code (LIN-1159), so an explicit opt-out must ALSO suppress
+    // provisioning, not just the prose — a credential with no channel to
+    // reach the worker would otherwise be minted and stranded.
+    expect(item.bootstrapToken).toBeNull();
   });
 
   test('watch returns 404 for unknown id', async ({ request }) => {
