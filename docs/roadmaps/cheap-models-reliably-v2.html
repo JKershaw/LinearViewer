@@ -439,8 +439,8 @@
         <p class="pdesc">Research (17 Jul): <b>time is already shown</b> per worker session. The gap is <b>money + tokens on worker sessions</b> — they emit neither, and cost can't be attributed to a run.</p>
         <ul class="rows">
           <li><span class="chip c-done">done</span><span class="rtitle"><span class="badge-key">time ✓</span> Worker runtime shown on Observation + session pages (wall-clock)</span><span class="prio">✓</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="badge-bug">gap 1</span> Worker sessions emit <b>no tokens/cost</b> — capture usage from the runner</span><span class="prio hot">—</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="badge-bug">gap 2</span> No session join key → surface <b>cost-per-session in currency</b> on the run pages</span><span class="prio hot">—</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1425">LIN-1425</a></span> Capture worker-session usage (tokens + cost) from the runner <span class="badge-key">gap 1</span></span><span class="prio hot">p2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1426">LIN-1426</a></span> Attribute + show <b>cost-per-session in £</b> on the run pages <span class="badge-blocked">← 1425</span></span><span class="prio hot">p2</span></li>
           <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-418">LIN-418</a></span> Server-side LLM cost/tokens (USD, per-feature, Settings only) · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a></span> telemetry ✓</span><span class="prio">✓</span></li>
           <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1404">LIN-1404</a>/1405</span> OpenCode relay · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1181">LIN-1181</a></span> Dash cost · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1411">LIN-1411</a></span> budget slider</span><span class="prio">p0/2</span></li>
         </ul>
@@ -490,8 +490,8 @@
         <div class="wave-label"><span class="wn">Wave 2 · next</span><span class="wt">Put cost on screen</span><span class="wgoal">Tokens → £, per session. → check 2</span></div>
         <div class="wave-body">
           <div class="lane"><span class="lane-tag">The cost gap</span>
-            <span class="tk hot"><span class="mini d-todo"></span>capture worker usage <span class="tkt">(gap 1 — candidate)</span></span>
-            <span class="tk hot"><span class="mini d-todo"></span>per-session cost in £ <span class="tkt">(gap 2 — candidate)</span></span>
+            <span class="tk hot"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1425">LIN-1425</a> <span class="tkt">capture worker usage</span></span>
+            <span class="tk hot"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1426">LIN-1426</a> <span class="tkt">per-session cost in £</span></span>
           </div>
           <div class="lane"><span class="lane-tag">OpenCode parity</span>
             <span class="tk"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1404">LIN-1404</a>/1405 <span class="tkt">tool/event relay</span></span>
@@ -537,9 +537,9 @@
         <p>v2.1 called this the single gate. Your reframe is better: <b>don't optimise the model, default it.</b> DeepSeek/GPT for build, Opus for review, measure. Reword the ticket from “choose the ideal models” to “pick a reliable default; revisit only if cost says so.”</p>
       </div>
       <div class="rp">
-        <h4>The cost gap is two-part (research done)</h4>
-        <div class="move">worker usage capture + per-session £ rollup · <span class="to">2 candidate tickets</span></div>
-        <p>Research 17 Jul: cost/tokens are instrumented only for the app's own LLM calls (USD, per-feature, Settings). <b>Worker sessions — the feature builds — emit no cost/tokens</b>, and there's no session join key. Time is already shown. So “20p” needs (1) capture worker usage from the runner, (2) attribute + render per-session cost in £. <b>Awaiting your file decision.</b></p>
+        <h4>The cost gap is two-part — filed ✓</h4>
+        <div class="move"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1425">LIN-1425</a></span> capture → blocks → <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1426">LIN-1426</a></span> show in £</div>
+        <p>Research 17 Jul: cost/tokens are instrumented only for the app's own LLM calls (USD, per-feature, Settings). <b>Worker sessions — the feature builds — emit no cost/tokens</b>, and there's no session join key. Time is already shown. Filed as two linked tickets: capture worker usage, then attribute + render per-session cost in <b>GBP</b> on the run pages.</p>
       </div>
       <div class="rp wip">
         <h4>Park the stepper &amp; determinism</h4>
