@@ -1330,7 +1330,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, briefCacheStore, recapCacheStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
-app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore }))
+app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore }))
 
 // Mount next-run routes (experimental "suggest the next autopilot run" — LIN-603).
 app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, reportHistoryStore }))
