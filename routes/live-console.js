@@ -24,6 +24,10 @@ import { buildConsoleFeed } from '../lib/live-console.js';
 // Bound the read window so peak memory tracks recent activity, not the full
 // 30-day agent-status retention (mirrors the observation feed's windowing).
 const FEED_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h
+// Also cap the per-workspace row count so the read is bounded at the store/DB
+// layer, not merged-then-sliced in memory (review R4). Comfortably exceeds the
+// tempo window + the DEFAULT_MAX_EVENTS stream cap, so nothing visible is lost.
+const FEED_PER_WORKSPACE_LIMIT = 300;
 
 /**
  * @param {Object} deps
@@ -85,7 +89,7 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, ge
     // whole feed (mirrors mergeLoops).
     const settled = await Promise.allSettled(
       workspaces.map(async (ws) => {
-        const { items } = await agentStatusStore.listStatus(ws.urlKey, { since });
+        const { items } = await agentStatusStore.listStatus(ws.urlKey, { since, limit: FEED_PER_WORKSPACE_LIMIT });
         return (items || []).map(item => ({
           ...item,
           workspaceUrlKey: ws.urlKey,

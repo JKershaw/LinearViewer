@@ -77,6 +77,35 @@ test.describe('Live Console (experimental)', () => {
       await expect(page.locator('#live-console-lanes-empty')).toBeVisible();
       await expect(page.locator('#live-console-stream-empty')).toBeVisible();
     });
+
+    test('filter chips stay hidden for a single-workspace session', async ({ page }) => {
+      // Chips only earn their place when there is more than one workspace to filter.
+      await expect(page.locator('#live-console-chips')).toBeHidden();
+    });
+  });
+
+  test.describe('Live data', () => {
+    test('renders seeded events with click-through to Observation', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await page.request.get(`/test/clear-agent-status?urlKey=${URL_KEY}`);
+      await page.request.post('/test/seed-agent-status', {
+        data: { urlKey: URL_KEY, taskIdentifier: 'LIN-777', action: 'implementation', status: 'in_progress', summary: 'wiring the thing' },
+      });
+      await page.request.post('/test/seed-agent-status', {
+        data: { urlKey: URL_KEY, taskIdentifier: 'LIN-778', action: 'review', status: 'completed', summary: 'approved and merged' },
+      });
+
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-event"]');
+
+      // A working task becomes a pulse-lane; a completed one is a done event.
+      await expect(page.locator('[data-testid="live-console-lane"]')).toHaveCount(1);
+      await expect(page.locator('[data-testid="live-console-event"]').first()).toBeVisible();
+
+      // The event task links through to that workspace's Observation page.
+      const link = page.locator('.lc-event-task', { hasText: 'LIN-778' });
+      await expect(link).toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);
+    });
   });
 
   test.describe('Events endpoint', () => {

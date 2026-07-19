@@ -70,8 +70,28 @@ test('renderLiveConsolePage emits the ambient shell with stable mount points', (
   // Stable testids / mount points the client fills.
   assert.match(html, /data-testid="live-console-stream"/);
   assert.match(html, /data-testid="live-console-lanes"/);
+  assert.match(html, /data-testid="live-console-chips"/);
   assert.match(html, /id="live-console-tempo"/);
   // Loads its own scoped assets.
   assert.match(html, /\/live-console\.css/);
   assert.match(html, /\/live-console\.js/);
+});
+
+test('renderer puts aria-live on the banner status, NOT on the wholesale-replaced stream list', () => {
+  const html = renderLiveConsolePage({ urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }], featureFlags: { liveConsole: true } });
+  // The status line is the polite live region…
+  assert.match(html, /id="live-console-status"[^>]*aria-live="polite"/);
+  // …and the stream <ol> is NOT (it is fully re-rendered each poll).
+  const streamTag = html.match(/<ol[^>]*id="live-console-stream"[^>]*>/)[0];
+  assert.ok(!/aria-live/.test(streamTag), 'stream <ol> must not carry aria-live');
+});
+
+test('renderer embeds the workspace list for client-side chip filtering', () => {
+  const html = renderLiveConsolePage({
+    urlKey: 'acme',
+    workspaces: [{ urlKey: 'acme', name: 'Acme' }, { urlKey: 'beta', name: 'Beta' }],
+    featureFlags: { liveConsole: true },
+  });
+  assert.match(html, /"workspaces":\[/);
+  assert.match(html, /"urlKey":"beta"/);
 });

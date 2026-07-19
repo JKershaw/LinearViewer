@@ -349,6 +349,32 @@ main.flight-companion-page[data-url-key]  - page container
   #flight-companion-copy-feedback         - copy status text
 ```
 
+## Live Console (experimental)
+
+The Live Console page (`/workspace/{urlKey}/live-console`) is an ambient, "lean-back" realtime feed of agent activity merged across ALL connected workspaces. Its spine is the agent-status log (research/implementation/review/close-out steps), shaped by `lib/live-console.js` into an event stream, a set of currently-working "lanes", a tempo sparkline, and fleet totals. Reads Mongo only — no Linear calls and no LLM per poll. Requires the per-user `liveConsole` feature flag; reached via a Settings link and the nav `⋯ more` overflow when on (route redirects to `/settings` when off). Polls every 5s (chained, in-flight-guarded, exponential backoff on failure; pauses while the tab is hidden). Purely presentational — no writes.
+
+### Live Console DOM Structure
+```
+main.lc-page[data-url-key]                    - page container
+  [data-testid="live-console-banner"]         - status banner
+    #live-console-dot[data-health]            - health dot (live|done|error|idle)
+    #live-console-status[aria-live=polite]    - one-line fleet status / connection state
+    #live-console-tempo                       - tempo sparkline <canvas> (event rate, last 20 min)
+  [data-testid="live-console-chips"]          - workspace filter chips (hidden when <2 workspaces)
+    .lc-chip[data-ws][aria-pressed]           - one toggle per workspace (.lc-chip--off when filtered out)
+  [data-testid="live-console-lanes"]          - "working now" rail (<ul>)
+    [data-testid="live-console-lane"]         - one breathing lane per working agent
+      a.lc-lane-task[href]                     - links to that workspace's /observation
+  [data-testid="live-console-stream"]         - activity stream (<ol>, newest first)
+    [data-testid="live-console-event"][data-kind]  - one event; data-kind: done|working|blocked|failed|info
+      a.lc-event-task[href]                    - links to that workspace's /observation
+```
+- `data-kind` vocabulary: `done` (✓), `working` (◐), `blocked` (◑), `failed` (✗), `info` (·) — colour AND glyph carry the state (never colour alone).
+- New events on later polls get a transient `.lc-event--new` class; lane pulses persist across polls via a keyed reconcile (nodes are updated in place, not rebuilt).
+
+### Live Console Endpoint
+- `GET /workspace/{urlKey}/api/live-console/events` — merged, normalized feed (session-auth; 403 when the flag is off). Returns `{ events:[{id,kind,ts,iso,workspaceUrlKey,workspaceName,task,action,status,summary}], lanes:[{workspaceUrlKey,workspaceName,task,action,summary,sinceMs}], tempo:[n,...], summary:{active,done,failed,blocked,total} }`. Generation-free.
+
 ## Common Workflows
 
 1. **Find in-progress tasks**: Look in "In Progress" section at top (displays as tree with subtasks)
