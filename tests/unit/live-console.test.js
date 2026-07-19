@@ -26,6 +26,7 @@ import {
   buildConsoleFeed,
   normalizeEvidenceEvents,
   deriveLoopLanes,
+  buildPulse,
   SUMMARY_MAX,
 } from '../../lib/live-console.js';
 
@@ -171,6 +172,36 @@ test('tempo buckets count events oldest→newest over the window', () => {
   // 4 buckets, oldest→newest: [t-4..t-3), [t-3..t-2), [t-2..t-1), [t-1..t-0)
   assert.equal(tempo.length, 4);
   assert.deepEqual(tempo, [0, 0, 2, 1]);
+});
+
+// ─── pulse (flowing-strip heartbeat hum) ──────────────────────────────────────
+
+test('buildPulse buckets heartbeats-only into a fine window ending at now', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const s = 1000;
+  const hbLoop = loop({
+    telemetry: { producedArtifacts: [], metrics: [
+      { toolCount: 1, timestamp: new Date(now - 3 * s).toISOString() },  // newest bucket
+      { toolCount: 2, timestamp: new Date(now - 4 * s).toISOString() },  // newest bucket
+      { toolCount: 3, timestamp: new Date(now - 12 * s).toISOString() }, // older bucket
+    ] },
+  });
+  const pulse = buildPulse([hbLoop], { now, windowMs: 30 * s, bucketMs: 5 * s });
+  assert.equal(pulse.endTs, now);
+  assert.equal(pulse.bucketMs, 5 * s);
+  assert.equal(pulse.buckets.length, 6);          // 30s / 5s
+  assert.equal(pulse.buckets[5], 2);              // the two beats 3s & 4s ago
+  assert.equal(pulse.buckets[3], 1);              // the beat 12s ago
+  // Discrete events (non-heartbeat) never enter the pulse.
+  assert.equal(pulse.buckets.reduce((a, b) => a + b, 0), 3);
+});
+
+test('buildConsoleFeed exposes pulse + serverNow for the flowing strip', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const feed = buildConsoleFeed({ statusItems: [], loops: [loop()] }, { now });
+  assert.equal(feed.serverNow, now);
+  assert.ok(Array.isArray(feed.pulse.buckets));
+  assert.equal(feed.pulse.endTs, now);
 });
 
 // ─── buildConsoleFeed: summary (fleet totals) ─────────────────────────────────

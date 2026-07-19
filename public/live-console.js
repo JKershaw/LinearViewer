@@ -32,8 +32,7 @@
   const MAX_HISTORY_ROWS = 300; // cap paged-in history rows
   const HISTORY_PAGE = 40;
   const TICK_MS = 30000;       // relative-time refresh cadence
-  const TEMPO_W = 160;         // sparkline LOGICAL size (fixed; never read back off the canvas)
-  const TEMPO_H = 28;
+  const PULSE_WINDOW_MS = 3 * 60 * 1000; // time span the flowing strip covers (right=now)
   const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Kind → glyph (colour lives in live-console.css via [data-kind]).
@@ -181,43 +180,127 @@
     }
   }
 
-  // ─── Tempo sparkline (DPR-aware) ────────────────────────────────────────────
+  // ─── Flowing activity strip ─────────────────────────────────────────────────
+  // A full-width band that scrolls right→left in real time: a soft amber
+  // heartbeat "hum" area beneath colour-coded event blips that enter at the right
+  // (now) and drift left as they age, fading out near the left. Driven by rAF so
+  // motion is continuous between the 5s data polls; the hum's vertical scale
+  // slow-decays so a given level holds still instead of re-normalizing each poll.
   function cssVar(name, fallback) {
     try {
       const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
       return v || fallback;
     } catch (e) { return fallback; }
   }
-  function paintTempo(tempo) {
+  function colorForKind(k) {
+    switch (k) {
+      case 'done': return cssVar('--green', '#16a34a');
+      case 'evidence': return cssVar('--brand', '#0d9488');
+      case 'failed': return cssVar('--red', '#cc0000');
+      case 'blocked': return cssVar('--slate', '#64748b');
+      case 'working': return cssVar('--amber', '#FFB224');
+      default: return cssVar('--muted', '#888');
+    }
+  }
+
+  let pulseData = { buckets: [], bucketMs: 5000, endTs: 0, serverNow: 0, perf: 0, events: [] };
+  let humMax = 1;
+  let rafId = null;
+
+  function updatePulse(feed) {
+    const p = feed.pulse || {};
+    pulseData.buckets = Array.isArray(p.buckets) ? p.buckets : [];
+    pulseData.bucketMs = p.bucketMs || 5000;
+    pulseData.endTs = p.endTs || feed.serverNow || 0;
+    pulseData.serverNow = feed.serverNow || pulseData.endTs || 0;
+    pulseData.perf = (window.performance && performance.now) ? performance.now() : 0;
+    pulseData.events = (Array.isArray(feed.events) ? feed.events : []).map(e => ({ ts: e.ts, kind: e.kind }));
+    const curMax = pulseData.buckets.length ? Math.max.apply(null, pulseData.buckets) : 0;
+    humMax = Math.max(curMax, humMax * 0.9, 1); // slow-decay → stable vertical scale
+    if (REDUCED_MOTION) renderPulse(); // no rAF; repaint a static snapshot per poll
+  }
+
+  function renderPulse() {
     const canvas = els.tempo;
     if (!canvas || !canvas.getContext) return;
-    const arr = Array.isArray(tempo) ? tempo : [];
-    const ctx = canvas.getContext('2d');
+    const cssW = canvas.clientWidth || canvas.offsetWidth || 0;
+    const cssH = canvas.clientHeight || 46;
+    if (cssW <= 0) return;
     const dpr = window.devicePixelRatio || 1;
-    // Logical size is FIXED (constants) — never read back off the canvas, because
-    // setting canvas.width rewrites the width attribute, which would compound by
-    // dpr on every poll and grow the chart without bound.
-    const cssW = TEMPO_W, cssH = TEMPO_H;
     const wantW = Math.round(cssW * dpr), wantH = Math.round(cssH * dpr);
     if (canvas.width !== wantW) canvas.width = wantW;
     if (canvas.height !== wantH) canvas.height = wantH;
-    canvas.style.width = cssW + 'px';
-    canvas.style.height = cssH + 'px';
+    const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
-    if (!arr.length) return;
-    const max = Math.max(1, ...arr);
-    const barW = cssW / arr.length;
-    const amber = cssVar('--amber', '#c58a00');
-    const muted = cssVar('--line', '#ccc');
-    for (let i = 0; i < arr.length; i++) {
-      const active = arr[i] > 0;
-      const h = active ? Math.max(1, Math.round((arr[i] / max) * (cssH - 2))) : 1;
-      const x = Math.round(i * barW);
-      const w = Math.max(1, Math.ceil(barW) - 1);
-      ctx.fillStyle = active ? amber : muted;
-      ctx.fillRect(x, cssH - h, w, h);
+
+    const W = cssW, H = cssH, base = H - 1, humH = H * 0.62;
+    const effNow = REDUCED_MOTION
+      ? pulseData.serverNow
+      : pulseData.serverNow + (((window.performance && performance.now) ? performance.now() : 0) - pulseData.perf);
+    if (!effNow) return;
+    const xFor = (ts) => W * (1 - (effNow - ts) / PULSE_WINDOW_MS);
+
+    // Heartbeat hum area.
+    const b = pulseData.buckets;
+    if (b.length) {
+      ctx.beginPath();
+      let firstX = null, lastX = null;
+      for (let i = 0; i < b.length; i++) {
+        const tsCenter = pulseData.endTs - (b.length - 1 - i) * pulseData.bucketMs + pulseData.bucketMs / 2;
+        const x = xFor(tsCenter);
+        const y = base - (b[i] / humMax) * humH;
+        if (firstX === null) { ctx.moveTo(x, base); ctx.lineTo(x, y); firstX = x; }
+        else ctx.lineTo(x, y);
+        lastX = x;
+      }
+      if (firstX !== null) {
+        ctx.lineTo(lastX, base);
+        ctx.closePath();
+        ctx.fillStyle = cssVar('--amber', '#FFB224');
+        ctx.globalAlpha = 0.16;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
     }
+
+    // Baseline hairline.
+    ctx.strokeStyle = cssVar('--line-soft', 'rgba(0,0,0,0.08)');
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, base + 0.5); ctx.lineTo(W, base + 0.5); ctx.stroke();
+
+    // Event blips: a thin riser + a dot, coloured by kind, fading as they age.
+    const fadeStart = PULSE_WINDOW_MS * 0.75;
+    const dotY = base - humH * 0.7;
+    for (const ev of pulseData.events) {
+      const age = effNow - ev.ts;
+      if (age < -2000 || age > PULSE_WINDOW_MS) continue;
+      let x = xFor(ev.ts);
+      if (x > W) x = W;
+      const alpha = age > fadeStart ? Math.max(0, 1 - (age - fadeStart) / (PULSE_WINDOW_MS - fadeStart)) : 1;
+      const color = colorForKind(ev.kind);
+      ctx.globalAlpha = alpha * 0.45;
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x, base); ctx.lineTo(x, dotY); ctx.stroke();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(x, dotY, 2.6, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function pulseFrame() {
+    if (stopped) return;
+    renderPulse();
+    rafId = requestAnimationFrame(pulseFrame);
+  }
+  function startPulse() {
+    if (REDUCED_MOTION) { renderPulse(); return; }
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(pulseFrame);
+  }
+  function stopPulse() {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   }
 
   // ─── Lanes (keyed reconcile so pulses breathe continuously) ─────────────────
@@ -385,7 +468,7 @@
     liveOldestTs = feed.oldestTs != null ? feed.oldestTs : liveOldestTs;
     liveHasMore = !!feed.hasMore;
     paintBanner(feed.summary);
-    paintTempo(feed.tempo);
+    updatePulse(feed);
     paintLanes(feed.lanes);
     paintStream(events, newIds);
     updateMoreButton();
@@ -419,11 +502,13 @@
     poll();
     clearInterval(tickTimer);
     tickTimer = setInterval(retickTimes, TICK_MS);
+    startPulse();
   }
   function stop() {
     stopped = true;
     clearTimeout(pollTimer);
     clearInterval(tickTimer);
+    stopPulse();
   }
 
   document.addEventListener('visibilitychange', () => {

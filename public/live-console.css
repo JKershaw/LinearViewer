@@ -55,8 +55,17 @@
   color: var(--text);
 }
 
-.lc-tempo { display: inline-flex; align-items: center; }
-.lc-tempo canvas { display: block; opacity: 0.9; }
+/* ── Flowing activity strip ─────────────────────────────────────────────── */
+.lc-pulse {
+  width: 100%;
+  height: 46px;
+  margin: 0.1rem 0 1.1rem;
+}
+.lc-pulse canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 
 /* ── Workspace filter chips ─────────────────────────────────────────────── */
 .lc-chips {
