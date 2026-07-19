@@ -48,7 +48,20 @@ function buildApp(captured, opts = {}) {
       addItem: async (urlKey, item) => {
         captured.item = item;
         return { _id: 'disp-1', dispatchedAt: '2026-07-09T00:00:00.000Z', ...item };
-      }
+      },
+      // Omitted by default so every pre-LIN-1431 test in this file stays
+      // structurally immune to anchor harness inheritance: createDispatchItem
+      // only looks up an anchor when this method exists at all. The LIN-1431
+      // follow-up tests below opt in and count the calls, so they cannot pass
+      // vacuously with the anchor never consulted.
+      ...(opts.getItemStatus
+        ? {
+            getItemStatus: async (...args) => {
+              captured.getItemStatusCalls = (captured.getItemStatusCalls || 0) + 1;
+              return opts.getItemStatus(...args);
+            }
+          }
+        : {})
     },
     dispatchTokenStore: {},
     workspaceFromUrl: (req, res, next) => {
@@ -200,5 +213,105 @@ describe('LIN-1162 — surface, don\'t silently drop when the server mint fails'
     });
     assert.equal(res.status, 503, JSON.stringify(res.body));
     assert.equal(captured.item, undefined);
+  });
+});
+
+/**
+ * LIN-1431 S3 #1 — the human reply box (public/session.js) posts only
+ * { prompt, followUpTo, target, force }: it never sets `attachProxy`, so
+ * `wantProxyContext` is false. Pre-LIN-1431 that meant NO finalizePrompt was
+ * passed at all, so a follow-up resuming a claude-code session was enqueued
+ * with `bootstrapToken: null` — and the broker that held its original
+ * credential died with its window (LIN-1362/1375), leaving the resumed session
+ * unable to write back.
+ *
+ * The fix is a SERVER-SIDE default keyed on the RESOLVED harness (never a new
+ * client flag, never a flip of applyDefaultHarness — 7926ee8). These tests pin
+ * both directions: a claude-code-resolved anchor provisions, a blank-harness
+ * anchor still does not (the LIN-1111 escape hatch, which the test at the top
+ * of this file locks for the fresh-dispatch case).
+ */
+const ANCHOR_ID = '11111111-2222-3333-4444-555555555555';
+
+describe('LIN-1431 — reply-box follow-up provisioning (no attachProxy)', () => {
+  test('a follow-up on a claude-code-resolved anchor mints a bootstrap with NO attachProxy', async () => {
+    const captured = {};
+    const app = buildApp(captured, {
+      getItemStatus: async (_urlKey, id) => (id === ANCHOR_ID ? { harness: 'claude-code' } : null)
+    });
+    // Exactly the reply box's payload shape — no attachProxy, no harness.
+    const res = await call(app, 'post', PATH, {
+      prompt: 'do the thing', followUpTo: ANCHOR_ID, target: 'cli'
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.ok(captured.getItemStatusCalls > 0,
+      'the anchor must actually be consulted — otherwise this passes for the wrong reason');
+    assert.equal(captured.item.harness, 'claude-code',
+      'harness is inherited from the anchor (beat 1), which is what arms the MCP branch');
+    // The exact token, not truthiness: in MCP mode provisionBootstrapToken either
+    // returns a token or throws (LIN-1175), so null/undefined here would be a
+    // silent contract violation.
+    assert.equal(captured.item.bootstrapToken, MINTED,
+      'a resumed broker-dependent session must receive a LIVE credential');
+    // Provision WITHOUT appending prose — the reply text is the user's own.
+    assert.equal(captured.item.prompt, 'do the thing',
+      'the prompt is forwarded verbatim; provisioning never rewrites it');
+    assert.ok(!captured.item.prompt.includes(MARKER), 'no proxy-context block is appended');
+    assert.ok(!captured.item.prompt.includes(MINTED), 'the token never enters prompt text');
+  });
+
+  test('a follow-up on a BLANK-harness anchor stays prose-only, bootstrapToken null (LIN-1111 survives the new default)', async () => {
+    const captured = {};
+    const app = buildApp(captured, {
+      // The store emits `harness: doc.harness || null`, so a blank-harness
+      // anchor yields null — inheriting null is indistinguishable from not
+      // inheriting, and shouldUseMcpTokenField(null) is false.
+      getItemStatus: async () => ({ harness: null })
+    });
+    const res = await call(app, 'post', PATH, {
+      prompt: 'do the thing', followUpTo: ANCHOR_ID, target: 'cli'
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.ok(captured.getItemStatusCalls > 0, 'the anchor was consulted');
+    assert.strictEqual(captured.item.harness, null,
+      'a blank anchor must NOT be silently upgraded to claude-code');
+    assert.strictEqual(captured.item.bootstrapToken, null,
+      'the blank-harness escape hatch mints nothing — a prose-path token has no channel to the worker');
+    assert.equal(captured.item.prompt, 'do the thing', 'prompt untouched');
+  });
+
+  test('a fresh dispatch (no followUpTo, no attachProxy) is unchanged: no mint, raw prompt', async () => {
+    const captured = {};
+    const app = buildApp(captured, {
+      getItemStatus: async () => ({ harness: 'claude-code' })
+    });
+    const res = await call(app, 'post', PATH, {
+      prompt: 'do the thing', harness: 'claude-code', target: 'cli'
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(captured.getItemStatusCalls, undefined,
+      'no followUpTo means no anchor lookup at all');
+    assert.strictEqual(captured.item.bootstrapToken, null,
+      'the new default is scoped to follow-ups — a fresh dispatch is byte-identical to before');
+    assert.equal(captured.item.prompt, 'do the thing');
+  });
+
+  test('a claude-code follow-up whose mint fails is refused with 503, nothing enqueued (fail-closed, LIN-1175/525)', async () => {
+    const captured = {};
+    const app = buildApp(captured, {
+      proxyTokenStore: { createToken: async () => { throw new Error('rate limited'); } },
+      getItemStatus: async () => ({ harness: 'claude-code' })
+    });
+    const res = await call(app, 'post', PATH, {
+      prompt: 'do the thing', followUpTo: ANCHOR_ID, target: 'cli'
+    });
+
+    assert.equal(res.status, 503, JSON.stringify(res.body));
+    // The real property: refused BEFORE enqueue. A resumed session must never
+    // launch credential-less while believing it has one.
+    assert.equal(captured.item, undefined, 'no item was ever enqueued');
   });
 });
