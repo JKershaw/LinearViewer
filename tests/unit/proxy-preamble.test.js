@@ -18,7 +18,8 @@ import {
   buildProxyContextPreamble,
   shouldUseMcpTokenField,
   applyDefaultDispatchHarness,
-  DEFAULT_DISPATCH_HARNESS
+  DEFAULT_DISPATCH_HARNESS,
+  provisionBootstrapToken
 } from '../../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../../lib/proxy-tokens.js';
 
@@ -331,5 +332,162 @@ describe('attachProxyContext — issueIdentifier shaping (unchanged from LIN-115
     const noId = await attachProxyContext({ proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', issueIdentifier: null, prompt: BASE });
     assert.ok(noId.prompt.includes('/api/proxy/stack'));
     assert.ok(!noId.prompt.includes('brief/null'));
+  });
+});
+
+// LIN-1429: provisionBootstrapToken is the mint extracted out of
+// attachProxyContext (owns the LIN-1175 fail-closed throw + LIN-1376 createdBy
+// stamp, prompt-free). These cover what the attachProxyContext-level tests
+// above cannot express directly: the bare return shape, and the guard-order /
+// log-asymmetry details now that they live on their own export.
+describe('provisionBootstrapToken (LIN-1429 — provisioning extracted from attachProxyContext)', () => {
+  test('returns the bare token string (not an object) on both harnesses', async () => {
+    const proseStore = fakeStore({ token: 'TOK_PROSE' });
+    const proseToken = await provisionBootstrapToken({
+      proxyTokenStore: proseStore, urlKey: 'acme', baseUrl: 'https://host', harness: null
+    });
+    assert.equal(proseToken, 'TOK_PROSE');
+    assert.equal(typeof proseToken, 'string');
+
+    const mcpStore = fakeStore({ token: 'TOK_MCP' });
+    const mcpToken = await provisionBootstrapToken({
+      proxyTokenStore: mcpStore, urlKey: 'acme', baseUrl: 'https://host', harness: 'claude-code'
+    });
+    assert.equal(mcpToken, 'TOK_MCP');
+    assert.equal(typeof mcpToken, 'string');
+  });
+
+  describe('prose (non-claude-code) degrades gracefully — returns null, never throws', () => {
+    test('no proxyTokenStore', async () => {
+      const out = await provisionBootstrapToken({
+        proxyTokenStore: null, urlKey: 'acme', baseUrl: 'https://host', harness: 'opencode'
+      });
+      assert.strictEqual(out, null, 'strictEqual so an accidental undefined is not mistaken for null');
+    });
+
+    test('falsy baseUrl — no mint attempted', async () => {
+      const store = fakeStore();
+      const out = await provisionBootstrapToken({
+        proxyTokenStore: store, urlKey: 'acme', baseUrl: '', harness: 'opencode'
+      });
+      assert.strictEqual(out, null);
+      assert.equal(store.calls.length, 0, 'no mint without a baseUrl');
+    });
+
+    test('mint throws', async () => {
+      const store = fakeStore({ throwErr: new Error('boom') });
+      const out = await provisionBootstrapToken({
+        proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', harness: 'opencode'
+      });
+      assert.strictEqual(out, null);
+    });
+
+    test('mint returns no token', async () => {
+      const store = fakeStore({ result: { token: null } });
+      const out = await provisionBootstrapToken({
+        proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', harness: 'opencode'
+      });
+      assert.strictEqual(out, null);
+      assert.equal(store.calls.length, 1, 'mint was still attempted');
+    });
+  });
+
+  describe('claude-code fails CLOSED (LIN-1175) — throws, never returns null', () => {
+    test('no proxyTokenStore', async () => {
+      await assert.rejects(
+        () => provisionBootstrapToken({
+          proxyTokenStore: null, urlKey: 'acme', baseUrl: 'https://host', harness: 'claude-code'
+        }),
+        (err) => {
+          assert.match(err.message, /LIN-1175/);
+          assert.equal(err.proxyAttachFailed, true);
+          return true;
+        }
+      );
+    });
+
+    test('falsy baseUrl — no mint attempted before failing closed', async () => {
+      const store = fakeStore();
+      await assert.rejects(
+        () => provisionBootstrapToken({
+          proxyTokenStore: store, urlKey: 'acme', baseUrl: '', harness: 'claude-code'
+        }),
+        /LIN-1175/
+      );
+      assert.equal(store.calls.length, 0, 'no mint without a baseUrl');
+    });
+
+    test('mint throws: the failure propagates, not swallowed', async () => {
+      const store = fakeStore({ throwErr: new Error('boom') });
+      await assert.rejects(
+        () => provisionBootstrapToken({
+          proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', harness: 'claude-code'
+        }),
+        (err) => {
+          assert.match(err.message, /LIN-1175/);
+          assert.equal(err.proxyAttachFailed, true);
+          return true;
+        }
+      );
+    });
+
+    test('mint returns no token: throws (does NOT return null)', async () => {
+      const store = fakeStore({ result: { token: null } });
+      await assert.rejects(
+        () => provisionBootstrapToken({
+          proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', harness: 'claude-code'
+        }),
+        (err) => {
+          assert.match(err.message, /LIN-1175/);
+          assert.equal(err.proxyAttachFailed, true);
+          return true;
+        }
+      );
+      assert.equal(store.calls.length, 1, 'mint was attempted before failing closed');
+    });
+  });
+
+  test('createdBy pass-through, plus kind/scope/label/ttl on the same options object', async () => {
+    const store = fakeStore({ token: 'TOK123' });
+    await provisionBootstrapToken({
+      proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host',
+      label: 'my-label', harness: 'claude-code', createdBy: 'account-A'
+    });
+    assert.equal(store.calls.length, 1);
+    const { urlKey, options } = store.calls[0];
+    assert.equal(urlKey, 'acme');
+    assert.equal(options.kind, 'bootstrap');
+    assert.equal(options.scope, 'readWrite');
+    assert.equal(options.label, 'my-label');
+    assert.equal(options.ttl, BOOTSTRAP_TOKEN_TTL_SECONDS);
+    assert.equal(options.createdBy, 'account-A');
+  });
+
+  describe('log asymmetry — only the mint-throws catch logs; the guards are silent', () => {
+    test('mint throws (prose path): exactly one console.error call', async (t) => {
+      const errorMock = t.mock.method(console, 'error', () => {});
+      const store = fakeStore({ throwErr: new Error('boom') });
+      await provisionBootstrapToken({
+        proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', harness: 'opencode'
+      });
+      assert.equal(errorMock.mock.calls.length, 1);
+    });
+
+    test('no proxyTokenStore (prose path): silent, zero console.error calls', async (t) => {
+      const errorMock = t.mock.method(console, 'error', () => {});
+      await provisionBootstrapToken({
+        proxyTokenStore: null, urlKey: 'acme', baseUrl: 'https://host', harness: 'opencode'
+      });
+      assert.equal(errorMock.mock.calls.length, 0);
+    });
+
+    test('mint returns no token (prose path): silent, zero console.error calls', async (t) => {
+      const errorMock = t.mock.method(console, 'error', () => {});
+      const store = fakeStore({ result: { token: null } });
+      await provisionBootstrapToken({
+        proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', harness: 'opencode'
+      });
+      assert.equal(errorMock.mock.calls.length, 0);
+    });
   });
 });
