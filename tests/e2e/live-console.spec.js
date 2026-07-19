@@ -12,6 +12,15 @@ let EVENTS_API;
 
 const featuresParam = (obj) => `features=${encodeURIComponent(JSON.stringify(obj))}`;
 
+// Lanes now derive from RUNNING dispatch loops too, and those persist in the dev
+// store across tests/runs — so a clean slate must clear dispatch state as well as
+// the agent-status log (clearing agent-status alone leaves running loops behind).
+async function clearFeed(page, key) {
+  await page.request.get(`/test/clear-agent-status?urlKey=${key}`);
+  await page.request.get(`/test/clear-dispatch-queue?urlKey=${key}`);
+  await page.request.get(`/test/clear-dispatch-history?urlKey=${key}`);
+}
+
 test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;
   PAGE_URL = `/workspace/${URL_KEY}/live-console`;
@@ -62,7 +71,7 @@ test.describe('Live Console (experimental)', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       // The dev store persists across runs; start these structure tests clean.
-      await page.request.get(`/test/clear-agent-status?urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -84,12 +93,24 @@ test.describe('Live Console (experimental)', () => {
       // Chips only earn their place when there is more than one workspace to filter.
       await expect(page.locator('#live-console-chips')).toBeHidden();
     });
+
+    test('the tempo canvas keeps a stable backing size across polls (no growth)', async ({ page }) => {
+      const canvas = page.locator('#live-console-tempo');
+      await page.waitForFunction(() => {
+        const c = document.getElementById('live-console-tempo');
+        return c && c.width > 0;
+      });
+      const first = await canvas.evaluate(c => c.width);
+      await page.waitForTimeout(11000); // ~2 poll cycles
+      const later = await canvas.evaluate(c => c.width);
+      expect(later).toBe(first); // was compounding by devicePixelRatio each poll
+    });
   });
 
   test.describe('Live data', () => {
     test('renders seeded events with click-through to Observation', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
-      await page.request.get(`/test/clear-agent-status?urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
       await page.request.post('/test/seed-agent-status', {
         data: { urlKey: URL_KEY, taskIdentifier: 'LIN-777', action: 'implementation', status: 'in_progress', summary: 'wiring the thing' },
       });
@@ -111,9 +132,7 @@ test.describe('Live Console (experimental)', () => {
 
     test('a running worker becomes a heartbeat lane and its [evidence] a stream event', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
-      await page.request.get(`/test/clear-agent-status?urlKey=${URL_KEY}`);
-      await page.request.get(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
-      await page.request.get(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
 
       // Dispatch a worker, claim it (→ agentState 'running'), then post a rich
       // heartbeat + an [evidence] marker through the real consumer flow.
@@ -147,9 +166,29 @@ test.describe('Live Console (experimental)', () => {
       await expect(evidence.locator('a.lc-event-summary-link')).toHaveAttribute('href', 'https://github.com/x/y/pull/9');
     });
 
+    test('a stale "working" entry drops off the lanes but still shows in the stream', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+      const now = Date.now(), min = 60 * 1000;
+      const seedWorking = (id, agoMin) => page.request.post('/test/seed-agent-status', {
+        data: { urlKey: URL_KEY, taskIdentifier: id, action: 'implementation', status: 'in_progress', summary: `on ${id}`, timestamp: new Date(now - agoMin * min).toISOString() },
+      });
+      await seedWorking('LIN-STALE', 120); // 2h idle → not a lane
+      await seedWorking('LIN-FRESH', 3);   // 3m ago → a live lane
+
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-lane"]');
+
+      // Exactly one lane — the fresh one; the stale session fell off the radar.
+      await expect(page.locator('[data-testid="live-console-lane"]')).toHaveCount(1);
+      await expect(page.locator('[data-testid="live-console-lane"]')).toContainText('LIN-FRESH');
+      // But the stale session's step is still legitimate history in the stream.
+      await expect(page.locator('[data-testid="live-console-event"]', { hasText: 'LIN-STALE' })).toBeVisible();
+    });
+
     test('"view earlier activity" pages older events into the history region', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
-      await page.request.get(`/test/clear-agent-status?urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
 
       // Two RECENT events (live window) + two OLD ones (hours ago) that only the
       // history pager should reach. Deterministic timestamps via the test seam.

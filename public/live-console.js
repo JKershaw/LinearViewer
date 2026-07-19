@@ -32,6 +32,8 @@
   const MAX_HISTORY_ROWS = 300; // cap paged-in history rows
   const HISTORY_PAGE = 40;
   const TICK_MS = 30000;       // relative-time refresh cadence
+  const TEMPO_W = 160;         // sparkline LOGICAL size (fixed; never read back off the canvas)
+  const TEMPO_H = 28;
   const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Kind → glyph (colour lives in live-console.css via [data-kind]).
@@ -192,15 +194,15 @@
     const arr = Array.isArray(tempo) ? tempo : [];
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
-    const cssW = parseInt(canvas.getAttribute('width'), 10) || 160;
-    const cssH = parseInt(canvas.getAttribute('height'), 10) || 28;
+    // Logical size is FIXED (constants) — never read back off the canvas, because
+    // setting canvas.width rewrites the width attribute, which would compound by
+    // dpr on every poll and grow the chart without bound.
+    const cssW = TEMPO_W, cssH = TEMPO_H;
     const wantW = Math.round(cssW * dpr), wantH = Math.round(cssH * dpr);
-    if (canvas.width !== wantW || canvas.height !== wantH) {
-      canvas.style.width = cssW + 'px';
-      canvas.style.height = cssH + 'px';
-      canvas.width = wantW;
-      canvas.height = wantH;
-    }
+    if (canvas.width !== wantW) canvas.width = wantW;
+    if (canvas.height !== wantH) canvas.height = wantH;
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
     if (!arr.length) return;
