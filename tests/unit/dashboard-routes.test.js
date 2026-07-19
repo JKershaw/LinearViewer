@@ -671,6 +671,44 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(s.status, 'in-progress');
   });
 
+  test('LIN-1445: a running session idle >1h (but <24h) is flagged stale yet stays in Active', async () => {
+    // Unified staleness: the stale FLAG now fires at 1h (shared with Live Console),
+    // decoupled from the 24h archive window — so it is visible-but-flagged, not hidden.
+    const TWO_H_ISO = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const idleAnchor = { id: 'sess-2h', kind: 'autopilot', issueIdentifier: 'LIN-730', issueTitle: 'Idle 2h', promptName: 'autopilot', prompt: 'p', dispatchedAt: TWO_H_ISO };
+    const router = makeRouter({ 'ws-a': { live: [idleAnchor], history: [], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const s = res.jsonBody.active.find(x => x.sessionId === 'sess-2h');
+    assert.ok(s, 'a 2h-idle session stays in Active (within the 24h archive window)');
+    assert.equal(s.stale, true, 'but it is flagged stale at the 1h threshold');
+    assert.equal(s.status, 'stale');
+  });
+
+  test('LIN-1445: a heartbeating run is NOT stale at the 1h mark (heartbeat-aware)', async () => {
+    // dispatch/resolve are 2h old, but a [working] heartbeat landed just now — the
+    // run is alive, so it must read in-progress, not stale. This fails without the
+    // heartbeat-aware activity floor (loopLastActivityMs).
+    const TWO_H_ISO = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const anchor = { id: 'sess-hb', kind: 'autopilot', issueIdentifier: 'LIN-740', issueTitle: 'Heartbeat session', promptName: 'autopilot', prompt: 'p', dispatchedAt: TWO_H_ISO };
+    const worker = { id: 'w-hb', sessionId: 'sess-hb', issueIdentifier: 'LIN-741', issueTitle: 'Worker', promptName: 'implementation', prompt: 'p', dispatchedAt: TWO_H_ISO, resolvedAt: TWO_H_ISO, status: 'taken', feedback: [{ message: '[working] 6 tools/32s · alive', timestamp: NOW_ISO }] };
+    const router = makeRouter({ 'ws-a': { live: [anchor], history: [worker], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const s = res.jsonBody.active.find(x => x.sessionId === 'sess-hb');
+    assert.ok(s, 'a heartbeating session stays in Active');
+    assert.equal(s.stale, false, 'the recent heartbeat keeps it fresh past the 1h threshold');
+    assert.notEqual(s.status, 'stale');
+  });
+
   test('a terminal session that finished <24h ago is Active, not Archive (LIN-631)', async () => {
     // Recency-only split: a just-completed session stays in Active for 24h instead
     // of dropping straight into the archive on completion.
