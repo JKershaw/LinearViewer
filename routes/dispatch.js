@@ -28,7 +28,7 @@ import { FEEDBACK_ENTRY_KINDS } from '../lib/dispatch-store.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
-import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
+import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField, applyDefaultDispatchHarness } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
@@ -1195,6 +1195,91 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       return badRequest.json(res, 'Invalid item ID format');
     }
 
+    // Wake-path credential provisioning (LIN-1430 / S2). A wake follow-up is
+    // built and enqueued INSIDE addFeedback (lib/dispatch-store.js), bypassing
+    // createDispatchItem entirely — so, pre-fix, `bootstrapToken` was
+    // structurally always null on this path and a resumed claude-code session
+    // had no credential to write back with (LIN-1428). This closure is the
+    // provisioning policy; the store only decides WHETHER a wake fires and
+    // resolves the donor (parent) harness to hand it.
+    //
+    // Mirrors the S1/S3 shape (routes/proxy.js's dispatch seam, this route's
+    // own follow-up-provisioning branch above): decide on the RESOLVED harness
+    // via shouldUseMcpTokenField, never throw (a feedback write must not be
+    // lost to a provisioning failure — LIN-1343), and stamp `createdBy` from
+    // the posting token's own owner so the exchanged working token resolves
+    // under LIN-1366's owner-scoped selection (never fabricated).
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const createdBy = req.dispatchTokenOwner ?? null;
+    const provisionWakeCredential = async (parentHarness) => {
+      // Null-harness rule here is DELIBERATELY the opposite of the reply-box /
+      // send_follow_up rule in LIN-1431 (S3). Do not "harmonize" them.
+      //
+      //   Here (wake):  null harness -> claude-code -> MINT.
+      //     A wake is machine-generated and resumes a parent on Simple Dispatcher,
+      //     whose own default harness is claude-code. Null means "unspecified", and
+      //     an unprovisioned claude-code resume is exactly the LIN-1428 stall.
+      //
+      //   There (S3):   blank harness -> stays prose -> NO MINT.
+      //     That path is user-facing and `applyDefaultHarness:false` keeps the
+      //     LIN-1159 interpose off on purpose — LIN-1111's blank-harness escape
+      //     hatch, test-locked at dispatch-route-proxy-context.test.js:125.
+      //
+      // Both are correct for their own path. Changing either to match the other
+      // regresses LIN-1111 or LIN-1430. See LIN-1431.
+      const resolved = applyDefaultDispatchHarness(parentHarness);
+      // Prose harness (explicit 'opencode' etc.): no out-of-band token is WANTED.
+      // Not a failure — the wake enqueues normally with bootstrapToken null.
+      if (!shouldUseMcpTokenField(resolved)) return { token: null, reason: null, degraded: null };
+      // ── STRUCTURAL misses: enqueue the wake anyway, token-less (LIN-1447) ──
+      // Neither of these can be fixed by retrying, so suppressing the wake would
+      // just strand the parent forever — the exact LIN-1428 stall. LIN-1447 landed
+      // this same tolerate-ownerless policy on POST /api/dispatch/broker-token
+      // (routes/dispatch.js above): an ownerless legacy token no longer 503s there,
+      // because the host runner authenticates with exactly such a token. Failing
+      // closed here would contradict that.
+      if (!proxyTokenStore) return { token: null, reason: null, degraded: 'no-proxy-token-store' };
+      // We deliberately do NOT mint for an ownerless caller. An ownerless bootstrap
+      // mints fine and EXCHANGES fine (exchangeBootstrapToken has no owner check) —
+      // it dies one hop later, at every data endpoint, because LIN-1366's
+      // owner-scoped selection fails closed on a null owner
+      // (lib/workspace-token-resolver.js `selectOwnerWorkspaceToken`, the explicit
+      // `scoped && !ownerAccountId` guard → reason 'not_connected'). So a minted
+      // ownerless token is dead on arrival; handing one to the wake would only
+      // disguise the miss. Enqueue token-less instead.
+      //
+      // NOTE — there is NO downstream backstop on this lane. LIN-1446's fallback
+      // mint is on SD's FRESH-LAUNCH path only (dispatcher.js:741); the follow-up/
+      // wake resume branch returns at dispatcher.js:658, well before it, and reads
+      // item.bootstrapToken directly with no mint of its own. So a degraded wake
+      // really does resume with an empty HARBOUR_LOCAL_BASE — LIN-1428's symptom,
+      // surviving in this narrow lane. We degrade anyway because a woken-but-
+      // uncredentialed parent strictly beats a parent that never wakes, and
+      // post-fix only these two structural lanes are token-less where pre-fix
+      // EVERY wake was. Do not widen the degrade on the assumption something
+      // downstream catches it — nothing does. SD-side follow-up: LIN-1449.
+      // This is also the degrade path for the harbour-feedback auth branch
+      // (authenticateFeedbackToken above), which never sets req.dispatchTokenOwner.
+      if (!createdBy) return { token: null, reason: null, degraded: 'no-token-owner' };
+      // ── TRANSIENT failures: withdraw the wake so the terminal stays retryable ──
+      try {
+        const token = await provisionBootstrapToken({
+          proxyTokenStore,
+          urlKey: req.dispatchUrlKey,
+          baseUrl,
+          label: 'wake-bootstrap',
+          harness: resolved,
+          createdBy
+        });
+        return token
+          ? { token, reason: null, degraded: null }
+          : { token: null, reason: 'wake-provision-failed:mint-returned-null', degraded: null };
+      } catch (err) {
+        console.error('Wake bootstrap provisioning failed:', err.message);
+        return { token: null, reason: `wake-provision-failed:${err.message}`, degraded: null };
+      }
+    };
+
     const { message, url, urlLabel, kind, rootItemId } = req.body;
 
     // Additive, tolerant validation (LIN-1297): an invalid kind/rootItemId is
@@ -1245,7 +1330,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         itemId,
         req.dispatchUrlKey,
         { message, url: url || null, urlLabel: urlLabel || null, kind: sanitizedKind, rootItemId: sanitizedRootItemId },
-        req.dispatchTokenLabel
+        req.dispatchTokenLabel,
+        provisionWakeCredential
       );
 
       if (!result) {
