@@ -211,6 +211,48 @@ test('buildConsoleFeed lanes come from running loops (with heartbeat), preferred
   assert.equal(byTask['LIN-5'].heartbeat, undefined);
 });
 
+test('deriveLoopLanes stamps lastActivityMs from the most recent of dispatch/agent/heartbeat', () => {
+  const lanes = deriveLoopLanes([loop()]);
+  // Latest signal is the 11:59 heartbeat / agentTimestamp.
+  assert.equal(lanes[0].lastActivityMs, new Date('2026-07-19T11:59:00.000Z').getTime());
+});
+
+test('buildConsoleFeed drops STALE running lanes (no activity within the window)', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const fresh = loop({ loopId: 'fresh', issueIdentifier: 'LIN-9' }); // activity 11:59 (1 min ago)
+  const stale = loop({
+    loopId: 'stale',
+    issueIdentifier: 'LIN-8',
+    dispatchedAt: '2026-07-19T10:00:00.000Z',
+    agentTimestamp: '2026-07-19T10:15:00.000Z',
+    telemetry: { metrics: [{ toolCount: 2, timestamp: '2026-07-19T10:20:00.000Z' }], producedArtifacts: [] },
+  });
+  const feed = buildConsoleFeed({ statusItems: [], loops: [fresh, stale] }, { now });
+  const tasks = feed.lanes.map(l => l.task);
+  assert.deepEqual(tasks, ['LIN-9']);          // stale LIN-8 (1h40m idle) dropped
+  assert.equal(feed.summary.active, 1);        // active count reflects the drop
+});
+
+test('buildConsoleFeed drops a STALE status-only working lane too', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const items = [
+    statusItem({ id: 'old', taskIdentifier: 'LIN-1', status: 'in_progress', timestamp: '2026-07-19T10:00:00Z' }), // 2h ago
+    statusItem({ id: 'new', taskIdentifier: 'LIN-2', status: 'in_progress', timestamp: '2026-07-19T11:55:00Z' }), // 5 min ago
+  ];
+  const { lanes } = buildConsoleFeed({ statusItems: items, loops: [] }, { now });
+  assert.deepEqual(lanes.map(l => l.task), ['LIN-2']);
+});
+
+test('laneStaleMs is configurable', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const stale = loop({ issueIdentifier: 'LIN-8', dispatchedAt: '2026-07-19T11:30:00Z', agentTimestamp: '2026-07-19T11:30:00Z',
+    telemetry: { metrics: [{ toolCount: 1, timestamp: '2026-07-19T11:30:00Z' }], producedArtifacts: [] } }); // 30 min ago
+  // Default 1h → kept.
+  assert.equal(buildConsoleFeed({ statusItems: [], loops: [stale] }, { now }).lanes.length, 1);
+  // Tighter 15-min cutoff → dropped.
+  assert.equal(buildConsoleFeed({ statusItems: [], loops: [stale] }, { now, laneStaleMs: 15 * 60 * 1000 }).lanes.length, 0);
+});
+
 // ─── evidence events from [evidence] artifacts ────────────────────────────────
 
 test('normalizeEvidenceEvents turns produced artifacts into linked evidence events', () => {
