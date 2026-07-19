@@ -1230,14 +1230,28 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const resolved = applyDefaultDispatchHarness(parentHarness);
       // Prose harness (explicit 'opencode' etc.): no out-of-band token is WANTED.
       // Not a failure — the wake enqueues normally with bootstrapToken null.
-      if (!shouldUseMcpTokenField(resolved)) return { token: null, reason: null };
-      if (!proxyTokenStore) return { token: null, reason: 'wake-provision-unavailable:no-proxy-token-store' };
-      // LIN-1397 shape: an ownerless credential passes the mint and only dies
-      // later at exchange (LIN-1366/1376). Fail closed HERE rather than mint a
-      // dead token. This is also the degrade-with-a-reason path for the
-      // harbour-feedback auth branch (authenticateFeedbackToken above), which
-      // never sets req.dispatchTokenOwner.
-      if (!createdBy) return { token: null, reason: 'wake-provision-unavailable:no-token-owner' };
+      if (!shouldUseMcpTokenField(resolved)) return { token: null, reason: null, degraded: null };
+      // ── STRUCTURAL misses: enqueue the wake anyway, token-less (LIN-1447) ──
+      // Neither of these can be fixed by retrying, so suppressing the wake would
+      // just strand the parent forever — the exact LIN-1428 stall. LIN-1447 landed
+      // this same tolerate-ownerless policy on POST /api/dispatch/broker-token
+      // (routes/dispatch.js above): an ownerless legacy token no longer 503s there,
+      // because the host runner authenticates with exactly such a token. Failing
+      // closed here would contradict that.
+      if (!proxyTokenStore) return { token: null, reason: null, degraded: 'no-proxy-token-store' };
+      // We deliberately do NOT mint for an ownerless caller. An ownerless bootstrap
+      // mints fine and EXCHANGES fine (exchangeBootstrapToken has no owner check) —
+      // it dies one hop later, at every data endpoint, because LIN-1366's
+      // owner-scoped selection fails closed on a null owner
+      // (lib/workspace-token-resolver.js `selectOwnerWorkspaceToken`, the explicit
+      // `scoped && !ownerAccountId` guard → reason 'not_connected'). So a minted
+      // ownerless token is dead on arrival; handing one to the wake would only
+      // disguise the miss. Enqueue token-less instead and let the consumer's own
+      // fallback mint (LIN-1446) be the credential backstop. This is also the
+      // degrade path for the harbour-feedback auth branch
+      // (authenticateFeedbackToken above), which never sets req.dispatchTokenOwner.
+      if (!createdBy) return { token: null, reason: null, degraded: 'no-token-owner' };
+      // ── TRANSIENT failures: withdraw the wake so the terminal stays retryable ──
       try {
         const token = await provisionBootstrapToken({
           proxyTokenStore,
@@ -1248,11 +1262,11 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           createdBy
         });
         return token
-          ? { token, reason: null }
-          : { token: null, reason: 'wake-provision-failed:mint-returned-null' };
+          ? { token, reason: null, degraded: null }
+          : { token: null, reason: 'wake-provision-failed:mint-returned-null', degraded: null };
       } catch (err) {
         console.error('Wake bootstrap provisioning failed:', err.message);
-        return { token: null, reason: `wake-provision-failed:${err.message}` };
+        return { token: null, reason: `wake-provision-failed:${err.message}`, degraded: null };
       }
     };
 

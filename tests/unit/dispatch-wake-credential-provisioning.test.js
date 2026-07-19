@@ -137,7 +137,7 @@ describe('LIN-1430 S2 — the honest witness: real mint -> exchange -> validate 
     );
   });
 
-  test('harbour-feedback auth branch (no dispatchTokenOwner) degrades to no-token-plus-reason, never a dead mint', async () => {
+  test('ownerless caller (harbour-feedback auth branch): wake STILL enqueues, token-less — never suppressed (LIN-1447 parity)', async () => {
     const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
     const proxyTokenStore = new ProxyTokenStore({ collection: createMockCollection() });
     const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
@@ -166,10 +166,37 @@ describe('LIN-1430 S2 — the honest witness: real mint -> exchange -> validate 
     const res = await call(app, 'post', `/api/dispatch/feedback/${child._id}`, { message: '[done] shipped' }, 'harbour-token');
     assert.equal(res.status, 200, JSON.stringify(res.body));
 
-    // A required token could not be provided (no owner to stamp) -> the wake is
-    // suppressed for retryability rather than minting an ownerless dead token.
+    // STRUCTURAL miss, not a transient failure: there is no owner to stamp and no
+    // retry can produce one. The wake must still fire — suppressing it here is what
+    // the LIN-1430 review blocked, because it contradicts LIN-1447 (which stopped
+    // POST /api/dispatch/broker-token 503ing for exactly this ownerless legacy
+    // token) and reproduces the LIN-1428 stall: a parent that never wakes at all.
     const wakes = wakeItems(collection, historyCollection);
-    assert.equal(wakes.length, 0, 'no wake enqueued — an unstampable credential is withheld, not minted dead');
+    assert.equal(wakes.length, 1, 'the wake still enqueues for an ownerless caller — tolerate, never suppress (LIN-1447)');
+    assert.equal(
+      wakes[0].bootstrapToken,
+      null,
+      'and carries NO token: an ownerless bootstrap mints and exchanges fine but is dead at every data endpoint ' +
+      '(LIN-1366 owner-scoped selection fails closed on a null owner), so minting one would only disguise the miss'
+    );
+  });
+
+  test('no proxy token store: wake STILL enqueues, token-less — structural, not transient', async () => {
+    const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
+    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const { token: consumerToken } = await dispatchTokenStore.createToken(URL_KEY, 'consumer', 'account-A');
+
+    const parent = await dispatchQueueStore.addItem(URL_KEY, { prompt: 'parent work', kind: 'implementation', harness: 'claude-code' });
+    const child = await takenChild(dispatchQueueStore, { sessionId: parent._id }, 'consumer');
+
+    // proxyTokenStore null — the workspace has no proxy configured at all.
+    const app = buildApp({ dispatchQueueStore, dispatchTokenStore, proxyTokenStore: null });
+    const res = await call(app, 'post', `/api/dispatch/feedback/${child._id}`, { message: '[done] shipped' }, consumerToken);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+
+    const wakes = wakeItems(collection, historyCollection);
+    assert.equal(wakes.length, 1, 'the wake still enqueues with no proxy token store — retrying cannot conjure one');
+    assert.equal(wakes[0].bootstrapToken, null, 'token-less');
   });
 });
 
@@ -270,13 +297,17 @@ describe('LIN-1430 S2 — donor rule: parent stored harness decides, never the c
 // ── Test 3: provisioning failure is retryable, never loses the feedback write ──
 
 describe('LIN-1430 S2 — provisioning failure is retryable, never loses feedback', () => {
-  test('required-but-unavailable: feedback still written, CAS witness NOT set, no wake, reason logged, retry re-enters', async (t) => {
+  test('TRANSIENT mint failure: feedback still written, CAS witness NOT set, no wake, reason logged, retry re-enters', async (t) => {
     const logMock = t.mock.method(console, 'log', () => {});
     const { store, collection, historyCollection } = makeStore();
     const parent = await store.addItem(URL_KEY, { prompt: 'parent work', kind: 'implementation', harness: 'claude-code' });
     const child = await takenChild(store, { sessionId: parent._id });
 
-    const failingCallback = async () => ({ token: null, reason: 'wake-provision-unavailable:no-token-owner' });
+    // A genuine TRANSIENT failure — the mint was reachable, attempted, and threw.
+    // Only this class withdraws the wake. A STRUCTURAL miss (ownerless caller, no
+    // proxy token store) returns `degraded` instead and still enqueues; that is the
+    // LIN-1447 parity the review blocked on, pinned in the describe block above.
+    const failingCallback = async () => ({ token: null, reason: 'wake-provision-failed:ECONNREFUSED', degraded: null });
 
     const res = await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a', failingCallback);
 
@@ -293,7 +324,7 @@ describe('LIN-1430 S2 — provisioning failure is retryable, never loses feedbac
 
     const logged = logMock.mock.calls.map(c => c.arguments[0]);
     assert.ok(
-      logged.some(m => typeof m === 'string' && m.includes('[dispatch-wake]') && m.includes('wake-provision-unavailable:no-token-owner')),
+      logged.some(m => typeof m === 'string' && m.includes('[dispatch-wake]') && m.includes('wake-provision-failed:ECONNREFUSED')),
       'the failure reason is recorded via the existing null-wake observability log'
     );
 
@@ -309,6 +340,42 @@ describe('LIN-1430 S2 — provisioning failure is retryable, never loses feedbac
     const wakesAfterRetry = wakeItems(collection, historyCollection);
     assert.equal(wakesAfterRetry.length, 1, 'the retry succeeds and enqueues the wake');
     assert.equal(wakesAfterRetry[0].bootstrapToken, 'retry-token');
+  });
+
+  test('STRUCTURAL degrade: wake enqueues token-less AND burns its CAS witness (not retryable, must not re-fire)', async (t) => {
+    const logMock = t.mock.method(console, 'log', () => {});
+    const { store, collection, historyCollection } = makeStore();
+    const parent = await store.addItem(URL_KEY, { prompt: 'parent work', kind: 'implementation', harness: 'claude-code' });
+    const child = await takenChild(store, { sessionId: parent._id });
+
+    const degradingCallback = async () => ({ token: null, reason: null, degraded: 'no-token-owner' });
+    const res = await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a', degradingCallback);
+
+    assert.ok(res && res.success);
+    const wakes = wakeItems(collection, historyCollection);
+    assert.equal(wakes.length, 1, 'the wake enqueues despite having no credential');
+    assert.equal(wakes[0].bootstrapToken, null);
+
+    // The counterpart of the transient case above: a degraded wake DID fire, so the
+    // once-only witness must be set. Otherwise a re-report would enqueue a second
+    // wake for the same terminal — trading the suppressed-wake bug for a
+    // duplicate-wake one, and breaking the LIN-1357 once-only guarantee.
+    const edgeAfter = historyCollection._docs.find(d => d._id === child._id);
+    assert.ok(
+      (edgeAfter.terminalWakeItems || []).includes(child._id),
+      'CAS witness IS set for a degraded-but-enqueued wake — once-only still holds'
+    );
+
+    const logged = logMock.mock.calls.map(c => c.arguments[0]);
+    assert.ok(
+      logged.some(m => typeof m === 'string' && m.includes('provisioned-without-credential') && m.includes('no-token-owner')),
+      'the degrade is self-attributing in the log rather than a silent token-less wake'
+    );
+
+    // And a re-report is suppressed by the witness, not re-enqueued.
+    const res2 = await store.addFeedback(child._id, URL_KEY, { message: '[done] re-reported' }, 'token-a', degradingCallback);
+    assert.ok(res2 && res2.success);
+    assert.equal(wakeItems(collection, historyCollection).length, 1, 'no duplicate wake on re-report');
   });
 
   test('already-woke-for-this-item still suppresses correctly with a provisioning callback present (LIN-1357 coverage preserved)', async () => {
