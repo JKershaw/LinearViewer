@@ -472,35 +472,35 @@ describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
     assert.strictEqual(explicitText, defaultText);
   });
 
-  test('standalone replaces push-wake instructions with poll-based completion', () => {
+  test('standalone step 3 leads with stand-by as the default, keyed off the Setup session-id check (LIN-1324)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
-    assert.ok(text.includes('Poll for completion'));
+    // Stand-by is no longer only the push-rails wording — the standalone branch
+    // must offer it too, gated on whether Setup found a real dispatch id.
+    assert.ok(text.includes('Your autopilot session id'), 'step 3 references the Setup session-id block');
+    assert.ok(/stand by/i.test(text), 'standalone still offers the stand-by discipline');
+    assert.ok(text.includes('woken automatically'));
+    // The bounded, one-off probe survives for the no-substrate case.
     assert.ok(text.includes('?wait=50'));
-    assert.ok(text.includes('holds open for up to ~50s'));
-    // Push-wake dependency must be removed from step 3.
-    assert.ok(!text.includes('Stand by for the wake — don\'t poll'));
-    // The "Your instruments" section still references the poll mechanism
-    // (it is shared prose), but the step-3 push-wake instruction is gone.
+    assert.ok(/one-off|single.*call/i.test(text));
+    // No standing loop anywhere in the standalone output.
+    assert.ok(!text.includes('background loop'), 'the standing background poll loop is gone');
+    assert.ok(!text.includes('not one call per turn'), 'the old standing-loop framing is gone');
   });
 
-  test('standalone step 3 prescribes a single background, silent-until-terminal poll loop (LIN-1318)', () => {
+  test('standalone step 3: real dispatch id -> stand by; minted UUID only -> bounded one-off liveness probe, never a standing loop (LIN-1324)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
-    const step3 = text.split(/^3\. \*\*Poll for completion/m)[1].split(/^4\. \*\*Cross-check/m)[0];
-    // A single background loop, not one visible call per turn.
-    assert.ok(step3.includes('background loop'));
-    assert.ok(step3.includes('not one call per turn'));
-    // Skip timeout-only iterations; emit only status + newest feedback on a real change.
-    assert.ok(step3.includes('reason:"timeout"'));
-    assert.ok(step3.includes('newest'));
-    assert.ok(step3.includes('feedback[].message'));
-    // Print the final feedback tail on terminal.
-    assert.ok(step3.includes('final feedback'));
-    // Bounded: ~30-min silence ceiling and 60 req/min rate limit.
-    assert.ok(step3.includes('60 req/min'));
-    // Harness-neutral — no mandated tool, a wake-on-change tool is only an optional preference.
-    assert.ok(!step3.includes('run_in_background'));
-    assert.ok(!step3.includes('Monitor'));
-    assert.ok(step3.includes('bash'));
+    const step3 = text.split(/^3\. \*\*Wait per Setup's session-id check/m)[1].split(/^4\. \*\*Cross-check/m)[0];
+    // Stand-by half: woken automatically on a terminal outcome, no polling.
+    assert.ok(/stand by/i.test(step3));
+    assert.ok(step3.includes('woken automatically'));
+    assert.ok(/do not poll|don'?t poll/i.test(step3));
+    // Bounded-probe half: a single, explicit, one-off call — never a standing loop.
+    assert.ok(step3.includes('?wait=50'));
+    assert.ok(/one-off|single/i.test(step3));
+    assert.ok(!step3.includes('background loop'));
+    // Both halves keep the ~30-min wedged-session judgment and the rate limit.
+    assert.ok(step3.includes('30 min') || step3.includes('30-min'));
+    assert.ok(step3.includes('60 req/min') || step3.includes('60 requests'));
   });
 
   test('standalone keeps waitForFollowUps and wedged-session ceiling', () => {
@@ -510,39 +510,53 @@ describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
     assert.ok(text.includes('liveness'));
   });
 
-  test('standalone never mentions "Your autopilot session id" block reference', () => {
+  test('standalone now DOES tell the agent to check for the "Your autopilot session id" block (LIN-1324)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
-    // The old reference to the end-of-prompt block is replaced by the inline UUID.
-    assert.ok(!text.includes('block at the very end of this prompt'));
-    // But the dispatch override clause references it as a fallback.
-    assert.ok(!text.includes('### Your autopilot session id'));
+    // Reversed from the pre-fix contract: standalone can no longer assume it has no
+    // wake substrate — it must check at runtime whether the queue stamped a real,
+    // resumable session id block onto this prompt, and that check is what decides
+    // stand-by vs. the bounded probe.
+    assert.ok(text.includes('Your autopilot session id'));
+    assert.ok(/block/i.test(text) && /very end/i.test(text));
+    assert.ok(!text.includes('### Your autopilot session id'), 'the block itself is only appended at dispatch time, not inlined here');
   });
 
-  test('standalone mode is orthogonal to variant — stepper composes with standalone', () => {
+  test('standalone mode is orthogonal to variant — stepper composes with standalone (LIN-1324)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper', standalone: true });
     // The stepper marker is present.
     assert.ok(text.includes("You're running as the STEPPER"));
     // The standalone Setup inline UUID is present.
     assert.ok(text.includes('Your session id is `'));
     assert.ok(UUID_PATTERN.test(text));
-    // Stepper standalone: beat 3 drops subscription, beat 4 polls, hard rules drop subscription.
-    assert.ok(text.includes('Poll for completion'));
-    assert.ok(text.includes('?wait=50'));
-    // The stepper disposition (beats + hard rules) must not reference
-    // subscription — the manual's shared prose may still mention it.
     const afterStepper = text.split("You're running as the STEPPER")[1];
     const stepperSection = afterStepper.split('**Hard rules')[0];
-    assert.ok(!stepperSection.includes("subscription: 'everything'"));
-    // But waitForFollowUps is kept.
+    // Beat 3 now ALWAYS carries subscription: 'everything', standalone or not (LIN-1324) —
+    // a real dispatch id, if one turns out to exist, needs the up-chain edge declared to wake.
+    assert.ok(stepperSection.includes("subscription: 'everything'"),
+      'beat 3 must carry subscription: everything even in the standalone build, so a real wake can land');
+    // waitForFollowUps is kept.
     assert.ok(text.includes('waitForFollowUps: true'));
-    // Beat 4 and the hard-rules bullet both carry the background-loop contract (LIN-1318) —
-    // all three standalone branches must move together.
-    const beat4Section = stepperSection.split(/^4\. \*\*Poll for completion/m)[1];
-    assert.ok(beat4Section && beat4Section.slice(0, 400).includes('background loop'));
+    // Beat 4 offers both the stand-by half and the bounded-probe half, and never a
+    // standing background loop.
+    const beat4Section = stepperSection.split(/^4\. \*\*Wait per Setup's session-id check/m)[1];
+    assert.ok(beat4Section, 'beat 4 heading uses the new session-id-check wording');
+    assert.ok(/stand by/i.test(beat4Section));
+    assert.ok(beat4Section.includes('?wait=50'));
+    assert.ok(!beat4Section.includes('background loop'));
+    // Hard rules converge on the same check, also without a standing loop.
     const hardRulesSection = afterStepper.split('**Hard rules')[1];
-    assert.ok(hardRulesSection.includes('background'));
-    assert.ok(hardRulesSection.includes('reason:"timeout"'));
-    assert.ok(hardRulesSection.includes('60 req/min'));
+    assert.ok(hardRulesSection.includes("subscription: 'everything'"));
+    assert.ok(/stand by/i.test(hardRulesSection));
+    assert.ok(hardRulesSection.includes('one-off'));
+    assert.ok(!hardRulesSection.includes('background loop'));
+    // Beat 5's corrective followUpTo must carry the same subscription: 'everything'
+    // wake edge as beat 3 (LIN-1324 review finding) — otherwise a corrective re-judge
+    // on a real-id run gets no [pending] wake and stalls to the wedged ceiling, the
+    // exact failure mode this ticket exists to fix, reintroduced on the corrective path.
+    const beat5Section = stepperSection.split(/^5\. \*\*Judge AND challenge/m)[1];
+    assert.ok(beat5Section, 'beat 5 heading is present');
+    assert.ok(beat5Section.includes("subscription: 'everything'"),
+      "beat 5's corrective followUpTo must carry subscription: 'everything' even in the standalone build");
   });
 
   test('standalone mode is orthogonal to mode — readonly composes with standalone', () => {
@@ -550,6 +564,7 @@ describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
     assert.ok(text.includes('READ-ONLY'));
     assert.ok(text.includes('Your session id is `'));
     assert.ok(UUID_PATTERN.test(text));
-    assert.ok(text.includes('Poll for completion'));
+    assert.ok(/stand by/i.test(text));
+    assert.ok(text.includes('?wait=50'));
   });
 });
