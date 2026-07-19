@@ -611,10 +611,16 @@ describe('addFeedback wake — LIN-1357 per-(edge, producing item) terminal witn
   const wakesTo = (collection, historyCollection, target) =>
     wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
 
-  // beat1 IS the edge (no followUpTo, subscribed up to PARENT). beat2 is a
-  // DISTINCT dispatch resumed into the same warm session via followUpTo+force,
-  // so _resolveEdgeDoc walks it back to beat1 — mirroring the real LIN-1316
-  // incident topology (93efbea2 / c0282b75).
+  // beat1 IS the edge (no followUpTo, subscribed up to PARENT). beat2 and beat3
+  // are DISTINCT dispatches resumed into the same warm session via
+  // followUpTo+force, so _resolveEdgeDoc walks BOTH back to beat1 — mirroring
+  // the real LIN-1316 incident topology (93efbea2 / c0282b75).
+  //
+  // Beats 2..N anchor on beat1, NOT on the previous beat: `autopilot-kickoff`
+  // mandates `followUpTo: ROOT` as a stable anchor. Confirmed against the live
+  // LIN-1355 incident dispatches — beat1 f2693c15 (followUpTo: null), beat2
+  // 10373994 and beat3 76484b16 BOTH carry `followUpTo: f2693c15, force: true`
+  // on session 63b94c3f. That is why one poisoned edge starved every later beat.
   async function seedStepperEdgeTopology(store, { subscription = 'everything' } = {}) {
     const PARENT = 'parent-S1';
     const beat1 = await store.addItem(URL_KEY, {
@@ -629,7 +635,13 @@ describe('addFeedback wake — LIN-1357 per-(edge, producing item) terminal witn
     });
     await store.takeItem(beat2._id, URL_KEY, 'token-2');
 
-    return { beat1Id: beat1._id, beat2Id: beat2._id, parent: PARENT };
+    const beat3 = await store.addItem(URL_KEY, {
+      prompt: 'stepper beat 3', kind: 'research', issueIdentifier: 'LIN-1357',
+      followUpTo: beat1._id, sessionId: PARENT, subscription, force: true
+    });
+    await store.takeItem(beat3._id, URL_KEY, 'token-3');
+
+    return { beat1Id: beat1._id, beat2Id: beat2._id, beat3Id: beat3._id, parent: PARENT };
   }
 
   test('THE REGRESSION PIN — a SECOND [done] terminal from a DISTINCT beat item resolving to the same edge wakes the parent AGAIN', async () => {
@@ -644,6 +656,35 @@ describe('addFeedback wake — LIN-1357 per-(edge, producing item) terminal witn
     await drain();
     assert.equal(wakesTo(collection, historyCollection, parent).length, 2,
       'beat 2 — a DISTINCT item on the SAME edge — wakes the parent a SECOND time. Fails on the old per-edge boolean witness, passes on the per-item set.');
+  });
+
+  // LIN-1355 close-out, review ledger item 2: the pin above stops at N=2, but the
+  // reported incident ran a 5-beat drip. "Two works" was the exact reasoning shape
+  // that let the original bug ship (the old boolean also passed at N=1), so the
+  // generalisation is pinned rather than argued from set semantics.
+  test('N BEATS, N WAKES — a THIRD distinct beat item on the same edge still wakes the parent (the witness does not saturate past 2)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const { beat1Id, beat2Id, beat3Id, parent } = await seedStepperEdgeTopology(store);
+
+    await store.addFeedback(beat1Id, URL_KEY, { message: '[done] beat 1 complete' }, 'token-1');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, parent).length, 1, 'beat 1 → wake 1');
+
+    await store.addFeedback(beat2Id, URL_KEY, { message: '[done] beat 2 complete' }, 'token-2');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, parent).length, 2, 'beat 2 → wake 2');
+
+    await store.addFeedback(beat3Id, URL_KEY, { message: '[done] beat 3 complete' }, 'token-3');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, parent).length, 3,
+      'beat 3 — a THIRD distinct item on the SAME edge — wakes the parent again. Pins the per-item witness at the arity production actually runs.');
+
+    const edgeDoc = await store.historyCollection.findOne({ _id: beat1Id });
+    assert.deepEqual(
+      [...edgeDoc.terminalWakeItems].sort(),
+      [beat1Id, beat2Id, beat3Id].sort(),
+      'the witness set holds all THREE producing items — it accumulates, it does not cap'
+    );
   });
 
   test('the [blocked] sibling: a SECOND [blocked] from a distinct beat item on the same edge also wakes again', async () => {
