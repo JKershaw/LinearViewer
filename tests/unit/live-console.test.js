@@ -1,0 +1,278 @@
+/**
+ * Unit coverage for the Live Console data layer (LIN-1436).
+ *
+ * The Live Console is an ambient, generation-free view: a real-time feed of the
+ * whole swarm's activity that you leave running and watch. Its spine is the
+ * agent-status store — discrete, human-readable step events (research /
+ * implementation / review / close-out, each with a one-line summary) already
+ * flowing through the system. `lib/live-console.js` is the PURE transform from
+ * those raw, workspace-tagged status entries into the shapes the client renders:
+ *
+ *   - events : normalized, newest-first, capped stream (the trickle)
+ *   - lanes  : the currently-working agents (one per workspace+task, latest wins)
+ *   - tempo  : event-arrival counts bucketed over the recent window (the sparkline)
+ *   - summary: fleet totals (active / done / failed / blocked)
+ *
+ * Everything here is deterministic (a `now` is injected, never read from the
+ * clock) and tolerant (never throws on malformed input) — the same discipline as
+ * lib/session-telemetry.js.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  normalizeStatusEvent,
+  buildConsoleFeed,
+  normalizeEvidenceEvents,
+  deriveLoopLanes,
+  SUMMARY_MAX,
+} from '../../lib/live-console.js';
+
+// A lean loop record, shaped like getLoopsForWorkspace(lean) output after the
+// route folds in { workspaceUrlKey, workspaceName }.
+function loop(over = {}) {
+  return {
+    loopId: 'loop-1',
+    issueIdentifier: 'LIN-9',
+    agentState: 'running',
+    agentAction: 'implementation',
+    agentSummary: 'editing lib/foo.js',
+    dispatchedAt: '2026-07-19T11:50:00.000Z',
+    agentTimestamp: '2026-07-19T11:59:00.000Z',
+    terminalStatus: undefined,
+    workspaceUrlKey: 'acme',
+    workspaceName: 'Acme',
+    telemetry: {
+      runtime: { ms: null },
+      metrics: [
+        { toolCount: 3, elapsedSeconds: 40, breakdown: { Bash: 2, Read: 1 }, total: 3, timestamp: '2026-07-19T11:55:00.000Z' },
+        { toolCount: 12, elapsedSeconds: 540, breakdown: { Bash: 7, Read: 5 }, total: 15, timestamp: '2026-07-19T11:59:00.000Z' },
+      ],
+      producedArtifacts: [],
+    },
+    ...over,
+  };
+}
+
+// A workspace-tagged agent-status entry, shaped like the store's listStatus items
+// after the route folds in { workspaceUrlKey, workspaceName }.
+function statusItem(over = {}) {
+  return {
+    id: 'e1',
+    taskIdentifier: 'LIN-42',
+    action: 'implementation',
+    status: 'completed',
+    summary: 'Landed the fix in PR #123',
+    timestamp: '2026-07-19T12:00:00.000Z',
+    workspaceUrlKey: 'acme',
+    workspaceName: 'Acme',
+    ...over,
+  };
+}
+
+// ─── normalizeStatusEvent ─────────────────────────────────────────────────────
+
+test('normalizeStatusEvent maps a completed entry to a done event with epoch ms', () => {
+  const ev = normalizeStatusEvent(statusItem());
+  assert.equal(ev.kind, 'done');
+  assert.equal(ev.task, 'LIN-42');
+  assert.equal(ev.action, 'implementation');
+  assert.equal(ev.workspaceUrlKey, 'acme');
+  assert.equal(ev.workspaceName, 'Acme');
+  assert.equal(ev.ts, new Date('2026-07-19T12:00:00.000Z').getTime());
+  assert.equal(ev.summary, 'Landed the fix in PR #123');
+});
+
+test('normalizeStatusEvent maps status vocabulary to kinds (tolerant of casing/synonyms)', () => {
+  assert.equal(normalizeStatusEvent(statusItem({ status: 'in_progress' })).kind, 'working');
+  assert.equal(normalizeStatusEvent(statusItem({ status: 'IN-PROGRESS' })).kind, 'working');
+  assert.equal(normalizeStatusEvent(statusItem({ status: 'blocked' })).kind, 'blocked');
+  assert.equal(normalizeStatusEvent(statusItem({ status: 'failed' })).kind, 'failed');
+  assert.equal(normalizeStatusEvent(statusItem({ status: 'error' })).kind, 'failed');
+  assert.equal(normalizeStatusEvent(statusItem({ status: 'success' })).kind, 'done');
+  // Unknown / absent status is a neutral info event, never a throw.
+  assert.equal(normalizeStatusEvent(statusItem({ status: 'noodling' })).kind, 'info');
+  assert.equal(normalizeStatusEvent(statusItem({ status: '' })).kind, 'info');
+});
+
+test('normalizeStatusEvent caps the summary and never throws on junk', () => {
+  const long = 'x'.repeat(SUMMARY_MAX + 500);
+  assert.equal(normalizeStatusEvent(statusItem({ summary: long })).summary.length, SUMMARY_MAX);
+  // Malformed inputs return null rather than throwing.
+  assert.equal(normalizeStatusEvent(null), null);
+  assert.equal(normalizeStatusEvent({}), null); // no timestamp
+  assert.equal(normalizeStatusEvent(statusItem({ timestamp: 'not-a-date' })), null);
+});
+
+// ─── buildConsoleFeed: events ─────────────────────────────────────────────────
+
+test('buildConsoleFeed returns events newest-first and caps to maxEvents', () => {
+  const items = [
+    statusItem({ id: 'a', timestamp: '2026-07-19T12:00:00.000Z' }),
+    statusItem({ id: 'b', timestamp: '2026-07-19T12:05:00.000Z' }),
+    statusItem({ id: 'c', timestamp: '2026-07-19T12:02:00.000Z' }),
+  ];
+  const { events } = buildConsoleFeed(items, { now: Date.parse('2026-07-19T12:10:00Z') });
+  assert.deepEqual(events.map(e => e.id), ['b', 'c', 'a']);
+
+  const { events: capped } = buildConsoleFeed(items, { now: Date.parse('2026-07-19T12:10:00Z'), maxEvents: 2 });
+  assert.deepEqual(capped.map(e => e.id), ['b', 'c']);
+});
+
+test('buildConsoleFeed is tolerant of a non-array / empty input', () => {
+  for (const bad of [null, undefined, 'nope', 42, {}]) {
+    const feed = buildConsoleFeed(bad, { now: 0 });
+    assert.deepEqual(feed.events, []);
+    assert.deepEqual(feed.lanes, []);
+    assert.deepEqual(feed.summary, { active: 0, done: 0, failed: 0, blocked: 0, total: 0 });
+  }
+});
+
+// ─── buildConsoleFeed: lanes (currently-working agents) ───────────────────────
+
+test('lanes hold one entry per workspace+task whose LATEST event is working', () => {
+  const items = [
+    // acme/LIN-1: started then finished → NOT a lane.
+    statusItem({ id: '1', workspaceUrlKey: 'acme', taskIdentifier: 'LIN-1', status: 'in_progress', timestamp: '2026-07-19T12:00:00Z' }),
+    statusItem({ id: '2', workspaceUrlKey: 'acme', taskIdentifier: 'LIN-1', status: 'completed', timestamp: '2026-07-19T12:03:00Z' }),
+    // acme/LIN-2: still working → a lane.
+    statusItem({ id: '3', workspaceUrlKey: 'acme', taskIdentifier: 'LIN-2', status: 'in_progress', timestamp: '2026-07-19T12:04:00Z', summary: 'reading src' }),
+    // beta/LIN-2: same task id, different workspace, still working → a distinct lane.
+    statusItem({ id: '4', workspaceUrlKey: 'beta', workspaceName: 'Beta', taskIdentifier: 'LIN-2', status: 'in_progress', timestamp: '2026-07-19T12:01:00Z' }),
+  ];
+  const { lanes } = buildConsoleFeed(items, { now: Date.parse('2026-07-19T12:05:00Z') });
+
+  // Two lanes: acme/LIN-2 and beta/LIN-2 — acme/LIN-1 excluded (latest is done).
+  assert.equal(lanes.length, 2);
+  const keys = lanes.map(l => `${l.workspaceUrlKey}/${l.task}`);
+  assert.ok(keys.includes('acme/LIN-2'));
+  assert.ok(keys.includes('beta/LIN-2'));
+  assert.ok(!keys.includes('acme/LIN-1'));
+
+  // Lanes carry the latest summary and are sorted most-recent first.
+  assert.equal(lanes[0].task, 'LIN-2');
+  assert.equal(lanes[0].workspaceUrlKey, 'acme');
+  assert.equal(lanes[0].summary, 'reading src');
+});
+
+// ─── buildConsoleFeed: tempo (sparkline buckets) ──────────────────────────────
+
+test('tempo buckets count events oldest→newest over the window', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const min = 60 * 1000;
+  const items = [
+    statusItem({ id: 'n0', timestamp: new Date(now - 0.5 * min).toISOString() }), // newest bucket
+    statusItem({ id: 'n1', timestamp: new Date(now - 1.5 * min).toISOString() }),
+    statusItem({ id: 'n2', timestamp: new Date(now - 1.7 * min).toISOString() }),
+    statusItem({ id: 'old', timestamp: new Date(now - 10 * min).toISOString() }), // outside a 4-bucket window
+  ];
+  const { tempo } = buildConsoleFeed(items, { now, tempoBucketMs: min, tempoBuckets: 4 });
+  // 4 buckets, oldest→newest: [t-4..t-3), [t-3..t-2), [t-2..t-1), [t-1..t-0)
+  assert.equal(tempo.length, 4);
+  assert.deepEqual(tempo, [0, 0, 2, 1]);
+});
+
+// ─── buildConsoleFeed: summary (fleet totals) ─────────────────────────────────
+
+// ─── heartbeats: loop-based lanes ─────────────────────────────────────────────
+
+test('deriveLoopLanes surfaces running loops with their latest heartbeat', () => {
+  const lanes = deriveLoopLanes([loop()]);
+  assert.equal(lanes.length, 1);
+  const l = lanes[0];
+  assert.equal(l.task, 'LIN-9');
+  assert.equal(l.workspaceUrlKey, 'acme');
+  // Latest heartbeat (last metric) carried for the live tick.
+  assert.equal(l.heartbeat.toolCount, 12);
+  assert.equal(l.heartbeat.total, 15);
+  assert.deepEqual(l.heartbeat.breakdown, { Bash: 7, Read: 5 });
+});
+
+test('deriveLoopLanes excludes terminal / non-running loops', () => {
+  assert.equal(deriveLoopLanes([loop({ agentState: 'complete' })]).length, 0);
+  assert.equal(deriveLoopLanes([loop({ agentState: 'error' })]).length, 0);
+  assert.equal(deriveLoopLanes([loop({ agentState: 'queued' })]).length, 0);
+  // A terminal marker overrides a stale 'running' agentState.
+  assert.equal(deriveLoopLanes([loop({ agentState: 'running', terminalStatus: 'done' })]).length, 0);
+});
+
+test('buildConsoleFeed lanes come from running loops (with heartbeat), preferred over status lanes', () => {
+  const items = [
+    // status says LIN-9 working, but the loop carries the richer heartbeat.
+    statusItem({ id: 's1', taskIdentifier: 'LIN-9', status: 'in_progress', timestamp: '2026-07-19T11:52:00Z' }),
+    // a working task with NO loop → still a lane via the status fallback.
+    statusItem({ id: 's2', taskIdentifier: 'LIN-5', status: 'in_progress', timestamp: '2026-07-19T11:58:00Z' }),
+  ];
+  const { lanes } = buildConsoleFeed({ statusItems: items, loops: [loop()] }, { now: Date.parse('2026-07-19T12:00:00Z') });
+  const byTask = Object.fromEntries(lanes.map(l => [l.task, l]));
+  assert.ok(byTask['LIN-9'].heartbeat, 'loop lane carries heartbeat');
+  assert.ok(byTask['LIN-5'], 'status-only working task still becomes a lane');
+  assert.equal(byTask['LIN-5'].heartbeat, undefined);
+});
+
+// ─── evidence events from [evidence] artifacts ────────────────────────────────
+
+test('normalizeEvidenceEvents turns produced artifacts into linked evidence events', () => {
+  const evLoop = loop({
+    telemetry: { metrics: [], producedArtifacts: [
+      { url: 'https://github.com/x/y/pull/9', label: 'PR #9', mentions: 2, timestamp: '2026-07-19T11:57:00.000Z' },
+    ] },
+  });
+  const evs = normalizeEvidenceEvents([evLoop]);
+  assert.equal(evs.length, 1);
+  assert.equal(evs[0].kind, 'evidence');
+  assert.equal(evs[0].url, 'https://github.com/x/y/pull/9');
+  assert.equal(evs[0].task, 'LIN-9');
+  assert.equal(evs[0].workspaceUrlKey, 'acme');
+  assert.equal(evs[0].ts, new Date('2026-07-19T11:57:00.000Z').getTime());
+});
+
+test('buildConsoleFeed merges evidence into the event stream, newest-first', () => {
+  const evLoop = loop({
+    telemetry: { metrics: [], producedArtifacts: [
+      { url: 'https://x/pr/1', label: 'PR #1', timestamp: '2026-07-19T11:58:30.000Z' },
+    ] },
+  });
+  const items = [statusItem({ id: 's1', timestamp: '2026-07-19T11:58:00Z' })];
+  const { events } = buildConsoleFeed({ statusItems: items, loops: [evLoop] }, { now: Date.parse('2026-07-19T12:00:00Z') });
+  assert.equal(events[0].kind, 'evidence'); // 11:58:30 newer than the 11:58:00 status
+  assert.equal(events[1].id, 's1');
+});
+
+// ─── pagination (view more) ───────────────────────────────────────────────────
+
+test('buildConsoleFeed paginates with pageSize + a before cursor', () => {
+  const mk = (id, min) => statusItem({ id, timestamp: `2026-07-19T12:${String(min).padStart(2, '0')}:00Z` });
+  const items = [mk('a', 5), mk('b', 4), mk('c', 3), mk('d', 2), mk('e', 1)];
+  const now = Date.parse('2026-07-19T12:10:00Z');
+
+  const first = buildConsoleFeed({ statusItems: items, loops: [] }, { now, pageSize: 2 });
+  assert.deepEqual(first.events.map(e => e.id), ['a', 'b']); // newest 2
+  assert.equal(first.hasMore, true);
+  assert.equal(first.oldestTs, first.events[1].ts);
+
+  // Next page: everything strictly older than the cursor.
+  const second = buildConsoleFeed({ statusItems: items, loops: [] }, { now, pageSize: 2, before: first.oldestTs });
+  assert.deepEqual(second.events.map(e => e.id), ['c', 'd']);
+  assert.equal(second.hasMore, true);
+
+  const third = buildConsoleFeed({ statusItems: items, loops: [] }, { now, pageSize: 2, before: second.oldestTs });
+  assert.deepEqual(third.events.map(e => e.id), ['e']);
+  assert.equal(third.hasMore, false);
+});
+
+test('summary counts kinds; active = number of working lanes', () => {
+  const items = [
+    statusItem({ id: '1', taskIdentifier: 'LIN-1', status: 'in_progress', timestamp: '2026-07-19T12:04:00Z' }),
+    statusItem({ id: '2', taskIdentifier: 'LIN-2', status: 'completed', timestamp: '2026-07-19T12:03:00Z' }),
+    statusItem({ id: '3', taskIdentifier: 'LIN-3', status: 'failed', timestamp: '2026-07-19T12:02:00Z' }),
+    statusItem({ id: '4', taskIdentifier: 'LIN-4', status: 'blocked', timestamp: '2026-07-19T12:01:00Z' }),
+  ];
+  const { summary } = buildConsoleFeed(items, { now: Date.parse('2026-07-19T12:05:00Z') });
+  assert.equal(summary.total, 4);
+  assert.equal(summary.done, 1);
+  assert.equal(summary.failed, 1);
+  assert.equal(summary.blocked, 1);
+  assert.equal(summary.active, 1); // one working lane
+});
