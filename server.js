@@ -100,6 +100,7 @@ import { createSessionsFeedCache } from './lib/sessions-feed-cache.js'
 import { fetchIssueContext } from './lib/linear.js'
 import { createTaskChatRoutes } from './routes/task-chat.js'
 import { createNextRunRoutes } from './routes/next-run.js'
+import { createLiveConsoleRoutes } from './routes/live-console.js'
 import { createFlightCompanionRoutes } from './routes/flight-companion.js'
 import { createShipBiscuitRoutes } from './routes/ship-biscuit.js'
 import { yapClientFromEnv } from './lib/yap-client.js'
@@ -1336,6 +1337,9 @@ app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferen
 
 // Mount flight-companion routes (experimental prototype for LIN-751 realtime chat — LIN-922).
 app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
+
+// Mount live-console routes (experimental ambient "watch the swarm" feed — LIN-1436).
+app.use(createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, getOpenRouterSource, getDeployInfo }))
 
 // The Ship's Biscuit (experimental, LIN-818): flag-gated LLM-set newspaper — a
 // deterministic edition model over the wired event stores + one editor-in-chief
