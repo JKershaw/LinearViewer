@@ -830,14 +830,28 @@ describe('pass-3 write tool — send_follow_up (LIN-1073)', () => {
     };
   }
 
-  function makeCatalog({ history, followUpEnabled = true, dispatchedBy = null } = {}) {
+  function makeCatalog({ history, followUpEnabled = true, dispatchedBy = null, anchorHarness, proxyTokenStore } = {}) {
     const provider = makeFakeProvider();
     const dispatchQueueStore = makeFakeDispatchQueueStore(history);
+    // getItemStatus is added ONLY when a test opts in (LIN-1431). Every
+    // pre-existing test in this block leaves it off, so their anchor resolves
+    // null and their harness/bootstrapToken assertions are unaffected — which
+    // is why the whole-item deepStrictEqual floor below still passes unchanged.
+    // Opting in also counts the calls, so an inheritance test cannot pass
+    // vacuously with the anchor never consulted.
+    if (anchorHarness !== undefined) {
+      dispatchQueueStore.getItemStatusCalls = 0;
+      dispatchQueueStore.getItemStatus = async () => {
+        dispatchQueueStore.getItemStatusCalls++;
+        return { harness: anchorHarness };
+      };
+    }
     const { tools, executeTool } = createChatToolCatalog({
       provider, scope: SCOPE, urlKey: URL_KEY,
       dispatchQueueStore, agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
       sessionIsTerminal: (session) => (session.loops || []).some(l => l.terminalStatus === 'done'),
       followUpEnabled, dispatchedBy,
+      ...(proxyTokenStore !== undefined ? { proxyTokenStore, baseUrl: 'https://harbour.test' } : {}),
     });
     return { tools, executeTool, dispatchQueueStore };
   }
@@ -923,6 +937,62 @@ describe('pass-3 write tool — send_follow_up (LIN-1073)', () => {
       /non-empty "prompt"/,
     );
     assert.strictEqual(dispatchQueueStore.calls.length, 0);
+  });
+
+  /**
+   * LIN-1431 S3 #2. `send_follow_up` used to pass no finalizePrompt at all, so a
+   * tool-driven follow-up resuming a claude-code session was enqueued with
+   * `bootstrapToken: null` — and the broker holding its original credential died
+   * with its window (LIN-1362/1375), leaving the resumed session unable to write
+   * back. It now provisions on the same terms as the human reply box: keyed on the
+   * RESOLVED harness (inherited from the anchor), no prose appended,
+   * `applyDefaultHarness:false` untouched.
+   */
+  const MINTED = 'bootstrap-xyz';
+  const workingTokenStore = { createToken: async () => ({ token: MINTED, kind: 'bootstrap', scope: 'readWrite' }) };
+
+  test('LIN-1431: a follow-up on a claude-code-resolved anchor carries a bootstrapToken', async () => {
+    const { executeTool, dispatchQueueStore } = makeCatalog({
+      history: twoSessionHistory(), anchorHarness: 'claude-code', proxyTokenStore: workingTokenStore,
+    });
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } });
+
+    assert.ok(dispatchQueueStore.getItemStatusCalls > 0,
+      'the anchor must actually be consulted — otherwise this passes for the wrong reason');
+    assert.strictEqual(dispatchQueueStore.calls[0].item.harness, 'claude-code',
+      'harness is inherited from the anchor, which is what arms the MCP branch');
+    assert.strictEqual(dispatchQueueStore.calls[0].item.bootstrapToken, MINTED,
+      'a resumed broker-dependent session must receive a LIVE credential');
+    assert.strictEqual(dispatchQueueStore.calls[0].item.prompt, 'ship it',
+      'provisioning appends no prose — the prompt is the trimmed original');
+  });
+
+  test('LIN-1431: a follow-up on a BLANK-harness anchor mints nothing and stays null', async () => {
+    const { executeTool, dispatchQueueStore } = makeCatalog({
+      history: twoSessionHistory(), anchorHarness: null, proxyTokenStore: workingTokenStore,
+    });
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } });
+
+    assert.ok(dispatchQueueStore.getItemStatusCalls > 0, 'the anchor was consulted');
+    assert.strictEqual(dispatchQueueStore.calls[0].item.harness, null,
+      'a blank anchor must NOT be silently upgraded to claude-code (LIN-1111)');
+    assert.strictEqual(dispatchQueueStore.calls[0].item.bootstrapToken, null,
+      'a prose-path token has no channel to the worker — minting one would strand it');
+  });
+
+  test('LIN-1431: a claude-code follow-up whose mint fails is refused, nothing enqueued (fail-closed)', async () => {
+    const { executeTool, dispatchQueueStore } = makeCatalog({
+      history: twoSessionHistory(),
+      anchorHarness: 'claude-code',
+      proxyTokenStore: { createToken: async () => { throw new Error('rate limited'); } },
+    });
+    // The tool surfaces the throw rather than resuming credential-less: the
+    // factory propagates before addItem (LIN-1175).
+    await assert.rejects(
+      () => executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } }),
+      /credential-less|token mint failed|cannot attach/i,
+    );
+    assert.strictEqual(dispatchQueueStore.calls.length, 0, 'no item was ever enqueued');
   });
 });
 

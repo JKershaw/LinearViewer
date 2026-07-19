@@ -177,9 +177,14 @@ function buildMockAnswer(context, question, related) {
  *   session read-model AND the gated `send_follow_up` chat tool's write
  * @param {Object}   deps.agentStatusStore     - agent status store (LIN-1073): the other dep
  *   the session read-model needs
+ * @param {Object}   [deps.proxyTokenStore]    - proxy token store (LIN-1431): lets the gated
+ *   `send_follow_up` tool provision a bootstrap credential for a follow-up resuming a
+ *   broker-dependent (claude-code) session. Absent → provisioning degrades exactly as
+ *   `provisionBootstrapToken` specifies (null for prose harnesses; fail-closed throw for
+ *   claude-code, surfaced as a tool error rather than a silently credential-less resume)
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -456,6 +461,11 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           // LIN-1139: thread the workspace prefs store so a tool-driven follow-up
           // resolves model/harness through the shared dispatch factory.
           workspacePreferencesStore,
+          // LIN-1431: same reason, one layer on — provisionBootstrapToken needs both
+          // of these, so a tool-driven follow-up onto a claude-code session can carry
+          // a live credential instead of resuming into a dead broker (LIN-1362/1375).
+          proxyTokenStore,
+          baseUrl: `${req.protocol}://${req.get('host')}`,
         });
         await streamChatWithTools(
           messages,

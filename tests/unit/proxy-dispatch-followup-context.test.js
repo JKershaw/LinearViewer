@@ -21,7 +21,7 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 // The marker line emitted by buildProxyContextPreamble (lib/proxy-preamble.js).
 const PROXY_CONTEXT_MARKER = '## Workspace API access (auto-appended)';
 
-function buildApp(captured, { createToken } = {}) {
+function buildApp(captured, { createToken, getItemStatus } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -51,7 +51,13 @@ function buildApp(captured, { createToken } = {}) {
       addItem: async (urlKey, item) => {
         captured.item = item;
         return { _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item };
-      }
+      },
+      // Omitted by default (matching every other test in this file, which must
+      // stay structurally immune to anchor-based harness inheritance): the
+      // factory only looks up an anchor when this method exists at all
+      // (dispatch-factory.js:105). Tests exercising inheritance (LIN-1431)
+      // pass it in explicitly.
+      ...(getItemStatus ? { getItemStatus } : {})
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
@@ -252,5 +258,35 @@ describe('LIN-1429 — claude-code follow-up fails CLOSED when provisioning cann
 
     assert.equal(res.status, 503, `expected 503, got ${res.status}: ${JSON.stringify(res.body)}`);
     assert.equal(captured.item, undefined, 'no item was ever enqueued');
+  });
+});
+
+describe('LIN-1431 (S3 §1 ruling) — harness inheritance reaches this route too', () => {
+  test('a follow-up onto an opencode anchor stays opencode, not interposed to claude-code', async () => {
+    const captured = {};
+    let getItemStatusCalls = 0;
+    const app = buildApp(captured, {
+      getItemStatus: async (_urlKey, id) => {
+        getItemStatusCalls++;
+        return id === FOLLOW_UP_ID ? { harness: 'opencode' } : null;
+      }
+    });
+    // No explicit harness, no preset: this route's applyDefaultHarness
+    // defaults to true (unchanged), so absent inheritance the LIN-1159
+    // interpose would silently re-harness the resume to claude-code (the bug
+    // this ruling accepts fixing, per the plan's §1). With inheritance, the
+    // anchor's own harness wins before the interpose ever runs.
+    const res = await call(app, 'post', '/api/proxy/dispatch', {
+      prompt: 'next beat',
+      issueIdentifier: 'TEST-1',
+      target: 'cli',
+      followUpTo: FOLLOW_UP_ID
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.ok(getItemStatusCalls > 0, 'the anchor must actually be consulted, not just structurally reachable');
+    assert.equal(captured.item.harness, 'opencode', 'the resume stays on the harness of the session it resumes');
+    assert.ok(!hasProxyContext(captured.item.prompt), 'opencode takes the prose branch, not MCP');
+    assert.equal(captured.item.bootstrapToken, null, 'opencode is not claude-code — no credential is minted for it');
   });
 });

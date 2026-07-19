@@ -54,6 +54,22 @@ function capturingStoreWithItems(items) {
   return store;
 }
 
+// Same as capturingStoreWithItems, plus a call counter on getItemStatus so a
+// test can prove the anchor was actually consulted — not just that the test
+// would still pass with the inheritance code deleted (LIN-1431's
+// vacuous-green trap).
+function capturingStoreWithItemsCounted(items) {
+  const store = capturingStoreWithItems(items);
+  let getItemStatusCalls = 0;
+  const rawGetItemStatus = store.getItemStatus;
+  store.getItemStatus = async (...args) => {
+    getItemStatusCalls++;
+    return rawGetItemStatus(...args);
+  };
+  Object.defineProperty(store, 'getItemStatusCalls', { get: () => getItemStatusCalls });
+  return store;
+}
+
 async function prefsWith(defaults) {
   const store = new WorkspacePreferencesStore({ collection: createMockCollection() });
   if (defaults) await store.saveWorkspacePreferences('acme', { dispatchDefaults: defaults });
@@ -467,6 +483,90 @@ describe('createDispatchItem — dispatch preset routing precedence (LIN-1390)',
     assert.equal(store.captured.item.model, 'ws-model');
     assert.equal(store.captured.item.harness, 'ws-harness');
     assert.strictEqual(store.captured.item.presetConfig, null);
+  });
+});
+
+describe('createDispatchItem — anchor harness inheritance (LIN-1431)', () => {
+  test('a follow-up inherits the anchor\'s harness when none is explicit', async () => {
+    const store = capturingStoreWithItemsCounted({
+      'anchor-1': { issueIdentifier: 'LIN-1', harness: 'claude-code' }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      applyDefaultHarness: false, fields: { followUpTo: 'anchor-1' }
+    });
+    assert.equal(store.captured.item.harness, 'claude-code');
+    assert.ok(store.getItemStatusCalls > 0, 'the anchor must actually be consulted');
+  });
+
+  test('a blank-harness anchor inherits nothing and stays null (the safety property)', async () => {
+    const store = capturingStoreWithItemsCounted({
+      'anchor-1': { issueIdentifier: 'LIN-1', harness: null }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      applyDefaultHarness: false, fields: { followUpTo: 'anchor-1' }
+    });
+    assert.strictEqual(store.captured.item.harness, null);
+    assert.ok(store.getItemStatusCalls > 0, 'the anchor must actually be consulted');
+  });
+
+  test('an explicit harness beats the anchor', async () => {
+    const store = capturingStoreWithItemsCounted({
+      'anchor-1': { issueIdentifier: 'LIN-1', harness: 'opencode' }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      harness: 'claude-code', applyDefaultHarness: false, fields: { followUpTo: 'anchor-1' }
+    });
+    assert.equal(store.captured.item.harness, 'claude-code');
+  });
+
+  test('a selected preset beats the anchor', async () => {
+    const store = capturingStoreWithItemsCounted({
+      'anchor-1': { issueIdentifier: 'LIN-1', harness: 'opencode' }
+    });
+    const presetsStore = presetsStoreWith({
+      p1: { id: 'p1', name: 'P', config: { harness: 'preset-harness' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      applyDefaultHarness: false, dispatchPresetsStore: presetsStore, presetId: 'p1',
+      fields: { followUpTo: 'anchor-1' }
+    });
+    assert.equal(store.captured.item.harness, 'preset-harness');
+  });
+
+  test('the anchor beats the workspace default', async () => {
+    const store = capturingStoreWithItemsCounted({
+      'anchor-1': { issueIdentifier: 'LIN-1', harness: 'claude-code' }
+    });
+    const prefs = await prefsWith({ harness: 'ws-harness' });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      applyDefaultHarness: false, workspacePreferencesStore: prefs, fields: { followUpTo: 'anchor-1' }
+    });
+    assert.equal(store.captured.item.harness, 'claude-code');
+  });
+
+  test('the anchor\'s presetConfig still beats a plain anchor.harness (LIN-1390 precedence untouched)', async () => {
+    const store = capturingStoreWithItemsCounted({
+      'anchor-1': { issueIdentifier: 'LIN-1', harness: 'opencode', presetConfig: { harness: 'preset-config-harness' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'autopilot', prompt: 'x',
+      applyDefaultHarness: false, fields: { followUpTo: 'anchor-1' }
+    });
+    assert.equal(store.captured.item.harness, 'preset-config-harness');
+  });
+
+  test('a fresh dispatch (no followUpTo) is byte-identical: no anchor lookup, harness resolution unchanged', async () => {
+    const store = capturingStoreWithItemsCounted({});
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x', applyDefaultHarness: false
+    });
+    assert.strictEqual(store.captured.item.harness, null);
+    assert.equal(store.getItemStatusCalls, 0, 'no followUpTo means the anchor is never looked up');
   });
 });
 

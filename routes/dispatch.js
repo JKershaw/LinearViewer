@@ -28,7 +28,7 @@ import { FEEDBACK_ENTRY_KINDS } from '../lib/dispatch-store.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
-import { attachProxyContext } from '../lib/proxy-preamble.js';
+import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
@@ -325,6 +325,20 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
       const wantProxyContext = attachProxy === true && !isAbort;
 
+      // Follow-up credential provisioning (LIN-1431 S3 #1). The human reply box
+      // (public/session.js) posts only { prompt, followUpTo, target, force } — it
+      // never sets `attachProxy`, so `wantProxyContext` is false and, pre-LIN-1431,
+      // NO finalizePrompt was passed at all: the follow-up was enqueued with
+      // `bootstrapToken: null` and resumed a session whose local broker had died
+      // with its window (LIN-1362/1375), leaving it unable to write back.
+      //
+      // The fix is a SERVER-SIDE default, deliberately not a new client flag: the
+      // reply-box client stays dumb by design (LIN-1252/1298/1309). It only arms
+      // the callback; whether a credential is actually minted is decided INSIDE it,
+      // on the RESOLVED harness (see below) — so this can never upgrade a blank
+      // harness, and `applyDefaultHarness:false` below is untouched (7926ee8).
+      const wantFollowUpProvisioning = !wantProxyContext && !isAbort && !!followUpTo && !!prompt;
+
       // Reject local target from non-localhost requests
       if (target === 'local') {
         const host = (req.get('host') || '').split(':')[0];
@@ -423,7 +437,44 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
                 return attached;
               }
             }
-          : { prompt }),
+          : wantFollowUpProvisioning
+            ? {
+                // LIN-1431 S3 #1: provision WITHOUT appending prose — S1's shape at
+                // routes/proxy.js's dispatch seam. The `shouldUseMcpTokenField` guard
+                // is load-bearing, not decorative: provisionBootstrapToken returns the
+                // minted token for prose harnesses too, and a prose-path token has no
+                // channel to reach the worker (the prompt is untouched here), so
+                // minting one would put an unreferenceable credential on the item.
+                //
+                // Keying on the RESOLVED harness is what preserves LIN-1111: a blank
+                // harness resolves to null here (applyDefaultHarness:false, and
+                // beat 1's anchor inheritance yields null for a blank anchor), and
+                // shouldUseMcpTokenField(null) is false — so a blank-harness reply
+                // takes the null branch below, exactly as before this change.
+                //
+                // Fail-closed comes for free and matches LIN-1162/LIN-525: in MCP mode
+                // provisionBootstrapToken THROWS with err.proxyAttachFailed on any
+                // inability to mint, createDispatchItem propagates it before addItem,
+                // and this route's catch already maps that flag to a transient 503.
+                // The server attaches or throws — it never silently drops.
+                finalizePrompt: async (resolvedHarness) => {
+                  if (shouldUseMcpTokenField(resolvedHarness)) {
+                    const bootstrapToken = await provisionBootstrapToken({
+                      proxyTokenStore,
+                      urlKey: workspace.urlKey,
+                      baseUrl,
+                      label: 'dispatch-bootstrap',
+                      harness: resolvedHarness,
+                      // LIN-1376: stamp the launching account, same as the
+                      // attachProxyContext branch above.
+                      createdBy: req.session?.accountId || null
+                    });
+                    return { prompt, bootstrapToken };
+                  }
+                  return { prompt, bootstrapToken: null };
+                }
+              }
+            : { prompt }),
         fields: {
           promptName: promptName || 'Prompt',
           issueId: issueId || null,
