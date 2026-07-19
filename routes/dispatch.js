@@ -1246,9 +1246,19 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // (lib/workspace-token-resolver.js `selectOwnerWorkspaceToken`, the explicit
       // `scoped && !ownerAccountId` guard → reason 'not_connected'). So a minted
       // ownerless token is dead on arrival; handing one to the wake would only
-      // disguise the miss. Enqueue token-less instead and let the consumer's own
-      // fallback mint (LIN-1446) be the credential backstop. This is also the
-      // degrade path for the harbour-feedback auth branch
+      // disguise the miss. Enqueue token-less instead.
+      //
+      // NOTE — there is NO downstream backstop on this lane. LIN-1446's fallback
+      // mint is on SD's FRESH-LAUNCH path only (dispatcher.js:741); the follow-up/
+      // wake resume branch returns at dispatcher.js:658, well before it, and reads
+      // item.bootstrapToken directly with no mint of its own. So a degraded wake
+      // really does resume with an empty HARBOUR_LOCAL_BASE — LIN-1428's symptom,
+      // surviving in this narrow lane. We degrade anyway because a woken-but-
+      // uncredentialed parent strictly beats a parent that never wakes, and
+      // post-fix only these two structural lanes are token-less where pre-fix
+      // EVERY wake was. Do not widen the degrade on the assumption something
+      // downstream catches it — nothing does. SD-side follow-up: LIN-1449.
+      // This is also the degrade path for the harbour-feedback auth branch
       // (authenticateFeedbackToken above), which never sets req.dispatchTokenOwner.
       if (!createdBy) return { token: null, reason: null, degraded: 'no-token-owner' };
       // ── TRANSIENT failures: withdraw the wake so the terminal stays retryable ──
