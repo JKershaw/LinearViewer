@@ -56,6 +56,19 @@ describe('buildWakeFollowUp — descriptor shape', () => {
     assert.ok(wake.prompt.includes('LIN-42'), 'carries the child identifier');
     assert.ok(wake.prompt.includes('[done] shipped in 40s'), 'carries the terminal outcome');
   });
+
+  // LIN-1430 (S2), test 4: the pure builder must stay exactly 6 keys. Credential
+  // provisioning (bootstrapToken) is attached in the STORE, never here — a wake
+  // descriptor with no route/store context has no way to resolve a donor harness.
+  test('the descriptor is exactly 6 keys — no bootstrapToken, no issueIdentifier (LIN-1430)', () => {
+    const wake = buildWakeFollowUp(makeChild(), doneFeedback);
+    assert.deepEqual(
+      Object.keys(wake).sort(),
+      ['followUpTo', 'kind', 'prompt', 'queueIfBusy', 'sessionId', 'subscription'].sort()
+    );
+    assert.ok(!('bootstrapToken' in wake), 'the builder never sets bootstrapToken');
+    assert.ok(!('issueIdentifier' in wake), 'the builder never sets issueIdentifier');
+  });
 });
 
 describe('buildWakeFollowUp — the §5 bubbling matrix', () => {
