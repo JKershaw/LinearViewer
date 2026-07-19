@@ -549,6 +549,14 @@ describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
     assert.ok(/stand by/i.test(hardRulesSection));
     assert.ok(hardRulesSection.includes('one-off'));
     assert.ok(!hardRulesSection.includes('background loop'));
+    // Beat 5's corrective followUpTo must carry the same subscription: 'everything'
+    // wake edge as beat 3 (LIN-1324 review finding) — otherwise a corrective re-judge
+    // on a real-id run gets no [pending] wake and stalls to the wedged ceiling, the
+    // exact failure mode this ticket exists to fix, reintroduced on the corrective path.
+    const beat5Section = stepperSection.split(/^5\. \*\*Judge AND challenge/m)[1];
+    assert.ok(beat5Section, 'beat 5 heading is present');
+    assert.ok(beat5Section.includes("subscription: 'everything'"),
+      "beat 5's corrective followUpTo must carry subscription: 'everything' even in the standalone build");
   });
 
   test('standalone mode is orthogonal to mode — readonly composes with standalone', () => {
