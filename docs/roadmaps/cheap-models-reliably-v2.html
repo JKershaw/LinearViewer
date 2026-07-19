@@ -328,10 +328,10 @@
       spine completed. v1 is kept frozen as the historical record of how the mechanism got built.
     </p>
     <div class="meta-row">
-      <span class="stat" style="border-color:var(--done)"><span class="dot d-done"></span> <b>mechanism built</b> — spine complete</span>
-      <span class="stat"><span class="dot d-prog"></span> WIP <b>8</b> — already on the proving edge</span>
-      <span class="stat"><span class="dot d-todo"></span> remaining work is <b>unblocked</b> — order is logical, not forced</span>
-      <span class="stat">generated <b>17 Jul</b> · <span class="rid">v2.0</span></span>
+      <span class="stat" style="border-color:var(--done)"><span class="dot d-done"></span> tests B + D <b>half-proven</b> — telemetry &amp; live-bug landed</span>
+      <span class="stat"><span class="dot d-done"></span> routing wired (<span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1400">LIN-1400</a></span>) · telemetry done (<span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a></span>)</span>
+      <span class="stat"><span class="dot d-prog"></span> frontier: <b>OpenCode instrument</b> + choose-models (<span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a></span>)</span>
+      <span class="stat">updated <b>17 Jul</b> · <span class="rid">v2.1</span></span>
     </div>
     <div class="ribbon">
       <span class="rlab">already shipped</span>
@@ -356,9 +356,9 @@
         <p class="proves">proven by: Harden + a live run</p>
       </div>
       <div class="acc-item">
-        <h4><span class="k">B</span> You can see what it cost</h4>
+        <h4><span class="k">B</span> You can see what it cost <span style="color:var(--done)">◐</span></h4>
         <p>Token spend, wall-clock, and the full transcript are visible per run — so “cheaper” is a measured fact, not a hope.</p>
-        <p class="proves">proven by: Instrument (<a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a>)</p>
+        <p class="proves">claude-code met (<a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a> done ✓); OpenCode parity in flight (<a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1402">LIN-1402</a>–1406)</p>
       </div>
       <div class="acc-item">
         <h4><span class="k">C</span> The smart model catches the cheap one</h4>
@@ -366,9 +366,9 @@
         <p class="proves">proven by: Supervise (<a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1269">LIN-1269</a> / 1236)</p>
       </div>
       <div class="acc-item">
-        <h4><span class="k">D</span> An unattended run survives a hiccup</h4>
+        <h4><span class="k">D</span> An unattended run survives a hiccup <span style="color:var(--done)">◐</span></h4>
         <p>A session wobble (logout, stall, dropped follow-up) doesn't wedge or silently lose the run. No known unattended-run bugs open.</p>
-        <p class="proves">proven by: Harden (<a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a> / 1355 / 1358 …)</p>
+        <p class="proves"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a> fixed ✓ (the logout bug we hit live); <a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a> / 1358 / 1409 remain</p>
       </div>
     </div>
   </section>
@@ -384,16 +384,16 @@
     </p>
     <div class="spine">
       <div class="loop">
-        <div class="step">
+        <div class="step active">
           <span class="n">1</span><div class="sh">Choose &amp; route</div>
-          <div class="sd">Pick the cheap models; wire per-kind presets (Opus→review, cheap→impl).</div>
-          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a></div>
+          <div class="sd">Per-kind routing wired (Opus→review, cheap→impl). Left: pick which cheap models.</div>
+          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1400">LIN-1400</a> done ✓ · <a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a> open</div>
         </div>
         <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
-        <div class="step active">
+        <div class="step">
           <span class="n">2</span><div class="sh">Instrument</div>
           <div class="sd">Telemetry: tokens, wall-clock, transcript — so a run is legible.</div>
-          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a> · in progress</div>
+          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a> done ✓ · OpenCode 1402–1406</div>
         </div>
         <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
         <div class="step active">
@@ -405,7 +405,7 @@
         <div class="step">
           <span class="n">4</span><div class="sh">Harden</div>
           <div class="sd">Kill the friction that breaks unattended runs before trusting them.</div>
-          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a> · 1355 · 1397 …</div>
+          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a> done ✓ · 1355 · 1409 …</div>
         </div>
         <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
         <div class="step">
@@ -418,10 +418,11 @@
     <div class="callout">
       <h4>Where the effort already is</h4>
       <p>
-        Of 8 in-progress tickets, the load-bearing three are steps 2–3: <b><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a></b> (telemetry),
-        <b><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1269">LIN-1269</a></b> (beats disposition), <b><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1236">LIN-1236</a></b> (spend audit). The instinct is right —
-        instrument and supervise first. The gap is step&nbsp;1: <b><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a> (choose models)</b> is still
-        Todo, yet nothing downstream is real until the cheap models are actually picked and routed.
+        Fast progress since v2.0: <b><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a> telemetry is Done</b> (test B met for claude-code),
+        <b>per-kind routing shipped</b> (<a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1400">LIN-1400</a>), and the live-logout bug <b><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a> is fixed</b>.
+        The instrument frontier moved to <b>OpenCode parity</b> (the <a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1402">LIN-1402</a>–1406 tool-relay series,
+        now in flight). The one genuine gap is still step&nbsp;1's other half: <b><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a> — actually
+        choosing which cheap models</b> — nothing downstream is fully real until that's decided.
       </p>
     </div>
   </section>
@@ -435,20 +436,20 @@
         <header><h3>Route — pick &amp; wire the models</h3><span class="tag">step 1</span></header>
         <p class="pdesc">Turn the presets mechanism into an actual policy: which cheap model for which kind of task.</p>
         <ul class="rows">
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a></span> Choose OpenRouter models <span class="badge-key">start here</span></span><span class="prio hot">p2 → p1?</span></li>
-          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1250">LIN-1250</a></span> Factor shared OpenRouter request/finish helpers</span><span class="prio">p0</span></li>
-          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1345">LIN-1345</a></span> Lower shared-key limit <span class="note">(unblocked)</span> · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1183">LIN-1183</a>/1184</span> fan-out + per-op override</span><span class="prio">p3</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1400">LIN-1400</a></span> Per-type override presets (Opus→review, cheap→impl) <span class="badge-key">routing wired</span></span><span class="prio">p3 ✓</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a></span> Choose OpenRouter models <span class="badge-key">the open half</span></span><span class="prio hot">p2 → p1?</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1250">LIN-1250</a></span> Factor shared OpenRouter helpers · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1345">LIN-1345</a></span> lower shared-key limit <span class="note">(unblocked)</span></span><span class="prio">p0/3</span></li>
         </ul>
       </div>
       <div class="pillar">
         <header><h3>Instrument — see the run</h3><span class="tag">step 2 · hot</span></header>
         <p class="pdesc">The dial that turns “cheaper” into a measured fact and “reliable” into something you can check.</p>
         <ul class="rows">
-          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a></span> Richer claude-code telemetry — tokens + wall-clock <span class="badge-key">core</span></span><span class="prio">p2</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1294">LIN-1294</a></span> OpenCode telemetry parity <span class="note">(unblocked)</span> · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1144">LIN-1144</a></span> tool-level heartbeat</span><span class="prio">p2/0</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1181">LIN-1181</a></span> Track Dash invocations, outcomes, cost</span><span class="prio">p2</span></li>
-          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1334">LIN-1334</a></span> Dispatch sessions in list · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1311">LIN-1311</a></span> transcript migration</span><span class="prio">p0</span></li>
-          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1288">LIN-1288</a>/89</span> truncation fix · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1341">LIN-1341</a></span> continuity · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1163">LIN-1163</a></span> runs layout</span><span class="prio">✓</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a></span> Richer claude-code telemetry — tokens + wall-clock <span class="badge-key">core ✓</span></span><span class="prio">p2 ✓</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1404">LIN-1404</a></span>/<span class="rid">1405</span> OpenCode tool + event relay · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1415">LIN-1415</a></span> transcript formatters <span class="badge-key">frontier</span></span><span class="prio">p0</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1402">LIN-1402</a></span>/<span class="rid">1403</span> OpenCode seam + rootItemId · then <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1406">LIN-1406</a></span> e2e witness (backlog)</span><span class="prio">p0</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1294">LIN-1294</a></span> OpenCode telemetry parity · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1144">LIN-1144</a></span> tool-level heartbeat <span class="note">(backlog)</span></span><span class="prio">p2/0</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1288">LIN-1288</a>/89</span> truncation · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1341">LIN-1341</a></span> continuity · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1163">LIN-1163</a></span> runs layout</span><span class="prio">✓</span></li>
         </ul>
       </div>
       <div class="pillar">
@@ -465,11 +466,11 @@
         <header><h3>Harden — survive unattended</h3><span class="tag">step 4 · the gate</span></header>
         <p class="pdesc">Every bug here is a way an autonomous cheap-model run silently fails. This is the gate before you trust it running alone.</p>
         <ul class="rows">
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a></span> Proxy-token needs creator's live session <span class="badge-bug">hit live 2×</span></span><span class="prio hot">p1</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1409">LIN-1409</a></span> Relax human-gate default → run-to-completion <span class="badge-key">unlocks unattended</span></span><span class="prio">p2</span></li>
           <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1397">LIN-1397</a></span> Stall-failsafe refire · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1360">LIN-1360</a></span> trustworthy session setup</span><span class="prio">p2</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a></span> beat-2 suppression · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1358">LIN-1358</a></span> wedged 195m resume</span><span class="prio">p1</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1323">LIN-1323</a>/1324</span> poll defeats follow-ups · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1395">LIN-1395</a></span> OpenCode credential parity</span><span class="prio">p2</span></li>
-          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1375">LIN-1375</a></span> token-leak ✓ · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1393">LIN-1393</a></span> deploy chain-split ✓</span><span class="prio">✓</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a></span> beat-2 suppression · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1358">LIN-1358</a></span> wedged 195m resume · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1413">LIN-1413</a></span> stale token pin</span><span class="prio">p1/2</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1323">LIN-1323</a>/1324</span> poll defeats follow-ups · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1408">LIN-1408</a></span> credential broker · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1395">LIN-1395</a></span> OpenCode creds</span><span class="prio">p2</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a></span> live-session bug ✓ · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1375">LIN-1375</a></span> token-leak ✓ · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1393">LIN-1393</a></span> chain-split ✓</span><span class="prio">✓</span></li>
         </ul>
       </div>
     </div>
@@ -481,11 +482,14 @@
     <p class="sec-sub">No hard edges remain, so these waves are sequenced by proving-logic, not blockers. Each wave ends at one of the four acceptance tests, so “done” is checkable.</p>
     <div class="waves">
       <div class="wave">
-        <div class="wave-label"><span class="wn">Wave 1 · now</span><span class="wt">Make a run legible</span><span class="wgoal">Pick the models; get spend + time on screen. → test B</span></div>
+        <div class="wave-label"><span class="wn">Wave 1 · now</span><span class="wt">Make a run legible</span><span class="wgoal">Telemetry landed; just pick the models. → test B</span></div>
         <div class="wave-body">
-          <div class="lane"><span class="lane-tag">Start here</span>
-            <span class="tk hot"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a> <span class="tkt">choose models &amp; route</span></span>
-            <span class="tk hot"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a> <span class="tkt">telemetry: tokens + wall-clock</span></span>
+          <div class="lane"><span class="lane-tag">The one gap</span>
+            <span class="tk hot"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a> <span class="tkt">choose which cheap models</span></span>
+          </div>
+          <div class="lane"><span class="lane-tag">Landed</span>
+            <span class="tk"><span class="mini d-done"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a> <span class="tkt">telemetry · done</span></span>
+            <span class="tk"><span class="mini d-done"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1400">LIN-1400</a> <span class="tkt">per-kind routing · done</span></span>
           </div>
         </div>
       </div>
@@ -497,7 +501,7 @@
             <span class="tk"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1236">LIN-1236</a> <span class="tkt">spend audit</span></span>
           </div>
           <div class="lane"><span class="lane-tag">Harden top bugs</span>
-            <span class="tk hot"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a> <span class="tkt">proxy session dep</span></span>
+            <span class="tk"><span class="mini d-done"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a> <span class="tkt">live-session bug · done</span></span>
             <span class="tk"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1397">LIN-1397</a> <span class="tkt">stall-failsafe</span></span>
             <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a> <span class="tkt">beat-2 suppression</span></span>
           </div>
@@ -542,14 +546,14 @@
     <p class="sec-sub">Two moves the fresh read surfaces. Nothing written to Linear — proposals only.</p>
     <div class="reprios">
       <div class="rp">
-        <h4>Promote the step that gates everything</h4>
+        <h4>Now the single gate: choose the models</h4>
         <div class="move"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1129">LIN-1129</a></span> choose models · <b>Todo p2</b> → <span class="to">p1, in progress</span></div>
-        <p>Instrument + supervise are already hot, but they're proving a rollout that hasn't been chosen yet. <b>Picking + routing the cheap models is step 1</b> of the whole loop and it's the one nobody's started.</p>
+        <p>Routing shipped (<span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1400">LIN-1400</a></span>) and telemetry landed (<span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a></span>) — so <b>the only thing between here and a first measured cheap-model run is deciding which models</b>. It's gone from one-of-several to the lone gap. Pull it into progress.</p>
       </div>
       <div class="rp">
-        <h4>Treat Harden as a release gate, not backlog</h4>
-        <div class="move"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a></span> + <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a></span> + <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1358">LIN-1358</a></span> · keep <span class="to">p1, scheduled</span></div>
-        <p>These are the exact failures that make an unattended cheap-model run untrustworthy — and 1373 bit us live twice this session. They're acceptance test D; don't let them drift in backlog while the rollout proceeds.</p>
+        <h4>Keep Harden as a release gate</h4>
+        <div class="move"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a></span> + <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1358">LIN-1358</a></span> + <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1409">LIN-1409</a></span> · keep <span class="to">p1, scheduled</span></div>
+        <p>The worst one (<span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a></span>, which bit us live twice) is now fixed — but beat-2 suppression, wedged-resume, and the run-to-completion default (<span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1409">LIN-1409</a></span>) are still what stands between “supervised demo” and “trust it alone.” Don't let them drift while the rollout proceeds.</p>
       </div>
     </div>
   </section>
