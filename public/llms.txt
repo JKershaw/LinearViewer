@@ -351,7 +351,7 @@ main.flight-companion-page[data-url-key]  - page container
 
 ## Live Console (experimental)
 
-The Live Console page (`/workspace/{urlKey}/live-console`) is an ambient, "lean-back" realtime feed of agent activity merged across ALL connected workspaces. Its spine is the agent-status log (research/implementation/review/close-out steps), shaped by `lib/live-console.js` into an event stream, a set of currently-working "lanes", a tempo sparkline, and fleet totals. Reads Mongo only — no Linear calls and no LLM per poll. Requires the per-user `liveConsole` feature flag; reached via a Settings link and the nav `⋯ more` overflow when on (route redirects to `/settings` when off). Polls every 5s (chained, in-flight-guarded, exponential backoff on failure; pauses while the tab is hidden). Purely presentational — no writes.
+The Live Console page (`/workspace/{urlKey}/live-console`) is an ambient, "lean-back" realtime feed of agent activity merged across ALL connected workspaces. It has TWO sources, shaped by `lib/live-console.js`: the agent-status log (research/implementation/review/close-out steps → the event STREAM) and lean dispatch loops (running loops → currently-working LANES carrying their latest HEARTBEAT — tool count / elapsed / per-tool breakdown — plus `[evidence]` artifacts as linked stream events; heartbeat beats also feed the tempo sparkline so it keeps moving between discrete steps). Reads Mongo only — no Linear calls and no LLM per poll. Requires the per-user `liveConsole` feature flag; reached via a Settings link and the nav `⋯ more` overflow when on (route redirects to `/settings` when off). Polls every 5s (chained, in-flight-guarded, exponential backoff on failure; pauses while the tab is hidden). A "view earlier activity" control pages OLDER status events (before page load) into a history region below the live feed. Purely presentational — no writes.
 
 ### Live Console DOM Structure
 ```
@@ -365,15 +365,20 @@ main.lc-page[data-url-key]                    - page container
   [data-testid="live-console-lanes"]          - "working now" rail (<ul>)
     [data-testid="live-console-lane"]         - one breathing lane per working agent
       a.lc-lane-task[href]                     - links to that workspace's /observation
-  [data-testid="live-console-stream"]         - activity stream (<ol>, newest first)
-    [data-testid="live-console-event"][data-kind]  - one event; data-kind: done|working|blocked|failed|info
+      [data-testid="live-console-heartbeat"]  - live tool-count/elapsed/breakdown tick (empty when none)
+  [data-testid="live-console-stream"]         - live activity stream (<ol>, newest first)
+    [data-testid="live-console-event"][data-kind]  - one event; data-kind: done|working|blocked|failed|evidence|info
       a.lc-event-task[href]                    - links to that workspace's /observation
+      a.lc-event-summary-link[href]            - (evidence only) links to the produced artifact
+  [data-testid="live-console-history"]        - paged-in OLDER events (<ol>, below the live stream)
+  [data-testid="live-console-more"]           - "view earlier activity" pager button
 ```
-- `data-kind` vocabulary: `done` (✓), `working` (◐), `blocked` (◑), `failed` (✗), `info` (·) — colour AND glyph carry the state (never colour alone).
-- New events on later polls get a transient `.lc-event--new` class; lane pulses persist across polls via a keyed reconcile (nodes are updated in place, not rebuilt).
+- `data-kind` vocabulary: `done` (✓), `working` (◐), `blocked` (◑), `failed` (✗), `evidence` (↗), `info` (·) — colour AND glyph carry the state (never colour alone).
+- New events on later polls get a transient `.lc-event--new` class; lane pulses + heartbeat ticks persist across polls via a keyed reconcile (nodes are updated in place, not rebuilt).
 
 ### Live Console Endpoint
-- `GET /workspace/{urlKey}/api/live-console/events` — merged, normalized feed (session-auth; 403 when the flag is off). Returns `{ events:[{id,kind,ts,iso,workspaceUrlKey,workspaceName,task,action,status,summary}], lanes:[{workspaceUrlKey,workspaceName,task,action,summary,sinceMs}], tempo:[n,...], summary:{active,done,failed,blocked,total} }`. Generation-free.
+- `GET /workspace/{urlKey}/api/live-console/events` — merged, normalized live feed (session-auth; 403 when the flag is off). Returns `{ events:[{id,kind,ts,iso,workspaceUrlKey,workspaceName,task,action,status,summary,url}], lanes:[{workspaceUrlKey,workspaceName,task,action,summary,sinceMs,heartbeat:{toolCount,elapsedSeconds,breakdown,total}}], tempo:[n,...], summary:{active,done,failed,blocked,total}, hasMore, oldestTs }`. Generation-free.
+- `GET …/events?before=<epochMs>&limit=<n>` — a HISTORY page: older status events strictly before the cursor. Returns `{ events:[…], hasMore, oldestTs }`.
 
 ## Common Workflows
 

@@ -2,17 +2,18 @@
  * Live Console client (experimental, LIN-1436).
  *
  * The ambient, lean-back view. Polls the generation-free events endpoint and
- * paints three surfaces:
- *   - the status banner + tempo sparkline (the system's rhythm),
- *   - the pulse-lane rail (one breathing lane per currently-working agent),
- *   - the activity stream (newest-first; genuinely-new events animate in).
+ * paints:
+ *   - the status banner + tempo sparkline (the system's rhythm, incl. heartbeats),
+ *   - the pulse-lane rail (one breathing lane per working agent, ticking its
+ *     latest heartbeat — tools/elapsed/breakdown — so long phases still move),
+ *   - the activity stream (status steps + [evidence] artifacts, newest-first),
+ *   - a "view earlier activity" pager that loads OLDER events below the live feed.
  *
  * Built to be left open all day: a KEYED reconcile (not innerHTML replace) keeps
- * lane pulses breathing continuously and never wipes a text selection mid-read;
- * polling is a chained setTimeout with an in-flight guard + exponential backoff,
- * so a slow/down server is never hammered and polls never overlap; the
- * seen-ids set is bounded to the last poll. Cross-workspace chips filter the
- * already-merged feed in place (no refetch).
+ * lane pulses breathing continuously; polling is a chained setTimeout with an
+ * in-flight guard + exponential backoff; the seen-ids set is bounded to the last
+ * poll. Cross-workspace chips filter in place (no refetch). The history region is
+ * append-only and never touched by the live reconcile.
  *
  * Pure presentation — no LLM, no writes. Requires common.js (window.api,
  * window.escapeHtml, window.relativeTime). Loaded only on /live-console.
@@ -27,17 +28,20 @@
 
   const POLL_MS = 5000;
   const MAX_BACKOFF_MS = 60000;
-  const MAX_DOM_EVENTS = 80;   // cap rendered rows (feed itself is capped server-side)
+  const MAX_DOM_EVENTS = 80;   // cap rendered LIVE rows (feed itself is capped server-side)
+  const MAX_HISTORY_ROWS = 300; // cap paged-in history rows
+  const HISTORY_PAGE = 40;
   const TICK_MS = 30000;       // relative-time refresh cadence
   const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Kind → glyph (colour lives in live-console.css via [data-kind]).
   const KIND = {
-    done:    { glyph: '✓' },
-    working: { glyph: '◐' },
-    blocked: { glyph: '◑' },
-    failed:  { glyph: '✗' },
-    info:    { glyph: '·' },
+    done:     { glyph: '✓' },
+    working:  { glyph: '◐' },
+    blocked:  { glyph: '◑' },
+    failed:   { glyph: '✗' },
+    evidence: { glyph: '↗' },
+    info:     { glyph: '·' },
   };
 
   const els = {
@@ -49,14 +53,23 @@
     lanesEmpty: document.getElementById('live-console-lanes-empty'),
     stream: document.getElementById('live-console-stream'),
     streamEmpty: document.getElementById('live-console-stream-empty'),
+    history: document.getElementById('live-console-history'),
+    more: document.getElementById('live-console-more'),
+    moreBtn: document.getElementById('live-console-more-btn'),
   };
 
   // ─── State ────────────────────────────────────────────────────────────────
   const hiddenWorkspaces = new Set();   // urlKeys toggled off (chip filter)
-  let seenEventIds = new Set();         // ids from the LAST poll (bounded; only to detect new arrivals)
+  let seenEventIds = new Set();         // ids from the LAST poll (bounded; detects new arrivals)
   const laneNodes = new Map();          // `${ws}::${task}` → <li>
-  const eventNodes = new Map();         // event id → <li>
-  let lastFeed = null;                  // last successful feed (for in-place re-filter)
+  const eventNodes = new Map();         // live event id → <li>
+  const historyIds = new Set();         // ids paged into the history region
+  let lastFeed = null;                  // last successful live feed (for in-place re-filter)
+  let liveOldestTs = null;              // oldest ts in the live feed (first history cursor)
+  let liveHasMore = false;              // server: more older events exist beyond the live page
+  let historyCursor = null;             // ts cursor for the next history page
+  let historyExhausted = false;         // a history page reported no more older events
+  let historyLoading = false;
   let firstPaint = true;
   let inFlight = false;
   let stopped = false;
@@ -74,6 +87,30 @@
     const t = document.createElement('template');
     t.innerHTML = html.trim();
     return t.content.firstElementChild;
+  }
+
+  function fmtDuration(s) {
+    if (s == null) return '';
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60), r = s % 60;
+    return r ? `${m}m ${r}s` : `${m}m`;
+  }
+  function fmtHeartbeat(hb) {
+    if (!hb) return '';
+    const bits = [];
+    const n = hb.total != null ? hb.total : hb.toolCount;
+    if (n != null) bits.push(`${n} tool${n === 1 ? '' : 's'}`);
+    if (hb.elapsedSeconds != null) bits.push(fmtDuration(hb.elapsedSeconds));
+    if (hb.breakdown) {
+      const top = Object.keys(hb.breakdown)
+        .map(k => [k, hb.breakdown[k]])
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([k, v]) => `${k}×${v}`)
+        .join(' ');
+      if (top) bits.push(top);
+    }
+    return bits.join(' · ');
   }
 
   // ─── Skeleton (first-paint) ─────────────────────────────────────────────────
@@ -108,8 +145,8 @@
         const on = !hiddenWorkspaces.has(k);
         btn.setAttribute('aria-pressed', String(on));
         btn.classList.toggle('lc-chip--off', !on);
-        // Re-render in place from the cached feed — no refetch, no re-animation.
         if (lastFeed) applyFeed(lastFeed, false);
+        filterHistory();
       });
     });
   }
@@ -132,16 +169,13 @@
       els.dot.classList.toggle('lc-status-dot--pulse', health === 'live' && !REDUCED_MOTION);
     }
   }
-
   function paintDisconnected() {
     if (els.dot) {
       els.dot.setAttribute('data-health', 'idle');
       els.dot.classList.remove('lc-status-dot--pulse');
     }
     if (els.status) {
-      els.status.textContent = firstPaint
-        ? 'could not reach the feed — retrying…'
-        : 'reconnecting to the feed…';
+      els.status.textContent = firstPaint ? 'could not reach the feed — retrying…' : 'reconnecting to the feed…';
     }
   }
 
@@ -152,18 +186,15 @@
       return v || fallback;
     } catch (e) { return fallback; }
   }
-
   function paintTempo(tempo) {
     const canvas = els.tempo;
     if (!canvas || !canvas.getContext) return;
     const arr = Array.isArray(tempo) ? tempo : [];
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
-    const cssW = canvas.width;   // attribute px = logical CSS px
-    const cssH = canvas.height;
-    // Scale the backing store for crisp HiDPI rendering; guard against re-scaling.
-    const wantW = Math.round(cssW * dpr);
-    const wantH = Math.round(cssH * dpr);
+    const cssW = parseInt(canvas.getAttribute('width'), 10) || 160;
+    const cssH = parseInt(canvas.getAttribute('height'), 10) || 28;
+    const wantW = Math.round(cssW * dpr), wantH = Math.round(cssH * dpr);
     if (canvas.width !== wantW || canvas.height !== wantH) {
       canvas.style.width = cssW + 'px';
       canvas.style.height = cssH + 'px';
@@ -173,7 +204,6 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
     if (!arr.length) return;
-
     const max = Math.max(1, ...arr);
     const barW = cssW / arr.length;
     const amber = cssVar('--amber', '#c58a00');
@@ -193,9 +223,12 @@
     const shimmer = REDUCED_MOTION ? '' : ' lc-lane--pulse';
     const li = nodeFromHtml(`<li class="lc-lane${shimmer}" data-testid="live-console-lane">
         <span class="lc-lane-bar" aria-hidden="true"></span>
-        <a class="lc-lane-task" href="${esc(obsHref(lane.workspaceUrlKey))}"></a>
-        <span class="lc-lane-action"></span>
-        <span class="lc-lane-summary"></span>
+        <a class="lc-lane-task" href="#"></a>
+        <span class="lc-lane-mid">
+          <span class="lc-lane-action"></span>
+          <span class="lc-lane-hb" data-testid="live-console-heartbeat"></span>
+          <span class="lc-lane-summary"></span>
+        </span>
         <span class="lc-lane-ws"></span>
       </li>`);
     updateLaneNode(li, lane);
@@ -207,12 +240,12 @@
     task.setAttribute('href', obsHref(lane.workspaceUrlKey));
     task.setAttribute('title', `open ${lane.workspaceName || lane.workspaceUrlKey} in Observation`);
     li.querySelector('.lc-lane-action').textContent = lane.action || 'working';
+    li.querySelector('.lc-lane-hb').textContent = fmtHeartbeat(lane.heartbeat); // live tick
     const sum = li.querySelector('.lc-lane-summary');
     sum.textContent = lane.summary || '';
     sum.setAttribute('title', lane.summary || '');
     li.querySelector('.lc-lane-ws').textContent = lane.workspaceName || lane.workspaceUrlKey || '';
   }
-
   function paintLanes(lanes) {
     if (!els.lanes) return;
     const visible = (Array.isArray(lanes) ? lanes : []).filter(l => l.task && isVisibleWs(l.workspaceUrlKey));
@@ -233,7 +266,7 @@
     if (els.lanesEmpty) els.lanesEmpty.hidden = visible.length > 0;
   }
 
-  // ─── Stream (events are immutable; insert new, trim, keep continuity) ────────
+  // ─── Events (immutable; insert new, trim, keep continuity) ──────────────────
   function eventNode(ev, isNew) {
     const k = kindOf(ev.kind);
     const cls = 'lc-event' + (isNew && !REDUCED_MOTION ? ' lc-event--new' : '');
@@ -241,7 +274,12 @@
       ? `<a class="lc-event-task" href="${esc(obsHref(ev.workspaceUrlKey))}" title="open ${esc(ev.workspaceName || ev.workspaceUrlKey)} in Observation">${esc(ev.task)}</a>`
       : '';
     const action = ev.action ? `<span class="lc-event-action">${esc(ev.action)}</span>` : '';
-    const summary = ev.summary ? `<span class="lc-event-summary" title="${esc(ev.summary)}">${esc(ev.summary)}</span>` : '';
+    // Evidence summaries link to the artifact itself; others are plain text.
+    const summary = ev.summary
+      ? (ev.kind === 'evidence' && ev.url
+          ? `<a class="lc-event-summary lc-event-summary-link" href="${esc(ev.url)}" target="_blank" rel="noopener" title="${esc(ev.summary)}">${esc(ev.summary)}</a>`
+          : `<span class="lc-event-summary" title="${esc(ev.summary)}">${esc(ev.summary)}</span>`)
+      : '';
     const ws = `<span class="lc-event-ws">${esc(ev.workspaceName || ev.workspaceUrlKey || '')}</span>`;
     const when = `<span class="lc-event-time" data-iso="${esc(ev.iso)}">${esc(rel(ev.iso))}</span>`;
     return nodeFromHtml(`<li class="${cls}" data-kind="${esc(ev.kind)}" data-testid="live-console-event">
@@ -268,26 +306,87 @@
       if (node !== target) els.stream.insertBefore(node, target);
       prev = node;
     }
-    if (els.streamEmpty) els.streamEmpty.hidden = visible.length > 0;
+    if (els.streamEmpty) els.streamEmpty.hidden = visible.length > 0 || eventNodes.size > 0;
   }
 
-  // Re-tick relative times in place (no re-render) so "just now" ages honestly.
   function retickTimes() {
     document.querySelectorAll('.lc-event-time[data-iso]').forEach(el => {
       el.textContent = rel(el.getAttribute('data-iso'));
     });
   }
 
-  // ─── Apply a feed (shared by poll + chip re-filter) ─────────────────────────
+  // ─── History (view more) ────────────────────────────────────────────────────
+  function updateMoreButton() {
+    if (!els.more) return;
+    // Offer "view earlier" whenever there is anything on screen and we have not
+    // paged all the way to the history floor — older events beyond the live
+    // window aren't known until we ask, so the affordance stays available.
+    const hasAnything = eventNodes.size > 0 || historyIds.size > 0;
+    els.more.hidden = !(hasAnything && !historyExhausted);
+    if (els.moreBtn) {
+      els.moreBtn.disabled = historyLoading;
+      els.moreBtn.textContent = historyLoading ? 'loading…' : 'view earlier activity ↓';
+    }
+  }
+  function filterHistory() {
+    if (!els.history) return;
+    els.history.querySelectorAll('[data-ws]').forEach(li => {
+      li.hidden = !isVisibleWs(li.getAttribute('data-ws'));
+    });
+  }
+  function appendHistory(events) {
+    if (!els.history) return;
+    for (const ev of events) {
+      if (historyIds.has(ev.id) || eventNodes.has(ev.id)) continue; // dedup vs history + live
+      historyIds.add(ev.id);
+      const node = eventNode(ev, false);
+      node.classList.add('lc-event--history');
+      node.setAttribute('data-ws', ev.workspaceUrlKey || '');
+      node.hidden = !isVisibleWs(ev.workspaceUrlKey);
+      els.history.appendChild(node);
+    }
+    // Trim the oldest history rows if the region grows too large.
+    while (els.history.children.length > MAX_HISTORY_ROWS) {
+      const first = els.history.firstElementChild;
+      if (!first) break;
+      els.history.removeChild(first);
+    }
+  }
+  async function loadMore() {
+    if (historyLoading) return;
+    const cursor = historyCursor != null ? historyCursor : liveOldestTs;
+    if (cursor == null) return;
+    historyLoading = true;
+    updateMoreButton();
+    try {
+      const res = await window.api(
+        `/workspace/${encodeURIComponent(urlKey)}/api/live-console/events?before=${encodeURIComponent(cursor)}&limit=${HISTORY_PAGE}`,
+        { on401: '/logout' }
+      );
+      appendHistory(Array.isArray(res.events) ? res.events : []);
+      historyCursor = res.oldestTs != null ? res.oldestTs : historyCursor;
+      if (!res.hasMore) historyExhausted = true;
+    } catch (err) {
+      if (els.moreBtn) els.moreBtn.textContent = 'could not load — try again';
+    } finally {
+      historyLoading = false;
+      updateMoreButton();
+    }
+  }
+
+  // ─── Apply a live feed (shared by poll + chip re-filter) ────────────────────
   function applyFeed(feed, animate) {
     if (firstPaint) { clearSkeleton(); firstPaint = false; }
     const events = Array.isArray(feed.events) ? feed.events : [];
     const newIds = new Set(animate ? events.filter(e => !seenEventIds.has(e.id)).map(e => e.id) : []);
-    seenEventIds = new Set(events.map(e => e.id)); // bounded to this poll
+    seenEventIds = new Set(events.map(e => e.id));
+    liveOldestTs = feed.oldestTs != null ? feed.oldestTs : liveOldestTs;
+    liveHasMore = !!feed.hasMore;
     paintBanner(feed.summary);
     paintTempo(feed.tempo);
     paintLanes(feed.lanes);
     paintStream(events, newIds);
+    updateMoreButton();
   }
 
   // ─── Poll loop (chained, in-flight-guarded, backoff) ────────────────────────
@@ -300,7 +399,7 @@
       lastFeed = feed;
       applyFeed(feed, true);
     } catch (err) {
-      if (err && err.status === 401) return; // window.api already redirected
+      if (err && err.status === 401) return;
       failures += 1;
       paintDisconnected();
     } finally {
@@ -308,15 +407,11 @@
       if (!stopped) schedule();
     }
   }
-
   function schedule() {
     clearTimeout(pollTimer);
-    const delay = failures > 0
-      ? Math.min(POLL_MS * Math.pow(2, failures - 1), MAX_BACKOFF_MS)
-      : POLL_MS;
+    const delay = failures > 0 ? Math.min(POLL_MS * Math.pow(2, failures - 1), MAX_BACKOFF_MS) : POLL_MS;
     pollTimer = setTimeout(poll, delay);
   }
-
   function start() {
     stopped = false;
     poll();
@@ -329,13 +424,12 @@
     clearInterval(tickTimer);
   }
 
-  // Pause polling while the tab is hidden (an ambient view left open all day
-  // shouldn't hammer the server in the background); resume + refresh on return.
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stop();
     else start();
   });
 
+  if (els.moreBtn) els.moreBtn.addEventListener('click', loadMore);
   buildChips();
   renderSkeleton();
   start();

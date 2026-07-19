@@ -61,6 +61,8 @@ test.describe('Live Console (experimental)', () => {
   test.describe('Page Structure', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      // The dev store persists across runs; start these structure tests clean.
+      await page.request.get(`/test/clear-agent-status?urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -105,6 +107,78 @@ test.describe('Live Console (experimental)', () => {
       // The event task links through to that workspace's Observation page.
       const link = page.locator('.lc-event-task', { hasText: 'LIN-778' });
       await expect(link).toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);
+    });
+
+    test('a running worker becomes a heartbeat lane and its [evidence] a stream event', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await page.request.get(`/test/clear-agent-status?urlKey=${URL_KEY}`);
+      await page.request.get(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+      await page.request.get(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
+
+      // Dispatch a worker, claim it (→ agentState 'running'), then post a rich
+      // heartbeat + an [evidence] marker through the real consumer flow.
+      const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+        data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-950', issueTitle: 'Heartbeat worker', target: 'cli' },
+      });
+      expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+      const workerId = (await worker.json()).item.id;
+      const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`)).json();
+      await page.request.post(`/api/dispatch/take/${workerId}`, { headers: { Authorization: `Bearer ${token}` } });
+      await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        data: { message: '[working] 12 tools in 8m 11s: Bash×7, Read×5 · 15 total' },
+      });
+      await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        data: { message: '[evidence] PR opened', url: 'https://github.com/x/y/pull/9', urlLabel: 'PR #9' },
+      });
+
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-lane"]');
+
+      // The lane carries a live heartbeat metric derived from the [working] beat.
+      const hb = page.locator('[data-testid="live-console-heartbeat"]').first();
+      await expect(hb).toContainText('tools');
+      await expect(hb).toContainText('Bash×7');
+
+      // The [evidence] marker surfaces as an evidence event linking to the artifact.
+      const evidence = page.locator('[data-testid="live-console-event"][data-kind="evidence"]').first();
+      await expect(evidence).toBeVisible();
+      await expect(evidence.locator('a.lc-event-summary-link')).toHaveAttribute('href', 'https://github.com/x/y/pull/9');
+    });
+
+    test('"view earlier activity" pages older events into the history region', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await page.request.get(`/test/clear-agent-status?urlKey=${URL_KEY}`);
+
+      // Two RECENT events (live window) + two OLD ones (hours ago) that only the
+      // history pager should reach. Deterministic timestamps via the test seam.
+      const now = Date.now();
+      const min = 60 * 1000;
+      const seed = (id, agoMin) => page.request.post('/test/seed-agent-status', {
+        data: { urlKey: URL_KEY, taskIdentifier: id, action: 'implementation', status: 'completed', summary: `work on ${id}`, timestamp: new Date(now - agoMin * min).toISOString() },
+      });
+      await seed('LIN-100', 1);
+      await seed('LIN-101', 2);
+      await seed('LIN-200', 30 * 60); // 30h ago — beyond the 24h live window
+      await seed('LIN-201', 40 * 60); // 40h ago — history-only
+
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-event"]');
+
+      // History endpoint returns the OLDER events strictly before a cursor.
+      const res = await page.request.get(`${EVENTS_API}?before=${now - 60 * min}&limit=10`);
+      const body = await res.json();
+      const ids = body.events.map(e => e.task);
+      expect(ids).toContain('LIN-200');
+      expect(ids).toContain('LIN-201');
+
+      // And the client's "view earlier activity" control drives the same path.
+      const moreBtn = page.locator('[data-testid="live-console-more"]');
+      if (await moreBtn.isVisible()) {
+        await moreBtn.click();
+        await expect(page.locator('#live-console-history [data-testid="live-console-event"]').first()).toBeVisible();
+      }
     });
   });
 

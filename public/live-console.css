@@ -119,7 +119,7 @@
 .lc-lane {
   position: relative;
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  grid-template-columns: auto 1fr auto;
   align-items: baseline;
   gap: 0.5rem;
   padding: 0.5rem 0.7rem 0.5rem 0.9rem;
@@ -128,6 +128,21 @@
   background: var(--card);
   overflow: hidden;
 }
+.lc-lane-mid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+}
+/* The live heartbeat tick — tools/elapsed/breakdown, updated every poll. */
+.lc-lane-hb {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  color: var(--amber-dim);
+  white-space: nowrap;
+}
+.lc-lane-hb:empty { display: none; }
 
 /* The breathing "alive" bar down the left edge of a working lane. */
 .lc-lane-bar {
@@ -188,10 +203,11 @@
   line-height: 1.3;
   color: var(--slate);
 }
-.lc-event[data-kind="done"]    .lc-event-glyph { color: var(--green); }
-.lc-event[data-kind="working"] .lc-event-glyph { color: var(--amber); }
-.lc-event[data-kind="blocked"] .lc-event-glyph { color: var(--slate); }
-.lc-event[data-kind="failed"]  .lc-event-glyph { color: var(--red); }
+.lc-event[data-kind="done"]     .lc-event-glyph { color: var(--green); }
+.lc-event[data-kind="working"]  .lc-event-glyph { color: var(--amber); }
+.lc-event[data-kind="blocked"]  .lc-event-glyph { color: var(--slate); }
+.lc-event[data-kind="failed"]   .lc-event-glyph { color: var(--red); }
+.lc-event[data-kind="evidence"] .lc-event-glyph { color: var(--brand); }
 
 .lc-event-body { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; min-width: 0; }
 .lc-event-task {
@@ -218,6 +234,8 @@
   overflow: hidden;
 }
 .lc-event[data-kind="failed"] .lc-event-summary { color: var(--red-dim); }
+.lc-event-summary-link { color: var(--brand-dim); text-decoration: none; }
+.lc-event-summary-link:hover { text-decoration: underline; }
 
 .lc-event-meta { display: flex; gap: 0.5rem; white-space: nowrap; }
 .lc-event-ws {
@@ -230,6 +248,25 @@
   font-size: 0.7rem;
   color: var(--muted);
 }
+
+/* History region (paged-in older events) reads as slightly recessed. */
+.lc-history { opacity: 0.82; }
+.lc-event--history { border-bottom-style: dashed; }
+
+/* View-more affordance. */
+.lc-more { display: flex; justify-content: center; padding: 0.6rem 0; }
+.lc-more-btn {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+}
+.lc-more-btn:hover:not(:disabled) { color: var(--text); background: var(--card-h); }
+.lc-more-btn:disabled { opacity: 0.6; cursor: default; }
 
 /* New-arrival animation: slide + fade in from the top. */
 .lc-event--new { animation: lc-arrive 0.55s ease-out; }
@@ -249,7 +286,7 @@
 
 @media (max-width: 560px) {
   .lc-lane { grid-template-columns: auto 1fr; }
-  .lc-lane-action, .lc-lane-ws { display: none; }
+  .lc-lane-ws { display: none; }
   .lc-event { grid-template-columns: auto 1fr; }
   .lc-event-meta { grid-column: 2; }
 }

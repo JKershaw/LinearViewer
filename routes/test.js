@@ -552,7 +552,9 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         taskIdentifier: body.taskIdentifier || 'TEST-1',
         action: body.action || 'implement',
         status: body.status || 'completed',
-        summary: body.summary || 'Shipped the change and verified it against CI.'
+        summary: body.summary || 'Shipped the change and verified it against CI.',
+        // Optional: let tests control the timestamp for deterministic ordering/paging.
+        timestamp: body.timestamp
       })
       res.send('ok')
     } catch (err) {

@@ -5,11 +5,15 @@
  * Anchored at /workspace/:urlKey/live-console (reusing workspaceFromUrl + the
  * experimental feature-gate-redirect-to-settings pattern shared by
  * collective/task-chat/next-run). The page is a provider-free shell; the client
- * polls a generation-free events endpoint that merges the agent-status feed
- * across every connected workspace and shapes it via lib/live-console.js.
+ * polls a generation-free events endpoint that merges, across every connected
+ * workspace:
+ *   - the agent-status log → the discrete step stream, and
+ *   - lean dispatch loops  → currently-working lanes (with live heartbeats) plus
+ *     [evidence] artifacts as stream events; heartbeat beats also feed the tempo.
  *
  *   GET /workspace/:urlKey/live-console            — page shell (gated)
- *   GET /workspace/:urlKey/api/live-console/events — merged, normalized feed (JSON)
+ *   GET /workspace/:urlKey/api/live-console/events — merged feed (JSON)
+ *       ?before=<epochMs>&limit=<n>  → a history PAGE (older status events only)
  *
  * Cost contract (mirrors Observation): the poll spends NO LLM call — it is pure
  * Mongo reads + a deterministic transform.
@@ -19,46 +23,65 @@ import { Router } from 'express';
 import { renderLiveConsolePage } from '../lib/render-live-console.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { buildConsoleFeed } from '../lib/live-console.js';
+import { buildConsoleFeed, DEFAULT_PAGE_SIZE } from '../lib/live-console.js';
+import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
 
-// Bound the read window so peak memory tracks recent activity, not the full
-// 30-day agent-status retention (mirrors the observation feed's windowing).
-const FEED_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h
-// Also cap the per-workspace row count so the read is bounded at the store/DB
-// layer, not merged-then-sliced in memory (review R4). Comfortably exceeds the
-// tempo window + the DEFAULT_MAX_EVENTS stream cap, so nothing visible is lost.
+// Live window: peak memory tracks recent activity, not the 30-day retention.
+const FEED_WINDOW_MS = 24 * 60 * 60 * 1000;      // 24h
+// History (view-more) reaches further back, still bounded.
+const HISTORY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7d
+// Per-workspace row cap so the read is bounded at the store/DB layer.
 const FEED_PER_WORKSPACE_LIMIT = 300;
+const HISTORY_PER_WORKSPACE_LIMIT = 500;
+const MAX_HISTORY_PAGE = 100;
 
 /**
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl - middleware: session + req.workspace
  * @param {Object}   deps.agentStatusStore - agent status store (listStatus)
+ * @param {Object}   deps.dispatchQueueStore - dispatch store (loops → lanes/heartbeats/evidence)
  * @param {Function} deps.getOpenRouterSource - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo - () → deploy metadata
  * @returns {Router}
  */
-export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, getOpenRouterSource, getDeployInfo }) {
+export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, dispatchQueueStore, getOpenRouterSource, getDeployInfo }) {
   const router = Router();
+
+  function connectedWorkspaces(req, workspace) {
+    const workspaces = (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }));
+    if (!workspaces.some(w => w.urlKey === workspace.urlKey)) {
+      workspaces.push({ urlKey: workspace.urlKey, name: workspace.name || workspace.urlKey });
+    }
+    return workspaces;
+  }
+
+  // Merge one read across every workspace; per-workspace failures degrade to []
+  // for that workspace so one bad store never blanks the whole feed.
+  async function mergeAcross(workspaces, readOne, label) {
+    const settled = await Promise.allSettled(workspaces.map(readOne));
+    const merged = [];
+    for (const r of settled) {
+      if (r.status === 'fulfilled') merged.push(...r.value);
+      else console.error(`Live console: ${label} read failed for a workspace:`, r.reason?.message);
+    }
+    return merged;
+  }
 
   // ─── HTML page ────────────────────────────────────────────────────────────
   router.get('/workspace/:urlKey/live-console', workspaceFromUrl, (req, res) => {
     const workspace = req.workspace;
     const featureFlags = getFeatureFlags(req.session);
-
-    // Gate: experimental feature must be enabled (mirrors collective/next-run).
     if (featureFlags.liveConsole !== true) {
       return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
     }
-
     try {
-      const html = renderLiveConsolePage({
+      res.send(renderLiveConsolePage({
         deployInfo: getDeployInfo(),
         urlKey: workspace.urlKey,
         openRouterSource: getOpenRouterSource(req),
         workspaces: req.session.workspaces,
         featureFlags,
-      });
-      res.send(html);
+      }));
     } catch (error) {
       console.error('Live console page error:', error);
       res.status(500).send(renderErrorPage('Something Went Wrong', 'Could not load the Live Console. Please try again.', {
@@ -68,7 +91,7 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, ge
     }
   });
 
-  // ─── Events endpoint (generation-free poll source) ──────────────────────────
+  // ─── Events endpoint (generation-free poll source + history pages) ──────────
   router.get('/workspace/:urlKey/api/live-console/events', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const featureFlags = getFeatureFlags(req.session);
@@ -76,36 +99,46 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, ge
       return res.status(403).json({ error: 'Live console feature is not enabled' });
     }
 
-    const workspaces = (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }));
-    // Anchor workspace is always in scope even if the session list is thin (e.g.
-    // a PAT-mode single-workspace session).
-    if (!workspaces.some(w => w.urlKey === workspace.urlKey)) {
-      workspaces.push({ urlKey: workspace.urlKey, name: workspace.name || workspace.urlKey });
+    const workspaces = connectedWorkspaces(req, workspace);
+    const now = Date.now();
+    const beforeRaw = Number(req.query.before);
+    const before = Number.isFinite(beforeRaw) && beforeRaw > 0 ? beforeRaw : null;
+
+    try {
+      if (before) {
+        // ── History page: older STATUS events only (cheap; no loops read). ──
+        const pageSize = Math.min(Math.max(1, Number(req.query.limit) || 40), MAX_HISTORY_PAGE);
+        const since = new Date(now - HISTORY_WINDOW_MS);
+        const statusItems = await mergeAcross(workspaces, async (ws) => {
+          const { items } = await agentStatusStore.listStatus(ws.urlKey, { since, limit: HISTORY_PER_WORKSPACE_LIMIT });
+          return (items || []).map(item => ({ ...item, workspaceUrlKey: ws.urlKey, workspaceName: ws.name || ws.urlKey }));
+        }, 'status(history)');
+
+        const feed = buildConsoleFeed({ statusItems, loops: [] }, { now, before, pageSize });
+        return res.json({ events: feed.events, hasMore: feed.hasMore, oldestTs: feed.oldestTs });
+      }
+
+      // ── Live poll: status stream + loops (lanes/heartbeats/evidence/tempo). ──
+      const since = new Date(now - FEED_WINDOW_MS);
+      const [statusItems, loops] = await Promise.all([
+        mergeAcross(workspaces, async (ws) => {
+          const { items } = await agentStatusStore.listStatus(ws.urlKey, { since, limit: FEED_PER_WORKSPACE_LIMIT });
+          return (items || []).map(item => ({ ...item, workspaceUrlKey: ws.urlKey, workspaceName: ws.name || ws.urlKey }));
+        }, 'status'),
+        dispatchQueueStore
+          ? mergeAcross(workspaces, async (ws) => {
+              const wsLoops = await getLoopsForWorkspace(ws.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: true });
+              return (wsLoops || []).map(lp => ({ ...lp, workspaceUrlKey: ws.urlKey, workspaceName: ws.name || ws.urlKey }));
+            }, 'loops')
+          : Promise.resolve([]),
+      ]);
+
+      const feed = buildConsoleFeed({ statusItems, loops }, { now, pageSize: DEFAULT_PAGE_SIZE });
+      res.json(feed);
+    } catch (error) {
+      console.error('Live console events error:', error);
+      res.status(500).json({ error: 'Failed to load the live feed' });
     }
-
-    const since = new Date(Date.now() - FEED_WINDOW_MS);
-
-    // Per-workspace reads degrade independently: one bad store never blanks the
-    // whole feed (mirrors mergeLoops).
-    const settled = await Promise.allSettled(
-      workspaces.map(async (ws) => {
-        const { items } = await agentStatusStore.listStatus(ws.urlKey, { since, limit: FEED_PER_WORKSPACE_LIMIT });
-        return (items || []).map(item => ({
-          ...item,
-          workspaceUrlKey: ws.urlKey,
-          workspaceName: ws.name || ws.urlKey,
-        }));
-      })
-    );
-
-    const merged = [];
-    for (const r of settled) {
-      if (r.status === 'fulfilled') merged.push(...r.value);
-      else console.error('Live console: status read failed for a workspace:', r.reason?.message);
-    }
-
-    const feed = buildConsoleFeed(merged, { now: Date.now() });
-    res.json(feed);
   });
 
   return router;

@@ -24,8 +24,36 @@ import assert from 'node:assert/strict';
 import {
   normalizeStatusEvent,
   buildConsoleFeed,
+  normalizeEvidenceEvents,
+  deriveLoopLanes,
   SUMMARY_MAX,
 } from '../../lib/live-console.js';
+
+// A lean loop record, shaped like getLoopsForWorkspace(lean) output after the
+// route folds in { workspaceUrlKey, workspaceName }.
+function loop(over = {}) {
+  return {
+    loopId: 'loop-1',
+    issueIdentifier: 'LIN-9',
+    agentState: 'running',
+    agentAction: 'implementation',
+    agentSummary: 'editing lib/foo.js',
+    dispatchedAt: '2026-07-19T11:50:00.000Z',
+    agentTimestamp: '2026-07-19T11:59:00.000Z',
+    terminalStatus: undefined,
+    workspaceUrlKey: 'acme',
+    workspaceName: 'Acme',
+    telemetry: {
+      runtime: { ms: null },
+      metrics: [
+        { toolCount: 3, elapsedSeconds: 40, breakdown: { Bash: 2, Read: 1 }, total: 3, timestamp: '2026-07-19T11:55:00.000Z' },
+        { toolCount: 12, elapsedSeconds: 540, breakdown: { Bash: 7, Read: 5 }, total: 15, timestamp: '2026-07-19T11:59:00.000Z' },
+      ],
+      producedArtifacts: [],
+    },
+    ...over,
+  };
+}
 
 // A workspace-tagged agent-status entry, shaped like the store's listStatus items
 // after the route folds in { workspaceUrlKey, workspaceName }.
@@ -146,6 +174,93 @@ test('tempo buckets count events oldest→newest over the window', () => {
 });
 
 // ─── buildConsoleFeed: summary (fleet totals) ─────────────────────────────────
+
+// ─── heartbeats: loop-based lanes ─────────────────────────────────────────────
+
+test('deriveLoopLanes surfaces running loops with their latest heartbeat', () => {
+  const lanes = deriveLoopLanes([loop()]);
+  assert.equal(lanes.length, 1);
+  const l = lanes[0];
+  assert.equal(l.task, 'LIN-9');
+  assert.equal(l.workspaceUrlKey, 'acme');
+  // Latest heartbeat (last metric) carried for the live tick.
+  assert.equal(l.heartbeat.toolCount, 12);
+  assert.equal(l.heartbeat.total, 15);
+  assert.deepEqual(l.heartbeat.breakdown, { Bash: 7, Read: 5 });
+});
+
+test('deriveLoopLanes excludes terminal / non-running loops', () => {
+  assert.equal(deriveLoopLanes([loop({ agentState: 'complete' })]).length, 0);
+  assert.equal(deriveLoopLanes([loop({ agentState: 'error' })]).length, 0);
+  assert.equal(deriveLoopLanes([loop({ agentState: 'queued' })]).length, 0);
+  // A terminal marker overrides a stale 'running' agentState.
+  assert.equal(deriveLoopLanes([loop({ agentState: 'running', terminalStatus: 'done' })]).length, 0);
+});
+
+test('buildConsoleFeed lanes come from running loops (with heartbeat), preferred over status lanes', () => {
+  const items = [
+    // status says LIN-9 working, but the loop carries the richer heartbeat.
+    statusItem({ id: 's1', taskIdentifier: 'LIN-9', status: 'in_progress', timestamp: '2026-07-19T11:52:00Z' }),
+    // a working task with NO loop → still a lane via the status fallback.
+    statusItem({ id: 's2', taskIdentifier: 'LIN-5', status: 'in_progress', timestamp: '2026-07-19T11:58:00Z' }),
+  ];
+  const { lanes } = buildConsoleFeed({ statusItems: items, loops: [loop()] }, { now: Date.parse('2026-07-19T12:00:00Z') });
+  const byTask = Object.fromEntries(lanes.map(l => [l.task, l]));
+  assert.ok(byTask['LIN-9'].heartbeat, 'loop lane carries heartbeat');
+  assert.ok(byTask['LIN-5'], 'status-only working task still becomes a lane');
+  assert.equal(byTask['LIN-5'].heartbeat, undefined);
+});
+
+// ─── evidence events from [evidence] artifacts ────────────────────────────────
+
+test('normalizeEvidenceEvents turns produced artifacts into linked evidence events', () => {
+  const evLoop = loop({
+    telemetry: { metrics: [], producedArtifacts: [
+      { url: 'https://github.com/x/y/pull/9', label: 'PR #9', mentions: 2, timestamp: '2026-07-19T11:57:00.000Z' },
+    ] },
+  });
+  const evs = normalizeEvidenceEvents([evLoop]);
+  assert.equal(evs.length, 1);
+  assert.equal(evs[0].kind, 'evidence');
+  assert.equal(evs[0].url, 'https://github.com/x/y/pull/9');
+  assert.equal(evs[0].task, 'LIN-9');
+  assert.equal(evs[0].workspaceUrlKey, 'acme');
+  assert.equal(evs[0].ts, new Date('2026-07-19T11:57:00.000Z').getTime());
+});
+
+test('buildConsoleFeed merges evidence into the event stream, newest-first', () => {
+  const evLoop = loop({
+    telemetry: { metrics: [], producedArtifacts: [
+      { url: 'https://x/pr/1', label: 'PR #1', timestamp: '2026-07-19T11:58:30.000Z' },
+    ] },
+  });
+  const items = [statusItem({ id: 's1', timestamp: '2026-07-19T11:58:00Z' })];
+  const { events } = buildConsoleFeed({ statusItems: items, loops: [evLoop] }, { now: Date.parse('2026-07-19T12:00:00Z') });
+  assert.equal(events[0].kind, 'evidence'); // 11:58:30 newer than the 11:58:00 status
+  assert.equal(events[1].id, 's1');
+});
+
+// ─── pagination (view more) ───────────────────────────────────────────────────
+
+test('buildConsoleFeed paginates with pageSize + a before cursor', () => {
+  const mk = (id, min) => statusItem({ id, timestamp: `2026-07-19T12:${String(min).padStart(2, '0')}:00Z` });
+  const items = [mk('a', 5), mk('b', 4), mk('c', 3), mk('d', 2), mk('e', 1)];
+  const now = Date.parse('2026-07-19T12:10:00Z');
+
+  const first = buildConsoleFeed({ statusItems: items, loops: [] }, { now, pageSize: 2 });
+  assert.deepEqual(first.events.map(e => e.id), ['a', 'b']); // newest 2
+  assert.equal(first.hasMore, true);
+  assert.equal(first.oldestTs, first.events[1].ts);
+
+  // Next page: everything strictly older than the cursor.
+  const second = buildConsoleFeed({ statusItems: items, loops: [] }, { now, pageSize: 2, before: first.oldestTs });
+  assert.deepEqual(second.events.map(e => e.id), ['c', 'd']);
+  assert.equal(second.hasMore, true);
+
+  const third = buildConsoleFeed({ statusItems: items, loops: [] }, { now, pageSize: 2, before: second.oldestTs });
+  assert.deepEqual(third.events.map(e => e.id), ['e']);
+  assert.equal(third.hasMore, false);
+});
 
 test('summary counts kinds; active = number of working lanes', () => {
   const items = [

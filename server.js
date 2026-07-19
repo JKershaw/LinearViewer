@@ -1339,7 +1339,7 @@ app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferen
 app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
 
 // Mount live-console routes (experimental ambient "watch the swarm" feed — LIN-1436).
-app.use(createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, getOpenRouterSource, getDeployInfo }))
+app.use(createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, dispatchQueueStore, getOpenRouterSource, getDeployInfo }))
 
 // The Ship's Biscuit (experimental, LIN-818): flag-gated LLM-set newspaper — a
 // deterministic edition model over the wired event stores + one editor-in-chief
