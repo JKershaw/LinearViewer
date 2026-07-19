@@ -359,7 +359,11 @@ main.lc-page[data-url-key]                    - page container
   [data-testid="live-console-banner"]         - status banner
     #live-console-dot[data-health]            - health dot (live|done|error|idle)
     #live-console-status[aria-live=polite]    - one-line fleet status / connection state
-    #live-console-tempo                       - tempo sparkline <canvas> (event rate, last 20 min)
+  .lc-pulse > #live-console-tempo             - full-width flowing activity strip <canvas>: scrolls
+                                                right→left in real time (now = right edge); a soft
+                                                heartbeat "hum" area under colour-coded event blips
+                                                that drift left and fade. rAF-animated, reduced-motion
+                                                aware (static snapshot instead of scrolling)
   [data-testid="live-console-chips"]          - workspace filter chips (hidden when <2 workspaces)
     .lc-chip[data-ws][aria-pressed]           - one toggle per workspace (.lc-chip--off when filtered out)
   [data-testid="live-console-lanes"]          - "working now" rail (<ul>)
@@ -377,7 +381,7 @@ main.lc-page[data-url-key]                    - page container
 - New events on later polls get a transient `.lc-event--new` class; lane pulses + heartbeat ticks persist across polls via a keyed reconcile (nodes are updated in place, not rebuilt).
 
 ### Live Console Endpoint
-- `GET /workspace/{urlKey}/api/live-console/events` — merged, normalized live feed (session-auth; 403 when the flag is off). Returns `{ events:[{id,kind,ts,iso,workspaceUrlKey,workspaceName,task,action,status,summary,url}], lanes:[{workspaceUrlKey,workspaceName,task,action,summary,sinceMs,heartbeat:{toolCount,elapsedSeconds,breakdown,total}}], tempo:[n,...], summary:{active,done,failed,blocked,total}, hasMore, oldestTs }`. Generation-free.
+- `GET /workspace/{urlKey}/api/live-console/events` — merged, normalized live feed (session-auth; 403 when the flag is off). Returns `{ events:[{id,kind,ts,iso,workspaceUrlKey,workspaceName,task,action,status,summary,url}], lanes:[{workspaceUrlKey,workspaceName,task,action,summary,sinceMs,lastActivityMs,heartbeat:{toolCount,elapsedSeconds,breakdown,total}}], tempo:[n,...], pulse:{bucketMs,endTs,buckets:[n,...]}, serverNow, summary:{active,done,failed,blocked,total}, hasMore, oldestTs }`. `pulse` is heartbeat-only fine-grained density (the strip's hum); `serverNow` anchors the strip's time axis. Generation-free.
 - `GET …/events?before=<epochMs>&limit=<n>` — a HISTORY page: older status events strictly before the cursor. Returns `{ events:[…], hasMore, oldestTs }`.
 
 ## Common Workflows

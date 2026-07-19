@@ -94,16 +94,17 @@ test.describe('Live Console (experimental)', () => {
       await expect(page.locator('#live-console-chips')).toBeHidden();
     });
 
-    test('the tempo canvas keeps a stable backing size across polls (no growth)', async ({ page }) => {
+    test('the activity-strip canvas keeps a stable backing size across polls (no growth)', async ({ page }) => {
       const canvas = page.locator('#live-console-tempo');
+      // Let the strip render at its full-width backing size (past the HTML default).
       await page.waitForFunction(() => {
         const c = document.getElementById('live-console-tempo');
-        return c && c.width > 0;
+        return c && c.clientWidth > 0 && c.width === Math.round(c.clientWidth * (window.devicePixelRatio || 1));
       });
       const first = await canvas.evaluate(c => c.width);
-      await page.waitForTimeout(11000); // ~2 poll cycles
+      await page.waitForTimeout(11000); // ~2 poll cycles + continuous animation frames
       const later = await canvas.evaluate(c => c.width);
-      expect(later).toBe(first); // was compounding by devicePixelRatio each poll
+      expect(later).toBe(first); // the old bug compounded width by devicePixelRatio each poll
     });
   });
 
