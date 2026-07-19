@@ -22,6 +22,7 @@ import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { UNSCOPED, selectOwnerWorkspaceToken } from './lib/workspace-token-resolver.js'
+import { refreshOwnerWorkspaceToken } from './lib/workspace-token-refresh.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -1166,6 +1167,20 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 const _tokenCache = new Map(); // "urlKey::owner" -> { token, expiresAt, cachedAt, provider }
 const TOKEN_CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
+// LIN-1373: TTL-preserving persist-back for refresh-on-resolve. Deliberately
+// NOT sessionStore.set() (lib/session-store.js's MongoSessionStore.set), which
+// ALWAYS rewrites `expires` to now+30d on every write — routing a background
+// agent's refresh through it would silently roll a continuously-polled
+// session's TTL forward on every resolve, extending its credential-at-rest
+// lifetime toward effectively permanent. That is the durable/no-TTL posture
+// LIN-1367's `(c)` deferred; this writes only the refreshed session content,
+// leaving the row's existing `expires` — and so the session's original
+// 30-day-from-last-human-activity lifetime — untouched. This is the line that
+// keeps LIN-1373 inside LIN-1367's settled `(b)` envelope.
+function persistSessionRow(sid, session) {
+  return sessionsCollection.updateOne({ _id: sid }, { $set: { session } });
+}
+
 async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
     return { token: 'test-token', reason: 'ok', provider: 'linear' };
@@ -1191,6 +1206,34 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     if (selected.token) {
       _tokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, cachedAt: Date.now(), provider: selected.provider });
       return { token: selected.token, reason: 'ok', provider: selected.provider };
+    }
+
+    // LIN-1373 refresh-on-resolve: the selector above only ever READS sessions,
+    // so a headless proxy token stopped resolving the instant its creator's
+    // Linear access token lapsed — only human web activity (ensureValidToken,
+    // above) ever refreshed it. When the fail-closed reason is session_expired
+    // for a SCOPED (owner-known) lookup, attempt exactly one refresh of the
+    // owner's own expired row using the refreshToken already sitting in that
+    // same session blob. Never for UNSCOPED (legacy owner-blind) callers —
+    // there is no single owner to refresh on behalf of. Any failure (nothing
+    // to refresh, or the refresh itself failing) falls straight through to the
+    // untouched session_expired result below — never a 500, never cached.
+    if (selected.reason === 'session_expired' && ownerAccountId !== UNSCOPED) {
+      try {
+        const refreshed = await refreshOwnerWorkspaceToken({
+          sessions,
+          urlKey,
+          ownerAccountId,
+          refreshAccessToken,
+          persistSession: persistSessionRow
+        });
+        if (refreshed) {
+          _tokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, cachedAt: Date.now(), provider: refreshed.provider });
+          return { token: refreshed.token, reason: 'ok', provider: refreshed.provider };
+        }
+      } catch (err) {
+        console.error(`Token refresh-on-resolve failed for workspace ${urlKey}:`, err);
+      }
     }
 
     // No usable token. reason/provider are already the right shape for the

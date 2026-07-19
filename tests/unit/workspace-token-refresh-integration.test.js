@@ -1,0 +1,208 @@
+/**
+ * Integration-style witness for LIN-1373's refresh-on-resolve fix.
+ *
+ * Every other spec in workspace-token-refresh.test.js drives
+ * `refreshOwnerWorkspaceToken` with a FAKE `refreshAccessToken` function — a
+ * green run there proves the orchestration (selection, persistence, single-
+ * flight) but proves nothing about the real Linear OAuth exchange, because
+ * the fetch/JSON/rotation code in lib/token-refresh.js is never actually
+ * executed. This file closes that gap: it drives the REAL `refreshAccessToken`
+ * (lib/token-refresh.js, unstubbed) against a local, controllable token
+ * endpoint via its new `tokenUrl` seam (LIN-1373), composed with the real
+ * `refreshOwnerWorkspaceToken` + `selectExpiredOwnerRow` +
+ * `selectOwnerWorkspaceToken` + `updateWorkspaceTokens`, over a Mongo-shaped
+ * in-memory sessions collection using the exact TTL-preserving persist-back
+ * server.js's `resolveWorkspaceAccess` uses (`updateOne({_id:sid},
+ * {$set:{session}})` — never `MongoSessionStore.set`, which would roll
+ * `expires`).
+ *
+ * `resolveWorkspaceAccess` itself (server.js) is thin glue over these pieces
+ * and is not re-imported here — server.js connects to a real database and
+ * starts listening at module load, so it is not import-safe in a unit test
+ * (the same reason tests/unit/linear-token-isolation.test.js's Block B tests
+ * route wiring against a hand-rolled resolver rather than the real one). This
+ * file instead proves every piece resolveWorkspaceAccess's session_expired
+ * branch calls is real end-to-end; server.js's own few lines of glue are
+ * covered by code review + the unchanged existing 11/11
+ * linear-token-isolation suite.
+ *
+ * Run with: node --test tests/unit/workspace-token-refresh-integration.test.js
+ */
+process.env.NODE_ENV = 'test';
+
+import { test, describe, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import { selectOwnerWorkspaceToken } from '../../lib/workspace-token-resolver.js';
+import { refreshOwnerWorkspaceToken, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
+import { refreshAccessToken, TokenRefreshError } from '../../lib/token-refresh.js';
+
+// A minimal Mongo-shaped in-memory sessions collection, matching the real
+// shape sessionsCollection.find({}).toArray() yields (each row: { _id, session,
+// expires }) and the exact updateOne call server.js's persistSessionRow makes.
+function inMemorySessionsCollection(seedDocs) {
+  const docs = seedDocs.map(d => ({ ...d }));
+  return {
+    async find() { return { async toArray() { return docs.map(d => ({ ...d })); } }; },
+    async updateOne(query, update) {
+      const doc = docs.find(d => d._id === query._id);
+      if (!doc) return { matchedCount: 0 };
+      Object.assign(doc, update.$set || {});
+      return { matchedCount: 1, modifiedCount: 1 };
+    },
+    _raw() { return docs; },
+  };
+}
+
+// The TTL-preserving persist-back server.js's resolveWorkspaceAccess uses
+// (deliberately not MongoSessionStore.set, which always rewrites `expires`).
+function makePersistSessionRow(collection) {
+  return (sid, session) => collection.updateOne({ _id: sid }, { $set: { session } });
+}
+
+let tokenServer;
+let tokenUrl;
+let tokenServerBehavior;
+
+beforeEach(async () => {
+  _resetInflightForTests();
+  process.env.LINEAR_CLIENT_ID = 'test-client-id';
+  process.env.LINEAR_CLIENT_SECRET = 'test-client-secret';
+
+  tokenServer = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => tokenServerBehavior(req, res, body));
+  });
+  await new Promise(resolve => tokenServer.listen(0, resolve));
+  const { port } = tokenServer.address();
+  tokenUrl = `http://127.0.0.1:${port}/oauth/token`;
+});
+
+afterEach(async () => {
+  await new Promise(resolve => tokenServer.close(resolve));
+});
+
+describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToken)', () => {
+  test('I1: expired owner row + valid refreshToken -> real HTTP round-trip refreshes, rotates, persists to the correct session row, and a re-select returns ok', async () => {
+    tokenServerBehavior = (req, res, body) => {
+      assert.equal(req.method, 'POST');
+      assert.ok(body.includes('grant_type=refresh_token'));
+      assert.ok(body.includes('refresh_token=real-refresh-token'));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        access_token: 'rotated-access-token',
+        refresh_token: 'rotated-refresh-token',
+        expires_in: 3600,
+        scope: 'read write',
+      }));
+    };
+
+    const originalExpires = new Date(Date.now() + 30 * 86400 * 1000);
+    const collection = inMemorySessionsCollection([
+      {
+        _id: 'sid-real-1',
+        expires: originalExpires,
+        session: {
+          accountId: 'account-real',
+          workspaces: [{
+            urlKey: 'acme-real',
+            provider: 'linear',
+            accessToken: 'stale-access-token',
+            refreshToken: 'real-refresh-token',
+            tokenExpiresAt: Date.now() - 10_000, // already expired
+          }],
+        },
+      },
+    ]);
+    const persistSession = makePersistSessionRow(collection);
+
+    // Pre-condition: the pure selector fails closed exactly like production
+    // (proving this is a real session_expired case, not a test fixture bug).
+    const before = selectOwnerWorkspaceToken(await collection.find().then(c => c.toArray()), 'acme-real', 'account-real');
+    assert.equal(before.reason, 'session_expired');
+
+    const sessions = await collection.find().then(c => c.toArray());
+    const refreshImpl = (refreshToken) => refreshAccessToken(refreshToken, { tokenUrl });
+
+    const result = await refreshOwnerWorkspaceToken({
+      sessions,
+      urlKey: 'acme-real',
+      ownerAccountId: 'account-real',
+      refreshAccessToken: refreshImpl,
+      persistSession,
+    });
+
+    assert.equal(result.token, 'rotated-access-token');
+    assert.equal(result.provider, 'linear');
+
+    // Persisted to the SAME row, rotated refresh_token (not the old one).
+    const persistedDoc = collection._raw().find(d => d._id === 'sid-real-1');
+    assert.equal(persistedDoc.session.workspaces[0].accessToken, 'rotated-access-token');
+    assert.equal(persistedDoc.session.workspaces[0].refreshToken, 'rotated-refresh-token');
+    assert.notEqual(persistedDoc.session.workspaces[0].refreshToken, 'real-refresh-token');
+
+    // TTL preserved — the session row's `expires` field is byte-identical to
+    // what it was before the refresh-on-resolve persist (the load-bearing
+    // LIN-1373 constraint that keeps this inside LIN-1367's (b) envelope).
+    assert.equal(persistedDoc.expires, originalExpires);
+
+    // Re-select via the real pure selector now returns ok with the fresh token.
+    const after = selectOwnerWorkspaceToken(collection._raw(), 'acme-real', 'account-real');
+    assert.equal(after.reason, 'ok');
+    assert.equal(after.token, 'rotated-access-token');
+  });
+
+  test('I2: Linear rejects the refresh (invalid_grant, real 400 over HTTP) -> real TokenRefreshError(EXPIRED), no persist, selector still session_expired (never a 500, never a fabricated success)', async () => {
+    tokenServerBehavior = (req, res) => {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'invalid_grant' }));
+    };
+
+    const collection = inMemorySessionsCollection([
+      {
+        _id: 'sid-real-2',
+        expires: new Date(Date.now() + 30 * 86400 * 1000),
+        session: {
+          accountId: 'account-real-2',
+          workspaces: [{
+            urlKey: 'acme-real-2',
+            provider: 'linear',
+            accessToken: 'stale-access-token',
+            refreshToken: 'dead-refresh-token',
+            tokenExpiresAt: Date.now() - 10_000,
+          }],
+        },
+      },
+    ]);
+    const persistSession = makePersistSessionRow(collection);
+    const sessions = await collection.find().then(c => c.toArray());
+    const refreshImpl = (refreshToken) => refreshAccessToken(refreshToken, { tokenUrl });
+
+    await assert.rejects(
+      () => refreshOwnerWorkspaceToken({
+        sessions,
+        urlKey: 'acme-real-2',
+        ownerAccountId: 'account-real-2',
+        refreshAccessToken: refreshImpl,
+        persistSession,
+      }),
+      (err) => {
+        assert.ok(err instanceof TokenRefreshError);
+        assert.equal(err.code, 'EXPIRED');
+        return true;
+      }
+    );
+
+    // No persistence happened — the stale row is exactly as it started.
+    const doc = collection._raw().find(d => d._id === 'sid-real-2');
+    assert.equal(doc.session.workspaces[0].accessToken, 'stale-access-token');
+
+    // Falling through, the real selector still reports session_expired — this
+    // is the exact 503 WORKSPACE_SESSION_EXPIRED envelope resolveWorkspaceAccess
+    // returns on refresh failure, never a 500.
+    const after = selectOwnerWorkspaceToken(collection._raw(), 'acme-real-2', 'account-real-2');
+    assert.equal(after.reason, 'session_expired');
+    assert.equal(after.token, null);
+  });
+});
