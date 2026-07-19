@@ -17,7 +17,7 @@
  */
 
 import { Router } from 'express';
-import { badRequest, jsonError, notFound, unauthorized, serviceUnavailable, workspaceUnavailableEnvelope } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, unauthorized, serviceUnavailable } from '../lib/errors.js';
 import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 import path from 'path';
@@ -1105,15 +1105,22 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * the existing dispatch-bootstrap mint. `createdBy` is stamped from the
    * calling dispatch token's own owner (req.dispatchTokenOwner, set by
    * authenticateDispatchToken) — never fabricated — so the exchanged working
-   * token resolves under LIN-1366's owner-scoped selection. A dispatch token
-   * with no owner (minted before LIN-1397, or never re-minted) fails closed
-   * here rather than minting a bootstrap that would only fail later at
-   * exchange time — the caller (the reaper) treats any failure from this
-   * endpoint as "mint failed" and falls through to a token-less refire.
+   * token resolves under LIN-1366's owner-scoped selection.
+   *
+   * TEMPORARY compat lane (LIN-1447, cleanup tracked by LIN-1448): a dispatch
+   * token with no owner (minted before LIN-1397, or never re-minted) used to
+   * fail closed here with a 503. But the host runner authenticates with
+   * exactly such an ownerless legacy token, so that 503 dead-ended LIN-1446's
+   * fresh-launch fallback mint and left every fresh worker's local write-back
+   * proxy (HARBOUR_LOCAL_BASE) uncomposed. Mint proceeds for the ownerless
+   * case the same way it does for an owner-stamped token (createdBy: null,
+   * same as createToken already accepts) instead of rejecting it — owner-
+   * stamped tokens are completely unaffected. Remove this lane once no
+   * ownerless tokens remain in use; LIN-1448 checks the log line below first.
    */
   router.post('/api/dispatch/broker-token', authenticateDispatchToken, async (req, res) => {
-    if (!req.dispatchTokenOwner) {
-      return res.status(503).json(workspaceUnavailableEnvelope('not_connected', req.dispatchUrlKey));
+    if (req.dispatchTokenOwner === null) {
+      console.warn(`Broker-token mint: ownerless legacy compat lane (LIN-1447) hit for urlKey=${req.dispatchUrlKey}`);
     }
 
     if (!proxyTokenStore) {

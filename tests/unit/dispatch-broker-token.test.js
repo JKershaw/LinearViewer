@@ -9,8 +9,10 @@
  *    kind:'bootstrap'/scope:'readWrite' proxy token scoped to the dispatch
  *    token's own urlKey, with createdBy stamped from the dispatch token owner.
  *  - Dispatch token with createdBy: null (pre-LIN-1397 / never re-minted) ->
- *    503 WORKSPACE_NOT_CONNECTED, fails BEFORE attempting a mint (never a
- *    null-owner success path).
+ *    201, mints the same kind:'bootstrap'/scope:'readWrite' proxy token with
+ *    createdBy stamped null (TEMPORARY ownerless-legacy compat lane, LIN-1447;
+ *    cleanup tracked by LIN-1448). This used to 503 before attempting a mint —
+ *    that guard is gone.
  *  - Invalid/absent Authorization -> 401, no mint attempted.
  *  - proxyTokenStore absent -> 503 (endpoint not configured), no crash.
  *  - Mint throws / returns no token -> 503, fail-closed.
@@ -96,13 +98,22 @@ describe('LIN-1397 — POST /api/dispatch/broker-token', () => {
     assert.equal(captured[0].options.createdBy, 'account-A');
   });
 
-  test('dispatch token with no owner -> 503 WORKSPACE_NOT_CONNECTED, no mint attempted', async () => {
-    let mintCalled = false;
-    const proxyTokenStore = { createToken: async () => { mintCalled = true; return { token: 'x' }; } };
+  test('dispatch token with no owner -> 201, ownerless-legacy compat lane mints with createdBy: null (LIN-1447)', async () => {
+    const captured = [];
+    const proxyTokenStore = {
+      createToken: async (urlKey, options) => {
+        captured.push({ urlKey, options });
+        return { token: 'minted-bootstrap', expiresAt: '2026-07-20T00:00:00.000Z' };
+      }
+    };
     const res = await call(buildApp({ proxyTokenStore }), PATH, 'no-owner-token');
-    assert.equal(res.status, 503, JSON.stringify(res.body));
-    assert.equal(res.body.code, 'WORKSPACE_NOT_CONNECTED');
-    assert.equal(mintCalled, false, 'never mints a null-owner bootstrap');
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(res.body.token, 'minted-bootstrap');
+    assert.equal(captured.length, 1, 'mints for an ownerless legacy token instead of 503ing');
+    assert.equal(captured[0].urlKey, 'acme');
+    assert.equal(captured[0].options.kind, 'bootstrap');
+    assert.equal(captured[0].options.scope, 'readWrite');
+    assert.equal(captured[0].options.createdBy, null, 'never fabricates an owner for a legacy token');
   });
 
   test('missing Authorization -> 401', async () => {
