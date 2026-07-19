@@ -118,25 +118,23 @@ and a fresh session is dispatched into the same wall.
    after run is **sprawling** (worth a flag). If the verb times out or errors, that's a **halt**
    (below), not a cue to hand-write your own prompt — that's how you'd paper over a broken signal.
 
-3. **Watch — one background loop, not one call per turn.** Run a single background loop over
-   `GET /dispatch/{id}?wait=50` rather than a visible foreground call every turn — a plain `bash`
-   loop works on any harness; prefer a wake-on-change tool only if yours has one, never require it.
-   The server holds each request open and returns the *instant* `status` transitions or new
-   feedback arrives, else at a ~50s cap. Read the **`status` field** for the terminal signal — not
-   prose. `reason` (`change` | `timeout` | `terminal`) and `waitedMs` tell you *why* it returned:
-   skip `reason:"timeout"` iterations entirely — they carry no new heartbeat, so let the loop stay
-   silent through them. On a real `change`, note only the `status` field and the newest
-   `feedback[].message`. Quiet has a ceiling, though: track the time since the *last new activity*
-   (new feedback or a tool event), not since the last poll — a string of quiet 50s holds is
-   healthy, but once **~30 min** pass with zero new activity the hold has stopped meaning "working"
-   and started meaning "wedged or dead." Don't poll a silent session forever: send it a one-line
-   liveness follow-up (`followUpTo` the dispatch id, with your `sessionId` carried on it — *"still
-   working? report where things stand"*), and if it can't resume (`[failed] no live session to
-   resume`) or stays silent after the nudge, re-dispatch fresh or hand back. When the status goes
-   terminal (`done` / `failed` / `blocked`), print the final feedback tail and stop the loop. Space
-   calls for the 60 req/min rate limit, and name the shell loop variable `dispatch_status` (or run
-   it under `bash`) — zsh reserves `status`. (The rest of your instruments are under *Your
-   instruments* below — including why `done` means "go look," not "finished.")
+3. **Wait per Setup's session-id check — stand by with a real dispatch id, a bounded probe without
+   one.** Look back at Setup: if the *Your autopilot session id* block appeared at the very end of
+   this prompt, you're queue-dispatched with a real, resumable session, so **stop and stand by** —
+   don't poll, don't build a watch loop. When the step reaches a terminal outcome (`done` / `failed`
+   / `blocked`) you are **woken automatically**, injected back into this session as a follow-up
+   within seconds — trust it. If that block did **not** appear, only the minted id from Setup exists
+   and no push can ever reach it: instead, use a single, explicit **one-off** liveness check —
+   `GET /dispatch/{id}?wait=50`, which holds open for up to ~50s and returns on a status change or a
+   timeout — called only when you actually need to know, **never** as a standing loop. Either path
+   shares the same judgment on silence: track the time since the *last new activity* (new feedback or
+   a tool event), and once **~30 min** pass with zero new activity the quiet has stopped meaning
+   "working" and started meaning "wedged or dead" — send a one-line liveness follow-up (`followUpTo`
+   the dispatch id, with your `sessionId` carried on it — *"still working? report where things
+   stand"*), and if it can't resume (`[failed] no live session to resume`) or stays silent after the
+   nudge, re-dispatch fresh or hand back. Keep any calls you do make spaced for the 60 req/min rate
+   limit. (The rest of your instruments are under *Your instruments* below — including why `done`
+   means "go look," not "finished.")
 
 4. **Cross-check — the step that earns its keep.** First read the worker's last message or two:
    `status` tells you the session *ended*, but the closing lines tell you in *what state* — and a
@@ -197,12 +195,15 @@ becoming a halt you didn't need — recognise these known quirks, don't debug th
   ended mid-flight, so confirm the run yourself or follow up to confirm it — don't advance on it.
 - **`[stalled?] … (last tool: Bash)`** with no new tool calls is *usually one long command
   running* — a test suite, not a dead session. Check before you re-dispatch.
-- **The watch poll runs as one background loop, not a visible call per turn.** `GET
-  /dispatch/{id}?wait=50` returns the moment something changes, else at the ~50s cap — run it in a
-  single background loop that stays silent through `reason:"timeout"` iterations and surfaces only
-  a real change (`status` + the newest `feedback[].message`) or the terminal feedback tail. Trust
-  the quiet only up to a ceiling, though: ~30 min with zero new activity is a wedged session, not a
-  working one — your cue to nudge then re-dispatch (step 3), not to poll on forever.
+- **`GET /dispatch/{id}?wait=50` is a liveness primitive, not how you await a child.** With a real
+  dispatch id (step 3) you don't call it to learn a step finished — you're pushed the outcome, so the
+  standing way to "watch" is to stand by, not poll. If step 3 has you on the bounded, one-off probe
+  instead (no real dispatch id to be woken on), this endpoint is that call: an *explicit, one-off
+  liveness check*, not a loop — it holds open ~50s and returns the moment something changes, else at
+  the cap, so a single quiet call is the hold/probe working, not a hang. Never rebuild it into a
+  standing watch loop, on either path. Trust the quiet only up to a ceiling, though: ~30 min with zero
+  new activity is a wedged session, not a working one — your cue to nudge then re-dispatch (step 3),
+  not to poll on forever.
 - **Shell loops: don't name the variable `status`.** zsh reserves it as a read-only alias for
   `$?` and the assignment aborts. Use `dispatch_status`, or run the loop under `bash`.
 - **`/recommend` can run past 25s** behind whitespace keepalives that `JSON.parse` ignores —

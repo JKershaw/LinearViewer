@@ -115,7 +115,7 @@ test('issue-scoped: an unrecognized variant falls back to a byte-identical stand
     assert.equal(bogus.body.promptName, base.body.promptName);
     assert.equal(bogus.body.kind, base.body.kind);
     assert.equal(bogus.body.repo, base.body.repo);
-    assert.ok(bogus.body.prompt.includes('**Stamp every dispatch with your session id.**'));
+    assert.ok(bogus.body.prompt.includes('**Stamp every dispatch with your session id — and check which one you actually have.**'));
     assert.ok(bogus.body.prompt.includes('overrides this value with the true dispatch id'));
     assert.doesNotMatch(bogus.body.prompt, /STEPPER/);
   });
@@ -168,7 +168,7 @@ test('general: a bogus variant is a byte-identical standard stack-walk response'
     assert.equal(bogus.body.label, base.body.label);
     assert.equal(bogus.body.promptName, base.body.promptName);
     assert.equal(bogus.body.kind, base.body.kind);
-    assert.ok(bogus.body.prompt.includes('**Stamp every dispatch with your session id.**'));
+    assert.ok(bogus.body.prompt.includes('**Stamp every dispatch with your session id — and check which one you actually have.**'));
     assert.ok(bogus.body.prompt.includes('overrides this value with the true dispatch id'));
     assert.doesNotMatch(bogus.body.prompt, /STEPPER/);
   });
