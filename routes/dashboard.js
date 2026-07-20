@@ -296,10 +296,13 @@ function loopIsWaiting(loop) {
  * ordinary standalone block is unaffected; a session with several independent
  * chains/workers evaluates each chain's own tail.
  *
+ * Exported for unit tests (LIN-1478) — the supersede characterization/agreement
+ * test asserts this against `lib/render-session.js`'s per-run mirror directly.
+ *
  * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
  * @returns {{waiting: boolean, message: string|null}}
  */
-function deriveSessionWaiting(enrichedLoops) {
+export function deriveSessionWaiting(enrichedLoops) {
   const supersededLoopIds = new Set();
   for (const l of enrichedLoops) {
     if (l && l.followUpTo) supersededLoopIds.add(l.followUpTo);
