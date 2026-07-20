@@ -57,6 +57,25 @@ test('workspaceUnavailableEnvelope: not_connected → config / not retryable', (
   assert.equal(env.retryable, false);
 });
 
+test('workspaceUnavailableEnvelope: owner_mismatch → config / not retryable (LIN-1413)', () => {
+  const env = workspaceUnavailableEnvelope('owner_mismatch', 'acme');
+  assert.equal(env.code, 'WORKSPACE_OWNER_MISMATCH');
+  assert.equal(env.category, 'config');
+  assert.equal(env.retryable, false);
+  assert.deepEqual(env.context, { workspaceUrlKey: 'acme' });
+});
+
+// Review finding (LIN-1413): the detector this reason is built on cannot tell
+// a genuine account fork apart from a legitimate colleague whose own session
+// merely lapsed (see Block C7, linear-token-isolation.test.js). A confident
+// "will not restore it" is provably false for that reachable second case, so
+// the copy must stay hedged ("may not") rather than asserting certainty.
+test('workspaceUnavailableEnvelope: owner_mismatch copy is hedged, not a false certainty (LIN-1413 review)', () => {
+  const env = workspaceUnavailableEnvelope('owner_mismatch', 'acme');
+  assert.match(env.detail, /may not/i);
+  assert.ok(!/will not/i.test(env.detail), `detail overclaims certainty: ${env.detail}`);
+});
+
 test('envelope context carries only the public workspace slug (privacy boundary)', () => {
   const env = workspaceUnavailableEnvelope('store_unreachable', 'acme');
   assert.deepEqual(Object.keys(env.context), ['workspaceUrlKey']);
@@ -157,6 +176,14 @@ test('Shape B (/stack) threads not_connected through to config envelope', async 
   const { status, body } = await getJson(buildApp('not_connected'), '/api/proxy/stack');
   assert.equal(status, 503);
   assert.equal(body.code, 'WORKSPACE_NOT_CONNECTED');
+  assert.equal(body.category, 'config');
+  assert.equal(body.retryable, false);
+});
+
+test('Shape B (/stack) threads owner_mismatch through to config envelope (LIN-1413)', async () => {
+  const { status, body } = await getJson(buildApp('owner_mismatch'), '/api/proxy/stack');
+  assert.equal(status, 503);
+  assert.equal(body.code, 'WORKSPACE_OWNER_MISMATCH');
   assert.equal(body.category, 'config');
   assert.equal(body.retryable, false);
 });

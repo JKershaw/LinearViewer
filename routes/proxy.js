@@ -1400,7 +1400,7 @@ One convention across every endpoint, so you can branch on the same fields every
 429 - Rate limited (max 60 requests/minute)
 500 - Internal server error
 502 - Upstream write was rejected (the create/update did not land)
-503 - Workspace or AI service unavailable
+503 - Workspace or AI service unavailable (the body's \`code\` discriminates WHY — see docs/proxy-integration.md)
 504 - Upstream provider request timed out or was aborted (mapped from a TimeoutError/AbortError)
 
 ## Notes

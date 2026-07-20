@@ -21,7 +21,7 @@ import { ensureIndexes } from './lib/db-indexes.js'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
-import { UNSCOPED, selectOwnerWorkspaceToken } from './lib/workspace-token-resolver.js'
+import { UNSCOPED, selectOwnerWorkspaceToken, detectOwnerAccountMismatch } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken } from './lib/workspace-token-refresh.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
@@ -1148,6 +1148,13 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 //   store_unreachable → session store find() threw (dyno booting post-deploy) — transient
 //   session_expired   → a session referenced this workspace but its token expired — re-auth
 //   not_connected     → no session references this workspace — never connected
+//   owner_mismatch    → the owner has no live token, but a DIFFERENT account does. A
+//                       SIGNAL, not a proof: it fires both when the owner account genuinely
+//                       no longer holds this workspace (re-auth cannot fix it) and when the
+//                       owner's own token merely lapsed while a legitimate colleague on the
+//                       same workspace is live (re-auth CAN fix it). The session data cannot
+//                       tell those apart — do not claim it can; see detectOwnerAccountMismatch
+//                       and lib/errors.js's hedged owner_mismatch detail (LIN-1413)
 // `provider` is the matched workspace's provider name (e.g. 'linear'), or null
 // when no session referenced the workspace. It lets the session-less consumer
 // proxy resolve the provider per workspace via getProviderForWorkspace (LIN-581),
@@ -1235,6 +1242,25 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
       } catch (err) {
         console.error(`Token refresh-on-resolve failed for workspace ${urlKey}:`, err);
       }
+    }
+
+    // LIN-1413: after the selector failed and refresh-on-resolve has already
+    // been given its chance (both above), check whether a DIFFERENT account
+    // holds a live token for this workspace while the scoped owner does not.
+    // That signal does not on its own prove the owner lost the workspace — it
+    // fires identically for a legitimate colleague's session merely being
+    // live while the owner's own lapsed (re-auth-fixable) — so it is
+    // reclassified to a distinct, hedged reason rather than a confident
+    // "re-auth is pointless" claim; see the detector's docstring and
+    // lib/errors.js's owner_mismatch detail. Never for UNSCOPED (legacy
+    // owner-blind) callers — detectOwnerAccountMismatch also returns false
+    // for those, but the reason is only ever reclassified when there is a
+    // specific owner to reclassify on behalf of. Log server-side only; the
+    // other account's id must never reach the wire (lib/errors.js privacy
+    // boundary).
+    if (ownerAccountId !== UNSCOPED && detectOwnerAccountMismatch(sessions, urlKey, ownerAccountId)) {
+      console.warn(`Workspace ${urlKey}: owner account mismatch detected for account ${ownerAccountId}`);
+      return { token: null, reason: 'owner_mismatch', provider: selected.provider };
     }
 
     // No usable token. reason/provider are already the right shape for the

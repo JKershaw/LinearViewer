@@ -25,7 +25,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
-import { selectOwnerWorkspaceToken, UNSCOPED } from '../../lib/workspace-token-resolver.js';
+import { selectOwnerWorkspaceToken, detectOwnerAccountMismatch, UNSCOPED } from '../../lib/workspace-token-resolver.js';
 
 // ---------------------------------------------------------------------------
 // Block A — pure selector `selectOwnerWorkspaceToken` (7 cases)
@@ -125,6 +125,75 @@ describe('selectOwnerWorkspaceToken (LIN-1366, Block A — pure selector)', () =
     );
     assert.equal(expiredOnly.token, null);
     assert.equal(expiredOnly.provider, 'linear');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block C — detectOwnerAccountMismatch (LIN-1413, pure sibling detector)
+// ---------------------------------------------------------------------------
+
+describe('detectOwnerAccountMismatch (LIN-1413, Block C — pure detector)', () => {
+  test('C1: owner has an expired row for urlKey, a different account has a live one -> true', () => {
+    const sessions = [
+      sessionRow('account-A', 'acme', 'tokA-expired', NOW + PAST_MS),
+      sessionRow('account-B', 'acme', 'tokB', NOW + FAR_FUTURE_MS),
+    ];
+    assert.equal(detectOwnerAccountMismatch(sessions, 'acme', 'account-A'), true);
+  });
+
+  test('C2: owner has no row at all, a different account has a live one -> true (the "stale row already gone" variant)', () => {
+    const sessions = [
+      sessionRow('account-B', 'acme', 'tokB', NOW + FAR_FUTURE_MS),
+    ];
+    assert.equal(detectOwnerAccountMismatch(sessions, 'acme', 'account-A'), true);
+  });
+
+  test('C3: owner\'s own token is merely expired and nobody else is live -> false (stays LIN-1373\'s case)', () => {
+    const sessions = [
+      sessionRow('account-A', 'acme', 'tokA-expired', NOW + PAST_MS),
+    ];
+    assert.equal(detectOwnerAccountMismatch(sessions, 'acme', 'account-A'), false);
+  });
+
+  test('C4: null/empty owner, even with another account live -> false (protects R4/not_connected)', () => {
+    const sessions = [
+      sessionRow('account-B', 'acme', 'tokB', NOW + FAR_FUTURE_MS),
+    ];
+    assert.equal(detectOwnerAccountMismatch(sessions, 'acme', null), false);
+    assert.equal(detectOwnerAccountMismatch(sessions, 'acme', ''), false);
+  });
+
+  test('C5: UNSCOPED -> false (owner-blind callers have no owner to mismatch against)', () => {
+    const sessions = [
+      sessionRow('account-B', 'acme', 'tokB', NOW + FAR_FUTURE_MS),
+    ];
+    assert.equal(detectOwnerAccountMismatch(sessions, 'acme', UNSCOPED), false);
+  });
+
+  test('C6: owner is live -> false (never reached in practice via server.js, asserted anyway)', () => {
+    const sessions = [
+      sessionRow('account-A', 'acme', 'tokA', NOW + FAR_FUTURE_MS),
+      sessionRow('account-B', 'acme', 'tokB', NOW + FURTHER_FUTURE_MS),
+    ];
+    assert.equal(detectOwnerAccountMismatch(sessions, 'acme', 'account-A'), false);
+  });
+
+  // C7 (LIN-1413 review): the review's blocking finding was that this exact
+  // fixture shape — structurally identical to C1 — is also produced by two
+  // legitimate colleagues sharing one workspace where only the asking
+  // account's session has lapsed. The detector has no way to tell that case
+  // apart from a genuine account fork (see the docstring above), so it
+  // deliberately still fires here too. What changed post-review is NOT this
+  // verdict — it's that lib/errors.js's owner_mismatch copy no longer asserts
+  // a confident "will not restore it" that would be actively wrong for
+  // Alice. This test documents the reachable case by name so the shared
+  // verdict is a recorded decision, not a silent gap.
+  test('C7: legitimate colleague — Alice\'s own session lapsed while Bob (a different, valid account) is live on the same workspace -> true, same as a genuine fork (indistinguishable; see docstring)', () => {
+    const sessions = [
+      sessionRow('account-alice', 'acme', 'tok-alice-expired', NOW + PAST_MS),
+      sessionRow('account-bob', 'acme', 'tok-bob-live', NOW + FAR_FUTURE_MS),
+    ];
+    assert.equal(detectOwnerAccountMismatch(sessions, 'acme', 'account-alice'), true);
   });
 });
 
@@ -305,5 +374,24 @@ describe('req.proxyCreatedBy route wiring (LIN-1366, Block B)', () => {
     assert.equal(body.retryable, false);
     assert.equal(body.context.workspaceUrlKey, 'acme');
     assert.equal(spy.calls[0].ownerAccountId, null);
+  });
+
+  test('R5 (LIN-1413): resolveWorkspaceAccess returning owner_mismatch -> 503 WORKSPACE_OWNER_MISMATCH end-to-end (exact envelope, verbatim)', async () => {
+    // Forced-reason resolver: proves the wire threading, mirroring R4's style.
+    // The detector itself (Block C) is exercised separately.
+    const resolveWorkspaceAccess = async () => ({ token: null, reason: 'owner_mismatch', provider: 'linear' });
+    const { app, proxyTokenStore } = buildApp({ resolveWorkspaceAccess, provider: fakeLinearProvider() });
+    const { token } = await proxyTokenStore.createToken('acme', { scope: 'read', createdBy: 'account-A' });
+
+    const { status, body } = await requestJson(app, '/api/proxy/issues', { token });
+
+    assert.equal(status, 503);
+    assert.equal(body.error, 'Workspace not available');
+    assert.equal(body.code, 'WORKSPACE_OWNER_MISMATCH');
+    assert.equal(body.category, 'config');
+    assert.equal(body.retryable, false);
+    assert.equal(body.context.workspaceUrlKey, 'acme');
+    // Privacy boundary: the other (live) account's id must never reach the wire.
+    assert.ok(!/account-B|accountId/i.test(JSON.stringify(body)));
   });
 });
