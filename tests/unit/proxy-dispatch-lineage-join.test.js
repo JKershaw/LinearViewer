@@ -42,10 +42,23 @@ function buildApp({ queued = [], history = [] } = {}) {
   const listHistory = async (urlKey, opts = {}) => {
     historyCalls.push(opts);
     if (opts.rootItemId && opts.rootItemId.$in) {
+      // A real Mongo query ANDs every field present on `opts` into one query
+      // object, so if the handler ever (wrongly) added `issueIdentifier` to
+      // the lineage query, it WOULD narrow these results too — mirror that
+      // here (rather than ignoring the field) so L4 actually fails if a
+      // future change re-scopes the lineage query by issue, instead of
+      // passing vacuously because the stub never modeled the field.
       const anchors = opts.rootItemId.$in;
-      return { items: history.filter(r => anchors.includes(r.rootItemId)) };
+      let items = history.filter(r => anchors.includes(r.rootItemId));
+      if (opts.issueIdentifier) items = items.filter(r => r.issueIdentifier === opts.issueIdentifier);
+      return { items };
     }
-    const items = opts.limit ? history.slice(0, opts.limit) : history;
+    // Real store: the page call DOES push issueIdentifier into the query
+    // when the caller passes it (LIN-613/615 index-backed predicate).
+    let items = opts.issueIdentifier
+      ? history.filter(r => r.issueIdentifier === opts.issueIdentifier)
+      : history;
+    items = opts.limit ? items.slice(0, opts.limit) : items;
     return { items };
   };
 
@@ -291,6 +304,21 @@ describe('LIN-1470 — lineage join, STANDING GUARD / CHARACTERIZATION (pass bef
     assert.equal(pageCall.limit, 200);
   });
 
+  // Review F6 (verified, not taken on restatement): T3 does NOT catch a
+  // coherent re-key of the anchor to sessionId/sessionGroupId (anchor +
+  // query field + sibling grouping all switched together) — re-running that
+  // exact mutation leaves T3 green, because wa/wb's feedback entries carry
+  // `rootItemId: 'wa-root'`/`'wb-root'`, and mergeLineageFeedback's
+  // entry-level `entry.rootItemId === anchor` filter (lib/dispatch-terminal.js)
+  // rejects them against the wrong anchor regardless of which field the
+  // candidate query and grouping used. T1/T2a/T2b/T5/T6c are what actually
+  // catch that mutation (their fixtures tag feedback entries with the SAME
+  // rootItemId as the row, so a wrong anchor lets the entry filter through).
+  // Only disabling the entry-level filter TOO makes T3 fail — verified by
+  // doing exactly that. So T3 is still real coverage (LIN-1461: shared
+  // sessionId/sessionGroupId must not collapse distinct lineages), just not
+  // for the anchor-rekey mutation class; it's two independent layers, and
+  // this test pins the entry-level one when the anchor itself is correct.
   test('T3 — sibling non-collapse (LIN-1461 standing guard): shared sessionId/sessionGroupId must NOT merge distinct rootItemIds', async () => {
     const wa = row({
       id: 'wa', rootItemId: 'wa-root', sessionId: 'orch-1', sessionGroupId: 'orch-1',
@@ -402,6 +430,92 @@ describe('LIN-1470 — beat 4 audit: abort rows × lineage merge (defense in dep
     const item = body.items.find(i => i.id === 'sibling-1');
     assert.equal(item.feedbackCount, 1, 'the untagged abort entry must NOT be absorbed into feedbackCount');
     assert.notEqual(item.status, 'aborted', 'the untargeted abort must not hijack this row\'s status via the generic merge');
+  });
+});
+
+describe('LIN-1470 — review F1: archived cancelled/expired rows must NOT join the lineage', () => {
+  // F1 (review of PR #971): the beat-4 carve-out excluded `status === 'queued'`,
+  // but `_archiveItem` (lib/dispatch-store.js) is called with exactly THREE
+  // statuses — 'taken' (:678), 'cancelled' (:635), 'expired' (:715) — so a
+  // `!== 'queued'` denylist also let cancelled/expired archived rows join the
+  // lineage and inherit a sibling's terminal feedback. Reachable ordinarily: a
+  // follow-up enqueued after its parent already posted `[done]`, then
+  // cancelled or expired before being taken. T9 only pinned the queued
+  // instance; these pin the other two members of the same class.
+  test('T11 — a cancelled follow-up does NOT inherit a completed lineage sibling\'s terminal status/completedAt/feedbackCount', async () => {
+    const parentDone = row({
+      id: 'parent-1', rootItemId: 'root-1',
+      feedback: [{ message: '[done] finished', rootItemId: 'root-1', timestamp: T2 }]
+    });
+    const cancelledChild = row({
+      id: 'child-cancelled', rootItemId: 'root-1', followUpTo: 'parent-1', status: 'cancelled', feedback: []
+    });
+    const { app } = buildApp({ history: [parentDone, cancelledChild] });
+    const { body } = await get(app, '/api/proxy/dispatch');
+
+    const child = body.items.find(i => i.id === 'child-cancelled');
+    assert.equal(child.status, 'cancelled', 'must NOT inherit the sibling\'s "done"');
+    assert.equal(child.completedAt, null, 'must NOT inherit the sibling\'s completedAt');
+    assert.equal(child.feedbackCount, 0, 'a cancelled row reports only its own (empty) feedback');
+
+    const doneList = await get(app, '/api/proxy/dispatch?status=done');
+    assert.ok(!doneList.body.items.find(i => i.id === 'child-cancelled'), 'must not be routed into ?status=done');
+    const cancelledList = await get(app, '/api/proxy/dispatch?status=cancelled');
+    assert.ok(cancelledList.body.items.find(i => i.id === 'child-cancelled'), 'must still be found under its own ?status=cancelled');
+  });
+
+  test('T12 — an expired follow-up does NOT inherit a completed lineage sibling\'s terminal status/completedAt/feedbackCount', async () => {
+    const parentDone = row({
+      id: 'parent-1', rootItemId: 'root-1',
+      feedback: [{ message: '[done] finished', rootItemId: 'root-1', timestamp: T2 }]
+    });
+    const expiredChild = row({
+      id: 'child-expired', rootItemId: 'root-1', followUpTo: 'parent-1', status: 'expired', feedback: []
+    });
+    const { app } = buildApp({ history: [parentDone, expiredChild] });
+    const { body } = await get(app, '/api/proxy/dispatch');
+
+    const child = body.items.find(i => i.id === 'child-expired');
+    assert.equal(child.status, 'expired', 'must NOT inherit the sibling\'s "done"');
+    assert.equal(child.completedAt, null, 'must NOT inherit the sibling\'s completedAt');
+    assert.equal(child.feedbackCount, 0, 'an expired row reports only its own (empty) feedback');
+
+    const doneList = await get(app, '/api/proxy/dispatch?status=done');
+    assert.ok(!doneList.body.items.find(i => i.id === 'child-expired'), 'must not be routed into ?status=done');
+    const expiredList = await get(app, '/api/proxy/dispatch?status=expired');
+    assert.ok(expiredList.body.items.find(i => i.id === 'child-expired'), 'must still be found under its own ?status=expired');
+  });
+});
+
+describe('LIN-1470 — review L4: cross-issue lineage under ?issueIdentifier= scoping', () => {
+  // L4 (review): reviewer decision #2 accepted this as correct-by-design
+  // ("rootItemId already isolates the lineage; inheriting the issue scope
+  // would drop siblings") but noted it was pinned by no test. The lineage
+  // batch query is deliberately NOT scoped by issueIdentifier, so a row can
+  // report complete via a sibling filed under a DIFFERENT issue that never
+  // itself appears in the same scoped list.
+  test('L4 — a row completes via a same-lineage sibling filed under a different issue, which itself is excluded from the scoped list', async () => {
+    const root = row({
+      id: 'root-1', rootItemId: 'root-1', issueIdentifier: 'LIN-A',
+      feedback: [{ message: 'own beat', rootItemId: 'root-1', timestamp: T1 }]
+    });
+    const crossIssueChild = row({
+      id: 'child-1', rootItemId: 'root-1', followUpTo: 'root-1', issueIdentifier: 'LIN-B',
+      feedback: [{ message: '[done] finished', rootItemId: 'root-1', timestamp: T2 }]
+    });
+    const { app } = buildApp({ history: [root, crossIssueChild] });
+
+    const scoped = await get(app, '/api/proxy/dispatch?issueIdentifier=LIN-A');
+    const item = scoped.body.items.find(i => i.id === 'root-1');
+    assert.ok(item, 'root-1 (issueIdentifier LIN-A) is present under its own scope');
+    assert.equal(item.status, 'done', 'completes via the LIN-B sibling despite the LIN-A scope');
+    assert.equal(item.completedAt, T2);
+    assert.equal(item.feedbackCount, 2, 'lineage-wide, including the cross-issue sibling');
+    assert.ok(!scoped.body.items.find(i => i.id === 'child-1'), 'the LIN-B sibling itself never appears in the LIN-A-scoped list');
+
+    // Sanity: the sibling's OWN scope shows it directly, unaffected.
+    const otherScoped = await get(app, '/api/proxy/dispatch?issueIdentifier=LIN-B');
+    assert.ok(otherScoped.body.items.find(i => i.id === 'child-1'), 'child-1 is visible under its own LIN-B scope');
   });
 });
 
