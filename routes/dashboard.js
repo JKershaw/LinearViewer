@@ -38,6 +38,7 @@ import { armKeepalive } from '../lib/http-keepalive.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { createTaskDoneCache } from '../lib/task-done-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
 import { hasPaidEnvKey } from '../lib/openrouter.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import {
@@ -303,10 +304,7 @@ function loopIsWaiting(loop) {
  * @returns {{waiting: boolean, message: string|null}}
  */
 export function deriveSessionWaiting(enrichedLoops) {
-  const supersededLoopIds = new Set();
-  for (const l of enrichedLoops) {
-    if (l && l.followUpTo) supersededLoopIds.add(l.followUpTo);
-  }
+  const supersededLoopIds = computeSupersededLoopIds(enrichedLoops);
   let waiting = false;
   let message = null;
   for (const l of enrichedLoops) {
