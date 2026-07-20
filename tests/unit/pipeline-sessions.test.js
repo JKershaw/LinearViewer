@@ -431,6 +431,27 @@ describe('durable-group follow-up stitch by sessionGroupId (LIN-1341)', () => {
     assert.deepStrictEqual(s.loops.map(l => l.loopId).sort(), ['a', 'b', 'c']);
   });
 
+  test('a chained thread\'s completedAt reflects the LATEST hop\'s terminal marker, not a stale root (LIN-1461)', () => {
+    // LIN-1461: a consumer reading only the root dispatch's OWN record sees it
+    // "done" at 10:05 and never learns the session kept going through two more
+    // follow-ups. Observation grouping already resolves the full session via
+    // sessionGroupId (no simple-dispatcher rootItemId needed) — this pins that
+    // its derived completedAt tracks the true latest activity, so the session
+    // never reads as frozen at the root's own stale completion.
+    const loops = loopsFrom([
+      worker('a', UNRELATED, '2026-06-22T10:00:00.000Z', { feedback: done('2026-06-22T10:05:00.000Z') }),
+      worker('b', UNRELATED, '2026-06-22T10:30:00.000Z', { followUpTo: 'a', sessionGroupId: 'a', feedback: done('2026-06-22T10:45:00.000Z') }),
+      worker('c', UNRELATED, '2026-06-22T11:00:00.000Z', { followUpTo: 'b', sessionGroupId: 'a', feedback: done('2026-06-22T11:20:00.000Z') })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(sessions.length, 1);
+    const s = sessions[0];
+    assert.strictEqual(s.sessionId, 'a');
+    assert.deepStrictEqual(s.loops.map(l => l.loopId).sort(), ['a', 'b', 'c']);
+    assert.strictEqual(s.completedAt, '2026-06-22T11:20:00.000Z');
+  });
+
   test('a stamped follow-up on an autopilot worker composes with sessionId grouping (group id == the autopilot session id)', () => {
     const loops = loopsFrom([
       orchestrator(),

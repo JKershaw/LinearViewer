@@ -1036,6 +1036,131 @@ test.describe('Proxy API - Dispatch', () => {
     expect(listed.completedAt).toBe(terminalEntry.timestamp);
   });
 
+  // LIN-1461: a consumer that dispatched the ORIGINAL item and keeps watching
+  // it by that id must not go "dark" the instant a follow-up repoints the
+  // session onto a new item id — the runner's next feedback (including the
+  // terminal marker) lands on the follow-up's own history doc, not the
+  // original's, so the watch endpoint must resolve the whole session's
+  // activity via the durable sessionGroupId rather than the queried item's
+  // own frozen feedback[]. Every real feedback POST carries `rootItemId`
+  // (simple-dispatcher reapers.js/hook.js/feedback.js tag every post with
+  // `session.rootItemId || itemMetadata.itemId`) — set it here too, matching
+  // production, since the merge is now SCOPED to the queried item's rootItemId
+  // lineage rather than the whole sessionGroupId family (LIN-1461 rework; see
+  // the sibling-isolation test below for why the wider scope regressed).
+  test('watch on the ORIGINAL id sees feedback (and the terminal marker) posted to a REPOINTED follow-up', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'implement the thing', target: 'cli' }
+    });
+    const originalId = (await enqueue.json()).id;
+    await request.post(`/api/dispatch/take/${originalId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    await request.post(`/api/dispatch/feedback/${originalId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[working] Session launched', rootItemId: originalId }
+    });
+
+    // A watcher polling the original id sees the pre-follow-up activity.
+    let watched = await (await request.get(`/api/proxy/dispatch/${originalId}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(watched.status).toBe('taken');
+    expect(watched.feedback).toHaveLength(1);
+
+    // The session repoints: a follow-up dispatch references the original id,
+    // gets taken, and the runner posts its terminal marker THERE — never
+    // again touching the original item's own doc.
+    const followUp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'now confirm CI is green', target: 'cli', followUpTo: originalId }
+    });
+    const followUpId = (await followUp.json()).id;
+    await request.post(`/api/dispatch/take/${followUpId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    await request.post(`/api/dispatch/feedback/${followUpId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      // The runner's rootItemId ALWAYS carries the ORIGINAL dispatch id, even
+      // on a repointed follow-up item — that's what keeps this lineage's
+      // entries findable regardless of which item id they're filed under.
+      data: { message: '[done] CI is green', rootItemId: originalId }
+    });
+
+    // The watcher never stopped polling the ORIGINAL id — it must see BOTH
+    // the pre-repoint feedback and the follow-up's terminal marker, and
+    // derive the session as done, not stuck reading 'taken' forever (the
+    // LIN-1461 "gone dark" symptom).
+    watched = await (await request.get(`/api/proxy/dispatch/${originalId}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(watched.id).toBe(originalId);
+    expect(watched.feedback).toHaveLength(2);
+    expect(watched.feedback[0].message).toBe('[working] Session launched');
+    expect(watched.feedback[1].message).toBe('[done] CI is green');
+    expect(watched.status).toBe('done');
+    expect(watched.completedAt).not.toBeNull();
+  });
+
+  // LIN-1461 rework: the class of regression the request-changes review
+  // caught. `sessionGroupId` falls back to `sessionId` (dispatch-store.js),
+  // and every worker an autopilot orchestrator spawns carries `sessionId` ==
+  // the orchestrator's own id (docs/autopilot-kickoff.md) — so ALL sibling
+  // workers in one run share ONE sessionGroupId, with NO followUpTo between
+  // them. A merge scoped only to sessionGroupId pulls a finished sibling's
+  // feedback (and terminal marker) into a still-running sibling's watch
+  // response. rootItemId (distinct per runner session) must keep them apart.
+  test('watch on one autopilot WORKER does not absorb a SIBLING worker\'s feedback or terminal marker', async ({ request }) => {
+    const sessionId = (await (await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'orchestrate', target: 'cli', kind: 'autopilot' }
+    })).json()).id;
+
+    const dispatchWorker = async (prompt) => {
+      const res = await request.post('/api/proxy/dispatch', {
+        headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+        data: { prompt, target: 'cli', sessionId }
+      });
+      const { id } = await res.json();
+      await request.post(`/api/dispatch/take/${id}`, { headers: { Authorization: `Bearer ${consumerToken}` } });
+      return id;
+    };
+
+    const workerA = await dispatchWorker('worker A: long task');
+    const workerB = await dispatchWorker('worker B: short task');
+
+    // Both workers post feedback tagged with THEIR OWN rootItemId (each is a
+    // distinct runner session) — worker A is still going, worker B finishes.
+    await request.post(`/api/dispatch/feedback/${workerA}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[heartbeat] worker A still working', rootItemId: workerA }
+    });
+    await request.post(`/api/dispatch/feedback/${workerB}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[done] worker B finished', rootItemId: workerB }
+    });
+
+    // Watching worker A must show ONLY worker A's own feedback, stay 'taken',
+    // and must NOT report worker B's completedAt.
+    const watchedA = await (await request.get(`/api/proxy/dispatch/${workerA}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(watchedA.id).toBe(workerA);
+    expect(watchedA.feedback).toHaveLength(1);
+    expect(watchedA.feedback[0].message).toBe('[heartbeat] worker A still working');
+    expect(watchedA.status).toBe('taken');
+    expect(watchedA.completedAt).toBeNull();
+
+    // Worker B independently shows as done, unaffected by worker A.
+    const watchedB = await (await request.get(`/api/proxy/dispatch/${workerB}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(watchedB.feedback).toHaveLength(1);
+    expect(watchedB.feedback[0].message).toBe('[done] worker B finished');
+    expect(watchedB.status).toBe('done');
+  });
+
   test('list endpoint scopes by issueIdentifier (store pushdown, LIN-615)', async ({ request }) => {
     // Two queued items on different issues + one on the target with history.
     const targetIssue = 'LIN-6150';
