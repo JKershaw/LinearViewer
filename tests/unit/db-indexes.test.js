@@ -116,6 +116,18 @@ describe('db-indexes', () => {
     }
   });
 
+  test('declares the per-runner-session lineage discovery index on both dispatch collections (LIN-1468)', () => {
+    // Backs _collectGroupFeedback's re-keyed candidate query so the merge's
+    // sibling lookup is one indexed read, not an unindexed scan.
+    for (const collection of ['dispatch-history', 'dispatch-queue']) {
+      const hasIt = INDEX_SPECS.some(s =>
+        s.collection === collection &&
+        JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, rootItemId: 1 })
+      );
+      assert.ok(hasIt, `${collection} must have a {urlKey:1, rootItemId:1} index`);
+    }
+  });
+
   test('unique option is honoured for tokenHash indexes', async () => {
     const db = freshDb();
     await ensureIndexes(db);

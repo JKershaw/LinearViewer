@@ -34,6 +34,14 @@
  * stays on the cheap default (own feedback only), so the extra indexed query
  * + in-memory filter/sort only runs on the watch/poll seam that actually
  * needs it.
+ *
+ * LIN-1468 (full-A) persists `rootItemId` as an item-doc-level field
+ * (previously only a feedback-entry attribute) and re-keys the candidate
+ * query above from `{urlKey, sessionGroupId}` to `{urlKey, rootItemId}` — the
+ * second describe block below covers that layer: field set at insert (never
+ * `sessionId`), survival through the `_archiveItem` take-path allowlist, the
+ * legacy field-less split the re-key introduces, and the additive response
+ * contract on both formatters.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -192,9 +200,12 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
       prompt: 'follow up', followUpTo: original._id, sessionGroupId: original._id
     });
 
+    // LIN-1468 re-keyed the candidate query onto `rootItemId` (was
+    // `sessionGroupId`) — intercept the same field the real query now sends,
+    // else this fault injection would silently never fire.
     const originalFind = store.historyCollection.find.bind(store.historyCollection);
     store.historyCollection.find = (query, opts) => {
-      if (query && query.sessionGroupId) {
+      if (query && query.rootItemId) {
         return { toArray: async () => { throw new Error('simulated Mongo fault'); } };
       }
       return originalFind(query, opts);
@@ -299,7 +310,9 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     let siblingQueried = false;
     const originalFind = store.historyCollection.find.bind(store.historyCollection);
     store.historyCollection.find = (query, opts) => {
-      if (query && query.sessionGroupId) siblingQueried = true;
+      // LIN-1468 re-keyed the candidate query onto `rootItemId` (was
+      // `sessionGroupId`) — watch the same field the real query now sends.
+      if (query && query.rootItemId) siblingQueried = true;
       return originalFind(query, opts);
     };
 
@@ -311,5 +324,136 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     assert.equal(siblingQueried, false, 'the sibling group query must not run unless includeGroupFeedback is requested');
     assert.equal(status.feedback.length, 1);
     assert.equal(status.feedback[0].message, 'own beat');
+  });
+});
+
+describe('rootItemId as a first-class item field (LIN-1468, full-A)', () => {
+  test('addItem stamps rootItemId = doc._id for a root dispatch', async () => {
+    const store = makeStore();
+    const doc = await store.addItem('acme', { prompt: 'root dispatch' });
+    assert.equal(doc.rootItemId, doc._id);
+  });
+
+  test('addItem inherits an explicit rootItemId (dispatch-factory.js\'s inheritance seam) for a follow-up', async () => {
+    const store = makeStore();
+    const original = await store.addItem('acme', { prompt: 'start' });
+    const followUp = await store.addItem('acme', {
+      prompt: 'continue', followUpTo: original._id, rootItemId: original.rootItemId
+    });
+    assert.equal(followUp.rootItemId, original._id);
+  });
+
+  test('a worker sharing an autopilot sessionId does NOT inherit rootItemId from sessionId — the three-tier trap', async () => {
+    // Regression test for the single most likely implementation error in the
+    // ticket: sessionGroupId falls back to sessionId, but rootItemId MUST NOT,
+    // or every sibling worker an autopilot spawns would collapse onto one
+    // rootItemId (the exact sibling-collapse bug LIN-1461 fixed, reinstated
+    // in a new field).
+    const store = makeStore();
+    const orchestratorSessionId = 'orchestrator-1';
+    const workerA = await store.addItem('acme', { prompt: 'worker A', sessionId: orchestratorSessionId });
+    const workerB = await store.addItem('acme', { prompt: 'worker B', sessionId: orchestratorSessionId });
+
+    assert.notEqual(workerA.rootItemId, orchestratorSessionId);
+    assert.notEqual(workerB.rootItemId, orchestratorSessionId);
+    assert.notEqual(workerA.rootItemId, workerB.rootItemId, 'sibling workers must get DISTINCT rootItemId anchors');
+    assert.equal(workerA.rootItemId, workerA._id);
+    assert.equal(workerB.rootItemId, workerB._id);
+  });
+
+  test('rootItemId survives the take/archive path (_archiveItem allowlist) — the fixture gap', async () => {
+    // The sharpest trap in the ticket: _archiveItem is an explicit field-by-
+    // field allowlist that runs on the TAKE path. A direct history insert
+    // (used by the legacy-row tests above) cannot catch a missing allowlist
+    // line — this fixture must drive the real take path.
+    const store = makeStore();
+    const doc = await store.addItem('acme', { prompt: 'do the thing' });
+    await store.takeItem(doc._id, 'acme', TOKEN);
+
+    const archived = await store.historyCollection.findOne({ _id: doc._id, urlKey: 'acme' });
+    assert.equal(archived.rootItemId, doc._id, 'rootItemId must survive _archiveItem, not just addItem');
+  });
+
+  test('addFeedback reconciles the item-doc-level rootItemId from tagged feedback, riding the existing atomic update', async () => {
+    const store = makeStore();
+    const original = await store.addItem('acme', { prompt: 'root' });
+    await store.takeItem(original._id, 'acme', TOKEN);
+
+    // A follow-up dispatched WITHOUT the factory's inheritance (simulating a
+    // pre-LIN-1468-aware caller, or the inheritance window before the anchor
+    // existed) starts out with its OWN rootItemId, not the lineage's.
+    const followUp = await store.addItem('acme', { prompt: 'continue', followUpTo: original._id });
+    await store.takeItem(followUp._id, 'acme', TOKEN);
+    const beforeFeedback = await store.historyCollection.findOne({ _id: followUp._id, urlKey: 'acme' });
+    assert.equal(beforeFeedback.rootItemId, followUp._id, 'starts out self-anchored, not yet reconciled');
+
+    // The runner's first tagged feedback POST on the follow-up carries the
+    // TRUE lineage anchor — addFeedback must reconcile the doc-level field to
+    // match, inside the same atomic findOneAndUpdate (never a separate write).
+    await store.addFeedback(followUp._id, 'acme', { message: '[done] finished', rootItemId: original._id }, TOKEN);
+    const afterFeedback = await store.historyCollection.findOne({ _id: followUp._id, urlKey: 'acme' });
+    assert.equal(afterFeedback.rootItemId, original._id, 'reconciled to producer truth by the tagged feedback write');
+  });
+
+  test('legacy split under the straight swap — the queried doc itself falls back via the entry tier', async () => {
+    // A history doc with entry-level rootItemId but NO doc-level field (e.g.
+    // written before this ticket's reconciliation existed) must still resolve
+    // its OWN anchor via the entry-fallback tier (Step 7's pinned precedence),
+    // independent of the candidate query re-key.
+    const store = makeStore();
+    const now = new Date();
+    await store.historyCollection.insertOne({
+      _id: 'legacy-root', urlKey: 'acme', prompt: 'old', promptName: 'Prompt', kind: 'custom',
+      dispatchedAt: now, target: 'cli', status: 'taken', resolvedAt: now, sessionGroupId: 'legacy-root',
+      feedback: [{ message: 'legacy own beat', timestamp: now, rootItemId: 'legacy-root' }]
+      // no doc-level rootItemId
+    });
+
+    const status = await store.getItemStatus('acme', 'legacy-root', { includeGroupFeedback: true });
+    assert.equal(status.feedback.length, 1);
+    assert.equal(status.feedback[0].message, 'legacy own beat');
+  });
+
+  test('legacy split under the straight swap — a field-less SIBLING drops out of the merge (the accepted pre-launch gap)', async () => {
+    // Named per the fork's ruling: under full-A's straight swap (chosen
+    // because this project is pre-launch with no meaningful field-less
+    // corpus), a sibling carrying only an entry-level rootItemId and no
+    // doc-level field is NOT a merge candidate — the candidate query can't
+    // find it. This is the accepted gap; a union-query fallback would find it
+    // instead, but that is not what full-A chose.
+    const store = makeStore();
+    const now = new Date();
+
+    const root = await store.addItem('acme', { prompt: 'root' });
+    await store.takeItem(root._id, 'acme', TOKEN);
+    await store.addFeedback(root._id, 'acme', { message: 'root beat', rootItemId: root._id }, TOKEN);
+
+    // A legacy-shaped sibling in the SAME sessionGroupId, tagged at the entry
+    // level with the same lineage anchor, but never reconciled to the
+    // doc-level field (simulates a pre-LIN-1468 row, inserted directly).
+    await store.historyCollection.insertOne({
+      _id: 'legacy-sibling', urlKey: 'acme', prompt: 'old sibling', promptName: 'Prompt', kind: 'custom',
+      dispatchedAt: now, target: 'cli', status: 'taken', resolvedAt: now, sessionGroupId: root.sessionGroupId,
+      feedback: [{ message: 'legacy sibling beat', timestamp: now, rootItemId: root._id }]
+      // no doc-level rootItemId — the case the straight swap cannot find
+    });
+
+    const status = await store.getItemStatus('acme', root._id, { includeGroupFeedback: true });
+    assert.equal(status.feedback.length, 1, 'the field-less sibling is not found under the straight swap');
+    assert.equal(status.feedback[0].message, 'root beat');
+  });
+
+  test('_formatFeedbackEntries exposes rootItemId conditionally — present when stored, no null when absent', async () => {
+    const store = makeStore();
+    const doc = await store.addItem('acme', { prompt: 'do the thing' });
+    await store.takeItem(doc._id, 'acme', TOKEN);
+    await store.addFeedback(doc._id, 'acme', { message: 'tagged', rootItemId: doc._id }, TOKEN);
+    await store.addFeedback(doc._id, 'acme', { message: 'untagged' }, TOKEN);
+
+    const status = await store.getItemStatus('acme', doc._id);
+    assert.equal(status.feedback[0].rootItemId, doc._id);
+    assert.equal('rootItemId' in status.feedback[1], false, 'an untagged entry must not serialise a null rootItemId key');
+    // Every previously-returned field stays byte-identical.
+    assert.deepEqual(Object.keys(status.feedback[1]).sort(), ['message', 'timestamp', 'url', 'urlLabel'].sort());
   });
 });
