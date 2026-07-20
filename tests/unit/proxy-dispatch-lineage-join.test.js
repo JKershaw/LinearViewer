@@ -530,3 +530,128 @@ describe('LIN-1470 — open question (beat 3): lineage query bound', () => {
     assert.ok(lineageCall.limit >= 200, 'generous enough to never truncate a realistic lineage');
   });
 });
+
+describe('LIN-1470 — review F7: forward-only merge invariant (a row is never reported complete before it was dispatched)', () => {
+  // F1 (T9/T11/T12) closed WHICH ROWS may join a lineage (status allowlist).
+  // F7 found the real axis is WHICH FEEDBACK a joined row may inherit: a
+  // still-running (`taken`) follow-up dispatched AFTER its parent already
+  // finished was joining the lineage and absorbing the parent's earlier
+  // terminal — no status predicate can close that, since the row genuinely
+  // IS `taken`. The grid below is deliberately the full status × timing
+  // cross-product asked for at review, not one more single-cell carve-out:
+  // for queued/cancelled/expired, `joinsLineage` already excludes the row
+  // regardless of timing (characterization, mirrors T9/T11/T12); for `taken`,
+  // timing is the whole story (fix-proving).
+  const DISPATCH_T = '2026-06-22T12:00:00.000Z'; // the row under test's own dispatchedAt
+  const BEFORE = '2026-06-22T11:00:00.000Z';     // sibling terminal BEFORE the row was dispatched
+  const AFTER = '2026-06-22T13:00:00.000Z';      // sibling terminal AT/AFTER the row was dispatched
+
+  const STATUSES = ['queued', 'taken', 'cancelled', 'expired'];
+  const TIMINGS = [
+    { name: 'sibling terminal BEFORE this row\'s dispatchedAt', ts: BEFORE, forwardOfDispatch: false },
+    { name: 'sibling terminal AT/AFTER this row\'s dispatchedAt', ts: AFTER, forwardOfDispatch: true }
+  ];
+
+  for (const status of STATUSES) {
+    for (const timing of TIMINGS) {
+      test(`status=${status} x ${timing.name} — invariant holds`, async () => {
+        const parent = row({
+          id: 'parent-1', rootItemId: 'root-1', dispatchedAt: T1,
+          feedback: [{ message: 'own beat', rootItemId: 'root-1', timestamp: T1 }]
+        });
+        const sibling = row({
+          id: 'sibling-1', rootItemId: 'root-1', followUpTo: 'parent-1', dispatchedAt: T1,
+          feedback: [{ message: '[done] sibling finished', rootItemId: 'root-1', timestamp: timing.ts }]
+        });
+        const target = row({
+          id: 'target-1', rootItemId: 'root-1', followUpTo: 'sibling-1',
+          status, dispatchedAt: DISPATCH_T, feedback: []
+        });
+
+        // Only 'taken' rows join the lineage at all (the F1 allowlist); the
+        // other three statuses are exercised via listItems (queued) or
+        // listHistory (cancelled/expired) exactly as T9/T11/T12 do.
+        const queued = status === 'queued' ? [target] : [];
+        const history = status === 'queued' ? [parent, sibling] : [parent, sibling, target];
+
+        const { app } = buildApp({ queued, history });
+        const { body } = await get(app, '/api/proxy/dispatch');
+        const item = body.items.find(i => i.id === 'target-1');
+
+        const canJoin = status === 'taken';
+        const shouldInherit = canJoin && timing.forwardOfDispatch;
+
+        assert.equal(item.status, shouldInherit ? 'done' : status,
+          `status mismatch for ${status} x ${timing.name}`);
+        assert.equal(item.completedAt, shouldInherit ? timing.ts : null,
+          `completedAt mismatch for ${status} x ${timing.name}`);
+        assert.equal(item.feedbackCount, shouldInherit ? 1 : 0,
+          `feedbackCount mismatch for ${status} x ${timing.name}`);
+
+        // The invariant itself, stated directly rather than inferred from
+        // the field assertions above: never complete before dispatched.
+        if (item.completedAt) {
+          assert.ok(
+            new Date(item.completedAt).getTime() >= new Date(DISPATCH_T).getTime(),
+            `completedAt (${item.completedAt}) must not precede this row's own dispatchedAt (${DISPATCH_T})`
+          );
+        }
+
+        // `?status=` routing must agree with the field, in both directions.
+        const ownStatusList = await get(app, `/api/proxy/dispatch?status=${shouldInherit ? 'done' : status}`);
+        assert.ok(ownStatusList.body.items.find(i => i.id === 'target-1'),
+          `must be found under its own resolved status (${shouldInherit ? 'done' : status})`);
+        if (!shouldInherit) {
+          const doneList = await get(app, '/api/proxy/dispatch?status=done');
+          assert.ok(!doneList.body.items.find(i => i.id === 'target-1'),
+            'must not be routed into ?status=done when it has not earned that terminal');
+        }
+      });
+    }
+  }
+
+  test('headline case (T1) still holds under the forward-only guard: an EARLIER original inherits a LATER follow-up\'s completion', async () => {
+    // Sanity that the fix does not regress the ticket's own motivating case.
+    // The original is dispatched at T1, before its follow-up's T2 completion,
+    // so the forward-only comparison (entry timestamp >= original's own
+    // dispatchedAt) passes trivially.
+    const root = row({
+      id: 'root-1', rootItemId: 'root-1', dispatchedAt: T1,
+      feedback: [{ message: 'own beat', rootItemId: 'root-1', timestamp: T1 }]
+    });
+    const child = row({
+      id: 'child-1', rootItemId: 'root-1', followUpTo: 'root-1', dispatchedAt: T2,
+      feedback: [{ message: '[done] finished', rootItemId: 'root-1', timestamp: T2 }]
+    });
+    const { app } = buildApp({ history: [root, child] });
+    const { body } = await get(app, '/api/proxy/dispatch');
+    const item = body.items.find(i => i.id === 'root-1');
+    assert.equal(item.feedbackCount, 2, 'still lineage-wide (own + child)');
+    assert.equal(item.completedAt, T2, 'still inherits the later lineage terminal');
+    assert.equal(item.status, 'done');
+  });
+
+  test('F7 repro fixture: a running (taken) follow-up dispatched AFTER its already-finished parent must NOT inherit the parent\'s terminal', async () => {
+    const parent = row({
+      id: 'parent-1', rootItemId: 'root-1', dispatchedAt: T1,
+      feedback: [{ message: '[done] finished', rootItemId: 'root-1', timestamp: T2 }]
+    });
+    const runningFollowUp = row({
+      id: 'followup-1', rootItemId: 'root-1', followUpTo: 'parent-1',
+      dispatchedAt: DISPATCH_T, // AFTER the parent's own T2 completion
+      feedback: []
+    });
+    const { app } = buildApp({ history: [parent, runningFollowUp] });
+
+    const { body } = await get(app, '/api/proxy/dispatch');
+    const item = body.items.find(i => i.id === 'followup-1');
+    assert.equal(item.status, 'taken', 'still running — must not read as "done"');
+    assert.equal(item.completedAt, null, 'must not report a completedAt earlier than its own dispatchedAt');
+    assert.equal(item.feedbackCount, 0, 'must not absorb the parent\'s earlier feedback entry');
+
+    const takenList = await get(app, '/api/proxy/dispatch?status=taken');
+    assert.ok(takenList.body.items.find(i => i.id === 'followup-1'), 'must still be found under ?status=taken');
+    const doneList = await get(app, '/api/proxy/dispatch?status=done');
+    assert.ok(!doneList.body.items.find(i => i.id === 'followup-1'), 'must NOT be routed into ?status=done');
+  });
+});

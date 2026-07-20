@@ -1344,7 +1344,7 @@ POST ${baseUrl}/api/proxy/autopilot/kickoff
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
   → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
   → { "items": [{ "id": "...", "status": "queued|taken|done|failed|aborted", "kind": "implementation", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
-  → "feedbackCount", "status" and "completedAt" are lineage-wide (LIN-1470): if this item was repointed to a follow-up dispatch, they reflect the WHOLE lineage's feedback (this row's own plus every row it was repointed to), not just this row's own stored entries — so a repointed row keeps accumulating "feedbackCount" and reaches a terminal "status"/"completedAt" once its follow-up finishes, instead of freezing at the point of repoint. This holds even under "?issueIdentifier=" scoping and even if a follow-up in the lineage was filed under a DIFFERENT issue than the row you're looking at — the lineage is keyed on the dispatch chain, not on the issue, so a scoped list can show a row as complete via a sibling that itself never appears in that same scoped list. Only a row that actually ran ("taken") joins a lineage this way; a still-"queued", "cancelled", or "expired" row always reports its own feedbackCount/status/completedAt (queued: 0/"queued"/null; cancelled/expired: their own — possibly empty — feedback only) regardless of what a same-lineage predecessor already did. Because "status" is derived last-wins over the merged, timestamp-sorted lineage, it is NOT one-way: a row that already reached "done" can later report "failed"/"aborted" if a LATER lineage sibling fails — the field reflects the lineage's current outcome, not merely the first terminal it ever reached.
+  → "feedbackCount", "status" and "completedAt" are lineage-wide (LIN-1470): if this item was repointed to a follow-up dispatch, they reflect the WHOLE lineage's feedback (this row's own plus every row it was repointed to), not just this row's own stored entries — so a repointed row keeps accumulating "feedbackCount" and reaches a terminal "status"/"completedAt" once its follow-up finishes, instead of freezing at the point of repoint. This holds even under "?issueIdentifier=" scoping and even if a follow-up in the lineage was filed under a DIFFERENT issue than the row you're looking at — the lineage is keyed on the dispatch chain, not on the issue, so a scoped list can show a row as complete via a sibling that itself never appears in that same scoped list. Only a row that actually ran ("taken") joins a lineage this way; a still-"queued", "cancelled", or "expired" row always reports its own feedbackCount/status/completedAt (queued: 0/"queued"/null; cancelled/expired: their own — possibly empty — feedback only) regardless of what a same-lineage predecessor already did. The merge is also forward-only (review F7): a "taken" row only inherits a sibling entry timestamped at or after ITS OWN dispatchedAt, so a still-running follow-up dispatched after its parent already finished keeps reporting its own values rather than the parent's earlier terminal — a row is never reported complete before it was itself dispatched. Because "status" is derived last-wins over the merged, timestamp-sorted lineage, it is NOT one-way: a row that already reached "done" can later report "failed"/"aborted" if a LATER lineage sibling fails — the field reflects the lineage's current outcome, not merely the first terminal it ever reached.
 
 GET ${baseUrl}/api/proxy/dispatch/{id}
   → Watch a dispatched item: whether it is still queued or has been taken by the runner, plus any feedback posted back. Poll this after dispatching.
@@ -5174,6 +5174,15 @@ One convention across every endpoint, so you can branch on the same fields every
       // reported `feedbackCount`; `_terminalFeedback` is `_lineageFeedback` PLUS
       // any harvested abort and feeds `status`/`completedAt` — kept separate so
       // the synthetic abort entry never inflates `feedbackCount`.
+      //
+      // Review F7: `joinsLineage` (WHICH ROWS may join) says nothing about
+      // WHICH FEEDBACK a joined row may inherit — a still-`taken` follow-up
+      // dispatched AFTER its parent already finished was absorbing the
+      // parent's earlier terminal. The invariant is structural, not another
+      // status carve-out: a row is never reported complete before it was
+      // itself dispatched. `mergeLineageFeedback` enforces this directly by
+      // taking `i.dispatchedAt` as `since` — a sibling entry only counts if
+      // its timestamp is at or after this row's own dispatch time.
       const resolved = merged.map(i => {
         // Rows that never ran (queued, cancelled, expired) opt out of the
         // lineage join entirely (see above) — `lineageFeedback` stays this
@@ -5181,7 +5190,7 @@ One convention across every endpoint, so you can branch on the same fields every
         const joinsLineage = i.status === 'taken';
         const anchor = joinsLineage ? anchorFor(i) : null;
         const siblingRows = anchor ? (siblingsByAnchor.get(anchor) || []).filter(s => s.id !== i.id) : [];
-        const lineageFeedback = joinsLineage ? mergeLineageFeedback(i.feedback, siblingRows, anchor) : (i.feedback || []);
+        const lineageFeedback = joinsLineage ? mergeLineageFeedback(i.feedback, siblingRows, anchor, i.dispatchedAt) : (i.feedback || []);
         const terminalFeedback = feedbackWithHarvestedAbort(lineageFeedback, abortedTargets.get(i.id));
         return { ...i, _lineageFeedback: lineageFeedback, _terminalFeedback: terminalFeedback, status: deriveTerminalStatus(terminalFeedback) || i.status };
       });

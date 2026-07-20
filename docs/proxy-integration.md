@@ -1421,9 +1421,11 @@ All query params optional. Merges the live queue and recent history, newest firs
 
 Only a row that actually ran (`taken`) joins a lineage this way; a still-`queued`, `cancelled`, or `expired` row always reports its own values (queued: `0`/`"queued"`/`null`; cancelled/expired: their own — possibly empty — feedback only), regardless of what a same-lineage predecessor already did.
 
+**The merge is forward-only: a row is never reported complete before it was itself dispatched (review F7).** A `taken` row only inherits a sibling's feedback entry if that entry's timestamp is at or after the row's own `dispatchedAt` — so a still-running follow-up dispatched *after* its parent already finished keeps reading its own values (`taken`/`null`/its own count), it does not inherit the parent's earlier terminal. The headline lineage case above is unaffected: an *earlier* original dispatch trivially satisfies "at or after" a *later* follow-up's completion.
+
 Because `status` is derived last-wins over the merged, timestamp-sorted lineage, it is not one-way: a row that already reached `done` can later read `failed`/`aborted` if a *later* lineage sibling fails.
 
-Note for aggregating consumers: `feedbackCount` is no longer additive across rows in the same response — every row in a lineage reports the same lineage-wide count, so summing it across listed rows over-counts by lineage depth.
+Note for aggregating consumers: `feedbackCount` is no longer additive across rows in the same response — every row in a lineage reports the same lineage-wide count, so summing it across listed rows over-counts by lineage depth. Relatedly, every `taken` row within one lineage now reports the same `feedbackCount`/`status`/`completedAt`, so `?status=done&limit=20` can be filled entirely by the rows of a single lineage rather than 20 distinct lineages.
 
 ## Error Handling
 
