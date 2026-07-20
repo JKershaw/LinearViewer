@@ -549,6 +549,136 @@ test.describe('Follow-up thread stitching through the real reply-box path (LIN-1
   });
 });
 
+// LIN-1478 (S2b): the render-edge fold — the third and final clause of
+// LIN-1469's regression pin (C1: "a session with >=2 wakes must render as one
+// continuous loop card"). Seeded through the REAL dispatch API, same
+// producer path as LIN-1292 above: a standalone anchor (own dispatch id, no
+// sessionId) driven to a [working] heartbeat, then a REAL reply-box-shaped
+// POST ({prompt, followUpTo, target}) that stitches a follow-up into the same
+// session and — via dispatch-factory.js's followUpTo inheritance seam —
+// inherits the anchor's rootItemId, so this is a genuine lineage, not a
+// hand-built one. Left non-terminal (no [done]/[failed]) on both wakes, per
+// the ticket's C1 clause: a still-running multi-wake session, not a finished
+// one. C2 (advancing heartbeat) and C3 (not stale) are S2a's (LIN-1477),
+// unit-only until now — this is their first end-to-end observation, and must
+// not regress.
+async function seedLineageWarm(page, { issueIdentifier, issueTitle }) {
+  const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'investigate the flake', promptName: 'implementation', kind: 'implementation', issueIdentifier, issueTitle, target: 'cli' }
+  });
+  expect(res.status(), `anchor seed failed: ${await res.text()}`).toBe(201);
+  const anchor = (await res.json()).item;
+
+  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+  const { token } = await tokenResp.json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+  const take1 = await page.request.post(`/api/dispatch/take/${anchor.id}`, { headers: auth });
+  expect(take1.status(), `anchor take failed: ${await take1.text()}`).toBe(200);
+  const beat1 = await page.request.post(`/api/dispatch/feedback/${anchor.id}`, {
+    headers: auth, data: { message: '[working] 4 tools/20s · alive' }
+  });
+  expect(beat1.status(), `anchor heartbeat failed: ${await beat1.text()}`).toBe(200);
+
+  // The follow-up, through the SAME wire shape public/session.js's reply box
+  // posts (LIN-1292): {prompt, followUpTo, target}, no sessionId.
+  const replyRes = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'continue investigating the flake', followUpTo: anchor.id, target: 'cli' }
+  });
+  expect(replyRes.status(), `follow-up seed failed: ${await replyRes.text()}`).toBe(201);
+  const followUp = (await replyRes.json()).item;
+
+  const take2 = await page.request.post(`/api/dispatch/take/${followUp.id}`, { headers: auth });
+  expect(take2.status(), `follow-up take failed: ${await take2.text()}`).toBe(200);
+  const beat2 = await page.request.post(`/api/dispatch/feedback/${followUp.id}`, {
+    headers: auth, data: { message: '[working] 9 tools/45s · alive' }
+  });
+  expect(beat2.status(), `follow-up heartbeat failed: ${await beat2.text()}`).toBe(200);
+
+  return { anchor, followUp, token };
+}
+
+test.describe('Lineage-continuous rendering (LIN-1478)', () => {
+  test('a session with >=2 wakes renders one continuous loop card, with an advancing heartbeat and not stale', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const { anchor, followUp } = await seedLineageWarm(page, { issueIdentifier: 'LIN-1478', issueTitle: 'Lineage fold repro' });
+
+    // C1 — the fold: exactly one session-lineage container, holding both
+    // wakes as still-individually-addressable session-run segments.
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(anchor.id)}`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
+    await expect(page.locator('[data-testid="session-lineage"]')).toHaveCount(1);
+    const runsInLineage = page.locator('[data-testid="session-lineage"] [data-testid="session-run"]');
+    await expect(runsInLineage).toHaveCount(2);
+    const loopIds = await runsInLineage.evaluateAll(els => els.map(el => el.getAttribute('data-loop-id')));
+    expect(loopIds).toContain(anchor.id);
+    expect(loopIds).toContain(followUp.id);
+
+    // C2/C3 (S2a, LIN-1477) observed end-to-end: the session's own feed row
+    // shows an advancing heartbeat (the second wake's own peak tool count
+    // exceeds the first's — each wake's OWN beat, not a merged/aggregated
+    // figure) and the session is not stale.
+    const feed = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions?view=sessions`);
+    expect(feed.status()).toBe(200);
+    const body = await feed.json();
+    const all = [...(body.active || []), ...(body.recent || [])];
+    const s = all.find(x => x.sessionId === anchor.id);
+    expect(s, `no session found for anchor ${anchor.id}: ${JSON.stringify(body.counts)}`).toBeTruthy();
+    expect(s.stale).toBe(false);
+    expect(s.status).toBe('in-progress');
+    const wake1 = s.runs.find(r => r.loopId === anchor.id);
+    const wake2 = s.runs.find(r => r.loopId === followUp.id);
+    expect(wake1, 'first wake present in the session\'s own runs').toBeTruthy();
+    expect(wake2, 'second wake present in the session\'s own runs').toBeTruthy();
+    expect(wake1.toolPeak).toBe(4);
+    expect(wake2.toolPeak).toBe(9);
+    expect(wake2.toolPeak).toBeGreaterThan(wake1.toolPeak);
+  });
+
+  test('reply targeting + force equivalence: a reply from the folded card posts followUpTo = the lineage tail, never the root', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const { anchor, followUp } = await seedLineageWarm(page, { issueIdentifier: 'LIN-1478', issueTitle: 'Lineage tail-reply repro' });
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(anchor.id)}`);
+    await page.waitForLoadState('networkidle');
+    const lineage = page.locator('[data-testid="session-lineage"]');
+    await expect(lineage).toHaveCount(1);
+
+    // Exactly ONE reply box for the whole lineage — the tail's own box,
+    // hoisted to the container footer, never the root's.
+    const box = lineage.locator('[data-testid="session-inline-reply"]');
+    await expect(box).toHaveCount(1);
+    await expect(box).toHaveAttribute('data-loop-id', followUp.id);
+    const boxLoopId = await box.getAttribute('data-loop-id');
+    expect(boxLoopId).not.toBe(anchor.id);
+    // force equivalence (LIN-1252): both wakes are non-terminal, so
+    // data-terminal must be false — the TAIL's own status. If this were
+    // wrongly aggregated with any()/all() over the lineage it would still
+    // read false here (neither wake is terminal), so this alone doesn't
+    // distinguish the derivations — the adversarial cases are unit-tested
+    // (tests/unit/render-session.test.js); this pins the byte-for-byte
+    // equivalence of the wire shape a real reply produces.
+    await expect(box).toHaveAttribute('data-terminal', 'false');
+
+    // Drive the REAL reply-box producer path — exactly what a human does.
+    const [request] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
+      (async () => {
+        await box.locator('textarea').fill('one more nudge on the flake');
+        await box.locator('[data-testid="session-inline-reply-send"]').click();
+      })()
+    ]);
+    const payload = request.postDataJSON();
+    expect(payload.followUpTo).toBe(followUp.id);
+    expect(payload.followUpTo).not.toBe(anchor.id);
+    const resp = await request.response();
+    expect(resp.status()).toBe(201);
+  });
+});
+
 // Note: cross-workspace / no-session isolation is workspaceFromUrl's contract
 // (shared middleware, covered by existing specs) and is not re-tested here — in
 // PAT mode the server auto-recreates a session on the next visit, so "no
