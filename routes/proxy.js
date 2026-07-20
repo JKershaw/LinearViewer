@@ -5142,7 +5142,11 @@ One convention across every endpoint, so you can branch on the same fields every
     );
 
     try {
-      const item = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id);
+      // This watch/poll seam is the one caller of getItemStatus that actually
+      // reads `feedback` to derive terminal status, so it's the one caller
+      // that opts into the (indexed-query-plus-merge) group feedback read —
+      // see getItemStatus's includeGroupFeedback doc (LIN-1461).
+      const item = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id, { includeGroupFeedback: true });
       if (!item) {
         logEvent(req, '/api/proxy/dispatch/:id', 404);
         return notFound.json(res, 'Dispatch item not found');
@@ -5181,7 +5185,7 @@ One convention across every endpoint, so you can branch on the same fields every
             keepalive.stop();
             return; // client gave up
           }
-          const next = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id);
+          const next = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id, { includeGroupFeedback: true });
           if (!next) break; // item expired mid-wait; return last known snapshot
           current = next;
           if (dispatchWatchChanged(baseline, current)) { reason = 'change'; break; }
