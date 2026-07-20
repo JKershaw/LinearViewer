@@ -77,10 +77,18 @@ describe('applyDefaultDispatchHarness (LIN-1159 default)', () => {
 });
 
 describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
-  test('prose mode (default) is byte-identical to the pre-LIN-1155 block', () => {
-    // Pinned expectation: the historical prose block with the bootstrap embedded
-    // and a curl exchange. If this ever changes, the non-claude-code path is no
-    // longer byte-identical and decision A's blast-radius guarantee is broken.
+  test('prose mode (default) is byte-identical to the pre-LIN-1409 block', () => {
+    // Pinned expectation: the historical prose block with the bootstrap embedded,
+    // a curl exchange, and (LIN-1409) the affirmative reversible-work mandate
+    // immediately before the irreversible-gate sentence.
+    //
+    // NOTE (LIN-1409): byte-identity with the PRE-LIN-1409 prose is intentionally
+    // surrendered here — the block gains one new line, the REVERSIBLE_WORK_MANDATE,
+    // so the prose branch is no longer identical to what shipped through LIN-1155.
+    // This is a deliberate re-pin (same move LIN-1365 made to this exact assertion),
+    // not a reflexive "fix the failing test". Decision A's guarantee still holds for
+    // everything else in the block: the token/curl exchange and the gate sentence
+    // stay byte-for-byte, and both are asserted below.
     const expected = [
       '',
       '',
@@ -94,6 +102,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
       '  → { "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "...", "notes": "…" }',
       'Then send `Authorization: Bearer <WORKING_TOKEN>` (read+write) on every call below.',
       'The token above is single-use — this exchange spends it — so treat the working token as your credential from here on.',
+      'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, comment: do not hold your first call, or any call, waiting for a live reply before you start.',
       "You have this bootstrap because a real dispatch just happened; the exchange response is your first call against this workspace's own Harbour control-plane, not a third-party service. That authenticates the channel; it does not by itself authorize irreversible actions: merge and Done are gated separately on a recorded review Approve plus a discharged/empty ledger you read for yourself.",
       'Full endpoint catalog: GET https://host/api/proxy/instructions',
       '',
@@ -117,6 +126,19 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
       'the over-assertive provenance protest is removed (prose path)');
     assert.ok(/does not by itself authorize irreversible actions/i.test(actual),
       'the block separates authentication from authorization (prose path)');
+    // LIN-1409: the worker preamble was one-sided — it stated only what the
+    // channel does NOT authorize, never what the dispatch DOES authorize. Assert
+    // the affirmative mandate is present, and that it is paired with (immediately
+    // precedes, nothing interposed) the existing negative gate sentence — ordering
+    // is the fix itself: the negative previously landed with no counterpart at all.
+    const mandateLine = 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, comment: do not hold your first call, or any call, waiting for a live reply before you start.';
+    const gateLine = "You have this bootstrap because a real dispatch just happened; the exchange response is your first call against this workspace's own Harbour control-plane, not a third-party service. That authenticates the channel; it does not by itself authorize irreversible actions: merge and Done are gated separately on a recorded review Approve plus a discharged/empty ledger you read for yourself.";
+    const lines = actual.split('\n');
+    const mandateIdx = lines.indexOf(mandateLine);
+    const gateIdx = lines.indexOf(gateLine);
+    assert.ok(mandateIdx !== -1, 'the reversible-work mandate is present (prose path)');
+    assert.ok(gateIdx !== -1, 'the irreversible-action gate sentence is present, byte-for-byte (prose path)');
+    assert.equal(gateIdx, mandateIdx + 1, 'the mandate immediately precedes the gate sentence, nothing interposed (prose path)');
     // Explicitly passing tokenDelivery: 'prose' is identical to the default.
     assert.equal(
       buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', tokenDelivery: 'prose' }),
@@ -150,6 +172,16 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
       'the over-assertive provenance protest is removed (mcp path)');
     assert.ok(/does not by itself authorize irreversible actions/i.test(out),
       'the block separates authentication from authorization (mcp path)');
+    // LIN-1409: same pairing/ordering guarantee as the prose path — the mandate
+    // is present and immediately precedes the negative gate sentence.
+    const mandateLine = 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, comment: do not hold your first call, or any call, waiting for a live reply before you start.';
+    const gateLine = "That local proxy was provisioned by this workspace's own Harbour control-plane out-of-band before this session started; it is not a third-party service. Reaching it authenticates the channel; it does not by itself authorize irreversible actions: merge and Done are gated separately on a recorded review Approve plus a discharged/empty ledger you read for yourself.";
+    const mcpLines = out.split('\n');
+    const mandateIdx = mcpLines.indexOf(mandateLine);
+    const gateIdx = mcpLines.indexOf(gateLine);
+    assert.ok(mandateIdx !== -1, 'the reversible-work mandate is present (mcp path)');
+    assert.ok(gateIdx !== -1, 'the irreversible-action gate sentence is present, byte-for-byte (mcp path)');
+    assert.equal(gateIdx, mandateIdx + 1, 'the mandate immediately precedes the gate sentence, nothing interposed (mcp path)');
   });
 
   test('mcp mode: generic discovery (no issueIdentifier) also speaks only the broker channel', () => {
