@@ -23,7 +23,12 @@ const ABORT_TS = '2026-06-22T12:00:00.000Z';
 const DONE_TS = '2026-06-22T12:00:00.000Z';
 const EARLIER_ABORT_TS = '2026-06-22T11:30:00.000Z';
 
-// Build an app whose dispatch store returns the given live (queued) + history rows.
+// Build an app whose dispatch store returns the given live (queued) + history
+// rows. LIN-1470: the stubs are OPTIONS-AWARE (honour `rootItemId.$in`,
+// `projection`, `limit`) rather than zero-arg — the list endpoint now issues
+// a SECOND, differently-shaped `listHistory` call (the lineage batch query),
+// and a stub that returns the identical fixture set regardless of options
+// would pass these tests accidentally, proving nothing about that query.
 function buildApp({ queued = [], history = [] } = {}) {
   const app = express();
   app.use(express.json());
@@ -40,7 +45,14 @@ function buildApp({ queued = [], history = [] } = {}) {
     briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       listItems: async () => queued,
-      listHistory: async () => ({ items: history })
+      listHistory: async (urlKey, opts = {}) => {
+        if (opts.rootItemId && opts.rootItemId.$in) {
+          const anchors = opts.rootItemId.$in;
+          return { items: history.filter(r => anchors.includes(r.rootItemId)) };
+        }
+        const items = opts.limit ? history.slice(0, opts.limit) : history;
+        return { items };
+      }
     },
     workspaceFromUrl: (req, res, next) => next(),
     freeTierStore: { tryUse: async () => ({ allowed: true }) }

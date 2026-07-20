@@ -1417,6 +1417,16 @@ All query params optional. Merges the live queue and recent history, newest firs
 { "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "dispatchedAt": "...", "resolvedAt": "...", "completedAt": "...", "feedbackCount": 10 } ], "total": 1 }
 ```
 
+**`feedbackCount`/`status`/`completedAt` are lineage-wide (LIN-1470).** If a row was repointed to a follow-up dispatch (`followUpTo`), these three fields reflect the WHOLE lineage's feedback — this row's own plus every row it was repointed to — not just this row's own stored entries. A repointed row keeps accumulating `feedbackCount` and reaches a terminal `status`/`completedAt` once its follow-up finishes, instead of freezing at the point of repoint. This holds even under `?issueIdentifier=` scoping, and even when a follow-up in the lineage was filed under a *different* issue than the row you're looking at (the lineage is keyed on the dispatch chain, not the issue), so a scoped list can show a row as complete via a sibling that never itself appears in that same scoped list.
+
+Only a row that actually ran (`taken`) joins a lineage this way; a still-`queued`, `cancelled`, or `expired` row always reports its own values (queued: `0`/`"queued"`/`null`; cancelled/expired: their own — possibly empty — feedback only), regardless of what a same-lineage predecessor already did.
+
+**The merge is forward-only: a row is never reported complete before it was itself dispatched (review F7).** A `taken` row only inherits a sibling's feedback entry if that entry's timestamp is at or after the row's own `dispatchedAt` — so a still-running follow-up dispatched *after* its parent already finished keeps reading its own values (`taken`/`null`/its own count), it does not inherit the parent's earlier terminal. The headline lineage case above is unaffected: an *earlier* original dispatch trivially satisfies "at or after" a *later* follow-up's completion.
+
+Because `status` is derived last-wins over the merged, timestamp-sorted lineage, it is not one-way: a row that already reached `done` can later read `failed`/`aborted` if a *later* lineage sibling fails.
+
+Note for aggregating consumers: `feedbackCount` is no longer additive across rows in the same response. Rows in one lineage report *overlapping* counts — each covers its own feedback plus every lineage entry timestamped at or after its own `dispatchedAt` — so summing across listed rows double-counts the shared entries. Note that overlapping is not identical: because the merge is forward-only, a later-dispatched row inherits a strict subset of what an earlier sibling sees, so its `feedbackCount` can legitimately be *lower*, and two rows of the same lineage can report different `status`/`completedAt` (a still-running follow-up reads `taken`/`null` while its finished parent reads `done`). What does hold for paging is that several rows of one lineage can share a terminal status, so `?status=done&limit=20` can be filled largely by a single lineage rather than 20 distinct ones.
+
 ## Error Handling
 
 | Status | Error | Description |
