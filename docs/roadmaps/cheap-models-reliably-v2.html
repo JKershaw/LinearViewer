@@ -313,7 +313,7 @@
 
 <div class="wrap">
   <header>
-    <p class="eyebrow">Harbour · delivery roadmap · lineage v2 · v2.2 re-sequence</p>
+    <p class="eyebrow">Harbour · delivery roadmap · lineage v2 · v2.3 · harden cleared</p>
     <h1>Cheap models, reliably — measure the cost, then blast through</h1>
     <p class="lede">
       The mechanism is built. The point now is <b>not to hunt for the perfect model</b> — that's a
@@ -328,10 +328,10 @@
       v2.2 re-sequences the proving phase around measured cost-per-feature (John's ordering, 17 Jul).
     </p>
     <div class="meta-row">
-      <span class="stat" style="border-color:var(--done)"><span class="dot d-done"></span> mechanism + routing + telemetry <b>shipped</b></span>
-      <span class="stat"><span class="dot d-prog"></span> order: <b>harden → observe → run default → measure</b></span>
-      <span class="stat"><span class="dot d-todo"></span> model choice = a <b>default</b>, not a project</span>
-      <span class="stat">updated <b>17 Jul</b> · <span class="rid">v2.2</span></span>
+      <span class="stat" style="border-color:var(--done)"><span class="dot d-done"></span> <b>Harden wave cleared</b> — run-breaking bugs done</span>
+      <span class="stat"><span class="dot d-prog"></span> now on <b>Observe</b> — cost capture in progress (<span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1425">LIN-1425</a></span>)</span>
+      <span class="stat"><span class="dot d-todo"></span> next: <b>run a default</b> + read cost-per-feature</span>
+      <span class="stat">updated <b>18 Jul</b> · <span class="rid">v2.3</span></span>
     </div>
     <div class="ribbon">
       <span class="rlab">already shipped</span>
@@ -353,16 +353,16 @@
     </p>
     <div class="spine">
       <div class="loop">
-        <div class="step active">
-          <span class="n">1</span><div class="sh">Harden</div>
-          <div class="sd">Fix the run-breaking bugs so an unattended run can't wedge, fail, or lie about its cost.</div>
-          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a> · 1358 · 1409 · 1397</div>
+        <div class="step">
+          <span class="n">1</span><div class="sh">Harden ✓</div>
+          <div class="sd">Run-breaking bugs cleared — unattended runs no longer wedge, drop, or lie.</div>
+          <div class="sids">1355·1358·1409·1397·1360·1323/4 ✓</div>
         </div>
         <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
-        <div class="step">
+        <div class="step active">
           <span class="n">2</span><div class="sh">Observe</div>
           <div class="sd">Cost <b>in £</b> + wall-clock, per session. The number is the product — tokens alone won't do.</div>
-          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a> ✓ · £-display gap</div>
+          <div class="sids"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1425">LIN-1425</a> in progress · <a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1426">LIN-1426</a> next</div>
         </div>
         <div class="arrow"><svg viewBox="0 0 30 20"><path d="M0 10 H24 M18 4 L24 10 L18 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></div>
         <div class="step">
@@ -396,9 +396,9 @@
     <p class="sec-sub">Four checks, in the order you'll clear them. The last one is the actual goal — a number you can act on.</p>
     <div class="acc">
       <div class="acc-item">
-        <h4><span class="k">1</span> Reliable</h4>
+        <h4><span class="k">1</span> Reliable <span style="color:var(--done)">◐</span></h4>
         <p>An unattended run completes without wedging, failing silently, or losing its work — cheap model or not.</p>
-        <p class="proves">cleared by: Harden</p>
+        <p class="proves">Harden wave done ✓ — one new bug open (<a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1428">LIN-1428</a>: resumed sessions can't write back)</p>
       </div>
       <div class="acc-item">
         <h4><span class="k">2</span> Observable — in money</h4>
@@ -424,25 +424,25 @@
     <p class="sec-sub">Two streams do the work now (Harden, Observe); Run is a small switch-on once they're ready; Optimise is parked until the cost data asks for it.</p>
     <div class="pillars">
       <div class="pillar">
-        <header><h3>Harden — runs that don't lie</h3><span class="tag">now · #1</span></header>
-        <p class="pdesc">Only the <b>run-breaking</b> bugs — the ones that wedge, drop, or falsify a run. Cosmetic issues get fixed later, by building.</p>
+        <header><h3>Harden — runs that don't lie</h3><span class="tag">done ✓ · #1</span></header>
+        <p class="pdesc">The run-breaking bugs are cleared. One new one surfaced (1428); the rest is cosmetic, fixed by building.</p>
         <ul class="rows">
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1409">LIN-1409</a></span> Relax human-gate → run-to-completion <span class="badge-key">unlocks unattended</span></span><span class="prio hot">p2</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a></span> beat-2 suppression · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1358">LIN-1358</a></span> wedged 195m resume</span><span class="prio hot">p1</span></li>
-          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1397">LIN-1397</a></span> stall-failsafe refire · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1360">LIN-1360</a></span> trustworthy session setup</span><span class="prio">p2</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1323">LIN-1323</a>/1324</span> poll defeats follow-ups · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1413">LIN-1413</a></span> stale token pin</span><span class="prio">p2</span></li>
-          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a></span> live-session ✓ · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1375">LIN-1375</a></span> token-leak ✓ · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1393">LIN-1393</a></span> chain-split ✓</span><span class="prio">✓</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1428">LIN-1428</a></span> Resumed sessions can't write back (dead local proxy) <span class="badge-bug">new · run-breaking</span></span><span class="prio hot">p1</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a></span> beat-2 · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1358">LIN-1358</a></span> wedged-resume · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1409">LIN-1409</a></span> run-to-completion ✓</span><span class="prio">✓</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1397">LIN-1397</a></span> stall-failsafe · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1360">LIN-1360</a></span> session trust · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1323">LIN-1323</a>/1324</span> poll vs follow-ups ✓</span><span class="prio">✓</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1429">LIN-1429</a>/1430/1431</span> credential provisioning on wake/follow-up <span class="badge-key">the token papercuts</span></span><span class="prio">✓</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1373">LIN-1373</a></span> live-session · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1375">LIN-1375</a></span> token-leak · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1393">LIN-1393</a></span> chain-split ✓</span><span class="prio">✓</span></li>
         </ul>
       </div>
       <div class="pillar">
-        <header><h3>Observe — cost in money + time</h3><span class="tag">now · #2</span></header>
-        <p class="pdesc">Research (17 Jul): <b>time is already shown</b> per worker session. The gap is <b>money + tokens on worker sessions</b> — they emit neither, and cost can't be attributed to a run.</p>
+        <header><h3>Observe — cost in money + time</h3><span class="tag">now · #2 · active</span></header>
+        <p class="pdesc"><b>Time ✓ already shown.</b> The active work is closing the money+tokens gap on worker sessions — capture is now in progress.</p>
         <ul class="rows">
-          <li><span class="chip c-done">done</span><span class="rtitle"><span class="badge-key">time ✓</span> Worker runtime shown on Observation + session pages (wall-clock)</span><span class="prio">✓</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1425">LIN-1425</a></span> Capture worker-session usage (tokens + cost) from the runner <span class="badge-key">gap 1</span></span><span class="prio hot">p2</span></li>
-          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1426">LIN-1426</a></span> Attribute + show <b>cost-per-session in £</b> on the run pages <span class="badge-blocked">← 1425</span></span><span class="prio hot">p2</span></li>
-          <li><span class="chip c-done">done</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-418">LIN-418</a></span> Server-side LLM cost/tokens (USD, per-feature, Settings only) · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a></span> telemetry ✓</span><span class="prio">✓</span></li>
-          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1404">LIN-1404</a>/1405</span> OpenCode relay · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1181">LIN-1181</a></span> Dash cost · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1411">LIN-1411</a></span> budget slider</span><span class="prio">p0/2</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1425">LIN-1425</a></span> Capture worker-session usage (tokens + cost) <span class="badge-key">gap 1 · started</span></span><span class="prio hot">p2</span></li>
+          <li><span class="chip c-back">backlog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1426">LIN-1426</a></span> Show <b>cost-per-session in £</b> on the run pages <span class="badge-blocked">← 1425</span></span><span class="prio hot">p2</span></li>
+          <li><span class="chip c-prog">in prog</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1416">LIN-1416</a>–1421</span> OpenCode telemetry relay (M-series) — M1–3/M6 done, M4/M5 left</span><span class="prio">p0</span></li>
+          <li><span class="chip c-done">done</span><span class="rtitle"><span class="badge-key">time ✓</span> Worker runtime shown · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-418">LIN-418</a></span> server-side cost (USD) · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1287">LIN-1287</a></span> ✓</span><span class="prio">✓</span></li>
+          <li><span class="chip c-todo">todo</span><span class="rtitle"><span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1181">LIN-1181</a></span> Dash cost · <span class="rid"><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1411">LIN-1411</a></span> budget slider</span><span class="prio">p2</span></li>
         </ul>
       </div>
       <div class="pillar">
@@ -472,30 +472,31 @@
     <div class="sec-head"><span class="sec-num">04</span><h2>Execution order — 2–3 in parallel</h2></div>
     <p class="sec-sub">Each wave ends at one of the four checks, so “done” is a thing you can point at.</p>
     <div class="waves">
-      <div class="wave">
-        <div class="wave-label"><span class="wn">Wave 1 · now</span><span class="wt">Make runs trustworthy</span><span class="wgoal">Kill the run-breaking bugs. → check 1</span></div>
+      <div class="wave" style="opacity:.72">
+        <div class="wave-label"><span class="wn">Wave 1 · done ✓</span><span class="wt">Runs trustworthy</span><span class="wgoal">Run-breaking bugs cleared. → check 1 ◐</span></div>
         <div class="wave-body">
-          <div class="lane"><span class="lane-tag">Fix first</span>
-            <span class="tk hot"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1409">LIN-1409</a> <span class="tkt">run-to-completion</span></span>
-            <span class="tk hot"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a> <span class="tkt">beat-2 suppression</span></span>
-            <span class="tk hot"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1358">LIN-1358</a> <span class="tkt">wedged resume</span></span>
+          <div class="lane"><span class="lane-tag">Cleared</span>
+            <span class="tk"><span class="mini d-done"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1409">LIN-1409</a></span>
+            <span class="tk"><span class="mini d-done"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1355">LIN-1355</a></span>
+            <span class="tk"><span class="mini d-done"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1358">LIN-1358</a></span>
+            <span class="tk"><span class="mini d-done"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1397">LIN-1397</a></span>
+            <span class="tk"><span class="mini d-done"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1360">LIN-1360</a></span>
+            <span class="tk"><span class="mini d-done"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1323">LIN-1323</a>/1324</span>
           </div>
-          <div class="lane"><span class="lane-tag">In flight</span>
-            <span class="tk"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1397">LIN-1397</a> <span class="tkt">stall-failsafe</span></span>
-            <span class="tk"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1323">LIN-1323</a>/1324 <span class="tkt">poll vs follow-ups</span></span>
+          <div class="lane"><span class="lane-tag">One left</span>
+            <span class="tk hot"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1428">LIN-1428</a> <span class="tkt">resumed sessions can't write back</span></span>
           </div>
         </div>
       </div>
       <div class="wave">
-        <div class="wave-label"><span class="wn">Wave 2 · next</span><span class="wt">Put cost on screen</span><span class="wgoal">Tokens → £, per session. → check 2</span></div>
+        <div class="wave-label"><span class="wn">Wave 2 · now</span><span class="wt">Put cost on screen</span><span class="wgoal">Tokens → £, per session. → check 2</span></div>
         <div class="wave-body">
           <div class="lane"><span class="lane-tag">The cost gap</span>
-            <span class="tk hot"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1425">LIN-1425</a> <span class="tkt">capture worker usage</span></span>
-            <span class="tk hot"><span class="mini d-todo"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1426">LIN-1426</a> <span class="tkt">per-session cost in £</span></span>
+            <span class="tk hot"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1425">LIN-1425</a> <span class="tkt">capture worker usage · started</span></span>
+            <span class="tk"><span class="mini d-back"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1426">LIN-1426</a> <span class="tkt">per-session cost in £</span></span>
           </div>
           <div class="lane"><span class="lane-tag">OpenCode parity</span>
-            <span class="tk"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1404">LIN-1404</a>/1405 <span class="tkt">tool/event relay</span></span>
-            <span class="tk"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1415">LIN-1415</a> <span class="tkt">transcript</span></span>
+            <span class="tk"><span class="mini d-prog"></span><a class="tlink" href="https://harbour.cat/workspace/linearviewer/swipe/LIN-1416">LIN-1416</a>–1421 <span class="tkt">telemetry relay (M4/M5 left)</span></span>
           </div>
         </div>
       </div>
