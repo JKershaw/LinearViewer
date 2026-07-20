@@ -193,10 +193,12 @@ const landingTrees = landingData.projects
 // Database & Session Setup
 // =============================================================================
 // Uses MongoDB in production (via MONGODB_URI) or MangoDB (file-based) in development.
-// MangoDB stores data in ./data directory for easy local development without MongoDB.
+// MangoDB stores data in ./data by default; HARBOUR_DATA_DIR overrides it so an out-of-tree
+// caller — the full-system hermetic test suite — can point each run at an isolated temp dir and
+// never read or clobber a developer's real ./data. Unset preserves today's behaviour exactly.
 const dbClient = process.env.MONGODB_URI
   ? new MongoClient(process.env.MONGODB_URI)
-  : new MangoClient('./data')
+  : new MangoClient(process.env.HARBOUR_DATA_DIR || './data')
 
 await dbClient.connect()
 const db = dbClient.db('linear-viewer')
