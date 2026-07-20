@@ -1161,6 +1161,98 @@ test.describe('Proxy API - Dispatch', () => {
     expect(watchedB.status).toBe('done');
   });
 
+  // LIN-1470 (review ledger L1): the lineage join on the LIST endpoint, through
+  // the real store rather than a stubbed `dispatchQueueStore`. Every unit test in
+  // proxy-dispatch-lineage-join.test.js injects a stub, and the existing
+  // real-store repoint fixture above covers only the `:id` WATCH endpoint — so
+  // nothing yet proved that `listHistory(urlKey, {rootItemId: {$in: [...]}, limit,
+  // projection})` actually merges a real repointed lineage on the list path. This
+  // is the same fixture as the `:id` test above, asserted on `GET /api/proxy/dispatch`.
+  test('list endpoint reports lineage-wide feedbackCount/status/completedAt for a REPOINTED row (LIN-1470)', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'implement the thing', target: 'cli' }
+    });
+    const originalId = (await enqueue.json()).id;
+    await request.post(`/api/dispatch/take/${originalId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    await request.post(`/api/dispatch/feedback/${originalId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[working] Session launched', rootItemId: originalId }
+    });
+
+    // Pre-repoint baseline on the LIST endpoint: the original is mid-flight.
+    let listed = (await (await request.get('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json()).items.find(i => i.id === originalId);
+    expect(listed.status).toBe('taken');
+    expect(listed.completedAt).toBeNull();
+    expect(listed.feedbackCount).toBe(1);
+
+    // The forward-only guard (review F7) compares the follow-up's `dispatchedAt`
+    // against the parent's feedback timestamps, both stamped by this same server
+    // process at ms precision. This wait is LOAD-BEARING, not politeness: without
+    // it the two can land in the same millisecond and `entryMs >= sinceMs` would
+    // admit the parent's earlier '[working]' entry, making the follow-up's
+    // feedbackCount assertion below flaky rather than wrong.
+    await new Promise(resolve => setTimeout(resolve, 25));
+
+    // The session repoints: the runner posts the terminal marker on the
+    // follow-up's own doc, never touching the original's again.
+    const followUp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'now confirm CI is green', target: 'cli', followUpTo: originalId }
+    });
+    const followUpId = (await followUp.json()).id;
+    await request.post(`/api/dispatch/take/${followUpId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    await request.post(`/api/dispatch/feedback/${followUpId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[done] CI is green', rootItemId: originalId }
+    });
+
+    const all = await (await request.get('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+
+    // The defect this ticket fixes: pre-LIN-1470 the original row froze at the
+    // point of repoint — feedbackCount stuck at 1, status stuck 'taken',
+    // completedAt null forever. It must now read the whole lineage.
+    const original = all.items.find(i => i.id === originalId);
+    expect(original).toBeTruthy();
+    expect(original.feedbackCount).toBe(2);
+    expect(original.status).toBe('done');
+    expect(original.completedAt).not.toBeNull();
+
+    // completedAt is the follow-up's terminal timestamp — a real completion time
+    // inherited across the repoint, not the original's own take time (LIN-400).
+    const followUpWatched = await (await request.get(`/api/proxy/dispatch/${followUpId}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    const terminalEntry = followUpWatched.feedback.find(f => f.message === '[done] CI is green');
+    expect(original.completedAt).toBe(terminalEntry.timestamp);
+    expect(new Date(original.completedAt).getTime()).toBeGreaterThan(new Date(original.resolvedAt).getTime());
+
+    // Review F7, through the real store: the follow-up was dispatched AFTER the
+    // parent's '[working]' entry, so it inherits nothing backwards — it reports
+    // only its own feedback. Two rows of ONE lineage therefore report DIFFERENT
+    // feedbackCounts (2 vs 1), which is exactly why the docs must not claim every
+    // taken row in a lineage reports the same values (review N1).
+    const child = all.items.find(i => i.id === followUpId);
+    expect(child.feedbackCount).toBe(1);
+    expect(child.status).toBe('done');
+
+    // ...and the repointed original is routed into the `done` bucket rather than
+    // vanishing from it (the `?status=` mis-routing half of the filed defect).
+    const doneList = await (await request.get('/api/proxy/dispatch?status=done', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(doneList.items.some(i => i.id === originalId)).toBe(true);
+    expect(doneList.items.every(i => i.status === 'done')).toBe(true);
+  });
+
   test('list endpoint scopes by issueIdentifier (store pushdown, LIN-615)', async ({ request }) => {
     // Two queued items on different issues + one on the target with history.
     const targetIssue = 'LIN-6150';

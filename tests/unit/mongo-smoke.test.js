@@ -500,6 +500,163 @@ describe(
       assert.strictEqual(edge.terminalWakeItems.length, 1, 'one producing item, one slot — no duplicates from the N racers');
     });
 
+    // --- LIN-1470 (review ledger L2): the lineage `$in` query's real plan ---
+    //
+    // The list endpoint's lineage join issues, via listHistory:
+    //   find({urlKey, rootItemId: {$in: anchors}}, {projection: {prompt: 0}})
+    //     .sort({resolvedAt: -1}).skip(0).limit(LINEAGE_QUERY_LIMIT)
+    // The review flagged that {urlKey, rootItemId} covers the PREDICATE but not
+    // the {resolvedAt: -1} SORT, and predicted the real failure mode was "the
+    // 32MB sort-memory limit erroring". Only real Mongo can answer that —
+    // MangoDB has no query planner and no explain() — so it is answered here.
+
+    // The exact query routes/proxy.js issues (LINEAGE_QUERY_LIMIT = 2000).
+    const LINEAGE_QUERY_LIMIT = 2000;
+    const lineageCursor = (collection, anchors) =>
+      collection
+        .find({ urlKey: 'acme', rootItemId: { $in: anchors } }, { projection: { prompt: 0 } })
+        .sort({ resolvedAt: -1 })
+        .skip(0)
+        .limit(LINEAGE_QUERY_LIMIT);
+
+    function findStage(stage, name) {
+      if (!stage) return null;
+      if (stage.stage === name) return stage;
+      return findStage(stage.inputStage, name);
+    }
+
+    async function seedLineages(collection, { lineages, perLineage, noise }) {
+      const anchors = [];
+      const docs = [];
+      for (let a = 0; a < lineages; a++) {
+        const anchor = randomUUID();
+        anchors.push(anchor);
+        for (let m = 0; m < perLineage; m++) {
+          docs.push({
+            _id: randomUUID(), urlKey: 'acme', rootItemId: anchor, status: 'taken',
+            dispatchedAt: new Date(Date.now() - m * 1000),
+            resolvedAt: new Date(Date.now() - m * 500),
+            // The multi-KB field `projection: {prompt: 0}` exists to keep out
+            // (the H12/503 incidents f5a94a53/15ca7b47).
+            prompt: 'x'.repeat(5000),
+            feedback: [{ message: '[done] ok', timestamp: new Date(), rootItemId: anchor }]
+          });
+        }
+      }
+      for (let n = 0; n < noise; n++) {
+        docs.push({
+          _id: randomUUID(), urlKey: 'acme', rootItemId: randomUUID(), status: 'taken',
+          resolvedAt: new Date(), prompt: 'x'.repeat(5000), feedback: []
+        });
+      }
+      await collection.insertMany(docs);
+      return anchors;
+    }
+
+    test('lineage $in query is served by the {urlKey, rootItemId} index, not a collection scan (LIN-1470 L2)', async () => {
+      const collection = freshCollection('lineage-explain');
+      // Build the index from the SHIPPED spec, so this can't drift from
+      // db-indexes.js and quietly explain a different shape than production.
+      const spec = INDEX_SPECS.find(
+        (s) => s.collection === 'dispatch-history' &&
+          JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, rootItemId: 1 })
+      );
+      assert.ok(spec, 'expected the {urlKey, rootItemId} dispatch-history spec (LIN-1468) in db-indexes.js');
+      await collection.createIndex(spec.keySpec, spec.options);
+
+      // 25 anchors x 8 rows = 200 lineage rows among 3000 unrelated rows —
+      // a full page's worth of anchors fanned out in ONE $in, which is the
+      // shape only the list endpoint produces (`_collectGroupFeedback` on the
+      // `:id` seam sends a single anchor).
+      const anchors = await seedLineages(collection, { lineages: 25, perLineage: 8, noise: 3000 });
+
+      const explained = await lineageCursor(collection, anchors).explain('executionStats');
+      const stats = explained.executionStats;
+
+      const ixscan = findStage(stats.executionStages, 'IXSCAN');
+      assert.ok(ixscan, 'the lineage query must be served by an index scan, not a COLLSCAN');
+      assert.strictEqual(
+        ixscan.indexName,
+        'urlKey_1_rootItemId_1',
+        'the lineage query must use the LIN-1468 {urlKey, rootItemId} index'
+      );
+      assert.strictEqual(
+        findStage(stats.executionStages, 'COLLSCAN'),
+        null,
+        'no collection scan may appear in the winning plan'
+      );
+
+      // Cost is bounded by the MATCHED lineage, not by history size: 200 of
+      // 3200 docs touched. This is the property the H12/503 incidents care about.
+      assert.strictEqual(stats.nReturned, 200, 'exactly the seeded lineage rows come back');
+      assert.strictEqual(stats.totalDocsExamined, 200, 'only matched lineage docs are fetched');
+      assert.ok(
+        stats.totalKeysExamined < 400,
+        `index keys examined should track the matched set, got ${stats.totalKeysExamined}`
+      );
+    });
+
+    test('the lineage sort is blocking but spills to disk rather than erroring (LIN-1470 L2 risk model)', async () => {
+      const collection = freshCollection('lineage-sort');
+      await collection.createIndex({ urlKey: 1, rootItemId: 1 });
+      const anchors = await seedLineages(collection, { lineages: 25, perLineage: 8, noise: 0 });
+
+      const sortStage = findStage(
+        (await lineageCursor(collection, anchors).explain('executionStats')).executionStats.executionStages,
+        'SORT'
+      );
+
+      // Confirms the review's structural read: {urlKey, rootItemId} does not
+      // cover {resolvedAt: -1}, so Mongo sorts the matched set in memory. If a
+      // future index ever covers the sort, this assertion should fail and be
+      // removed DELIBERATELY rather than silently drifting.
+      assert.ok(sortStage, 'the {resolvedAt: -1} sort is not index-covered, so a blocking SORT is expected');
+      assert.strictEqual(sortStage.usedDisk, false, 'a realistic lineage sorts well within memory');
+
+      // The review assumed a 32MB ceiling. Measured on the engine CI actually
+      // runs (mongo:8.0), the blocking-sort budget is 100MB — and the `>=` is
+      // deliberately loose so this pins the CLAIM (materially more headroom
+      // than 32MB) rather than one server build's exact default.
+      assert.ok(
+        sortStage.memLimit >= 32 * 1024 * 1024,
+        `blocking-sort budget should exceed the 32MB assumed in review, got ${sortStage.memLimit}`
+      );
+    });
+
+    test('an OVER-budget lineage sort degrades to a disk spill, it does not throw (LIN-1470 L2)', async () => {
+      // The review's stated worst case was the sort-memory limit ERRORING. That
+      // is not this query's failure mode: `find()` blocking sorts have used
+      // allowDiskUse-by-default since MongoDB 4.4, so exceeding the budget
+      // degrades to a disk spill and still returns a complete result. Proven
+      // by squeezing the budget rather than seeding 100MB of documents.
+      const collection = freshCollection('lineage-sort-overflow');
+      await collection.createIndex({ urlKey: 1, rootItemId: 1 });
+      const anchors = await seedLineages(collection, { lineages: 1, perLineage: 2000, noise: 0 });
+
+      const paramName = 'internalQueryMaxBlockingSortMemoryUsageBytes';
+      const original = (await db.admin().command({ getParameter: 1, [paramName]: 1 }))[paramName];
+      try {
+        await db.admin().command({ setParameter: 1, [paramName]: 200 * 1024 });
+
+        const sortStage = findStage(
+          (await lineageCursor(collection, anchors).explain('executionStats')).executionStats.executionStages,
+          'SORT'
+        );
+        assert.strictEqual(sortStage.usedDisk, true, 'an over-budget sort should spill to disk');
+
+        // The load-bearing half: a complete, un-truncated result, no throw.
+        const rows = await lineageCursor(collection, anchors).toArray();
+        assert.strictEqual(
+          rows.length,
+          LINEAGE_QUERY_LIMIT,
+          'the spilled sort still returns the full capped result set rather than erroring'
+        );
+      } finally {
+        // Restore before any later test observes a squeezed budget.
+        await db.admin().command({ setParameter: 1, [paramName]: original });
+      }
+    });
+
     test('addFeedback: TWO DISTINCT beat items sharing one edge each win their own terminalWakeItems CAS slot on real MongoDB (LIN-1357)', async () => {
       // The regression this ticket fixes, proven against real MongoDB: a
       // multi-beat stepper's beat 1 and beat 2 are distinct dispatch ids that

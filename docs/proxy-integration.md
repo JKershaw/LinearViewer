@@ -1425,7 +1425,7 @@ Only a row that actually ran (`taken`) joins a lineage this way; a still-`queued
 
 Because `status` is derived last-wins over the merged, timestamp-sorted lineage, it is not one-way: a row that already reached `done` can later read `failed`/`aborted` if a *later* lineage sibling fails.
 
-Note for aggregating consumers: `feedbackCount` is no longer additive across rows in the same response — every row in a lineage reports the same lineage-wide count, so summing it across listed rows over-counts by lineage depth. Relatedly, every `taken` row within one lineage now reports the same `feedbackCount`/`status`/`completedAt`, so `?status=done&limit=20` can be filled entirely by the rows of a single lineage rather than 20 distinct lineages.
+Note for aggregating consumers: `feedbackCount` is no longer additive across rows in the same response. Rows in one lineage report *overlapping* counts — each covers its own feedback plus every lineage entry timestamped at or after its own `dispatchedAt` — so summing across listed rows double-counts the shared entries. Note that overlapping is not identical: because the merge is forward-only, a later-dispatched row inherits a strict subset of what an earlier sibling sees, so its `feedbackCount` can legitimately be *lower*, and two rows of the same lineage can report different `status`/`completedAt` (a still-running follow-up reads `taken`/`null` while its finished parent reads `done`). What does hold for paging is that several rows of one lineage can share a terminal status, so `?status=done&limit=20` can be filled largely by a single lineage rather than 20 distinct ones.
 
 ## Error Handling
 
