@@ -1148,9 +1148,13 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 //   store_unreachable → session store find() threw (dyno booting post-deploy) — transient
 //   session_expired   → a session referenced this workspace but its token expired — re-auth
 //   not_connected     → no session references this workspace — never connected
-//   owner_mismatch    → the owner has no live token, but a DIFFERENT account does — the
-//                       owner account no longer holds this workspace; re-auth will not fix
-//                       it (LIN-1413)
+//   owner_mismatch    → the owner has no live token, but a DIFFERENT account does. A
+//                       SIGNAL, not a proof: it fires both when the owner account genuinely
+//                       no longer holds this workspace (re-auth cannot fix it) and when the
+//                       owner's own token merely lapsed while a legitimate colleague on the
+//                       same workspace is live (re-auth CAN fix it). The session data cannot
+//                       tell those apart — do not claim it can; see detectOwnerAccountMismatch
+//                       and lib/errors.js's hedged owner_mismatch detail (LIN-1413)
 // `provider` is the matched workspace's provider name (e.g. 'linear'), or null
 // when no session referenced the workspace. It lets the session-less consumer
 // proxy resolve the provider per workspace via getProviderForWorkspace (LIN-581),
