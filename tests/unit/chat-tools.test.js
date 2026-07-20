@@ -776,6 +776,35 @@ function multiWakeHistory({
   ];
 }
 
+// LIN-1486 fixture: an ANCHORLESS multi-loop session — two workers sharing an
+// explicit `sessionId` ('sess-orphan') whose orchestrator never dispatched (no
+// kind:'autopilot' loop with that loopId exists), so `_buildSessions`' "orphan
+// explicit-sessionId group" pass builds it with `anchorLoop: null`. Neither
+// worker carries `rootItemId`, so each is its OWN lineage — `w1` is dispatched
+// first and finishes; `w2` is dispatched later and is still running. This
+// exercises `findAnchorLoop(session) || session.loops[0]` picking `w1` (the
+// first-dispatched loop, per `_assembleSession`'s dispatchedAt-ascending
+// order) as the fallback anchor, whose own (single-loop) lineage tail is
+// itself — DELIBERATELY chosen so old and new code disagree: the OLD
+// `sessionIsTerminal` aggregate (`loops.every(loopIsTerminal)`) is false here
+// (w2 is still running), while the NEW tail-of-w1's-own-lineage force is true
+// (w1 is done) — a real behaviour change, not just a re-derivation of the
+// same answer.
+function orphanMultiLoopHistory() {
+  return [
+    sessionHistoryItem({
+      id: 'w1', sessionId: 'sess-orphan', issueIdentifier: 'LIN-620', target: 'cli',
+      dispatchedAt: T_MULTI_ANCHOR_DISPATCHED, resolvedAt: T_MULTI_ANCHOR_DONE, status: 'taken',
+      feedback: [{ message: '[done] Task completed in 4s', timestamp: T_MULTI_ANCHOR_DONE }],
+    }),
+    sessionHistoryItem({
+      id: 'w2', sessionId: 'sess-orphan', issueIdentifier: 'LIN-620', target: 'cli',
+      dispatchedAt: T_MULTI_WAKE_DISPATCHED, resolvedAt: null, status: 'taken',
+      feedback: [{ message: '[working] 1 tools/3s · alive', timestamp: T_MULTI_WAKE_DISPATCHED }],
+    }),
+  ];
+}
+
 describe('pass-3 session reads — list_task_sessions / get_session (LIN-1073)', () => {
   function makeCatalog(history) {
     const provider = makeFakeProvider();
@@ -1193,6 +1222,22 @@ describe('LIN-1486: send_follow_up targets the lineage tail, not the session roo
     await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-cancelled', prompt: 'continue' } });
     assert.strictEqual(dispatchQueueStore.calls[0].item.force, true,
       'a cancelled loop is terminal via agentState alone — no marker is ever posted for it');
+  });
+
+  test('anchorless multi-loop session (orphan explicit-sessionId group) — force is the fallback anchor\'s OWN lineage tail, not the old every() aggregate', async () => {
+    // findAnchorLoop(session) returns null here (no kind:'autopilot' loop), so
+    // the handler falls back to session.loops[0] as its anchor — w1, the
+    // first-dispatched loop. w1's own (single-loop) lineage tail is itself
+    // (done), so force must be true. The OLD sessionIsTerminal aggregate
+    // (loops.every(loopIsTerminal)) would have been FALSE here, since w2 is
+    // still running — proving this is a genuine behaviour change on an
+    // anchorless session, not a no-op re-derivation of the prior answer.
+    const { executeTool, dispatchQueueStore } = makeCatalog(orphanMultiLoopHistory());
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-orphan', prompt: 'continue' } });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.followUpTo, 'w1',
+      'targets the fallback anchor (session.loops[0]) itself, its own lineage tail');
+    assert.strictEqual(dispatchQueueStore.calls[0].item.force, true,
+      'w1 is done; the old every()-across-both-workers aggregate would have said false because w2 is still running');
   });
 });
 
