@@ -592,3 +592,84 @@ describe('getSessionsForWorkspace', () => {
     await assert.rejects(() => getSessionsForWorkspace('ws', {}), /must be injected/);
   });
 });
+
+// ─── Lineage-aware instruments (LIN-1477) ──────────────────────────────────────
+
+function heartbeat(timestamp, message = '[working] 3 tools/30s · alive') {
+  return { message, url: null, urlLabel: null, timestamp };
+}
+
+describe('lineage-aware instruments (LIN-1477)', () => {
+  test('lineageId derives from rootItemId when present', () => {
+    const loops = loopsFrom([
+      worker('root-1', CHILD, '2026-06-22T10:00:00.000Z'),
+      worker('follow-1', CHILD, '2026-06-22T10:30:00.000Z', { rootItemId: 'root-1' })
+    ]);
+    const root = loops.find(l => l.loopId === 'root-1');
+    const follow = loops.find(l => l.loopId === 'follow-1');
+    assert.strictEqual(follow.lineageId, 'root-1');
+    assert.strictEqual(root.lineageId, 'root-1');
+  });
+
+  test("lineageId falls back to the loop's own id when rootItemId is absent (I2)", () => {
+    const [loop] = loopsFrom([worker('solo-1', CHILD, '2026-06-22T10:00:00.000Z')]);
+    assert.strictEqual(loop.lineageId, loop.loopId);
+    assert.strictEqual(loop.loopId, 'solo-1', 'loop identity itself must stay untouched');
+  });
+
+  test('lineageMetrics aggregate heartbeats across every loop sharing a lineage', () => {
+    const loops = loopsFrom([
+      worker('root-2', CHILD, '2026-06-22T10:00:00.000Z', {
+        feedback: [heartbeat('2026-06-22T10:05:00.000Z', '[working] 3 tools/30s · alive')]
+      }),
+      worker('follow-2', CHILD, '2026-06-22T11:00:00.000Z', {
+        rootItemId: 'root-2',
+        feedback: [heartbeat('2026-06-22T11:10:00.000Z', '[working] 5 tools/45s · alive')]
+      })
+    ]);
+    const root = loops.find(l => l.loopId === 'root-2');
+    const follow = loops.find(l => l.loopId === 'follow-2');
+
+    // Both loops in the lineage see the SAME aggregated lineage metrics — the
+    // heartbeat "advances" across the repoint (LIN-1469 C2).
+    assert.strictEqual(root.lineageMetrics.length, 2);
+    assert.strictEqual(follow.lineageMetrics.length, 2);
+    const expectedLastMs = new Date('2026-06-22T11:10:00.000Z').getTime();
+    assert.strictEqual(root.lineageLastActivityMs, expectedLastMs);
+    assert.strictEqual(follow.lineageLastActivityMs, expectedLastMs);
+
+    // Per-run telemetry stays per-item and untouched alongside it (I4).
+    assert.strictEqual(root.telemetry.metrics.length, 1);
+    assert.strictEqual(follow.telemetry.metrics.length, 1);
+  });
+
+  test('lineageLastActivityMs is null when the lineage has no parsed heartbeat', () => {
+    const [loop] = loopsFrom([worker('solo-2', CHILD, '2026-06-22T10:00:00.000Z', { feedback: [] })]);
+    assert.deepStrictEqual(loop.lineageMetrics, []);
+    assert.strictEqual(loop.lineageLastActivityMs, null);
+  });
+
+  test("a sibling's [done] must NOT mark another lineage member terminal (I1 regression pin)", () => {
+    const loops = loopsFrom([
+      worker('root-3', CHILD, '2026-06-22T10:00:00.000Z', {
+        feedback: done('2026-06-22T10:30:00.000Z')
+      }),
+      worker('follow-3', CHILD, '2026-06-22T11:00:00.000Z', {
+        rootItemId: 'root-3',
+        feedback: [heartbeat('2026-06-22T11:05:00.000Z', '[working] 2 tools/10s · alive')]
+      })
+    ]);
+    const follow = loops.find(l => l.loopId === 'follow-3');
+
+    assert.strictEqual(
+      follow.terminalStatus,
+      null,
+      "a sibling's terminal marker must not leak into this loop's OWN terminal status"
+    );
+    // The lineage aggregate is still built from BOTH loops' feedback (metrics
+    // path only) — isolation applies to terminal/wake derivation, not to the
+    // lineage metrics themselves.
+    assert.strictEqual(follow.lineageId, 'root-3');
+    assert.ok(follow.lineageMetrics.length >= 1);
+  });
+});
