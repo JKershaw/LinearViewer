@@ -217,7 +217,7 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     assert.equal(status.feedback[0].message, 'own beat');
   });
 
-  test('equal/missing/unparseable timestamps sort deterministically, without a NaN comparator', async () => {
+  test('equal/valid timestamps sort deterministically; an unverifiable SIBLING entry is excluded (LIN-1480 forward-only fail-closed), while an unverifiable OWN entry always survives', async () => {
     const store = makeStore();
     const urlKey = 'acme';
     const sharedTime = new Date('2026-07-20T08:00:00.000Z');
@@ -229,9 +229,18 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     await store.addFeedback(original._id, urlKey, { message: 'own with bad timestamp', rootItemId: original._id }, TOKEN);
     // Force the timestamps directly on the stored docs (addFeedback always
     // stamps `new Date()`, so overwrite post-hoc to pin exact values/edge cases).
+    // `dispatchedAt` is pinned strictly before `sharedTime` so the forward-only
+    // guard (LIN-1480, `since = doc.dispatchedAt`) deterministically admits the
+    // valid sibling entry below, independent of wall-clock time-of-day.
     const ownDoc = await store.historyCollection.findOne({ _id: original._id, urlKey });
     ownDoc.feedback[0].timestamp = sharedTime;
     ownDoc.feedback[1].timestamp = 'not-a-real-timestamp';
+    // `findOne` returns a shallow copy (mock-collection.js), so a top-level
+    // field like `dispatchedAt` must be set on the STORED doc directly (the
+    // nested `feedback[i]` mutations above work only because the array/objects
+    // inside are shared by reference with the shallow copy).
+    store.historyCollection._docs.find(d => d._id === original._id).dispatchedAt =
+      new Date(sharedTime.getTime() - 60000);
 
     const followUp = await dispatchTakenFollowUp(store, urlKey, {
       prompt: 'continue', followUpTo: original._id, sessionGroupId: original._id
@@ -243,24 +252,28 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     delete siblingDoc.feedback[1].timestamp;
 
     // Two independent reads must return the SAME order every time (determinism),
-    // and must not throw / produce an order that silently drops entries.
+    // and must not throw.
     const first = await store.getItemStatus(urlKey, original._id, { includeGroupFeedback: true });
     const second = await store.getItemStatus(urlKey, original._id, { includeGroupFeedback: true });
 
-    assert.equal(first.feedback.length, 4);
     assert.deepEqual(first.feedback.map(f => f.message), second.feedback.map(f => f.message));
 
-    // Valid timestamps (the two "at shared time" entries) sort before the
-    // invalid/missing ones. Within each tied group the comparator returns 0,
-    // so Array#sort's guaranteed stability (ES2019+) preserves this merge's
-    // own construction order — the queried item's own entries before its
-    // sibling's — on every read, not just this one.
+    // `ownFeedback` is never filtered (LIN-1480 Step 2) — the unparseable OWN
+    // entry always survives. A SIBLING entry, by contrast, is only inherited
+    // if its own timestamp AND `since` are both verifiable (fail-closed) — an
+    // entry the merge cannot verify belongs at/after this row's own dispatch
+    // is dropped rather than merely sorted last, so 'sibling missing
+    // timestamp' does not appear at all.
+    //
+    // Among the two remaining valid-timestamp entries at the exact same
+    // instant, the comparator returns 0, so Array#sort's guaranteed stability
+    // (ES2019+) preserves this merge's own construction order — the queried
+    // item's own entries before its sibling's.
     const messages = first.feedback.map(f => f.message);
     assert.deepEqual(messages, [
       'own at shared time',
       'sibling at shared time',
-      'own with bad timestamp',
-      'sibling missing timestamp'
+      'own with bad timestamp'
     ]);
   });
 
