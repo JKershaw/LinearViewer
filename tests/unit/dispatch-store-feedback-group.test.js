@@ -456,4 +456,19 @@ describe('rootItemId as a first-class item field (LIN-1468, full-A)', () => {
     // Every previously-returned field stays byte-identical.
     assert.deepEqual(Object.keys(status.feedback[1]).sort(), ['message', 'timestamp', 'url', 'urlLabel'].sort());
   });
+
+  test('_formatFeedbackEntries exposes kind conditionally — present when stored, no null when absent (LIN-1475)', async () => {
+    const store = makeStore();
+    const doc = await store.addItem('acme', { prompt: 'do the thing' });
+    await store.takeItem(doc._id, 'acme', TOKEN);
+    await store.addFeedback(doc._id, 'acme', { message: 'beat', kind: 'heartbeat' }, TOKEN);
+    await store.addFeedback(doc._id, 'acme', { message: 'untagged' }, TOKEN);
+
+    const status = await store.getItemStatus('acme', doc._id);
+    assert.equal(status.feedback[0].kind, 'heartbeat');
+    assert.equal('kind' in status.feedback[1], false, 'an untagged entry must not serialise a null kind key');
+    // Every previously-returned field stays byte-identical.
+    assert.deepEqual(Object.keys(status.feedback[0]).sort(), ['kind', 'message', 'timestamp', 'url', 'urlLabel'].sort());
+    assert.deepEqual(Object.keys(status.feedback[1]).sort(), ['message', 'timestamp', 'url', 'urlLabel'].sort());
+  });
 });

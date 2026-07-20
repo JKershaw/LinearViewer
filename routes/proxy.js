@@ -493,6 +493,9 @@ function formatDispatchWatch(item, meta = null) {
       // Additive-only (LIN-1297 idiom, matching _formatFeedbackEntries):
       // assign only when present, never emit `rootItemId: null` (LIN-1468).
       if (f.rootItemId) entry.rootItemId = f.rootItemId;
+      // Additive-only (LIN-1297 idiom, matching _formatFeedbackEntries):
+      // assign only when present, never emit `kind: null` (LIN-1475).
+      if (f.kind) entry.kind = f.kind;
       return entry;
     })
   };
