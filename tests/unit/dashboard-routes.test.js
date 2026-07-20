@@ -803,6 +803,95 @@ describe('GET /api/dashboard/sessions', () => {
   });
 });
 
+// ─── Lineage-aware activity clock + stale derivation (LIN-1477) ───────────────
+// `loopActivityMs` (routes/dashboard.js) folds in `loop.lineageLastActivityMs`
+// (emitted by lib/pipeline-loops.js) so `sessionActivityMs`/`stale` inherit it —
+// a session must not go stale while its lineage is still beating on a repoint,
+// even when the specific loop THIS session tracks is itself long idle.
+describe('lineage-aware activity clock (LIN-1477)', () => {
+  test('a session stays out of stale while its lineage is beating, even though its OWN dispatch is >24h old (C3)', async () => {
+    const OLD_ISO = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const RECENT_BEAT_TS = new Date(Date.now() - 5 * 60 * 1000).toISOString(); // 5 min ago
+    const staleAnchor = { id: 'sess-lineage', kind: 'autopilot', issueIdentifier: 'LIN-720', issueTitle: 'Lineage session', promptName: 'autopilot', prompt: 'p', dispatchedAt: OLD_ISO };
+    // A dispatch sharing the SAME lineage (rootItemId points back at the
+    // anchor's own id) that beat recently. It is NOT itself a member of the
+    // session — the lineage aggregate is built across every loop fetched, not
+    // just a session's own loops (lib/pipeline-loops.js), so this alone must be
+    // enough to advance the anchor's activity clock.
+    const lineageSibling = {
+      id: 'sibling-1', rootItemId: 'sess-lineage', issueIdentifier: 'LIN-721', issueTitle: 'Sibling',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: OLD_ISO, resolvedAt: OLD_ISO, status: 'taken',
+      feedback: [{ message: '[working] 3 tools/30s · alive', url: null, urlLabel: null, timestamp: RECENT_BEAT_TS }]
+    };
+    const router = makeRouter({ 'ws-a': { live: [staleAnchor], history: [lineageSibling], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const s = res.jsonBody.active.find(x => x.sessionId === 'sess-lineage');
+    assert.ok(s, 'the lineage heartbeat keeps the session in Active, not Archive');
+    assert.equal(s.stale, false, 'not marked stale while its lineage is beating (LIN-1469 C3)');
+    assert.equal(s.status, 'in-progress');
+  });
+
+  test('a lineage with no RECENT beat does NOT rescue the session — still goes stale (negative control)', async () => {
+    // Same shape as the previous test, but the sibling's heartbeat is itself old
+    // — isolates the wiring (reads the lineage timestamp) from a hardcoded pass
+    // (any lineage sibling present ⇒ never stale).
+    const OLD_ISO = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const staleAnchor = { id: 'sess-lineage-2', kind: 'autopilot', issueIdentifier: 'LIN-722', issueTitle: 'Lineage session 2', promptName: 'autopilot', prompt: 'p', dispatchedAt: OLD_ISO };
+    const staleLineageSibling = {
+      id: 'sibling-2', rootItemId: 'sess-lineage-2', issueIdentifier: 'LIN-723', issueTitle: 'Sibling 2',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: OLD_ISO, resolvedAt: OLD_ISO, status: 'taken',
+      feedback: [{ message: '[working] 3 tools/30s · alive', url: null, urlLabel: null, timestamp: OLD_ISO }]
+    };
+    const router = makeRouter({ 'ws-a': { live: [staleAnchor], history: [staleLineageSibling], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const s = res.jsonBody.recent.find(x => x.sessionId === 'sess-lineage-2');
+    assert.ok(s, 'no rescue: session lands in the archive');
+    assert.equal(s.stale, true, 'a lineage with no recent beat still goes stale — proves the wiring reads timestamps, not just sibling presence');
+    assert.ok(!res.jsonBody.active.some(x => x.sessionId === 'sess-lineage-2'));
+  });
+
+  test('followUpTo supersede/unfreeze behavior is unaffected by lineage fields (I3)', async () => {
+    // Mirrors the existing LIN-1341 RC2 block-then-replied regression test, with
+    // rootItemId added to both loops, to pin that lineage aggregation composes
+    // with — and never interferes with — the followUpTo supersede rule.
+    const blockedWorker = {
+      id: 'w-li-br', sessionId: 'sess-li-br', issueIdentifier: 'LIN-730', issueTitle: 'Blocked worker (lineage)',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      rootItemId: 'w-li-br',
+      feedback: [{ message: '[blocked] need your decision on the auth flow', timestamp: NOW_ISO }]
+    };
+    const REPLY_TS = new Date(Date.now() + 60000).toISOString();
+    const replyWorker = {
+      id: 'w-li-br-reply', followUpTo: 'w-li-br', rootItemId: 'w-li-br', target: 'cli',
+      issueIdentifier: 'LIN-730', issueTitle: 'Blocked worker (lineage)',
+      promptName: 'implementation', prompt: 'reply', dispatchedAt: REPLY_TS, resolvedAt: REPLY_TS, status: 'taken',
+      feedback: [{ message: '[done] resolved after your input', timestamp: REPLY_TS }]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [autopilotLiveItem('sess-li-br', 'LIN-729')], history: [blockedWorker, replyWorker], agentStatus: [] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-li-br');
+    assert.ok(s, 'session is present');
+    assert.equal(s.waiting, false, 'the reply still clears the superseded [blocked] loop even with rootItemId present on both loops');
+    assert.notEqual(s.status, 'waiting');
+  });
+});
+
 // ─── Descendant recency rollup (LIN-1314) ─────────────────────────────────────
 // "Sub-session" = a descendant CHILD-AUTOPILOT session (its own separate
 // sessionId group), not a worker loop within one session — sessionActivityMs

@@ -284,6 +284,51 @@ test('laneStaleMs is configurable', () => {
   assert.equal(buildConsoleFeed({ statusItems: [], loops: [stale] }, { now, laneStaleMs: 15 * 60 * 1000 }).lanes.length, 0);
 });
 
+// ─── lineage-aware lane survival (LIN-1477) ────────────────────────────────────
+
+test('deriveLoopLanes folds a lineage heartbeat into lastActivityMs when it is the most recent signal', () => {
+  const lp = loop({
+    dispatchedAt: '2026-07-19T10:00:00.000Z',
+    agentTimestamp: '2026-07-19T10:05:00.000Z',
+    telemetry: { metrics: [{ toolCount: 1, timestamp: '2026-07-19T10:10:00.000Z' }], producedArtifacts: [] },
+    // A repoint on the same lineage beat far more recently than this loop's own
+    // dispatch/agent/heartbeat signals.
+    lineageLastActivityMs: Date.parse('2026-07-19T11:55:00.000Z'),
+  });
+  const [lane] = deriveLoopLanes([lp]);
+  assert.equal(lane.lastActivityMs, Date.parse('2026-07-19T11:55:00.000Z'));
+});
+
+test('a lane survives the 1h staleness filter while its lineage is beating, even though the loop itself is idle', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const lp = loop({
+    loopId: 'lineage-lane',
+    issueIdentifier: 'LIN-8',
+    dispatchedAt: '2026-07-19T10:00:00.000Z',
+    agentTimestamp: '2026-07-19T10:15:00.000Z',
+    telemetry: { metrics: [{ toolCount: 2, timestamp: '2026-07-19T10:20:00.000Z' }], producedArtifacts: [] },
+    lineageLastActivityMs: Date.parse('2026-07-19T11:50:00.000Z'), // 10 min ago
+  });
+  const feed = buildConsoleFeed({ statusItems: [], loops: [lp] }, { now });
+  assert.deepEqual(feed.lanes.map(l => l.task), ['LIN-8'], 'the lineage beat keeps the lane alive past its own 1h40m idle own-signals');
+});
+
+test('a stale lineage (no recent beat) does NOT rescue the lane — negative control', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const lp = loop({
+    loopId: 'lineage-lane-2',
+    issueIdentifier: 'LIN-8',
+    dispatchedAt: '2026-07-19T10:00:00.000Z',
+    agentTimestamp: '2026-07-19T10:15:00.000Z',
+    telemetry: { metrics: [{ toolCount: 2, timestamp: '2026-07-19T10:20:00.000Z' }], producedArtifacts: [] },
+    // The lineage aggregate exists but is itself old — must not be treated as a
+    // free pass; this isolates the wiring from a hardcoded "always survives".
+    lineageLastActivityMs: Date.parse('2026-07-19T10:20:00.000Z'),
+  });
+  const feed = buildConsoleFeed({ statusItems: [], loops: [lp] }, { now });
+  assert.deepEqual(feed.lanes, [], 'no recent lineage beat, no rescue — the lane still drops as stale');
+});
+
 // ─── evidence events from [evidence] artifacts ────────────────────────────────
 
 test('normalizeEvidenceEvents turns produced artifacts into linked evidence events', () => {

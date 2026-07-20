@@ -319,12 +319,21 @@ function deriveSessionWaiting(enrichedLoops) {
  * Most-relevant activity timestamp for a run, used to sort the merged feed.
  * Prefers the truthful completion time (terminal feedback marker) so a run that
  * just finished sorts above an older still-running one.
+ *
+ * LIN-1477: also takes the lineage heartbeat (`loop.lineageLastActivityMs`,
+ * emitted by `lib/pipeline-loops.js`) into account, so a loop whose lineage has
+ * since beaten on a follow-up run reads as recently active even though ITS OWN
+ * timestamps predate that beat — the max of the two, never a replacement. This
+ * is the only lineage input into the activity clock; identity/terminal
+ * derivation elsewhere are untouched.
  * @param {Object} loop
  * @returns {number} epoch ms (0 when unknown)
  */
 function loopActivityMs(loop) {
   const t = loop.completedAt || loop.agentTimestamp || loop.resolvedAt || loop.dispatchedAt;
-  const ms = t ? new Date(t).getTime() : 0;
+  const ownMs = t ? new Date(t).getTime() : 0;
+  const lineageMs = Number.isFinite(loop.lineageLastActivityMs) ? loop.lineageLastActivityMs : 0;
+  const ms = Math.max(ownMs, lineageMs);
   return Number.isFinite(ms) ? ms : 0;
 }
 
