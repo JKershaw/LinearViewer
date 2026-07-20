@@ -544,3 +544,97 @@ describe('render-session: blocked/pending transcript marker (LIN-1163 item 6)', 
     assert.equal(entries[2].blocked, true, 'a [pending] entry is flagged');
   });
 });
+
+describe('render-session: lineage-continuous rendering (LIN-1478 S-C fold)', () => {
+  // Two loops sharing a lineageId (the second's `item.rootItemId ?? loop.loopId`
+  // resolves to the first's id, mirroring lib/pipeline-loops.js's derivation).
+  // wake-1 has 1 heartbeat, wake-2 has 3 — distinct `metrics.length`s so the
+  // per-run chip test below can tell "own count" from "bled-in lineage total".
+  function twoWakeSession(overrides = {}) {
+    return fixtureSession({
+      loops: [
+        {
+          loopId: 'wake-1', lineageId: 'wake-1', issueIdentifier: 'LIN-900', issueId: 'uuid-900',
+          issueTitle: 'Seed task', iteration: 1, kind: 'autopilot', dispatchedAt: '2026-07-04T10:00:00.000Z',
+          terminalStatus: null, feedback: [{ message: '[blocked] need a decision', url: null, urlLabel: null, timestamp: '2026-07-04T10:00:01.000Z' }],
+          telemetry: { runtime: { ms: 60000 }, metrics: [{ toolCount: 2 }], producedArtifacts: [] }
+        },
+        {
+          loopId: 'wake-2', lineageId: 'wake-1', followUpTo: 'wake-1', issueIdentifier: 'LIN-900', issueId: 'uuid-900',
+          issueTitle: 'Seed task', iteration: 2, kind: 'autopilot', dispatchedAt: '2026-07-04T10:05:00.000Z',
+          terminalStatus: null, feedback: [{ message: 'resuming after reply', url: null, urlLabel: null, timestamp: '2026-07-04T10:05:01.000Z' }],
+          telemetry: { runtime: { ms: 30000 }, metrics: [{ toolCount: 5 }, { toolCount: 7 }, { toolCount: 9 }], producedArtifacts: [] }
+        }
+      ],
+      ...overrides
+    });
+  }
+
+  test('a two-wake lineage renders ONE session-lineage container holding two session-run segments', () => {
+    const html = renderSessionPage({ session: twoWakeSession(), urlKey: 'ws-a', issueContext: [] });
+    const lineageContainers = html.match(/data-testid="session-lineage"/g) || [];
+    assert.equal(lineageContainers.length, 1, 'exactly one lineage container');
+    assert.match(html, /data-testid="session-lineage" data-lineage-id="wake-1"/);
+    const runSegments = html.match(/data-testid="session-run"/g) || [];
+    assert.equal(runSegments.length, 2, 'both constituent runs still render as session-run segments');
+    assert.match(html, /data-loop-id="wake-1"/, 'the first wake keeps its own data-loop-id');
+    assert.match(html, /data-loop-id="wake-2"/, 'the second wake keeps its own data-loop-id');
+  });
+
+  test('a single-run session renders with NO added lineage chrome — visually unchanged', () => {
+    const session = fixtureSession({
+      loops: [{
+        loopId: 'solo-1', lineageId: 'solo-1', issueIdentifier: 'LIN-900', issueId: 'uuid-900',
+        issueTitle: 'Solo task', iteration: 1, kind: 'autopilot', dispatchedAt: '2026-07-04T10:00:00.000Z',
+        terminalStatus: 'done', terminalCompletedAt: '2026-07-04T10:01:00.000Z',
+        feedback: [{ message: '[done] landed', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:00.000Z' }],
+        telemetry: { runtime: { ms: 60000 }, metrics: [], producedArtifacts: [] }
+      }]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('data-testid="session-lineage"'), 'a lineage of one adds no wrapper');
+    assert.match(html, /data-testid="session-run"[^>]*data-loop-id="solo-1"/);
+  });
+
+  test('two separate lineages in one session render as two containers, not one merged card', () => {
+    const session = fixtureSession({
+      loops: [
+        ...twoWakeSession().loops,
+        {
+          loopId: 'other-1', lineageId: 'other-1', issueIdentifier: 'LIN-901', issueId: 'uuid-901',
+          issueTitle: 'Unrelated task', iteration: 1, kind: 'implementation', dispatchedAt: '2026-07-04T10:10:00.000Z',
+          terminalStatus: 'done', terminalCompletedAt: '2026-07-04T10:12:00.000Z',
+          feedback: [{ message: '[done] separate work', url: null, urlLabel: null, timestamp: '2026-07-04T10:12:00.000Z' }],
+          telemetry: { runtime: { ms: 60000 }, metrics: [], producedArtifacts: [] }
+        }
+      ]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    const lineageContainers = html.match(/data-testid="session-lineage"/g) || [];
+    assert.equal(lineageContainers.length, 1, 'only the two-wake lineage gets a container; the solo other-1 loop does not');
+    assert.match(html, /data-lineage-id="wake-1"/);
+    assert.ok(!html.includes('data-lineage-id="other-1"'), 'a lineage of one carries no data-lineage-id container');
+    const runSegments = html.match(/data-testid="session-run"/g) || [];
+    assert.equal(runSegments.length, 3, 'all three runs across both lineages still render individually');
+  });
+
+  test('per-run telemetry chips stay per-run inside a folded lineage — no bleed between wakes', () => {
+    const html = renderSessionPage({ session: twoWakeSession(), urlKey: 'ws-a', issueContext: [] });
+    // wake-1 has 1 heartbeat, wake-2 has 3 — each run's own chip must reflect
+    // only its own metrics.length, never the lineage total (4).
+    const wake1Block = html.slice(html.indexOf('data-loop-id="wake-1"'), html.indexOf('data-loop-id="wake-2"'));
+    const wake2Block = html.slice(html.indexOf('data-loop-id="wake-2"'));
+    assert.match(wake1Block, /session-run-metrics">◐ 1 heartbeats/, 'wake-1 chip shows its own 1 heartbeat');
+    assert.match(wake2Block, /session-run-metrics">◐ 3 heartbeats/, 'wake-2 chip shows its own 3 heartbeats');
+    assert.ok(!html.includes('4 heartbeats'), 'no chip shows the lineage-wide total');
+  });
+
+  test('lineage grouping preserves loop order and does not re-key loop identity', () => {
+    const html = renderSessionPage({ session: twoWakeSession(), urlKey: 'ws-a', issueContext: [] });
+    const wake1Pos = html.indexOf('data-loop-id="wake-1"');
+    const wake2Pos = html.indexOf('data-loop-id="wake-2"');
+    assert.ok(wake1Pos > -1 && wake2Pos > wake1Pos, 'wake-1 renders before wake-2, matching dispatchedAt order');
+    // loopId is never replaced by lineageId on the run node itself.
+    assert.ok(!html.includes('data-loop-id="undefined"'));
+  });
+});
