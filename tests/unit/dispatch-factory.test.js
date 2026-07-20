@@ -358,6 +358,66 @@ describe('createDispatchItem — sessionGroupId inheritance (LIN-1341)', () => {
   });
 });
 
+describe('createDispatchItem — rootItemId inheritance (LIN-1468)', () => {
+  test('a follow-up inherits its anchor\'s own rootItemId', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { id: 'anchor-1', issueIdentifier: 'LIN-1', rootItemId: 'root-1' }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'one more thing', fields: { followUpTo: 'anchor-1', target: 'cli' }
+    });
+    assert.equal(store.captured.item.rootItemId, 'root-1');
+  });
+
+  // The regression test for the single most likely implementation error: a
+  // rootItemId tier on `anchor.sessionId` would collapse every sibling worker
+  // an autopilot spawns onto one anchor (LIN-1461's sibling-collapse bug,
+  // reinstated in a new field). Unlike sessionGroupId inheritance immediately
+  // above, this must NOT fall back to the anchor's sessionId.
+  test('a follow-up to an autopilot worker does NOT inherit rootItemId from the worker\'s sessionId', async () => {
+    const store = capturingStoreWithItems({
+      'w1': { id: 'w1', issueIdentifier: 'LIN-1', sessionId: 'ap-1', rootItemId: null }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'reply', fields: { followUpTo: 'w1', target: 'cli' }
+    });
+    assert.notEqual(store.captured.item.rootItemId, 'ap-1');
+    assert.equal(store.captured.item.rootItemId, 'w1', 'falls through to the anchor\'s own dispatch id, not its sessionId');
+  });
+
+  test('a follow-up to a pre-field (un-stamped) anchor self-heals onto the anchor\'s own dispatch id', async () => {
+    const store = capturingStoreWithItems({
+      'orig': { id: 'orig', issueIdentifier: 'LIN-1' } // no rootItemId — legacy row
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'reply', fields: { followUpTo: 'orig', target: 'cli' }
+    });
+    assert.equal(store.captured.item.rootItemId, 'orig');
+  });
+
+  test('a follow-up whose anchor is unresolvable (aged out) inherits no anchor — the store mints its own root', async () => {
+    const store = capturingStoreWithItems({});
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'x', fields: { followUpTo: 'ghost', target: 'cli' }
+    });
+    assert.strictEqual(store.captured.item.rootItemId, undefined);
+  });
+
+  test('a store without getItemStatus (test fakes) is a no-op, never throws', async () => {
+    const store = capturingStore(); // no getItemStatus method
+    await createDispatchItem({
+      store, urlKey: 'acme', prompt: 'x', fields: { followUpTo: 'anchor-1', target: 'cli' }
+    });
+    assert.strictEqual(store.captured.item.rootItemId, undefined);
+  });
+
+  test('no followUpTo: no anchor is inherited (the store mints its own root)', async () => {
+    const store = capturingStoreWithItems({ 'anchor-1': { issueIdentifier: 'LIN-1', rootItemId: 'root-1' } });
+    await createDispatchItem({ store, urlKey: 'acme', prompt: 'x', fields: { target: 'cli' } });
+    assert.strictEqual(store.captured.item.rootItemId, undefined);
+  });
+});
+
 describe('createDispatchItem — field passthrough', () => {
   test('caller fields are spread onto the item, factory-owned fields override', async () => {
     const store = capturingStore();

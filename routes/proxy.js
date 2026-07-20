@@ -483,12 +483,18 @@ function formatDispatchWatch(item, meta = null) {
     // completion. completedAt is the real completion time, null until terminal.
     resolvedAt: item.resolvedAt || null,
     completedAt: deriveCompletedAt(item.feedback),
-    feedback: (item.feedback || []).map(f => ({
-      message: f.message,
-      url: f.url || null,
-      urlLabel: f.urlLabel || null,
-      timestamp: f.timestamp || null
-    }))
+    feedback: (item.feedback || []).map(f => {
+      const entry = {
+        message: f.message,
+        url: f.url || null,
+        urlLabel: f.urlLabel || null,
+        timestamp: f.timestamp || null
+      };
+      // Additive-only (LIN-1297 idiom, matching _formatFeedbackEntries):
+      // assign only when present, never emit `rootItemId: null` (LIN-1468).
+      if (f.rootItemId) entry.rootItemId = f.rootItemId;
+      return entry;
+    })
   };
   if (meta) {
     body.reason = meta.reason;
