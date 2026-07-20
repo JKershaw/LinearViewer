@@ -1158,6 +1158,42 @@ describe('LIN-1486: send_follow_up targets the lineage tail, not the session roo
     assert.strictEqual(dispatchQueueStore.calls[0].item.force, true,
       'an expired loop is terminal via agentState alone — no marker is ever posted for it');
   });
+
+  test('a skipped tail forces, even though its agentState alone is not terminal', async () => {
+    // `[skipped]` (LIN-1478's runner-refused-cancel marker) is the OTHER
+    // terminalStatus value LIN-1478's literal `'done'||'failed'` check misses —
+    // sibling to the aborted case above, mapping to agentState:'complete' via
+    // MARKER_TO_AGENT_STATE rather than 'error'.
+    const history = [
+      sessionHistoryItem({
+        id: 'sess-skipped', kind: 'autopilot', issueIdentifier: 'LIN-603', target: 'cli',
+        dispatchedAt: T_MULTI_ANCHOR_DISPATCHED, resolvedAt: null, status: 'taken',
+        feedback: [{ message: '[skipped] Human continued the session', timestamp: T_MULTI_ANCHOR_DONE }],
+      }),
+    ];
+    const { executeTool, dispatchQueueStore } = makeCatalog(history);
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-skipped', prompt: 'continue' } });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.force, true,
+      'terminalStatus:"skipped" must force even when historyStatus/agentStatus alone derive a non-terminal agentState');
+  });
+
+  test('a cancelled tail forces via its terminal agentState, even with no feedback marker at all', async () => {
+    // `_deriveAgentState` maps historyStatus:'cancelled' -> agentState:'complete'
+    // (the operator explicitly removed the item) with no terminal feedback
+    // marker — sibling to the expired case above, exercising the OTHER
+    // no-marker terminal agentState value.
+    const history = [
+      sessionHistoryItem({
+        id: 'sess-cancelled', kind: 'autopilot', issueIdentifier: 'LIN-604', target: 'cli',
+        dispatchedAt: T_MULTI_ANCHOR_DISPATCHED, resolvedAt: T_MULTI_ANCHOR_DONE, status: 'cancelled',
+        feedback: [],
+      }),
+    ];
+    const { executeTool, dispatchQueueStore } = makeCatalog(history);
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-cancelled', prompt: 'continue' } });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.force, true,
+      'a cancelled loop is terminal via agentState alone — no marker is ever posted for it');
+  });
 });
 
 describe('read-only invariant', () => {
