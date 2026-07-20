@@ -9,7 +9,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockCollection } from '../fixtures/mock-collection.js';
-import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { DispatchQueueStore, FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-store.js';
 
 const URL_KEY = 'acme';
 
@@ -79,5 +79,29 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
     const doc = store.historyCollection._docs.find(d => d._id === item._id);
     assert.equal(doc.feedback[0].kind, 'not-a-real-kind');
     assert.equal(doc.feedback[0].rootItemId, 'not-a-uuid');
+  });
+
+  test('LIN-1425: "usage" is a recognized FEEDBACK_ENTRY_KINDS member', () => {
+    assert.ok(FEEDBACK_ENTRY_KINDS.includes('usage'));
+  });
+
+  test('LIN-1425: a kind:"usage" feedback entry persists, keyed on rootItemId', async () => {
+    const store = makeStore();
+    const item = await takenItem(store);
+    const rootItemId = '11111111-2222-3333-4444-555555555555';
+    const message = '[usage] {"schema":1,"harness":"claude-code","model":"claude-opus-4-8","inputTokens":5529,"outputTokens":25811,"cacheCreationInputTokens":145449,"cacheReadInputTokens":4588835,"costUsd":null}';
+
+    const res = await store.addFeedback(
+      item._id,
+      URL_KEY,
+      { message, kind: 'usage', rootItemId },
+      'token-a'
+    );
+
+    assert.ok(res && res.success);
+    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    assert.equal(doc.feedback[0].kind, 'usage');
+    assert.equal(doc.feedback[0].rootItemId, rootItemId);
+    assert.equal(doc.feedback[0].message, message);
   });
 });
