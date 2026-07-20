@@ -15,7 +15,7 @@
 import { Router, json } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
-import { deriveTerminalStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort } from '../lib/dispatch-terminal.js';
+import { deriveTerminalStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateOpaqueDispatchField, validateDispatchPayload } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
@@ -1323,6 +1323,7 @@ POST ${baseUrl}/api/proxy/autopilot/kickoff
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
   → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
   → { "items": [{ "id": "...", "status": "queued|taken|done|failed|aborted", "kind": "implementation", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
+  → "feedbackCount", "status" and "completedAt" are lineage-wide (LIN-1470): if this item was repointed to a follow-up dispatch, they reflect the WHOLE lineage's feedback (this row's own plus every row it was repointed to), not just this row's own stored entries — so a repointed row keeps accumulating "feedbackCount" and reaches a terminal "status"/"completedAt" once its follow-up finishes, instead of freezing at the point of repoint.
 
 GET ${baseUrl}/api/proxy/dispatch/{id}
   → Watch a dispatched item: whether it is still queued or has been taken by the runner, plus any feedback posted back. Poll this after dispatching.
@@ -5052,6 +5053,38 @@ One convention across every endpoint, so you can branch on the same fields every
         ...history.items
       ];
 
+      // LIN-1470: lineage join. A repoint (follow-up dispatch) mints a NEW row;
+      // without this, the original row's feedbackCount/completedAt/status freeze
+      // at the point of repoint. Derive each row's lineage anchor per the pinned
+      // two-tier precedence — doc-level rootItemId, then the first OWN feedback
+      // entry carrying rootItemId, then the row's own id — and batch-fetch every
+      // OTHER row sharing an anchor in ONE indexed query (constant in N: 2 reads
+      // above + 1 here, never 2+N). NEVER sessionId/sessionGroupId: every worker
+      // an autopilot spawns shares its orchestrator's sessionId, so grouping on
+      // it would collapse all siblings onto one anchor and reinstate the
+      // LIN-1461 production bug. Anchors are null-filtered before the $in query
+      // ($in: [null] would mass-mis-group every field-less legacy row); the
+      // `?? row.id` fallback means this is defensive rather than reachable today.
+      // History-only (queued rows carry no feedback) and deliberately NOT scoped
+      // by issueIdentifier — rootItemId already isolates the lineage, and
+      // inheriting the issue scope would drop siblings filed under a different
+      // issue. `projection: {prompt: 0}` preserved (the H12/503 read-cost guard).
+      const anchorFor = item => item.rootItemId ?? item.feedback?.find(f => f.rootItemId)?.rootItemId ?? item.id;
+      const anchors = [...new Set(merged.map(anchorFor).filter(Boolean))];
+
+      const siblingsByAnchor = new Map();
+      if (anchors.length) {
+        const { items: lineageSiblings } = await dispatchQueueStore.listHistory(req.proxyUrlKey, {
+          rootItemId: { $in: anchors },
+          projection: { prompt: 0 }
+        });
+        for (const sib of lineageSiblings) {
+          const bucket = siblingsByAnchor.get(sib.rootItemId);
+          if (bucket) bucket.push(sib);
+          else siblingsByAnchor.set(sib.rootItemId, [sib]);
+        }
+      }
+
       // LIN-1261 F2: attribute an abort's terminality to the loop it TARGETS at the
       // proxy read boundary too (same class as the reconstruction path, different
       // consumer). Simple Dispatcher posts `[aborted]` to the abort row's OWN
@@ -5068,13 +5101,20 @@ One convention across every endpoint, so you can branch on the same fields every
 
       // Resolve each item's effective status once (terminal marker → done/failed/
       // aborted, else the lifecycle status) so filtering and the response agree.
-      // The abort attribution is derived onto `_terminalFeedback` (status +
-      // completedAt read from it below); the row's own `feedback` — hence the
-      // reported `feedbackCount` — is left untouched, so the synthetic abort entry
-      // never inflates the stored-feedback count.
+      // LIN-1470: the lineage merge runs BEFORE abort attribution — ordering is
+      // load-bearing, since `feedbackWithHarvestedAbort`'s F1 guard only lets an
+      // abort win when it is strictly later than the existing terminal, so it
+      // must see the true lineage terminal (a later child `[done]`), not just
+      // this row's own. `_lineageFeedback` (own + verified siblings) feeds the
+      // reported `feedbackCount`; `_terminalFeedback` is `_lineageFeedback` PLUS
+      // any harvested abort and feeds `status`/`completedAt` — kept separate so
+      // the synthetic abort entry never inflates `feedbackCount`.
       const resolved = merged.map(i => {
-        const terminalFeedback = feedbackWithHarvestedAbort(i.feedback, abortedTargets.get(i.id));
-        return { ...i, _terminalFeedback: terminalFeedback, status: deriveTerminalStatus(terminalFeedback) || i.status };
+        const anchor = anchorFor(i);
+        const siblingRows = (siblingsByAnchor.get(anchor) || []).filter(s => s.id !== i.id);
+        const lineageFeedback = mergeLineageFeedback(i.feedback, siblingRows, anchor);
+        const terminalFeedback = feedbackWithHarvestedAbort(lineageFeedback, abortedTargets.get(i.id));
+        return { ...i, _lineageFeedback: lineageFeedback, _terminalFeedback: terminalFeedback, status: deriveTerminalStatus(terminalFeedback) || i.status };
       });
 
       // `status` is derived from feedback (not stored), so it stays a JS filter;
@@ -5101,7 +5141,10 @@ One convention across every endpoint, so you can branch on the same fields every
         // resolvedAt = take/archive time; completedAt = real completion (null until terminal).
         resolvedAt: i.resolvedAt || null,
         completedAt: deriveCompletedAt(i._terminalFeedback),
-        feedbackCount: (i.feedback || []).length
+        // LIN-1470: lineage-wide (own + verified siblings), not just this row's
+        // own stored feedback — see the merge above. Excludes any synthetic
+        // harvested-abort entry (that only lives in `_terminalFeedback`).
+        feedbackCount: i._lineageFeedback.length
       }));
 
       logEvent(req, '/api/proxy/dispatch', 200);
