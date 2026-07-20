@@ -1348,6 +1348,10 @@ Notes:
 - `?wait=0` / absent / invalid values are the plain immediate short-poll (fully backwards-compatible) — and omit `reason`/`waitedMs` entirely (those fields appear only when `?wait>0`).
 - `status` is **reported, not adjudicated**: a `done` means the runner's session ended, not that the work is correct (a worker can background a long command, exit, and post `done` early). Treat `done` as "go look" — cross-check the `[evidence]` URLs, and if unsatisfied, dispatch fresh work. The long-poll never locks anything in.
 
+**`feedback` (and the derived `status`/`completedAt`) are lineage-wide, not just this row's own (LIN-1461/LIN-1480).** If this dispatch was repointed to a follow-up (`followUpTo`), the returned `feedback` merges this row's own entries with every other row in the same dispatch chain — so watching by the ORIGINAL id keeps seeing progress even after a repoint, instead of freezing at the point of repoint. Only a row that actually ran (`taken`) joins a lineage this way; a `queued` row (including a freshly-dispatched follow-up not yet picked up) reports its own values only.
+
+**The merge is forward-only: a row is never reported complete before it was itself dispatched (LIN-1480).** `feedback` only inherits a sibling entry if that entry's timestamp is at or after this row's own `dispatchedAt` — so a still-running follow-up dispatched *after* its parent already finished keeps reading its own values (`taken`/`completedAt: null`), it does not inherit the parent's earlier terminal, and under `?wait=` the long-poll actually holds instead of short-circuiting with `reason: "terminal"`. This is the same invariant `GET /api/proxy/dispatch` (the list endpoint) enforces on `feedbackCount`/`status`/`completedAt` — the two surfaces agree on any row they both report.
+
 ```json
 {
   "id": "uuid",
