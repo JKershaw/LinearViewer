@@ -341,6 +341,21 @@ const MAX_IDENTIFIER_LENGTH = 100;     // Issue identifiers
 // Proxy consumers are remote, so 'local' (Harbour OS, spawns on the server's
 // own /dev/tty) is intentionally excluded from the targets they may set.
 const VALID_PROXY_DISPATCH_TARGETS = ['cli', 'web', 'dash'];
+// LIN-1470: defensive cap on the list endpoint's lineage batch query
+// (`rootItemId: {$in: anchors}`). Unlike the 200-row PAGE bound, nothing
+// structurally limits how many rows one $in query can match: it spans the
+// full 30-day history TTL, not just the current page, and — unlike the
+// existing single-anchor equivalent at `_collectGroupFeedback` (the `:id`
+// watch endpoint, one anchor per request) — this one fans the same query
+// shape out across every anchor on the CURRENT PAGE (up to 200) in one call.
+// A hard row-count cap is nonetheless the wrong lever here: the query already
+// carries `projection: {prompt: 0}`, so it never touches the multi-KB-to-10MB
+// field the H12/503 incidents (f5a94a53/15ca7b47) were actually about — the
+// per-row cost is bounded (metadata + a typically-small feedback[]) the same
+// way the existing shipped single-anchor query already is. 2000 is a
+// generous backstop (10x the page bound) against a pathological outlier
+// lineage, not a tuned realistic ceiling — no shipped lineage has come close.
+const LINEAGE_QUERY_LIMIT = 2000;
 
 // Timeout for individual GraphQL requests to Linear.
 // Prevents the proxy from hanging silently when Linear is slow or payloads are large,
@@ -5076,6 +5091,7 @@ One convention across every endpoint, so you can branch on the same fields every
       if (anchors.length) {
         const { items: lineageSiblings } = await dispatchQueueStore.listHistory(req.proxyUrlKey, {
           rootItemId: { $in: anchors },
+          limit: LINEAGE_QUERY_LIMIT,
           projection: { prompt: 0 }
         });
         for (const sib of lineageSiblings) {
