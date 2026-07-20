@@ -638,3 +638,110 @@ describe('render-session: lineage-continuous rendering (LIN-1478 S-C fold)', () 
     assert.ok(!html.includes('data-loop-id="undefined"'));
   });
 });
+
+describe('render-session: tail-anchored reply box + force safety (LIN-1478 beat 4)', () => {
+  // Extracts the single reply box's opening-tag attributes as a {name: value}
+  // map, so tests compare data-* fields directly rather than fragile raw-HTML
+  // string matching (whitespace/join order shouldn't matter to "field-for-field
+  // identical").
+  function extractReplyBoxAttrs(html) {
+    const match = html.match(/<div class="sess-inline-reply" ([^>]*)>/);
+    assert.ok(match, 'a reply box renders');
+    const attrs = {};
+    const attrRe = /([a-z-]+)="([^"]*)"/g;
+    let m;
+    while ((m = attrRe.exec(match[1]))) attrs[m[1]] = m[2];
+    return attrs;
+  }
+
+  function replyBoxCount(html) {
+    return (html.match(/data-testid="session-inline-reply"/g) || []).length;
+  }
+
+  // wake-1 (root) then wake-2 (tail) — terminalStatus overridable per test to
+  // drive the adversarial force cases.
+  function lineageSession({ rootTerminal = null, tailTerminal = null } = {}) {
+    return fixtureSession({
+      loops: [
+        {
+          loopId: 'wake-1', lineageId: 'wake-1', issueIdentifier: 'LIN-900', issueId: 'uuid-900',
+          issueTitle: 'Seed task', iteration: 1, kind: 'autopilot', dispatchedAt: '2026-07-04T10:00:00.000Z',
+          terminalStatus: rootTerminal, terminalCompletedAt: rootTerminal ? '2026-07-04T10:01:00.000Z' : null,
+          feedback: [{ message: '[blocked] need a decision', url: null, urlLabel: null, timestamp: '2026-07-04T10:00:01.000Z' }],
+          telemetry: { runtime: { ms: 60000 }, metrics: [{ toolCount: 2 }], producedArtifacts: [] }
+        },
+        {
+          loopId: 'wake-2', lineageId: 'wake-1', followUpTo: 'wake-1', issueIdentifier: 'LIN-900', issueId: 'uuid-900',
+          issueTitle: 'Seed task', iteration: 2, kind: 'autopilot', dispatchedAt: '2026-07-04T10:05:00.000Z',
+          terminalStatus: tailTerminal, terminalCompletedAt: tailTerminal ? '2026-07-04T10:06:00.000Z' : null,
+          feedback: [{ message: 'resuming after reply', url: null, urlLabel: null, timestamp: '2026-07-04T10:05:01.000Z' }]
+        }
+      ]
+    });
+  }
+
+  test('exactly ONE reply box per lineage, on the tail, never the root', () => {
+    const session = lineageSession({});
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], canReply: true });
+    assert.equal(replyBoxCount(html), 1, 'exactly one reply box for the whole lineage');
+    const attrs = extractReplyBoxAttrs(html);
+    assert.equal(attrs['data-loop-id'], 'wake-2', 'targets the tail (wake-2), never the root (wake-1)');
+  });
+
+  test('the lineage reply box is field-for-field identical to the tail run\'s own box rendered standalone', () => {
+    const session = lineageSession({});
+    const lineageHtml = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], canReply: true, waiting: true });
+
+    // Same tail loop object, rendered as if it were the session's only run —
+    // i.e. what today's per-run inline box on that exact run emits.
+    const soloSession = fixtureSession({ loops: [session.loops[1]] });
+    const soloHtml = renderSessionPage({ session: soloSession, urlKey: 'ws-a', issueContext: [], canReply: true, waiting: true });
+
+    assert.deepEqual(extractReplyBoxAttrs(lineageHtml), extractReplyBoxAttrs(soloHtml));
+  });
+
+  test('adversarial: tail RUNNING + an earlier run DONE — data-terminal is false (never aggregated true, never kill-firsts a live tail)', () => {
+    const session = lineageSession({ rootTerminal: 'done', tailTerminal: null });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], canReply: true, waiting: false });
+    const attrs = extractReplyBoxAttrs(html);
+    assert.equal(attrs['data-loop-id'], 'wake-2');
+    assert.equal(attrs['data-terminal'], 'false', 'an any()-style aggregation would wrongly read true off the done root');
+    assert.equal(attrs['data-session-waiting'], 'false');
+  });
+
+  test('adversarial: tail TERMINAL — data-terminal is true even though an earlier run is still running (never aggregated false, never collides with the parked window)', () => {
+    const session = lineageSession({ rootTerminal: null, tailTerminal: 'done' });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], canReply: true, waiting: false });
+    const attrs = extractReplyBoxAttrs(html);
+    assert.equal(attrs['data-loop-id'], 'wake-2');
+    assert.equal(attrs['data-terminal'], 'true', 'an all()-style aggregation would wrongly read false off the running root');
+  });
+
+  test('non-tail runs inside a folded lineage render no reply box of their own', () => {
+    const session = lineageSession({});
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], canReply: true });
+    // The single box found (asserted above) already proves this by count, but
+    // pin it structurally too: the root's own data-loop-id never appears as a
+    // reply box's data-loop-id value.
+    const attrs = extractReplyBoxAttrs(html);
+    assert.notEqual(attrs['data-loop-id'], 'wake-1');
+  });
+
+  test('a lineage of one is unchanged: its single run is trivially its own tail, reply box still inline', () => {
+    const session = fixtureSession({
+      loops: [{
+        loopId: 'solo-1', lineageId: 'solo-1', issueIdentifier: 'LIN-900', issueId: 'uuid-900',
+        issueTitle: 'Solo task', iteration: 1, kind: 'autopilot', dispatchedAt: '2026-07-04T10:00:00.000Z',
+        terminalStatus: 'done', terminalCompletedAt: '2026-07-04T10:01:00.000Z',
+        feedback: [{ message: '[done] landed', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:00.000Z' }],
+        telemetry: { runtime: { ms: 60000 }, metrics: [], producedArtifacts: [] }
+      }]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], canReply: true });
+    assert.equal(replyBoxCount(html), 1);
+    const attrs = extractReplyBoxAttrs(html);
+    assert.equal(attrs['data-loop-id'], 'solo-1');
+    assert.equal(attrs['data-terminal'], 'true');
+    assert.ok(!html.includes('data-testid="session-lineage"'), 'no lineage wrapper for a group of one');
+  });
+});
