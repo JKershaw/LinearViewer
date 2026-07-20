@@ -1036,6 +1036,65 @@ test.describe('Proxy API - Dispatch', () => {
     expect(listed.completedAt).toBe(terminalEntry.timestamp);
   });
 
+  // LIN-1461: a consumer that dispatched the ORIGINAL item and keeps watching
+  // it by that id must not go "dark" the instant a follow-up repoints the
+  // session onto a new item id — the runner's next feedback (including the
+  // terminal marker) lands on the follow-up's own history doc, not the
+  // original's, so the watch endpoint must resolve the whole session's
+  // activity via the durable sessionGroupId rather than the queried item's
+  // own frozen feedback[].
+  test('watch on the ORIGINAL id sees feedback (and the terminal marker) posted to a REPOINTED follow-up', async ({ request }) => {
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'implement the thing', target: 'cli' }
+    });
+    const originalId = (await enqueue.json()).id;
+    await request.post(`/api/dispatch/take/${originalId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    await request.post(`/api/dispatch/feedback/${originalId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[working] Session launched' }
+    });
+
+    // A watcher polling the original id sees the pre-follow-up activity.
+    let watched = await (await request.get(`/api/proxy/dispatch/${originalId}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(watched.status).toBe('taken');
+    expect(watched.feedback).toHaveLength(1);
+
+    // The session repoints: a follow-up dispatch references the original id,
+    // gets taken, and the runner posts its terminal marker THERE — never
+    // again touching the original item's own doc.
+    const followUp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'now confirm CI is green', target: 'cli', followUpTo: originalId }
+    });
+    const followUpId = (await followUp.json()).id;
+    await request.post(`/api/dispatch/take/${followUpId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    await request.post(`/api/dispatch/feedback/${followUpId}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[done] CI is green' }
+    });
+
+    // The watcher never stopped polling the ORIGINAL id — it must see BOTH
+    // the pre-repoint feedback and the follow-up's terminal marker, and
+    // derive the session as done, not stuck reading 'taken' forever (the
+    // LIN-1461 "gone dark" symptom).
+    watched = await (await request.get(`/api/proxy/dispatch/${originalId}`, {
+      headers: { Authorization: `Bearer ${readToken}` }
+    })).json();
+    expect(watched.id).toBe(originalId);
+    expect(watched.feedback).toHaveLength(2);
+    expect(watched.feedback[0].message).toBe('[working] Session launched');
+    expect(watched.feedback[1].message).toBe('[done] CI is green');
+    expect(watched.status).toBe('done');
+    expect(watched.completedAt).not.toBeNull();
+  });
+
   test('list endpoint scopes by issueIdentifier (store pushdown, LIN-615)', async ({ request }) => {
     // Two queued items on different issues + one on the target with history.
     const targetIssue = 'LIN-6150';
