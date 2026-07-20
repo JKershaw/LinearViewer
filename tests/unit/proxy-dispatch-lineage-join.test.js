@@ -332,6 +332,79 @@ describe('LIN-1470 — lineage join, STANDING GUARD / CHARACTERIZATION (pass bef
   });
 });
 
+describe('LIN-1470 — beat 4 audit finding: queued rows must not join the lineage', () => {
+  test('T9 — a freshly-queued follow-up does NOT inherit a completed parent\'s terminal status/completedAt/feedbackCount', async () => {
+    // The common real trigger: a human replies to a FINISHED session
+    // (session.js's reply box, LIN-1004) — POSTs a new dispatch with
+    // followUpTo=<finished session>, target cli/web. dispatch-factory.js
+    // inherits rootItemId onto the new item the same way sessionGroupId
+    // inheritance already works. The new item sits QUEUED (not yet taken) —
+    // it must read as queued/null/0 until it actually runs, not silently
+    // "done" from a lineage sibling that already finished.
+    const parentDone = row({
+      id: 'parent-1', rootItemId: 'root-x', status: 'done',
+      feedback: [{ message: '[done] finished beat 1', rootItemId: 'root-x', timestamp: T1 }]
+    });
+    const freshFollowUp = row({
+      id: 'followup-1', rootItemId: 'root-x', followUpTo: 'parent-1'
+      // no feedback field — a brand-new queued item has none yet
+    });
+    delete freshFollowUp.feedback;
+    delete freshFollowUp.resolvedAt;
+
+    const { app } = buildApp({ queued: [freshFollowUp], history: [parentDone] });
+    const { body } = await get(app, '/api/proxy/dispatch');
+
+    const followUp = body.items.find(i => i.id === 'followup-1');
+    assert.equal(followUp.status, 'queued', 'must NOT inherit the parent\'s "done"');
+    assert.equal(followUp.completedAt, null, 'must NOT inherit the parent\'s completedAt');
+    assert.equal(followUp.feedbackCount, 0, 'a queued row has posted no feedback of its own yet');
+
+    // Sanity: the history parent is unaffected by this guard — it still
+    // gets its own (here, unremarkable) lineage-derived fields normally.
+    const parent = body.items.find(i => i.id === 'parent-1');
+    assert.equal(parent.status, 'done');
+    assert.equal(parent.completedAt, T1);
+    assert.equal(parent.feedbackCount, 1);
+  });
+});
+
+describe('LIN-1470 — beat 4 audit: abort rows × lineage merge (defense in depth)', () => {
+  test('T10 — an abort row\'s untagged [aborted] feedback is never absorbed as another row\'s lineage feedback, even under a hypothetical rootItemId collision', async () => {
+    // Verified (beat 4) that this codebase never actually produces this
+    // collision: an abort row's doc-level rootItemId always defaults to its
+    // OWN freshly-minted id (lib/dispatch-store.js addItem: `item.rootItemId
+    // || doc._id`, and dispatch-factory.js's rootItemId inheritance is gated
+    // on `followUpTo`, which routes reject alongside `abort`), and
+    // simple-dispatcher's abort branch posts the `[aborted]` marker to the
+    // abort row's OWN feedback with no `rootItemId` tag at all. This test
+    // pins the SECOND, independent layer of protection: even if a future
+    // change broke that non-collision (an abort row ending up doc-level
+    // rootItemId-tagged the SAME as a sibling it targets), the entry-level
+    // `f.rootItemId === anchor` filter in mergeLineageFeedback still refuses
+    // an untagged feedback entry, so the abort message could not leak into
+    // another row's feedbackCount/status outside the deliberate
+    // harvestAbortedTargets/feedbackWithHarvestedAbort(abortTo) path.
+    const sibling = row({
+      id: 'sibling-1', rootItemId: 'root-y',
+      feedback: [{ message: 'own beat', rootItemId: 'root-y', timestamp: T1 }]
+    });
+    // Hypothetical: an abort row that DOES collide on doc-level rootItemId
+    // with the sibling's anchor, but — matching real simple-dispatcher
+    // behaviour — posts its [aborted] marker WITHOUT a rootItemId tag.
+    const collidingAbort = row({
+      id: 'abort-collide', rootItemId: 'root-y', abort: true, abortTo: 'some-other-target', issueIdentifier: null,
+      feedback: [{ message: '[aborted] cancelled', timestamp: T2 }] // no rootItemId tag — matches dispatcher.js:479
+    });
+    const { app } = buildApp({ history: [sibling, collidingAbort] });
+    const { body } = await get(app, '/api/proxy/dispatch');
+
+    const item = body.items.find(i => i.id === 'sibling-1');
+    assert.equal(item.feedbackCount, 1, 'the untagged abort entry must NOT be absorbed into feedbackCount');
+    assert.notEqual(item.status, 'aborted', 'the untargeted abort must not hijack this row\'s status via the generic merge');
+  });
+});
+
 describe('LIN-1470 — open question (beat 3): lineage query bound', () => {
   test('T8 — the lineage batch query carries a defensive limit', async () => {
     const root = row({ id: 'root-1', rootItemId: 'root-1' });

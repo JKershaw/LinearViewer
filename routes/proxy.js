@@ -1338,7 +1338,7 @@ POST ${baseUrl}/api/proxy/autopilot/kickoff
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
   → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
   → { "items": [{ "id": "...", "status": "queued|taken|done|failed|aborted", "kind": "implementation", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
-  → "feedbackCount", "status" and "completedAt" are lineage-wide (LIN-1470): if this item was repointed to a follow-up dispatch, they reflect the WHOLE lineage's feedback (this row's own plus every row it was repointed to), not just this row's own stored entries — so a repointed row keeps accumulating "feedbackCount" and reaches a terminal "status"/"completedAt" once its follow-up finishes, instead of freezing at the point of repoint.
+  → "feedbackCount", "status" and "completedAt" are lineage-wide (LIN-1470): if this item was repointed to a follow-up dispatch, they reflect the WHOLE lineage's feedback (this row's own plus every row it was repointed to), not just this row's own stored entries — so a repointed row keeps accumulating "feedbackCount" and reaches a terminal "status"/"completedAt" once its follow-up finishes, instead of freezing at the point of repoint. This holds even under "?issueIdentifier=" scoping and even if a follow-up in the lineage was filed under a DIFFERENT issue than the row you're looking at — the lineage is keyed on the dispatch chain, not on the issue, so a scoped list can show a row as complete via a sibling that itself never appears in that same scoped list. Only ARCHIVED rows join a lineage this way; a still-"queued" row (not yet taken) always reports its own feedbackCount/status/completedAt (0/"queued"/null) regardless of what a same-lineage predecessor already did.
 
 GET ${baseUrl}/api/proxy/dispatch/{id}
   → Watch a dispatched item: whether it is still queued or has been taken by the runner, plus any feedback posted back. Poll this after dispatching.
@@ -5085,7 +5085,19 @@ One convention across every endpoint, so you can branch on the same fields every
       // inheriting the issue scope would drop siblings filed under a different
       // issue. `projection: {prompt: 0}` preserved (the H12/503 read-cost guard).
       const anchorFor = item => item.rootItemId ?? item.feedback?.find(f => f.rootItemId)?.rootItemId ?? item.id;
-      const anchors = [...new Set(merged.map(anchorFor).filter(Boolean))];
+
+      // LIN-1470: only ARCHIVED (history) rows join the lineage. A still-
+      // QUEUED row hasn't been taken yet — if it inherits an already-
+      // completed sibling's terminal feedback (the common case: a follow-up
+      // reply to a finished session, queued but not yet run, shares that
+      // session's rootItemId), it would misreport `status: 'done'`/a stale
+      // `completedAt` for work that hasn't started. Mirrors the existing
+      // precedent at the `:id` watch endpoint (`getItemStatus` returns
+      // immediately for the active/queued branch, never calling
+      // `_collectGroupFeedback`) and the ticket's own framing (trap 6:
+      // "queued rows carry no feedback").
+      const historyRows = merged.filter(i => i.status !== 'queued');
+      const anchors = [...new Set(historyRows.map(anchorFor).filter(Boolean))];
 
       const siblingsByAnchor = new Map();
       if (anchors.length) {
@@ -5126,9 +5138,13 @@ One convention across every endpoint, so you can branch on the same fields every
       // any harvested abort and feeds `status`/`completedAt` — kept separate so
       // the synthetic abort entry never inflates `feedbackCount`.
       const resolved = merged.map(i => {
-        const anchor = anchorFor(i);
-        const siblingRows = (siblingsByAnchor.get(anchor) || []).filter(s => s.id !== i.id);
-        const lineageFeedback = mergeLineageFeedback(i.feedback, siblingRows, anchor);
+        // Queued rows opt out of the lineage join entirely (see above) —
+        // `lineageFeedback` stays this row's own (empty) feedback, same as
+        // pre-LIN-1470.
+        const isQueued = i.status === 'queued';
+        const anchor = isQueued ? null : anchorFor(i);
+        const siblingRows = anchor ? (siblingsByAnchor.get(anchor) || []).filter(s => s.id !== i.id) : [];
+        const lineageFeedback = isQueued ? (i.feedback || []) : mergeLineageFeedback(i.feedback, siblingRows, anchor);
         const terminalFeedback = feedbackWithHarvestedAbort(lineageFeedback, abortedTargets.get(i.id));
         return { ...i, _lineageFeedback: lineageFeedback, _terminalFeedback: terminalFeedback, status: deriveTerminalStatus(terminalFeedback) || i.status };
       });
