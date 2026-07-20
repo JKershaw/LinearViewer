@@ -1241,16 +1241,19 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     }
 
     // LIN-1413: after the selector failed and refresh-on-resolve has already
-    // been given its chance (both above), check whether the failure is
-    // explained by an account-provenance mismatch rather than a plain lapse —
-    // i.e. the scoped owner has no live token, but a DIFFERENT account does.
-    // That distinguishes "your own token lapsed" (re-auth/refresh can fix it)
-    // from "your token's owner account no longer holds this workspace"
-    // (re-auth cannot fix it). Never for UNSCOPED (legacy owner-blind)
-    // callers — detectOwnerAccountMismatch also returns false for those, but
-    // the reason is only ever reclassified when there is a specific owner to
-    // reclassify on behalf of. Log server-side only; the other account's id
-    // must never reach the wire (lib/errors.js privacy boundary).
+    // been given its chance (both above), check whether a DIFFERENT account
+    // holds a live token for this workspace while the scoped owner does not.
+    // That signal does not on its own prove the owner lost the workspace — it
+    // fires identically for a legitimate colleague's session merely being
+    // live while the owner's own lapsed (re-auth-fixable) — so it is
+    // reclassified to a distinct, hedged reason rather than a confident
+    // "re-auth is pointless" claim; see the detector's docstring and
+    // lib/errors.js's owner_mismatch detail. Never for UNSCOPED (legacy
+    // owner-blind) callers — detectOwnerAccountMismatch also returns false
+    // for those, but the reason is only ever reclassified when there is a
+    // specific owner to reclassify on behalf of. Log server-side only; the
+    // other account's id must never reach the wire (lib/errors.js privacy
+    // boundary).
     if (ownerAccountId !== UNSCOPED && detectOwnerAccountMismatch(sessions, urlKey, ownerAccountId)) {
       console.warn(`Workspace ${urlKey}: owner account mismatch detected for account ${ownerAccountId}`);
       return { token: null, reason: 'owner_mismatch', provider: selected.provider };

@@ -177,6 +177,24 @@ describe('detectOwnerAccountMismatch (LIN-1413, Block C — pure detector)', () 
     ];
     assert.equal(detectOwnerAccountMismatch(sessions, 'acme', 'account-A'), false);
   });
+
+  // C7 (LIN-1413 review): the review's blocking finding was that this exact
+  // fixture shape — structurally identical to C1 — is also produced by two
+  // legitimate colleagues sharing one workspace where only the asking
+  // account's session has lapsed. The detector has no way to tell that case
+  // apart from a genuine account fork (see the docstring above), so it
+  // deliberately still fires here too. What changed post-review is NOT this
+  // verdict — it's that lib/errors.js's owner_mismatch copy no longer asserts
+  // a confident "will not restore it" that would be actively wrong for
+  // Alice. This test documents the reachable case by name so the shared
+  // verdict is a recorded decision, not a silent gap.
+  test('C7: legitimate colleague — Alice\'s own session lapsed while Bob (a different, valid account) is live on the same workspace -> true, same as a genuine fork (indistinguishable; see docstring)', () => {
+    const sessions = [
+      sessionRow('account-alice', 'acme', 'tok-alice-expired', NOW + PAST_MS),
+      sessionRow('account-bob', 'acme', 'tok-bob-live', NOW + FAR_FUTURE_MS),
+    ];
+    assert.equal(detectOwnerAccountMismatch(sessions, 'acme', 'account-alice'), true);
+  });
 });
 
 // ---------------------------------------------------------------------------

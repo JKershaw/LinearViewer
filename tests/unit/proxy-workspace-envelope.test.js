@@ -65,6 +65,17 @@ test('workspaceUnavailableEnvelope: owner_mismatch → config / not retryable (L
   assert.deepEqual(env.context, { workspaceUrlKey: 'acme' });
 });
 
+// Review finding (LIN-1413): the detector this reason is built on cannot tell
+// a genuine account fork apart from a legitimate colleague whose own session
+// merely lapsed (see Block C7, linear-token-isolation.test.js). A confident
+// "will not restore it" is provably false for that reachable second case, so
+// the copy must stay hedged ("may not") rather than asserting certainty.
+test('workspaceUnavailableEnvelope: owner_mismatch copy is hedged, not a false certainty (LIN-1413 review)', () => {
+  const env = workspaceUnavailableEnvelope('owner_mismatch', 'acme');
+  assert.match(env.detail, /may not/i);
+  assert.ok(!/will not/i.test(env.detail), `detail overclaims certainty: ${env.detail}`);
+});
+
 test('envelope context carries only the public workspace slug (privacy boundary)', () => {
   const env = workspaceUnavailableEnvelope('store_unreachable', 'acme');
   assert.deepEqual(Object.keys(env.context), ['workspaceUrlKey']);
