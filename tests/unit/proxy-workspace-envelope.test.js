@@ -57,6 +57,14 @@ test('workspaceUnavailableEnvelope: not_connected → config / not retryable', (
   assert.equal(env.retryable, false);
 });
 
+test('workspaceUnavailableEnvelope: owner_mismatch → config / not retryable (LIN-1413)', () => {
+  const env = workspaceUnavailableEnvelope('owner_mismatch', 'acme');
+  assert.equal(env.code, 'WORKSPACE_OWNER_MISMATCH');
+  assert.equal(env.category, 'config');
+  assert.equal(env.retryable, false);
+  assert.deepEqual(env.context, { workspaceUrlKey: 'acme' });
+});
+
 test('envelope context carries only the public workspace slug (privacy boundary)', () => {
   const env = workspaceUnavailableEnvelope('store_unreachable', 'acme');
   assert.deepEqual(Object.keys(env.context), ['workspaceUrlKey']);
@@ -157,6 +165,14 @@ test('Shape B (/stack) threads not_connected through to config envelope', async 
   const { status, body } = await getJson(buildApp('not_connected'), '/api/proxy/stack');
   assert.equal(status, 503);
   assert.equal(body.code, 'WORKSPACE_NOT_CONNECTED');
+  assert.equal(body.category, 'config');
+  assert.equal(body.retryable, false);
+});
+
+test('Shape B (/stack) threads owner_mismatch through to config envelope (LIN-1413)', async () => {
+  const { status, body } = await getJson(buildApp('owner_mismatch'), '/api/proxy/stack');
+  assert.equal(status, 503);
+  assert.equal(body.code, 'WORKSPACE_OWNER_MISMATCH');
   assert.equal(body.category, 'config');
   assert.equal(body.retryable, false);
 });

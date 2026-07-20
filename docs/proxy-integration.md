@@ -168,10 +168,11 @@ The workspace-unavailable `code`s and how to act on each:
 | `code` | `category` | `retryable` | What it means → what to do |
 | --- | --- | --- | --- |
 | `WORKSPACE_STORE_UNAVAILABLE` | `upstream` | `true` | Session store is unreachable (e.g. a dyno is booting right after a deploy). **Back off and retry** — it is expected to self-heal. |
-| `WORKSPACE_SESSION_EXPIRED` | `auth` | `false` | A session for this workspace exists but its token expired. **A human must re-authenticate**; retrying won't help. |
+| `WORKSPACE_SESSION_EXPIRED` | `auth` | `false` | A session for this workspace exists but its token expired. **A human must re-authenticate** — this works when the token's own owner account still holds the workspace; retrying won't help. |
 | `WORKSPACE_NOT_CONNECTED` | `config` | `false` | No session references this workspace. **It is not connected** — connect it first; retrying won't help. |
+| `WORKSPACE_OWNER_MISMATCH` | `config` | `false` | This token's owner account no longer holds this workspace — a **different** account does. **Re-authenticating will not help**; a new token must be issued from the account that currently holds the workspace. Note this moves only the token — other account-keyed state (OpenRouter key, preferences, saved chats) stays on the old account. |
 
-The HTTP status stays `503` for all three — only the body distinguishes them. Callers that don't recognise `code`/`category` can keep treating any non-`2xx` as failure; the new fields are purely additive. Other subsystems' errors may adopt the same envelope over time.
+The HTTP status stays `503` for all four — only the body distinguishes them. Callers that don't recognise `code`/`category` can keep treating any non-`2xx` as failure; the new fields are purely additive. Other subsystems' errors may adopt the same envelope over time.
 
 ### Read Endpoints
 
