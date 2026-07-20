@@ -5146,6 +5146,12 @@ One convention across every endpoint, so you can branch on the same fields every
           limit: LINEAGE_QUERY_LIMIT,
           projection: { prompt: 0 }
         });
+        // L3 (review, LIN-1485): a full page means the newest-N cap may have
+        // silently dropped the oldest members of a lineage — see the cap's
+        // definition above for why that's otherwise undetectable.
+        if (lineageSiblings.length === LINEAGE_QUERY_LIMIT) {
+          console.warn(`Lineage query hit LINEAGE_QUERY_LIMIT (${LINEAGE_QUERY_LIMIT}) for urlKey=${req.proxyUrlKey}, anchors=${anchors.length} — result may be truncated`);
+        }
         for (const sib of lineageSiblings) {
           const bucket = siblingsByAnchor.get(sib.rootItemId);
           if (bucket) bucket.push(sib);
