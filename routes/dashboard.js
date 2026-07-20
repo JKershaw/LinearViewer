@@ -1303,8 +1303,10 @@ export function createDashboardRoutes({
       }
     }
 
-    // Test mode: deterministic summary, no OpenRouter call (keeps E2E offline).
-    if (process.env.NODE_ENV === 'test') {
+    // Test mode: deterministic summary, no OpenRouter call (keeps E2E offline). The full-system
+    // hermetic suite sets HARBOUR_DISABLE_AI_MOCK=1 to force the REAL model path against a wire-fake
+    // OpenRouter endpoint (Tap 1); unset (every existing test) preserves the offline mock exactly.
+    if (process.env.NODE_ENV === 'test' && process.env.HARBOUR_DISABLE_AI_MOCK !== '1') {
       const summary = buildTestSummary(loop);
       await runSummaryCacheStore.put(workspace.urlKey, loopId, { inputHash, summary, model: 'test-mock' });
       return res.json({ status: 'fresh', loopId, summary, model: 'test-mock', generatedAt: new Date().toISOString() });
@@ -1491,8 +1493,9 @@ export function createDashboardRoutes({
       }
     }
 
-    // Test mode: deterministic summary, no OpenRouter call (keeps E2E offline).
-    if (process.env.NODE_ENV === 'test') {
+    // Test mode: deterministic summary, no OpenRouter call (keeps E2E offline). HARBOUR_DISABLE_AI_MOCK=1
+    // forces the REAL model path against a wire-fake (Tap 1); unset preserves the offline mock exactly.
+    if (process.env.NODE_ENV === 'test' && process.env.HARBOUR_DISABLE_AI_MOCK !== '1') {
       const summary = buildTestSessionSummary(session);
       await sessionSummaryCacheStore.put(workspace.urlKey, sessionId, { inputHash, summary, model: 'test-mock' });
       return res.json({ status: 'fresh', sessionId, live: false, summary, model: 'test-mock', generatedAt: new Date().toISOString() });
