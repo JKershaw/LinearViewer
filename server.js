@@ -598,16 +598,22 @@ async function ensureValidToken(req, res, next) {
   if (!needsTokenRefresh) return next()
 
   try {
-    // Provider-aware refresh / re-mint seam (LIN-712). GitHub App installation
-    // tokens carry NO refresh_token — they are RE-MINTED from the App JWT +
-    // installationId — so a GitHub workspace must NOT be routed through Linear's
-    // refresh endpoint. Branch on provider: GitHub re-mints via the provider seam;
-    // everything else (Linear, and the legacy undefined-provider default) keeps the
-    // refresh_token exchange below, byte-for-byte unchanged. (PAT/local never reach
-    // here — PAT is skipped above and local carries a MAX expiry, so needsTokenRefresh
-    // stays false.) Switching GitHub to a real ~1h expiry means GitHub bindings flow
-    // through this middleware for the first time — that is intended, not a regression.
-    if (workspace.provider === 'github') {
+    // Provider-aware refresh / re-mint seam (LIN-712, widened to github-projects
+    // in LIN-1499 Phase 1/D2). GitHub App installation tokens carry NO
+    // refresh_token — they are RE-MINTED from the App JWT + installationId — so
+    // a GitHub-family workspace must NOT be routed through Linear's refresh
+    // endpoint. Before this widening, a github-projects workspace fell to the
+    // `else` below and called refreshAccessToken(undefined), which throws into
+    // the catch and destroys the workspace/session — every github-projects
+    // workspace was deleted within ~1h of creation, guaranteed. Branch on
+    // provider: GitHub-family re-mints via the provider seam; everything else
+    // (Linear, and the legacy undefined-provider default) keeps the
+    // refresh_token exchange below, byte-for-byte unchanged. (PAT/local never
+    // reach here — PAT is skipped above and local carries a MAX expiry, so
+    // needsTokenRefresh stays false.) Switching GitHub-family providers to a
+    // real ~1h expiry means those bindings flow through this middleware for
+    // the first time — that is intended, not a regression.
+    if (workspace.provider === 'github' || workspace.provider === 'github-projects') {
       await remintActiveCredential(workspace, getProviderForWorkspace(workspace))
     } else {
       const newTokens = await refreshAccessToken(workspace.refreshToken)
@@ -1235,7 +1241,8 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
           urlKey,
           ownerAccountId,
           refreshAccessToken,
-          persistSession: persistSessionRow
+          persistSession: persistSessionRow,
+          resolveProvider: getProviderForWorkspace
         });
         if (refreshed) {
           _tokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, cachedAt: Date.now(), provider: refreshed.provider });
