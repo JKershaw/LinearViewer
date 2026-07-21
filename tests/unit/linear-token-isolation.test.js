@@ -23,9 +23,15 @@ process.env.NODE_ENV = 'test';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { selectOwnerWorkspaceToken, detectOwnerAccountMismatch, detectOwnerSignedOut, classifyWorkspaceFailure, UNSCOPED } from '../../lib/workspace-token-resolver.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 // ---------------------------------------------------------------------------
 // Block A — pure selector `selectOwnerWorkspaceToken` (7 cases)
@@ -293,6 +299,59 @@ describe('classifyWorkspaceFailure (LIN-1506, Block E — ordering witness)', ()
     const sessions = [];
     const result = classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', selectedReason: 'store_unreachable' });
     assert.equal(result, 'store_unreachable');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block F — source-grep wiring witness (LIN-1506, witness C)
+// ---------------------------------------------------------------------------
+
+// Extracts the body of `async function resolveWorkspaceAccess` from server.js:
+// from the function keyword to the next TOP-LEVEL `\n}` (a newline immediately
+// followed by a column-0 closing brace). A plain line-based find() would not
+// work here — the call site under test spans multiple lines. This relies on
+// the repo's consistent 2-space indentation (CLAUDE.md): every brace that
+// closes an inner block (if/try/etc.) is preceded by at least one space, so
+// only the function's own closing brace matches the literal substring "\n}".
+function extractResolveWorkspaceAccessBody(src) {
+  const start = src.indexOf('async function resolveWorkspaceAccess');
+  assert.ok(start >= 0, 'async function resolveWorkspaceAccess not found in server.js');
+  const end = src.indexOf('\n}', start);
+  assert.ok(end >= 0, "could not find resolveWorkspaceAccess's top-level closing brace");
+  return src.slice(start, end + 2);
+}
+
+describe('resolveWorkspaceAccess wiring (LIN-1506, Block F — witness C, source-grep)', () => {
+  // This is the ONLY thing in the suite that catches the classifier never
+  // being wired in at all: witness A's detector tests pass because the pure
+  // functions exist and are correct, and the envelope tests (beat 4, Block 2)
+  // inject the reason directly via buildApp(reason) rather than going through
+  // resolveWorkspaceAccess. If the call site here were deleted entirely, the
+  // rest of the suite would stay fully green.
+  //
+  // What this test does NOT prove: reachability (that resolveWorkspaceAccess
+  // is actually invoked on a request), argument correctness (that the right
+  // sessions/urlKey/ownerAccountId are passed), or that the return value is
+  // used by the caller. It is a wiring smoke-detector — text and position —
+  // not a behavioural witness. Witness E (Block E, above) is the behavioural
+  // witness for the classifier itself, once you already know it's called.
+  test('#27 (witness C): classifyWorkspaceFailure is called after refreshOwnerWorkspaceToken, and detectOwnerAccountMismatch no longer appears directly', () => {
+    const body = extractResolveWorkspaceAccessBody(SERVER_SRC);
+
+    const classifyIdx = body.indexOf('classifyWorkspaceFailure(');
+    const refreshIdx = body.indexOf('refreshOwnerWorkspaceToken(');
+
+    assert.ok(classifyIdx >= 0, 'classifyWorkspaceFailure( is not called inside resolveWorkspaceAccess');
+    assert.ok(refreshIdx >= 0, 'sanity check failed: refreshOwnerWorkspaceToken( is not called inside resolveWorkspaceAccess');
+    assert.ok(
+      classifyIdx > refreshIdx,
+      'classifyWorkspaceFailure must be called AFTER refreshOwnerWorkspaceToken has had its chance to resolve a token — reclassifying a failure that refresh-on-resolve could still turn into a success would be premature'
+    );
+
+    assert.ok(
+      !body.includes('detectOwnerAccountMismatch('),
+      'detectOwnerAccountMismatch must no longer be called directly inside resolveWorkspaceAccess — it moved inside classifyWorkspaceFailure (lib/workspace-token-resolver.js)'
+    );
   });
 });
 

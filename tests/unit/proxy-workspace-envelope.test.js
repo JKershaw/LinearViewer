@@ -65,6 +65,19 @@ test('workspaceUnavailableEnvelope: owner_mismatch → config / not retryable (L
   assert.deepEqual(env.context, { workspaceUrlKey: 'acme' });
 });
 
+test('workspaceUnavailableEnvelope: owner_signed_out → auth / not retryable, names the real remedy (LIN-1506)', () => {
+  const env = workspaceUnavailableEnvelope('owner_signed_out', 'acme');
+  assert.equal(env.code, 'WORKSPACE_OWNER_SIGNED_OUT');
+  // Q2: category is 'auth' (not 'config', unlike owner_mismatch) — re-authenticating
+  // is genuinely the fix when the owner is simply signed out.
+  assert.equal(env.category, 'auth');
+  assert.equal(env.retryable, false);
+  // The honest remedy: sign in again, or issue a fresh token. Deliberately does NOT
+  // avoid the word "token" — see the retargeted privacy regex below (Q4).
+  assert.match(env.detail, /sign in|token/i);
+  assert.deepEqual(env.context, { workspaceUrlKey: 'acme' });
+});
+
 // Review finding (LIN-1413): the detector this reason is built on cannot tell
 // a genuine account fork apart from a legitimate colleague whose own session
 // merely lapsed (see Block C7, linear-token-isolation.test.js). A confident
@@ -76,12 +89,94 @@ test('workspaceUnavailableEnvelope: owner_mismatch copy is hedged, not a false c
   assert.ok(!/will not/i.test(env.detail), `detail overclaims certainty: ${env.detail}`);
 });
 
+// Retargeted per LIN-1506 (Q4). The OLD regex here (/token|secret|accessToken|
+// apiKey|bearer/i) matched the bare English WORD "token" in prose, not just a
+// leaked value — and owner_signed_out's honest remedy copy legitimately
+// contains it ("issue a fresh token"). Rewording that copy to dodge the
+// heuristic would degrade required copy to satisfy a test, which inverts this
+// ticket's priorities. So this targets what the privacy boundary actually
+// names (workspaceUnavailableEnvelope's doc comment above: "never accessToken /
+// openRouterApiKey / proxy-token bytes / workspace content") — field NAMES and
+// VALUE SHAPES, not vocabulary:
+//   - sensitive field names, as serialized JSON keys (a real leak would put the
+//     value under one of these keys, not loose in prose)
+//   - opaque credential-shaped values: a contiguous 24+ char run of token/base64
+//     alphabet that also contains a digit — the actual "bytes" the boundary
+//     forbids, which no hand-written prose sentence produces. The digit
+//     requirement is deliberate, not incidental: our OWN envelope `code`s are
+//     24-27 char SCREAMING_SNAKE_CASE runs with no digit (WORKSPACE_OWNER_
+//     MISMATCH is exactly 24 chars) and must never be flagged as a leak — see
+//     the "clean envelope" sanity check below.
+// Must strictly strengthen: the existing store_unreachable assertion stays.
+const SENSITIVE_FIELD_NAME_LEAK = /"(accessToken|refreshToken|apiKey|openRouterApiKey|proxyToken|secret|clientSecret)"\s*:/i;
+const OPAQUE_RUN = /\b[A-Za-z0-9_-]{24,}\b/g;
+
+function opaqueCredentialShapedValues(blob) {
+  return (blob.match(OPAQUE_RUN) || []).filter(run => /\d/.test(run));
+}
+
+function assertNoPrivacyLeak(env) {
+  const blob = JSON.stringify(env);
+  assert.ok(!SENSITIVE_FIELD_NAME_LEAK.test(blob), `leaked a sensitive field name: ${blob}`);
+  const leaks = opaqueCredentialShapedValues(blob);
+  assert.equal(leaks.length, 0, `leaked an opaque credential-shaped value: ${JSON.stringify(leaks)}`);
+}
+
 test('envelope context carries only the public workspace slug (privacy boundary)', () => {
   const env = workspaceUnavailableEnvelope('store_unreachable', 'acme');
   assert.deepEqual(Object.keys(env.context), ['workspaceUrlKey']);
-  // No token/secret/content leakage anywhere in the serialized body.
-  const blob = JSON.stringify(env);
-  assert.ok(!/token|secret|accessToken|apiKey|bearer/i.test(blob), `leaked sensitive field: ${blob}`);
+  assertNoPrivacyLeak(env);
+});
+
+// The whole point of the Q4 retarget: owner_signed_out's honest copy contains
+// the bare word "token" and must NOT be flagged as a leak by the tightened check.
+test('envelope for owner_signed_out is not flagged despite containing the required word "token" in its remedy copy', () => {
+  const env = workspaceUnavailableEnvelope('owner_signed_out', 'acme');
+  assert.match(env.detail, /token/i, 'sanity: the required word is actually present');
+  assertNoPrivacyLeak(env);
+});
+
+// Demonstration, not just assertion, that the retargeted regex still catches a
+// genuine leak — constructed against fabricated envelopes shaped like real ones.
+test('the retargeted privacy regex still catches a genuine leak (demonstration)', () => {
+  const leakedByFieldName = {
+    error: 'Workspace not available',
+    code: 'WORKSPACE_UNAVAILABLE',
+    category: 'internal',
+    retryable: false,
+    detail: 'ok',
+    context: { workspaceUrlKey: 'acme', accessToken: 'whatever-the-value-is' }
+  };
+  assert.ok(
+    SENSITIVE_FIELD_NAME_LEAK.test(JSON.stringify(leakedByFieldName)),
+    'regex failed to catch a leaked accessToken field name'
+  );
+
+  const leakedByValueShape = {
+    error: 'Workspace not available',
+    code: 'WORKSPACE_OWNER_MISMATCH',
+    category: 'config',
+    retryable: false,
+    // An opaque account-id-shaped value leaked into prose, no sensitive key name involved.
+    detail: 'A different account (acct_9f8e7d6c5b4a3928374652819abc) is live for this workspace.',
+    context: { workspaceUrlKey: 'acme' }
+  };
+  assert.ok(
+    opaqueCredentialShapedValues(JSON.stringify(leakedByValueShape)).length > 0,
+    'value-shape check failed to catch an opaque credential/account-id-shaped value leaked into detail prose'
+  );
+
+  // Sanity: an ordinary, non-leaking envelope must NOT trip either check —
+  // otherwise the "still catches a leak" demonstration above would be vacuous.
+  // This is also where the digit requirement earns its keep: owner_mismatch's
+  // own `code` (WORKSPACE_OWNER_MISMATCH, 24 chars, no digit) would have
+  // false-tripped a pure length-only check.
+  for (const reason of ['store_unreachable', 'session_expired', 'not_connected', 'owner_mismatch', 'owner_signed_out']) {
+    const clean = workspaceUnavailableEnvelope(reason, 'acme');
+    const blob = JSON.stringify(clean);
+    assert.ok(!SENSITIVE_FIELD_NAME_LEAK.test(blob), `false positive (field name) on ${reason}: ${blob}`);
+    assert.deepEqual(opaqueCredentialShapedValues(blob), [], `false positive (value shape) on ${reason}: ${blob}`);
+  }
 });
 
 test('unknown reason falls back to a safe, non-retryable internal envelope', () => {
@@ -186,4 +281,13 @@ test('Shape B (/stack) threads owner_mismatch through to config envelope (LIN-14
   assert.equal(body.code, 'WORKSPACE_OWNER_MISMATCH');
   assert.equal(body.category, 'config');
   assert.equal(body.retryable, false);
+});
+
+test('Shape B (/stack) threads owner_signed_out through to auth envelope (LIN-1506)', async () => {
+  const { status, body } = await getJson(buildApp('owner_signed_out'), '/api/proxy/stack');
+  assert.equal(status, 503);
+  assert.equal(body.code, 'WORKSPACE_OWNER_SIGNED_OUT');
+  assert.equal(body.category, 'auth');
+  assert.equal(body.retryable, false);
+  assert.equal(body.context.workspaceUrlKey, 'acme');
 });
