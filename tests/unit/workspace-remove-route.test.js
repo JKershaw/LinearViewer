@@ -13,10 +13,15 @@
  *
  * Run with: node --test tests/unit/workspace-remove-route.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MangoClient } from '@jkershaw/mangodb';
 import { createWorkspaceRoutes } from '../../routes/workspace.js';
 import { workspaceTokenCacheKey } from '../../lib/workspace-token-cache.js';
+import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 
 function getHandler(router) {
   const layer = router.stack.find(l => l.route?.path === '/workspace/:urlKey/remove' && l.route.methods.post);
@@ -44,8 +49,8 @@ function makeSession(initial = {}) {
   };
 }
 
-function makeHandler(evictWorkspaceToken) {
-  const router = createWorkspaceRoutes({ evictWorkspaceToken });
+function makeHandler(evictWorkspaceToken, extraDeps = {}) {
+  const router = createWorkspaceRoutes({ evictWorkspaceToken, ...extraDeps });
   return getHandler(router);
 }
 
@@ -135,5 +140,80 @@ describe('POST /workspace/:urlKey/remove eviction (LIN-1507, witness D(i))', () 
 
     assert.deepEqual(evicted, []);
     assert.equal(res.statusCode, 404);
+  });
+});
+
+describe('POST /workspace/:urlKey/remove durable deletion (LIN-1523)', () => {
+  let dbClient;
+  let dbDir;
+  let counter = 0;
+
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'workspace-remove-route-durable-'));
+    dbClient = new MangoClient(dbDir);
+    await dbClient.connect();
+  });
+
+  after(async () => {
+    if (dbClient?.close) await dbClient.close();
+    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+  });
+
+  function freshCredentialStore() {
+    const db = dbClient.db(`ocs_${counter++}`);
+    return new OwnerCredentialStore({ collection: db.collection('owner-credentials') });
+  }
+
+  test('remove-last-workspace: the durable record is gone after the destroy() path', async () => {
+    const ownerCredentialStore = freshCredentialStore();
+    await ownerCredentialStore.put('acct-1', 'acme', { provider: 'linear', scope: 'org-1', token: 't', refreshToken: 'r', tokenExpiresAt: 123 });
+    const handler = makeHandler(undefined, { ownerCredentialStore });
+    const session = makeSession({ accountId: 'acct-1', workspaces: [{ id: 'ws-1', urlKey: 'acme' }], activeWorkspaceId: 'ws-1' });
+
+    await handler({ params: { urlKey: 'acme' }, session }, makeRes());
+
+    assert.equal(await ownerCredentialStore.get('acct-1', 'acme'), null, 'durable record must be gone after the last-workspace disconnect');
+  });
+
+  test('remove-one-of-many: the removed workspace\'s durable record is gone, but a SIBLING workspace\'s record is intact — deletion is scoped, not account-wide', async () => {
+    const ownerCredentialStore = freshCredentialStore();
+    await ownerCredentialStore.put('acct-1', 'acme', { provider: 'linear', scope: 'org-1', token: 't-acme', refreshToken: 'r-acme', tokenExpiresAt: 123 });
+    await ownerCredentialStore.put('acct-1', 'beta', { provider: 'linear', scope: 'org-2', token: 't-beta', refreshToken: 'r-beta', tokenExpiresAt: 456 });
+    const handler = makeHandler(undefined, { ownerCredentialStore });
+    const session = makeSession({
+      accountId: 'acct-1',
+      workspaces: [{ id: 'ws-1', urlKey: 'acme' }, { id: 'ws-2', urlKey: 'beta' }],
+      activeWorkspaceId: 'ws-1',
+    });
+
+    await handler({ params: { urlKey: 'acme' }, session }, makeRes());
+
+    assert.equal(await ownerCredentialStore.get('acct-1', 'acme'), null, 'the disconnected workspace\'s durable record must be gone');
+    const sibling = await ownerCredentialStore.get('acct-1', 'beta');
+    assert.ok(sibling, 'the sibling workspace\'s durable record must survive');
+    assert.equal(sibling.refreshToken, 'r-beta');
+  });
+
+  test('an absent ownerCredentialStore dependency does not throw on either branch (mirrors the evictWorkspaceToken precedent above)', async () => {
+    const handlerNoDeps = makeHandler(undefined, {});
+
+    const lastWsSession = makeSession({ accountId: 'acct-1', workspaces: [{ id: 'ws-1', urlKey: 'acme' }], activeWorkspaceId: 'ws-1' });
+    await assert.doesNotReject(() => handlerNoDeps({ params: { urlKey: 'acme' }, session: lastWsSession }, makeRes()));
+
+    const manyWsSession = makeSession({
+      accountId: 'acct-1',
+      workspaces: [{ id: 'ws-1', urlKey: 'acme' }, { id: 'ws-2', urlKey: 'beta' }],
+      activeWorkspaceId: 'ws-1',
+    });
+    await assert.doesNotReject(() => handlerNoDeps({ params: { urlKey: 'acme' }, session: manyWsSession }, makeRes()));
+  });
+
+  test('the store-level delete is a no-op on a record that is not there — no throw (beat 2 store method, exercised at this call site)', async () => {
+    const ownerCredentialStore = freshCredentialStore();
+    const handler = makeHandler(undefined, { ownerCredentialStore });
+    const session = makeSession({ accountId: 'acct-1', workspaces: [{ id: 'ws-1', urlKey: 'acme' }], activeWorkspaceId: 'ws-1' });
+
+    await assert.doesNotReject(() => handler({ params: { urlKey: 'acme' }, session }, makeRes()));
+    assert.equal(await ownerCredentialStore.get('acct-1', 'acme'), null);
   });
 });

@@ -126,6 +126,8 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
 
     const sessions = await collection.find().then(c => c.toArray());
     const refreshImpl = (refreshToken) => refreshAccessToken(refreshToken, { tokenUrl });
+    const storeCalls = [];
+    const store = { async put(accountId, urlKey, credential) { storeCalls.push({ accountId, urlKey, credential }); } };
 
     const result = await refreshOwnerWorkspaceToken({
       sessions,
@@ -133,10 +135,18 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
       ownerAccountId: 'account-real',
       refreshAccessToken: refreshImpl,
       persistSession,
+      store,
     });
 
     assert.equal(result.token, 'rotated-access-token');
     assert.equal(result.provider, 'linear');
+
+    // LIN-1523: the durable dual-write landed once, with the rotated (not the
+    // old) refreshToken, for the correct owner/workspace pair.
+    assert.equal(storeCalls.length, 1);
+    assert.equal(storeCalls[0].accountId, 'account-real');
+    assert.equal(storeCalls[0].urlKey, 'acme-real');
+    assert.equal(storeCalls[0].credential.refreshToken, 'rotated-refresh-token');
 
     // Persisted to the SAME row, rotated refresh_token (not the old one).
     const persistedDoc = collection._raw().find(d => d._id === 'sid-real-1');

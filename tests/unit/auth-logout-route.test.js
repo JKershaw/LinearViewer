@@ -14,10 +14,15 @@
  *
  * Run with: node --test tests/unit/auth-logout-route.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MangoClient } from '@jkershaw/mangodb';
 import { createAuthRoutes } from '../../routes/auth.js';
 import { workspaceTokenCacheKey } from '../../lib/workspace-token-cache.js';
+import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 
 function getHandler(router, method, path) {
   const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
@@ -125,5 +130,50 @@ describe('routes/auth.js — /logout eviction (LIN-1507, witness D(i))', () => {
 
     assert.ok(session.destroyed);
     assert.equal(res.redirectedTo, '/');
+  });
+});
+
+// LIN-1523's most important negative assertion: a cache is not a grant. If
+// someone later "tidies" /logout into symmetry with the disconnect routes
+// (routes/workspace.js) by adding a durable delete here, this test fails —
+// that would silently undo the entire point of the phase (a delegated agent
+// keeps working after the human's browser session ends).
+describe('routes/auth.js — /logout is explicitly NOT a durable-deletion site (LIN-1523)', () => {
+  let dbClient;
+  let dbDir;
+
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'auth-logout-route-durable-'));
+    dbClient = new MangoClient(dbDir);
+    await dbClient.connect();
+  });
+
+  after(async () => {
+    if (dbClient?.close) await dbClient.close();
+    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+  });
+
+  test('the durable owner credential SURVIVES /logout — the LIN-1507 cache eviction runs, but no durable delete does', async () => {
+    const ownerCredentialStore = new OwnerCredentialStore({ collection: dbClient.db('main').collection('owner-credentials') });
+    await ownerCredentialStore.put('acct-1', 'acme', { provider: 'linear', scope: 'org-1', token: 't', refreshToken: 'r', tokenExpiresAt: 123 });
+
+    const evicted = [];
+    const router = createAuthRoutes({
+      sessionStore: { cleanup: async () => {} },
+      evictWorkspaceToken: (key) => evicted.push(key),
+      ownerCredentialStore, // deliberately unused by /logout — passed to prove it's ignored, not merely absent
+    });
+    const handler = getHandler(router, 'get', '/logout');
+    const session = makeSession({ accountId: 'acct-1', workspaces: [{ urlKey: 'acme' }] });
+    const res = makeRes();
+
+    handler({ session }, res);
+
+    // The cache WAS evicted (unchanged LIN-1507 behaviour)...
+    assert.equal(evicted.length, 2);
+    // ...but the durable record is untouched.
+    const survived = await ownerCredentialStore.get('acct-1', 'acme');
+    assert.ok(survived, 'the durable credential must still exist after /logout');
+    assert.equal(survived.refreshToken, 'r');
   });
 });

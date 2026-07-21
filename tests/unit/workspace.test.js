@@ -10,6 +10,8 @@ import {
   upsertWorkspace,
   removeWorkspace,
   updateWorkspaceTokens,
+  rotateOwnerCredential,
+  persistOwnerCredential,
   getWorkspaceToken,
   linkProvider,
   unlinkProvider,
@@ -21,6 +23,28 @@ import {
   saveSession,
   MAX_WORKSPACES
 } from '../../lib/workspace.js';
+
+// LIN-1523: fake durable owner-credential store — records every `put` call so
+// tests can assert on write count/args without a real backing collection.
+function fakeCredentialStore() {
+  const calls = [];
+  const records = new Map();
+  const key = (accountId, urlKey) => `${accountId}::${urlKey}`;
+  return {
+    calls,
+    async put(accountId, urlKey, credential) {
+      calls.push({ op: 'put', accountId, urlKey, credential });
+      records.set(key(accountId, urlKey), credential);
+    },
+    async get(accountId, urlKey) {
+      return records.get(key(accountId, urlKey)) ?? null;
+    },
+    async delete(accountId, urlKey) {
+      calls.push({ op: 'delete', accountId, urlKey });
+      records.delete(key(accountId, urlKey));
+    },
+  };
+}
 
 // =============================================================================
 // updateWorkspaceTokens Tests
@@ -192,6 +216,138 @@ describe('updateWorkspaceTokens', () => {
 });
 
 // =============================================================================
+// rotateOwnerCredential / persistOwnerCredential Tests (LIN-1523, Session 1)
+// =============================================================================
+
+describe('rotateOwnerCredential', () => {
+  test('calls updateWorkspaceTokens with the unchanged tokenData argument, synchronously, before the durable write', async () => {
+    const workspace = { id: 'ws-1', urlKey: 'acme', provider: 'linear', bindings: [{ provider: 'linear', scope: 'org-1', credentials: {} }] };
+    const tokenData = { access_token: 'fresh', refresh_token: 'fresh-refresh', expires_in: 3600 };
+    const store = fakeCredentialStore();
+
+    await rotateOwnerCredential({ accountId: 'account-A', workspace, tokenData, store });
+
+    // updateWorkspaceTokens's own effect (session-side scalar mirror) landed —
+    // proves the mutator ran, unchanged, as part of the seam.
+    assert.strictEqual(workspace.accessToken, 'fresh');
+    assert.strictEqual(workspace.refreshToken, 'fresh-refresh');
+  });
+
+  test('the durable put happens exactly once per rotation, keyed on accountId + workspace.urlKey', async () => {
+    const workspace = { id: 'ws-1', urlKey: 'acme', provider: 'linear', bindings: [{ provider: 'linear', scope: 'org-1', credentials: {} }] };
+    const tokenData = { access_token: 'fresh', refresh_token: 'fresh-refresh', expires_in: 3600 };
+    const store = fakeCredentialStore();
+
+    await rotateOwnerCredential({ accountId: 'account-A', workspace, tokenData, store });
+
+    assert.strictEqual(store.calls.length, 1);
+    assert.strictEqual(store.calls[0].accountId, 'account-A');
+    assert.strictEqual(store.calls[0].urlKey, 'acme');
+    assert.strictEqual(store.calls[0].credential.refreshToken, 'fresh-refresh');
+    assert.strictEqual(store.calls[0].credential.token, 'fresh');
+    assert.strictEqual(store.calls[0].credential.provider, 'linear');
+    assert.strictEqual(store.calls[0].credential.scope, 'org-1');
+  });
+
+  // LIN-1523 corrective: pins BOTH halves of the mirroring asymmetry in one
+  // test, as an assertion rather than an argument-by-construction. The
+  // session's accessToken/tokenExpiresAt mirror MUST remain (updateWorkspaceTokens's
+  // own unchanged effect); the durable store gets the rotated refreshToken;
+  // and — the guard against rejected approach E — the store is proven never
+  // READ during rotation (a store double with no `.get()` at all is injected,
+  // so any accidental read-back would throw, not silently succeed) and the
+  // session's refreshToken ends up EXACTLY what updateWorkspaceTokens alone
+  // would have produced from tokenData, untouched by the durable-store step.
+  test('durable store gets the rotated refreshToken; session mirror is exactly updateWorkspaceTokens\'s own effect, never read back from the store (rejected approach E guard)', async () => {
+    const workspace = {
+      id: 'ws-1', urlKey: 'acme', provider: 'linear',
+      accessToken: 'stale-access', refreshToken: 'old-refresh', tokenExpiresAt: 1000,
+      bindings: [{ provider: 'linear', scope: 'org-1', credentials: { token: 'stale-access', refreshToken: 'old-refresh' } }],
+    };
+    // Run updateWorkspaceTokens alone, on an identical fixture, to know
+    // exactly what its own (unchanged) effect on the session mirror is —
+    // the value rotateOwnerCredential's session side must match exactly.
+    const workspaceViaMutatorAlone = {
+      id: 'ws-1', urlKey: 'acme', provider: 'linear',
+      accessToken: 'stale-access', refreshToken: 'old-refresh', tokenExpiresAt: 1000,
+      bindings: [{ provider: 'linear', scope: 'org-1', credentials: { token: 'stale-access', refreshToken: 'old-refresh' } }],
+    };
+    const tokenData = { access_token: 'fresh', refresh_token: 'fresh-refresh', expires_in: 3600 };
+    updateWorkspaceTokens(workspaceViaMutatorAlone, tokenData);
+
+    // A store double that only implements `put` — no `get` at all — so if
+    // rotateOwnerCredential ever tried to read the durable record back, the
+    // call would throw (TypeError: store.get is not a function), not
+    // silently succeed and mask a regression.
+    const calls = [];
+    const putOnlyStore = { async put(accountId, urlKey, credential) { calls.push({ accountId, urlKey, credential }); } };
+
+    await rotateOwnerCredential({ accountId: 'account-A', workspace, tokenData, store: putOnlyStore });
+
+    // Durable half: the store got the NEW (rotated) refreshToken.
+    assert.strictEqual(calls.length, 1);
+    assert.strictEqual(calls[0].credential.refreshToken, 'fresh-refresh');
+    assert.notStrictEqual(calls[0].credential.refreshToken, 'old-refresh');
+
+    // Session half: the mirror (accessToken/tokenExpiresAt) is still written —
+    // this half IS supposed to stay mirrored, never "fixed" into asymmetry —
+    // and the session's refreshToken is EXACTLY updateWorkspaceTokens's own
+    // effect, proving the durable-store step never wrote back. accessToken/
+    // refreshToken are deterministic strings so they're compared exactly;
+    // tokenExpiresAt is Date.now()-derived in BOTH calls (this one and the
+    // reference mutator-alone call above), so it's compared within a small
+    // tolerance rather than strict equality, to avoid a real-clock-tick flake
+    // between the two independent `updateWorkspaceTokens` calls.
+    assert.strictEqual(workspace.accessToken, workspaceViaMutatorAlone.accessToken);
+    assert.strictEqual(workspace.refreshToken, workspaceViaMutatorAlone.refreshToken);
+    assert.strictEqual(workspace.refreshToken, 'fresh-refresh');
+    assert.ok(
+      Math.abs(workspace.tokenExpiresAt - workspaceViaMutatorAlone.tokenExpiresAt) < 1000,
+      'tokenExpiresAt must match updateWorkspaceTokens\'s own effect (within a sub-second clock-tick tolerance)'
+    );
+  });
+
+  test('the durable store is never mutated beyond one `put` — no extra key is grown on workspace by the seam', async () => {
+    const workspace = { id: 'ws-1', urlKey: 'acme', provider: 'linear', bindings: [{ provider: 'linear', scope: 'org-1', credentials: {} }] };
+    const tokenData = { access_token: 'fresh', refresh_token: 'fresh-refresh', expires_in: 3600 };
+    const store = fakeCredentialStore();
+    const workspaceKeysBefore = new Set(Object.keys(workspace));
+
+    await rotateOwnerCredential({ accountId: 'account-A', workspace, tokenData, store });
+
+    // The only fields updateWorkspaceTokens itself would ever add. No new key
+    // (e.g. a durable-record cache) was introduced by the seam.
+    const newKeys = Object.keys(workspace).filter(k => !workspaceKeysBefore.has(k));
+    assert.deepStrictEqual(new Set(newKeys), new Set(['accessToken', 'refreshToken', 'tokenExpiresAt', 'credentials']));
+  });
+});
+
+describe('persistOwnerCredential', () => {
+  test('writes the credential already sitting on an already-mutated workspace, without touching updateWorkspaceTokens', async () => {
+    const workspace = {
+      id: 'ws-1',
+      urlKey: 'acme',
+      provider: 'linear',
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+      tokenExpiresAt: 12345,
+      bindings: [{ provider: 'linear', scope: 'org-1', credentials: { token: 'access-1' } }],
+    };
+    const store = fakeCredentialStore();
+
+    await persistOwnerCredential('account-A', workspace, store);
+
+    assert.strictEqual(store.calls.length, 1);
+    assert.strictEqual(store.calls[0].accountId, 'account-A');
+    assert.strictEqual(store.calls[0].urlKey, 'acme');
+    assert.strictEqual(store.calls[0].credential.token, 'access-1');
+    assert.strictEqual(store.calls[0].credential.refreshToken, 'refresh-1');
+    assert.strictEqual(store.calls[0].credential.tokenExpiresAt, 12345);
+    assert.strictEqual(store.calls[0].credential.scope, 'org-1');
+  });
+});
+
+// =============================================================================
 // linkProvider Tests (LIN-562)
 // =============================================================================
 
@@ -327,6 +483,59 @@ describe('unlinkProvider', () => {
     const ws = { id: 'ws-1' };
     assert.doesNotThrow(() => unlinkProvider(ws, 'linear', 'org-1'));
     assert.strictEqual(ws.id, 'ws-1');
+  });
+});
+
+// LIN-1523 (beat 4): the provider-removal route (server.js) calls
+// unlinkProvider(workspace, provider, scope) then, when provider === 'linear',
+// ownerCredentialStore.delete(accountId, workspace.urlKey) — exactly this
+// sequence, composed here since server.js itself isn't import-safe in a unit
+// test (see tests/unit/provider-remove-durable-delete.test.js's source-text
+// guard for proof the route actually wires it this way). This proves the
+// EFFECT of that composition on real store contents, not just that a call
+// happened.
+describe('unlinkProvider + durable delete, composed as the provider-removal route calls them', () => {
+  test('unlinking the active Linear binding: the session-side delete happens (unchanged unlinkProvider behaviour) AND the durable record is gone', async () => {
+    const store = fakeCredentialStore();
+    await store.put('account-A', 'acme', { provider: 'linear', scope: 'org-1', token: 'lin', refreshToken: 'lr', tokenExpiresAt: 100 });
+
+    const ws = linkProvider({ id: 'ws-1', urlKey: 'acme' }, 'linear', 'org-1', { token: 'lin', refreshToken: 'lr', tokenExpiresAt: 100 });
+    const unlinkTarget = 'linear'; // the request's `provider` — matches the route's own variable
+    unlinkProvider(ws, unlinkTarget, 'org-1');
+    // Mirrors the route: `if (provider === 'linear') await ownerCredentialStore.delete(...)`.
+    if (unlinkTarget === 'linear') {
+      await store.delete('account-A', ws.urlKey);
+    }
+
+    // The session-side delete already happened inside unlinkProvider (existing,
+    // untouched behaviour) — the last binding was removed, so the scalar
+    // mirror is cleared.
+    assert.strictEqual(ws.bindings.length, 0);
+    assert.strictEqual(ws.refreshToken, undefined);
+
+    // And the durable record is gone too — asserted on the store's actual
+    // contents (a point read), not on whether delete() was called.
+    assert.strictEqual(await store.get('account-A', 'acme'), null);
+  });
+
+  test('unlinking a non-Linear binding leaves the Linear durable record untouched — the route\'s guard is provider-scoped', async () => {
+    const store = fakeCredentialStore();
+    await store.put('account-A', 'acme', { provider: 'linear', scope: 'org-1', token: 'lin', refreshToken: 'lr', tokenExpiresAt: 100 });
+
+    const ws = linkProvider({ id: 'ws-1', urlKey: 'acme' }, 'linear', 'org-1', { token: 'lin', refreshToken: 'lr', tokenExpiresAt: 100 });
+    linkProvider(ws, 'github', 'owner/repo', { token: 'gh' });
+    const unlinkTarget = 'github';
+    unlinkProvider(ws, unlinkTarget, 'owner/repo');
+    if (unlinkTarget === 'linear') {
+      await store.delete('account-A', ws.urlKey); // never reached — the guard is false
+    }
+
+    // Linear's own binding survives, and so must its durable record.
+    assert.strictEqual(ws.bindings.length, 1);
+    assert.strictEqual(ws.bindings[0].provider, 'linear');
+    const survived = await store.get('account-A', 'acme');
+    assert.ok(survived, 'the Linear durable record must survive an unrelated (github) unlink');
+    assert.strictEqual(survived.refreshToken, 'lr');
   });
 });
 

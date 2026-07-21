@@ -45,6 +45,7 @@ import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
 import { AccountStore } from './lib/account-store.js'
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
+import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
@@ -70,7 +71,7 @@ import { renderLandingPage } from './lib/render-landing.js'
 import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential } from './lib/workspace.js'
+import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, rotateOwnerCredential, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential } from './lib/workspace.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createEnsurePATSession } from './lib/pat-session.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
@@ -480,6 +481,19 @@ const workspaceStore = new WorkspaceStore({ collection: workspacesCollection })
 const accountWorkspacesCollection = db.collection('account-workspaces')
 const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWorkspacesCollection })
 
+// Durable owner-scoped Linear credential (LIN-1523, Session 1 of LIN-1501).
+// Additive-only in this session: dual-written alongside the session-only
+// credential (never instead of it) via rotateOwnerCredential/
+// persistOwnerCredential at every rotation/acquisition site — ensureValidToken
+// and handleTokenRefreshAndRetry below, the off-session refresh path
+// (refreshOwnerWorkspaceToken), and both OAuth-callback branches
+// (routes/auth.js). No read path is wired to it yet — that is Session 2
+// (LIN-1524). Plaintext `refreshToken` at rest is accepted conditionally for
+// this phase only — see LIN-1522, which owns encryption/retention for this
+// collection.
+const ownerCredentialsCollection = db.collection('owner-credentials')
+const ownerCredentialStore = new OwnerCredentialStore({ collection: ownerCredentialsCollection })
+
 // =============================================================================
 // Process-level safety net (LIN-608)
 // =============================================================================
@@ -619,8 +633,8 @@ async function ensureValidToken(req, res, next) {
     } else {
       const newTokens = await refreshAccessToken(workspace.refreshToken)
 
-      // Update workspace tokens
-      updateWorkspaceTokens(workspace, newTokens)
+      // Update workspace tokens + dual-write the durable owner credential (LIN-1523)
+      await rotateOwnerCredential({ accountId: req.session.accountId, workspace, tokenData: newTokens, store: ownerCredentialStore })
     }
 
     await saveSession(req.session)
@@ -667,14 +681,14 @@ app.use((req, res, next) => {
 for (const provider of getAllProviders()) {
   let authRouter
   try {
-    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken })
+    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore })
   } catch (err) {
     if (err instanceof NotImplementedError) continue
     throw err
   }
   app.use(authRouter)
 }
-app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken }))
+app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
 
@@ -869,7 +883,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res) {
  */
 async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res) {
   const tokenData = await refreshAccessToken(workspace.refreshToken);
-  updateWorkspaceTokens(workspace, tokenData);
+  await rotateOwnerCredential({ accountId: session.accountId, workspace, tokenData, store: ownerCredentialStore });
   await saveSession(session);
   console.log('Token refreshed after 401, retrying request');
 
@@ -1282,7 +1296,8 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
           ownerAccountId,
           refreshAccessToken,
           persistSession: persistSessionRow,
-          resolveProvider: getProviderForWorkspace
+          resolveProvider: getProviderForWorkspace,
+          store: ownerCredentialStore
         });
         if (refreshed) {
           workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider });
@@ -2382,6 +2397,16 @@ app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async
   }
 
   unlinkProvider(workspace, provider, scope);
+
+  // LIN-1523: unlinking the active Linear binding revokes its durable
+  // credential too — the existing session-side delete (inside unlinkProvider,
+  // untouched, unlinkProvider stays a pure/sync mutator) stays; this is
+  // ADDITIVE alongside it, not a replacement. Scoped to 'linear' only: the
+  // durable store is Linear-only by design, so unlinking a non-Linear
+  // provider (e.g. github) must not touch it.
+  if (provider === 'linear') {
+    await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey);
+  }
 
   try {
     await saveSession(req.session);

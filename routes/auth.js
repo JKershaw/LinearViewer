@@ -10,7 +10,7 @@ import { Router } from 'express'
 import { getProvider } from '../lib/providers/registry.js'
 import { AuthExchangeError } from '../lib/providers/interface.js'
 import { renderErrorPage } from '../lib/render.js'
-import { upsertWorkspace, saveSession, linkProvider, getActiveWorkspace, validateWorkspaceUrlKey } from '../lib/workspace.js'
+import { upsertWorkspace, saveSession, linkProvider, getActiveWorkspace, validateWorkspaceUrlKey, persistOwnerCredential } from '../lib/workspace.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-preferences.js'
 import { establishAccount } from '../lib/account-session.js'
@@ -27,9 +27,10 @@ import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
  * @param {import('../lib/account-store.js').AccountStore} options.accountStore - LIN-1329: find-or-create the durable account for the signing-in identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
  * @param {(key: string) => void} [options.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`). Called at /logout for every workspace the session referenced, before the session is destroyed.
+ * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [options.ownerCredentialStore] - LIN-1523: durable owner-credential store. Linear-only; other providers' auth routers receive this option too (shared mount loop) but ignore it.
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken }) {
+export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore }) {
   const router = Router()
 
   const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
@@ -272,6 +273,14 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
           return res.status(409).send(html)
         }
 
+        // LIN-1523: durable dual-write, AFTER the limit-check + establishAccount
+        // above — never before, or a refused workspace would leave a durable
+        // credential behind. `workspace` was already fully populated by
+        // linkProvider earlier in this handler; there is no updateWorkspaceTokens
+        // call to wrap here, so this reaches persistOwnerCredential directly
+        // rather than through the rotateOwnerCredential rotation seam.
+        await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore)
+
         // Success: clear the OAuth state/intent, save the session, and return to
         // the initiating workspace's settings. Do NOT set activeWorkspaceId — the
         // user stays on their current workspace (plan UX (b), mirroring GitHub
@@ -334,6 +343,15 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
               })
               return res.status(409).send(html)
             }
+
+            // LIN-1523: durable dual-write, AFTER the limit-check + establishAccount
+            // above — never before, or a refused workspace would leave a durable
+            // credential behind. `workspace` was already fully populated by
+            // linkProvider earlier in this handler; there is no
+            // updateWorkspaceTokens call to wrap here, so this reaches
+            // persistOwnerCredential directly rather than through the
+            // rotateOwnerCredential rotation seam.
+            await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore)
 
             // Load saved user preferences and apply to session.
             // regenerate() wiped the session, so rehydrate every durable field
