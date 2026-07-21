@@ -60,11 +60,25 @@ function sessionRow(sid, accountId, urlKey, { accessToken, expiresAt, refreshTok
   return { _id: sid, session: { accountId, workspaces: [{ urlKey, provider, accessToken, tokenExpiresAt: expiresAt, refreshToken }] } };
 }
 
-// LIN-1523: fake durable owner-credential store for the Linear rotation arm
-// (rotateOwnerCredential), which now requires a `store` dependency.
-function fakeStore() {
+// LIN-1523/1524: fake durable owner-credential store. `get` is now load-bearing
+// for the Linear arm (LIN-1524 point-reads it to find what to refresh), so this
+// fake is stateful — a `put` updates what a later `get` sees, mirroring a real
+// collection, which matters for tests that refresh the SAME (account, urlKey)
+// more than once (e.g. single-flight cleanup).
+function fakeStore(seed = {}) {
   const calls = [];
-  return { calls, async put(accountId, urlKey, credential) { calls.push({ accountId, urlKey, credential }); } };
+  const records = new Map();
+  for (const [key, credential] of Object.entries(seed)) records.set(key, credential);
+  return {
+    calls,
+    async get(accountId, urlKey) {
+      return records.get(`${accountId}::${urlKey}`) ?? null;
+    },
+    async put(accountId, urlKey, credential) {
+      calls.push({ accountId, urlKey, credential });
+      records.set(`${accountId}::${urlKey}`, credential);
+    },
+  };
 }
 
 // GitHub-family session row builder (LIN-1499). `installationId` is
@@ -166,14 +180,14 @@ describe('selectExpiredOwnerRow (LIN-1373, Block A — pure selector)', () => {
 // Block B — refreshOwnerWorkspaceToken (fake IO)
 // ---------------------------------------------------------------------------
 
-describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestration)', () => {
+describe('refreshOwnerWorkspaceToken (LIN-1373/1524, Block B — refresh orchestration)', () => {
   beforeEach(() => {
     _resetInflightForTests();
   });
 
-  test('B1: refreshes the expired owner row, persists to the correct sid, and returns the fresh token', async () => {
+  test('B1: refreshes from the durable record, mirrors accessToken/tokenExpiresAt into the owner\'s session row, and returns the fresh token', async () => {
     const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A' }),
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
     ];
     const persisted = [];
     const refreshAccessToken = async (refreshToken) => {
@@ -181,7 +195,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
       return { access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 };
     };
     const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
-    const store = fakeStore();
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
     const result = await refreshOwnerWorkspaceToken({
       sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store
@@ -191,50 +205,56 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
     assert.ok(result.expiresAt > Date.now());
     assert.equal(result.provider, 'linear');
 
-    assert.equal(persisted.length, 1);
-    assert.equal(persisted[0].sid, 'sid-1');
-    assert.equal(persisted[0].session.workspaces[0].accessToken, 'fresh-token');
-
-    // LIN-1523: the durable dual-write landed once, for the right owner/urlKey.
+    // LIN-1524: the durable record is what got refreshed and re-persisted —
+    // exactly one put, for the right owner/urlKey, with the rotated refreshToken.
     assert.equal(store.calls.length, 1);
     assert.equal(store.calls[0].accountId, 'account-A');
     assert.equal(store.calls[0].urlKey, 'acme');
     assert.equal(store.calls[0].credential.refreshToken, 'refresh-A-rotated');
+    assert.equal(store.calls[0].credential.scope, 'org-1');
+
+    // The session row (which exists here) is mirrored — accessToken/tokenExpiresAt
+    // only, never the refreshToken.
+    assert.equal(persisted.length, 1);
+    assert.equal(persisted[0].sid, 'sid-1');
+    assert.equal(persisted[0].session.workspaces[0].accessToken, 'fresh-token');
+    assert.equal(persisted[0].session.workspaces[0].refreshToken, undefined);
   });
 
-  test('B2: rotation — the NEW refresh_token (not the old) is what gets persisted', async () => {
-    const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A-old' }),
-    ];
-    const persisted = [];
+  test('B2: rotation — the NEW refresh_token (not the old) is what gets persisted durably', async () => {
+    const sessions = [];
     const refreshAccessToken = async () => ({ access_token: 'fresh-token', refresh_token: 'refresh-A-new', expires_in: 3600 });
-    const persistSession = async (sid, session) => { persisted.push(session); };
+    const persistSession = async () => {};
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A-old', tokenExpiresAt: NOW + PAST_MS } });
 
-    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store: fakeStore() });
+    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
-    assert.equal(persisted[0].workspaces[0].refreshToken, 'refresh-A-new');
-    assert.notEqual(persisted[0].workspaces[0].refreshToken, 'refresh-A-old');
+    assert.equal(store.calls[0].credential.refreshToken, 'refresh-A-new');
+    assert.notEqual(store.calls[0].credential.refreshToken, 'refresh-A-old');
+    // And a subsequent get sees the rotated value (the fake mirrors a real collection).
+    const reread = await store.get('account-A', 'acme');
+    assert.equal(reread.refreshToken, 'refresh-A-new');
   });
 
-  test('B3: refresh throws EXPIRED -> propagates to the caller, no persist, no swallowing into a fake success', async () => {
+  test('B3: refresh throws EXPIRED -> propagates to the caller, no persist (durable or session), no swallowing into a fake success', async () => {
     const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'dead-refresh' }),
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
     ];
     let persistCalled = false;
     const refreshAccessToken = async () => { throw new TokenRefreshError('Refresh token expired or invalid', 'EXPIRED'); };
     const persistSession = async () => { persistCalled = true; };
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'dead-refresh', tokenExpiresAt: NOW + PAST_MS } });
 
     await assert.rejects(
-      () => refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession }),
+      () => refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store }),
       TokenRefreshError
     );
     assert.equal(persistCalled, false);
+    assert.equal(store.calls.length, 0, 'no durable put on a failed refresh');
   });
 
   test('B4: single-flight — two concurrent calls for the same (owner, urlKey) invoke refreshAccessToken exactly once, both resolve to the fresh token', async () => {
-    const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A' }),
-    ];
+    const sessions = [];
     let callCount = 0;
     let releaseRefresh;
     const gate = new Promise(resolve => { releaseRefresh = resolve; });
@@ -244,7 +264,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
       return { access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 };
     };
     const persistSession = async () => {};
-    const store = fakeStore();
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
     const p1 = refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
     const p2 = refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
@@ -261,19 +281,13 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
     let callCount = 0;
     const refreshAccessToken = async () => {
       callCount++;
-      return { access_token: `fresh-token-${callCount}`, refresh_token: 'refresh-A-rotated', expires_in: 3600 };
+      return { access_token: `fresh-token-${callCount}`, refresh_token: `refresh-A-rotated-${callCount}`, expires_in: 3600 };
     };
     const persistSession = async () => {};
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
-    // Each call gets its own freshly-fetched session snapshot — mirroring real
-    // usage, where server.js re-reads sessionsCollection.find({}).toArray() on
-    // every resolveWorkspaceAccess call rather than reusing a stale array.
-    const freshLapsedSessions = () => [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A' }),
-    ];
-
-    const r1 = await refreshOwnerWorkspaceToken({ sessions: freshLapsedSessions(), urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store: fakeStore() });
-    const r2 = await refreshOwnerWorkspaceToken({ sessions: freshLapsedSessions(), urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store: fakeStore() });
+    const r1 = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
+    const r2 = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
     assert.equal(callCount, 2);
     assert.equal(r1.token, 'fresh-token-1');
@@ -281,9 +295,6 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
   });
 
   test('B6: single-flight cleanup after FAILURE — a later independent call still attempts its own refresh (the map entry was removed, not stuck)', async () => {
-    const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A' }),
-    ];
     let callCount = 0;
     const refreshAccessToken = async () => {
       callCount++;
@@ -291,10 +302,10 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
       return { access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 };
     };
     const persistSession = async () => {};
-    const store = fakeStore();
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
-    await assert.rejects(() => refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store }));
-    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
+    await assert.rejects(() => refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store }));
+    const result = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
     assert.equal(callCount, 2);
     assert.equal(result.token, 'fresh-token');
@@ -302,7 +313,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
 
   test('B7: TTL preserved — persistSession is called with only the session content; caller (server.js) is responsible for never routing this through the TTL-rolling session store', async () => {
     const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A' }),
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
     ];
     const persistCalls = [];
     const refreshAccessToken = async () => ({ access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 });
@@ -312,37 +323,57 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
       assert.equal(args.length, 2);
       persistCalls.push(args);
     };
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
-    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store: fakeStore() });
+    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
     assert.equal(persistCalls.length, 1);
   });
 
-  test('B8: missing refreshToken on the owner\'s expired row -> resolves null, no network call, no persist', async () => {
-    const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
-    ];
-    let refreshCalled = false;
-    let persistCalled = false;
-    const refreshAccessToken = async () => { refreshCalled = true; return {}; };
-    const persistSession = async () => { persistCalled = true; };
+  test('B8: durable record present but with NO refreshToken -> resolves null, no network call, no durable put', async () => {
+    const refreshAccessToken = async () => { throw new Error('must not be called'); };
+    const persistSession = async () => { throw new Error('must not be called'); };
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: undefined, tokenExpiresAt: NOW + PAST_MS } });
 
-    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession });
+    const result = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
     assert.equal(result, null);
-    assert.equal(refreshCalled, false);
-    assert.equal(persistCalled, false);
+    assert.equal(store.calls.length, 0);
   });
 
-  test('B9: no matching session row at all -> resolves null, no network call', async () => {
-    const sessions = [];
+  test('B9a: no durable record at all (never connected) -> resolves null, no network call — fail-closed', async () => {
     let refreshCalled = false;
     const refreshAccessToken = async () => { refreshCalled = true; return {}; };
     const persistSession = async () => {};
+    const store = fakeStore(); // empty — no record for this (accountId, urlKey)
 
-    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession });
+    const result = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
     assert.equal(result, null);
     assert.equal(refreshCalled, false);
+  });
+
+  test('B9b (LIN-1524\'s actual deliverable): durable record present, NO session row anywhere -> refresh proceeds and succeeds', async () => {
+    // The end-to-end proof of the phase: a proxy token resolving a workspace
+    // whose owner has fully logged out (zero session rows for this account,
+    // anywhere) still refreshes successfully, sourced entirely from the
+    // durable record. Before LIN-1524 this was structurally impossible —
+    // selectExpiredOwnerRow requires a session row to even look at.
+    const sessions = []; // no session rows AT ALL, for any account
+    const refreshAccessToken = async (refreshToken) => {
+      assert.equal(refreshToken, 'refresh-A');
+      return { access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 };
+    };
+    let persistSessionCalled = false;
+    const persistSession = async () => { persistSessionCalled = true; };
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
+
+    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
+
+    assert.equal(result.token, 'fresh-token');
+    assert.equal(store.calls.length, 1, 'the durable record was rotated');
+    assert.equal(store.calls[0].credential.refreshToken, 'refresh-A-rotated');
+    // No session row existed, so nothing was mirrored into one — correctly a no-op.
+    assert.equal(persistSessionCalled, false);
   });
 });
 
@@ -605,7 +636,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1499, Block D — GitHub-family routin
 
   test('D8 [Linear regression]: an all-Linear session is completely unaffected by resolveProvider being absent (existing callers never pass it for the Linear-only arm)', async () => {
     const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A', provider: 'linear' }),
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: undefined, provider: 'linear' }),
     ];
     const refreshAccessToken = async (refreshToken) => {
       assert.equal(refreshToken, 'refresh-A');
@@ -613,13 +644,17 @@ describe('refreshOwnerWorkspaceToken (LIN-1499, Block D — GitHub-family routin
     };
     const persisted = [];
     const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
     // No resolveProvider passed at all — the Linear arm must never call it.
-    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store: fakeStore() });
+    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
     assert.equal(result.token, 'fresh-token');
     assert.equal(result.provider, 'linear');
-    assert.equal(persisted[0].session.workspaces[0].refreshToken, 'refresh-A-rotated');
+    // LIN-1524: the session mirror carries accessToken only — refreshToken is
+    // durable-store-only and never written back into the session.
+    assert.equal(persisted[0].session.workspaces[0].accessToken, 'fresh-token');
+    assert.equal(persisted[0].session.workspaces[0].refreshToken, undefined);
   });
 });
 

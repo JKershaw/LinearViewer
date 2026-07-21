@@ -204,9 +204,13 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
       // substituted default after the fact. Only the raw field can (LIN-1367).
       console.log(`Linear OAuth callback; expires_in=${JSON.stringify(data.expires_in)} (present=${data.expires_in !== undefined})`)
 
+      // LIN-1524: refreshToken is deliberately NOT passed here — linkProvider
+      // would mirror it onto the binding's credentials (and, for the active
+      // binding, the scalar mirror), and Linear's rotating credential is
+      // durable-store-only now. `data.refresh_token` is threaded straight to
+      // persistOwnerCredential below instead, once accountId is known.
       linkProvider(workspace, authProvider.name, org.id, {
         token: data.access_token,
-        refreshToken: data.refresh_token,
         tokenExpiresAt: calculateExpiresAt(data.expires_in || 86400)
       })
 
@@ -279,7 +283,9 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
         // linkProvider earlier in this handler; there is no updateWorkspaceTokens
         // call to wrap here, so this reaches persistOwnerCredential directly
         // rather than through the rotateOwnerCredential rotation seam.
-        await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore)
+        // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
+        // longer carries one (linkProvider above was deliberately not given it).
+        await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)
 
         // Success: clear the OAuth state/intent, save the session, and return to
         // the initiating workspace's settings. Do NOT set activeWorkspaceId — the
@@ -351,7 +357,9 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
             // updateWorkspaceTokens call to wrap here, so this reaches
             // persistOwnerCredential directly rather than through the
             // rotateOwnerCredential rotation seam.
-            await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore)
+            // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
+            // longer carries one (linkProvider above was deliberately not given it).
+            await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)
 
             // Load saved user preferences and apply to session.
             // regenerate() wiped the session, so rehydrate every durable field
