@@ -23,7 +23,7 @@ import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-p
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken } from './lib/workspace-token-refresh.js'
-import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair } from './lib/workspace-token-cache.js'
+import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -902,9 +902,17 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
         action: 'Try again',
         actionUrl: '/'
       });
-    // LIN-1507: capture accountId before destroy(); PAT sessions are always
-    // single-workspace (CLAUDE.md), so `workspace` here is the only entry.
-    evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, session.accountId);
+    // LIN-1507: this destroys the WHOLE session, not just the dead-PAT
+    // workspace — and a PAT session is NOT guaranteed single-workspace: OAuth
+    // login preserves and appends to session.workspaces rather than replacing
+    // it (routes/auth.js's mode:'new' callback restores existingWorkspaces
+    // before upsertWorkspace), so a PAT session can accumulate a co-resident
+    // OAuth workspace (CLAUDE.md: "OAuth still works alongside PAT"). Evicting
+    // only `workspace` would leave that co-resident workspace's cached token
+    // outliving the session for up to the full TTL — the exact defect this
+    // ticket exists to close. Evict every workspace on the session, the same
+    // treatment as /logout, capturing before destroy() wipes the data.
+    evictAllWorkspaceTokens(evictWorkspaceToken, session.workspaces, session.accountId);
     session.destroy(() => res.status(401).send(html));
     return;
   }

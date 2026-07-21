@@ -66,18 +66,21 @@ describe('LIN-1507 witness D(ii) — session.destroy( census', () => {
 describe('LIN-1507 witness D(ii) — source assertions for the 3 non-injectable server.js sites', () => {
   // Honesty about what this proves, per the ticket: witness D(ii) pins the
   // SET of destroy sites, not their correctness. This test proves an
-  // evictWorkspaceTokenPair(evictWorkspaceToken call appears in the source
-  // text shortly before each session.destroy( in server.js — it does NOT
-  // prove the call is reached at runtime, receives the right urlKey/
-  // accountId, or runs in the correct order relative to other statements.
-  // Three calls in subtly wrong places (e.g. evicting the wrong workspace,
-  // or a dead branch) would still pass this test. Its real value is catching
-  // a FUTURE destroy call added with no matching eviction nearby — not
-  // certifying today's three are wired correctly. That confidence instead
-  // comes from the manual source excerpts reviewed in the LIN-1507 beat 4
-  // report and the behavioural witness D(i) tests covering the two sites
-  // (routes/auth.js, routes/workspace.js) that CAN be driven directly.
-  test('every session.destroy( in server.js is preceded by an evictWorkspaceTokenPair(evictWorkspaceToken call', () => {
+  // evictWorkspaceTokenPair(evictWorkspaceToken or evictAllWorkspaceTokens(
+  // evictWorkspaceToken call appears in the source text shortly before each
+  // session.destroy( in server.js — it does NOT prove the call is reached at
+  // runtime, receives the right urlKey/accountId, or runs in the correct
+  // order relative to other statements. Three calls in subtly wrong places
+  // (e.g. evicting the wrong workspace, or a dead branch) would still pass
+  // this test. Its real value is catching a FUTURE destroy call added with
+  // no matching eviction nearby — not certifying today's three are wired
+  // correctly. That confidence instead comes from the manual source excerpts
+  // reviewed in the LIN-1507 beat reports and the behavioural witness D(i)
+  // tests covering the two sites (routes/auth.js, routes/workspace.js) that
+  // CAN be driven directly, plus the direct unit tests on
+  // evictAllWorkspaceTokens itself (tests/unit/workspace-token-cache.test.js)
+  // for the PAT site's multi-workspace loop.
+  test('every session.destroy( in server.js is preceded by an eviction call (evictWorkspaceTokenPair or evictAllWorkspaceTokens)', () => {
     const source = read('server.js');
     const destroyRegex = /\bsession\.destroy\(/g;
     let match;
@@ -87,9 +90,9 @@ describe('LIN-1507 witness D(ii) — source assertions for the 3 non-injectable 
       const windowStart = Math.max(0, match.index - 500);
       const preceding = source.slice(windowStart, match.index);
       assert.ok(
-        /evictWorkspaceTokenPair\(evictWorkspaceToken/.test(preceding),
+        /(evictWorkspaceTokenPair|evictAllWorkspaceTokens)\(evictWorkspaceToken/.test(preceding),
         `session.destroy( at character offset ${match.index} in server.js has no ` +
-        'evictWorkspaceTokenPair(evictWorkspaceToken call in the preceding 500 characters. Every session-' +
+        'evictWorkspaceTokenPair(evictWorkspaceToken or evictAllWorkspaceTokens(evictWorkspaceToken call in the preceding 500 characters. Every session-' +
         'destruction path in server.js must evict its workspace(s)\' cache entries BEFORE destroy() runs (LIN-1507).'
       );
     }

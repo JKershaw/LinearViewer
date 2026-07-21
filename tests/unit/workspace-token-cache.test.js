@@ -12,7 +12,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair } from '../../lib/workspace-token-cache.js';
+import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from '../../lib/workspace-token-cache.js';
 import { UNSCOPED } from '../../lib/workspace-token-resolver.js';
 
 describe('workspaceTokenCacheKey (LIN-1366 owner-isolation format, pinned verbatim)', () => {
@@ -162,5 +162,65 @@ describe('evictWorkspaceTokenPair (LIN-1507, witness D — the ::* decision)', (
 
     assert.equal(cache.get(scopedKey), undefined);
     assert.equal(cache.get(unscopedKey), undefined);
+  });
+});
+
+describe('evictAllWorkspaceTokens (LIN-1507 beat 5 — the PAT multi-workspace gap)', () => {
+  // Pins the beat-5 conclusion: a PAT session is NOT guaranteed single-
+  // workspace (OAuth login preserves + appends to session.workspaces rather
+  // than replacing it), so server.js's handleUnauthorizedError PAT branch
+  // must evict EVERY workspace on the session before its whole-session
+  // destroy() — not just the one dead-PAT workspace. This is the pure loop
+  // that call site now uses; handleUnauthorizedError itself can't be driven
+  // directly in a unit test (server.js has zero exports and connects to a
+  // real DB + calls app.listen() at module scope), so this test is the
+  // behavioural proof for that call site's logic.
+  test('a PAT session holding a second (OAuth) workspace evicts BOTH workspaces\' key pairs', () => {
+    const evicted = [];
+    const patWorkspace = { urlKey: 'acme-pat' };
+    const oauthWorkspace = { urlKey: 'acme-oauth' };
+
+    evictAllWorkspaceTokens((key) => evicted.push(key), [patWorkspace, oauthWorkspace], 'acct-1');
+
+    assert.deepEqual(new Set(evicted), new Set([
+      workspaceTokenCacheKey('acme-pat', 'acct-1'),
+      workspaceTokenCacheKey('acme-pat'),
+      workspaceTokenCacheKey('acme-oauth', 'acct-1'),
+      workspaceTokenCacheKey('acme-oauth'),
+    ]));
+    assert.equal(evicted.length, 4, 'exactly one scoped + one unscoped key per workspace — the PAT workspace alone would only be 2');
+  });
+
+  test('a single-workspace (PAT-only) session evicts just that one pair', () => {
+    const evicted = [];
+    evictAllWorkspaceTokens((key) => evicted.push(key), [{ urlKey: 'acme-pat' }], 'acct-1');
+
+    assert.deepEqual(new Set(evicted), new Set([
+      workspaceTokenCacheKey('acme-pat', 'acct-1'),
+      workspaceTokenCacheKey('acme-pat'),
+    ]));
+  });
+
+  test('no workspaces (undefined/empty) evicts nothing and does not throw', () => {
+    assert.doesNotThrow(() => evictAllWorkspaceTokens(() => { throw new Error('should not be called'); }, undefined, 'acct-1'));
+    assert.doesNotThrow(() => evictAllWorkspaceTokens(() => { throw new Error('should not be called'); }, [], 'acct-1'));
+  });
+
+  test('a falsy evict is a no-op across every workspace (optional dependency guard)', () => {
+    assert.doesNotThrow(() => evictAllWorkspaceTokens(undefined, [{ urlKey: 'a' }, { urlKey: 'b' }], 'acct-1'));
+  });
+
+  test('end-to-end against a real cache: all entries for all workspaces are gone', () => {
+    let clock = 0;
+    const cache = createWorkspaceTokenCache({ ttlMs: 30000, now: () => clock });
+    const keys = [
+      workspaceTokenCacheKey('acme-pat', 'acct-1'), workspaceTokenCacheKey('acme-pat'),
+      workspaceTokenCacheKey('acme-oauth', 'acct-1'), workspaceTokenCacheKey('acme-oauth'),
+    ];
+    for (const key of keys) cache.set(key, { token: 'stale' });
+
+    evictAllWorkspaceTokens(cache.evict, [{ urlKey: 'acme-pat' }, { urlKey: 'acme-oauth' }], 'acct-1');
+
+    for (const key of keys) assert.equal(cache.get(key), undefined, `${key} should have been evicted`);
   });
 });
