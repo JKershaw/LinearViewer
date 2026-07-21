@@ -96,8 +96,8 @@ Both In Progress and Projects sections use the same nested structure:
 - `.project[data-project-type="periodicals"]` - synthetic Periodicals group (recurring maintenance templates, not Linear issues; workspace-flag gated). Its rows expand to a dispatchable prompt; they have no Linear URL and no "Add task" link.
 
 ### Search Selectors
-- `.search-toggle` - opens/closes search panel (in nav bar)
-- `#search-panel` - search input panel (below nav bar)
+- `.search-toggle` - opens/closes search panel (in nav bar's `.nav-actions`)
+- `#search-panel` - search input panel (below the page title, not the nav bar; LIN-1512)
 - `#search-input` - text input for keyword search
 - `.search-clear` / `#search-clear` - clears search and restores full view
 - `#search-no-results` - "no matching issues" message (shown when search has zero results)
