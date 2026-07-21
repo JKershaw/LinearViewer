@@ -33,9 +33,11 @@ process.env.NODE_ENV = 'test';
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import crypto from 'node:crypto';
 import { selectOwnerWorkspaceToken } from '../../lib/workspace-token-resolver.js';
 import { refreshOwnerWorkspaceToken, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
 import { refreshAccessToken, TokenRefreshError } from '../../lib/token-refresh.js';
+import { GitHubProvider } from '../../lib/providers/github/index.js';
 
 // A minimal Mongo-shaped in-memory sessions collection, matching the real
 // shape sessionsCollection.find({}).toArray() yields (each row: { _id, session,
@@ -204,5 +206,117 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
     const after = selectOwnerWorkspaceToken(collection._raw(), 'acme-real-2', 'account-real-2');
     assert.equal(after.reason, 'session_expired');
     assert.equal(after.token, null);
+  });
+});
+
+/**
+ * LIN-1499 close-out ledger item 2: the plan's verification table assigned
+ * "a GitHub row re-mints end-to-end and rotates the scalar mirror" to THIS
+ * file, but the composition — the REAL `GitHubProvider.refreshCredential`
+ * (lib/providers/github/index.js) driven through the REAL
+ * `remintActiveCredential` (lib/workspace.js) via the REAL `doRefresh`
+ * (lib/workspace-token-refresh.js) — was never actually exercised as one
+ * chain; every existing GitHub case in workspace-token-refresh.test.js drives
+ * `doRefresh` with a FAKE provider object instead. This block closes that
+ * gap deterministically at the existing injected `fetchImpl`/`now` seams —
+ * no live GitHub App, no real network, no waiting for a real installation
+ * token to expire. Mirrors the offline pattern already established in
+ * tests/unit/github-app-integration.test.js (ephemeral in-test RSA keypair
+ * signs the App JWT; `fetchImpl` stubs the install-token HTTP round-trip).
+ */
+describe('LIN-1499 GitHub composition witness (real refreshCredential + real remintActiveCredential, through doRefresh)', () => {
+  const APP_ENV = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG'];
+  let savedEnv;
+
+  beforeEach(() => {
+    _resetInflightForTests();
+    savedEnv = Object.fromEntries(APP_ENV.map(k => [k, process.env[k]]));
+    const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+    process.env.GITHUB_APP_ID = '123456';
+    process.env.GITHUB_APP_PRIVATE_KEY = privateKey.export({ type: 'pkcs1', format: 'pem' });
+    process.env.GITHUB_APP_SLUG = 'my-app';
+  });
+
+  afterEach(() => {
+    for (const k of APP_ENV) {
+      if (savedEnv[k] === undefined) delete process.env[k];
+      else process.env[k] = savedEnv[k];
+    }
+  });
+
+  test('I3: an expired GitHub owner row re-mints via the REAL GitHubProvider.refreshCredential composed through doRefresh — scalar mirror rotates, refreshToken stays undefined, no real network call', async () => {
+    const now = 1_700_000_000_000; // fixed epoch ms — drives both mintAppJwt's iat and the staleness math below
+    const storedExpiry = now - 60 * 60 * 1000; // expired an hour ago
+    const freshExpiryIso = new Date(now + 60 * 60 * 1000).toISOString();
+
+    const calls = [];
+    const fetchImpl = async (url, init) => {
+      calls.push({ url, method: init?.method });
+      return {
+        ok: true,
+        status: 201,
+        statusText: 'Created',
+        text: async () => JSON.stringify({ token: 'ghs_fresh_from_real_provider', expires_at: freshExpiryIso }),
+      };
+    };
+
+    // The real provider, no boot client — the production GitHub App shape.
+    // Its refreshCredential is NOT stubbed; only the network boundary
+    // (fetchImpl) and the clock (now) are injected.
+    const provider = new GitHubProvider();
+    const resolveProvider = () => provider;
+
+    const collection = inMemorySessionsCollection([
+      {
+        _id: 'sid-gh-1',
+        expires: new Date(Date.now() + 30 * 86400 * 1000),
+        session: {
+          accountId: 'account-gh',
+          workspaces: [{
+            urlKey: 'acme-gh',
+            provider: 'github',
+            accessToken: 'stale-gh-token',
+            tokenExpiresAt: storedExpiry,
+            bindings: [{
+              provider: 'github',
+              scope: 'octocat/repo',
+              credentials: { token: 'stale-gh-token', installationId: '987' },
+            }],
+          }],
+        },
+      },
+    ]);
+    const persistSession = makePersistSessionRow(collection);
+    const sessions = await collection.find().then(c => c.toArray());
+    const refreshAccessTokenImpl = async () => { throw new Error('Linear exchange must not be called for a GitHub row'); };
+
+    const result = await refreshOwnerWorkspaceToken({
+      sessions,
+      urlKey: 'acme-gh',
+      ownerAccountId: 'account-gh',
+      refreshAccessToken: refreshAccessTokenImpl,
+      persistSession,
+      resolveProvider,
+      fetchImpl,
+      now,
+    });
+
+    // The only "network" activity was the injected fetchImpl — proves the
+    // real mint path executed (App JWT signed, install-token endpoint hit)
+    // without ever reaching a live socket.
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, 'https://api.github.com/app/installations/987/access_tokens');
+    assert.equal(calls[0].method, 'POST');
+
+    assert.equal(result.token, 'ghs_fresh_from_real_provider');
+    assert.equal(result.provider, 'github');
+    assert.ok(result.expiresAt > storedExpiry, 'tokenExpiresAt advances to a real, strictly-later ms epoch');
+
+    const persistedDoc = collection._raw().find(d => d._id === 'sid-gh-1');
+    const persistedWs = persistedDoc.session.workspaces[0];
+    assert.equal(persistedWs.accessToken, 'ghs_fresh_from_real_provider', 'scalar mirror rotates');
+    assert.equal(persistedWs.refreshToken, undefined, 'GitHub-family must never gain a refreshToken (would corrupt Linear-wire-shaped state)');
+    assert.ok(Number.isFinite(persistedWs.tokenExpiresAt) && !Number.isNaN(persistedWs.tokenExpiresAt));
+    assert.equal(persistedWs.bindings[0].credentials.installationId, '987', 'installationId survives the linkProvider merge');
   });
 });

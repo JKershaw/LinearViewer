@@ -489,19 +489,26 @@ describe('remintActiveCredential', () => {
     assert.strictEqual(ws.refreshToken, undefined);
   });
 
-  test('LIN-1499: opts ({fetchImpl, now}) are forwarded to provider.refreshCredential, not dropped', async () => {
+  test('LIN-1499: opts ({fetchImpl, now}) are forwarded to provider.refreshCredential, not dropped, and now arrives as a number', async () => {
     // Pins the beat-1 passthrough as load-bearing: a fake provider that asserts on
     // its SECOND argument fails if remintActiveCredential stops forwarding opts.
+    //
+    // `now` is also actually CONSUMED here (mirroring mintAppJwt's real
+    // `Math.floor(now / 1000)` contract, lib/providers/github/app-auth.js:122-125)
+    // rather than merely recorded: the fake provider derives tokenExpiresAt from
+    // `opts.now + 1000`. If `now` regressed to a function seam, `fn + 1000`
+    // coerces to a concatenated string, not the expected numeric sum, and the
+    // assertion below fails instead of passing silently.
     const ws = linkProvider({ id: 'gh-2' }, 'github', 'octocat/seam', {
       installationId: '1', token: 'old', tokenExpiresAt: 1,
     });
     const fetchImpl = async () => { throw new Error('should not be called — this test only checks wiring'); };
-    const now = () => 123;
+    const now = 1_700_000_000_000;
     let receivedOpts;
     const provider = {
       async refreshCredential(binding, opts) {
         receivedOpts = opts;
-        return { token: 'new', tokenExpiresAt: 2, installationId: '1' };
+        return { token: 'new', tokenExpiresAt: opts.now + 1000, installationId: '1' };
       },
     };
 
@@ -509,6 +516,7 @@ describe('remintActiveCredential', () => {
 
     assert.strictEqual(receivedOpts.fetchImpl, fetchImpl);
     assert.strictEqual(receivedOpts.now, now);
+    assert.strictEqual(ws.tokenExpiresAt, now + 1000, 'now must arrive as a number, not a function, for the provider to do arithmetic on');
   });
 
   test('LIN-1499: opts default to {} when the caller passes none (existing server.js:611 call site stays byte-identical)', async () => {

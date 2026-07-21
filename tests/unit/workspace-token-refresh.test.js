@@ -524,7 +524,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1499, Block D — GitHub-family routin
     assert.equal(Number.isNaN(persistedWs.tokenExpiresAt), false);
   });
 
-  test('D6 [seam load-bearing, LIN-1499 item 4]: {fetchImpl, now} passed into refreshOwnerWorkspaceToken reach provider.refreshCredential unchanged', async () => {
+  test('D6 [seam load-bearing, LIN-1499 item 4]: {fetchImpl, now} passed into refreshOwnerWorkspaceToken reach provider.refreshCredential unchanged, and now arrives as a number the provider can do arithmetic on', async () => {
     // This is the plumbing proof that beat 1's remintActiveCredential passthrough
     // is load-bearing: if that passthrough were reverted (provider.refreshCredential(active)
     // called with no second argument), the fake provider below would receive
@@ -533,24 +533,39 @@ describe('refreshOwnerWorkspaceToken (LIN-1499, Block D — GitHub-family routin
     // refresh SUCCEEDED would still pass with the passthrough reverted (the fake
     // ignores unused args) — asserting on referential identity of the received
     // opts is what makes this a real proof, not a decorative one.
+    //
+    // `now` is also actually CONSUMED here (mirroring mintAppJwt's real
+    // `Math.floor(now / 1000)` contract, lib/providers/github/app-auth.js:122-125)
+    // rather than merely recorded: the fake provider derives tokenExpiresAt from
+    // `opts.now + FAR_FUTURE_MS`. If `now` regressed to a function seam (as it
+    // was before this fix), `fn + FAR_FUTURE_MS` coerces to a concatenated
+    // string, not the expected numeric sum, and the assertion below fails
+    // instead of passing silently.
     const sessions = [
       githubSessionRow('sid-1', 'account-A', 'acme-gh', { accessToken: 'stale-gh', expiresAt: NOW + PAST_MS, installationId: '987' }),
     ];
     const calls = [];
-    const provider = fakeMintProvider({ token: 'ghs_fresh', tokenExpiresAt: NOW + FAR_FUTURE_MS, installationId: '987' }, calls);
+    const NOW_MS = 1_700_000_000_000;
+    const provider = {
+      async refreshCredential(binding, opts) {
+        calls.push({ binding, opts });
+        return { token: 'ghs_fresh', tokenExpiresAt: opts.now + FAR_FUTURE_MS, installationId: '987' };
+      },
+    };
     const resolveProvider = () => provider;
     const refreshAccessToken = async () => ({});
     const persistSession = async () => {};
     const fetchImpl = async () => { throw new Error('never actually invoked — this test only checks wiring'); };
-    const now = () => 999;
+    const now = NOW_MS;
 
-    await refreshOwnerWorkspaceToken({
+    const result = await refreshOwnerWorkspaceToken({
       sessions, urlKey: 'acme-gh', ownerAccountId: 'account-A', refreshAccessToken, persistSession, resolveProvider, fetchImpl, now
     });
 
     assert.equal(calls.length, 1);
     assert.strictEqual(calls[0].opts.fetchImpl, fetchImpl, 'the exact fetchImpl instance must reach provider.refreshCredential');
-    assert.strictEqual(calls[0].opts.now, now, 'the exact now instance must reach provider.refreshCredential');
+    assert.strictEqual(calls[0].opts.now, now, 'the exact now value must reach provider.refreshCredential');
+    assert.strictEqual(result.expiresAt, NOW_MS + FAR_FUTURE_MS, 'now must arrive as a number, not a function, for the provider to do arithmetic on');
   });
 
   test('D7 [fail-closed preserved]: a genuine mint failure propagates — no persist, no fabricated success, no workspace removal attempted here', async () => {
