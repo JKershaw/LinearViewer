@@ -25,7 +25,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
-import { selectOwnerWorkspaceToken, detectOwnerAccountMismatch, UNSCOPED } from '../../lib/workspace-token-resolver.js';
+import { selectOwnerWorkspaceToken, detectOwnerAccountMismatch, detectOwnerSignedOut, classifyWorkspaceFailure, UNSCOPED } from '../../lib/workspace-token-resolver.js';
 
 // ---------------------------------------------------------------------------
 // Block A — pure selector `selectOwnerWorkspaceToken` (7 cases)
@@ -38,6 +38,17 @@ const PAST_MS = -10_000; // already expired
 
 function sessionRow(accountId, urlKey, accessToken, expiresAt, provider = 'linear') {
   return { session: { accountId, workspaces: [{ urlKey, provider, accessToken, tokenExpiresAt: expiresAt }] } };
+}
+
+// LIN-1506: a session row for a DIFFERENT workspace than the one under test —
+// expresses case (b), which the flat sessionRow() above structurally cannot
+// (its single workspaces[] entry always matches the urlKey being tested). This
+// is the shape a signed-in owner who simply never connected THIS workspace
+// produces: a live session, just not one that references `testedUrlKey`.
+// detectOwnerSignedOut is workspace-independent (Q1) and must return false
+// against this fixture — only this helper can prove that.
+function otherWorkspaceSessionRow(accountId, otherUrlKey, accessToken, expiresAt, provider = 'linear') {
+  return { session: { accountId, workspaces: [{ urlKey: otherUrlKey, provider, accessToken, tokenExpiresAt: expiresAt }] } };
 }
 
 describe('selectOwnerWorkspaceToken (LIN-1366, Block A — pure selector)', () => {
@@ -194,6 +205,94 @@ describe('detectOwnerAccountMismatch (LIN-1413, Block C — pure detector)', () 
       sessionRow('account-bob', 'acme', 'tok-bob-live', NOW + FAR_FUTURE_MS),
     ];
     assert.equal(detectOwnerAccountMismatch(sessions, 'acme', 'account-alice'), true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block D — detectOwnerSignedOut (LIN-1506, pure sibling detector)
+// ---------------------------------------------------------------------------
+
+describe('detectOwnerSignedOut (LIN-1506, Block D — pure detector)', () => {
+  test('D1: owner has no session row anywhere -> true', () => {
+    const sessions = [
+      sessionRow('account-B', 'acme', 'tokB', NOW + FAR_FUTURE_MS),
+    ];
+    assert.equal(detectOwnerSignedOut(sessions, 'account-A'), true);
+  });
+
+  // Q1's alarm: detectOwnerSignedOut is deliberately 2-arg (no urlKey), so this
+  // fixture — a live session, just for a DIFFERENT workspace — must NOT read as
+  // signed-out. If someone later widens the predicate to take urlKey and match
+  // it, this is the test that fails.
+  test('D2: owner has a live row for a DIFFERENT workspace (case (b), via otherWorkspaceSessionRow) -> false — a signed-in owner who never connected THIS workspace must not be told to sign in', () => {
+    const sessions = [
+      otherWorkspaceSessionRow('account-A', 'other-workspace', 'tokA', NOW + FAR_FUTURE_MS),
+    ];
+    assert.equal(detectOwnerSignedOut(sessions, 'account-A'), false);
+  });
+
+  test('D3: null / empty / UNSCOPED ownerAccountId -> false (the first-line guard)', () => {
+    const sessions = [];
+    assert.equal(detectOwnerSignedOut(sessions, null), false);
+    assert.equal(detectOwnerSignedOut(sessions, ''), false);
+    assert.equal(detectOwnerSignedOut(sessions, UNSCOPED), false);
+  });
+
+  // The detector is about row EXISTENCE, not token liveness — that distinction
+  // is selectOwnerWorkspaceToken's job (it already returns session_expired for
+  // this exact fixture). An owner with a stale-but-present row is not "signed
+  // out" by this predicate's contract.
+  test('D4: owner has a row for THIS workspace but its token is expired -> false (existence, not liveness)', () => {
+    const sessions = [
+      sessionRow('account-A', 'acme', 'tokA-expired', NOW + PAST_MS),
+    ];
+    assert.equal(detectOwnerSignedOut(sessions, 'account-A'), false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block E — classifyWorkspaceFailure (LIN-1506, ordering witness)
+// ---------------------------------------------------------------------------
+
+describe('classifyWorkspaceFailure (LIN-1506, Block E — ordering witness)', () => {
+  // Witness E: this decision had no test at all before this beat. Uses C2's
+  // exact fixture — both detectOwnerAccountMismatch AND detectOwnerSignedOut
+  // fire on this input (owner has no row anywhere; a different account is
+  // live), so only ordering decides the result.
+  test('E1 (witness E): C2\'s exact fixture — owner has no row at all, a DIFFERENT account holds a live session -> owner_mismatch, NOT owner_signed_out', () => {
+    const sessions = [
+      sessionRow('account-B', 'acme', 'tokB', NOW + FAR_FUTURE_MS),
+    ];
+    const result = classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', selectedReason: 'not_connected' });
+    assert.equal(result, 'owner_mismatch');
+  });
+
+  test('E2: not_connected + owner genuinely signed out (no row anywhere, nobody else live either) -> owner_signed_out', () => {
+    const sessions = [];
+    const result = classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', selectedReason: 'not_connected' });
+    assert.equal(result, 'owner_signed_out');
+  });
+
+  test('E3: ok passes through unchanged', () => {
+    const sessions = [sessionRow('account-A', 'acme', 'tokA', NOW + FAR_FUTURE_MS)];
+    const result = classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', selectedReason: 'ok' });
+    assert.equal(result, 'ok');
+  });
+
+  test('E4: session_expired passes through unchanged', () => {
+    const sessions = [sessionRow('account-A', 'acme', 'tokA-expired', NOW + PAST_MS)];
+    const result = classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', selectedReason: 'session_expired' });
+    assert.equal(result, 'session_expired');
+  });
+
+  // Proves the not_connected gate actually matters, not just that
+  // detectOwnerSignedOut is false: this fixture has NO row for the owner
+  // anywhere (detectOwnerSignedOut would return true in isolation), yet
+  // store_unreachable must NOT be reclassified — it isn't the not_connected case.
+  test('E5: store_unreachable passes through unchanged, even when the owner has no session row at all', () => {
+    const sessions = [];
+    const result = classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', selectedReason: 'store_unreachable' });
+    assert.equal(result, 'store_unreachable');
   });
 });
 
