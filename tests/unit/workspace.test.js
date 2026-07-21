@@ -468,6 +468,65 @@ describe('remintActiveCredential', () => {
       /no provider binding/
     );
   });
+
+  // LIN-1499 Phase 1 D2: ensureValidToken (server.js) now routes github-projects
+  // through this same seam instead of Linear's refreshAccessToken. This proves the
+  // seam itself behaves identically for github-projects as it already does for
+  // github — the primitive server.js's widened branch now depends on.
+  test('LIN-1499: re-mints a github-projects binding the same way as github (D2 fix)', async () => {
+    const ws = linkProvider({ id: 'ghp-1' }, 'github-projects', 'octocat/board', {
+      installationId: '555', token: 'ghp_old', tokenExpiresAt: 1000,
+    });
+    const seen = [];
+    const provider = fakeMintProvider({ token: 'ghp_new', tokenExpiresAt: 6000, installationId: '555' }, seen);
+
+    await remintActiveCredential(ws, provider);
+
+    assert.strictEqual(seen[0].credentials.installationId, '555');
+    assert.strictEqual(ws.accessToken, 'ghp_new');
+    assert.strictEqual(ws.tokenExpiresAt, 6000);
+    // No Linear contamination — a github-projects binding never gains a refreshToken.
+    assert.strictEqual(ws.refreshToken, undefined);
+  });
+
+  test('LIN-1499: opts ({fetchImpl, now}) are forwarded to provider.refreshCredential, not dropped', async () => {
+    // Pins the beat-1 passthrough as load-bearing: a fake provider that asserts on
+    // its SECOND argument fails if remintActiveCredential stops forwarding opts.
+    const ws = linkProvider({ id: 'gh-2' }, 'github', 'octocat/seam', {
+      installationId: '1', token: 'old', tokenExpiresAt: 1,
+    });
+    const fetchImpl = async () => { throw new Error('should not be called — this test only checks wiring'); };
+    const now = () => 123;
+    let receivedOpts;
+    const provider = {
+      async refreshCredential(binding, opts) {
+        receivedOpts = opts;
+        return { token: 'new', tokenExpiresAt: 2, installationId: '1' };
+      },
+    };
+
+    await remintActiveCredential(ws, provider, { fetchImpl, now });
+
+    assert.strictEqual(receivedOpts.fetchImpl, fetchImpl);
+    assert.strictEqual(receivedOpts.now, now);
+  });
+
+  test('LIN-1499: opts default to {} when the caller passes none (existing server.js:611 call site stays byte-identical)', async () => {
+    const ws = linkProvider({ id: 'gh-3' }, 'github', 'octocat/default', {
+      installationId: '1', token: 'old', tokenExpiresAt: 1,
+    });
+    let receivedOpts;
+    const provider = {
+      async refreshCredential(binding, opts) {
+        receivedOpts = opts;
+        return { token: 'new', tokenExpiresAt: 2, installationId: '1' };
+      },
+    };
+
+    await remintActiveCredential(ws, provider);
+
+    assert.deepStrictEqual(receivedOpts, {});
+  });
 });
 
 // =============================================================================
