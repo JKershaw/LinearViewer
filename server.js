@@ -21,7 +21,7 @@ import { ensureIndexes } from './lib/db-indexes.js'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
-import { UNSCOPED, selectOwnerWorkspaceToken, detectOwnerAccountMismatch } from './lib/workspace-token-resolver.js'
+import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken } from './lib/workspace-token-refresh.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
@@ -1157,6 +1157,13 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 //                       same workspace is live (re-auth CAN fix it). The session data cannot
 //                       tell those apart — do not claim it can; see detectOwnerAccountMismatch
 //                       and lib/errors.js's hedged owner_mismatch detail (LIN-1413)
+//   owner_signed_out  → the owner has no session row at all (not scoped to this workspace).
+//                       Reclassified from not_connected: honest about the real remedy (sign
+//                       in again, or issue a fresh token) instead of implying the workspace
+//                       was never connected. Also a SIGNAL, not proof of permanent loss — see
+//                       detectOwnerSignedOut and lib/errors.js's owner_signed_out detail
+//                       (LIN-1506). Unreachable whenever owner_mismatch also fires — that
+//                       reason wins the overlap; see classifyWorkspaceFailure's ordering.
 // `provider` is the matched workspace's provider name (e.g. 'linear'), or null
 // when no session referenced the workspace. It lets the session-less consumer
 // proxy resolve the provider per workspace via getProviderForWorkspace (LIN-581),
@@ -1246,28 +1253,24 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
       }
     }
 
-    // LIN-1413: after the selector failed and refresh-on-resolve has already
-    // been given its chance (both above), check whether a DIFFERENT account
-    // holds a live token for this workspace while the scoped owner does not.
-    // That signal does not on its own prove the owner lost the workspace — it
-    // fires identically for a legitimate colleague's session merely being
-    // live while the owner's own lapsed (re-auth-fixable) — so it is
-    // reclassified to a distinct, hedged reason rather than a confident
-    // "re-auth is pointless" claim; see the detector's docstring and
-    // lib/errors.js's owner_mismatch detail. Never for UNSCOPED (legacy
-    // owner-blind) callers — detectOwnerAccountMismatch also returns false
-    // for those, but the reason is only ever reclassified when there is a
-    // specific owner to reclassify on behalf of. Log server-side only; the
-    // other account's id must never reach the wire (lib/errors.js privacy
-    // boundary).
-    if (ownerAccountId !== UNSCOPED && detectOwnerAccountMismatch(sessions, urlKey, ownerAccountId)) {
+    // LIN-1413/LIN-1506: after the selector failed and refresh-on-resolve has
+    // already been given its chance (both above), reclassify WHY no token
+    // resolved into the most honest reason the session data supports —
+    // owner_mismatch (a DIFFERENT account holds a live token for this
+    // workspace) or owner_signed_out (the owner has no session row at all).
+    // Neither is proof the owner lost the workspace, and ordering is
+    // load-bearing (owner_mismatch wins any overlap) — see
+    // classifyWorkspaceFailure's docstring in lib/workspace-token-resolver.js.
+    const reason = classifyWorkspaceFailure({ sessions, urlKey, ownerAccountId, selectedReason: selected.reason });
+    if (reason === 'owner_mismatch') {
+      // Log server-side only; the other account's id must never reach the
+      // wire (lib/errors.js privacy boundary).
       console.warn(`Workspace ${urlKey}: owner account mismatch detected for account ${ownerAccountId}`);
-      return { token: null, reason: 'owner_mismatch', provider: selected.provider };
     }
 
-    // No usable token. reason/provider are already the right shape for the
-    // workspaceUnavailable 503 envelope — see lib/workspace-token-resolver.js.
-    return { token: selected.token, reason: selected.reason, provider: selected.provider };
+    // reason/provider are already the right shape for the workspaceUnavailable
+    // 503 envelope — see lib/workspace-token-resolver.js.
+    return { token: selected.token, reason, provider: selected.provider };
   } catch (err) {
     console.error('Error looking up workspace access token:', err);
     return { token: null, reason: 'store_unreachable', provider: null };
