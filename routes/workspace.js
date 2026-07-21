@@ -51,9 +51,10 @@ function starterSeed(urlKey) {
  * @param {import('../lib/account-store.js').AccountStore} [deps.accountStore] - LIN-1329: find-or-create the durable account for a new local workspace.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} [deps.accountWorkspaceStore] - LIN-1329: bind the account to the workspace.
  * @param {(key: string) => void} [deps.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`).
+ * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [deps.ownerCredentialStore] - LIN-1523: durable owner-credential store. Deleted alongside the LIN-1507 cache eviction on disconnect — a cache is not a grant, but a disconnected workspace's durable credential must not outlive the disconnect either.
  * @returns {Router} Express router
  */
-export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken } = {}) {
+export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore } = {}) {
   const router = Router()
 
   /**
@@ -140,6 +141,10 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
       const workspaces = req.session.workspaces || []
       for (const workspace of workspaces) {
         evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, accountId)
+        // LIN-1523: this IS a disconnect (unlike /logout) — the durable
+        // credential must not outlive it, or a proxy token keeps resolving
+        // indefinitely against a workspace the user believes is gone.
+        if (ownerCredentialStore) await ownerCredentialStore.delete(accountId, workspace.urlKey)
       }
       return req.session.destroy(() => res.redirect('/'))
     }
@@ -153,6 +158,8 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
     // so evict just this one workspace's cache entries rather than treating
     // it as a destroy.
     evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, req.session.accountId)
+    // LIN-1523: durable delete alongside the cache eviction — see the note above.
+    if (ownerCredentialStore) await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey)
 
     removeWorkspace(req.session, workspace.id)
     await saveSession(req.session)
