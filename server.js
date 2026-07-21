@@ -1157,6 +1157,13 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 //                       same workspace is live (re-auth CAN fix it). The session data cannot
 //                       tell those apart — do not claim it can; see detectOwnerAccountMismatch
 //                       and lib/errors.js's hedged owner_mismatch detail (LIN-1413)
+//   owner_signed_out  → the owner has no session row at all (not scoped to this workspace).
+//                       Reclassified from not_connected: honest about the real remedy (sign
+//                       in again, or issue a fresh token) instead of implying the workspace
+//                       was never connected. Also a SIGNAL, not proof of permanent loss — see
+//                       detectOwnerSignedOut and lib/errors.js's owner_signed_out detail
+//                       (LIN-1506). Unreachable whenever owner_mismatch also fires — that
+//                       reason wins the overlap; see classifyWorkspaceFailure's ordering.
 // `provider` is the matched workspace's provider name (e.g. 'linear'), or null
 // when no session referenced the workspace. It lets the session-less consumer
 // proxy resolve the provider per workspace via getProviderForWorkspace (LIN-581),
