@@ -548,27 +548,36 @@ describe('refreshOwnerWorkspaceToken (LIN-1499, Block D — GitHub-family routin
     assert.equal(persistedWs.bindings[0].credentials.installationId, '987');
   });
 
-  test('D5 [no Linear contamination]: a GitHub workspace never gains a refreshToken after refresh, even though updateWorkspaceTokens is never called for it', async () => {
+  test('D5 [LIN-1524 close-out replacement assertion — no Linear contamination]: a GitHub-family re-mint never creates (or touches) a durable Linear credential record', async () => {
+    // The original D5 ("a GitHub workspace never gains a refreshToken") is a
+    // VACUITY TRAP after LIN-1524: since updateWorkspaceTokens no longer
+    // writes refreshToken for ANYONE (Linear included), that assertion would
+    // now pass even if a GitHub-family re-mint accidentally started calling
+    // `refreshAccessToken` or writing a durable record — it protects nothing
+    // post-cutover. The replacement per the ticket's own test plan: assert
+    // directly against the durable store, which is Linear-only by design —
+    // `store.get(accountId, urlKey)` must still return null after a
+    // GitHub-family refresh, and `store.put` must never have been called.
     const sessions = [
       githubSessionRow('sid-1', 'account-A', 'acme-gh', { accessToken: 'stale-gh', expiresAt: NOW + PAST_MS, installationId: '987' }),
     ];
     const provider = fakeMintProvider({ token: 'ghs_fresh', tokenExpiresAt: NOW + FAR_FUTURE_MS, installationId: '987' }, []);
     const resolveProvider = () => provider;
-    const refreshAccessToken = async () => ({ access_token: 'WRONG', refresh_token: 'WRONG', expires_in: 3600 });
+    const refreshAccessToken = async () => { throw new Error('must not be called for GitHub-family — this is the Linear-only arm'); };
     const persisted = [];
     const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
+    const store = fakeStore();
 
-    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme-gh', ownerAccountId: 'account-A', refreshAccessToken, persistSession, resolveProvider });
+    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme-gh', ownerAccountId: 'account-A', refreshAccessToken, persistSession, resolveProvider, store });
 
     const persistedWs = persisted[0].session.workspaces[0];
-    // A GitHub-shaped patch ({token, tokenExpiresAt, installationId}) fed to the
-    // Linear-wire-shaped updateWorkspaceTokens (access_token/refresh_token/
-    // expires_in) would set refreshToken=undefined and tokenExpiresAt=NaN. The
-    // real assertion is simpler and stronger: refreshToken must still be
-    // undefined, and tokenExpiresAt must be the real minted number, not NaN.
     assert.equal(persistedWs.refreshToken, undefined);
     assert.equal(persistedWs.tokenExpiresAt, NOW + FAR_FUTURE_MS);
     assert.equal(Number.isNaN(persistedWs.tokenExpiresAt), false);
+
+    // The actual replacement assertion: the durable store was never touched.
+    assert.equal(store.calls.length, 0, 'store.put must never be called for a GitHub-family re-mint');
+    assert.equal(await store.get('account-A', 'acme-gh'), null, 'no durable Linear credential may exist for a GitHub-family workspace');
   });
 
   test('D6 [seam load-bearing, LIN-1499 item 4]: {fetchImpl, now} passed into refreshOwnerWorkspaceToken reach provider.refreshCredential unchanged, and now arrives as a number the provider can do arithmetic on', async () => {
