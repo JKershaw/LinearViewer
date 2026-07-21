@@ -23,7 +23,7 @@ import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-p
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken } from './lib/workspace-token-refresh.js'
-import { createWorkspaceTokenCache, workspaceTokenCacheKey } from './lib/workspace-token-cache.js'
+import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair } from './lib/workspace-token-cache.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -632,7 +632,11 @@ async function ensureValidToken(req, res, next) {
       return res.redirect('/')
     }
 
-    // No workspaces left, destroy session
+    // No workspaces left, destroy session. LIN-1507: capture accountId BEFORE
+    // destroy() — `workspace` (the one that just failed refresh) is the only
+    // workspace this session held, since `remaining === 0` proves it.
+    const accountId = req.session.accountId
+    evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, accountId)
     req.session.destroy(() => res.redirect('/'))
   }
 }
@@ -827,12 +831,21 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
  * workspace or shows the landing page if no workspaces remain.
  */
 async function handleWorkspaceRemoval(session, workspaceId, res) {
+  // LIN-1507: capture the workspace's urlKey BEFORE removeWorkspace() drops it
+  // from session.workspaces — by the time `remaining === 0` below, it's gone.
+  const removedWorkspace = session.workspaces?.find(w => w.id === workspaceId);
   const remaining = removeWorkspace(session, workspaceId);
   const deployInfo = getDeployInfo()
 
   if (remaining > 0) {
     await saveSession(session);
     return res.redirect('/');
+  }
+
+  // accountId is still live here — only `workspaces`/`activeWorkspaceId` were
+  // touched above, and destroy()'s callback runs after the session data is gone.
+  if (removedWorkspace) {
+    evictWorkspaceTokenPair(evictWorkspaceToken, removedWorkspace.urlKey, session.accountId);
   }
 
   return new Promise((resolve) => {
@@ -889,6 +902,9 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
         action: 'Try again',
         actionUrl: '/'
       });
+    // LIN-1507: capture accountId before destroy(); PAT sessions are always
+    // single-workspace (CLAUDE.md), so `workspace` here is the only entry.
+    evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, session.accountId);
     session.destroy(() => res.status(401).send(html));
     return;
   }
