@@ -188,6 +188,24 @@ test.describe('Search Feature', () => {
     await expect(toggle).toBeVisible();
   });
 
+  test('search panel renders below the page title, outside the nav (LIN-1512)', async ({ page }) => {
+    // The symmetric guard to the LIN-1149 toggle check above: the panel operates on
+    // page content, so it belongs after the <h1>, not in the nav chrome. The whole
+    // deliverable rests on one call-site ordering in lib/render.js — without this,
+    // a refactor could move the panel back above the header and stay green.
+    await page.locator('.search-toggle').click();
+
+    // Out of the nav entirely (the toggle stays — see the LIN-1149 test above)
+    await expect(page.locator('nav #search-panel')).toHaveCount(0);
+
+    // ...and geometrically below the page title, not merely later in the DOM
+    const panel = page.locator('#search-panel');
+    await expect(panel).not.toHaveClass(/hidden/);
+    const titleBox = await page.locator('h1').first().boundingBox();
+    const panelBox = await panel.boundingBox();
+    expect(panelBox.y).toBeGreaterThan(titleBox.y + titleBox.height);
+  });
+
   test('empty search restores view without closing panel', async ({ page }) => {
     await page.locator('.search-toggle').click();
     const searchInput = page.locator('#search-input');
