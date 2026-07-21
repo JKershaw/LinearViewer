@@ -12,8 +12,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from '../../lib/workspace-token-cache.js';
+import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens, DEFAULT_BLOCK_WINDOW_MS, REFRESH_WORST_CASE_MS } from '../../lib/workspace-token-cache.js';
 import { UNSCOPED } from '../../lib/workspace-token-resolver.js';
+import { TOKEN_REFRESH_TIMEOUT_MS, TOKEN_REFRESH_MAX_RETRIES, TOKEN_REFRESH_RETRY_DELAY_MS } from '../../lib/token-refresh.js';
 
 describe('workspaceTokenCacheKey (LIN-1366 owner-isolation format, pinned verbatim)', () => {
   test('a scoped owner produces "<urlKey>::<ownerAccountId>"', () => {
@@ -124,6 +125,75 @@ describe('createWorkspaceTokenCache (LIN-1507, witness B)', () => {
     // writable again — proving its tombstone was pruned, not retained.
     const oldKey = workspaceTokenCacheKey('acme', 'owner-0');
     assert.equal(cache.set(oldKey, { token: 'ok-again' }), true, 'a long-stale tombstone must not block a write forever');
+  });
+});
+
+describe('DEFAULT_BLOCK_WINDOW_MS (LIN-1507 close-out Gate 2 — derived from the refresh worst case, not a hand-picked ~5s)', () => {
+  test('REFRESH_WORST_CASE_MS matches an independent computation from the real lib/token-refresh.js constants', () => {
+    // 3 attempts (1 + MAX_RETRIES) each up to the timeout, plus the two
+    // exponential-backoff delays between them (2^0 and 2^1 * base delay).
+    const attempts = TOKEN_REFRESH_MAX_RETRIES + 1;
+    const backoff = TOKEN_REFRESH_RETRY_DELAY_MS * (2 ** 0 + 2 ** 1);
+    assert.equal(REFRESH_WORST_CASE_MS, attempts * TOKEN_REFRESH_TIMEOUT_MS + backoff);
+  });
+
+  test('DEFAULT_BLOCK_WINDOW_MS exceeds the refresh path worst case, not just the old ~5s estimate', () => {
+    assert.ok(DEFAULT_BLOCK_WINDOW_MS > REFRESH_WORST_CASE_MS, 'must exceed the derived worst case, with margin');
+    assert.ok(DEFAULT_BLOCK_WINDOW_MS >= 31000, 'close-out required raising the window to at least ~31s');
+  });
+
+  test('a resolve that writes after the old 5s window but before the real refresh worst case is still blocked (the Gate 2 regression)', () => {
+    let clock = 0;
+    // No blockWindowMs override — exercises the real production default.
+    const cache = createWorkspaceTokenCache({ ttlMs: 30000, now: () => clock });
+    const key = workspaceTokenCacheKey('acme', 'owner-1');
+    cache.set(key, { token: 'stale' });
+    cache.evict(key);
+
+    // A refresh-on-resolve write landing at 10s post-logout: past the old
+    // 5s tombstone (would have wrongly re-cached a live token) but well
+    // inside the real ~30.3s refresh worst case.
+    clock = 10000;
+    const wrote = cache.set(key, { token: 'freshly-refreshed' });
+    assert.equal(wrote, false, 'must still be blocked — this is exactly the race Gate 2 found reopened');
+    assert.equal(cache.get(key), undefined);
+  });
+
+  test('a resolve that writes after the full derived window succeeds (no unbounded block)', () => {
+    let clock = 0;
+    const cache = createWorkspaceTokenCache({ ttlMs: 30000, now: () => clock });
+    const key = workspaceTokenCacheKey('acme', 'owner-1');
+    cache.evict(key);
+
+    clock = DEFAULT_BLOCK_WINDOW_MS;
+    assert.equal(cache.set(key, { token: 'fresh' }), true, 'the widened window must still be finite, not permanent');
+  });
+
+  test('side effect check: a non-evicted key is unaffected by the wider default window — TTL expiry still applies normally', () => {
+    let clock = 0;
+    const cache = createWorkspaceTokenCache({ ttlMs: 1000, now: () => clock });
+    const key = workspaceTokenCacheKey('acme', 'owner-1');
+    cache.set(key, { token: 't1' });
+
+    clock = 999;
+    assert.deepEqual(cache.get(key), { token: 't1' }, 'a key that was never evicted must not be held hostage by the larger default block window');
+
+    clock = 1000;
+    assert.equal(cache.get(key), undefined, 'plain TTL expiry is independent of blockWindowMs, however large');
+  });
+
+  test('side effect check: tombstones from the wider default window still prune on access rather than growing unbounded', () => {
+    let clock = 0;
+    const cache = createWorkspaceTokenCache({ ttlMs: 30000, now: () => clock });
+    for (let i = 0; i < 20; i++) {
+      cache.evict(workspaceTokenCacheKey('acme', `owner-${i}`));
+    }
+
+    clock = DEFAULT_BLOCK_WINDOW_MS + 1;
+    // Touching the cache prunes every tombstone whose window has elapsed —
+    // a long-stale entry from before the widened window must not linger.
+    const oldKey = workspaceTokenCacheKey('acme', 'owner-0');
+    assert.equal(cache.set(oldKey, { token: 'ok-again' }), true, 'a long-stale tombstone must not block a write forever, even with the wider window');
   });
 });
 
