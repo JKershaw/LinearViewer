@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { removeWorkspace, upsertWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, URL_KEY_REGEX, linkProvider } from '../lib/workspace.js'
 import { badRequest, notFound, serverError } from '../lib/errors.js'
 import { establishAccount } from '../lib/account-session.js'
+import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
 
 /**
  * Slugify a workspace name into the urlKey body (alphanumeric + hyphens).
@@ -49,9 +50,10 @@ function starterSeed(urlKey) {
  * @param {import('../lib/local-store.js').LocalStore} [deps.localStore] - Local provider store, used to seed starter content for new local workspaces.
  * @param {import('../lib/account-store.js').AccountStore} [deps.accountStore] - LIN-1329: find-or-create the durable account for a new local workspace.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} [deps.accountWorkspaceStore] - LIN-1329: bind the account to the workspace.
+ * @param {(key: string) => void} [deps.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`).
  * @returns {Router} Express router
  */
-export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore } = {}) {
+export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken } = {}) {
   const router = Router()
 
   /**
@@ -132,6 +134,13 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
 
     // If only one workspace, just logout entirely
     if (req.session.workspaces?.length <= 1) {
+      // LIN-1507: same treatment as /logout — capture accountId + workspaces
+      // BEFORE destroy() destroys the session data.
+      const accountId = req.session.accountId
+      const workspaces = req.session.workspaces || []
+      for (const workspace of workspaces) {
+        evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, accountId)
+      }
       return req.session.destroy(() => res.redirect('/'))
     }
 
@@ -139,6 +148,11 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
     if (!workspace) {
       return notFound.html(res, 'Workspace not found')
     }
+
+    // LIN-1507: the session survives this removal (unlike the branch above),
+    // so evict just this one workspace's cache entries rather than treating
+    // it as a destroy.
+    evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, req.session.accountId)
 
     removeWorkspace(req.session, workspace.id)
     await saveSession(req.session)

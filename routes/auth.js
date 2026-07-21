@@ -14,6 +14,7 @@ import { upsertWorkspace, saveSession, linkProvider, getActiveWorkspace, validat
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-preferences.js'
 import { establishAccount } from '../lib/account-session.js'
+import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
 
 /**
  * Create auth routes with required dependencies.
@@ -25,9 +26,10 @@ import { establishAccount } from '../lib/account-session.js'
  *   provider as a documented legacy default for direct constructions (LIN-561).
  * @param {import('../lib/account-store.js').AccountStore} options.accountStore - LIN-1329: find-or-create the durable account for the signing-in identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
+ * @param {(key: string) => void} [options.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`). Called at /logout for every workspace the session referenced, before the session is destroyed.
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore }) {
+export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken }) {
   const router = Router()
 
   const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
@@ -381,6 +383,15 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
    * Destroys the session, logging the user out.
    */
   router.get('/logout', (req, res) => {
+    // LIN-1507: capture accountId + workspaces BEFORE destroy() — the session
+    // data is gone once the callback fires, so the eviction keys must be
+    // derived now or not at all.
+    const accountId = req.session.accountId
+    const workspaces = req.session.workspaces || []
+    for (const workspace of workspaces) {
+      evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, accountId)
+    }
+
     req.session.destroy((err) => {
       if (err) {
         console.error('Session destroy error during logout:', err)
