@@ -307,6 +307,41 @@ describe('rotateOwnerCredential', () => {
     );
   });
 
+  test('LIN-1524 close-out Finding #4 (legacy no-accountId session): the durable write silently no-ops — never throws, never blocks the session-side rotation', async () => {
+    // A pre-LIN-1329 session can still be live (30-day rolling TTL from last
+    // activity, LIN-1329 landed 2026-07-15) with `workspaces` populated but no
+    // `accountId` — this fake mirrors OwnerCredentialStore.put's REAL guard
+    // (`!accountId || !urlKey` → warn + return false, no throw; see
+    // owner-credential-store.test.js's own direct guard test) rather than the
+    // suite's usual always-succeeds fakeCredentialStore(), so this test proves
+    // the composed behaviour, not just the store's own unit guard.
+    const guardedStore = {
+      calls: [],
+      async put(accountId, urlKey, credential) {
+        this.calls.push({ accountId, urlKey, credential });
+        if (!accountId || !urlKey) return false;
+        return true;
+      },
+    };
+    const workspace = { id: 'ws-1', urlKey: 'acme', provider: 'linear', bindings: [{ provider: 'linear', scope: 'org-1', credentials: {} }] };
+    const tokenData = { access_token: 'fresh', refresh_token: 'fresh-refresh', expires_in: 3600 };
+
+    await assert.doesNotReject(
+      rotateOwnerCredential({ accountId: undefined, workspace, tokenData, store: guardedStore })
+    );
+
+    // Session-side rotation (the human-facing behaviour) is unaffected —
+    // updateWorkspaceTokens ran regardless of the durable half's outcome.
+    assert.strictEqual(workspace.accessToken, 'fresh');
+    assert.strictEqual(workspace.refreshToken, 'fresh-refresh');
+
+    // The durable half was attempted (not skipped client-side) and the
+    // store's own guard is what rejected it — confirms the two halves are
+    // decoupled, not that the caller silently declined to even try.
+    assert.strictEqual(guardedStore.calls.length, 1);
+    assert.strictEqual(guardedStore.calls[0].accountId, undefined);
+  });
+
   test('the durable store is never mutated beyond one `put` — no extra key is grown on workspace by the seam', async () => {
     const workspace = { id: 'ws-1', urlKey: 'acme', provider: 'linear', bindings: [{ provider: 'linear', scope: 'org-1', credentials: {} }] };
     const tokenData = { access_token: 'fresh', refresh_token: 'fresh-refresh', expires_in: 3600 };
@@ -486,24 +521,41 @@ describe('unlinkProvider', () => {
   });
 });
 
-// LIN-1523 (beat 4): the provider-removal route (server.js) calls
-// unlinkProvider(workspace, provider, scope) then, when provider === 'linear',
-// ownerCredentialStore.delete(accountId, workspace.urlKey) — exactly this
-// sequence, composed here since server.js itself isn't import-safe in a unit
-// test (see tests/unit/provider-remove-durable-delete.test.js's source-text
-// guard for proof the route actually wires it this way). This proves the
-// EFFECT of that composition on real store contents, not just that a call
-// happened.
+// LIN-1523 (beat 4) + LIN-1524 close-out Finding #2 (fixed here): the
+// provider-removal route (server.js) captures a reference to the RAW
+// `workspace.bindings` array before the call, then calls
+// unlinkProvider(workspace, provider, scope), then, only when
+// `provider === 'linear' && workspace.bindings !== bindingsBefore` (reference
+// identity — unlinkProvider only ever reassigns `bindings` on an actual
+// removal), ownerCredentialStore.delete(accountId, workspace.urlKey) —
+// exactly this sequence, composed here since server.js itself isn't
+// import-safe in a unit test (see
+// tests/unit/provider-remove-durable-delete.test.js's source-text guard for
+// proof the route actually wires it this way). This proves the EFFECT of
+// that composition on real store contents, not just that a call happened.
+//
+// NOTE: getBindingsForWorkspace(workspace).length is NOT a safe before/after
+// signal here — it SYNTHESIZES a phantom binding whenever workspace.bindings
+// is empty/absent, so a real removal that empties bindings to [] would read
+// back as an unchanged count. Reference identity on the raw array sidesteps
+// that trap entirely.
 describe('unlinkProvider + durable delete, composed as the provider-removal route calls them', () => {
+  // Mirrors the route's own before/after signal exactly (server.js's fix for
+  // Finding #2) rather than re-deriving a different one here.
+  function bindingRemoved(workspace, bindingsBefore) {
+    return workspace.bindings !== bindingsBefore;
+  }
+
   test('unlinking the active Linear binding: the session-side delete happens (unchanged unlinkProvider behaviour) AND the durable record is gone', async () => {
     const store = fakeCredentialStore();
     await store.put('account-A', 'acme', { provider: 'linear', scope: 'org-1', token: 'lin', refreshToken: 'lr', tokenExpiresAt: 100 });
 
     const ws = linkProvider({ id: 'ws-1', urlKey: 'acme' }, 'linear', 'org-1', { token: 'lin', refreshToken: 'lr', tokenExpiresAt: 100 });
     const unlinkTarget = 'linear'; // the request's `provider` — matches the route's own variable
+    const bindingsBefore = ws.bindings;
     unlinkProvider(ws, unlinkTarget, 'org-1');
-    // Mirrors the route: `if (provider === 'linear') await ownerCredentialStore.delete(...)`.
-    if (unlinkTarget === 'linear') {
+    const removed = bindingRemoved(ws, bindingsBefore);
+    if (unlinkTarget === 'linear' && removed) {
       await store.delete('account-A', ws.urlKey);
     }
 
@@ -525,8 +577,10 @@ describe('unlinkProvider + durable delete, composed as the provider-removal rout
     const ws = linkProvider({ id: 'ws-1', urlKey: 'acme' }, 'linear', 'org-1', { token: 'lin', refreshToken: 'lr', tokenExpiresAt: 100 });
     linkProvider(ws, 'github', 'owner/repo', { token: 'gh' });
     const unlinkTarget = 'github';
+    const bindingsBefore = ws.bindings;
     unlinkProvider(ws, unlinkTarget, 'owner/repo');
-    if (unlinkTarget === 'linear') {
+    const removed = bindingRemoved(ws, bindingsBefore);
+    if (unlinkTarget === 'linear' && removed) {
       await store.delete('account-A', ws.urlKey); // never reached — the guard is false
     }
 
@@ -535,6 +589,37 @@ describe('unlinkProvider + durable delete, composed as the provider-removal rout
     assert.strictEqual(ws.bindings[0].provider, 'linear');
     const survived = await store.get('account-A', 'acme');
     assert.ok(survived, 'the Linear durable record must survive an unrelated (github) unlink');
+    assert.strictEqual(survived.refreshToken, 'lr');
+  });
+
+  test('LIN-1524 close-out Finding #2 (the actual bug): unlinking Linear with a non-matching scope is a no-op — the durable record must SURVIVE, not be deleted', async () => {
+    const store = fakeCredentialStore();
+    await store.put('account-A', 'acme', { provider: 'linear', scope: 'org-1', token: 'lin', refreshToken: 'lr', tokenExpiresAt: 100 });
+
+    const ws = linkProvider({ id: 'ws-1', urlKey: 'acme' }, 'linear', 'org-1', { token: 'lin', refreshToken: 'lr', tokenExpiresAt: 100 });
+    const unlinkTarget = 'linear';
+    const bogusScope = 'org-does-not-match';
+    const bindingsBefore = ws.bindings;
+    unlinkProvider(ws, unlinkTarget, bogusScope); // no-op: (provider, scope) doesn't match any binding
+    const removed = bindingRemoved(ws, bindingsBefore);
+
+    // The pre-fix bug: gating only on `provider === 'linear'` (ignoring
+    // `removed`) would delete the durable record here even though the
+    // session binding is untouched. The fix requires BOTH.
+    assert.strictEqual(removed, false, 'a non-matching scope must not be observed as a removal');
+    if (unlinkTarget === 'linear' && removed) {
+      await store.delete('account-A', ws.urlKey); // must NOT be reached
+    }
+
+    // Session binding survives untouched (unlinkProvider's own no-op).
+    assert.strictEqual(ws.bindings.length, 1);
+    assert.strictEqual(ws.refreshToken, 'lr');
+
+    // And critically, so must the durable record — this is the bug this
+    // test pins: a POST with provider=linear and a bogus scope must not
+    // brick a workspace whose session credential still works.
+    const survived = await store.get('account-A', 'acme');
+    assert.ok(survived, 'the durable record must survive a no-op unlink (non-matching scope)');
     assert.strictEqual(survived.refreshToken, 'lr');
   });
 });

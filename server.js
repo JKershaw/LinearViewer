@@ -643,8 +643,20 @@ async function ensureValidToken(req, res, next) {
   } catch (error) {
     console.error(`Token refresh failed for workspace ${workspace.id}:`, error)
 
+    // LIN-1507: capture accountId BEFORE any session mutation below — destroy()
+    // (the remaining===0 arm) wipes it, and LIN-1524 close-out Finding #1 needs
+    // it in BOTH arms, not just the destroy one.
+    const accountId = req.session.accountId
+
     // Remove failed workspace
     const remaining = removeWorkspace(req.session, workspace.id)
+
+    // LIN-1524 close-out Finding #1: this failed workspace's durable credential
+    // must not outlive its session-side removal — `workspace` is gone from
+    // session.workspaces after removeWorkspace above regardless of `remaining`,
+    // so the durable delete belongs here, before the branch, not only in the
+    // destroy arm below.
+    await ownerCredentialStore.delete(accountId, workspace.urlKey)
 
     if (remaining > 0) {
       // Switch to another workspace
@@ -652,10 +664,7 @@ async function ensureValidToken(req, res, next) {
       return res.redirect('/')
     }
 
-    // No workspaces left, destroy session. LIN-1507: capture accountId BEFORE
-    // destroy() — `workspace` (the one that just failed refresh) is the only
-    // workspace this session held, since `remaining === 0` proves it.
-    const accountId = req.session.accountId
+    // No workspaces left, destroy session.
     evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, accountId)
     req.session.destroy(() => res.redirect('/'))
   }
@@ -856,6 +865,13 @@ async function handleWorkspaceRemoval(session, workspaceId, res) {
   const removedWorkspace = session.workspaces?.find(w => w.id === workspaceId);
   const remaining = removeWorkspace(session, workspaceId);
   const deployInfo = getDeployInfo()
+
+  // LIN-1524 close-out Finding #1: the removed workspace's durable credential
+  // must not outlive its session-side removal — belongs here, before the
+  // branch, since `removedWorkspace` is gone from session.workspaces either way.
+  if (removedWorkspace) {
+    await ownerCredentialStore.delete(session.accountId, removedWorkspace.urlKey);
+  }
 
   if (remaining > 0) {
     await saveSession(session);
@@ -2396,15 +2412,31 @@ app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async
     return res.redirect(`${settingsUrl}?provider_error=invalid`);
   }
 
+  // LIN-1524 close-out Finding #2: unlinkProvider no-ops on an unmatched
+  // (provider, scope) — it returns `workspace` unchanged in both the removed
+  // and no-op cases, so its return value carries no removal signal.
+  // getBindingsForWorkspace is NOT safe for this before/after comparison: it
+  // SYNTHESIZES a phantom binding whenever `workspace.bindings` is empty/absent
+  // (by design, for legacy un-migrated workspaces), so a real removal that
+  // empties `workspace.bindings` to `[]` would read back as an unchanged
+  // count. The reliable signal is reference identity on the RAW
+  // `workspace.bindings` array: unlinkProvider only ever reassigns it (always
+  // to a new array, via `.filter()`) on an actual removal, and leaves it
+  // byte-identical (same reference, including both undefined) on a no-op.
+  const bindingsBefore = workspace.bindings;
   unlinkProvider(workspace, provider, scope);
+  const bindingRemoved = workspace.bindings !== bindingsBefore;
 
   // LIN-1523: unlinking the active Linear binding revokes its durable
   // credential too — the existing session-side delete (inside unlinkProvider,
   // untouched, unlinkProvider stays a pure/sync mutator) stays; this is
   // ADDITIVE alongside it, not a replacement. Scoped to 'linear' only: the
   // durable store is Linear-only by design, so unlinking a non-Linear
-  // provider (e.g. github) must not touch it.
-  if (provider === 'linear') {
+  // provider (e.g. github) must not touch it. Gated on `bindingRemoved` too
+  // (LIN-1524 close-out Finding #2): a POST with `provider=linear` and a
+  // non-matching `scope` must not destroy a durable record whose session
+  // binding is still intact.
+  if (provider === 'linear' && bindingRemoved) {
     await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey);
   }
 

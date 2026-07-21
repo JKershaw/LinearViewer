@@ -65,4 +65,25 @@ describe('provider-removal route: durable delete (LIN-1523, source-text pin)', (
     const body = routeHandlerBody();
     assert.match(body, /ownerCredentialStore\.delete\(req\.session\.accountId,\s*workspace\.urlKey\)/);
   });
+
+  test('LIN-1524 close-out Finding #2: the durable delete is ALSO gated on an actual binding removal, not provider alone', () => {
+    // unlinkProvider no-ops on an unmatched (provider, scope) — a bare
+    // `if (provider === 'linear')` guard deletes the durable record even when
+    // the session binding was untouched. The fix captures a reference to the
+    // raw `workspace.bindings` array before the call and compares identity
+    // after (unlinkProvider only ever reassigns it, via `.filter()`, on an
+    // actual removal — never on a no-op). getBindingsForWorkspace().length is
+    // deliberately NOT used: it synthesizes a phantom binding whenever
+    // `bindings` is empty, which would mask a real removal. See
+    // tests/unit/workspace.test.js's composed test for the behavioural proof
+    // of the actual bug this pins.
+    const body = routeHandlerBody();
+    assert.match(body, /const bindingsBefore = workspace\.bindings/, 'expected a captured reference to workspace.bindings before unlinkProvider runs');
+    assert.match(body, /workspace\.bindings !== bindingsBefore/, 'expected a reference-identity check after unlinkProvider runs');
+
+    const deleteIdx = body.indexOf('ownerCredentialStore.delete(');
+    const beforeDelete = body.slice(0, deleteIdx);
+    const ifLine = beforeDelete.split('\n').reverse().find(l => l.trim().startsWith('if ('));
+    assert.match(ifLine, /bindingRemoved/, "the durable delete's guard must also require the removal signal, not just provider === 'linear'");
+  });
 });

@@ -144,6 +144,23 @@ describe('createEnsurePATSession', () => {
     }
   });
 
+  test('LIN-1524 close-out Finding #3 (posture pin): PAT workspace carries no refreshToken, and the factory takes no ownerCredentialStore dependency', async () => {
+    // Structural half: the factory's own deps signature has no store param —
+    // confirmed by freshStores() below not including one and the middleware
+    // still working correctly. Behavioural half: the produced credential has
+    // no refreshToken field at all, since a PAT is static/non-expiring and
+    // has nothing rotating to persist durably.
+    const middleware = createEnsurePATSession(freshStores());
+    const { req, res } = makeReqRes();
+    await middleware(req, res, () => {});
+
+    const ws = req.session.workspaces[0];
+    assert.strictEqual(ws.refreshToken, undefined, 'PAT workspace must not carry a refreshToken');
+    assert.strictEqual(ws.tokenExpiresAt, Number.MAX_SAFE_INTEGER, 'PAT never expires');
+    const binding = ws.bindings.find(b => b.provider === 'linear' && b.scope === 'org-1');
+    assert.strictEqual(binding.credentials.refreshToken, undefined, 'no refreshToken in the binding either — nothing durable to store');
+  });
+
   test('skips auth/test/logout/legal routes even with no session workspaces', async () => {
     const middleware = createEnsurePATSession(freshStores());
     for (const path of ['/auth/linear', '/logout', '/test/set-session', '/privacy', '/terms', '/styleguide']) {
