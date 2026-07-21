@@ -25,9 +25,10 @@ import { establishAccount } from '../lib/account-session.js'
  *   provider as a documented legacy default for direct constructions (LIN-561).
  * @param {import('../lib/account-store.js').AccountStore} options.accountStore - LIN-1329: find-or-create the durable account for the signing-in identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
+ * @param {(key: string) => void} [options.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`). Not yet called here — wiring at the logout call site lands in a follow-up beat.
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore }) {
+export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken }) {
   const router = Router()
 
   const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];

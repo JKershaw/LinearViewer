@@ -49,9 +49,10 @@ function starterSeed(urlKey) {
  * @param {import('../lib/local-store.js').LocalStore} [deps.localStore] - Local provider store, used to seed starter content for new local workspaces.
  * @param {import('../lib/account-store.js').AccountStore} [deps.accountStore] - LIN-1329: find-or-create the durable account for a new local workspace.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} [deps.accountWorkspaceStore] - LIN-1329: bind the account to the workspace.
+ * @param {(key: string) => void} [deps.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`). Not yet called here — wiring at the remove-workspace call sites lands in a follow-up beat.
  * @returns {Router} Express router
  */
-export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore } = {}) {
+export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken } = {}) {
   const router = Router()
 
   /**

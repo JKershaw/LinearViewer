@@ -23,6 +23,7 @@ import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-p
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken } from './lib/workspace-token-refresh.js'
+import { createWorkspaceTokenCache, workspaceTokenCacheKey } from './lib/workspace-token-cache.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -656,14 +657,14 @@ app.use((req, res, next) => {
 for (const provider of getAllProviders()) {
   let authRouter
   try {
-    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore })
+    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken })
   } catch (err) {
     if (err instanceof NotImplementedError) continue
     throw err
   }
   app.use(authRouter)
 }
-app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore }))
+app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
 
@@ -1181,8 +1182,17 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 // pure selector in lib/workspace-token-resolver.js, which never lets one account
 // borrow another's token. The cache is owner-keyed so a scoped lookup can never
 // return a different owner's cached token.
-const _tokenCache = new Map(); // "urlKey::owner" -> { token, expiresAt, cachedAt, provider }
 const TOKEN_CACHE_TTL_MS = 30 * 1000; // 30 seconds
+const workspaceTokenCache = createWorkspaceTokenCache({ ttlMs: TOKEN_CACHE_TTL_MS });
+
+// LIN-1507: prompt (not 30s-fuzzy) cache eviction. Threaded into every
+// session-destruction call site so a revoked session's cached token is gone
+// immediately rather than served for up to TOKEN_CACHE_TTL_MS after the
+// session row is deleted. Takes the pre-computed cache key (see
+// workspaceTokenCacheKey) — this wrapper never derives a key itself.
+function evictWorkspaceToken(key) {
+  workspaceTokenCache.evict(key);
+}
 
 // LIN-1373: TTL-preserving persist-back for refresh-on-resolve. Deliberately
 // NOT sessionStore.set() (lib/session-store.js's MongoSessionStore.set), which
@@ -1203,15 +1213,14 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     return { token: 'test-token', reason: 'ok', provider: 'linear' };
   }
 
-  const cacheKey = `${urlKey}::${ownerAccountId === UNSCOPED ? '*' : ownerAccountId}`;
+  const cacheKey = workspaceTokenCacheKey(urlKey, ownerAccountId);
 
-  // Check cache first
-  const cached = _tokenCache.get(cacheKey);
-  if (cached && Date.now() - cached.cachedAt < TOKEN_CACHE_TTL_MS) {
-    // Only return if the token hasn't expired
-    if (cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
-      return { token: cached.token, reason: 'ok', provider: cached.provider };
-    }
+  // Check cache first — the factory already applies TTL internally and
+  // returns undefined on a miss/expiry, so only the freshness-vs-expiry
+  // check (business logic, not cache mechanics) stays here.
+  const cached = workspaceTokenCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
+    return { token: cached.token, reason: 'ok', provider: cached.provider };
   }
 
   // Look up the access token from the sessions collection, scoped to
@@ -1221,7 +1230,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     const selected = selectOwnerWorkspaceToken(sessions, urlKey, ownerAccountId);
 
     if (selected.token) {
-      _tokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, cachedAt: Date.now(), provider: selected.provider });
+      workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider });
       return { token: selected.token, reason: 'ok', provider: selected.provider };
     }
 
@@ -1245,7 +1254,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
           persistSession: persistSessionRow
         });
         if (refreshed) {
-          _tokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, cachedAt: Date.now(), provider: refreshed.provider });
+          workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider });
           return { token: refreshed.token, reason: 'ok', provider: refreshed.provider };
         }
       } catch (err) {
