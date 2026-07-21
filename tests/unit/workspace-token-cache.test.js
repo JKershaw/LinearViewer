@@ -12,7 +12,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorkspaceTokenCache, workspaceTokenCacheKey } from '../../lib/workspace-token-cache.js';
+import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair } from '../../lib/workspace-token-cache.js';
 import { UNSCOPED } from '../../lib/workspace-token-resolver.js';
 
 describe('workspaceTokenCacheKey (LIN-1366 owner-isolation format, pinned verbatim)', () => {
@@ -124,5 +124,43 @@ describe('createWorkspaceTokenCache (LIN-1507, witness B)', () => {
     // writable again — proving its tombstone was pruned, not retained.
     const oldKey = workspaceTokenCacheKey('acme', 'owner-0');
     assert.equal(cache.set(oldKey, { token: 'ok-again' }), true, 'a long-stale tombstone must not block a write forever');
+  });
+});
+
+describe('evictWorkspaceTokenPair (LIN-1507, witness D — the ::* decision)', () => {
+  test('evicts BOTH the owner-scoped key and the owner-blind (::*) key', () => {
+    const evicted = [];
+    evictWorkspaceTokenPair((key) => evicted.push(key), 'acme', 'owner-1');
+
+    assert.deepEqual(evicted, [
+      workspaceTokenCacheKey('acme', 'owner-1'),
+      workspaceTokenCacheKey('acme'),
+    ]);
+  });
+
+  test('an undefined ownerAccountId still evicts the ::* key (twice is harmless/idempotent)', () => {
+    const evicted = [];
+    evictWorkspaceTokenPair((key) => evicted.push(key), 'acme', undefined);
+
+    assert.deepEqual(evicted, [workspaceTokenCacheKey('acme'), workspaceTokenCacheKey('acme')]);
+  });
+
+  test('a falsy evict is a no-op (optional dependency guard)', () => {
+    assert.doesNotThrow(() => evictWorkspaceTokenPair(undefined, 'acme', 'owner-1'));
+    assert.doesNotThrow(() => evictWorkspaceTokenPair(null, 'acme', 'owner-1'));
+  });
+
+  test('end-to-end against a real cache: both entries are gone after the pair-evict', () => {
+    let clock = 0;
+    const cache = createWorkspaceTokenCache({ ttlMs: 30000, now: () => clock });
+    const scopedKey = workspaceTokenCacheKey('acme', 'owner-1');
+    const unscopedKey = workspaceTokenCacheKey('acme');
+    cache.set(scopedKey, { token: 'scoped' });
+    cache.set(unscopedKey, { token: 'unscoped-could-be-the-same-user' });
+
+    evictWorkspaceTokenPair(cache.evict, 'acme', 'owner-1');
+
+    assert.equal(cache.get(scopedKey), undefined);
+    assert.equal(cache.get(unscopedKey), undefined);
   });
 });
