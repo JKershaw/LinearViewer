@@ -26,6 +26,7 @@ import { WorkspaceStore } from '../../lib/workspace-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 import { establishAccount } from '../../lib/account-session.js';
 
 const uri = process.env.MONGODB_TEST_URI;
@@ -510,8 +511,8 @@ describe(
     // 32MB sort-memory limit erroring". Only real Mongo can answer that —
     // MangoDB has no query planner and no explain() — so it is answered here.
 
-    // The exact query routes/proxy.js issues (LINEAGE_QUERY_LIMIT = 2000).
-    const LINEAGE_QUERY_LIMIT = 2000;
+    // The exact query routes/proxy.js issues, with the cap imported from the
+    // route module itself (LIN-1494 F2 tidy — no hand-mirrored constant).
     const lineageCursor = (collection, anchors) =>
       collection
         .find({ urlKey: 'acme', rootItemId: { $in: anchors } }, { projection: { prompt: 0 } })

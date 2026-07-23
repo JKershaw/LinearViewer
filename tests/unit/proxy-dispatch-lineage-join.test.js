@@ -26,7 +26,7 @@ process.env.NODE_ENV = 'test';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { createProxyRoutes } from '../../routes/proxy.js';
+import { createProxyRoutes, LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 
 const T1 = '2026-06-22T10:00:00.000Z';
 const T2 = '2026-06-22T11:00:00.000Z';
@@ -51,15 +51,22 @@ function buildApp({ queued = [], history = [] } = {}) {
       const anchors = opts.rootItemId.$in;
       let items = history.filter(r => anchors.includes(r.rootItemId));
       if (opts.issueIdentifier) items = items.filter(r => r.issueIdentifier === opts.issueIdentifier);
-      return { items };
+      // LIN-1494: mirror the real store's `limit` branch (lib/dispatch-store.js)
+      // — `total` is the exact PRE-slice matching count, `items` the capped
+      // slice. The old stub ignored `limit` and returned no `total`, which is
+      // exactly the harness gap that let a `length === cap` proxy look correct.
+      const total = items.length;
+      if (opts.limit) items = items.slice(0, opts.limit);
+      return { items, total };
     }
     // Real store: the page call DOES push issueIdentifier into the query
     // when the caller passes it (LIN-613/615 index-backed predicate).
     let items = opts.issueIdentifier
       ? history.filter(r => r.issueIdentifier === opts.issueIdentifier)
       : history;
+    const total = items.length; // pre-slice count, as the real store returns
     items = opts.limit ? items.slice(0, opts.limit) : items;
-    return { items };
+    return { items, total };
   };
 
   const listItems = async (urlKey, opts = {}) => {
@@ -656,21 +663,20 @@ describe('LIN-1470 — review F7: forward-only merge invariant (a row is never r
   });
 });
 
-describe('LIN-1485 — L3: telemetry when the lineage query hits LINEAGE_QUERY_LIMIT (silent truncation signal)', () => {
-  // Mirrors the not-exported const in routes/proxy.js (`LINEAGE_QUERY_LIMIT = 2000`).
-  // Not imported because the module doesn't export it; kept in sync by naming it
-  // in every assertion message so a drift shows up as a failure, not a silent gap.
-  const CAP = 2000;
+describe('LIN-1485/LIN-1494 — L3: telemetry when the lineage query overruns LINEAGE_QUERY_LIMIT (exact truncation signal)', () => {
+  // Imported from routes/proxy.js (LIN-1494 F2 tidy) — no more hand-mirrored
+  // `const CAP = 2000` kept in sync by naming conventions.
+  const CAP = LINEAGE_QUERY_LIMIT;
 
   // Builds `count` rows sharing one rootItemId anchor: index 0 is the anchor row
-  // itself (id === anchor), the rest are siblings. The stub's lineage ($in) branch
-  // (buildApp above) does not apply `limit`, so the returned sibling count is
-  // exactly `count` — the harness's stand-in for "the store's real `.limit(2000)`
-  // clamp already ran and produced exactly this many rows."
+  // itself (id === anchor), the rest are siblings. The terminal `[done]` entry
+  // rides an EARLY row (index 1) so it survives the stub's limit slice in the
+  // over-cap fixtures — the real store keeps the newest rows, and which rows
+  // are dropped is not what these cases pin.
   function lineageRows(anchor, count, terminalAt) {
     const rows = [];
     for (let i = 0; i < count; i++) {
-      const isTerminal = terminalAt != null && i === count - 1;
+      const isTerminal = terminalAt != null && i === Math.min(1, count - 1);
       rows.push(row({
         id: i === 0 ? anchor : `${anchor}-sib-${i}`,
         rootItemId: anchor,
@@ -684,18 +690,36 @@ describe('LIN-1485 — L3: telemetry when the lineage query hits LINEAGE_QUERY_L
     return rows;
   }
 
-  test('T13 — fires exactly once when the lineage query returns exactly LINEAGE_QUERY_LIMIT rows', async (t) => {
+  test('T13 — fires exactly once when the lineage genuinely overruns the cap, and reports the exact total', async (t) => {
     const warnMock = t.mock.method(console, 'warn', () => {});
-    const history = lineageRows('root-cap', CAP, T2);
+    // CAP + 1 matching rows: the stub returns `items` sliced to CAP with
+    // `total` = CAP + 1 — the store's exact pre-slice count.
+    const history = lineageRows('root-cap', CAP + 1, T2);
     const { app } = buildApp({ history });
 
     const { status } = await get(app, '/api/proxy/dispatch');
 
     assert.equal(status, 200);
-    assert.equal(warnMock.mock.calls.length, 1, 'must fire exactly once when the lineage query returns exactly the cap');
+    assert.equal(warnMock.mock.calls.length, 1, 'must fire exactly once when the lineage overruns the cap');
     const [message] = warnMock.mock.calls[0].arguments;
     assert.match(message, /LINEAGE_QUERY_LIMIT/, 'the log line should name the signal it is reporting');
-    assert.match(message, /2000/, 'the log line should carry the cap value itself');
+    assert.match(message, new RegExp(String(CAP)), 'the log line should carry the cap value itself');
+    assert.match(message, new RegExp(`total=${CAP + 1}`), 'the log line should answer "how far over cap" with the exact total');
+  });
+
+  test('T13b (LIN-1494 headline) — SILENT on a lineage of exactly LINEAGE_QUERY_LIMIT rows (nothing was truncated)', async (t) => {
+    // The shipped `lineageSiblings.length === LINEAGE_QUERY_LIMIT` gate
+    // false-positived here: a lineage of exactly 2000 rows is complete, but
+    // the proxy read "full page" as "may be truncated". The store's `total`
+    // is exact, so exactly-at-cap must not warn.
+    const warnMock = t.mock.method(console, 'warn', () => {});
+    const history = lineageRows('root-exact', CAP, T2);
+    const { app } = buildApp({ history });
+
+    const { status } = await get(app, '/api/proxy/dispatch');
+
+    assert.equal(status, 200);
+    assert.equal(warnMock.mock.calls.length, 0, 'exactly-at-cap is complete, not truncated — must stay silent');
   });
 
   test('T14 — silent when the lineage query returns one row under the cap (the case that actually protects the ticket\'s intent)', async (t) => {
@@ -724,20 +748,95 @@ describe('LIN-1485 — L3: telemetry when the lineage query hits LINEAGE_QUERY_L
   });
 
   test('T16 — response payload (merge/feedbackCount/status/completedAt) is unaffected by the telemetry firing', async (t) => {
-    // Deliberately AT the cap (same fixture shape as T13) so the telemetry
+    // Deliberately OVER the cap (same fixture shape as T13) so the telemetry
     // branch actually executes — this proves the added conditional/log line
     // is read-only and does not perturb the derived response fields it sits
     // beside, driving the real handler end to end rather than asserting on
     // the log call in isolation.
-    const history = lineageRows('root-cap-2', CAP, T2);
+    const warnMock = t.mock.method(console, 'warn', () => {});
+    const history = lineageRows('root-cap-2', CAP + 1, T2);
     const { app } = buildApp({ history });
 
     const { body } = await get(app, '/api/proxy/dispatch');
     const item = body.items.find(i => i.id === 'root-cap-2');
 
+    assert.equal(warnMock.mock.calls.length, 1, 'precondition: the telemetry branch executed for this fixture');
     assert.ok(item, 'the anchor row is present in the response');
-    assert.equal(item.feedbackCount, CAP, 'lineage-wide count — one feedback entry per row in the lineage, unaffected by telemetry');
+    // The lineage query returned the capped CAP rows (of CAP + 1), so the
+    // merged feedback covers exactly the rows the store handed back.
+    assert.equal(item.feedbackCount, CAP, 'lineage-wide count over the returned (capped) rows, unaffected by telemetry');
     assert.equal(item.status, 'done', 'lineage-derived terminal status, unaffected by telemetry');
     assert.equal(item.completedAt, T2, 'lineage-derived completedAt, unaffected by telemetry');
+  });
+});
+
+describe('LIN-1494 — dispatch-list response: honest `total` + `truncated` from the store\'s pre-slice count', () => {
+  // The page query carries `limit: 200`; `listHistory` returns the exact full
+  // matching count beside the capped items. The response previously reported
+  // `total: filtered.length` — a count over the newest-200 window presented
+  // as the count of matching dispatch items.
+  const PAGE_LIMIT = 200;
+
+  function plainRows(count, { issueIdentifier = 'LIN-1494', feedback = [] } = {}) {
+    // Legacy-style rows (no rootItemId, anchor falls back to own id) keep the
+    // lineage query out of the way of what these cases pin.
+    const rows = [];
+    for (let i = 0; i < count; i++) {
+      rows.push(row({ id: `h-${issueIdentifier}-${i}`, issueIdentifier, feedback }));
+    }
+    return rows;
+  }
+
+  test('unfiltered: total = queued + history.total when the 200-row window truncates, with truncated: true', async () => {
+    const history = plainRows(PAGE_LIMIT + 50);
+    const queuedRow = { ...row({ id: 'q-1' }), status: 'queued' };
+    const { app } = buildApp({ queued: [queuedRow], history });
+
+    const { status, body } = await get(app, '/api/proxy/dispatch');
+
+    assert.equal(status, 200);
+    assert.equal(body.total, 1 + PAGE_LIMIT + 50, 'the store\'s exact matching count, not the windowed 201');
+    assert.equal(body.truncated, true, 'the newest-200 window did not cover the whole history');
+  });
+
+  test('unfiltered: total unchanged and truncated: false when the window covers everything (back-compat)', async () => {
+    const history = plainRows(3);
+    const queuedRow = { ...row({ id: 'q-1' }), status: 'queued' };
+    const { app } = buildApp({ queued: [queuedRow], history });
+
+    const { body } = await get(app, '/api/proxy/dispatch');
+
+    assert.equal(body.total, 4, 'identical to the old filtered.length when history fits the window');
+    assert.equal(body.truncated, false);
+  });
+
+  test('issue-scoped: total is the store\'s exact per-issue count past the window', async () => {
+    const history = [
+      ...plainRows(PAGE_LIMIT + 30, { issueIdentifier: 'LIN-A' }),
+      ...plainRows(5, { issueIdentifier: 'LIN-B' })
+    ];
+    const { app } = buildApp({ history });
+
+    const scoped = await get(app, '/api/proxy/dispatch?issueIdentifier=LIN-A');
+    assert.equal(scoped.body.total, PAGE_LIMIT + 30, 'the scoped store count is exact for the issue');
+    assert.equal(scoped.body.truncated, true);
+
+    const other = await get(app, '/api/proxy/dispatch?issueIdentifier=LIN-B');
+    assert.equal(other.body.total, 5);
+    assert.equal(other.body.truncated, false);
+  });
+
+  test('status-filtered: total stays the windowed filtered.length (exact total is unknowable), truncated still disclosed', async () => {
+    // Status is feedback-derived in JS — the store cannot count it — so the
+    // existing `filtered.length` semantics are deliberately preserved (the
+    // T2b pins depend on this). The `truncated` flag still discloses that
+    // the window (and the lineage anchor seeding) did not cover everything.
+    const history = plainRows(PAGE_LIMIT + 50, { feedback: [{ message: '[done] finished', timestamp: T1 }] });
+    const { app } = buildApp({ history });
+
+    const { body } = await get(app, '/api/proxy/dispatch?status=done');
+
+    assert.equal(body.total, PAGE_LIMIT, 'the windowed count — NOT the store total — for a derived-status filter');
+    assert.equal(body.truncated, true);
   });
 });

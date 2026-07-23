@@ -67,6 +67,30 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
     return merged;
   }
 
+  // Status reads are CAPPED per workspace, and listStatus returns the exact
+  // pre-slice `total` beside the capped `items` (LIN-1494). Aggregate the
+  // per-workspace truncation signal (any ws with total > items.length) and the
+  // Σ of totals so the feed can report honest hasMore/summary.total instead of
+  // deriving them from the already-truncated pool. Failure discipline matches
+  // mergeAcross: a failed workspace contributes nothing — no phantom totals,
+  // no poisoned hasMore.
+  async function readStatusAcross(workspaces, readOne, label) {
+    const settled = await Promise.allSettled(workspaces.map(readOne));
+    const statusItems = [];
+    let sourceTotal = 0;
+    let sourceHasMore = false;
+    for (const r of settled) {
+      if (r.status === 'fulfilled') {
+        statusItems.push(...r.value.items);
+        sourceTotal += r.value.total;
+        if (r.value.total > r.value.items.length) sourceHasMore = true;
+      } else {
+        console.error(`Live console: ${label} read failed for a workspace:`, r.reason?.message);
+      }
+    }
+    return { statusItems, sourceTotal, sourceHasMore };
+  }
+
   // ─── HTML page ────────────────────────────────────────────────────────────
   router.get('/workspace/:urlKey/live-console', workspaceFromUrl, (req, res) => {
     const workspace = req.workspace;
@@ -107,23 +131,35 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
     try {
       if (before) {
         // ── History page: older STATUS events only (cheap; no loops read). ──
+        // LIN-1494: the `before` cursor is pushed DOWN into the store read as
+        // an exclusive `until` bound, so each page reads the newest rows OLDER
+        // than the cursor and paging genuinely advances past the per-workspace
+        // cap. This pushdown is what makes the honest `hasMore` below safe:
+        // truncation-aware hasMore WITHOUT it would have "view more" re-read
+        // the same newest rows forever (an empty-page loop — worse than the
+        // old dead-end).
         const pageSize = Math.min(Math.max(1, Number(req.query.limit) || 40), MAX_HISTORY_PAGE);
         const since = new Date(now - HISTORY_WINDOW_MS);
-        const statusItems = await mergeAcross(workspaces, async (ws) => {
-          const { items } = await agentStatusStore.listStatus(ws.urlKey, { since, limit: HISTORY_PER_WORKSPACE_LIMIT });
-          return (items || []).map(item => ({ ...item, workspaceUrlKey: ws.urlKey, workspaceName: ws.name || ws.urlKey }));
+        const until = new Date(before);
+        const { statusItems, sourceHasMore } = await readStatusAcross(workspaces, async (ws) => {
+          const { items, total } = await agentStatusStore.listStatus(ws.urlKey, { since, until, limit: HISTORY_PER_WORKSPACE_LIMIT });
+          return { items: (items || []).map(item => ({ ...item, workspaceUrlKey: ws.urlKey, workspaceName: ws.name || ws.urlKey })), total: total || 0 };
         }, 'status(history)');
 
-        const feed = buildConsoleFeed({ statusItems, loops: [] }, { now, before, pageSize });
+        const feed = buildConsoleFeed({ statusItems, loops: [] }, { now, before, pageSize, sourceHasMore });
         return res.json({ events: feed.events, hasMore: feed.hasMore, oldestTs: feed.oldestTs });
       }
 
       // ── Live poll: status stream + loops (lanes/heartbeats/evidence/tempo). ──
+      // LIN-1494: thread the stores' truncation signal + Σ pre-slice totals
+      // into the feed so `hasMore` and `summary.total` are honest about rows
+      // the per-workspace cap dropped, instead of being derived from the
+      // truncated pool.
       const since = new Date(now - FEED_WINDOW_MS);
-      const [statusItems, loops] = await Promise.all([
-        mergeAcross(workspaces, async (ws) => {
-          const { items } = await agentStatusStore.listStatus(ws.urlKey, { since, limit: FEED_PER_WORKSPACE_LIMIT });
-          return (items || []).map(item => ({ ...item, workspaceUrlKey: ws.urlKey, workspaceName: ws.name || ws.urlKey }));
+      const [statusRead, loops] = await Promise.all([
+        readStatusAcross(workspaces, async (ws) => {
+          const { items, total } = await agentStatusStore.listStatus(ws.urlKey, { since, limit: FEED_PER_WORKSPACE_LIMIT });
+          return { items: (items || []).map(item => ({ ...item, workspaceUrlKey: ws.urlKey, workspaceName: ws.name || ws.urlKey })), total: total || 0 };
         }, 'status'),
         dispatchQueueStore
           ? mergeAcross(workspaces, async (ws) => {
@@ -133,7 +169,12 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
           : Promise.resolve([]),
       ]);
 
-      const feed = buildConsoleFeed({ statusItems, loops }, { now, pageSize: DEFAULT_PAGE_SIZE });
+      const feed = buildConsoleFeed({ statusItems: statusRead.statusItems, loops }, {
+        now,
+        pageSize: DEFAULT_PAGE_SIZE,
+        sourceHasMore: statusRead.sourceHasMore,
+        sourceTotal: statusRead.sourceTotal,
+      });
       res.json(feed);
     } catch (error) {
       console.error('Live console events error:', error);
