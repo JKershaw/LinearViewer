@@ -23,9 +23,16 @@ process.env.NODE_ENV = 'test';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
-import { selectOwnerWorkspaceToken, detectOwnerAccountMismatch, UNSCOPED } from '../../lib/workspace-token-resolver.js';
+import { selectOwnerWorkspaceToken, detectOwnerAccountMismatch, detectOwnerSignedOut, classifyWorkspaceFailure, UNSCOPED } from '../../lib/workspace-token-resolver.js';
+import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 // ---------------------------------------------------------------------------
 // Block A — pure selector `selectOwnerWorkspaceToken` (7 cases)
@@ -38,6 +45,17 @@ const PAST_MS = -10_000; // already expired
 
 function sessionRow(accountId, urlKey, accessToken, expiresAt, provider = 'linear') {
   return { session: { accountId, workspaces: [{ urlKey, provider, accessToken, tokenExpiresAt: expiresAt }] } };
+}
+
+// LIN-1506: a session row for a DIFFERENT workspace than the one under test —
+// expresses case (b), which the flat sessionRow() above structurally cannot
+// (its single workspaces[] entry always matches the urlKey being tested). This
+// is the shape a signed-in owner who simply never connected THIS workspace
+// produces: a live session, just not one that references `testedUrlKey`.
+// detectOwnerSignedOut is workspace-independent (Q1) and must return false
+// against this fixture — only this helper can prove that.
+function otherWorkspaceSessionRow(accountId, otherUrlKey, accessToken, expiresAt, provider = 'linear') {
+  return { session: { accountId, workspaces: [{ urlKey: otherUrlKey, provider, accessToken, tokenExpiresAt: expiresAt }] } };
 }
 
 describe('selectOwnerWorkspaceToken (LIN-1366, Block A — pure selector)', () => {
@@ -194,6 +212,236 @@ describe('detectOwnerAccountMismatch (LIN-1413, Block C — pure detector)', () 
       sessionRow('account-bob', 'acme', 'tok-bob-live', NOW + FAR_FUTURE_MS),
     ];
     assert.equal(detectOwnerAccountMismatch(sessions, 'acme', 'account-alice'), true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block D — detectOwnerSignedOut (LIN-1506, pure sibling detector)
+// ---------------------------------------------------------------------------
+
+describe('detectOwnerSignedOut (LIN-1506, Block D — pure detector)', () => {
+  test('D1: owner has no session row anywhere -> true', () => {
+    const sessions = [
+      sessionRow('account-B', 'acme', 'tokB', NOW + FAR_FUTURE_MS),
+    ];
+    assert.equal(detectOwnerSignedOut(sessions, 'account-A'), true);
+  });
+
+  // Q1's alarm: detectOwnerSignedOut is deliberately 2-arg (no urlKey), so this
+  // fixture — a live session, just for a DIFFERENT workspace — must NOT read as
+  // signed-out. If someone later widens the predicate to take urlKey and match
+  // it, this is the test that fails.
+  test('D2: owner has a live row for a DIFFERENT workspace (case (b), via otherWorkspaceSessionRow) -> false — a signed-in owner who never connected THIS workspace must not be told to sign in', () => {
+    const sessions = [
+      otherWorkspaceSessionRow('account-A', 'other-workspace', 'tokA', NOW + FAR_FUTURE_MS),
+    ];
+    assert.equal(detectOwnerSignedOut(sessions, 'account-A'), false);
+  });
+
+  test('D3: null / empty / UNSCOPED ownerAccountId -> false (the first-line guard)', () => {
+    const sessions = [];
+    assert.equal(detectOwnerSignedOut(sessions, null), false);
+    assert.equal(detectOwnerSignedOut(sessions, ''), false);
+    assert.equal(detectOwnerSignedOut(sessions, UNSCOPED), false);
+  });
+
+  // The detector is about row EXISTENCE, not token liveness — that distinction
+  // is selectOwnerWorkspaceToken's job (it already returns session_expired for
+  // this exact fixture). An owner with a stale-but-present row is not "signed
+  // out" by this predicate's contract.
+  test('D4: owner has a row for THIS workspace but its token is expired -> false (existence, not liveness)', () => {
+    const sessions = [
+      sessionRow('account-A', 'acme', 'tokA-expired', NOW + PAST_MS),
+    ];
+    assert.equal(detectOwnerSignedOut(sessions, 'account-A'), false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block E — classifyWorkspaceFailure (LIN-1506, ordering witness)
+// ---------------------------------------------------------------------------
+
+describe('classifyWorkspaceFailure (LIN-1506, Block E — ordering witness)', () => {
+  // Witness E: this decision had no test at all before this beat. Uses C2's
+  // exact fixture — both detectOwnerAccountMismatch AND detectOwnerSignedOut
+  // fire on this input (owner has no row anywhere; a different account is
+  // live), so only ordering decides the result.
+  test('E1 (witness E): C2\'s exact fixture — owner has no row at all, a DIFFERENT account holds a live session -> owner_mismatch, NOT owner_signed_out', () => {
+    const sessions = [
+      sessionRow('account-B', 'acme', 'tokB', NOW + FAR_FUTURE_MS),
+    ];
+    const result = classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', selectedReason: 'not_connected' });
+    assert.equal(result, 'owner_mismatch');
+  });
+
+  test('E2: not_connected + owner genuinely signed out (no row anywhere, nobody else live either) -> owner_signed_out', () => {
+    const sessions = [];
+    const result = classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', selectedReason: 'not_connected' });
+    assert.equal(result, 'owner_signed_out');
+  });
+
+  test('E3: ok passes through unchanged', () => {
+    const sessions = [sessionRow('account-A', 'acme', 'tokA', NOW + FAR_FUTURE_MS)];
+    const result = classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', selectedReason: 'ok' });
+    assert.equal(result, 'ok');
+  });
+
+  test('E4: session_expired passes through unchanged', () => {
+    const sessions = [sessionRow('account-A', 'acme', 'tokA-expired', NOW + PAST_MS)];
+    const result = classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', selectedReason: 'session_expired' });
+    assert.equal(result, 'session_expired');
+  });
+
+  // Proves the not_connected gate actually matters, not just that
+  // detectOwnerSignedOut is false: this fixture has NO row for the owner
+  // anywhere (detectOwnerSignedOut would return true in isolation), yet
+  // store_unreachable must NOT be reclassified — it isn't the not_connected case.
+  test('E5: store_unreachable passes through unchanged, even when the owner has no session row at all', () => {
+    const sessions = [];
+    const result = classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', selectedReason: 'store_unreachable' });
+    assert.equal(result, 'store_unreachable');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block F — source-grep wiring witness (LIN-1506, witness C)
+// ---------------------------------------------------------------------------
+
+// Extracts the body of `async function resolveWorkspaceAccess` from server.js:
+// from the function keyword to the next TOP-LEVEL `\n}` (a newline immediately
+// followed by a column-0 closing brace). A plain line-based find() would not
+// work here — the call site under test spans multiple lines. This relies on
+// the repo's consistent 2-space indentation (CLAUDE.md): every brace that
+// closes an inner block (if/try/etc.) is preceded by at least one space, so
+// only the function's own closing brace matches the literal substring "\n}".
+function extractResolveWorkspaceAccessBody(src) {
+  const start = src.indexOf('async function resolveWorkspaceAccess');
+  assert.ok(start >= 0, 'async function resolveWorkspaceAccess not found in server.js');
+  const end = src.indexOf('\n}', start);
+  assert.ok(end >= 0, "could not find resolveWorkspaceAccess's top-level closing brace");
+  return src.slice(start, end + 2);
+}
+
+describe('resolveWorkspaceAccess wiring (LIN-1506, Block F — witness C, source-grep)', () => {
+  // This is the ONLY thing in the suite that catches the classifier never
+  // being wired in at all: witness A's detector tests pass because the pure
+  // functions exist and are correct, and the envelope tests (beat 4, Block 2)
+  // inject the reason directly via buildApp(reason) rather than going through
+  // resolveWorkspaceAccess. If the call site here were deleted entirely, the
+  // rest of the suite would stay fully green.
+  //
+  // What this test does NOT prove: reachability (that resolveWorkspaceAccess
+  // is actually invoked on a request), argument correctness (that the right
+  // sessions/urlKey/ownerAccountId are passed), or that the return value is
+  // used by the caller. It is a wiring smoke-detector — text and position —
+  // not a behavioural witness. Witness E (Block E, above) is the behavioural
+  // witness for the classifier itself, once you already know it's called.
+  test('#27 (witness C): classifyWorkspaceFailure is called after refreshOwnerWorkspaceToken, and detectOwnerAccountMismatch no longer appears directly', () => {
+    const body = extractResolveWorkspaceAccessBody(SERVER_SRC);
+
+    const classifyIdx = body.indexOf('classifyWorkspaceFailure(');
+    const refreshIdx = body.indexOf('refreshOwnerWorkspaceToken(');
+
+    assert.ok(classifyIdx >= 0, 'classifyWorkspaceFailure( is not called inside resolveWorkspaceAccess');
+    assert.ok(refreshIdx >= 0, 'sanity check failed: refreshOwnerWorkspaceToken( is not called inside resolveWorkspaceAccess');
+    assert.ok(
+      classifyIdx > refreshIdx,
+      'classifyWorkspaceFailure must be called AFTER refreshOwnerWorkspaceToken has had its chance to resolve a token — reclassifying a failure that refresh-on-resolve could still turn into a success would be premature'
+    );
+
+    assert.ok(
+      !body.includes('detectOwnerAccountMismatch('),
+      'detectOwnerAccountMismatch must no longer be called directly inside resolveWorkspaceAccess — it moved inside classifyWorkspaceFailure (lib/workspace-token-resolver.js)'
+    );
+  });
+
+  test('LIN-1524: UNSCOPED callers never reach refreshOwnerWorkspaceToken (and so never consult the durable store) — the guard is textually attached to the call', () => {
+    // The durable store is the ONLY thing refreshOwnerWorkspaceToken's Linear
+    // arm reads/writes now (LIN-1524) — so "UNSCOPED never consults the
+    // durable store" reduces to "UNSCOPED never reaches this call at all".
+    // That's a source-text fact, not a behavioural one (Block A's A5 already
+    // proves the pure selector's OWN owner-blind behaviour is unaffected;
+    // this proves the call site guarding the durable-refresh attempt).
+    const body = extractResolveWorkspaceAccessBody(SERVER_SRC);
+    const callIdx = body.indexOf('refreshOwnerWorkspaceToken(');
+    assert.ok(callIdx >= 0, 'expected a refreshOwnerWorkspaceToken( call inside resolveWorkspaceAccess');
+
+    const ifLine = body.slice(0, callIdx).split('\n').reverse().find(l => l.trim().startsWith('if ('));
+    assert.ok(ifLine, 'expected an `if (...)` guarding the refreshOwnerWorkspaceToken( call');
+    assert.match(ifLine, /ownerAccountId !== UNSCOPED/, 'the durable-refresh attempt must stay gated on a real (non-UNSCOPED) owner — an owner-blind caller must never trigger a durable-store read/write on anyone\'s behalf');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block G (LIN-1524) — owner isolation over the DURABLE store itself
+// ---------------------------------------------------------------------------
+//
+// Block A (above) proves the session-side selector never lets one account's
+// proxy token resolve to a different account's SESSION token. Now that Linear's
+// rotating credential lives in a separate store (lib/owner-credential-store.js,
+// keyed on `(accountId, urlKey)`), that same guarantee needs its own direct
+// proof at the storage layer: account A's durable record must never resolve
+// for account B, and vice versa, even when both hold a record for the exact
+// same `urlKey` (the realistic case — a Linear org connected by two different
+// Harbour accounts, e.g. two teammates who each connected the same team's
+// workspace independently).
+
+function inMemoryCredentialCollection() {
+  const docs = new Map();
+  return {
+    async findOne(query) { return docs.get(query._id) ?? null; },
+    async updateOne(query, update) {
+      const existing = docs.get(query._id) || { _id: query._id };
+      docs.set(query._id, { ...existing, ...(update.$set || {}) });
+      return { matchedCount: 1, modifiedCount: 1 };
+    },
+    async deleteOne(query) {
+      const had = docs.has(query._id);
+      docs.delete(query._id);
+      return { deletedCount: had ? 1 : 0 };
+    },
+  };
+}
+
+describe('OwnerCredentialStore owner isolation over the durable store (LIN-1524, Block G)', () => {
+  test('G1: account A\'s durable record is never returned for account B\'s get, even for the identical urlKey', async () => {
+    const store = new OwnerCredentialStore({ collection: inMemoryCredentialCollection() });
+    await store.put('account-A', 'acme', { provider: 'linear', scope: 'org-1', token: 'a-token', refreshToken: 'a-refresh', tokenExpiresAt: NOW + FAR_FUTURE_MS });
+    await store.put('account-B', 'acme', { provider: 'linear', scope: 'org-1', token: 'b-token', refreshToken: 'b-refresh', tokenExpiresAt: NOW + FAR_FUTURE_MS });
+
+    const forA = await store.get('account-A', 'acme');
+    const forB = await store.get('account-B', 'acme');
+
+    assert.equal(forA.refreshToken, 'a-refresh');
+    assert.equal(forB.refreshToken, 'b-refresh');
+    assert.notEqual(forA.refreshToken, forB.refreshToken);
+  });
+
+  test('G2: deleting account A\'s record never touches account B\'s, same urlKey', async () => {
+    const store = new OwnerCredentialStore({ collection: inMemoryCredentialCollection() });
+    await store.put('account-A', 'acme', { provider: 'linear', scope: 'org-1', token: 'a-token', refreshToken: 'a-refresh', tokenExpiresAt: NOW + FAR_FUTURE_MS });
+    await store.put('account-B', 'acme', { provider: 'linear', scope: 'org-1', token: 'b-token', refreshToken: 'b-refresh', tokenExpiresAt: NOW + FAR_FUTURE_MS });
+
+    await store.delete('account-A', 'acme');
+
+    assert.equal(await store.get('account-A', 'acme'), null);
+    const survived = await store.get('account-B', 'acme');
+    assert.ok(survived, 'account B\'s record must survive account A\'s deletion');
+    assert.equal(survived.refreshToken, 'b-refresh');
+  });
+
+  test('G3: an attacker-shaped accountId cannot collide with a real one via the composite key (no delimiter-injection cross-read)', async () => {
+    // The key is a plain template literal `${accountId}::${urlKey}` — verify
+    // an accountId value crafted to LOOK like `${real}::${urlKey}` cannot
+    // shadow the real owner's record for the same urlKey.
+    const store = new OwnerCredentialStore({ collection: inMemoryCredentialCollection() });
+    await store.put('account-A', 'acme', { provider: 'linear', scope: 'org-1', token: 'a-token', refreshToken: 'a-refresh', tokenExpiresAt: NOW + FAR_FUTURE_MS });
+
+    const crafted = await store.get('account-A::acme', 'x'); // would collide if the key were naively parsed/split
+    assert.equal(crafted, null);
+    // And the real owner's record is untouched.
+    const real = await store.get('account-A', 'acme');
+    assert.equal(real.refreshToken, 'a-refresh');
   });
 });
 

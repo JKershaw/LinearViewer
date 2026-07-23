@@ -21,8 +21,9 @@ import { ensureIndexes } from './lib/db-indexes.js'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
-import { UNSCOPED, selectOwnerWorkspaceToken, detectOwnerAccountMismatch } from './lib/workspace-token-resolver.js'
+import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken } from './lib/workspace-token-refresh.js'
+import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -44,6 +45,7 @@ import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
 import { AccountStore } from './lib/account-store.js'
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
+import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
@@ -69,7 +71,7 @@ import { renderLandingPage } from './lib/render-landing.js'
 import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, updateWorkspaceTokens, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential } from './lib/workspace.js'
+import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, rotateOwnerCredential, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential } from './lib/workspace.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createEnsurePATSession } from './lib/pat-session.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
@@ -479,6 +481,19 @@ const workspaceStore = new WorkspaceStore({ collection: workspacesCollection })
 const accountWorkspacesCollection = db.collection('account-workspaces')
 const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWorkspacesCollection })
 
+// Durable owner-scoped Linear credential (LIN-1523, Session 1 of LIN-1501).
+// Additive-only in this session: dual-written alongside the session-only
+// credential (never instead of it) via rotateOwnerCredential/
+// persistOwnerCredential at every rotation/acquisition site — ensureValidToken
+// and handleTokenRefreshAndRetry below, the off-session refresh path
+// (refreshOwnerWorkspaceToken), and both OAuth-callback branches
+// (routes/auth.js). No read path is wired to it yet — that is Session 2
+// (LIN-1524). Plaintext `refreshToken` at rest is accepted conditionally for
+// this phase only — see LIN-1522, which owns encryption/retention for this
+// collection.
+const ownerCredentialsCollection = db.collection('owner-credentials')
+const ownerCredentialStore = new OwnerCredentialStore({ collection: ownerCredentialsCollection })
+
 // =============================================================================
 // Process-level safety net (LIN-608)
 // =============================================================================
@@ -542,7 +557,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore }))
 }
 
 // =============================================================================
@@ -598,22 +613,44 @@ async function ensureValidToken(req, res, next) {
   if (!needsTokenRefresh) return next()
 
   try {
-    // Provider-aware refresh / re-mint seam (LIN-712). GitHub App installation
-    // tokens carry NO refresh_token — they are RE-MINTED from the App JWT +
-    // installationId — so a GitHub workspace must NOT be routed through Linear's
-    // refresh endpoint. Branch on provider: GitHub re-mints via the provider seam;
-    // everything else (Linear, and the legacy undefined-provider default) keeps the
-    // refresh_token exchange below, byte-for-byte unchanged. (PAT/local never reach
-    // here — PAT is skipped above and local carries a MAX expiry, so needsTokenRefresh
-    // stays false.) Switching GitHub to a real ~1h expiry means GitHub bindings flow
-    // through this middleware for the first time — that is intended, not a regression.
-    if (workspace.provider === 'github') {
+    // Provider-aware refresh / re-mint seam (LIN-712, widened to github-projects
+    // in LIN-1499 Phase 1/D2). GitHub App installation tokens carry NO
+    // refresh_token — they are RE-MINTED from the App JWT + installationId — so
+    // a GitHub-family workspace must NOT be routed through Linear's refresh
+    // endpoint. Before this widening, a github-projects workspace fell to the
+    // `else` below and called refreshAccessToken(undefined), which throws into
+    // the catch and destroys the workspace/session — every github-projects
+    // workspace was deleted within ~1h of creation, guaranteed. Branch on
+    // provider: GitHub-family re-mints via the provider seam; everything else
+    // (Linear, and the legacy undefined-provider default) keeps the
+    // refresh_token exchange below, byte-for-byte unchanged. (PAT/local never
+    // reach here — PAT is skipped above and local carries a MAX expiry, so
+    // needsTokenRefresh stays false.) Switching GitHub-family providers to a
+    // real ~1h expiry means those bindings flow through this middleware for
+    // the first time — that is intended, not a regression.
+    if (workspace.provider === 'github' || workspace.provider === 'github-projects') {
       await remintActiveCredential(workspace, getProviderForWorkspace(workspace))
     } else {
-      const newTokens = await refreshAccessToken(workspace.refreshToken)
+      // LIN-1524: Linear's rotating credential lives ONLY in the durable
+      // store now — `workspace.refreshToken` is never written anymore, so it
+      // is read from there instead. A miss (no durable record, or one with no
+      // refreshToken) is a deliberate, explicit failure — not a silent
+      // no-op — so it falls into the SAME catch below that a real
+      // `refreshAccessToken` failure always has: remove the workspace, evict,
+      // possibly destroy the session. This is the read-side of close-out
+      // Finding #4's legacy no-`accountId` session (a guaranteed durable
+      // read-miss, since `store.get` fails closed on a missing accountId) —
+      // it degrades to exactly today's pre-cutover failure mode, not a new one.
+      const durableRecord = await ownerCredentialStore.get(req.session.accountId, workspace.urlKey)
+      if (!durableRecord?.refreshToken) {
+        throw new Error(`No durable Linear credential to refresh workspace ${workspace.id}`)
+      }
+      const newTokens = await refreshAccessToken(durableRecord.refreshToken)
 
-      // Update workspace tokens
-      updateWorkspaceTokens(workspace, newTokens)
+      // Update workspace tokens (session-side accessToken/tokenExpiresAt
+      // mirror only, LIN-1524) + persist the rotated refreshToken durably
+      // (LIN-1523/1524's rotation seam).
+      await rotateOwnerCredential({ accountId: req.session.accountId, workspace, tokenData: newTokens, store: ownerCredentialStore })
     }
 
     await saveSession(req.session)
@@ -622,8 +659,20 @@ async function ensureValidToken(req, res, next) {
   } catch (error) {
     console.error(`Token refresh failed for workspace ${workspace.id}:`, error)
 
+    // LIN-1507: capture accountId BEFORE any session mutation below — destroy()
+    // (the remaining===0 arm) wipes it, and LIN-1524 close-out Finding #1 needs
+    // it in BOTH arms, not just the destroy one.
+    const accountId = req.session.accountId
+
     // Remove failed workspace
     const remaining = removeWorkspace(req.session, workspace.id)
+
+    // LIN-1524 close-out Finding #1: this failed workspace's durable credential
+    // must not outlive its session-side removal — `workspace` is gone from
+    // session.workspaces after removeWorkspace above regardless of `remaining`,
+    // so the durable delete belongs here, before the branch, not only in the
+    // destroy arm below.
+    await ownerCredentialStore.delete(accountId, workspace.urlKey)
 
     if (remaining > 0) {
       // Switch to another workspace
@@ -631,7 +680,8 @@ async function ensureValidToken(req, res, next) {
       return res.redirect('/')
     }
 
-    // No workspaces left, destroy session
+    // No workspaces left, destroy session.
+    evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, accountId)
     req.session.destroy(() => res.redirect('/'))
   }
 }
@@ -656,14 +706,14 @@ app.use((req, res, next) => {
 for (const provider of getAllProviders()) {
   let authRouter
   try {
-    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore })
+    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore })
   } catch (err) {
     if (err instanceof NotImplementedError) continue
     throw err
   }
   app.use(authRouter)
 }
-app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore }))
+app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
 
@@ -826,12 +876,28 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
  * workspace or shows the landing page if no workspaces remain.
  */
 async function handleWorkspaceRemoval(session, workspaceId, res) {
+  // LIN-1507: capture the workspace's urlKey BEFORE removeWorkspace() drops it
+  // from session.workspaces — by the time `remaining === 0` below, it's gone.
+  const removedWorkspace = session.workspaces?.find(w => w.id === workspaceId);
   const remaining = removeWorkspace(session, workspaceId);
   const deployInfo = getDeployInfo()
+
+  // LIN-1524 close-out Finding #1: the removed workspace's durable credential
+  // must not outlive its session-side removal — belongs here, before the
+  // branch, since `removedWorkspace` is gone from session.workspaces either way.
+  if (removedWorkspace) {
+    await ownerCredentialStore.delete(session.accountId, removedWorkspace.urlKey);
+  }
 
   if (remaining > 0) {
     await saveSession(session);
     return res.redirect('/');
+  }
+
+  // accountId is still live here — only `workspaces`/`activeWorkspaceId` were
+  // touched above, and destroy()'s callback runs after the session data is gone.
+  if (removedWorkspace) {
+    evictWorkspaceTokenPair(evictWorkspaceToken, removedWorkspace.urlKey, session.accountId);
   }
 
   return new Promise((resolve) => {
@@ -845,11 +911,14 @@ async function handleWorkspaceRemoval(session, workspaceId, res) {
 }
 
 /**
- * Attempts to refresh an expired token and retry the request.
+ * Attempts to refresh an expired token and retry the request. `refreshToken`
+ * is passed explicitly (LIN-1524) — Linear's rotating credential lives in the
+ * durable store now, not on `workspace`, and the caller (handleUnauthorizedError)
+ * already fetched the durable record to decide whether to call this at all.
  */
-async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res) {
-  const tokenData = await refreshAccessToken(workspace.refreshToken);
-  updateWorkspaceTokens(workspace, tokenData);
+async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res, refreshToken) {
+  const tokenData = await refreshAccessToken(refreshToken);
+  await rotateOwnerCredential({ accountId: session.accountId, workspace, tokenData, store: ownerCredentialStore });
   await saveSession(session);
   console.log('Token refreshed after 401, retrying request');
 
@@ -888,13 +957,35 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
         action: 'Try again',
         actionUrl: '/'
       });
+    // LIN-1507: this destroys the WHOLE session, not just the dead-PAT
+    // workspace — and a PAT session is NOT guaranteed single-workspace: OAuth
+    // login preserves and appends to session.workspaces rather than replacing
+    // it (routes/auth.js's mode:'new' callback restores existingWorkspaces
+    // before upsertWorkspace), so a PAT session can accumulate a co-resident
+    // OAuth workspace (CLAUDE.md: "OAuth still works alongside PAT"). Evicting
+    // only `workspace` would leave that co-resident workspace's cached token
+    // outliving the session for up to the full TTL — the exact defect this
+    // ticket exists to close. Evict every workspace on the session, the same
+    // treatment as /logout, capturing before destroy() wipes the data.
+    evictAllWorkspaceTokens(evictWorkspaceToken, session.workspaces, session.accountId);
     session.destroy(() => res.status(401).send(html));
     return;
   }
 
-  if (workspace.refreshToken) {
+  // LIN-1524 (folding in LIN-1503's mandatory predicate half): re-point at the
+  // durable record instead of the session-side `workspace.refreshToken`,
+  // which Linear no longer carries — that gate would now be permanently
+  // false for Linear too, and every 401 would delete the workspace instead of
+  // refreshing it (the same LIN-1499 destructive-mode defect class, this time
+  // for Linear). Provider-blindness itself is UNCHANGED and stays exactly as
+  // broken as before for GitHub-family (no durable record ever exists for it,
+  // so this still evaluates false and falls through to removal) — LIN-1503
+  // remains filed separately for that broader fix; this is only the one
+  // re-point this cutover makes mandatory.
+  const durableRecord = await ownerCredentialStore.get(session.accountId, workspace.urlKey);
+  if (durableRecord?.refreshToken) {
     try {
-      return await handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res);
+      return await handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res, durableRecord.refreshToken);
     } catch (refreshError) {
       console.error('Token refresh failed after 401:', refreshError);
       return handleWorkspaceRemoval(session, workspace.id, res);
@@ -1157,6 +1248,13 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 //                       same workspace is live (re-auth CAN fix it). The session data cannot
 //                       tell those apart — do not claim it can; see detectOwnerAccountMismatch
 //                       and lib/errors.js's hedged owner_mismatch detail (LIN-1413)
+//   owner_signed_out  → the owner has no session row at all (not scoped to this workspace).
+//                       Reclassified from not_connected: honest about the real remedy (sign
+//                       in again, or issue a fresh token) instead of implying the workspace
+//                       was never connected. Also a SIGNAL, not proof of permanent loss — see
+//                       detectOwnerSignedOut and lib/errors.js's owner_signed_out detail
+//                       (LIN-1506). Unreachable whenever owner_mismatch also fires — that
+//                       reason wins the overlap; see classifyWorkspaceFailure's ordering.
 // `provider` is the matched workspace's provider name (e.g. 'linear'), or null
 // when no session referenced the workspace. It lets the session-less consumer
 // proxy resolve the provider per workspace via getProviderForWorkspace (LIN-581),
@@ -1174,8 +1272,17 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 // pure selector in lib/workspace-token-resolver.js, which never lets one account
 // borrow another's token. The cache is owner-keyed so a scoped lookup can never
 // return a different owner's cached token.
-const _tokenCache = new Map(); // "urlKey::owner" -> { token, expiresAt, cachedAt, provider }
 const TOKEN_CACHE_TTL_MS = 30 * 1000; // 30 seconds
+const workspaceTokenCache = createWorkspaceTokenCache({ ttlMs: TOKEN_CACHE_TTL_MS });
+
+// LIN-1507: prompt (not 30s-fuzzy) cache eviction. Threaded into every
+// session-destruction call site so a revoked session's cached token is gone
+// immediately rather than served for up to TOKEN_CACHE_TTL_MS after the
+// session row is deleted. Takes the pre-computed cache key (see
+// workspaceTokenCacheKey) — this wrapper never derives a key itself.
+function evictWorkspaceToken(key) {
+  workspaceTokenCache.evict(key);
+}
 
 // LIN-1373: TTL-preserving persist-back for refresh-on-resolve. Deliberately
 // NOT sessionStore.set() (lib/session-store.js's MongoSessionStore.set), which
@@ -1196,15 +1303,14 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     return { token: 'test-token', reason: 'ok', provider: 'linear' };
   }
 
-  const cacheKey = `${urlKey}::${ownerAccountId === UNSCOPED ? '*' : ownerAccountId}`;
+  const cacheKey = workspaceTokenCacheKey(urlKey, ownerAccountId);
 
-  // Check cache first
-  const cached = _tokenCache.get(cacheKey);
-  if (cached && Date.now() - cached.cachedAt < TOKEN_CACHE_TTL_MS) {
-    // Only return if the token hasn't expired
-    if (cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
-      return { token: cached.token, reason: 'ok', provider: cached.provider };
-    }
+  // Check cache first — the factory already applies TTL internally and
+  // returns undefined on a miss/expiry, so only the freshness-vs-expiry
+  // check (business logic, not cache mechanics) stays here.
+  const cached = workspaceTokenCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
+    return { token: cached.token, reason: 'ok', provider: cached.provider };
   }
 
   // Look up the access token from the sessions collection, scoped to
@@ -1214,31 +1320,41 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     const selected = selectOwnerWorkspaceToken(sessions, urlKey, ownerAccountId);
 
     if (selected.token) {
-      _tokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, cachedAt: Date.now(), provider: selected.provider });
+      workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider });
       return { token: selected.token, reason: 'ok', provider: selected.provider };
     }
 
-    // LIN-1373 refresh-on-resolve: the selector above only ever READS sessions,
-    // so a headless proxy token stopped resolving the instant its creator's
-    // Linear access token lapsed — only human web activity (ensureValidToken,
-    // above) ever refreshed it. When the fail-closed reason is session_expired
-    // for a SCOPED (owner-known) lookup, attempt exactly one refresh of the
-    // owner's own expired row using the refreshToken already sitting in that
-    // same session blob. Never for UNSCOPED (legacy owner-blind) callers —
-    // there is no single owner to refresh on behalf of. Any failure (nothing
-    // to refresh, or the refresh itself failing) falls straight through to the
-    // untouched session_expired result below — never a 500, never cached.
-    if (selected.reason === 'session_expired' && ownerAccountId !== UNSCOPED) {
+    // LIN-1373 refresh-on-resolve, widened LIN-1524: the selector above only
+    // ever READS sessions, so a headless proxy token stopped resolving the
+    // instant its creator's Linear access token lapsed — only human web
+    // activity (ensureValidToken, above) ever refreshed it. `selected.token`
+    // is already known falsy here (we returned above if it were truthy), so
+    // the predicate is really `ownerAccountId !== UNSCOPED` — written as
+    // `!selected.token && ...` to state the intent at the call site: attempt
+    // a durable refresh whenever no token resolved AND there's a single owner
+    // to refresh on behalf of. LIN-1524 is what makes this reachable for
+    // BOTH `session_expired` (a session row exists, expired) and
+    // `not_connected` (no session row at all — e.g. after logout): Linear's
+    // rotating credential now lives in the durable store regardless of which
+    // one applies, so a bare `session_expired` gate would have wrongly kept
+    // `not_connected` — the whole point of this ticket — falling straight to
+    // a 503 forever. Never for UNSCOPED (legacy owner-blind) callers — there
+    // is no single owner to refresh on behalf of. Any failure (nothing to
+    // refresh, or the refresh itself failing) falls straight through to the
+    // untouched classification below — never a 500, never cached.
+    if (!selected.token && ownerAccountId !== UNSCOPED) {
       try {
         const refreshed = await refreshOwnerWorkspaceToken({
           sessions,
           urlKey,
           ownerAccountId,
           refreshAccessToken,
-          persistSession: persistSessionRow
+          persistSession: persistSessionRow,
+          resolveProvider: getProviderForWorkspace,
+          store: ownerCredentialStore
         });
         if (refreshed) {
-          _tokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, cachedAt: Date.now(), provider: refreshed.provider });
+          workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider });
           return { token: refreshed.token, reason: 'ok', provider: refreshed.provider };
         }
       } catch (err) {
@@ -1246,28 +1362,24 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
       }
     }
 
-    // LIN-1413: after the selector failed and refresh-on-resolve has already
-    // been given its chance (both above), check whether a DIFFERENT account
-    // holds a live token for this workspace while the scoped owner does not.
-    // That signal does not on its own prove the owner lost the workspace — it
-    // fires identically for a legitimate colleague's session merely being
-    // live while the owner's own lapsed (re-auth-fixable) — so it is
-    // reclassified to a distinct, hedged reason rather than a confident
-    // "re-auth is pointless" claim; see the detector's docstring and
-    // lib/errors.js's owner_mismatch detail. Never for UNSCOPED (legacy
-    // owner-blind) callers — detectOwnerAccountMismatch also returns false
-    // for those, but the reason is only ever reclassified when there is a
-    // specific owner to reclassify on behalf of. Log server-side only; the
-    // other account's id must never reach the wire (lib/errors.js privacy
-    // boundary).
-    if (ownerAccountId !== UNSCOPED && detectOwnerAccountMismatch(sessions, urlKey, ownerAccountId)) {
+    // LIN-1413/LIN-1506: after the selector failed and refresh-on-resolve has
+    // already been given its chance (both above), reclassify WHY no token
+    // resolved into the most honest reason the session data supports —
+    // owner_mismatch (a DIFFERENT account holds a live token for this
+    // workspace) or owner_signed_out (the owner has no session row at all).
+    // Neither is proof the owner lost the workspace, and ordering is
+    // load-bearing (owner_mismatch wins any overlap) — see
+    // classifyWorkspaceFailure's docstring in lib/workspace-token-resolver.js.
+    const reason = classifyWorkspaceFailure({ sessions, urlKey, ownerAccountId, selectedReason: selected.reason });
+    if (reason === 'owner_mismatch') {
+      // Log server-side only; the other account's id must never reach the
+      // wire (lib/errors.js privacy boundary).
       console.warn(`Workspace ${urlKey}: owner account mismatch detected for account ${ownerAccountId}`);
-      return { token: null, reason: 'owner_mismatch', provider: selected.provider };
     }
 
-    // No usable token. reason/provider are already the right shape for the
-    // workspaceUnavailable 503 envelope — see lib/workspace-token-resolver.js.
-    return { token: selected.token, reason: selected.reason, provider: selected.provider };
+    // reason/provider are already the right shape for the workspaceUnavailable
+    // 503 envelope — see lib/workspace-token-resolver.js.
+    return { token: selected.token, reason, provider: selected.provider };
   } catch (err) {
     console.error('Error looking up workspace access token:', err);
     return { token: null, reason: 'store_unreachable', provider: null };
@@ -2338,7 +2450,33 @@ app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async
     return res.redirect(`${settingsUrl}?provider_error=invalid`);
   }
 
+  // LIN-1524 close-out Finding #2: unlinkProvider no-ops on an unmatched
+  // (provider, scope) — it returns `workspace` unchanged in both the removed
+  // and no-op cases, so its return value carries no removal signal.
+  // getBindingsForWorkspace is NOT safe for this before/after comparison: it
+  // SYNTHESIZES a phantom binding whenever `workspace.bindings` is empty/absent
+  // (by design, for legacy un-migrated workspaces), so a real removal that
+  // empties `workspace.bindings` to `[]` would read back as an unchanged
+  // count. The reliable signal is reference identity on the RAW
+  // `workspace.bindings` array: unlinkProvider only ever reassigns it (always
+  // to a new array, via `.filter()`) on an actual removal, and leaves it
+  // byte-identical (same reference, including both undefined) on a no-op.
+  const bindingsBefore = workspace.bindings;
   unlinkProvider(workspace, provider, scope);
+  const bindingRemoved = workspace.bindings !== bindingsBefore;
+
+  // LIN-1523: unlinking the active Linear binding revokes its durable
+  // credential too — the existing session-side delete (inside unlinkProvider,
+  // untouched, unlinkProvider stays a pure/sync mutator) stays; this is
+  // ADDITIVE alongside it, not a replacement. Scoped to 'linear' only: the
+  // durable store is Linear-only by design, so unlinking a non-Linear
+  // provider (e.g. github) must not touch it. Gated on `bindingRemoved` too
+  // (LIN-1524 close-out Finding #2): a POST with `provider=linear` and a
+  // non-matching `scope` must not destroy a durable record whose session
+  // binding is still intact.
+  if (provider === 'linear' && bindingRemoved) {
+    await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey);
+  }
 
   try {
     await saveSession(req.session);

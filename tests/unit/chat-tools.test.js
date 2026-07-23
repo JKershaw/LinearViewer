@@ -735,6 +735,76 @@ function twoSessionHistory() {
   ];
 }
 
+// LIN-1486 fixture: a multi-wake lineage — an autopilot anchor ('sess-multi'),
+// a follow-up wake attached via `followUpTo`/`rootItemId` (the lineage TAIL,
+// 'wake-1'), and an unrelated sibling worker ('w-side') attached the ordinary
+// explicit-`sessionId` way (no `rootItemId`, so it is its OWN lineage — the
+// autopilot-anchor-plus-workers case is not one lineage). `w-side` is
+// dispatched AFTER the tail so a naive "last loop in the session" pick would
+// wrongly choose it over the true lineage tail.
+const T_MULTI_ANCHOR_DISPATCHED = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+const T_MULTI_ANCHOR_DONE = new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString();
+const T_MULTI_WAKE_DISPATCHED = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+const T_MULTI_WAKE_DONE = new Date(Date.now() - 1.5 * 60 * 60 * 1000).toISOString();
+const T_MULTI_WSIDE_DISPATCHED = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+function multiWakeHistory({
+  anchorFeedback = [{ message: '[done] Task completed in 6s', timestamp: T_MULTI_ANCHOR_DONE }],
+  anchorResolvedAt = T_MULTI_ANCHOR_DONE,
+  anchorStatus = 'taken',
+  tailFeedback = [{ message: '[working] 1 tools/4s · alive', timestamp: T_MULTI_WAKE_DISPATCHED }],
+  tailResolvedAt = null,
+  tailStatus = 'taken',
+} = {}) {
+  return [
+    sessionHistoryItem({
+      id: 'sess-multi', kind: 'autopilot', issueIdentifier: 'LIN-600', target: 'cli',
+      dispatchedAt: T_MULTI_ANCHOR_DISPATCHED, resolvedAt: anchorResolvedAt, status: anchorStatus,
+      feedback: anchorFeedback,
+    }),
+    sessionHistoryItem({
+      id: 'wake-1', issueIdentifier: 'LIN-600', target: 'cli',
+      followUpTo: 'sess-multi', rootItemId: 'sess-multi',
+      dispatchedAt: T_MULTI_WAKE_DISPATCHED, resolvedAt: tailResolvedAt, status: tailStatus,
+      feedback: tailFeedback,
+    }),
+    sessionHistoryItem({
+      id: 'w-side', sessionId: 'sess-multi', issueIdentifier: 'LIN-600', target: 'cli',
+      dispatchedAt: T_MULTI_WSIDE_DISPATCHED, resolvedAt: null, status: 'taken',
+      feedback: [{ message: '[working] 1 tools/2s · alive', timestamp: T_MULTI_WSIDE_DISPATCHED }],
+    }),
+  ];
+}
+
+// LIN-1486 fixture: an ANCHORLESS multi-loop session — two workers sharing an
+// explicit `sessionId` ('sess-orphan') whose orchestrator never dispatched (no
+// kind:'autopilot' loop with that loopId exists), so `_buildSessions`' "orphan
+// explicit-sessionId group" pass builds it with `anchorLoop: null`. Neither
+// worker carries `rootItemId`, so each is its OWN lineage — `w1` is dispatched
+// first and finishes; `w2` is dispatched later and is still running. This
+// exercises `findAnchorLoop(session) || session.loops[0]` picking `w1` (the
+// first-dispatched loop, per `_assembleSession`'s dispatchedAt-ascending
+// order) as the fallback anchor, whose own (single-loop) lineage tail is
+// itself — DELIBERATELY chosen so old and new code disagree: the OLD
+// `sessionIsTerminal` aggregate (`loops.every(loopIsTerminal)`) is false here
+// (w2 is still running), while the NEW tail-of-w1's-own-lineage force is true
+// (w1 is done) — a real behaviour change, not just a re-derivation of the
+// same answer.
+function orphanMultiLoopHistory() {
+  return [
+    sessionHistoryItem({
+      id: 'w1', sessionId: 'sess-orphan', issueIdentifier: 'LIN-620', target: 'cli',
+      dispatchedAt: T_MULTI_ANCHOR_DISPATCHED, resolvedAt: T_MULTI_ANCHOR_DONE, status: 'taken',
+      feedback: [{ message: '[done] Task completed in 4s', timestamp: T_MULTI_ANCHOR_DONE }],
+    }),
+    sessionHistoryItem({
+      id: 'w2', sessionId: 'sess-orphan', issueIdentifier: 'LIN-620', target: 'cli',
+      dispatchedAt: T_MULTI_WAKE_DISPATCHED, resolvedAt: null, status: 'taken',
+      feedback: [{ message: '[working] 1 tools/3s · alive', timestamp: T_MULTI_WAKE_DISPATCHED }],
+    }),
+  ];
+}
+
 describe('pass-3 session reads — list_task_sessions / get_session (LIN-1073)', () => {
   function makeCatalog(history) {
     const provider = makeFakeProvider();
@@ -993,6 +1063,181 @@ describe('pass-3 write tool — send_follow_up (LIN-1073)', () => {
       /credential-less|token mint failed|cannot attach/i,
     );
     assert.strictEqual(dispatchQueueStore.calls.length, 0, 'no item was ever enqueued');
+  });
+});
+
+// LIN-1486: `send_follow_up` must target the TAIL of the anchor's own lineage
+// (not the session root) and derive `force` from that tail's own terminality
+// (not an aggregate across the whole session). The `sessionIsTerminal` mock
+// used by the OTHER send_follow_up tests above is intentionally a loose
+// "any loop done" stub — fine for those tests, but it doesn't reproduce the
+// real bug (root-anchored, anchor-first-then-all()). This block injects a
+// FAITHFUL mirror of the real `sessionIsTerminal`/`loopIsTerminal`
+// (routes/dashboard.js:160-185) so the RED failures below are for the right
+// reason — root-targeting and anchor-only force — not an artifact of a loose
+// test double.
+const MOCK_TERMINAL_AGENT_STATES = new Set(['complete', 'error']);
+const MOCK_MARKER_TO_AGENT_STATE = { done: 'complete', failed: 'error', aborted: 'error', skipped: 'complete' };
+function mockLoopIsTerminal(l) {
+  if (!l) return false;
+  if (MOCK_TERMINAL_AGENT_STATES.has(l.agentState)) return true;
+  return l.terminalStatus ? MOCK_TERMINAL_AGENT_STATES.has(MOCK_MARKER_TO_AGENT_STATE[l.terminalStatus]) : false;
+}
+function mockSessionIsTerminal(session) {
+  const loops = session.loops || [];
+  const anchor = loops.find(l => l.kind === 'autopilot');
+  if (anchor) return mockLoopIsTerminal(anchor);
+  return loops.length > 0 && loops.every(mockLoopIsTerminal);
+}
+
+describe('LIN-1486: send_follow_up targets the lineage tail, not the session root', () => {
+  function makeFakeDispatchQueueStore(history) {
+    const calls = [];
+    const stores = makeMockSessionStores({ history });
+    return {
+      ...stores.dispatchQueueStore,
+      calls,
+      async addItem(urlKey, item) {
+        calls.push({ urlKey, item });
+        return { _id: 'queued-item-1', urlKey, ...item };
+      },
+    };
+  }
+
+  function makeCatalog(history) {
+    const provider = makeFakeProvider();
+    const dispatchQueueStore = makeFakeDispatchQueueStore(history);
+    const { executeTool } = createChatToolCatalog({
+      provider, scope: SCOPE, urlKey: URL_KEY,
+      dispatchQueueStore, agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
+      sessionIsTerminal: mockSessionIsTerminal,
+      followUpEnabled: true,
+    });
+    return { executeTool, dispatchQueueStore };
+  }
+
+  test('targets the lineage tail (the wake), not the session root', async () => {
+    const { executeTool, dispatchQueueStore } = makeCatalog(multiWakeHistory());
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-multi', prompt: 'continue' } });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.followUpTo, 'wake-1',
+      'must resume the live tail, not the long-finished root anchor');
+  });
+
+  test('force is the TAIL\'s own terminality — a running tail behind a done anchor is force:false', async () => {
+    const { executeTool, dispatchQueueStore } = makeCatalog(multiWakeHistory());
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-multi', prompt: 'continue' } });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.force, false,
+      'the tail is still running — force:true here would kill-first a live run (the LIN-1252 collision)');
+  });
+
+  test('force is the TAIL\'s own terminality — a done tail behind a running anchor is force:true', async () => {
+    const history = multiWakeHistory({
+      anchorFeedback: [{ message: '[working] 1 tools/2s · alive', timestamp: T_MULTI_ANCHOR_DISPATCHED }],
+      anchorResolvedAt: null,
+      tailFeedback: [{ message: '[done] Task completed in 5s', timestamp: T_MULTI_WAKE_DONE }],
+      tailResolvedAt: T_MULTI_WAKE_DONE,
+    });
+    const { executeTool, dispatchQueueStore } = makeCatalog(history);
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-multi', prompt: 'continue' } });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.force, true,
+      'anchor-first (the old rule) would read the still-running anchor and wrongly return false');
+  });
+
+  test('sibling-lineage isolation — a worker dispatched AFTER the tail must not be chosen over it', async () => {
+    // w-side (a sibling lineage — no rootItemId) is dispatched later than wake-1.
+    // A naive "last loop in session.loops" implementation would pick w-side.
+    const { executeTool, dispatchQueueStore } = makeCatalog(multiWakeHistory());
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-multi', prompt: 'continue' } });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.followUpTo, 'wake-1',
+      'the sibling worker w-side must never be targeted for the anchor\'s own follow-up');
+  });
+
+  test('an aborted tail forces, even though its agentState alone is not terminal', async () => {
+    // The abort marker lands on an otherwise still-"taken"/"running" loop
+    // (harvestAbortedTargets appends a synthetic [aborted] entry to a live
+    // target's feedback) — LIN-1478's literal `terminalStatus === 'done'||'failed'`
+    // shape would miss this; the fix's predicate must also check terminalStatus
+    // against ALL four markers, not just agentState.
+    const history = [
+      sessionHistoryItem({
+        id: 'sess-abort', kind: 'autopilot', issueIdentifier: 'LIN-601', target: 'cli',
+        dispatchedAt: T_MULTI_ANCHOR_DISPATCHED, resolvedAt: null, status: 'taken',
+        feedback: [{ message: '[aborted] Aborted by operator', timestamp: T_MULTI_ANCHOR_DONE }],
+      }),
+    ];
+    const { executeTool, dispatchQueueStore } = makeCatalog(history);
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-abort', prompt: 'continue' } });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.force, true,
+      'terminalStatus:"aborted" must force even when historyStatus/agentStatus alone derive a non-terminal agentState');
+  });
+
+  test('an expired tail forces via its terminal agentState, even with no feedback marker at all', async () => {
+    // `_deriveAgentState` maps historyStatus:'expired' -> agentState:'error' with
+    // no terminal feedback marker whatsoever — LIN-1478's literal shape (which
+    // only checks terminalStatus) would silently drop force here.
+    const history = [
+      sessionHistoryItem({
+        id: 'sess-expired', kind: 'autopilot', issueIdentifier: 'LIN-602', target: 'cli',
+        dispatchedAt: T_MULTI_ANCHOR_DISPATCHED, resolvedAt: T_MULTI_ANCHOR_DONE, status: 'expired',
+        feedback: [],
+      }),
+    ];
+    const { executeTool, dispatchQueueStore } = makeCatalog(history);
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-expired', prompt: 'continue' } });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.force, true,
+      'an expired loop is terminal via agentState alone — no marker is ever posted for it');
+  });
+
+  test('a skipped tail forces, even though its agentState alone is not terminal', async () => {
+    // `[skipped]` (LIN-1478's runner-refused-cancel marker) is the OTHER
+    // terminalStatus value LIN-1478's literal `'done'||'failed'` check misses —
+    // sibling to the aborted case above, mapping to agentState:'complete' via
+    // MARKER_TO_AGENT_STATE rather than 'error'.
+    const history = [
+      sessionHistoryItem({
+        id: 'sess-skipped', kind: 'autopilot', issueIdentifier: 'LIN-603', target: 'cli',
+        dispatchedAt: T_MULTI_ANCHOR_DISPATCHED, resolvedAt: null, status: 'taken',
+        feedback: [{ message: '[skipped] Human continued the session', timestamp: T_MULTI_ANCHOR_DONE }],
+      }),
+    ];
+    const { executeTool, dispatchQueueStore } = makeCatalog(history);
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-skipped', prompt: 'continue' } });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.force, true,
+      'terminalStatus:"skipped" must force even when historyStatus/agentStatus alone derive a non-terminal agentState');
+  });
+
+  test('a cancelled tail forces via its terminal agentState, even with no feedback marker at all', async () => {
+    // `_deriveAgentState` maps historyStatus:'cancelled' -> agentState:'complete'
+    // (the operator explicitly removed the item) with no terminal feedback
+    // marker — sibling to the expired case above, exercising the OTHER
+    // no-marker terminal agentState value.
+    const history = [
+      sessionHistoryItem({
+        id: 'sess-cancelled', kind: 'autopilot', issueIdentifier: 'LIN-604', target: 'cli',
+        dispatchedAt: T_MULTI_ANCHOR_DISPATCHED, resolvedAt: T_MULTI_ANCHOR_DONE, status: 'cancelled',
+        feedback: [],
+      }),
+    ];
+    const { executeTool, dispatchQueueStore } = makeCatalog(history);
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-cancelled', prompt: 'continue' } });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.force, true,
+      'a cancelled loop is terminal via agentState alone — no marker is ever posted for it');
+  });
+
+  test('anchorless multi-loop session (orphan explicit-sessionId group) — force is the fallback anchor\'s OWN lineage tail, not the old every() aggregate', async () => {
+    // findAnchorLoop(session) returns null here (no kind:'autopilot' loop), so
+    // the handler falls back to session.loops[0] as its anchor — w1, the
+    // first-dispatched loop. w1's own (single-loop) lineage tail is itself
+    // (done), so force must be true. The OLD sessionIsTerminal aggregate
+    // (loops.every(loopIsTerminal)) would have been FALSE here, since w2 is
+    // still running — proving this is a genuine behaviour change on an
+    // anchorless session, not a no-op re-derivation of the prior answer.
+    const { executeTool, dispatchQueueStore } = makeCatalog(orphanMultiLoopHistory());
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-orphan', prompt: 'continue' } });
+    assert.strictEqual(dispatchQueueStore.calls[0].item.followUpTo, 'w1',
+      'targets the fallback anchor (session.loops[0]) itself, its own lineage tail');
+    assert.strictEqual(dispatchQueueStore.calls[0].item.force, true,
+      'w1 is done; the old every()-across-both-workers aggregate would have said false because w2 is still running');
   });
 });
 

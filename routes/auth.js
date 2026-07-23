@@ -10,10 +10,11 @@ import { Router } from 'express'
 import { getProvider } from '../lib/providers/registry.js'
 import { AuthExchangeError } from '../lib/providers/interface.js'
 import { renderErrorPage } from '../lib/render.js'
-import { upsertWorkspace, saveSession, linkProvider, getActiveWorkspace, validateWorkspaceUrlKey } from '../lib/workspace.js'
+import { upsertWorkspace, saveSession, linkProvider, getActiveWorkspace, validateWorkspaceUrlKey, persistOwnerCredential } from '../lib/workspace.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-preferences.js'
 import { establishAccount } from '../lib/account-session.js'
+import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
 
 /**
  * Create auth routes with required dependencies.
@@ -25,9 +26,11 @@ import { establishAccount } from '../lib/account-session.js'
  *   provider as a documented legacy default for direct constructions (LIN-561).
  * @param {import('../lib/account-store.js').AccountStore} options.accountStore - LIN-1329: find-or-create the durable account for the signing-in identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
+ * @param {(key: string) => void} [options.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`). Called at /logout for every workspace the session referenced, before the session is destroyed.
+ * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [options.ownerCredentialStore] - LIN-1523: durable owner-credential store. Linear-only; other providers' auth routers receive this option too (shared mount loop) but ignore it.
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore }) {
+export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore }) {
   const router = Router()
 
   const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
@@ -201,9 +204,13 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
       // substituted default after the fact. Only the raw field can (LIN-1367).
       console.log(`Linear OAuth callback; expires_in=${JSON.stringify(data.expires_in)} (present=${data.expires_in !== undefined})`)
 
+      // LIN-1524: refreshToken is deliberately NOT passed here — linkProvider
+      // would mirror it onto the binding's credentials (and, for the active
+      // binding, the scalar mirror), and Linear's rotating credential is
+      // durable-store-only now. `data.refresh_token` is threaded straight to
+      // persistOwnerCredential below instead, once accountId is known.
       linkProvider(workspace, authProvider.name, org.id, {
         token: data.access_token,
-        refreshToken: data.refresh_token,
         tokenExpiresAt: calculateExpiresAt(data.expires_in || 86400)
       })
 
@@ -270,6 +277,16 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
           return res.status(409).send(html)
         }
 
+        // LIN-1523: durable dual-write, AFTER the limit-check + establishAccount
+        // above — never before, or a refused workspace would leave a durable
+        // credential behind. `workspace` was already fully populated by
+        // linkProvider earlier in this handler; there is no updateWorkspaceTokens
+        // call to wrap here, so this reaches persistOwnerCredential directly
+        // rather than through the rotateOwnerCredential rotation seam.
+        // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
+        // longer carries one (linkProvider above was deliberately not given it).
+        await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)
+
         // Success: clear the OAuth state/intent, save the session, and return to
         // the initiating workspace's settings. Do NOT set activeWorkspaceId — the
         // user stays on their current workspace (plan UX (b), mirroring GitHub
@@ -333,6 +350,17 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
               return res.status(409).send(html)
             }
 
+            // LIN-1523: durable dual-write, AFTER the limit-check + establishAccount
+            // above — never before, or a refused workspace would leave a durable
+            // credential behind. `workspace` was already fully populated by
+            // linkProvider earlier in this handler; there is no
+            // updateWorkspaceTokens call to wrap here, so this reaches
+            // persistOwnerCredential directly rather than through the
+            // rotateOwnerCredential rotation seam.
+            // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
+            // longer carries one (linkProvider above was deliberately not given it).
+            await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)
+
             // Load saved user preferences and apply to session.
             // regenerate() wiped the session, so rehydrate every durable field
             // session readers rely on — features, northStarByWorkspace, and the
@@ -381,6 +409,15 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
    * Destroys the session, logging the user out.
    */
   router.get('/logout', (req, res) => {
+    // LIN-1507: capture accountId + workspaces BEFORE destroy() — the session
+    // data is gone once the callback fires, so the eviction keys must be
+    // derived now or not at all.
+    const accountId = req.session.accountId
+    const workspaces = req.session.workspaces || []
+    for (const workspace of workspaces) {
+      evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, accountId)
+    }
+
     req.session.destroy((err) => {
       if (err) {
         console.error('Session destroy error during logout:', err)

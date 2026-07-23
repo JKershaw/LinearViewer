@@ -655,3 +655,89 @@ describe('LIN-1470 — review F7: forward-only merge invariant (a row is never r
     assert.ok(!doneList.body.items.find(i => i.id === 'followup-1'), 'must NOT be routed into ?status=done');
   });
 });
+
+describe('LIN-1485 — L3: telemetry when the lineage query hits LINEAGE_QUERY_LIMIT (silent truncation signal)', () => {
+  // Mirrors the not-exported const in routes/proxy.js (`LINEAGE_QUERY_LIMIT = 2000`).
+  // Not imported because the module doesn't export it; kept in sync by naming it
+  // in every assertion message so a drift shows up as a failure, not a silent gap.
+  const CAP = 2000;
+
+  // Builds `count` rows sharing one rootItemId anchor: index 0 is the anchor row
+  // itself (id === anchor), the rest are siblings. The stub's lineage ($in) branch
+  // (buildApp above) does not apply `limit`, so the returned sibling count is
+  // exactly `count` — the harness's stand-in for "the store's real `.limit(2000)`
+  // clamp already ran and produced exactly this many rows."
+  function lineageRows(anchor, count, terminalAt) {
+    const rows = [];
+    for (let i = 0; i < count; i++) {
+      const isTerminal = terminalAt != null && i === count - 1;
+      rows.push(row({
+        id: i === 0 ? anchor : `${anchor}-sib-${i}`,
+        rootItemId: anchor,
+        feedback: [{
+          message: isTerminal ? '[done] finished' : 'own beat',
+          rootItemId: anchor,
+          timestamp: isTerminal ? terminalAt : T1
+        }]
+      }));
+    }
+    return rows;
+  }
+
+  test('T13 — fires exactly once when the lineage query returns exactly LINEAGE_QUERY_LIMIT rows', async (t) => {
+    const warnMock = t.mock.method(console, 'warn', () => {});
+    const history = lineageRows('root-cap', CAP, T2);
+    const { app } = buildApp({ history });
+
+    const { status } = await get(app, '/api/proxy/dispatch');
+
+    assert.equal(status, 200);
+    assert.equal(warnMock.mock.calls.length, 1, 'must fire exactly once when the lineage query returns exactly the cap');
+    const [message] = warnMock.mock.calls[0].arguments;
+    assert.match(message, /LINEAGE_QUERY_LIMIT/, 'the log line should name the signal it is reporting');
+    assert.match(message, /2000/, 'the log line should carry the cap value itself');
+  });
+
+  test('T14 — silent when the lineage query returns one row under the cap (the case that actually protects the ticket\'s intent)', async (t) => {
+    const warnMock = t.mock.method(console, 'warn', () => {});
+    const history = lineageRows('root-under', CAP - 1, T2);
+    const { app } = buildApp({ history });
+
+    const { status } = await get(app, '/api/proxy/dispatch');
+
+    assert.equal(status, 200);
+    assert.equal(warnMock.mock.calls.length, 0, 'a healthy under-cap lineage (CAP - 1 rows) must never trip the telemetry');
+  });
+
+  test('T15 — silent on an ordinary small lineage (no anchors even reach the batch query)', async (t) => {
+    const warnMock = t.mock.method(console, 'warn', () => {});
+    const root = row({
+      id: 'root-small', rootItemId: 'root-small',
+      feedback: [{ message: 'own beat', rootItemId: 'root-small', timestamp: T1 }]
+    });
+    const { app } = buildApp({ history: [root] });
+
+    const { status } = await get(app, '/api/proxy/dispatch');
+
+    assert.equal(status, 200);
+    assert.equal(warnMock.mock.calls.length, 0);
+  });
+
+  test('T16 — response payload (merge/feedbackCount/status/completedAt) is unaffected by the telemetry firing', async (t) => {
+    // Deliberately AT the cap (same fixture shape as T13) so the telemetry
+    // branch actually executes — this proves the added conditional/log line
+    // is read-only and does not perturb the derived response fields it sits
+    // beside, driving the real handler end to end rather than asserting on
+    // the log call in isolation.
+    const history = lineageRows('root-cap-2', CAP, T2);
+    const { app } = buildApp({ history });
+
+    const { body } = await get(app, '/api/proxy/dispatch');
+    const item = body.items.find(i => i.id === 'root-cap-2');
+
+    assert.ok(item, 'the anchor row is present in the response');
+    assert.equal(item.feedbackCount, CAP, 'lineage-wide count — one feedback entry per row in the lineage, unaffected by telemetry');
+    assert.equal(item.status, 'done', 'lineage-derived terminal status, unaffected by telemetry');
+    assert.equal(item.completedAt, T2, 'lineage-derived completedAt, unaffected by telemetry');
+  });
+});

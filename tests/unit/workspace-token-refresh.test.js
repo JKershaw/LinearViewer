@@ -1,19 +1,41 @@
 /**
- * Unit tests for LIN-1373: proxy-token refresh-on-resolve.
+ * Unit tests for LIN-1373: proxy-token refresh-on-resolve, and its LIN-1499
+ * Phase 1 provider-aware routing.
  *
- * Before this fix, `resolveWorkspaceAccess` (server.js) only ever READ
+ * Before LIN-1373, `resolveWorkspaceAccess` (server.js) only ever READ
  * sessions via the pure selector `selectOwnerWorkspaceToken` — a headless
  * proxy token stopped resolving the instant its creating human's Linear
  * access token lapsed, because only human web activity (`ensureValidToken`)
  * ever refreshed it, and that middleware structurally no-ops for a
  * session-less agent request.
  *
- * Block A drives the new pure sibling selector `selectExpiredOwnerRow`
- * (lib/workspace-token-resolver.js) directly.
+ * Before LIN-1499 Phase 1, that refresh-on-resolve path (and ensureValidToken
+ * itself) was Linear-only: a GitHub/github-projects workspace's refreshability
+ * predicate required `refreshToken`, which a GitHub-family binding never has
+ * by design (it re-mints from `installationId` instead) — so GitHub got no
+ * off-session refresh at all (D1), and `github-projects` was actively routed
+ * into Linear's `refreshAccessToken(undefined)` on the WEB path, which throws
+ * and deletes the workspace/session (D2, destructive).
+ *
+ * Block A drives the pure sibling selector `selectExpiredOwnerRow`
+ * (lib/workspace-token-resolver.js) directly — Linear cases.
  * Block B drives `refreshOwnerWorkspaceToken` (lib/workspace-token-refresh.js)
- * with fake IO (refreshAccessToken, persistSession) — refresh success,
+ * with fake IO (refreshAccessToken, persistSession) — Linear refresh success,
  * rotation, failure fall-through, missing refresh token, single-flight
  * coalescing, and TTL preservation.
+ * Block C (LIN-1499) extends Block A's selector coverage to GitHub-family
+ * (`installationId`-based) refreshability — proves D1's predicate fix.
+ * Block D (LIN-1499) extends Block B's orchestration coverage to GitHub-family
+ * routing — proves D2's routing fix, the beat-1 `{fetchImpl, now}` passthrough
+ * is load-bearing (not decorative), scalar-mirror rotation, no Linear
+ * contamination, and fail-closed behaviour on a real mint failure.
+ * Block E (LIN-1499) pins the `ensureValidToken` (server.js) branch widening
+ * itself via a source-text regression guard, mirroring the precedent in
+ * tests/unit/task-chat-route.test.js — server.js is not import-safe in a unit
+ * test (it connects to Mongo and calls app.listen at module load), so this is
+ * the same level of testability the codebase already uses for that file's own
+ * glue (see also tests/unit/workspace-token-refresh-integration.test.js's
+ * docstring, which makes the identical call for resolveWorkspaceAccess).
  *
  * Run with: node --test tests/unit/workspace-token-refresh.test.js
  */
@@ -21,6 +43,9 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { selectExpiredOwnerRow, selectOwnerWorkspaceToken } from '../../lib/workspace-token-resolver.js';
 import { refreshOwnerWorkspaceToken, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
@@ -33,6 +58,49 @@ const FURTHER_PAST_MS = -20_000; // expired even earlier
 
 function sessionRow(sid, accountId, urlKey, { accessToken, expiresAt, refreshToken, provider = 'linear' }) {
   return { _id: sid, session: { accountId, workspaces: [{ urlKey, provider, accessToken, tokenExpiresAt: expiresAt, refreshToken }] } };
+}
+
+// LIN-1523/1524: fake durable owner-credential store. `get` is now load-bearing
+// for the Linear arm (LIN-1524 point-reads it to find what to refresh), so this
+// fake is stateful — a `put` updates what a later `get` sees, mirroring a real
+// collection, which matters for tests that refresh the SAME (account, urlKey)
+// more than once (e.g. single-flight cleanup).
+function fakeStore(seed = {}) {
+  const calls = [];
+  const records = new Map();
+  for (const [key, credential] of Object.entries(seed)) records.set(key, credential);
+  return {
+    calls,
+    async get(accountId, urlKey) {
+      return records.get(`${accountId}::${urlKey}`) ?? null;
+    },
+    async put(accountId, urlKey, credential) {
+      calls.push({ accountId, urlKey, credential });
+      records.set(`${accountId}::${urlKey}`, credential);
+    },
+  };
+}
+
+// GitHub-family session row builder (LIN-1499). `installationId` is
+// binding-scoped (never mirrored onto the workspace's legacy scalar fields —
+// see lib/workspace.js's linkProvider), so a realistic fixture needs an
+// explicit `bindings` array, exactly as a real persisted session carries one
+// once linkProvider has run. Passing `installationId: undefined` produces a
+// binding with no installationId — the "not yet refreshable" case.
+function githubSessionRow(sid, accountId, urlKey, { accessToken, expiresAt, installationId, provider = 'github' }) {
+  return {
+    _id: sid,
+    session: {
+      accountId,
+      workspaces: [{
+        urlKey,
+        provider,
+        accessToken,
+        tokenExpiresAt: expiresAt,
+        bindings: [{ provider, scope: 'octocat/repo', credentials: { token: accessToken, installationId } }],
+      }],
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -112,14 +180,14 @@ describe('selectExpiredOwnerRow (LIN-1373, Block A — pure selector)', () => {
 // Block B — refreshOwnerWorkspaceToken (fake IO)
 // ---------------------------------------------------------------------------
 
-describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestration)', () => {
+describe('refreshOwnerWorkspaceToken (LIN-1373/1524, Block B — refresh orchestration)', () => {
   beforeEach(() => {
     _resetInflightForTests();
   });
 
-  test('B1: refreshes the expired owner row, persists to the correct sid, and returns the fresh token', async () => {
+  test('B1: refreshes from the durable record, mirrors accessToken/tokenExpiresAt into the owner\'s session row, and returns the fresh token', async () => {
     const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A' }),
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
     ];
     const persisted = [];
     const refreshAccessToken = async (refreshToken) => {
@@ -127,53 +195,66 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
       return { access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 };
     };
     const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
     const result = await refreshOwnerWorkspaceToken({
-      sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession
+      sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store
     });
 
     assert.equal(result.token, 'fresh-token');
     assert.ok(result.expiresAt > Date.now());
     assert.equal(result.provider, 'linear');
 
+    // LIN-1524: the durable record is what got refreshed and re-persisted —
+    // exactly one put, for the right owner/urlKey, with the rotated refreshToken.
+    assert.equal(store.calls.length, 1);
+    assert.equal(store.calls[0].accountId, 'account-A');
+    assert.equal(store.calls[0].urlKey, 'acme');
+    assert.equal(store.calls[0].credential.refreshToken, 'refresh-A-rotated');
+    assert.equal(store.calls[0].credential.scope, 'org-1');
+
+    // The session row (which exists here) is mirrored — accessToken/tokenExpiresAt
+    // only, never the refreshToken.
     assert.equal(persisted.length, 1);
     assert.equal(persisted[0].sid, 'sid-1');
     assert.equal(persisted[0].session.workspaces[0].accessToken, 'fresh-token');
+    assert.equal(persisted[0].session.workspaces[0].refreshToken, undefined);
   });
 
-  test('B2: rotation — the NEW refresh_token (not the old) is what gets persisted', async () => {
-    const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A-old' }),
-    ];
-    const persisted = [];
+  test('B2: rotation — the NEW refresh_token (not the old) is what gets persisted durably', async () => {
+    const sessions = [];
     const refreshAccessToken = async () => ({ access_token: 'fresh-token', refresh_token: 'refresh-A-new', expires_in: 3600 });
-    const persistSession = async (sid, session) => { persisted.push(session); };
+    const persistSession = async () => {};
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A-old', tokenExpiresAt: NOW + PAST_MS } });
 
-    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession });
+    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
-    assert.equal(persisted[0].workspaces[0].refreshToken, 'refresh-A-new');
-    assert.notEqual(persisted[0].workspaces[0].refreshToken, 'refresh-A-old');
+    assert.equal(store.calls[0].credential.refreshToken, 'refresh-A-new');
+    assert.notEqual(store.calls[0].credential.refreshToken, 'refresh-A-old');
+    // And a subsequent get sees the rotated value (the fake mirrors a real collection).
+    const reread = await store.get('account-A', 'acme');
+    assert.equal(reread.refreshToken, 'refresh-A-new');
   });
 
-  test('B3: refresh throws EXPIRED -> propagates to the caller, no persist, no swallowing into a fake success', async () => {
+  test('B3: refresh throws EXPIRED -> propagates to the caller, no persist (durable or session), no swallowing into a fake success', async () => {
     const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'dead-refresh' }),
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
     ];
     let persistCalled = false;
     const refreshAccessToken = async () => { throw new TokenRefreshError('Refresh token expired or invalid', 'EXPIRED'); };
     const persistSession = async () => { persistCalled = true; };
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'dead-refresh', tokenExpiresAt: NOW + PAST_MS } });
 
     await assert.rejects(
-      () => refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession }),
+      () => refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store }),
       TokenRefreshError
     );
     assert.equal(persistCalled, false);
+    assert.equal(store.calls.length, 0, 'no durable put on a failed refresh');
   });
 
   test('B4: single-flight — two concurrent calls for the same (owner, urlKey) invoke refreshAccessToken exactly once, both resolve to the fresh token', async () => {
-    const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A' }),
-    ];
+    const sessions = [];
     let callCount = 0;
     let releaseRefresh;
     const gate = new Promise(resolve => { releaseRefresh = resolve; });
@@ -183,9 +264,10 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
       return { access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 };
     };
     const persistSession = async () => {};
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
-    const p1 = refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession });
-    const p2 = refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession });
+    const p1 = refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
+    const p2 = refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
     releaseRefresh();
     const [r1, r2] = await Promise.all([p1, p2]);
@@ -199,19 +281,13 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
     let callCount = 0;
     const refreshAccessToken = async () => {
       callCount++;
-      return { access_token: `fresh-token-${callCount}`, refresh_token: 'refresh-A-rotated', expires_in: 3600 };
+      return { access_token: `fresh-token-${callCount}`, refresh_token: `refresh-A-rotated-${callCount}`, expires_in: 3600 };
     };
     const persistSession = async () => {};
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
-    // Each call gets its own freshly-fetched session snapshot — mirroring real
-    // usage, where server.js re-reads sessionsCollection.find({}).toArray() on
-    // every resolveWorkspaceAccess call rather than reusing a stale array.
-    const freshLapsedSessions = () => [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A' }),
-    ];
-
-    const r1 = await refreshOwnerWorkspaceToken({ sessions: freshLapsedSessions(), urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession });
-    const r2 = await refreshOwnerWorkspaceToken({ sessions: freshLapsedSessions(), urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession });
+    const r1 = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
+    const r2 = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
     assert.equal(callCount, 2);
     assert.equal(r1.token, 'fresh-token-1');
@@ -219,9 +295,6 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
   });
 
   test('B6: single-flight cleanup after FAILURE — a later independent call still attempts its own refresh (the map entry was removed, not stuck)', async () => {
-    const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A' }),
-    ];
     let callCount = 0;
     const refreshAccessToken = async () => {
       callCount++;
@@ -229,9 +302,10 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
       return { access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 };
     };
     const persistSession = async () => {};
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
-    await assert.rejects(() => refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession }));
-    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession });
+    await assert.rejects(() => refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store }));
+    const result = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
     assert.equal(callCount, 2);
     assert.equal(result.token, 'fresh-token');
@@ -239,7 +313,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
 
   test('B7: TTL preserved — persistSession is called with only the session content; caller (server.js) is responsible for never routing this through the TTL-rolling session store', async () => {
     const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: 'refresh-A' }),
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
     ];
     const persistCalls = [];
     const refreshAccessToken = async () => ({ access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 });
@@ -249,36 +323,400 @@ describe('refreshOwnerWorkspaceToken (LIN-1373, Block B — refresh orchestratio
       assert.equal(args.length, 2);
       persistCalls.push(args);
     };
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
-    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession });
+    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
     assert.equal(persistCalls.length, 1);
   });
 
-  test('B8: missing refreshToken on the owner\'s expired row -> resolves null, no network call, no persist', async () => {
-    const sessions = [
-      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
-    ];
-    let refreshCalled = false;
-    let persistCalled = false;
-    const refreshAccessToken = async () => { refreshCalled = true; return {}; };
-    const persistSession = async () => { persistCalled = true; };
+  test('B8: durable record present but with NO refreshToken -> resolves null, no network call, no durable put', async () => {
+    const refreshAccessToken = async () => { throw new Error('must not be called'); };
+    const persistSession = async () => { throw new Error('must not be called'); };
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: undefined, tokenExpiresAt: NOW + PAST_MS } });
 
-    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession });
+    const result = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
     assert.equal(result, null);
-    assert.equal(refreshCalled, false);
-    assert.equal(persistCalled, false);
+    assert.equal(store.calls.length, 0);
   });
 
-  test('B9: no matching session row at all -> resolves null, no network call', async () => {
-    const sessions = [];
+  test('B9a: no durable record at all (never connected) -> resolves null, no network call — fail-closed', async () => {
     let refreshCalled = false;
     const refreshAccessToken = async () => { refreshCalled = true; return {}; };
     const persistSession = async () => {};
+    const store = fakeStore(); // empty — no record for this (accountId, urlKey)
 
-    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession });
+    const result = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
     assert.equal(result, null);
     assert.equal(refreshCalled, false);
+  });
+
+  test('B9b (LIN-1524\'s actual deliverable): durable record present, NO session row anywhere -> refresh proceeds and succeeds', async () => {
+    // The end-to-end proof of the phase: a proxy token resolving a workspace
+    // whose owner has fully logged out (zero session rows for this account,
+    // anywhere) still refreshes successfully, sourced entirely from the
+    // durable record. Before LIN-1524 this was structurally impossible —
+    // selectExpiredOwnerRow requires a session row to even look at.
+    const sessions = []; // no session rows AT ALL, for any account
+    const refreshAccessToken = async (refreshToken) => {
+      assert.equal(refreshToken, 'refresh-A');
+      return { access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 };
+    };
+    let persistSessionCalled = false;
+    const persistSession = async () => { persistSessionCalled = true; };
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
+
+    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
+
+    assert.equal(result.token, 'fresh-token');
+    assert.equal(store.calls.length, 1, 'the durable record was rotated');
+    assert.equal(store.calls[0].credential.refreshToken, 'refresh-A-rotated');
+    // No session row existed, so nothing was mirrored into one — correctly a no-op.
+    assert.equal(persistSessionCalled, false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block C (LIN-1499 Phase 1) — selectExpiredOwnerRow, GitHub-family
+// refreshability (D1: "GitHub gets no off-session refresh at all")
+// ---------------------------------------------------------------------------
+
+describe('selectExpiredOwnerRow (LIN-1499, Block C — GitHub-family provider-awareness)', () => {
+  test('C1 [D1 FIXED]: an expired GitHub row with installationId and NO refreshToken is now selected — impossible before this ticket', () => {
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-gh', { accessToken: 'stale-gh', expiresAt: NOW + PAST_MS, installationId: '987' }),
+    ];
+    const row = selectExpiredOwnerRow(sessions, 'acme-gh', 'account-A');
+    assert.ok(row, 'D1: a GitHub row with installationId must be selected');
+    assert.equal(row.sid, 'sid-1');
+    assert.equal(row.provider, 'github');
+    // The pre-LIN-1499 shape carried refreshToken as the sole refreshability
+    // signal; a GitHub row simply never has one, and that must not disqualify it.
+    assert.equal(row.refreshToken, undefined);
+  });
+
+  test('C2: a github-projects row with installationId is ALSO selected (the family, not just github)', () => {
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-ghp', { accessToken: 'stale-ghp', expiresAt: NOW + PAST_MS, installationId: '555', provider: 'github-projects' }),
+    ];
+    const row = selectExpiredOwnerRow(sessions, 'acme-ghp', 'account-A');
+    assert.ok(row);
+    assert.equal(row.provider, 'github-projects');
+  });
+
+  test('C3: an expired GitHub row MISSING installationId stays unselectable (fail-closed, not select-then-throw)', () => {
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-gh', { accessToken: 'stale-gh', expiresAt: NOW + PAST_MS, installationId: undefined }),
+    ];
+    assert.equal(selectExpiredOwnerRow(sessions, 'acme-gh', 'account-A'), null);
+  });
+
+  test('C4: a LIVE (non-expired) GitHub row is not selected, same as Linear', () => {
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-gh', { accessToken: 'live-gh', expiresAt: NOW + FAR_FUTURE_MS, installationId: '987' }),
+    ];
+    assert.equal(selectExpiredOwnerRow(sessions, 'acme-gh', 'account-A'), null);
+  });
+
+  test('C5: Linear rows are unaffected by the GitHub-family branch — still refreshToken-gated (regression guard on A3)', () => {
+    const sessions = [
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: undefined, provider: 'linear' }),
+    ];
+    assert.equal(selectExpiredOwnerRow(sessions, 'acme', 'account-A'), null);
+  });
+
+  test('C6: selectOwnerWorkspaceToken remains untouched for GitHub rows too (byte-identical selector, D1/D2 live only in the sibling)', () => {
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-gh', { accessToken: 'stale-gh', expiresAt: NOW + PAST_MS, installationId: '987' }),
+    ];
+    const result = selectOwnerWorkspaceToken(sessions, 'acme-gh', 'account-A');
+    assert.equal(result.token, null);
+    assert.equal(result.reason, 'session_expired');
+    assert.equal(result.provider, 'github');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block D (LIN-1499 Phase 1) — refreshOwnerWorkspaceToken, GitHub-family
+// routing (D1/D2 fixed at the orchestration layer)
+// ---------------------------------------------------------------------------
+
+describe('refreshOwnerWorkspaceToken (LIN-1499, Block D — GitHub-family routing)', () => {
+  beforeEach(() => {
+    _resetInflightForTests();
+  });
+
+  // A fake minting provider, shaped like GitHubProvider/GitHubProjectsProvider's
+  // real refreshCredential: rotated token + real ms expiry + installationId, no
+  // refreshToken. Captures the exact `opts` it was called with so Block D's
+  // seam tests can assert on it directly.
+  function fakeMintProvider(patch, calls) {
+    return {
+      async refreshCredential(binding, opts) {
+        calls.push({ binding, opts });
+        return patch;
+      },
+    };
+  }
+
+  test('D1 [D1 FIXED end-to-end]: an expired GitHub owner row is refreshed via the provider seam, off-session, and returns ok', async () => {
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-gh', { accessToken: 'stale-gh', expiresAt: NOW + PAST_MS, installationId: '987' }),
+    ];
+    const calls = [];
+    const provider = fakeMintProvider({ token: 'ghs_fresh', tokenExpiresAt: NOW + FAR_FUTURE_MS, installationId: '987' }, calls);
+    const resolveProvider = () => provider;
+    let refreshAccessTokenCalled = false;
+    const refreshAccessToken = async () => { refreshAccessTokenCalled = true; return {}; };
+    const persisted = [];
+    const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
+
+    const result = await refreshOwnerWorkspaceToken({
+      sessions, urlKey: 'acme-gh', ownerAccountId: 'account-A', refreshAccessToken, persistSession, resolveProvider
+    });
+
+    assert.equal(result.token, 'ghs_fresh');
+    assert.equal(result.provider, 'github');
+    assert.ok(result.expiresAt > Date.now());
+    // Proves D1: this exact case (installationId, no refreshToken) previously
+    // returned null from the selector and never reached this far at all.
+    assert.equal(calls.length, 1);
+    // Never touches the Linear exchange.
+    assert.equal(refreshAccessTokenCalled, false);
+    assert.equal(persisted.length, 1);
+    assert.equal(persisted[0].sid, 'sid-1');
+  });
+
+  test('D2 [D2 FIXED at the routing layer]: a github-projects row is refreshed via the provider seam and NEVER handed to refreshAccessToken', async () => {
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-ghp', { accessToken: 'stale-ghp', expiresAt: NOW + PAST_MS, installationId: '555', provider: 'github-projects' }),
+    ];
+    const calls = [];
+    const provider = fakeMintProvider({ token: 'ghp_fresh', tokenExpiresAt: NOW + FAR_FUTURE_MS, installationId: '555' }, calls);
+    const resolveProvider = () => provider;
+    let refreshAccessTokenCalled = false;
+    const refreshAccessToken = async () => { refreshAccessTokenCalled = true; return { access_token: 'WRONG-linear-shaped', refresh_token: 'WRONG', expires_in: 3600 }; };
+    const persistSession = async () => {};
+
+    const result = await refreshOwnerWorkspaceToken({
+      sessions, urlKey: 'acme-ghp', ownerAccountId: 'account-A', refreshAccessToken, persistSession, resolveProvider
+    });
+
+    assert.equal(result.token, 'ghp_fresh');
+    assert.equal(result.provider, 'github-projects');
+    assert.equal(calls.length, 1, 'the minting provider was invoked exactly once');
+    assert.equal(refreshAccessTokenCalled, false, 'D2: github-projects must NEVER reach the Linear refreshAccessToken exchange');
+  });
+
+  test("D3 [D2's destructive mode cannot recur here]: a github-projects refresh never calls anything Linear-shaped, and persists cleanly — no exception to be caught, nothing to remove", async () => {
+    // Before the fix, this exact shape (github-projects, no refreshToken) drove
+    // refreshAccessToken(undefined), which throws TokenRefreshError('Invalid
+    // refresh token','INVALID') — the throw that fed ensureValidToken's catch
+    // into removeWorkspace + session.destroy. Proving this call now resolves
+    // (not rejects) for a healthy installationId is the orchestration-layer half
+    // of "the destructive mode is gone"; Block E pins the server.js branch itself.
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-ghp', { accessToken: 'stale-ghp', expiresAt: NOW + PAST_MS, installationId: '555', provider: 'github-projects' }),
+    ];
+    const provider = fakeMintProvider({ token: 'ghp_fresh', tokenExpiresAt: NOW + FAR_FUTURE_MS, installationId: '555' }, []);
+    const resolveProvider = () => provider;
+    const refreshAccessToken = async () => { throw new TokenRefreshError('Invalid refresh token', 'INVALID'); };
+    const persistSession = async () => {};
+
+    await assert.doesNotReject(() =>
+      refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme-ghp', ownerAccountId: 'account-A', refreshAccessToken, persistSession, resolveProvider })
+    );
+  });
+
+  test('D4: scalar mirror (accessToken/tokenExpiresAt) rotates in lockstep, persisted to the correct session row', async () => {
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-gh', { accessToken: 'stale-gh', expiresAt: NOW + PAST_MS, installationId: '987' }),
+    ];
+    const provider = fakeMintProvider({ token: 'ghs_fresh', tokenExpiresAt: NOW + FAR_FUTURE_MS, installationId: '987' }, []);
+    const resolveProvider = () => provider;
+    const refreshAccessToken = async () => ({});
+    const persisted = [];
+    const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
+
+    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme-gh', ownerAccountId: 'account-A', refreshAccessToken, persistSession, resolveProvider });
+
+    const persistedWs = persisted[0].session.workspaces[0];
+    assert.equal(persistedWs.accessToken, 'ghs_fresh');
+    assert.equal(persistedWs.tokenExpiresAt, NOW + FAR_FUTURE_MS);
+    // installationId survives the linkProvider merge onto the binding.
+    assert.equal(persistedWs.bindings[0].credentials.installationId, '987');
+  });
+
+  test('D5 [LIN-1524 close-out replacement assertion — no Linear contamination]: a GitHub-family re-mint never creates (or touches) a durable Linear credential record', async () => {
+    // The original D5 ("a GitHub workspace never gains a refreshToken") is a
+    // VACUITY TRAP after LIN-1524: since updateWorkspaceTokens no longer
+    // writes refreshToken for ANYONE (Linear included), that assertion would
+    // now pass even if a GitHub-family re-mint accidentally started calling
+    // `refreshAccessToken` or writing a durable record — it protects nothing
+    // post-cutover. The replacement per the ticket's own test plan: assert
+    // directly against the durable store, which is Linear-only by design —
+    // `store.get(accountId, urlKey)` must still return null after a
+    // GitHub-family refresh, and `store.put` must never have been called.
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-gh', { accessToken: 'stale-gh', expiresAt: NOW + PAST_MS, installationId: '987' }),
+    ];
+    const provider = fakeMintProvider({ token: 'ghs_fresh', tokenExpiresAt: NOW + FAR_FUTURE_MS, installationId: '987' }, []);
+    const resolveProvider = () => provider;
+    const refreshAccessToken = async () => { throw new Error('must not be called for GitHub-family — this is the Linear-only arm'); };
+    const persisted = [];
+    const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
+    const store = fakeStore();
+
+    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme-gh', ownerAccountId: 'account-A', refreshAccessToken, persistSession, resolveProvider, store });
+
+    const persistedWs = persisted[0].session.workspaces[0];
+    assert.equal(persistedWs.refreshToken, undefined);
+    assert.equal(persistedWs.tokenExpiresAt, NOW + FAR_FUTURE_MS);
+    assert.equal(Number.isNaN(persistedWs.tokenExpiresAt), false);
+
+    // The actual replacement assertion: the durable store was never touched.
+    assert.equal(store.calls.length, 0, 'store.put must never be called for a GitHub-family re-mint');
+    assert.equal(await store.get('account-A', 'acme-gh'), null, 'no durable Linear credential may exist for a GitHub-family workspace');
+  });
+
+  test('D6 [seam load-bearing, LIN-1499 item 4]: {fetchImpl, now} passed into refreshOwnerWorkspaceToken reach provider.refreshCredential unchanged, and now arrives as a number the provider can do arithmetic on', async () => {
+    // This is the plumbing proof that beat 1's remintActiveCredential passthrough
+    // is load-bearing: if that passthrough were reverted (provider.refreshCredential(active)
+    // called with no second argument), the fake provider below would receive
+    // `opts === undefined`, and the strict-equal identity assertions on
+    // receivedOpts.fetchImpl/now would fail. A test that only checked the
+    // refresh SUCCEEDED would still pass with the passthrough reverted (the fake
+    // ignores unused args) — asserting on referential identity of the received
+    // opts is what makes this a real proof, not a decorative one.
+    //
+    // `now` is also actually CONSUMED here (mirroring mintAppJwt's real
+    // `Math.floor(now / 1000)` contract, lib/providers/github/app-auth.js:122-125)
+    // rather than merely recorded: the fake provider derives tokenExpiresAt from
+    // `opts.now + FAR_FUTURE_MS`. If `now` regressed to a function seam (as it
+    // was before this fix), `fn + FAR_FUTURE_MS` coerces to a concatenated
+    // string, not the expected numeric sum, and the assertion below fails
+    // instead of passing silently.
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-gh', { accessToken: 'stale-gh', expiresAt: NOW + PAST_MS, installationId: '987' }),
+    ];
+    const calls = [];
+    const NOW_MS = 1_700_000_000_000;
+    const provider = {
+      async refreshCredential(binding, opts) {
+        calls.push({ binding, opts });
+        return { token: 'ghs_fresh', tokenExpiresAt: opts.now + FAR_FUTURE_MS, installationId: '987' };
+      },
+    };
+    const resolveProvider = () => provider;
+    const refreshAccessToken = async () => ({});
+    const persistSession = async () => {};
+    const fetchImpl = async () => { throw new Error('never actually invoked — this test only checks wiring'); };
+    const now = NOW_MS;
+
+    const result = await refreshOwnerWorkspaceToken({
+      sessions, urlKey: 'acme-gh', ownerAccountId: 'account-A', refreshAccessToken, persistSession, resolveProvider, fetchImpl, now
+    });
+
+    assert.equal(calls.length, 1);
+    assert.strictEqual(calls[0].opts.fetchImpl, fetchImpl, 'the exact fetchImpl instance must reach provider.refreshCredential');
+    assert.strictEqual(calls[0].opts.now, now, 'the exact now value must reach provider.refreshCredential');
+    assert.strictEqual(result.expiresAt, NOW_MS + FAR_FUTURE_MS, 'now must arrive as a number, not a function, for the provider to do arithmetic on');
+  });
+
+  test('D7 [fail-closed preserved]: a genuine mint failure propagates — no persist, no fabricated success, no workspace removal attempted here', async () => {
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-gh', { accessToken: 'stale-gh', expiresAt: NOW + PAST_MS, installationId: '987' }),
+    ];
+    const provider = {
+      async refreshCredential() { throw new Error('GitHub credential refresh: installation revoked'); },
+    };
+    const resolveProvider = () => provider;
+    const refreshAccessToken = async () => ({});
+    let persistCalled = false;
+    const persistSession = async () => { persistCalled = true; };
+
+    await assert.rejects(
+      () => refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme-gh', ownerAccountId: 'account-A', refreshAccessToken, persistSession, resolveProvider }),
+      /installation revoked/
+    );
+    assert.equal(persistCalled, false);
+  });
+
+  test('D8 [Linear regression]: an all-Linear session is completely unaffected by resolveProvider being absent (existing callers never pass it for the Linear-only arm)', async () => {
+    const sessions = [
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS, refreshToken: undefined, provider: 'linear' }),
+    ];
+    const refreshAccessToken = async (refreshToken) => {
+      assert.equal(refreshToken, 'refresh-A');
+      return { access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 };
+    };
+    const persisted = [];
+    const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
+
+    // No resolveProvider passed at all — the Linear arm must never call it.
+    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
+
+    assert.equal(result.token, 'fresh-token');
+    assert.equal(result.provider, 'linear');
+    // LIN-1524: the session mirror carries accessToken only — refreshToken is
+    // durable-store-only and never written back into the session.
+    assert.equal(persisted[0].session.workspaces[0].accessToken, 'fresh-token');
+    assert.equal(persisted[0].session.workspaces[0].refreshToken, undefined);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block E (LIN-1499 Phase 1) — server.js's ensureValidToken branch widening
+// (D2's destructive-mode-gone claim, at the level server.js itself supports)
+// ---------------------------------------------------------------------------
+//
+// server.js is not import-safe in a unit test: importing it connects to Mongo
+// and calls app.listen() at module load (confirmed by grep — `app.listen(PORT`
+// runs unconditionally at the bottom of the file, no require.main guard). The
+// codebase's own established answer to this — stated explicitly in this file's
+// sibling tests/unit/workspace-token-refresh-integration.test.js's docstring,
+// and precedented structurally in tests/unit/task-chat-route.test.js — is a
+// source-text regression guard: cheap, deterministic, and it catches exactly
+// the regression that matters here (the branch condition narrowing back to
+// 'github' only, which is exactly how D2 was introduced/survived before this
+// ticket). It does not execute ensureValidToken; Block D above proves the
+// primitive the branch now calls (remintActiveCredential via the provider
+// seam) behaves correctly for github-projects; this block proves server.js
+// actually invokes it for github-projects instead of the Linear arm.
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+
+describe('ensureValidToken branch widening (LIN-1499, Block E — source-text pin)', () => {
+  test("E1: the re-mint branch condition covers BOTH 'github' and 'github-projects'", () => {
+    const conditionLine = SERVER_SRC.split('\n').find(l => l.includes("await remintActiveCredential(workspace, getProviderForWorkspace(workspace))"));
+    assert.ok(conditionLine, 'expected to find the remintActiveCredential call site in server.js');
+    // Walk back to find the `if (...)` guarding this call.
+    const lines = SERVER_SRC.split('\n');
+    const callIdx = lines.indexOf(conditionLine);
+    const ifLine = lines.slice(0, callIdx).reverse().find(l => l.trim().startsWith('if ('));
+    assert.ok(ifLine, 'expected an `if (...)` guarding the remintActiveCredential call');
+    assert.match(ifLine, /provider === 'github'/);
+    assert.match(ifLine, /provider === 'github-projects'/, "D2 regression guard: the branch must not narrow back to 'github' only");
+  });
+
+  test('E2: the off-session refresh call site passes resolveProvider through to refreshOwnerWorkspaceToken', () => {
+    assert.match(SERVER_SRC, /refreshOwnerWorkspaceToken\(\{[\s\S]{0,300}?resolveProvider:\s*getProviderForWorkspace/, 'expected resolveProvider: getProviderForWorkspace in the refreshOwnerWorkspaceToken call options');
+  });
+
+  test('E3: the removeWorkspace catch inside ensureValidToken is untouched — exactly one removal call in that function body (no new removal path introduced)', () => {
+    // Scoped to ensureValidToken's own body (between its declaration and the
+    // next top-level `async function`/`app.use` boundary) rather than the
+    // whole file — server.js has a SECOND, unrelated removeWorkspace call site
+    // in handleWorkspaceRemoval (the 401-retry path, LIN-1503, out of scope
+    // for this ticket), so a whole-file count would conflate the two.
+    const startIdx = SERVER_SRC.indexOf('async function ensureValidToken(req, res, next) {');
+    assert.notEqual(startIdx, -1, 'expected to find ensureValidToken in server.js');
+    const endIdx = SERVER_SRC.indexOf('\n}', SERVER_SRC.indexOf('\n', startIdx) + 1);
+    const bodySlice = SERVER_SRC.slice(startIdx, endIdx);
+    const removeWorkspaceCalls = (bodySlice.match(/removeWorkspace\(/g) || []).length;
+    assert.equal(removeWorkspaceCalls, 1, "removeWorkspace should still be called from exactly one place inside ensureValidToken's catch — this pins that beat 2 did not touch or duplicate it");
   });
 });
