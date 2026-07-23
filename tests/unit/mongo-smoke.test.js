@@ -631,7 +631,10 @@ describe(
       // by squeezing the budget rather than seeding 100MB of documents.
       const collection = freshCollection('lineage-sort-overflow');
       await collection.createIndex({ urlKey: 1, rootItemId: 1 });
-      const anchors = await seedLineages(collection, { lineages: 1, perLineage: 2000, noise: 0 });
+      // 2001 rows — ONE over the cap — so the rows.length assertion below
+      // proves `.limit(LINEAGE_QUERY_LIMIT)` actually clamps an over-cap
+      // lineage, not merely that an at-cap lineage comes back whole (LIN-1492).
+      const anchors = await seedLineages(collection, { lineages: 1, perLineage: 2001, noise: 0 });
 
       const paramName = 'internalQueryMaxBlockingSortMemoryUsageBytes';
       const original = (await db.admin().command({ getParameter: 1, [paramName]: 1 }))[paramName];
@@ -644,7 +647,8 @@ describe(
         );
         assert.strictEqual(sortStage.usedDisk, true, 'an over-budget sort should spill to disk');
 
-        // The load-bearing half: a complete, un-truncated result, no throw.
+        // The load-bearing half: the over-cap lineage is clamped to exactly
+        // the cap — no throw, no over-cap rows leaking through.
         const rows = await lineageCursor(collection, anchors).toArray();
         assert.strictEqual(
           rows.length,
