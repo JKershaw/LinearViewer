@@ -569,10 +569,18 @@ describe('deploy-boundary straddle merge (LIN-1393)', () => {
 
 describe('getSessionsForWorkspace', () => {
   test('reconstructs sessions end-to-end through mock stores', async () => {
+    // Unlike every _buildLoops-driven test above (which injects the fixed NOW),
+    // the public API has no injectable clock — it filters against the REAL
+    // `now − LOOKBACK_MS` (30-day) window. The shared 2026-06-22 fixture
+    // constants therefore age out of the window by calendar (they did on
+    // 2026-07-22, silently breaking this one test while all the NOW-injected
+    // ones stayed green), so this test builds its fixtures on fresh timestamps.
+    const base = Date.now() - 4 * 60 * 60 * 1000; // four hours ago — always in window
+    const iso = (offsetMin) => new Date(base + offsetMin * 60000).toISOString();
     const history = [
-      orchestrator(),
-      worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
-      worker('w2', SPAWNED, '2026-06-22T12:00:00.000Z', { sessionId: SESSION_ID })
+      orchestrator({ dispatchedAt: iso(0), resolvedAt: iso(1), feedback: done(iso(180)) }),
+      worker('w1', CHILD, iso(30), { sessionId: SESSION_ID }),
+      worker('w2', SPAWNED, iso(120), { sessionId: SESSION_ID })
     ];
     const deps = {
       dispatchStore: {

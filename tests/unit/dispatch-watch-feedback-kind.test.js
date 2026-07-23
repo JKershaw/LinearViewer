@@ -77,4 +77,26 @@ describe('LIN-1475 — watch endpoint kind exposure', () => {
     assert.deepEqual(Object.keys(tagged).sort(), ['kind', 'message', 'timestamp', 'url', 'urlLabel'].sort());
     assert.deepEqual(Object.keys(untagged).sort(), ['message', 'timestamp', 'url', 'urlLabel'].sort());
   });
+
+  test('LIN-1425: kind:"usage" survives the watch endpoint\'s formatter unchanged', async () => {
+    const dispatchQueueStore = new DispatchQueueStore({
+      collection: createMockCollection(),
+      historyCollection: createMockCollection()
+    });
+    const app = buildApp({ dispatchQueueStore });
+
+    const created = await dispatchQueueStore.addItem('acme', { prompt: 'do the thing' });
+    await dispatchQueueStore.takeItem(created._id, 'acme');
+    const rootItemId = '11111111-2222-3333-4444-555555555555';
+    const usageMessage = '[usage] {"schema":1,"harness":"claude-code","model":"claude-opus-4-8","inputTokens":1,"outputTokens":2,"cacheCreationInputTokens":3,"cacheReadInputTokens":4,"costUsd":null}';
+    await dispatchQueueStore.addFeedback(created._id, 'acme', { message: usageMessage, kind: 'usage', rootItemId }, null);
+
+    const watchRes = await call(app, 'get', `/api/proxy/dispatch/${created._id}`);
+    assert.equal(watchRes.status, 200, JSON.stringify(watchRes.body));
+
+    const [entry] = watchRes.body.feedback;
+    assert.equal(entry.kind, 'usage');
+    assert.equal(entry.rootItemId, rootItemId);
+    assert.equal(entry.message, usageMessage);
+  });
 });

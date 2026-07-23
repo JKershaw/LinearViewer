@@ -16,6 +16,7 @@ import {
   parseHeartbeats,
   parseEvidenceArtifacts,
   parseModel,
+  parseUsage,
   deriveRuntime,
   buildRunTelemetry,
   buildSessionTelemetry,
@@ -195,6 +196,112 @@ describe('parseModel', () => {
   });
 });
 
+describe('parseUsage (LIN-1425)', () => {
+  const usageMessage = (overrides = {}) =>
+    `[usage] ${JSON.stringify({
+      schema: 1,
+      harness: 'claude-code',
+      model: 'claude-opus-4-8',
+      inputTokens: 5529,
+      outputTokens: 25811,
+      cacheCreationInputTokens: 145449,
+      cacheReadInputTokens: 4588835,
+      costUsd: null,
+      ...overrides,
+    })}`;
+
+  test('omitted (null) when no kind:"usage" entry exists', () => {
+    const feedback = [
+      { message: '[started] session abc · tty 3' },
+      { message: '[working] 6 tools/32s · alive', kind: 'heartbeat' },
+    ];
+    assert.equal(parseUsage(feedback), null);
+  });
+
+  test('parses a well-formed kind:"usage" entry, whitelisting exactly the four token fields + model + costUsd', () => {
+    const feedback = [{ message: usageMessage(), kind: 'usage' }];
+    const usage = parseUsage(feedback);
+    assert.deepEqual(usage, {
+      harness: 'claude-code',
+      model: 'claude-opus-4-8',
+      inputTokens: 5529,
+      outputTokens: 25811,
+      cacheCreationInputTokens: 145449,
+      cacheReadInputTokens: 4588835,
+      costUsd: null,
+    });
+  });
+
+  test('opencode-style entry carries a numeric costUsd through untouched', () => {
+    const feedback = [{ message: usageMessage({ harness: 'opencode', costUsd: 0.0421 }), kind: 'usage' }];
+    assert.equal(parseUsage(feedback).costUsd, 0.0421);
+  });
+
+  test('cumulative snapshot semantics: the LAST kind:"usage" entry wins, never summed', () => {
+    const feedback = [
+      { message: usageMessage({ inputTokens: 100, outputTokens: 200 }), kind: 'usage' },
+      { message: usageMessage({ inputTokens: 5529, outputTokens: 25811 }), kind: 'usage' },
+    ];
+    const usage = parseUsage(feedback);
+    assert.equal(usage.inputTokens, 5529);
+    assert.equal(usage.outputTokens, 25811);
+  });
+
+  test('ignores an entry whose kind is not "usage" even if the message looks like a usage payload', () => {
+    const feedback = [{ message: usageMessage(), kind: 'assistant-text' }];
+    assert.equal(parseUsage(feedback), null);
+  });
+
+  test('an entry with no kind at all (pre-LIN-1475 row) is tolerated, never matched', () => {
+    const feedback = [{ message: usageMessage() }];
+    assert.equal(parseUsage(feedback), null);
+  });
+
+  test('malformed JSON payload is tolerated, never throws', () => {
+    const feedback = [{ message: '[usage] {"schema":1, not-json', kind: 'usage' }];
+    assert.doesNotThrow(() => parseUsage(feedback));
+    assert.equal(parseUsage(feedback), null);
+  });
+
+  test('truncated JSON payload (e.g. cut at the message-length cap) is tolerated, never throws', () => {
+    const feedback = [{ message: '[usage] {"schema":1,"harness":"claude-code","inputTokens":55', kind: 'usage' }];
+    assert.doesNotThrow(() => parseUsage(feedback));
+    assert.equal(parseUsage(feedback), null);
+  });
+
+  test('empty object payload is tolerated and yields null (no fields to attach)', () => {
+    const feedback = [{ message: '[usage] {}', kind: 'usage' }];
+    assert.equal(parseUsage(feedback), null);
+  });
+
+  test('absent message on a kind:"usage" entry is tolerated', () => {
+    const feedback = [{ kind: 'usage' }];
+    assert.doesNotThrow(() => parseUsage(feedback));
+    assert.equal(parseUsage(feedback), null);
+  });
+
+  test('vendor-noise fields on the payload are dropped, not copied through', () => {
+    const feedback = [{
+      message: `[usage] ${JSON.stringify({
+        inputTokens: 10,
+        outputTokens: 20,
+        cache_creation: { ephemeral_5m_input_tokens: 1 },
+        server_tool_use: { web_search_requests: 0 },
+        service_tier: 'standard',
+        speed: 'fast',
+        inference_geo: 'us',
+      })}`,
+      kind: 'usage',
+    }];
+    const usage = parseUsage(feedback);
+    assert.deepEqual(Object.keys(usage).sort(), ['costUsd', 'inputTokens', 'outputTokens'].sort());
+  });
+
+  test('non-array input returns null', () => {
+    assert.equal(parseUsage(undefined), null);
+  });
+});
+
 describe('deriveRuntime', () => {
   test('runtime from dispatchedAt → completedAt, with [done] duration as cross-check', () => {
     const feedback = [{ message: '[done] Task completed in 55s' }];
@@ -252,6 +359,31 @@ describe('buildRunTelemetry', () => {
       feedback: [{ message: '[started] session abc · model claude-opus-4-8' }],
     });
     assert.equal(t.model, 'claude-opus-4-8');
+  });
+
+  test('LIN-1425: usage field included, omitted (not null), when a kind:"usage" entry is/isn\'t present', () => {
+    const withUsage = buildRunTelemetry({
+      dispatchedAt: '2026-06-22T10:00:00.000Z',
+      feedback: [{
+        message: '[usage] {"schema":1,"harness":"claude-code","model":"claude-opus-4-8","inputTokens":1,"outputTokens":2,"cacheCreationInputTokens":3,"cacheReadInputTokens":4,"costUsd":null}',
+        kind: 'usage',
+      }],
+    });
+    assert.deepEqual(withUsage.usage, {
+      harness: 'claude-code',
+      model: 'claude-opus-4-8',
+      inputTokens: 1,
+      outputTokens: 2,
+      cacheCreationInputTokens: 3,
+      cacheReadInputTokens: 4,
+      costUsd: null,
+    });
+
+    const withoutUsage = buildRunTelemetry({
+      dispatchedAt: '2026-06-22T10:00:00.000Z',
+      feedback: [{ message: '[working] 6 tools/32s · alive' }],
+    });
+    assert.ok(!('usage' in withoutUsage));
   });
 });
 
