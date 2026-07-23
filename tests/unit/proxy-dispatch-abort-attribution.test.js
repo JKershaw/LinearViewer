@@ -46,12 +46,16 @@ function buildApp({ queued = [], history = [] } = {}) {
     dispatchQueueStore: {
       listItems: async () => queued,
       listHistory: async (urlKey, opts = {}) => {
+        // LIN-1494: mirror the real store's shape — `total` is the exact
+        // pre-slice matching count returned beside the capped `items`.
         if (opts.rootItemId && opts.rootItemId.$in) {
           const anchors = opts.rootItemId.$in;
-          return { items: history.filter(r => anchors.includes(r.rootItemId)) };
+          const matching = history.filter(r => anchors.includes(r.rootItemId));
+          const items = opts.limit ? matching.slice(0, opts.limit) : matching;
+          return { items, total: matching.length };
         }
         const items = opts.limit ? history.slice(0, opts.limit) : history;
-        return { items };
+        return { items, total: history.length };
       }
     },
     workspaceFromUrl: (req, res, next) => next(),

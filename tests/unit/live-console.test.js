@@ -380,6 +380,48 @@ test('buildConsoleFeed paginates with pageSize + a before cursor', () => {
   assert.equal(third.hasMore, false);
 });
 
+// ─── buildConsoleFeed: source-level truncation signals (LIN-1494) ─────────────
+
+test('sourceHasMore forces hasMore even when the in-memory pool fits one page', () => {
+  // The store capped its read (per-workspace limit) — the pool the feed sees
+  // is complete-LOOKING but the source has older rows. Deriving hasMore from
+  // the truncated pool alone is what dead-ended "view earlier activity".
+  const now = Date.parse('2026-07-19T12:10:00Z');
+  const items = [statusItem({ id: '1', timestamp: '2026-07-19T12:00:00Z' })];
+  const feed = buildConsoleFeed({ statusItems: items, loops: [] }, { now, sourceHasMore: true });
+  assert.equal(feed.events.length, 1, 'pool fits one page');
+  assert.equal(feed.hasMore, true, 'the store-level truncation signal must OR into hasMore');
+});
+
+test('sourceTotal overrides summary.total (plus evidence events)', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const items = [statusItem({ id: '1', timestamp: '2026-07-19T11:59:00Z' })];
+  const evLoop = loop({
+    telemetry: {
+      runtime: { ms: null }, metrics: [],
+      producedArtifacts: [{ label: 'PR #9', url: 'https://github.com/x/y/pull/9', timestamp: '2026-07-19T11:58:00Z' }],
+    },
+  });
+  const feed = buildConsoleFeed({ statusItems: items, loops: [evLoop] }, { now, sourceTotal: 40 });
+  // 40 status entries exist at the source (only 1 materialised) + 1 evidence event.
+  assert.equal(feed.summary.total, 41, 'the store-level total + evidence events, not the truncated pool length');
+});
+
+test('omitting sourceHasMore/sourceTotal preserves today\'s outputs byte-identically (back-compat pin, incl. bare-array input)', () => {
+  const now = Date.parse('2026-07-19T12:10:00Z');
+  const items = [
+    statusItem({ id: '1', timestamp: '2026-07-19T12:00:00Z' }),
+    statusItem({ id: '2', timestamp: '2026-07-19T12:01:00Z', status: 'failed' }),
+  ];
+  const withOpts = buildConsoleFeed({ statusItems: items, loops: [] }, { now });
+  assert.equal(withOpts.hasMore, false, 'no source signal, pool fits → hasMore false as before');
+  assert.equal(withOpts.summary.total, 2, 'falls back to the pool length as before');
+  // Bare-array input form (documented back-compat) unchanged too.
+  const bare = buildConsoleFeed(items, { now });
+  assert.deepEqual(bare.summary, withOpts.summary);
+  assert.equal(bare.hasMore, false);
+});
+
 test('summary counts kinds; active = number of working lanes', () => {
   const items = [
     statusItem({ id: '1', taskIdentifier: 'LIN-1', status: 'in_progress', timestamp: '2026-07-19T12:04:00Z' }),
