@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
-import { selectOwnerWorkspaceToken, detectOwnerAccountMismatch, detectOwnerSignedOut, classifyWorkspaceFailure, UNSCOPED } from '../../lib/workspace-token-resolver.js';
+import { selectOwnerWorkspaceToken, detectOwnerAccountMismatch, detectOwnerSignedOut, classifyWorkspaceFailure, describeWorkspaceResolution, UNSCOPED } from '../../lib/workspace-token-resolver.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -641,5 +641,64 @@ describe('req.proxyCreatedBy route wiring (LIN-1366, Block B)', () => {
     assert.equal(body.context.workspaceUrlKey, 'acme');
     // Privacy boundary: the other (live) account's id must never reach the wire.
     assert.ok(!/account-B|accountId/i.test(JSON.stringify(body)));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// describeWorkspaceResolution — secret-safe diagnostic summary for the
+// WORKSPACE_NOT_CONNECTED ambiguity. Two genuinely different failures collapse
+// into the identical bare `not_connected` reason (a null-owner token vs. an
+// owner who is signed in but has no session referencing THIS workspace), and
+// resolveWorkspaceAccess logged nothing to tell them apart. This pure summary
+// is what server.js logs on every non-ok resolution so the next occurrence is
+// self-explanatory — without leaking any other account's id or token bytes.
+// ---------------------------------------------------------------------------
+
+describe('describeWorkspaceResolution (diagnostic summary — non-sensitive)', () => {
+  test('null-owner token: distinguishes the createdBy:null regression from a real miss', () => {
+    const sessions = [
+      // A different account is live on the workspace, but the token has no owner.
+      sessionRow('account-B', 'acme', 'tokB', NOW + FAR_FUTURE_MS),
+    ];
+    const d = describeWorkspaceResolution(sessions, 'acme', null);
+    assert.equal(d.ownerAccountId, '<null>', 'a null owner is surfaced explicitly — the regression signature');
+    assert.equal(d.ownerSessionRowCount, 0, 'a null owner owns no rows');
+    assert.equal(d.ownerHasRowForWorkspace, false);
+  });
+
+  test('signed in, workspace not on the owner session (multi-device fork): rowCount>0, no row for this workspace, another account live', () => {
+    const sessions = [
+      // The owner IS signed in — but their live session is for a different workspace.
+      otherWorkspaceSessionRow('account-A', 'other-ws', 'tokA', NOW + FAR_FUTURE_MS),
+      // Meanwhile a different device/account holds this workspace live.
+      sessionRow('account-B', 'acme', 'tokB', NOW + FAR_FUTURE_MS),
+    ];
+    const d = describeWorkspaceResolution(sessions, 'acme', 'account-A');
+    assert.equal(d.ownerSessionRowCount, 1, 'the owner has a session — so this is NOT the null/never-signed-in case');
+    assert.deepEqual(d.ownerReferencedUrlKeys, ['other-ws'], 'and it references a DIFFERENT workspace than the one requested');
+    assert.equal(d.ownerHasRowForWorkspace, false, 'the owner has no row for THIS workspace — the true not_connected shape');
+    assert.equal(d.otherAccountLiveForWorkspace, true, 'a different account is live here — the multi-device fork, made visible');
+  });
+
+  test('owner token merely expired (session_expired): owner has a row for this workspace, nobody else live', () => {
+    const sessions = [
+      sessionRow('account-A', 'acme', 'tokA-expired', NOW + PAST_MS),
+    ];
+    const d = describeWorkspaceResolution(sessions, 'acme', 'account-A');
+    assert.equal(d.ownerHasRowForWorkspace, true, 'the expiry case still owns a row for this workspace');
+    assert.equal(d.ownerNearestExpiryForWorkspace, NOW + PAST_MS, 'the nearest owner expiry is surfaced for the log');
+    assert.equal(d.otherAccountLiveForWorkspace, false);
+  });
+
+  test('privacy boundary: never emits another account id or any token bytes', () => {
+    const sessions = [
+      otherWorkspaceSessionRow('account-A', 'other-ws', 'tokA', NOW + FAR_FUTURE_MS),
+      sessionRow('account-B', 'acme', 'tokB-secret', NOW + FAR_FUTURE_MS),
+    ];
+    const d = describeWorkspaceResolution(sessions, 'acme', 'account-A');
+    const serialized = JSON.stringify(d);
+    assert.ok(!serialized.includes('account-B'), 'the other account id must never appear in the summary');
+    assert.ok(!serialized.includes('tokB-secret'), 'no access token bytes in the summary');
+    assert.ok(!serialized.includes('tokA'), 'not even the owner\'s own token bytes');
   });
 });

@@ -21,7 +21,7 @@ import { ensureIndexes } from './lib/db-indexes.js'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
-import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure } from './lib/workspace-token-resolver.js'
+import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken } from './lib/workspace-token-refresh.js'
 import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
@@ -1371,11 +1371,22 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     // load-bearing (owner_mismatch wins any overlap) — see
     // classifyWorkspaceFailure's docstring in lib/workspace-token-resolver.js.
     const reason = classifyWorkspaceFailure({ sessions, urlKey, ownerAccountId, selectedReason: selected.reason });
-    if (reason === 'owner_mismatch') {
-      // Log server-side only; the other account's id must never reach the
-      // wire (lib/errors.js privacy boundary).
-      console.warn(`Workspace ${urlKey}: owner account mismatch detected for account ${ownerAccountId}`);
-    }
+
+    // Diagnostic log on EVERY non-ok resolution (not just owner_mismatch, which
+    // was the only case that logged before). A bare `not_connected` is genuinely
+    // ambiguous — a null-owner token (createdBy:null) and an owner who is signed
+    // in but has no session for THIS workspace (the multi-device fork) produce
+    // the identical code — so without this breadcrumb a WORKSPACE_NOT_CONNECTED
+    // incident is un-diagnosable from the logs. The summary is secret-safe: only
+    // the caller's OWN owner id and public workspace slugs, never another
+    // account's id or any token bytes (see describeWorkspaceResolution's privacy
+    // contract; same boundary lib/errors.js enforces on the wire).
+    const diag = describeWorkspaceResolution(sessions, urlKey, ownerAccountId);
+    console.warn(`[workspace-access] resolution failed`, {
+      selectedReason: selected.reason,
+      finalReason: reason,
+      ...diag
+    });
 
     // reason/provider are already the right shape for the workspaceUnavailable
     // 503 envelope — see lib/workspace-token-resolver.js.
