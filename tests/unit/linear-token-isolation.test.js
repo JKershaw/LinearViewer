@@ -29,6 +29,7 @@ import { dirname, join } from 'node:path';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { selectOwnerWorkspaceToken, detectOwnerAccountMismatch, detectOwnerSignedOut, classifyWorkspaceFailure, UNSCOPED } from '../../lib/workspace-token-resolver.js';
+import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -352,6 +353,95 @@ describe('resolveWorkspaceAccess wiring (LIN-1506, Block F — witness C, source
       !body.includes('detectOwnerAccountMismatch('),
       'detectOwnerAccountMismatch must no longer be called directly inside resolveWorkspaceAccess — it moved inside classifyWorkspaceFailure (lib/workspace-token-resolver.js)'
     );
+  });
+
+  test('LIN-1524: UNSCOPED callers never reach refreshOwnerWorkspaceToken (and so never consult the durable store) — the guard is textually attached to the call', () => {
+    // The durable store is the ONLY thing refreshOwnerWorkspaceToken's Linear
+    // arm reads/writes now (LIN-1524) — so "UNSCOPED never consults the
+    // durable store" reduces to "UNSCOPED never reaches this call at all".
+    // That's a source-text fact, not a behavioural one (Block A's A5 already
+    // proves the pure selector's OWN owner-blind behaviour is unaffected;
+    // this proves the call site guarding the durable-refresh attempt).
+    const body = extractResolveWorkspaceAccessBody(SERVER_SRC);
+    const callIdx = body.indexOf('refreshOwnerWorkspaceToken(');
+    assert.ok(callIdx >= 0, 'expected a refreshOwnerWorkspaceToken( call inside resolveWorkspaceAccess');
+
+    const ifLine = body.slice(0, callIdx).split('\n').reverse().find(l => l.trim().startsWith('if ('));
+    assert.ok(ifLine, 'expected an `if (...)` guarding the refreshOwnerWorkspaceToken( call');
+    assert.match(ifLine, /ownerAccountId !== UNSCOPED/, 'the durable-refresh attempt must stay gated on a real (non-UNSCOPED) owner — an owner-blind caller must never trigger a durable-store read/write on anyone\'s behalf');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block G (LIN-1524) — owner isolation over the DURABLE store itself
+// ---------------------------------------------------------------------------
+//
+// Block A (above) proves the session-side selector never lets one account's
+// proxy token resolve to a different account's SESSION token. Now that Linear's
+// rotating credential lives in a separate store (lib/owner-credential-store.js,
+// keyed on `(accountId, urlKey)`), that same guarantee needs its own direct
+// proof at the storage layer: account A's durable record must never resolve
+// for account B, and vice versa, even when both hold a record for the exact
+// same `urlKey` (the realistic case — a Linear org connected by two different
+// Harbour accounts, e.g. two teammates who each connected the same team's
+// workspace independently).
+
+function inMemoryCredentialCollection() {
+  const docs = new Map();
+  return {
+    async findOne(query) { return docs.get(query._id) ?? null; },
+    async updateOne(query, update) {
+      const existing = docs.get(query._id) || { _id: query._id };
+      docs.set(query._id, { ...existing, ...(update.$set || {}) });
+      return { matchedCount: 1, modifiedCount: 1 };
+    },
+    async deleteOne(query) {
+      const had = docs.has(query._id);
+      docs.delete(query._id);
+      return { deletedCount: had ? 1 : 0 };
+    },
+  };
+}
+
+describe('OwnerCredentialStore owner isolation over the durable store (LIN-1524, Block G)', () => {
+  test('G1: account A\'s durable record is never returned for account B\'s get, even for the identical urlKey', async () => {
+    const store = new OwnerCredentialStore({ collection: inMemoryCredentialCollection() });
+    await store.put('account-A', 'acme', { provider: 'linear', scope: 'org-1', token: 'a-token', refreshToken: 'a-refresh', tokenExpiresAt: NOW + FAR_FUTURE_MS });
+    await store.put('account-B', 'acme', { provider: 'linear', scope: 'org-1', token: 'b-token', refreshToken: 'b-refresh', tokenExpiresAt: NOW + FAR_FUTURE_MS });
+
+    const forA = await store.get('account-A', 'acme');
+    const forB = await store.get('account-B', 'acme');
+
+    assert.equal(forA.refreshToken, 'a-refresh');
+    assert.equal(forB.refreshToken, 'b-refresh');
+    assert.notEqual(forA.refreshToken, forB.refreshToken);
+  });
+
+  test('G2: deleting account A\'s record never touches account B\'s, same urlKey', async () => {
+    const store = new OwnerCredentialStore({ collection: inMemoryCredentialCollection() });
+    await store.put('account-A', 'acme', { provider: 'linear', scope: 'org-1', token: 'a-token', refreshToken: 'a-refresh', tokenExpiresAt: NOW + FAR_FUTURE_MS });
+    await store.put('account-B', 'acme', { provider: 'linear', scope: 'org-1', token: 'b-token', refreshToken: 'b-refresh', tokenExpiresAt: NOW + FAR_FUTURE_MS });
+
+    await store.delete('account-A', 'acme');
+
+    assert.equal(await store.get('account-A', 'acme'), null);
+    const survived = await store.get('account-B', 'acme');
+    assert.ok(survived, 'account B\'s record must survive account A\'s deletion');
+    assert.equal(survived.refreshToken, 'b-refresh');
+  });
+
+  test('G3: an attacker-shaped accountId cannot collide with a real one via the composite key (no delimiter-injection cross-read)', async () => {
+    // The key is a plain template literal `${accountId}::${urlKey}` — verify
+    // an accountId value crafted to LOOK like `${real}::${urlKey}` cannot
+    // shadow the real owner's record for the same urlKey.
+    const store = new OwnerCredentialStore({ collection: inMemoryCredentialCollection() });
+    await store.put('account-A', 'acme', { provider: 'linear', scope: 'org-1', token: 'a-token', refreshToken: 'a-refresh', tokenExpiresAt: NOW + FAR_FUTURE_MS });
+
+    const crafted = await store.get('account-A::acme', 'x'); // would collide if the key were naively parsed/split
+    assert.equal(crafted, null);
+    // And the real owner's record is untouched.
+    const real = await store.get('account-A', 'acme');
+    assert.equal(real.refreshToken, 'a-refresh');
   });
 });
 

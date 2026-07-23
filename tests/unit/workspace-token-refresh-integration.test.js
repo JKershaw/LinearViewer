@@ -111,7 +111,8 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
             urlKey: 'acme-real',
             provider: 'linear',
             accessToken: 'stale-access-token',
-            refreshToken: 'real-refresh-token',
+            // LIN-1524: no refreshToken on the session row anymore — it lives
+            // only in the durable store (`store.get` below).
             tokenExpiresAt: Date.now() - 10_000, // already expired
           }],
         },
@@ -127,7 +128,17 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
     const sessions = await collection.find().then(c => c.toArray());
     const refreshImpl = (refreshToken) => refreshAccessToken(refreshToken, { tokenUrl });
     const storeCalls = [];
-    const store = { async put(accountId, urlKey, credential) { storeCalls.push({ accountId, urlKey, credential }); } };
+    // LIN-1524: the durable record is what actually carries the refresh token now.
+    const durableRecords = new Map([
+      ['account-real::acme-real', { provider: 'linear', scope: 'acme-real', token: 'stale-access-token', refreshToken: 'real-refresh-token', tokenExpiresAt: Date.now() - 10_000 }],
+    ]);
+    const store = {
+      async get(accountId, urlKey) { return durableRecords.get(`${accountId}::${urlKey}`) ?? null; },
+      async put(accountId, urlKey, credential) {
+        storeCalls.push({ accountId, urlKey, credential });
+        durableRecords.set(`${accountId}::${urlKey}`, credential);
+      },
+    };
 
     const result = await refreshOwnerWorkspaceToken({
       sessions,
@@ -141,28 +152,35 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
     assert.equal(result.token, 'rotated-access-token');
     assert.equal(result.provider, 'linear');
 
-    // LIN-1523: the durable dual-write landed once, with the rotated (not the
+    // LIN-1524: the durable write landed once, with the rotated (not the
     // old) refreshToken, for the correct owner/workspace pair.
     assert.equal(storeCalls.length, 1);
     assert.equal(storeCalls[0].accountId, 'account-real');
     assert.equal(storeCalls[0].urlKey, 'acme-real');
     assert.equal(storeCalls[0].credential.refreshToken, 'rotated-refresh-token');
 
-    // Persisted to the SAME row, rotated refresh_token (not the old one).
+    // The session row is mirrored (accessToken only — refreshToken lives ONLY
+    // in the durable store now, never written back to the session).
     const persistedDoc = collection._raw().find(d => d._id === 'sid-real-1');
     assert.equal(persistedDoc.session.workspaces[0].accessToken, 'rotated-access-token');
-    assert.equal(persistedDoc.session.workspaces[0].refreshToken, 'rotated-refresh-token');
-    assert.notEqual(persistedDoc.session.workspaces[0].refreshToken, 'real-refresh-token');
+    assert.equal(persistedDoc.session.workspaces[0].refreshToken, undefined);
 
     // TTL preserved — the session row's `expires` field is byte-identical to
     // what it was before the refresh-on-resolve persist (the load-bearing
     // LIN-1373 constraint that keeps this inside LIN-1367's (b) envelope).
     assert.equal(persistedDoc.expires, originalExpires);
 
-    // Re-select via the real pure selector now returns ok with the fresh token.
+    // Re-select via the real pure selector now returns ok with the fresh token
+    // (accessToken mirror is what makes this resolve — the durable record
+    // itself is never consulted by this selector).
     const after = selectOwnerWorkspaceToken(collection._raw(), 'acme-real', 'account-real');
     assert.equal(after.reason, 'ok');
     assert.equal(after.token, 'rotated-access-token');
+
+    // And the durable record itself now holds the rotated refresh token.
+    const durableAfter = await store.get('account-real', 'acme-real');
+    assert.equal(durableAfter.refreshToken, 'rotated-refresh-token');
+    assert.notEqual(durableAfter.refreshToken, 'real-refresh-token');
   });
 
   test('I2: Linear rejects the refresh (invalid_grant, real 400 over HTTP) -> real TokenRefreshError(EXPIRED), no persist, selector still session_expired (never a 500, never a fabricated success)', async () => {
@@ -181,7 +199,7 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
             urlKey: 'acme-real-2',
             provider: 'linear',
             accessToken: 'stale-access-token',
-            refreshToken: 'dead-refresh-token',
+            // LIN-1524: no refreshToken on the session row — durable-store-only.
             tokenExpiresAt: Date.now() - 10_000,
           }],
         },
@@ -190,6 +208,10 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
     const persistSession = makePersistSessionRow(collection);
     const sessions = await collection.find().then(c => c.toArray());
     const refreshImpl = (refreshToken) => refreshAccessToken(refreshToken, { tokenUrl });
+    const store = {
+      async get() { return { provider: 'linear', scope: 'acme-real-2', token: 'stale-access-token', refreshToken: 'dead-refresh-token', tokenExpiresAt: Date.now() - 10_000 }; },
+      async put() { throw new Error('must not be called — the refresh failed'); },
+    };
 
     await assert.rejects(
       () => refreshOwnerWorkspaceToken({
@@ -198,6 +220,7 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
         ownerAccountId: 'account-real-2',
         refreshAccessToken: refreshImpl,
         persistSession,
+        store,
       }),
       (err) => {
         assert.ok(err instanceof TokenRefreshError);
@@ -299,6 +322,18 @@ describe('LIN-1499 GitHub composition witness (real refreshCredential + real rem
     const persistSession = makePersistSessionRow(collection);
     const sessions = await collection.find().then(c => c.toArray());
     const refreshAccessTokenImpl = async () => { throw new Error('Linear exchange must not be called for a GitHub row'); };
+    // LIN-1524 close-out replacement assertion (D5-style), applied here at the
+    // COMPOSITION level with the real provider: the original assertion below
+    // ("refreshToken stays undefined") is a vacuity trap post-cutover, since
+    // NOTHING writes refreshToken to the session for anyone anymore — it would
+    // pass even if this composition accidentally started creating a durable
+    // Linear record for a GitHub-family workspace. The real proof is against
+    // the durable store directly: it must never be touched.
+    const storeCalls = [];
+    const store = {
+      async get() { return null; },
+      async put(...args) { storeCalls.push(args); },
+    };
 
     const result = await refreshOwnerWorkspaceToken({
       sessions,
@@ -307,6 +342,7 @@ describe('LIN-1499 GitHub composition witness (real refreshCredential + real rem
       refreshAccessToken: refreshAccessTokenImpl,
       persistSession,
       resolveProvider,
+      store,
       fetchImpl,
       now,
     });
@@ -328,5 +364,75 @@ describe('LIN-1499 GitHub composition witness (real refreshCredential + real rem
     assert.equal(persistedWs.refreshToken, undefined, 'GitHub-family must never gain a refreshToken (would corrupt Linear-wire-shaped state)');
     assert.ok(Number.isFinite(persistedWs.tokenExpiresAt) && !Number.isNaN(persistedWs.tokenExpiresAt));
     assert.equal(persistedWs.bindings[0].credentials.installationId, '987', 'installationId survives the linkProvider merge');
+
+    // The actual replacement assertion: the durable store — Linear-only by
+    // design — was never touched by this GitHub-family composition.
+    assert.equal(storeCalls.length, 0, 'store.put must never be called for a GitHub-family re-mint, even at the real-provider composition level');
+  });
+});
+
+describe('LIN-1524 durable-only real-refresh witness (logged-out owner, unstubbed refreshAccessToken)', () => {
+  test('I4 (LIN-1524\'s end-to-end deliverable): real HTTP Linear refresh sourced from a durable record with NO session row present at all', async () => {
+    // The integration-level counterpart of the unit suite's B9b: a proxy token
+    // resolving a workspace whose owner has fully logged out — zero session
+    // rows for this account, anywhere, in the whole collection — still
+    // refreshes successfully, using the REAL (unstubbed) refreshAccessToken
+    // over real HTTP, sourced entirely from the durable record. Before
+    // LIN-1524 this was structurally impossible: refresh-on-resolve only ever
+    // read sessions, so a logged-out owner's proxy token was permanently dead
+    // the moment the session row disappeared. This is the phase's actual
+    // deliverable, proven at the same fidelity (real HTTP, real token
+    // exchange) as I1/I2.
+    tokenServerBehavior = (req, res, body) => {
+      assert.equal(req.method, 'POST');
+      assert.ok(body.includes('grant_type=refresh_token'));
+      assert.ok(body.includes('refresh_token=durable-only-refresh-token'));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        access_token: 'rotated-from-durable-only',
+        refresh_token: 'rotated-refresh-durable-only',
+        expires_in: 3600,
+        scope: 'read write',
+      }));
+    };
+
+    // No session rows at all — the collection is entirely empty. There is
+    // nothing for selectExpiredOwnerRow (or its sibling selectOwnerSessionRow)
+    // to find, by construction.
+    const collection = inMemorySessionsCollection([]);
+    const persistSession = makePersistSessionRow(collection);
+    const refreshImpl = (refreshToken) => refreshAccessToken(refreshToken, { tokenUrl });
+
+    const durableRecords = new Map([
+      ['account-loggedout::acme-loggedout', { provider: 'linear', scope: 'acme-loggedout', token: 'stale-pre-logout-token', refreshToken: 'durable-only-refresh-token', tokenExpiresAt: Date.now() - 10_000 }],
+    ]);
+    const storeCalls = [];
+    const store = {
+      async get(accountId, urlKey) { return durableRecords.get(`${accountId}::${urlKey}`) ?? null; },
+      async put(accountId, urlKey, credential) { storeCalls.push({ accountId, urlKey, credential }); durableRecords.set(`${accountId}::${urlKey}`, credential); },
+    };
+
+    const result = await refreshOwnerWorkspaceToken({
+      sessions: await collection.find().then(c => c.toArray()),
+      urlKey: 'acme-loggedout',
+      ownerAccountId: 'account-loggedout',
+      refreshAccessToken: refreshImpl,
+      persistSession,
+      store,
+    });
+
+    assert.equal(result.token, 'rotated-from-durable-only');
+    assert.equal(result.provider, 'linear');
+    assert.ok(result.expiresAt > Date.now());
+
+    // The durable record was rotated — real refresh_token, real rotation.
+    assert.equal(storeCalls.length, 1);
+    assert.equal(storeCalls[0].credential.refreshToken, 'rotated-refresh-durable-only');
+    assert.notEqual(storeCalls[0].credential.refreshToken, 'durable-only-refresh-token');
+
+    // No session row existed anywhere — nothing was (or could be) mirrored
+    // into one. The collection stays empty; this is not an error case, it's
+    // the correct behaviour for a logged-out owner.
+    assert.equal(collection._raw().length, 0);
   });
 });

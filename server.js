@@ -557,7 +557,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore }))
 }
 
 // =============================================================================
@@ -631,9 +631,25 @@ async function ensureValidToken(req, res, next) {
     if (workspace.provider === 'github' || workspace.provider === 'github-projects') {
       await remintActiveCredential(workspace, getProviderForWorkspace(workspace))
     } else {
-      const newTokens = await refreshAccessToken(workspace.refreshToken)
+      // LIN-1524: Linear's rotating credential lives ONLY in the durable
+      // store now — `workspace.refreshToken` is never written anymore, so it
+      // is read from there instead. A miss (no durable record, or one with no
+      // refreshToken) is a deliberate, explicit failure — not a silent
+      // no-op — so it falls into the SAME catch below that a real
+      // `refreshAccessToken` failure always has: remove the workspace, evict,
+      // possibly destroy the session. This is the read-side of close-out
+      // Finding #4's legacy no-`accountId` session (a guaranteed durable
+      // read-miss, since `store.get` fails closed on a missing accountId) —
+      // it degrades to exactly today's pre-cutover failure mode, not a new one.
+      const durableRecord = await ownerCredentialStore.get(req.session.accountId, workspace.urlKey)
+      if (!durableRecord?.refreshToken) {
+        throw new Error(`No durable Linear credential to refresh workspace ${workspace.id}`)
+      }
+      const newTokens = await refreshAccessToken(durableRecord.refreshToken)
 
-      // Update workspace tokens + dual-write the durable owner credential (LIN-1523)
+      // Update workspace tokens (session-side accessToken/tokenExpiresAt
+      // mirror only, LIN-1524) + persist the rotated refreshToken durably
+      // (LIN-1523/1524's rotation seam).
       await rotateOwnerCredential({ accountId: req.session.accountId, workspace, tokenData: newTokens, store: ownerCredentialStore })
     }
 
@@ -643,8 +659,20 @@ async function ensureValidToken(req, res, next) {
   } catch (error) {
     console.error(`Token refresh failed for workspace ${workspace.id}:`, error)
 
+    // LIN-1507: capture accountId BEFORE any session mutation below — destroy()
+    // (the remaining===0 arm) wipes it, and LIN-1524 close-out Finding #1 needs
+    // it in BOTH arms, not just the destroy one.
+    const accountId = req.session.accountId
+
     // Remove failed workspace
     const remaining = removeWorkspace(req.session, workspace.id)
+
+    // LIN-1524 close-out Finding #1: this failed workspace's durable credential
+    // must not outlive its session-side removal — `workspace` is gone from
+    // session.workspaces after removeWorkspace above regardless of `remaining`,
+    // so the durable delete belongs here, before the branch, not only in the
+    // destroy arm below.
+    await ownerCredentialStore.delete(accountId, workspace.urlKey)
 
     if (remaining > 0) {
       // Switch to another workspace
@@ -652,10 +680,7 @@ async function ensureValidToken(req, res, next) {
       return res.redirect('/')
     }
 
-    // No workspaces left, destroy session. LIN-1507: capture accountId BEFORE
-    // destroy() — `workspace` (the one that just failed refresh) is the only
-    // workspace this session held, since `remaining === 0` proves it.
-    const accountId = req.session.accountId
+    // No workspaces left, destroy session.
     evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, accountId)
     req.session.destroy(() => res.redirect('/'))
   }
@@ -857,6 +882,13 @@ async function handleWorkspaceRemoval(session, workspaceId, res) {
   const remaining = removeWorkspace(session, workspaceId);
   const deployInfo = getDeployInfo()
 
+  // LIN-1524 close-out Finding #1: the removed workspace's durable credential
+  // must not outlive its session-side removal — belongs here, before the
+  // branch, since `removedWorkspace` is gone from session.workspaces either way.
+  if (removedWorkspace) {
+    await ownerCredentialStore.delete(session.accountId, removedWorkspace.urlKey);
+  }
+
   if (remaining > 0) {
     await saveSession(session);
     return res.redirect('/');
@@ -879,10 +911,13 @@ async function handleWorkspaceRemoval(session, workspaceId, res) {
 }
 
 /**
- * Attempts to refresh an expired token and retry the request.
+ * Attempts to refresh an expired token and retry the request. `refreshToken`
+ * is passed explicitly (LIN-1524) — Linear's rotating credential lives in the
+ * durable store now, not on `workspace`, and the caller (handleUnauthorizedError)
+ * already fetched the durable record to decide whether to call this at all.
  */
-async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res) {
-  const tokenData = await refreshAccessToken(workspace.refreshToken);
+async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res, refreshToken) {
+  const tokenData = await refreshAccessToken(refreshToken);
   await rotateOwnerCredential({ accountId: session.accountId, workspace, tokenData, store: ownerCredentialStore });
   await saveSession(session);
   console.log('Token refreshed after 401, retrying request');
@@ -937,9 +972,20 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
     return;
   }
 
-  if (workspace.refreshToken) {
+  // LIN-1524 (folding in LIN-1503's mandatory predicate half): re-point at the
+  // durable record instead of the session-side `workspace.refreshToken`,
+  // which Linear no longer carries — that gate would now be permanently
+  // false for Linear too, and every 401 would delete the workspace instead of
+  // refreshing it (the same LIN-1499 destructive-mode defect class, this time
+  // for Linear). Provider-blindness itself is UNCHANGED and stays exactly as
+  // broken as before for GitHub-family (no durable record ever exists for it,
+  // so this still evaluates false and falls through to removal) — LIN-1503
+  // remains filed separately for that broader fix; this is only the one
+  // re-point this cutover makes mandatory.
+  const durableRecord = await ownerCredentialStore.get(session.accountId, workspace.urlKey);
+  if (durableRecord?.refreshToken) {
     try {
-      return await handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res);
+      return await handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res, durableRecord.refreshToken);
     } catch (refreshError) {
       console.error('Token refresh failed after 401:', refreshError);
       return handleWorkspaceRemoval(session, workspace.id, res);
@@ -1278,17 +1324,25 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
       return { token: selected.token, reason: 'ok', provider: selected.provider };
     }
 
-    // LIN-1373 refresh-on-resolve: the selector above only ever READS sessions,
-    // so a headless proxy token stopped resolving the instant its creator's
-    // Linear access token lapsed — only human web activity (ensureValidToken,
-    // above) ever refreshed it. When the fail-closed reason is session_expired
-    // for a SCOPED (owner-known) lookup, attempt exactly one refresh of the
-    // owner's own expired row using the refreshToken already sitting in that
-    // same session blob. Never for UNSCOPED (legacy owner-blind) callers —
-    // there is no single owner to refresh on behalf of. Any failure (nothing
-    // to refresh, or the refresh itself failing) falls straight through to the
-    // untouched session_expired result below — never a 500, never cached.
-    if (selected.reason === 'session_expired' && ownerAccountId !== UNSCOPED) {
+    // LIN-1373 refresh-on-resolve, widened LIN-1524: the selector above only
+    // ever READS sessions, so a headless proxy token stopped resolving the
+    // instant its creator's Linear access token lapsed — only human web
+    // activity (ensureValidToken, above) ever refreshed it. `selected.token`
+    // is already known falsy here (we returned above if it were truthy), so
+    // the predicate is really `ownerAccountId !== UNSCOPED` — written as
+    // `!selected.token && ...` to state the intent at the call site: attempt
+    // a durable refresh whenever no token resolved AND there's a single owner
+    // to refresh on behalf of. LIN-1524 is what makes this reachable for
+    // BOTH `session_expired` (a session row exists, expired) and
+    // `not_connected` (no session row at all — e.g. after logout): Linear's
+    // rotating credential now lives in the durable store regardless of which
+    // one applies, so a bare `session_expired` gate would have wrongly kept
+    // `not_connected` — the whole point of this ticket — falling straight to
+    // a 503 forever. Never for UNSCOPED (legacy owner-blind) callers — there
+    // is no single owner to refresh on behalf of. Any failure (nothing to
+    // refresh, or the refresh itself failing) falls straight through to the
+    // untouched classification below — never a 500, never cached.
+    if (!selected.token && ownerAccountId !== UNSCOPED) {
       try {
         const refreshed = await refreshOwnerWorkspaceToken({
           sessions,
@@ -2396,15 +2450,31 @@ app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async
     return res.redirect(`${settingsUrl}?provider_error=invalid`);
   }
 
+  // LIN-1524 close-out Finding #2: unlinkProvider no-ops on an unmatched
+  // (provider, scope) — it returns `workspace` unchanged in both the removed
+  // and no-op cases, so its return value carries no removal signal.
+  // getBindingsForWorkspace is NOT safe for this before/after comparison: it
+  // SYNTHESIZES a phantom binding whenever `workspace.bindings` is empty/absent
+  // (by design, for legacy un-migrated workspaces), so a real removal that
+  // empties `workspace.bindings` to `[]` would read back as an unchanged
+  // count. The reliable signal is reference identity on the RAW
+  // `workspace.bindings` array: unlinkProvider only ever reassigns it (always
+  // to a new array, via `.filter()`) on an actual removal, and leaves it
+  // byte-identical (same reference, including both undefined) on a no-op.
+  const bindingsBefore = workspace.bindings;
   unlinkProvider(workspace, provider, scope);
+  const bindingRemoved = workspace.bindings !== bindingsBefore;
 
   // LIN-1523: unlinking the active Linear binding revokes its durable
   // credential too — the existing session-side delete (inside unlinkProvider,
   // untouched, unlinkProvider stays a pure/sync mutator) stays; this is
   // ADDITIVE alongside it, not a replacement. Scoped to 'linear' only: the
   // durable store is Linear-only by design, so unlinking a non-Linear
-  // provider (e.g. github) must not touch it.
-  if (provider === 'linear') {
+  // provider (e.g. github) must not touch it. Gated on `bindingRemoved` too
+  // (LIN-1524 close-out Finding #2): a POST with `provider=linear` and a
+  // non-matching `scope` must not destroy a durable record whose session
+  // binding is still intact.
+  if (provider === 'linear' && bindingRemoved) {
     await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey);
   }
 
