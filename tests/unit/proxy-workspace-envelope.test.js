@@ -1,7 +1,7 @@
 /**
  * LIN-417 — structured error envelope for proxy workspace-resolution failures.
  *
- * Two layers are pinned here:
+ * Three layers are pinned here:
  *
  *  1. The pure reason→envelope mapping in lib/errors.js
  *     (`workspaceUnavailableEnvelope`): each `reason` produces a stable
@@ -18,6 +18,12 @@
  *     drives each and the test asserts the 503 body is the structured envelope.
  *     The HTTP status stays 503 in every case; only the body gains structure.
  *
+ *  3. The reason PERSISTENCE added by LIN-1540: the same recovered `reason` also
+ *     rides the durable proxy-events audit row as its `note`, so 503s are
+ *     countable by reason after the response is gone. Layer 2 proves the reason
+ *     reaches the caller; layer 3 proves it reaches the store and comes back out
+ *     of the events read surface.
+ *
  * The e2e suite can't cover this: in test mode `resolveWorkspaceAccess`
  * short-circuits `test-workspace`→`test-token` (reason `ok`), so the null /
  * failure path never runs end-to-end.
@@ -28,6 +34,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { workspaceUnavailableEnvelope } from '../../lib/errors.js';
+import { ProxyEventStore } from '../../lib/proxy-events.js';
 
 // ---------------------------------------------------------------------------
 // 1. Pure envelope mapping (lib/errors.js)
@@ -191,7 +198,10 @@ test('unknown reason falls back to a safe, non-retryable internal envelope', () 
 // 2. Dual-shape threading through the live proxy routes (forced reason)
 // ---------------------------------------------------------------------------
 
-function buildApp(reason) {
+// `proxyEventStore` is injectable so the LIN-1540 tests below can observe what
+// the 503 path actually writes to the audit row; it defaults to the original
+// no-op, so every test above is unaffected.
+function buildApp(reason, proxyEventStore = { recordEvent: async () => {} }) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -201,7 +211,7 @@ function buildApp(reason) {
         tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1'
       })
     },
-    proxyEventStore: { recordEvent: async () => {} },
+    proxyEventStore,
     // The seam under test: force a chosen failure reason (null token).
     resolveWorkspaceAccess: async () => ({ token: null, reason }),
     getWorkspaceAccessToken: async () => null,
@@ -210,7 +220,9 @@ function buildApp(reason) {
     recapCacheStore: {},
     briefCacheStore: {},
     dispatchQueueStore: {},
-    workspaceFromUrl: (req, res, next) => next(),
+    // Pins the same workspace the token resolves to, so the user-facing events
+    // read surface (GET /workspace/:urlKey/api/proxy/events) is reachable here.
+    workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: 'acme' }; next(); },
     getWorkspaceOpenRouterKey: async () => null,
     workspacePreferencesStore: {},
     // Free-tier metering: a no-op stub; the failure paths under test never charge.
@@ -290,4 +302,69 @@ test('Shape B (/stack) threads owner_signed_out through to auth envelope (LIN-15
   assert.equal(body.category, 'auth');
   assert.equal(body.retryable, false);
   assert.equal(body.context.workspaceUrlKey, 'acme');
+});
+
+// ---------------------------------------------------------------------------
+// 3. Reason PERSISTENCE on the durable audit row (LIN-1540)
+// ---------------------------------------------------------------------------
+//
+// Everything above pins the reason reaching the *response envelope* — which is
+// ephemeral. LIN-1538's diagnostic had the same weakness one layer down: its
+// only sink was a console.warn, so the discriminating field could never be
+// counted. `workspaceUnavailable` already wrote a durable, 30-day-TTL audit row
+// on this exact path, but dropped the in-scope `reason`, so every 503 landed as
+// an indistinguishable `note: null`. Passing it through as the existing `note`
+// breadcrumb (the LIN-961 field) makes 503s countable BY REASON with no schema
+// change. These tests pin the write side; the read side already returned `note`.
+
+test('LIN-1540: a 503 records the failure reason as the note on the audit row', async () => {
+  // Two DIFFERENT reasons, because the bug this guards against is a dropped
+  // argument: a single-reason assertion would still pass if the code hardcoded
+  // one value. Against the unfixed `logEvent(req, endpoint, 503)` both legs
+  // record `note: null` and fail.
+  for (const reason of ['not_connected', 'owner_mismatch']) {
+    const recorded = [];
+    const store = { recordEvent: async event => { recorded.push(event); } };
+
+    const { status } = await getJson(buildApp(reason, store), '/api/proxy/stack');
+
+    assert.equal(status, 503);
+    assert.equal(recorded.length, 1, `expected exactly one audit row for ${reason}`);
+    assert.equal(recorded[0].status, 503);
+    assert.equal(recorded[0].note, reason, `audit row lost the reason for ${reason}`);
+    // The row still identifies the call it describes — the note is additive.
+    assert.equal(recorded[0].urlKey, 'acme');
+    assert.equal(recorded[0].endpoint, '/api/proxy/stack');
+  }
+});
+
+// The acceptance surface named by the ticket: the reason must be READABLE, not
+// merely written. Driven through the real ProxyEventStore (so recordEvent's
+// `note || null` normalization and listEvents' projection both run) over a
+// minimal in-memory collection, then read back through the live user-facing
+// route rather than by inspecting the store directly.
+function inMemoryEventCollection() {
+  const docs = [];
+  return {
+    insertOne: async doc => { docs.push(doc); return { insertedId: doc._id }; },
+    // Honours the urlKey + non-expired filter listEvents actually issues, so
+    // the 30-day TTL semantics stay real rather than being stubbed away.
+    find: ({ urlKey, expiresAt }) => ({
+      toArray: async () => docs.filter(d => d.urlKey === urlKey && d.expiresAt > expiresAt.$gt)
+    })
+  };
+}
+
+test('LIN-1540: the reason is readable on GET /workspace/:urlKey/api/proxy/events', async () => {
+  const store = new ProxyEventStore({ collection: inMemoryEventCollection() });
+  const app = buildApp('session_expired', store);
+
+  const { status } = await getJson(app, '/api/proxy/stack');
+  assert.equal(status, 503);
+
+  const { status: readStatus, body } = await getJson(app, '/workspace/acme/api/proxy/events');
+  assert.equal(readStatus, 200);
+  assert.equal(body.total, 1);
+  assert.equal(body.items[0].status, 503);
+  assert.equal(body.items[0].note, 'session_expired');
 });

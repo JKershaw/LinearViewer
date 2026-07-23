@@ -727,9 +727,12 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * decide whether to back off (retryable) or escalate (auth/config).
    * `reason` is threaded unmodified from resolveWorkspaceAccess at every read,
    * write, and compute endpoint (all now share the single raw-token path).
+   * It also rides the audit write as the `note` breadcrumb (LIN-1540) so a 503
+   * records WHICH reason fired and is countable by reason over the store's
+   * 30-day window; the envelope already returns it, so this widens no exposure.
    */
   function workspaceUnavailable(req, res, endpoint, reason) {
-    logEvent(req, endpoint, 503);
+    logEvent(req, endpoint, 503, reason);
     return res.status(503).json(workspaceUnavailableEnvelope(reason, req.proxyUrlKey));
   }
 
