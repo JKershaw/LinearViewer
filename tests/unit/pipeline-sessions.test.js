@@ -579,7 +579,10 @@ describe('getSessionsForWorkspace', () => {
         listItems: async () => [],
         listHistory: async () => ({ items: history })
       },
-      agentStatusStore: { listStatus: async () => ({ items: [] }) }
+      agentStatusStore: { listStatus: async () => ({ items: [] }) },
+      // Pin "now" next to the fixed-date fixtures: without it the real clock
+      // ages them out of the 30-day lookback and the test time-bombs.
+      now: NOW
     };
     const sessions = await getSessionsForWorkspace('ws', deps);
     assert.strictEqual(sessions.length, 1);
