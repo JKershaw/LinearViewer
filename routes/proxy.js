@@ -756,6 +756,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    *  - 401/403 from Linear → 401 (workspace token invalid/expired)
    *  - 404 from Linear     → 404 (resource not found)
    *  - 429 from Linear     → 429 (rate limited)
+   *  - a flagged caller error (extensions.userError) → 400 (see below)
    *  - anything else       → 500
    */
   function graphqlErrorStatus(err) {
@@ -767,6 +768,19 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     if (status === 401 || status === 403) return 401;
     if (status === 404) return 404;
     if (status === 429) return 429;
+    // Linear reports a CALLER error inside an HTTP 200 GraphQL envelope carrying
+    // no `statusCode` at all — e.g. a malformed page cursor:
+    //   status: 200, extensions: { code: 'INVALID_INPUT', type: 'invalid input',
+    //   userError: true, userPresentableMessage: 'after is not a valid …' }
+    // Neither branch above can see that (200 matches nothing, statusCode is
+    // undefined), so every such response fell through to 500 — telling an agent
+    // "the server broke, back off and retry" about an input only the caller can
+    // fix. `userError` is Linear's own explicit "this one is on you" flag, so it
+    // maps to 400 on every route, not just /issues: a caller error is a caller
+    // error wherever it lands. Deliberately evaluated LAST, after the four
+    // mappings above have had their say, so this can only refine a would-be 500
+    // — no status this function already returns can move. (LIN-1511)
+    if (err.response?.errors?.[0]?.extensions?.userError === true) return 400;
     return 500;
   }
 
@@ -781,13 +795,23 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    *  - err.message                    → network / fetch / parse failure,
    *    potentially containing internal stack traces or proxy-level details.
    *    Log server-side and return a generic message to the caller.
+   *
+   * Within the first bucket, `extensions.userPresentableMessage` is preferred
+   * over the top-level `message` when Linear supplies one: it is the same trust
+   * class (Linear-authored, on the same `errors[0]`, explicitly named as
+   * caller-presentable) but far more actionable — "after is not a valid
+   * pagination cursor identifier." instead of the generic "Argument Validation
+   * Error", which is precisely the self-diagnosis this policy exists to serve.
+   * Only that one string is surfaced: the sibling `extensions.validationErrors`
+   * carries the whole echoed variables object and stays server-side. (LIN-1511)
    */
   function graphqlErrorDetail(err) {
     if (err.name === 'TimeoutError' || err.name === 'AbortError') {
       return 'Linear API request timed out — the response may be too large or Linear is slow. Try a more specific query.';
     }
 
-    const gqlMessage = err.response?.errors?.[0]?.message;
+    const gqlError = err.response?.errors?.[0];
+    const gqlMessage = gqlError?.extensions?.userPresentableMessage || gqlError?.message;
     if (gqlMessage) {
       const status = err.response?.status || err.response?.errors?.[0]?.extensions?.statusCode;
       if (status === 401 || status === 403) {
@@ -1070,6 +1094,9 @@ GET ${baseUrl}/api/proxy/issues?teamId={teamId}&limit={n}&after={cursor}
     hasNextPage is false — that flag is the authoritative terminal signal (do
     not key off endCursor, which may still be non-null on the final page). The
     cursor is opaque — pass it through verbatim, do not parse it.
+  → A cursor the provider does not recognise (hand-built, truncated, or from a
+    different query) is a 400, not a 500 — do not retry it, re-page from the
+    start instead.
 
 GET ${baseUrl}/api/proxy/issues/{issueId}
   → Full issue detail; issueId: UUID or identifier like "LIN-123"
@@ -1446,7 +1473,9 @@ One convention across every endpoint, so you can branch on the same fields every
 
 ## Error Codes
 
-400 - Validation error (bad/missing field, malformed ID)
+400 - Validation error (bad/missing field, malformed ID, malformed page cursor).
+      Includes input the upstream provider rejects as a caller error — the
+      \`detail\` names what was wrong. Never retryable: fix the input.
 401 - Invalid, expired, or consumed token
 403 - Endpoint requires read-write token (yours is read-only)
 404 - Resource not found (includes a trashed target on the task-automation endpoints)

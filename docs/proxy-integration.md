@@ -281,6 +281,14 @@ as the `after` query param on the next request, and stop when `hasNextPage` is
 Local provider but a real cursor string for Linear). The cursor is opaque — pass
 it through verbatim; do not parse, decode, or construct it.
 
+A cursor the provider does not recognise — hand-built, truncated, or carried over
+from a different query — returns **`400`** with a `detail` naming the problem
+(e.g. `"after is not a valid pagination cursor identifier."`). That is a caller
+error, not a server fault: **do not retry it**, restart the loop from the first
+unpaged request. Note the providers differ here, which is why the cursor must
+come back untouched from a previous response: Linear rejects an unrecognised
+cursor, while the Local provider degrades it to the first page.
+
 ```bash
 after=
 while :; do
@@ -1462,7 +1470,7 @@ Note for aggregating consumers: `feedbackCount` is no longer additive across row
 
 | Status | Error | Description |
 |--------|-------|-------------|
-| 400 | Various | Invalid input (bad UUID, missing required field, etc.) |
+| 400 | Various | Invalid input (bad UUID, missing required field, malformed page cursor, etc.). Also covers input the **upstream provider** rejects as a caller error — Linear flags these with `userError` inside an HTTP 200 GraphQL envelope, and the proxy maps them here rather than to a 500. `detail` carries the provider's own explanation of what was wrong. **Never retryable** — fix the input. |
 | 401 | `Missing or invalid Authorization header` | No Bearer token provided |
 | 401 | `Invalid, expired, or consumed token` | Token doesn't exist, expired, or was single-use and already used |
 | 403 | `This endpoint requires a read-write token` | Write endpoint called with read-only token |
