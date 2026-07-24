@@ -235,13 +235,14 @@ Response:
 #### List Issues
 
 ```
-GET /api/proxy/issues?teamId={uuid}&limit={n}
+GET /api/proxy/issues?teamId={uuid}&limit={n}&after={cursor}
 ```
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `teamId` | UUID | No | Filter by team |
 | `limit` | int | No | Max results (1-250, default 50) |
+| `after` | string | No | Opaque page cursor — pass the previous response's `pageInfo.endCursor` to fetch the next page. Alias: `cursor`. |
 
 Response includes pagination:
 ```json
@@ -271,6 +272,37 @@ Response includes pagination:
   }
 }
 ```
+
+**Paging the whole workspace.** `limit` caps a single page at 250. To read every
+issue in a larger workspace, loop: pass the response's `pageInfo.endCursor` back
+as the `after` query param on the next request, and stop when `hasNextPage` is
+`false`. `hasNextPage` is the authoritative terminal signal — do **not** key off
+`endCursor`, which may still be non-null on the final page (it is null for the
+Local provider but a real cursor string for Linear). The cursor is opaque — pass
+it through verbatim; do not parse, decode, or construct it.
+
+A cursor the provider does not recognise — hand-built, truncated, or carried over
+from a different query — returns **`400`** with a `detail` naming the problem
+(e.g. `"after is not a valid pagination cursor identifier."`). That is a caller
+error, not a server fault: **do not retry it**, restart the loop from the first
+unpaged request. Note the providers differ here, which is why the cursor must
+come back untouched from a previous response: Linear rejects an unrecognised
+cursor, while the Local provider degrades it to the first page.
+
+```bash
+after=
+while :; do
+  page=$(curl -s -H "Authorization: Bearer $TOKEN" \
+    "$BASE/api/proxy/issues?limit=250${after:+&after=$after}")
+  echo "$page" | jq -c '.issues[].identifier'
+  [ "$(echo "$page" | jq -r '.pageInfo.hasNextPage')" = "true" ] || break
+  after=$(echo "$page" | jq -r '.pageInfo.endCursor')
+done
+```
+
+> `/api/proxy/search` does **not** support `after` — its results are
+> relevance-ranked and capped, and paging it is tracked separately. Use
+> `/api/proxy/issues` for complete workspace enumeration.
 
 #### Get Issue Detail
 
@@ -1438,7 +1470,7 @@ Note for aggregating consumers: `feedbackCount` is no longer additive across row
 
 | Status | Error | Description |
 |--------|-------|-------------|
-| 400 | Various | Invalid input (bad UUID, missing required field, etc.) |
+| 400 | Various | Invalid input (bad UUID, missing required field, malformed page cursor, etc.). Also covers input the **upstream provider** rejects as a caller error — Linear flags these with `userError` inside an HTTP 200 GraphQL envelope, and the proxy maps them here rather than to a 500. `detail` carries the provider's own explanation of what was wrong. **Never retryable** — fix the input. |
 | 401 | `Missing or invalid Authorization header` | No Bearer token provided |
 | 401 | `Invalid, expired, or consumed token` | Token doesn't exist, expired, or was single-use and already used |
 | 403 | `This endpoint requires a read-write token` | Write endpoint called with read-only token |
