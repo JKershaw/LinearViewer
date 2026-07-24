@@ -180,6 +180,16 @@ describe('rate table shape (LIN-1495)', () => {
     }
   });
 
+  test('the table and its rows are frozen — a rate card a caller can mutate is not one representation', () => {
+    assert.ok(Object.isFrozen(MODEL_PRICING));
+    for (const [id, rate] of Object.entries(MODEL_PRICING)) {
+      assert.ok(Object.isFrozen(rate), `${id}'s rate row is frozen`);
+    }
+    const row = getModelRate('anthropic/claude-opus-5');
+    assert.throws(() => { 'use strict'; row.prompt = 0; }, TypeError);
+    assert.strictEqual(getModelRate('anthropic/claude-opus-5').prompt, 5.00);
+  });
+
   test('getModelRate rejects unknown, falsy, and non-string ids', () => {
     assert.strictEqual(getModelRate('some-provider/unknown-model'), null);
     assert.strictEqual(getModelRate(''), null);
