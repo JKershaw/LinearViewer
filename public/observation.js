@@ -562,6 +562,40 @@ function runsByTask(s) {
   return groups;
 }
 
+// Group a task's worker runs into lineages (LIN-1487): a multi-wake lineage
+// folds into one visual unit at RENDER time, mirroring the session page's
+// `groupLoopsByLineage` (S2b). The key is `r.lineageId ?? r.loopId` — NEVER raw
+// `r.lineageId`: a null/undefined lineage (stale docs materialized before the
+// field existed; pre-LIN-1468 dispatch rows that never carried a rootItemId)
+// would otherwise collapse every unrelated null-lineage run under one
+// `undefined` key into a bogus mega-group. The fallback degrades those to a
+// lineage-of-one, which renders exactly as today. Order is preserved and a
+// lineage's runs move together at first-seen position. This groups PRESENTATION
+// only — `s.runs` stays N entries, so `sessionSignature` and every per-run-keyed
+// client site keep reading the unfolded runs.
+function runsByLineage(runs) {
+  const order = [];
+  const byLineage = new Map();
+  for (const r of runs) {
+    const key = r.lineageId ?? r.loopId;
+    if (!byLineage.has(key)) { byLineage.set(key, []); order.push(key); }
+    byLineage.get(key).push(r);
+  }
+  return order.map(key => byLineage.get(key));
+}
+
+// Rail-trim classes for a worker at flat render-position `i` of `n` (LIN-1487).
+// Replaces the old `.obs-worker:first-child`/`:last-child` CSS trims, which a
+// lineage wrapper would match per-group and sever the rail at every boundary.
+// A lone run matches BOTH (exactly as a sole `:first-child`+`:last-child` did),
+// so a single-run task block renders byte-identical to before the fold.
+function railClassAt(i, n) {
+  const parts = [];
+  if (i === 0) parts.push('is-rail-start');
+  if (i === n - 1) parts.push('is-rail-end');
+  return parts.join(' ');
+}
+
 // Task display order: tasksTouched first (seed-first, as the server emits), then
 // any run-only task not already covered.
 function taskOrder(s, groups) {
@@ -619,8 +653,24 @@ function renderTaskBlock(s, ident, node, runs) {
     ? `<a class="obs-task-ident" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(ident)}</a>`
     : `<span class="obs-task-ident">${escapeHtml(ident)}</span>`;
 
-  const runsHtml = runs.length
-    ? `<ul class="obs-worker-tree">${runs.map(renderWorkerNode).join('')}</ul>`
+  // Fold multi-wake lineages into one visual unit (LIN-1487) WITHIN this task
+  // block — nesting the fold under `renderTaskBlock` keeps it scoped to a single
+  // `issueIdentifier`, so a lineage that spans issues splits across task blocks
+  // and folds as two groups (an accepted limitation; §4/LIN-1491). The runs are
+  // unfolded underneath: `runs` is still N entries, each `renderWorkerNode`
+  // keeps its own `data-loop`/state/chips, and the rail-trim classes are stamped
+  // over the FLAT rendered order (`groups.flat()`) so there is exactly one
+  // rail-start and one rail-end per task block, regardless of grouping.
+  const groups = runsByLineage(runs);
+  const rendered = groups.flat();
+  let seq = 0;
+  const runsHtml = rendered.length
+    ? `<ul class="obs-worker-tree">${groups.map(group => {
+        const nodes = group.map(r => renderWorkerNode(r, railClassAt(seq++, rendered.length))).join('');
+        return group.length === 1
+          ? nodes
+          : `<li class="obs-lineage" data-lineage-id="${escapeHtml(String((group[0].lineageId ?? group[0].loopId) || ''))}"><ul class="obs-lineage-runs">${nodes}</ul></li>`;
+      }).join('')}</ul>`
     : `<p class="obs-dim obs-worker-empty">No worker runs under this task.</p>`;
 
   return `<div class="obs-task">
@@ -705,7 +755,7 @@ function renderRecapLine(run) {
   return `<span class="obs-worker-recap obs-dim">—</span>`;
 }
 
-function renderWorkerNode(run) {
+function renderWorkerNode(run, railClass = '') {
   const m = runState(run.agentState);
   const glyph = NODE_GLYPH[m.state] || '○';
   const expanded = expandedRuns.has(run.loopId);
@@ -724,7 +774,7 @@ function renderWorkerNode(run) {
   // Phase-timeline rail node: a status glyph anchored on the connector rail. The
   // run's textual state sits on the right of the phase line, so the node's colour
   // is never the sole signal.
-  return `<li class="obs-worker" data-state="${escapeHtml(m.state)}"${expanded ? ' data-open="1"' : ''}>
+  return `<li class="obs-worker${railClass ? ' ' + railClass : ''}" data-state="${escapeHtml(m.state)}"${expanded ? ' data-open="1"' : ''}>
       <span class="obs-worker-node" data-state="${escapeHtml(m.state)}"${m.live ? ' data-live="1"' : ''} aria-hidden="true">${escapeHtml(glyph)}</span>
       <button type="button" class="obs-worker-head" data-loop="${loop}" aria-expanded="${expanded ? 'true' : 'false'}">
         <span class="obs-worker-caret" aria-hidden="true">▸</span>
@@ -1250,5 +1300,10 @@ if (typeof module !== 'undefined' && module.exports) {
     // stable-order regression can drive the real `diffSessionList` (with the
     // heavy per-card DOM helpers stubbed) instead of re-porting the logic.
     diffSessionList, expandedSessions,
+    // LIN-1487: expose the lineage-fold seam so the fold, the repaint signature's
+    // invariance to it, the rail-trim classes, and the deliberate cross-issue
+    // split (renderTasks groups by issue BEFORE the fold) are unit-testable
+    // without a DOM.
+    sessionSignature, runsByLineage, renderTaskBlock, renderTasks,
   };
 }

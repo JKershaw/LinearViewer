@@ -81,6 +81,25 @@ test('findByWorkspace drops docs written by a stale builderVersion (treated as a
   assert.equal(sessions.length, 0, 'stale-version doc excluded so it gets rebuilt');
 });
 
+// LIN-1487 (L3, ledger G1): the v3→v4 bump exists because pre-LIN-1477 v3 docs
+// carry no `lineageId` and would otherwise still match — so the render-time
+// lineage fold would silently no-op on the write-quiet archive. A doc pinned at
+// the specific pre-bump version (3) must miss on BOTH the list read and the
+// point read, forcing a rebuild that materializes `lineageId`.
+test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it rebuilds with lineageId', async () => {
+  const collection = createMockCollection();
+  const store = new ObservationSessionsStore({ collection });
+  await store.upsertSession(URL_KEY, makeSession('S1'));
+
+  // The bump is exactly v3 → v4; a lingering v3 archive doc is the target set.
+  assert.equal(BUILDER_VERSION, 4, 'this bump-specific pin tracks the current version');
+  const doc = collection._docs.find(d => d.type === 'session');
+  doc.builderVersion = 3;
+
+  assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v3 doc');
+  assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v3 doc → route reconstructs');
+});
+
 test('removeSession deletes a single derived doc (idempotent)', async () => {
   const store = new ObservationSessionsStore({ collection: createMockCollection() });
   await store.upsertSession(URL_KEY, makeSession('S1'));

@@ -579,9 +579,25 @@ a.obs-task-ident:hover { text-decoration: underline; }
   width: 1px;
   background: var(--line-soft);
 }
-/* Trim the rail so it starts at the first node and ends at the last one. */
-.obs-worker:first-child::before { top: 0.75rem; }
-.obs-worker:last-child::before { bottom: auto; height: 0.75rem; }
+/* Trim the rail so it starts at the first node and ends at the last one.
+   LIN-1487: keyed on render-time classes stamped over the FLAT run list, NOT
+   `:first-child`/`:last-child` — the lineage fold (below) nests workers under a
+   wrapper `<ul>`, so the structural pseudo-classes would match per-group and
+   sever the rail at every lineage boundary. The classes make the trim
+   nesting-agnostic; a single-run block still gets both (one worker is stamped
+   `is-rail-start is-rail-end`), so it renders byte-identical to before the fold. */
+.obs-worker.is-rail-start::before { top: 0.75rem; }
+.obs-worker.is-rail-end::before { bottom: auto; height: 0.75rem; }
+
+/* A multi-wake lineage folded into one visual unit (LIN-1487): a subtle grouped
+   surface so the feed reads N wakes as one continuous loop rather than N cells,
+   while the worker nodes underneath stay unfolded (own data-loop/state/chips).
+   No horizontal padding, so the connector rail stays aligned with ungrouped runs
+   above and below and remains continuous across the task block. A group of one
+   is never wrapped, so single-run blocks are unchanged. The nested list needs
+   its own reset — `.obs-worker-tree`'s does not inherit. */
+.obs-lineage { background: var(--card-h, transparent); border-radius: var(--radius-md); }
+.obs-lineage-runs { list-style: none; margin: 0; padding: 0; }
 
 .obs-worker-node {
   position: relative;

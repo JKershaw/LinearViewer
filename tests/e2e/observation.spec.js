@@ -481,6 +481,92 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await expect(run.locator('[data-testid="session-inline-reply"]')).toBeVisible();
     });
   });
+
+  // LIN-1487 (S2c) T5 — the repaint-freeze regression guard.
+  //
+  // A multi-wake lineage folds into ONE visual unit in the feed, but the runs
+  // stay unfolded and `sessionSignature` keeps mapping over the unfolded runs, so
+  // a per-run agentState transition INSIDE a folded lineage must still repaint the
+  // open card. The hazard the plan names: had the fold collapsed the run term in
+  // the signature, this transition would be invisible and the open card would
+  // freeze on stale state.
+  //
+  // The mechanism is forced. A real feedback POST advances `lastActivity`, itself
+  // a signature term, so the card would repaint for an UNRELATED reason and pass
+  // green against the very defect the test exists to catch. So the sessions feed
+  // is fully mocked with `lastActivity`, `status` and `runCount` byte-identical
+  // across both polls — the ONLY term that can move the signature is the run term
+  // the fold would destroy. Poll #2 is forced immediately via `visibilitychange`
+  // (the page's own handler) rather than waiting out the 5s cadence.
+  test.describe('lineage fold — two-poll repaint (LIN-1487 T5)', () => {
+    test('a per-run state change inside a folded lineage repaints the open card', async ({ page }) => {
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+
+      // One session, one task, TWO wakes sharing a lineage (rootItemId-derived
+      // lineageId) → they fold into one `.obs-lineage` unit. Pinned across polls:
+      // status/runCount/lastActivity. Only run 'wake-1' moves: running → complete.
+      const LAST_ACTIVITY = new Date(Date.now() - 60 * 1000).toISOString(); // recent → Active
+      const runBase = (loopId, agentState) => ({
+        loopId, lineageId: 'lineage-root', issueIdentifier: 'LIN-1487', issueTitle: 'Feed fold',
+        agentState, stage: null, promptName: 'implementation', kind: 'implementation',
+        iteration: null, agentSummary: null, runtime: null, metrics: [], toolPeak: null,
+        producedArtifacts: [],
+      });
+      const feed = (wake1State) => ({
+        active: [{
+          sessionId: 'sess-fold-e2e', workspaceUrlKey: URL_KEY, workspaceName: 'Test',
+          seedIssue: 'LIN-1486', seedTitle: 'Fold session', tasksTouched: ['LIN-1487'],
+          status: 'in-progress', terminal: false, stale: false, standalone: false, taken: true,
+          waiting: false, waitingMessage: null,
+          runCount: 2,
+          runs: [runBase('wake-1', wake1State), runBase('wake-2', 'complete')],
+          recentKind: null, dispatchedAt: LAST_ACTIVITY, completedAt: null,
+          lastActivity: LAST_ACTIVITY, runtime: null, model: null,
+        }],
+        recent: [], recentTotal: 0,
+        counts: { total: 1, active: 1, recent: 0 },
+      });
+
+      // Response is gated on a flag the test flips — robust to however many polls
+      // fire before we advance (they all read 'running', never a premature
+      // 'complete').
+      let advanced = false;
+      await page.route('**/api/dashboard/sessions*', (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(feed(advanced ? 'complete' : 'running')) })
+      );
+      // Neutralise the drill-down side fetches so expansion never errors/hangs.
+      for (const glob of ['**/api/dashboard/session-context/**', '**/api/dashboard/hydrate/**', '**/api/dashboard/session-summary/**', '**/api/dashboard/run-summary/**']) {
+        await page.route(glob, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+      }
+
+      await page.goto(OBSERVATION_URL);
+      await page.waitForLoadState('networkidle');
+
+      const card = page.locator('#obs-active .obs-session').filter({ hasText: 'Fold session' }).first();
+      await expect(card).toBeVisible();
+      await card.locator('.obs-disc').first().click();
+
+      // The two wakes are folded into ONE lineage unit (not two bare cells).
+      const lineage = card.locator('.obs-lineage').first();
+      await expect(lineage).toBeVisible();
+      await expect(lineage.locator('.obs-worker')).toHaveCount(2);
+
+      // Poll #1 state: wake-1 is running.
+      const wake1 = card.locator('.obs-worker').filter({ has: page.locator('[data-loop="wake-1"]') }).first();
+      await expect(wake1.locator('.obs-worker-state')).toHaveText('running');
+
+      // Advance the feed and force poll #2. lastActivity/status/runCount are
+      // unchanged, so the signature moves ONLY on wake-1's agentState.
+      advanced = true;
+      await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+
+      // The open card must repaint: wake-1 now reads 'complete'. A frozen card
+      // (folded-signature regression) would still read 'running' here.
+      await expect(wake1.locator('.obs-worker-state')).toHaveText('complete');
+      // The card stayed folded and intact across the repaint.
+      await expect(card.locator('.obs-lineage .obs-worker')).toHaveCount(2);
+    });
+  });
 });
 
 // LIN-1194: the Sessions tab. An intra-page switcher on the Observation page adds
