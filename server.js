@@ -66,11 +66,11 @@ import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
-import { isAuthError, clientErrorStatus, clientErrorMessage } from './lib/errors.js'
+import { isAuthError, clientErrorStatus, clientErrorMessage, serviceUnavailable } from './lib/errors.js'
 import { renderLandingPage } from './lib/render-landing.js'
 import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
-import { refreshAccessToken } from './lib/token-refresh.js'
+import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
 import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, rotateOwnerCredential, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential } from './lib/workspace.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createEnsurePATSession } from './lib/pat-session.js'
@@ -659,6 +659,16 @@ async function ensureValidToken(req, res, next) {
   } catch (error) {
     console.error(`Token refresh failed for workspace ${workspace.id}:`, error)
 
+    // LIN-1545 (S1): a TRANSIENT refresh blip (a Linear 5xx / network drop /
+    // malformed response → TokenRefreshError NETWORK/INVALID/UNKNOWN) must NOT
+    // tear down the workspace or delete the shared durable credential every
+    // headless worker on it reads — doing so flips the whole tree to
+    // WORKSPACE_NOT_CONNECTED off one blip. Fail only THIS request, retryably,
+    // and leave the credential, the workspace, and the session untouched.
+    if (isTransientRefreshFailure(error)) {
+      return serviceUnavailable.html(res)
+    }
+
     // LIN-1507: capture accountId BEFORE any session mutation below — destroy()
     // (the remaining===0 arm) wipes it, and LIN-1524 close-out Finding #1 needs
     // it in BOTH arms, not just the destroy one.
@@ -672,7 +682,15 @@ async function ensureValidToken(req, res, next) {
     // session.workspaces after removeWorkspace above regardless of `remaining`,
     // so the durable delete belongs here, before the branch, not only in the
     // destroy arm below.
-    await ownerCredentialStore.delete(accountId, workspace.urlKey)
+    // LIN-1545 (S1): but only a DEFINITIVE revocation (invalid_grant → EXPIRED)
+    // may delete it. A non-TokenRefreshError that reaches here (the
+    // `No durable Linear credential` throw above, or a post-refresh
+    // rotate/save failure) still removes the now-unusable workspace, but must
+    // not delete a durable record that is either already absent or was just
+    // successfully rotated — preserving pre-cutover self-heal-on-re-login.
+    if (isDefinitiveRevocation(error)) {
+      await ownerCredentialStore.delete(accountId, workspace.urlKey)
+    }
 
     if (remaining > 0) {
       // Switch to another workspace
@@ -875,7 +893,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
  * Removes the workspace from session, then either redirects to switch
  * workspace or shows the landing page if no workspaces remain.
  */
-async function handleWorkspaceRemoval(session, workspaceId, res) {
+async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable = true) {
   // LIN-1507: capture the workspace's urlKey BEFORE removeWorkspace() drops it
   // from session.workspaces — by the time `remaining === 0` below, it's gone.
   const removedWorkspace = session.workspaces?.find(w => w.id === workspaceId);
@@ -885,7 +903,14 @@ async function handleWorkspaceRemoval(session, workspaceId, res) {
   // LIN-1524 close-out Finding #1: the removed workspace's durable credential
   // must not outlive its session-side removal — belongs here, before the
   // branch, since `removedWorkspace` is gone from session.workspaces either way.
-  if (removedWorkspace) {
+  // LIN-1545 (S2): `deleteDurable` gates that delete so the shared durable
+  // credential is revoked ONLY on a definitive removal, never on a transient
+  // refresh blip. It defaults true, so every genuine-removal caller keeps its
+  // unconditional-delete semantics (and this stays one textual delete site, in
+  // the same pre-branch order, for the LIN-1524 census); the reactive
+  // 401-retry path passes it explicitly and, on a transient failure, never
+  // calls this at all.
+  if (removedWorkspace && deleteDurable) {
     await ownerCredentialStore.delete(session.accountId, removedWorkspace.urlKey);
   }
 
@@ -988,10 +1013,24 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
       return await handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res, durableRecord.refreshToken);
     } catch (refreshError) {
       console.error('Token refresh failed after 401:', refreshError);
-      return handleWorkspaceRemoval(session, workspace.id, res);
+      // LIN-1545 (S2): mirror the proactive path (S1). Only a DEFINITIVE
+      // revocation (invalid_grant → EXPIRED) may delete the shared durable
+      // credential and tear the workspace down. A transient refresh blip
+      // (NETWORK/INVALID/UNKNOWN) — or a post-refresh rotate/render failure,
+      // where the token was in fact just rotated successfully — must keep the
+      // durable credential and the workspace, and fail only THIS request
+      // retryably, so one blip can't flip every headless worker to
+      // WORKSPACE_NOT_CONNECTED.
+      if (isDefinitiveRevocation(refreshError)) {
+        return handleWorkspaceRemoval(session, workspace.id, res, true);
+      }
+      return serviceUnavailable.html(res);
     }
   }
 
+  // No durable record to refresh from: the workspace is genuinely disconnected,
+  // so remove it. The durable delete here is a no-op (nothing to delete), and
+  // leaving `deleteDurable` at its default keeps this path byte-equivalent.
   return handleWorkspaceRemoval(session, workspace.id, res);
 }
 

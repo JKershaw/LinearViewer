@@ -15,10 +15,22 @@
  * /logout (routes/auth.js) is therefore asserted to have ZERO durable-delete
  * calls, deliberately, not by omission.
  *
+ * LIN-1545 narrowed the two human REFRESH sites further: at those sites the
+ * delete now fires only on a DEFINITIVE revocation (`invalid_grant` →
+ * `TokenRefreshError` code `EXPIRED`), NOT on any refresh failure. A transient
+ * `NETWORK`/`INVALID`/`UNKNOWN` refresh blip keeps the credential and fails the
+ * request transiently (a retryable 503) — otherwise one Linear 5xx during the
+ * owner's refresh would nuke the shared durable record and flip every headless
+ * worker on the workspace to WORKSPACE_NOT_CONNECTED tree-wide. This is a
+ * deliberate revision recorded here (never a silent relaxation): the textual
+ * call site + its pre-branch/pre-destroy order are unchanged (so the count and
+ * the source-order assertions below still hold), only the guard around the two
+ * refresh sites narrowed from "refresh failed" to "definitively revoked".
+ *
  * Known durable-delete call sites (5, all `if-guarded or unconditional`
  * `ownerCredentialStore.delete(`/`ownerCredentialStore.delete(` calls):
- *   - server.js: ensureValidToken's catch block (refresh failure → workspace removed)
- *   - server.js: handleWorkspaceRemoval (both the remaining>0 and destroy arms — one call site, shared)
+ *   - server.js: ensureValidToken's catch block (gated on definitive revocation — LIN-1545 S1)
+ *   - server.js: handleWorkspaceRemoval (both the remaining>0 and destroy arms — one call site, shared; gated on `deleteDurable`, only ever reached on definitive revocation from the 401-retry path — LIN-1545 S2)
  *   - server.js: /workspace/:urlKey/settings/providers/remove (Linear-only, gated on an actual unlink — Finding #2)
  *   - routes/workspace.js: /workspace/:urlKey/remove, single-workspace-logout-equivalent arm
  *   - routes/workspace.js: /workspace/:urlKey/remove, multi-workspace remove-one arm
@@ -109,7 +121,7 @@ describe('LIN-1524 close-out Finding #1 — source assertions for the 2 non-inje
 
   test('handleWorkspaceRemoval calls ownerCredentialStore.delete( before either of its return paths (remaining>0 redirect, destroy arm)', () => {
     const source = read('server.js');
-    const startMarker = 'async function handleWorkspaceRemoval(session, workspaceId, res) {';
+    const startMarker = 'async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable = true) {';
     const startIdx = source.indexOf(startMarker);
     assert.notEqual(startIdx, -1, 'expected to find handleWorkspaceRemoval in server.js');
 
@@ -128,5 +140,103 @@ describe('LIN-1524 close-out Finding #1 — source assertions for the 2 non-inje
       deleteIdx < remainingCheckIdx && deleteIdx < destroyIdx,
       'the durable delete must be wired BEFORE the remaining>0/destroy branch, so it covers BOTH arms — not just one'
     );
+  });
+});
+
+describe('LIN-1545 — durable delete narrowed to definitive revocation at both human refresh paths', () => {
+  // These pin the *guard* around the two refresh-path deletes, not just their
+  // presence: transient refresh failures must keep the durable credential and
+  // fail with a retryable 503, and only a definitive (invalid_grant / EXPIRED)
+  // revocation may delete it. Same honesty caveat as the census above — this is
+  // a source-text assertion (the middleware is module-private and server.js is
+  // not import-safe); genuine runtime coverage of the branch lives in the
+  // isDefinitiveRevocation / isTransientRefreshFailure predicate unit tests in
+  // tests/unit/token-refresh.test.js, which both server.js sites call.
+
+  test('S1: ensureValidToken\'s catch returns a transient 503 before the guarded delete, and gates the delete on definitive revocation', () => {
+    const source = read('server.js');
+    const catchIdx = source.indexOf('} catch (error) {\n    console.error(`Token refresh failed for workspace');
+    assert.notEqual(catchIdx, -1, 'expected to find ensureValidToken\'s catch block in server.js');
+    const nextFnIdx = source.indexOf('\n// Apply middleware to all routes except auth and logout', catchIdx);
+    assert.notEqual(nextFnIdx, -1, 'expected to find the end of ensureValidToken');
+    const catchBody = source.slice(catchIdx, nextFnIdx);
+
+    const transientIdx = catchBody.indexOf('isTransientRefreshFailure(');
+    const serviceUnavailableIdx = catchBody.indexOf('serviceUnavailable');
+    const definitiveIdx = catchBody.indexOf('isDefinitiveRevocation(');
+    const deleteIdx = catchBody.indexOf('ownerCredentialStore.delete(');
+
+    assert.notEqual(transientIdx, -1, 'expected an isTransientRefreshFailure( branch in ensureValidToken\'s catch');
+    assert.notEqual(serviceUnavailableIdx, -1, 'expected a serviceUnavailable (retryable 503) response for the transient path');
+    assert.notEqual(definitiveIdx, -1, 'expected an isDefinitiveRevocation( guard around the durable delete');
+    assert.notEqual(deleteIdx, -1, 'expected the ownerCredentialStore.delete( call to still exist (census site)');
+    assert.ok(
+      transientIdx < deleteIdx && serviceUnavailableIdx < deleteIdx,
+      'the transient 503 early-return must come BEFORE the durable delete, so a transient blip never reaches it'
+    );
+    assert.ok(
+      definitiveIdx < deleteIdx,
+      'the durable delete must be gated on isDefinitiveRevocation(, so it fires only on EXPIRED'
+    );
+  });
+
+  test('S2: handleWorkspaceRemoval gates its durable delete on the deleteDurable flag', () => {
+    const source = read('server.js');
+    const startIdx = source.indexOf('async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable = true) {');
+    assert.notEqual(startIdx, -1, 'expected handleWorkspaceRemoval to carry the deleteDurable = true default param');
+    const endIdx = source.indexOf('\n/**\n * Attempts to refresh an expired token and retry the request.', startIdx);
+    assert.notEqual(endIdx, -1, 'expected to find the end of handleWorkspaceRemoval');
+    const fnBody = source.slice(startIdx, endIdx);
+
+    const guardIdx = fnBody.indexOf('if (removedWorkspace && deleteDurable)');
+    const deleteIdx = fnBody.indexOf('ownerCredentialStore.delete(');
+    assert.notEqual(guardIdx, -1, 'expected the durable delete to be gated on `removedWorkspace && deleteDurable`');
+    assert.ok(guardIdx < deleteIdx, 'the deleteDurable guard must wrap the durable delete');
+  });
+
+  test('S2: handleUnauthorizedError deletes+removes only on definitive revocation, else returns a transient 503', () => {
+    const source = read('server.js');
+    const startIdx = source.indexOf('async function handleUnauthorizedError(workspace, session, teamId, openRouterSource, res) {');
+    assert.notEqual(startIdx, -1, 'expected to find handleUnauthorizedError in server.js');
+    const endIdx = source.indexOf('\n/**\n * Home page', startIdx);
+    assert.notEqual(endIdx, -1, 'expected to find the end of handleUnauthorizedError');
+    const fnBody = source.slice(startIdx, endIdx);
+
+    const catchIdx = fnBody.indexOf('catch (refreshError)');
+    assert.notEqual(catchIdx, -1, 'expected the refresh-retry catch (refreshError) in handleUnauthorizedError');
+    const catchBody = fnBody.slice(catchIdx);
+
+    const definitiveIdx = catchBody.indexOf('isDefinitiveRevocation(refreshError)');
+    const removalIdx = catchBody.indexOf('handleWorkspaceRemoval(session, workspace.id, res, true)');
+    const serviceUnavailableIdx = catchBody.indexOf('serviceUnavailable');
+    assert.notEqual(definitiveIdx, -1, 'expected the removal to be gated on isDefinitiveRevocation(refreshError)');
+    assert.notEqual(removalIdx, -1, 'expected a definitive-only handleWorkspaceRemoval(..., true) call in the catch');
+    assert.notEqual(serviceUnavailableIdx, -1, 'expected a serviceUnavailable (retryable 503) fall-through for transient failures');
+    assert.ok(
+      definitiveIdx < removalIdx && removalIdx < serviceUnavailableIdx,
+      'the catch must delete+remove on definitive revocation, then fall through to the transient 503'
+    );
+  });
+
+  test('the WORKSPACE_UNAVAILABLE_BY_REASON 503 envelope in lib/errors.js is untouched (codes/slugs unchanged)', () => {
+    // LIN-1545 reuses the generic serviceUnavailable helper for the human
+    // refresh paths and must NOT touch the structured headless-resolve envelope.
+    // Pin every reason key and its code slug so an accidental edit here is caught.
+    const source = read('lib/errors.js');
+    assert.ok(source.includes('const WORKSPACE_UNAVAILABLE_BY_REASON = {'), 'expected the WORKSPACE_UNAVAILABLE_BY_REASON map to still exist');
+    const expectedSlugs = [
+      'WORKSPACE_STORE_UNAVAILABLE',
+      'WORKSPACE_SESSION_EXPIRED',
+      'WORKSPACE_NOT_CONNECTED',
+      'WORKSPACE_OWNER_MISMATCH',
+      'WORKSPACE_OWNER_SIGNED_OUT',
+      'WORKSPACE_UNAVAILABLE', // the fallback code in workspaceUnavailableEnvelope
+    ];
+    for (const slug of expectedSlugs) {
+      assert.ok(source.includes(`'${slug}'`), `expected the ${slug} code slug to be unchanged in lib/errors.js`);
+    }
+    for (const reason of ['store_unreachable', 'session_expired', 'not_connected', 'owner_mismatch', 'owner_signed_out']) {
+      assert.ok(source.includes(`${reason}:`), `expected the ${reason} reason key to be unchanged in lib/errors.js`);
+    }
   });
 });

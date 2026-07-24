@@ -8,7 +8,9 @@ import assert from 'node:assert';
 import {
   refreshAccessToken,
   calculateExpiresAt,
-  TokenRefreshError
+  TokenRefreshError,
+  isDefinitiveRevocation,
+  isTransientRefreshFailure
 } from '../../lib/token-refresh.js';
 
 // =============================================================================
@@ -96,6 +98,56 @@ describe('TokenRefreshError', () => {
   test('is instance of Error', () => {
     const error = new TokenRefreshError('Test', 'CODE');
     assert.ok(error instanceof Error);
+  });
+});
+
+// =============================================================================
+// Refresh-failure classification predicates (LIN-1545)
+// =============================================================================
+
+describe('isDefinitiveRevocation', () => {
+  test('true only for a TokenRefreshError with code EXPIRED (invalid_grant)', () => {
+    assert.strictEqual(isDefinitiveRevocation(new TokenRefreshError('x', 'EXPIRED')), true);
+  });
+
+  test('false for every transient TokenRefreshError code', () => {
+    for (const code of ['NETWORK', 'INVALID', 'UNKNOWN']) {
+      assert.strictEqual(
+        isDefinitiveRevocation(new TokenRefreshError('x', code)),
+        false,
+        `expected ${code} to NOT be a definitive revocation`
+      );
+    }
+  });
+
+  test('false for a non-TokenRefreshError (plain Error, null, undefined)', () => {
+    assert.strictEqual(isDefinitiveRevocation(new Error('No durable credential')), false);
+    assert.strictEqual(isDefinitiveRevocation(null), false);
+    assert.strictEqual(isDefinitiveRevocation(undefined), false);
+  });
+});
+
+describe('isTransientRefreshFailure', () => {
+  test('true for every non-EXPIRED TokenRefreshError code', () => {
+    for (const code of ['NETWORK', 'INVALID', 'UNKNOWN']) {
+      assert.strictEqual(
+        isTransientRefreshFailure(new TokenRefreshError('x', code)),
+        true,
+        `expected ${code} to be a transient refresh failure`
+      );
+    }
+  });
+
+  test('false for a definitive EXPIRED revocation', () => {
+    assert.strictEqual(isTransientRefreshFailure(new TokenRefreshError('x', 'EXPIRED')), false);
+  });
+
+  test('false for a non-TokenRefreshError — it is NEITHER transient nor definitive', () => {
+    const err = new Error('No durable Linear credential to refresh');
+    assert.strictEqual(isTransientRefreshFailure(err), false);
+    assert.strictEqual(isDefinitiveRevocation(err), false);
+    assert.strictEqual(isTransientRefreshFailure(null), false);
+    assert.strictEqual(isTransientRefreshFailure(undefined), false);
   });
 });
 
