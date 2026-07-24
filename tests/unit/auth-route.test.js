@@ -15,6 +15,7 @@ import { MangoClient } from '@jkershaw/mangodb';
 import { createAuthRoutes } from '../../routes/auth.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
+import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 import { getWorkspaceByUrlKey } from '../../lib/workspace.js';
 
 function fakeProvider(overrides = {}) {
@@ -87,6 +88,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     return {
       accountStore: new AccountStore({ collection: db.collection('accounts') }),
       accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
+      ownerCredentialStore: new OwnerCredentialStore({ collection: db.collection('owner-credentials') }),
     };
   }
 
@@ -150,8 +152,8 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   // binding written for it (previously establishAccount ran first and left a
   // binding in place even though the user was shown a 400).
   test('at the workspace limit, sign-in is rejected 400 and writes NO account↔workspace binding (LIN-1349)', async () => {
-    const { accountStore, accountWorkspaceStore } = freshAccountStores();
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore });
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const existingWorkspaces = Array.from({ length: 10 }, (_, i) => ({ id: `ws-${i}`, name: `Workspace ${i}`, urlKey: `ws-${i}`, addedAt: Date.now() }));
@@ -164,6 +166,11 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     // The crux: establishAccount never ran, so no binding exists for the refused workspace.
     assert.deepEqual(await accountWorkspaceStore.listAccountsForWorkspace('org-1'), []);
     assert.strictEqual(session.accountId, undefined);
+    // LIN-1523 corrective: the durable write sits AFTER the limit-check +
+    // establishAccount, so a refused sign-in (no accountId was even minted
+    // here) must leave the owner-credentials collection untouched — asserted
+    // on the store's actual contents, not on whether a write was attempted.
+    assert.deepStrictEqual(await ownerCredentialStore.collection.find({}).toArray(), []);
   });
 
   // LIN-1350: a throw inside the post-regenerate callback (e.g. the prefs
@@ -215,11 +222,11 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   }
 
   test('add-source: connecting a SECOND Linear org links its identity onto the SAME account, minting none (LIN-1351)', async () => {
-    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {}); // the user's FIRST org
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore });
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const session = addSourceSession(myAccount._id);
 
@@ -236,11 +243,11 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   });
 
   test('add-source: session.accountId is UNCHANGED across the round-trip — the path does NOT regenerate (LIN-1351)', async () => {
-    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore });
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const session = addSourceSession(myAccount._id);
     let regenCount = 0;
@@ -253,14 +260,43 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.strictEqual(regenCount, 0, 'add-source path does NOT call session.regenerate()');
   });
 
+  // LIN-1523 corrective: add-source has its OWN upsertWorkspace limit-check
+  // (routes/auth.js, ahead of its own establishAccount call), separate from
+  // the normal-login branch's — both branches can refuse, so both need this
+  // proof. `myAccount._id` is already live here (add-source never
+  // regenerates), so the durable store can be queried directly by key rather
+  // than only by "the collection is empty".
+  test('add-source: at the workspace limit, sign-in is rejected 400 and writes NO durable owner credential (LIN-1349/LIN-1523)', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const myAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
+
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const existingWorkspaces = Array.from({ length: 10 }, (_, i) => ({ id: `ws-${i}`, name: `Workspace ${i}`, urlKey: `ws-${i}`, addedAt: Date.now() }));
+    const session = addSourceSession(myAccount._id, { workspaces: existingWorkspaces });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 400);
+    assert.match(res.body, /Workspace Limit Reached/);
+    // establishAccount never ran for org-2 (the limit-check refused first) —
+    // no account↔workspace binding for the refused org.
+    assert.deepEqual(await accountWorkspaceStore.listAccountsForWorkspace('org-2'), []);
+    // The crux: no durable credential exists for (myAccount, 'beta') — the
+    // refused workspace's urlKey — asserted on the store's actual contents.
+    assert.strictEqual(await ownerCredentialStore.get(myAccount._id, 'beta'), null);
+  });
+
   test('add-source: strict 409 when the 2nd Linear identity already belongs to a DIFFERENT account — nothing mutated, no session save (LIN-1351/LIN-1326)', async () => {
-    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
     const otherAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(otherAccount._id, 'linear', 'viewer-2', {}); // Y already owns the 2nd org's identity
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});    // X owns only its first org
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore });
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = addSourceSession(myAccount._id);
@@ -279,6 +315,10 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.deepStrictEqual(await accountWorkspaceStore.listAccountsForWorkspace('org-2'), []);
     assert.strictEqual(session.accountId, myAccount._id);
     assert.strictEqual(saveCount, 0, 'no session save on the strict-conflict path');
+    // LIN-1523 corrective: establishAccount itself refused here (AFTER the
+    // limit-check passed) — persistOwnerCredential sits after this check too,
+    // so no durable credential exists for (myAccount, 'beta') either.
+    assert.strictEqual(await ownerCredentialStore.get(myAccount._id, 'beta'), null);
   });
 
   test('add-source: a strict 409 leaves NO org-2 workspace in session.workspaces — the refused org cannot authorize /workspace/:urlKey/* (LIN-1351 review regression)', async () => {
@@ -291,13 +331,13 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     // connection was just refused. This asserts the ACTUAL leaked state (org-2
     // absent from session.workspaces + the exploited authorization lookup denied),
     // NOT the weak saveCount===0 proxy the review called out.
-    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
     const otherAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(otherAccount._id, 'linear', 'viewer-2', {}); // Y already owns the 2nd org's identity
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});    // X owns only its first org
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore });
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = addSourceSession(myAccount._id);
@@ -321,12 +361,12 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   });
 
   test('add-source: two Linear orgs with DISTINCT org-scoped viewer.ids coexist on ONE account (LIN-1351)', async () => {
-    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
     await accountWorkspaceStore.bindAccountToWorkspace(myAccount._id, 'org-1'); // first org already bound
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore });
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const session = addSourceSession(myAccount._id);
 
@@ -343,11 +383,11 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   });
 
   test('add-source: on success STAYS on the current workspace and returns to its settings — no auto-switch (LIN-1351, UX (b))', async () => {
-    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore });
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = addSourceSession(myAccount._id);
@@ -362,8 +402,8 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   });
 
   test('login-path fence: normal mode:new login still regenerates and does NOT preserve a pre-existing session.accountId (LIN-1351 guard)', async () => {
-    const { accountStore, accountWorkspaceStore } = freshAccountStores();
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore });
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     // A normal login (no add-source intent) carrying a STALE accountId that MUST be

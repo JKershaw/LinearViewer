@@ -30,8 +30,11 @@ function createMockCollection() {
         // Honour top-level equality on taskIdentifier so this mock mirrors real
         // MangoDB/MongoDB query matching (LIN-613 pushes this filter into the query).
         if (query.taskIdentifier && doc.taskIdentifier !== query.taskIdentifier) return false;
-        // Honour the 30-day `since` window (LIN-622) the feed read pushes down.
+        // Honour the 30-day `since` window (LIN-622) the feed read pushes down,
+        // and the exclusive `until` upper bound (LIN-1494) the live-console
+        // history cursor pushes down.
         if (query.timestamp?.$gte && !(doc.timestamp >= query.timestamp.$gte)) return false;
+        if (query.timestamp?.$lt && !(doc.timestamp < query.timestamp.$lt)) return false;
         return true;
       });
       return {
@@ -133,6 +136,46 @@ describe('AgentStatusStore.listStatus', () => {
       'the since window must ride into the query so a real DB filters server-side');
     assert.strictEqual(result.total, 1, 'only the in-window entry is materialised');
     assert.strictEqual(result.items[0].id, 'recent');
+  });
+
+  test('windows by an until predicate (exclusive), pushed into the query alongside since (LIN-1494)', async () => {
+    // The live-console history cursor: paging past a capped read only works
+    // if the upper bound rides into the QUERY — otherwise every "view more"
+    // re-reads the same newest-N rows and hasMore=true loops on empty pages.
+    const base = Date.now();
+    const expiresAt = new Date(base + 1000 * 60 * 60 * 24 * 30);
+    collection._docs.push(
+      { _id: 'newest', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'research', status: 'completed', summary: 'n', timestamp: new Date(base), expiresAt },
+      { _id: 'mid', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'research', status: 'completed', summary: 'm', timestamp: new Date(base - 1000 * 60 * 60), expiresAt },
+      { _id: 'old', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'research', status: 'completed', summary: 'o', timestamp: new Date(base - 1000 * 60 * 60 * 2), expiresAt },
+      { _id: 'at-until', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'research', status: 'completed', summary: 'a', timestamp: new Date(base - 1000 * 60 * 30), expiresAt }
+    );
+    const since = new Date(base - 1000 * 60 * 60 * 24 * 7);
+    const until = new Date(base - 1000 * 60 * 30); // excludes 'newest' AND 'at-until' (exclusive bound)
+
+    const result = await store.listStatus('ws-1', { since, until });
+
+    const query = collection._queries[collection._queries.length - 1];
+    assert.deepStrictEqual(query.timestamp, { $gte: since, $lt: until },
+      'both bounds must ride into ONE timestamp predicate so a real DB filters server-side');
+    assert.strictEqual(result.total, 2, 'total counts the [since, until) window pre-slice');
+    assert.deepStrictEqual(result.items.map(i => i.id), ['mid', 'old'], 'newest-first within the window; at/after until excluded');
+  });
+
+  test('until alone forms its own query bound; total stays pre-slice under limit', async () => {
+    const base = Date.now();
+    const expiresAt = new Date(base + 1000 * 60 * 60 * 24 * 30);
+    for (let i = 0; i < 5; i++) {
+      collection._docs.push({ _id: `d-${i}`, urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'research', status: 'completed', summary: `s${i}`, timestamp: new Date(base - i * 1000), expiresAt });
+    }
+    const until = new Date(base - 500); // excludes only the newest (d-0)
+
+    const result = await store.listStatus('ws-1', { until, limit: 2 });
+
+    const query = collection._queries[collection._queries.length - 1];
+    assert.deepStrictEqual(query.timestamp, { $lt: until }, 'until without since is a bare $lt bound');
+    assert.strictEqual(result.total, 4, 'the pre-slice windowed count, not the limited page size');
+    assert.strictEqual(result.items.length, 2);
   });
 
   test('isolates entries per urlKey', async () => {

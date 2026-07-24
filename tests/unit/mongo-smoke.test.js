@@ -26,6 +26,8 @@ import { WorkspaceStore } from '../../lib/workspace-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
+import { LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 import { establishAccount } from '../../lib/account-session.js';
 
 const uri = process.env.MONGODB_TEST_URI;
@@ -510,8 +512,8 @@ describe(
     // 32MB sort-memory limit erroring". Only real Mongo can answer that —
     // MangoDB has no query planner and no explain() — so it is answered here.
 
-    // The exact query routes/proxy.js issues (LINEAGE_QUERY_LIMIT = 2000).
-    const LINEAGE_QUERY_LIMIT = 2000;
+    // The exact query routes/proxy.js issues, with the cap imported from the
+    // route module itself (LIN-1494 F2 tidy — no hand-mirrored constant).
     const lineageCursor = (collection, anchors) =>
       collection
         .find({ urlKey: 'acme', rootItemId: { $in: anchors } }, { projection: { prompt: 0 } })
@@ -631,7 +633,10 @@ describe(
       // by squeezing the budget rather than seeding 100MB of documents.
       const collection = freshCollection('lineage-sort-overflow');
       await collection.createIndex({ urlKey: 1, rootItemId: 1 });
-      const anchors = await seedLineages(collection, { lineages: 1, perLineage: 2000, noise: 0 });
+      // 2001 rows — ONE over the cap — so the rows.length assertion below
+      // proves `.limit(LINEAGE_QUERY_LIMIT)` actually clamps an over-cap
+      // lineage, not merely that an at-cap lineage comes back whole (LIN-1492).
+      const anchors = await seedLineages(collection, { lineages: 1, perLineage: 2001, noise: 0 });
 
       const paramName = 'internalQueryMaxBlockingSortMemoryUsageBytes';
       const original = (await db.admin().command({ getParameter: 1, [paramName]: 1 }))[paramName];
@@ -644,7 +649,8 @@ describe(
         );
         assert.strictEqual(sortStage.usedDisk, true, 'an over-budget sort should spill to disk');
 
-        // The load-bearing half: a complete, un-truncated result, no throw.
+        // The load-bearing half: the over-cap lineage is clamped to exactly
+        // the cap — no throw, no over-cap rows leaking through.
         const rows = await lineageCursor(collection, anchors).toArray();
         assert.strictEqual(
           rows.length,
@@ -689,6 +695,48 @@ describe(
       const edge = await store.historyCollection.findOne({ _id: beat1._id });
       assert.ok(edge.terminalWakeItems.includes(beat1._id) && edge.terminalWakeItems.includes(beat2._id));
       assert.strictEqual(edge.terminalWakeItems.length, 2, 'exactly the two distinct producing items');
+    });
+
+    // -----------------------------------------------------------------------
+    // LIN-1546: OwnerCredentialStore.putIfRefreshToken optimistic CAS on REAL
+    // MongoDB. The owner-credential unit suite proves this on MangoDB; this
+    // pins the load-bearing MangoDB-vs-Mongo-divergent behaviours on the engine
+    // production actually runs: a field-filter CAS that MISSES yields
+    // matchedCount 0 (not a thrown error, not a silent match), and a CAS on a
+    // missing record NEVER upserts. Same class of divergence the dispatch-store
+    // terminal-wake CAS smoke above guards.
+    // -----------------------------------------------------------------------
+    test('owner-credential CAS: win rotates in place, lose leaves the winner untouched, missing never upserts (real MongoDB)', async () => {
+      const store = new OwnerCredentialStore({ collection: freshCollection('owner-credentials') });
+      const accountId = randomUUID();
+      const urlKey = `acme-${randomUUID().slice(0, 8)}`;
+
+      // CAS on a MISSING record: false, and NO record is created (no upsert).
+      const missWon = await store.putIfRefreshToken(accountId, urlKey, 'R0', {
+        provider: 'linear', scope: 'org-1', token: 'a', refreshToken: 'R1', tokenExpiresAt: Date.now() + 3600_000,
+      });
+      assert.strictEqual(missWon, false, 'CAS on a missing record must miss on real MongoDB');
+      assert.strictEqual(await store.get(accountId, urlKey), null, 'a CAS miss must not upsert on real MongoDB');
+
+      // Seed R0, then a matching-witness CAS WINS and rotates in place.
+      await store.put(accountId, urlKey, { provider: 'linear', scope: 'org-1', token: 'access-0', refreshToken: 'R0', tokenExpiresAt: Date.now() + 3600_000 });
+      const won = await store.putIfRefreshToken(accountId, urlKey, 'R0', {
+        provider: 'linear', scope: 'org-1', token: 'access-1', refreshToken: 'R1', tokenExpiresAt: Date.now() + 3600_000,
+      });
+      assert.strictEqual(won, true);
+      assert.strictEqual((await store.get(accountId, urlKey)).refreshToken, 'R1');
+
+      // A stale-witness CAS (loser still holding R0, but the record is now R1)
+      // LOSES and leaves the winner's record intact.
+      const lost = await store.putIfRefreshToken(accountId, urlKey, 'R0', {
+        provider: 'linear', scope: 'org-1', token: 'access-loser', refreshToken: 'R_loser', tokenExpiresAt: Date.now() + 3600_000,
+      });
+      assert.strictEqual(lost, false, 'a stale-witness CAS must miss on real MongoDB');
+      assert.strictEqual((await store.get(accountId, urlKey)).refreshToken, 'R1', 'the winner\'s credential is untouched by the loser');
+
+      // Exactly one record exists throughout — no CAS ever forked a duplicate.
+      const all = await store.collection.find({ accountId, urlKey }).toArray();
+      assert.strictEqual(all.length, 1);
     });
   }
 );

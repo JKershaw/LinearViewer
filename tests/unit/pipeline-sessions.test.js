@@ -569,17 +569,37 @@ describe('deploy-boundary straddle merge (LIN-1393)', () => {
 
 describe('getSessionsForWorkspace', () => {
   test('reconstructs sessions end-to-end through mock stores', async () => {
+    // Clock-relative fixtures, deliberately (LIN-1535). The `__internal` tests
+    // above inject the fixed NOW and never touch a store read, so fixed-date
+    // fixtures are fine there. This one drives the PUBLIC entrypoint, which
+    // derives its 30-day window from the real clock in TWO places — the JS
+    // cutoff in `_buildLoops` and, with no seam at all, the store-side `since`
+    // predicate in `_fetchWorkspaceData` — so any fixed date ages out by
+    // calendar (the shared 2026-06-22 constants did on 2026-07-22, silently
+    // breaking this one test while every NOW-injected test stayed green).
+    const base = Date.now() - 4 * 60 * 60 * 1000; // four hours ago — always in window
+    const iso = (offsetMin) => new Date(base + offsetMin * 60000).toISOString();
     const history = [
-      orchestrator(),
-      worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
-      worker('w2', SPAWNED, '2026-06-22T12:00:00.000Z', { sessionId: SESSION_ID })
+      orchestrator({ dispatchedAt: iso(0), resolvedAt: iso(1), feedback: done(iso(180)) }),
+      worker('w1', CHILD, iso(30), { sessionId: SESSION_ID }),
+      worker('w2', SPAWNED, iso(120), { sessionId: SESSION_ID })
     ];
+    // The mocks HONOUR the `since` predicate the store read pushes down, rather
+    // than ignoring their options argument — same `$gte` semantics as the real
+    // stores (`dispatchedAt` in dispatch-store, `timestamp` in
+    // agent-status-store). A `since`-blind mock is what left the store-side half
+    // of the window unexercised by the whole suite: rows a real Mongo would have
+    // discarded still came back, so an aged-out fixture could hide behind a
+    // green check (LIN-1535).
+    const windowed = (rows, field) => async (_urlKey, { since } = {}) => ({
+      items: since ? rows.filter(r => new Date(r[field]) >= since) : rows
+    });
     const deps = {
       dispatchStore: {
         listItems: async () => [],
-        listHistory: async () => ({ items: history })
+        listHistory: windowed(history, 'dispatchedAt')
       },
-      agentStatusStore: { listStatus: async () => ({ items: [] }) }
+      agentStatusStore: { listStatus: windowed([], 'timestamp') }
     };
     const sessions = await getSessionsForWorkspace('ws', deps);
     assert.strictEqual(sessions.length, 1);

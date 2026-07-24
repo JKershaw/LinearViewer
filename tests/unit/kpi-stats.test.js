@@ -599,7 +599,18 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
   test('does not leak workspace keys or feedback content through aggregation', async () => {
     const collections = await realCollections({
       proxyEvents: [
-        { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: daysAgo(0), urlKey: 'secret-workspace' }
+        // `note` is a FREE-TEXT breadcrumb (lib/proxy-events.js), not an enum: today's
+        // writers are a reason token (LIN-1540) and an English sentence (LIN-961's
+        // free-tier fallback), and nothing constrains a future writer. It is therefore
+        // deliberately NOT projected into PROXY_FIELDS or emitted here — see the
+        // LIN-1540 verdict. What this pins is the EMIT half: whatever a note carries
+        // never reaches the serialized stats. It does NOT pin the projection half —
+        // adding `note: 1` to PROXY_FIELDS keeps this green, which is correct by the
+        // same reasoning (`urlKey` IS projected yet reduced to a count; the boundary
+        // sits at emit, not at projection). The two defenses are complementary: this
+        // test seeds the `aggregate` branch of loadProxyBins, while the `find`
+        // fallback is defended by PROXY_FIELDS omitting `note` in the first place.
+        { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: daysAgo(0), urlKey: 'secret-workspace', note: 'SENSITIVE-NOTE-BREADCRUMB' }
       ],
       dispatchHistory: [
         { _id: 'h1', urlKey: 'secret-workspace', kind: 'implementation', status: 'taken', dispatchedAt: daysAgo(1), feedback: [{ body: 'CONFIDENTIAL-FEEDBACK-BODY' }] }
@@ -610,5 +621,6 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     const serialized = JSON.stringify(stats);
     assert.ok(!serialized.includes('secret-workspace'), 'workspace urlKey leaked');
     assert.ok(!serialized.includes('CONFIDENTIAL-FEEDBACK-BODY'), 'feedback content leaked');
+    assert.ok(!serialized.includes('SENSITIVE-NOTE-BREADCRUMB'), 'proxy event note leaked');
   });
 });

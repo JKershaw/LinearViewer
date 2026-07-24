@@ -948,11 +948,12 @@ a.wordmark:hover {
 /* =============================================================================
    Search Panel
    =============================================================================
-   Search input below nav bar for filtering issues by keyword.
+   Search input below the page title for filtering issues by keyword (LIN-1512).
+   The `search` toggle that opens it stays in the nav bar's .nav-actions.
 */
 /* Search panel — same elevated in-flow card treatment as the selector dropdown
    (LIN-1058): --card surface, --line border, --radius-md, --shadow-lg; stays in
-   normal flow below the nav, no floating overlay, no backdrop. */
+   normal flow below the title, no floating overlay, no backdrop. */
 .search-panel {
   padding: var(--space-2) var(--space-3);
   margin-bottom: var(--space-2);

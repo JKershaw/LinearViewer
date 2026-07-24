@@ -37,7 +37,7 @@ import { establishAccount } from '../lib/account-session.js';
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -105,13 +105,15 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     // custom key, so the multiWorkspace / maxWorkspaces output is unchanged then.
     const workerSuffix = (singleUrlKey.match(/-w\d+$/) || [''])[0]
 
-    // Base workspace configuration - IDs must be valid UUIDs to pass validation
+    // Base workspace configuration - IDs must be valid UUIDs to pass validation.
+    // LIN-1524: no `refreshToken` field — Linear session workspaces never carry
+    // one anymore. `noRefreshToken` now controls whether a durable record gets
+    // seeded (below, once accountId is known), not a session-side field.
     const createWorkspace = (id, name, urlKey) => ({
       id,
       name,
       urlKey,
       accessToken: 'test-token',
-      refreshToken: noRefreshToken ? null : 'test-refresh-token',
       tokenExpiresAt: tokenExpired
         ? Date.now() - (60 * 60 * 1000)  // 1 hour in the past
         : Date.now() + (24 * 60 * 60 * 1000),  // 24 hours from now
@@ -146,11 +148,12 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       ]
     }
 
-    // PAT mode: mark first workspace as personal access token
+    // PAT mode: mark first workspace as personal access token. No durable
+    // record follows (LIN-1524 close-out Finding #3: PAT gets none, by design
+    // — a PAT has no refresh_token to persist).
     if (patMode) {
       workspaces[0].isPAT = true;
       workspaces[0].tokenExpiresAt = Number.MAX_SAFE_INTEGER;
-      delete workspaces[0].refreshToken;
     }
 
     req.session.workspaces = workspaces
@@ -178,6 +181,26 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     // having no identity to link).
     if (!noLinearUser) {
       await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', 'test-linear-user-id', {}, workspaces[0].id)
+    }
+
+    // LIN-1524: seed a durable record for every non-PAT Linear workspace,
+    // mirroring what a real OAuth connection would have written durably —
+    // `noRefreshToken` now controls whether that durable record exists
+    // (previously a session-side field), so ensureValidToken's durable-store
+    // refresh path has something to find when a spec drives `tokenExpired`.
+    // Skipped for `noLinearUser` (no accountId to key on) and any `isPAT`
+    // workspace (close-out Finding #3: PAT gets no durable record, by design).
+    if (!noLinearUser && !noRefreshToken && ownerCredentialStore) {
+      for (const ws of workspaces) {
+        if (ws.isPAT) continue
+        await ownerCredentialStore.put(req.session.accountId, ws.urlKey, {
+          provider: 'linear',
+          scope: ws.id,
+          token: ws.accessToken,
+          refreshToken: 'test-refresh-token',
+          tokenExpiresAt: ws.tokenExpiresAt
+        })
+      }
     }
 
     // Set or clear OpenRouter API key in session based on flag

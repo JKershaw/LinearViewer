@@ -162,6 +162,17 @@ describe('render-session: telemetry + model omission', () => {
     assert.match(html, /data-testid="session-run-model"[^>]*>◇ claude-opus-4-8</);
     assert.match(html, /data-testid="session-model"[^>]*>claude-opus-4-8</);
   });
+
+  test('LIN-1425: telemetry.usage is inert — output is byte-identical whether present or absent', () => {
+    const withoutUsage = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+
+    const session = fixtureSession();
+    session.telemetry.usage = { harness: 'claude-code', model: 'claude-opus-4-8', inputTokens: 1, outputTokens: 2, costUsd: null };
+    session.loops[0].telemetry.usage = { harness: 'claude-code', model: 'claude-opus-4-8', inputTokens: 1, outputTokens: 2, costUsd: null };
+    const withUsage = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+
+    assert.equal(withUsage, withoutUsage, 'renderRunChips/renderSessionPage must not render or be affected by telemetry.usage (display is LIN-1426)');
+  });
 });
 
 describe('render-session: brief/recap context branches', () => {

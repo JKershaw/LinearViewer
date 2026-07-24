@@ -171,8 +171,9 @@ The workspace-unavailable `code`s and how to act on each:
 | `WORKSPACE_SESSION_EXPIRED` | `auth` | `false` | A session for this workspace exists but its token expired. **A human must re-authenticate** — this works when the token's own owner account still holds the workspace; retrying won't help. |
 | `WORKSPACE_NOT_CONNECTED` | `config` | `false` | No session references this workspace. **It is not connected** — connect it first; retrying won't help. |
 | `WORKSPACE_OWNER_MISMATCH` | `config` | `false` | A **different** account holds a live session for this workspace while this token's own account does not. This can mean the token's account no longer holds the workspace, **or** simply that its own session lapsed while another legitimate account on the same workspace happens to be live — the two are indistinguishable from this signal alone. **Try re-authenticating first**; if that does not restore access, a new token must be issued from the account that currently holds the workspace. Note this moves only the token — other account-keyed state (OpenRouter key, preferences, saved chats) stays on the old account. |
+| `WORKSPACE_OWNER_SIGNED_OUT` | `auth` | `false` | This token's owner account has no active session at all (not just for this workspace). This is a signal, not proof of permanent loss — the owner may simply be logged out right now. **Sign in again, or issue a fresh token**, to restore access; retrying won't help. |
 
-The HTTP status stays `503` for all four — only the body distinguishes them. Callers that don't recognise `code`/`category` can keep treating any non-`2xx` as failure; the new fields are purely additive. Other subsystems' errors may adopt the same envelope over time.
+The HTTP status stays `503` for all five — only the body distinguishes them. Callers that don't recognise `code`/`category` can keep treating any non-`2xx` as failure; the new fields are purely additive. Other subsystems' errors may adopt the same envelope over time.
 
 ### Read Endpoints
 
@@ -1348,6 +1349,10 @@ Notes:
 - `?wait=0` / absent / invalid values are the plain immediate short-poll (fully backwards-compatible) — and omit `reason`/`waitedMs` entirely (those fields appear only when `?wait>0`).
 - `status` is **reported, not adjudicated**: a `done` means the runner's session ended, not that the work is correct (a worker can background a long command, exit, and post `done` early). Treat `done` as "go look" — cross-check the `[evidence]` URLs, and if unsatisfied, dispatch fresh work. The long-poll never locks anything in.
 
+**`feedback` (and the derived `status`/`completedAt`) are lineage-wide, not just this row's own (LIN-1461/LIN-1480).** If this dispatch was repointed to a follow-up (`followUpTo`), the returned `feedback` merges this row's own entries with every other row in the same dispatch chain — so watching by the ORIGINAL id keeps seeing progress even after a repoint, instead of freezing at the point of repoint. Only a row that actually ran (`taken`) joins a lineage this way; a `queued` row (including a freshly-dispatched follow-up not yet picked up) reports its own values only.
+
+**The merge is forward-only: a row is never reported complete before it was itself dispatched (LIN-1480).** `feedback` only inherits a sibling entry if that entry's timestamp is at or after this row's own `dispatchedAt` — so a still-running follow-up dispatched *after* its parent already finished keeps reading its own values (`taken`/`completedAt: null`), it does not inherit the parent's earlier terminal, and under `?wait=` the long-poll actually holds instead of short-circuiting with `reason: "terminal"`. This is the same invariant `GET /api/proxy/dispatch` (the list endpoint) enforces on `feedbackCount`/`status`/`completedAt` — the two surfaces agree on any row they both report.
+
 ```json
 {
   "id": "uuid",
@@ -1414,8 +1419,10 @@ GET /api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|faile
 All query params optional. Merges the live queue and recent history, newest first — use it to resolve an item's `id` when you only know the issue. `status` is the same derived terminal status as the watch endpoint, so it is a valid filter value.
 
 ```json
-{ "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "dispatchedAt": "...", "resolvedAt": "...", "completedAt": "...", "feedbackCount": 10 } ], "total": 1 }
+{ "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "dispatchedAt": "...", "resolvedAt": "...", "completedAt": "...", "feedbackCount": 10 } ], "total": 1, "truncated": false }
 ```
+
+**`total` / `truncated` semantics (LIN-1494).** The read merges the live queue with the *newest 200* history rows. For an unfiltered or `?issueIdentifier=`-scoped read, `total` is the **exact full matching count** — queued items plus the store's pre-window history count — so it can exceed the number of rows the window (and therefore `items`) covers. For a `?status=` read, `total` remains the count of matching rows **within that window** (status is derived from feedback at read time, so an exact per-status total is not knowable without reading the whole history). `truncated: true` discloses that the 200-row window did not cover the whole history — in that case older rows exist that this response's `items` (and the lineage join's anchor seeding) never saw, so page by `issueIdentifier` or treat window-derived aggregates as recent-window signals, not a census.
 
 **`feedbackCount`/`status`/`completedAt` are lineage-wide (LIN-1470).** If a row was repointed to a follow-up dispatch (`followUpTo`), these three fields reflect the WHOLE lineage's feedback — this row's own plus every row it was repointed to — not just this row's own stored entries. A repointed row keeps accumulating `feedbackCount` and reaches a terminal `status`/`completedAt` once its follow-up finishes, instead of freezing at the point of repoint. This holds even under `?issueIdentifier=` scoping, and even when a follow-up in the lineage was filed under a *different* issue than the row you're looking at (the lineage is keyed on the dispatch chain, not the issue), so a scoped list can show a row as complete via a sibling that never itself appears in that same scoped list.
 

@@ -355,13 +355,16 @@ const VALID_PROXY_DISPATCH_TARGETS = ['cli', 'web', 'dash'];
 // way the existing shipped single-anchor query already is. 2000 is a
 // generous backstop (10x the page bound) against a pathological outlier
 // lineage, not a tuned realistic ceiling — no shipped lineage has come close.
-// L3 (review): if a lineage DOES exceed this cap, truncation is silent —
-// `listHistory`'s `limit` path sorts `{resolvedAt: -1}` and keeps only the
-// newest N, so the oldest members of an over-cap lineage are dropped from
-// the merge (and so from feedbackCount/status/completedAt derivation) with
-// no error or log line. Accepted as a backstop-of-last-resort, not a
-// correctness guarantee at that scale.
-const LINEAGE_QUERY_LIMIT = 2000;
+// L3 (review): if a lineage DOES exceed this cap, `listHistory`'s `limit`
+// path sorts `{resolvedAt: -1}` and keeps only the newest N, so the oldest
+// members of an over-cap lineage are dropped from the merge (and so from
+// feedbackCount/status/completedAt derivation). The list handler consumes
+// the store's pre-slice `total` to warn — with the exact overshoot — when
+// that happens (LIN-1485 → LIN-1494). Accepted as a backstop-of-last-resort,
+// not a correctness guarantee at that scale.
+// Exported (LIN-1494 F2 tidy) so the tests that exercise this exact cap
+// import it instead of hand-mirroring the constant.
+export const LINEAGE_QUERY_LIMIT = 2000;
 
 // Timeout for individual GraphQL requests to Linear.
 // Prevents the proxy from hanging silently when Linear is slow or payloads are large,
@@ -724,9 +727,12 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * decide whether to back off (retryable) or escalate (auth/config).
    * `reason` is threaded unmodified from resolveWorkspaceAccess at every read,
    * write, and compute endpoint (all now share the single raw-token path).
+   * It also rides the audit write as the `note` breadcrumb (LIN-1540) so a 503
+   * records WHICH reason fired and is countable by reason over the store's
+   * 30-day window; the envelope already returns it, so this widens no exposure.
    */
   function workspaceUnavailable(req, res, endpoint, reason) {
-    logEvent(req, endpoint, 503);
+    logEvent(req, endpoint, 503, reason);
     return res.status(503).json(workspaceUnavailableEnvelope(reason, req.proxyUrlKey));
   }
 
@@ -5115,37 +5121,30 @@ One convention across every endpoint, so you can branch on the same fields every
       const historyRows = merged.filter(i => i.status === 'taken');
       const anchors = [...new Set(historyRows.map(anchorFor).filter(Boolean))];
 
-      // F2 (review, non-blocking): `listHistory` runs `find()` AND
-      // `countDocuments()` under `Promise.all` whenever `limit` is set
-      // (lib/dispatch-store.js `if (limit) { ... }` branch) — destructuring
-      // `{ items }` below discards that count, so this call pays for an
-      // index-scan it never uses. Confirmed coupled to `LINEAGE_QUERY_LIMIT`:
-      // the count only runs because we pass `limit`, and dropping `limit`
-      // to dodge it would also drop the L3 backstop (unbounded read + no
-      // query-side sort pushdown on a pathological lineage) — not an
-      // acceptable trade on an endpoint with two prior H12/503 incidents.
-      // A proper fix (e.g. a `countTotal: false` option on `listHistory`)
-      // would touch `lib/dispatch-store.js`, the one file this PR has kept
-      // at zero diff across three review rounds specifically because it's
-      // the repo's busiest file (74 commits/30d) and LIN-1461/LIN-1468 both
-      // landed there in the days right before this ticket. Weighed against
-      // that: the discarded count is a single indexed count (no document
-      // fetch) over the SAME `{urlKey, rootItemId:{$in:...}}` predicate the
-      // `find()` beside it already runs, under the same `{prompt:0}`
-      // projection that keeps it clear of the multi-KB-to-10MB field the
-      // two real H12/503 incidents were actually about — so its cost is
-      // bounded to the same profile as the already-shipped single-anchor
-      // equivalent (`_collectGroupFeedback`), not the unbounded-payload
-      // shape those incidents were. Decision: accept the discarded count as
-      // a known, small, indexed cost rather than touch the high-churn store
-      // file for it — recorded here as a deliberate call, not an accident.
+      // LIN-1494 (superseding review F2 on LIN-1470): `listHistory` runs
+      // `find()` AND `countDocuments()` under `Promise.all` whenever `limit`
+      // is set (lib/dispatch-store.js `if (limit) { ... }` branch). Earlier
+      // revisions destructured `{ items }` only and recorded the discarded
+      // count as an accepted indexed cost; it is now CONSUMED — the pre-slice
+      // `total` is the exact truncation signal for the L3 telemetry below,
+      // replacing the `length === cap` proxy that false-positived on a
+      // lineage of exactly LINEAGE_QUERY_LIMIT rows and could never report
+      // how far over the cap real traffic runs. (The page query's twin count
+      // feeds the response's honest `total`/`truncated` the same way.)
       const siblingsByAnchor = new Map();
       if (anchors.length) {
-        const { items: lineageSiblings } = await dispatchQueueStore.listHistory(req.proxyUrlKey, {
+        const { items: lineageSiblings, total: lineageTotal } = await dispatchQueueStore.listHistory(req.proxyUrlKey, {
           rootItemId: { $in: anchors },
           limit: LINEAGE_QUERY_LIMIT,
           projection: { prompt: 0 }
         });
+        // L3 (LIN-1485, exactness via LIN-1494): the store's pre-slice count
+        // says precisely whether the newest-N cap dropped the oldest members
+        // of a lineage — and by how much (the question LIN-1485 named as the
+        // point of this telemetry). Exactly-at-cap is complete, not truncated.
+        if (lineageTotal > LINEAGE_QUERY_LIMIT) {
+          console.warn(`Lineage query exceeded LINEAGE_QUERY_LIMIT (${LINEAGE_QUERY_LIMIT}) for urlKey=${req.proxyUrlKey}, anchors=${anchors.length}, total=${lineageTotal} — result truncated to the newest ${LINEAGE_QUERY_LIMIT}`);
+        }
         for (const sib of lineageSiblings) {
           const bucket = siblingsByAnchor.get(sib.rootItemId);
           if (bucket) bucket.push(sib);
@@ -5229,7 +5228,22 @@ One convention across every endpoint, so you can branch on the same fields every
       }));
 
       logEvent(req, '/api/proxy/dispatch', 200);
-      res.json({ items, total: filtered.length });
+      // LIN-1494: `total` is exact wherever the store can count it. Unfiltered
+      // and issue-scoped reads report queued + the page query's pre-slice
+      // history count (the repo convention that `total` is "the full count
+      // before limit" — /stack, /agent/status, /api/dispatch/history) — not a
+      // count over the newest-200 window presented as the matching total.
+      // A `?status=` read keeps the windowed `filtered.length`: status is
+      // feedback-derived in JS, so an exact per-status total is unknowable
+      // without reading the whole history (not an acceptable trade on an
+      // endpoint with two prior H12/503 incidents). `truncated` (naming
+      // precedent: deferTruncated) discloses the newest-200 window in both
+      // cases — including that the lineage join's anchor set is seeded from
+      // that window only. A windowed list is normal operation, not an
+      // anomaly, so there is no console.warn here.
+      const historyTotal = history.total ?? history.items.length;
+      const total = statusFilter ? filtered.length : queued.length + historyTotal;
+      res.json({ items, total, truncated: historyTotal > history.items.length });
     } catch (err) {
       logEvent(req, '/api/proxy/dispatch', 500);
       console.error('Proxy dispatch list error:', err.message);
