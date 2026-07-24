@@ -281,8 +281,7 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
         // above — never before, or a refused workspace would leave a durable
         // credential behind. `workspace` was already fully populated by
         // linkProvider earlier in this handler; there is no updateWorkspaceTokens
-        // call to wrap here, so this reaches persistOwnerCredential directly
-        // rather than through the rotateOwnerCredential rotation seam.
+        // call to wrap here, so this reaches persistOwnerCredential directly.
         // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
         // longer carries one (linkProvider above was deliberately not given it).
         await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)
@@ -355,8 +354,7 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
             // credential behind. `workspace` was already fully populated by
             // linkProvider earlier in this handler; there is no
             // updateWorkspaceTokens call to wrap here, so this reaches
-            // persistOwnerCredential directly rather than through the
-            // rotateOwnerCredential rotation seam.
+            // persistOwnerCredential directly.
             // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
             // longer carries one (linkProvider above was deliberately not given it).
             await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)

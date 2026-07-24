@@ -483,8 +483,9 @@ const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWor
 
 // Durable owner-scoped Linear credential (LIN-1523, Session 1 of LIN-1501).
 // Additive-only in this session: dual-written alongside the session-only
-// credential (never instead of it) via rotateOwnerCredential/
-// persistOwnerCredential at every rotation/acquisition site — ensureValidToken
+// credential (never instead of it) via persistOwnerCredential (OAuth
+// acquisition) and the durable store's compare-and-set write (the Linear
+// refresh path) at every rotation/acquisition site — ensureValidToken
 // and handleTokenRefreshAndRetry below, the off-session refresh path
 // (refreshOwnerWorkspaceToken), and both OAuth-callback branches
 // (routes/auth.js). No read path is wired to it yet — that is Session 2
