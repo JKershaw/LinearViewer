@@ -235,13 +235,14 @@ Response:
 #### List Issues
 
 ```
-GET /api/proxy/issues?teamId={uuid}&limit={n}
+GET /api/proxy/issues?teamId={uuid}&limit={n}&after={cursor}
 ```
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `teamId` | UUID | No | Filter by team |
 | `limit` | int | No | Max results (1-250, default 50) |
+| `after` | string | No | Opaque page cursor — pass the previous response's `pageInfo.endCursor` to fetch the next page. Alias: `cursor`. |
 
 Response includes pagination:
 ```json
@@ -271,6 +272,29 @@ Response includes pagination:
   }
 }
 ```
+
+**Paging the whole workspace.** `limit` caps a single page at 250. To read every
+issue in a larger workspace, loop: pass the response's `pageInfo.endCursor` back
+as the `after` query param on the next request, and stop when `hasNextPage` is
+`false`. `hasNextPage` is the authoritative terminal signal — do **not** key off
+`endCursor`, which may still be non-null on the final page (it is null for the
+Local provider but a real cursor string for Linear). The cursor is opaque — pass
+it through verbatim; do not parse, decode, or construct it.
+
+```bash
+after=
+while :; do
+  page=$(curl -s -H "Authorization: Bearer $TOKEN" \
+    "$BASE/api/proxy/issues?limit=250${after:+&after=$after}")
+  echo "$page" | jq -c '.issues[].identifier'
+  [ "$(echo "$page" | jq -r '.pageInfo.hasNextPage')" = "true" ] || break
+  after=$(echo "$page" | jq -r '.pageInfo.endCursor')
+done
+```
+
+> `/api/proxy/search` does **not** support `after` — its results are
+> relevance-ranked and capped, and paging it is tracked separately. Use
+> `/api/proxy/issues` for complete workspace enumeration.
 
 #### Get Issue Detail
 

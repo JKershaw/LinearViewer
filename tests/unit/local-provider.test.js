@@ -225,6 +225,21 @@ describe('LocalProvider proxy surface (LIN-583)', () => {
     assert.deepEqual((await provider.issues(SCOPE, { teamId: 't1' })).nodes, []);
   });
 
+  test('issues degrades a garbage/empty cursor to page 1 gracefully (opaque pass-through, no throw) — LIN-1511', async () => {
+    const page1 = await provider.issues(SCOPE, { first: 1 });
+    // Garbage and empty cursors both resolve to offset 0 (parseInt(...) || 0) —
+    // the "pass through, don't validate" contract degrades to page 1 rather than
+    // throwing, so a consumer's malformed cursor can never 500 this provider.
+    for (const after of ['not-a-number', '', '!!!', '-5']) {
+      const p = await provider.issues(SCOPE, { first: 1, after });
+      assert.deepEqual(
+        p.nodes.map(n => n.identifier),
+        page1.nodes.map(n => n.identifier),
+        `after=${JSON.stringify(after)} should degrade to page 1`
+      );
+    }
+  });
+
   test('issueDetail returns nested {nodes} children/comments/relations/inverseRelations', async () => {
     const issue = await provider.issueDetail(SCOPE, 'LOCAL-1');
     assert.equal(issue.identifier, 'LOCAL-1');

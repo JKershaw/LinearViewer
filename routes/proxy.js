@@ -1046,13 +1046,19 @@ GET ${baseUrl}/api/proxy/projects
   → List active projects
   → { "projects": [{ "id": "...", "name": "..." }] }
 
-GET ${baseUrl}/api/proxy/issues?teamId={teamId}&limit={n}
+GET ${baseUrl}/api/proxy/issues?teamId={teamId}&limit={n}&after={cursor}
   → List issues (optionally filter by team, default limit 50, max 250)
   → { "issues": [{ "id": "...", "identifier": "LIN-1", "title": "...",
                    "state": { "name": "In Progress", "type": "started" },
                    "labels": ["bug"], "priority": 2, "priorityLabel": "High",
                    "team": { "id": "...", "name": "Engineering" }, "teamId": "...",
-                   "cycle": { "id": "...", "number": 12 } }] }
+                   "cycle": { "id": "...", "number": 12 } }],
+      "pageInfo": { "hasNextPage": true, "endCursor": "..." } }
+  → To page the whole workspace past the 250 cap: pass the previous response's
+    pageInfo.endCursor back as the "after" query param and repeat. Stop when
+    hasNextPage is false — that flag is the authoritative terminal signal (do
+    not key off endCursor, which may still be non-null on the final page). The
+    cursor is opaque — pass it through verbatim, do not parse it.
 
 GET ${baseUrl}/api/proxy/issues/{issueId}
   → Full issue detail; issueId: UUID or identifier like "LIN-123"
@@ -1609,13 +1615,19 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const teamId = req.query.teamId;
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 250);
+      // Opaque page cursor: pass the previous response's pageInfo.endCursor back
+      // as `after` (or the `cursor` alias) to fetch the next slice. Treated
+      // verbatim — never parsed/validated here — because its format is
+      // provider-defined (Linear = base64 string, Local = stringified offset).
+      // Absent → null, i.e. today's first-page behaviour (LIN-1511).
+      const after = req.query.after ?? req.query.cursor ?? null;
 
       if (teamId && !UUID_REGEX.test(teamId)) {
         logEvent(req, '/api/proxy/issues', 400);
         return badRequest.json(res, 'Invalid teamId format');
       }
 
-      const { nodes, pageInfo } = await provider.issues(token, { teamId: teamId || null, first: limit, after: null });
+      const { nodes, pageInfo } = await provider.issues(token, { teamId: teamId || null, first: limit, after });
       logEvent(req, '/api/proxy/issues', 200);
       res.json({
         issues: nodes.map(flattenIssue),
