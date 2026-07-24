@@ -524,6 +524,20 @@ function extractResolveWorkspaceAccessBody(src) {
   return src.slice(start, end + 2);
 }
 
+// LIN-1547 (review finding F1): strip JS comments before grepping the body.
+// resolveWorkspaceAccess *mentions* `ownerAccountId !== UNSCOPED` in a comment
+// that textually precedes the real guard, so a comment-keeping grep can bind
+// `guardIdx` to the comment — deleting the real guard line while leaving the
+// comment would still pass. This removes block + line comments first so I5c
+// greps only executable code. Safe for this body specifically: it contains no
+// `//` or `/*` sequence inside a string literal (the URL-in-a-string pitfall),
+// so there is nothing for the naive stripper to over-eat.
+function stripComments(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ');
+}
+
 describe('LIN-1544 durable-credential resolve witness (logout -> headless resolve reason:ok, guards LIN-1524)', () => {
   beforeEach(() => { _resetInflightForTests(); });
 
@@ -654,8 +668,20 @@ describe('LIN-1544 durable-credential resolve witness (logout -> headless resolv
     // not-import-safe server.js. Whitespace-tolerant (normalises runs of
     // whitespace to a single space) so it survives reflow/reformatting and
     // pins BEHAVIOUR — the ordering of guard -> refresh -> ok-return — not an
-    // exact source string.
-    const flat = extractResolveWorkspaceAccessBody(SERVER_SRC).replace(/\s+/g, ' ');
+    // exact source string. Comments are stripped FIRST (LIN-1547 F1) so no
+    // grep below can bind to prose that merely mentions the code it checks.
+    const flat = stripComments(extractResolveWorkspaceAccessBody(SERVER_SRC)).replace(/\s+/g, ' ');
+
+    // LIN-1547 (F1): assert the guard as a REAL `if (... ownerAccountId !== UNSCOPED)`
+    // statement, not just any occurrence of the text. With comments stripped this
+    // is doubly safe: the only remaining occurrence is the executable guard, and
+    // this regex additionally requires it be inside an `if (...)` head. Deleting
+    // the real guard line now fails here even if a comment mentioning it survived.
+    assert.match(
+      flat,
+      /if \([^)]*ownerAccountId !== UNSCOPED[^)]*\)/,
+      'resolveWorkspaceAccess must gate refresh-on-resolve behind a real `if (... ownerAccountId !== UNSCOPED)` statement (not merely mention it in a comment)'
+    );
 
     const guardIdx = flat.indexOf('ownerAccountId !== UNSCOPED');
     const refreshIdx = flat.indexOf('refreshOwnerWorkspaceToken(');
@@ -673,5 +699,26 @@ describe('LIN-1544 durable-credential resolve witness (logout -> headless resolv
     assert.ok(ifRefreshedIdx > refreshIdx, 'the ok-envelope must sit inside the `if (refreshed)` success block');
     assert.ok(okReturnIdx >= 0, "resolveWorkspaceAccess must return reason: 'ok' inside the `if (refreshed)` block");
     assert.ok(classifyIdx === -1 || okReturnIdx < classifyIdx, "the `if (refreshed)` reason: 'ok' return must precede the classifyWorkspaceFailure fallthrough");
+
+    // LIN-1547 (ledger item 2): pin the DURABLE-STORE WIRING ARGS the production
+    // refresh call passes, not just the guard->refresh->ok ORDERING above. The
+    // ordering grep would stay green if a future edit dropped or swapped the
+    // durable `store` (or the `persistSession`/`resolveProvider` legs) — the
+    // sharpest residual drift risk. Scope the search to the call's argument
+    // region (between the call site and the `if (refreshed)` that follows it) so
+    // an unrelated later mention cannot satisfy it.
+    const callArgs = flat.slice(refreshIdx, ifRefreshedIdx);
+    assert.ok(
+      callArgs.includes('store: ownerCredentialStore'),
+      'refreshOwnerWorkspaceToken must be wired with the durable `store: ownerCredentialStore` arg (dropping it would silently disable durable refresh while keeping this witness green)'
+    );
+    assert.ok(
+      callArgs.includes('persistSession: persistSessionRow'),
+      'refreshOwnerWorkspaceToken must be wired with `persistSession: persistSessionRow`'
+    );
+    assert.ok(
+      callArgs.includes('resolveProvider: getProviderForWorkspace'),
+      'refreshOwnerWorkspaceToken must be wired with `resolveProvider: getProviderForWorkspace`'
+    );
   });
 });
