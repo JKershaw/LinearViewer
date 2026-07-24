@@ -92,7 +92,8 @@ Both In Progress and Projects sections use the same nested structure:
 - `.project[data-id="{project-id}"]` - project container
 - `.project-header` - clickable project header
 - `[data-completed-for="{project-id}"]` - completed tasks section
-- `[data-action="create-task"]` - "Add +" link (project level, authenticated only)
+- `[data-testid="create-task"]` - create-task affordance (project level, authenticated only). For providers with in-app create support (ui.inlineCreate) this is the in-app form: `[data-testid="create-task-trigger"]` toggles `[data-testid="create-task-form"]` (fields: title/description/teamId/projectId/priority/stateId). Providers with only an external deep-link instead render `[data-action="create-task"]` (a `target="_blank"` link).
+- `[data-testid="edit-issue"]` - in-app edit affordance inside an issue's Details (only when the provider supports in-app edit, ui.inlineEdit): `[data-testid="edit-issue-trigger"]` toggles `[data-testid="edit-issue-form"]` (fields: title/description/stateId/priority)
 - `.project[data-project-type="periodicals"]` - synthetic Periodicals group (recurring maintenance templates, not Linear issues; workspace-flag gated). Its rows expand to a dispatchable prompt; they have no Linear URL and no "Add task" link.
 
 ### Search Selectors
