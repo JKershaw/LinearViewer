@@ -91,13 +91,32 @@ test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it reb
   const store = new ObservationSessionsStore({ collection });
   await store.upsertSession(URL_KEY, makeSession('S1'));
 
-  // The bump is exactly v3 → v4; a lingering v3 archive doc is the target set.
-  assert.equal(BUILDER_VERSION, 4, 'this bump-specific pin tracks the current version');
+  // The pin tracks the CURRENT version (LIN-1495 moved it 4 → 5); a lingering v3
+  // archive doc from before LIN-1487 must still miss on both reads.
+  assert.equal(BUILDER_VERSION, 5, 'this bump-specific pin tracks the current version');
   const doc = collection._docs.find(d => d.type === 'session');
   doc.builderVersion = 3;
 
   assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v3 doc');
   assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v3 doc → route reconstructs');
+});
+
+// LIN-1495: the v4 → v5 bump exists because `telemetry.usage.costUsd` is now
+// derived at build time rather than stored as a permanent null. A v4 doc still
+// matches the SHAPE (the change is a value inside an existing field, not a new
+// key), so without the bump it would keep serving `costUsd: null` until 30-day
+// churn — the exact "—" the derivation exists to replace. Pinning the v4 doc as
+// the target set is what makes this bump load-bearing rather than cosmetic.
+test('a v4 doc (pre-LIN-1495) read-misses on both list and point reads so it rebuilds with a priced costUsd', async () => {
+  const collection = createMockCollection();
+  const store = new ObservationSessionsStore({ collection });
+  await store.upsertSession(URL_KEY, makeSession('S1'));
+
+  const doc = collection._docs.find(d => d.type === 'session');
+  doc.builderVersion = 4;
+
+  assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v4 doc');
+  assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v4 doc → route reconstructs');
 });
 
 test('removeSession deletes a single derived doc (idempotent)', async () => {
