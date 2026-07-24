@@ -218,6 +218,16 @@ describe('parseUsage (LIN-1425)', () => {
     assert.equal(parseUsage(feedback), null);
   });
 
+  // LIN-1495: the derived cost for the default `usageMessage()` payload, stated as
+  // the arithmetic rather than as a magic literal — anthropic/claude-opus-4.8 at
+  // prompt 5.00 / completion 25.00 / cacheWrite 6.25 / cacheRead 0.50 USD per 1M.
+  const DEFAULT_PAYLOAD_COST = (
+    5529 * 5.00
+    + 25811 * 25.00
+    + 145449 * 6.25
+    + 4588835 * 0.50
+  ) / 1e6;
+
   test('parses a well-formed kind:"usage" entry, whitelisting exactly the four token fields + model + costUsd', () => {
     const feedback = [{ message: usageMessage(), kind: 'usage' }];
     const usage = parseUsage(feedback);
@@ -228,13 +238,64 @@ describe('parseUsage (LIN-1425)', () => {
       outputTokens: 25811,
       cacheCreationInputTokens: 145449,
       cacheReadInputTokens: 4588835,
-      costUsd: null,
+      // LIN-1495: claude-code posts costUsd: null (it has no native cost), so the
+      // figure is derived here from the four token counts + the static rate card.
+      costUsd: DEFAULT_PAYLOAD_COST,
     });
+    // Assert the exact value, not merely non-null, so an arithmetic regression —
+    // a dropped cache tier, a doubled 1e6 divisor — cannot pass.
+    assert.equal(usage.costUsd, 3.87639375);
   });
 
   test('opencode-style entry carries a numeric costUsd through untouched', () => {
     const feedback = [{ message: usageMessage({ harness: 'opencode', costUsd: 0.0421 }), kind: 'usage' }];
     assert.equal(parseUsage(feedback).costUsd, 0.0421);
+  });
+
+  test('LIN-1495: a native cost of 0 is authoritative too — never overwritten by a derivation', () => {
+    const feedback = [{ message: usageMessage({ harness: 'opencode', costUsd: 0 }), kind: 'usage' }];
+    assert.equal(parseUsage(feedback).costUsd, 0);
+  });
+
+  test('LIN-1495: an opencode entry whose costUsd is null IS derived when its model resolves', () => {
+    const feedback = [{
+      message: usageMessage({ harness: 'opencode', model: 'anthropic/claude-sonnet-4.6', costUsd: null }),
+      kind: 'usage',
+    }];
+    // sonnet-4.6: prompt 3.00 / completion 15.00 / cacheWrite 3.75 / cacheRead 0.30
+    assert.equal(parseUsage(feedback).costUsd, (
+      5529 * 3.00
+      + 25811 * 15.00
+      + 145449 * 3.75
+      + 4588835 * 0.30
+    ) / 1e6);
+  });
+
+  test('LIN-1495: a <synthetic> payload with real tokens stays null — unpriceable, never guessed', () => {
+    const feedback = [{ message: usageMessage({ model: '<synthetic>' }), kind: 'usage' }];
+    const usage = parseUsage(feedback);
+    assert.equal(usage.model, '<synthetic>');
+    assert.equal(usage.costUsd, null, 'null means unknown; a guessed rate would look authoritative');
+  });
+
+  test('LIN-1495: a bare model alias with real tokens stays null (no version, so no rate)', () => {
+    assert.equal(parseUsage([{ message: usageMessage({ model: 'opus' }), kind: 'usage' }]).costUsd, null);
+  });
+
+  test('LIN-1495: a dated model id is priced after its build-date suffix is stripped', () => {
+    const feedback = [{
+      message: usageMessage({ model: 'claude-haiku-4-5-20251001', outputTokens: 1_000_000, inputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 }),
+      kind: 'usage',
+    }];
+    assert.equal(parseUsage(feedback).costUsd, 5.00); // haiku-4.5 completion rate
+  });
+
+  test('LIN-1495: derivation adds no key to the usage object', () => {
+    const usage = parseUsage([{ message: usageMessage(), kind: 'usage' }]);
+    assert.deepEqual(
+      Object.keys(usage).sort(),
+      ['cacheCreationInputTokens', 'cacheReadInputTokens', 'costUsd', 'harness', 'inputTokens', 'model', 'outputTokens'].sort()
+    );
   });
 
   test('cumulative snapshot semantics: the LAST kind:"usage" entry wins, never summed', () => {
@@ -376,7 +437,9 @@ describe('buildRunTelemetry', () => {
       outputTokens: 2,
       cacheCreationInputTokens: 3,
       cacheReadInputTokens: 4,
-      costUsd: null,
+      // LIN-1495: derived, since claude-code reports no native cost —
+      // (1×5.00 + 2×25.00 + 3×6.25 + 4×0.50) / 1e6
+      costUsd: 0.00007575,
     });
 
     const withoutUsage = buildRunTelemetry({
