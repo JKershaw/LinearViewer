@@ -179,135 +179,29 @@
   <script src="../../public/chat.js"></script>
   <script src="./chat-next.js"></script>
   <script src="./mock-agent.js"></script>
+  <script src="./scenes.js"></script>
 
   <script>
   (function () {
     'use strict';
 
-    var thread = document.getElementById('thread');
-    var empty = document.getElementById('empty');
-    var input = document.getElementById('composer-input');
-    var live = null;          // the in-flight stream handle
-    var failNext = false;     // the "error + retry" scene arms this once
-
-    function showEmpty(on) { empty.hidden = !on; }
-
-    var chat = window.ChatUI.mount(thread, {
+    // Shape A supplies its own elements; scenes.js owns the conversation, the
+    // states and the transport wiring, identically for both shapes.
+    var app = window.ChatScenes.init({
+      thread: document.getElementById('thread'),
       composer: document.querySelector('.chat-composer'),
-      submitKey: 'enter',                 // §6.2 — the convention the contract recommends for all four
-      markdown: true,
-      you: 'you',
-      onSend: function (text) {
-        showEmpty(false);
-        return new Promise(function (resolve, reject) {
-          var s = chat.beginStream({ who: 'session' });
-          var mode = failNext ? 'fail' : (/\blong\b|\bscroll\b/i.test(text) ? 'long' : 'answer');
-          failNext = false;
-          var run = window.MockAgent.stream({
-            mode: mode,
-            onToken: function (t) { s.write(t); },
-            onDone: function () { live = null; s.done(); resolve(); },
-            onError: function (e) {
-              live = null;
-              // §7.5 — the error lands on the failed turn, which carries the
-              // Retry. The stream handle owns the failure (including handing
-              // the draft back), so this settles rather than rejects; a
-              // rejection here would put a SECOND error on the user's turn.
-              s.fail(e.message, function () { chat.setBusy(true); onRetry(text); });
-              resolve();
-            }
-          });
-          live = { abort: run.abort, stream: s, settle: resolve };
-        });
-      },
-      onStop: function () {                // §6.4 — present, so Stop renders
-        if (!live) return;
-        live.abort();
-        live.stream.stopped();
-        live.settle();                     // never leave the send promise dangling
-        live = null;
-      }
+      input: document.getElementById('composer-input'),
+      send: document.querySelector('[data-chat-send]'),
+      empty: document.getElementById('empty')
     });
-
-    function onRetry(text) {
-      var s = chat.beginStream({ who: 'session' });
-      var run = window.MockAgent.stream({
-        mode: 'answer',
-        onToken: function (t) { s.write(t); },
-        onDone: function () { live = null; s.done(); },
-        onError: function (e) { live = null; s.fail(e.message, function () { onRetry(text); }); }
-      });
-      live = { abort: run.abort, stream: s };
-    }
-
-    // ── prototype scenes ────────────────────────────────────────────────────
-    function reset() {
-      if (live) { live.abort(); live = null; }
-      chat.clear();
-      chat.setDisabled(null);
-      chat.setBusy(false);
-      showEmpty(true);
-    }
-
-    var scenes = {
-      empty: reset,
-
-      populated: function () {
-        reset();
-        showEmpty(false);
-        chat.append({ who: 'you', self: true, text: 'why is the collective scroll check wrong?', markdown: false });
-        chat.append({ who: 'session', whoState: 'in-progress', text: window.MockAgent.ANSWER });
-        chat.append({ who: 'session', whoState: 'in-progress', text: 'Want me to write the failing E2E assertion for it first?' });
-        chat.append({ who: 'you', self: true, text: 'yes — and keep it thread-scoped', markdown: false });
-        // A settled transcript a reader would scroll back through — and the only
-        // way a full-page capture shows the code block rather than the tail.
-        thread.scrollTop = 0;
-      },
-
-      thinking: function () {
-        reset();
-        showEmpty(false);
-        input.value = 'why is the collective scroll check wrong?';
-        input.dispatchEvent(new Event('input'));
-        document.querySelector('[data-chat-send]').click();
-      },
-
-      long: function () {
-        reset();
-        showEmpty(false);
-        input.value = 'stream me a long one so I can scroll up while it runs';
-        input.dispatchEvent(new Event('input'));
-        document.querySelector('[data-chat-send]').click();
-      },
-
-      error: function () {
-        reset();
-        showEmpty(false);
-        failNext = true;
-        input.value = 'what broke in run 3?';
-        input.dispatchEvent(new Event('input'));
-        document.querySelector('[data-chat-send]').click();
-      },
-
-      limited: function () {
-        reset();
-        showEmpty(false);
-        chat.append({ who: 'you', self: true, text: 'one more question', markdown: false });
-        // §7.6 — say what, and for how long, and keep the draft.
-        input.value = 'this draft survives the block';
-        input.dispatchEvent(new Event('input'));
-        chat.setDisabled('Free-tier limit reached — 20/20 today. Resets at midnight UTC. Your draft is kept.');
-      }
-    };
 
     document.querySelector('[data-testid="proto-rail"]').addEventListener('click', function (e) {
       var s = e.target.getAttribute('data-scene');
-      if (s && scenes[s]) scenes[s]();
+      if (s) app.run(s);
     });
 
-    // ?scene= for the screenshot script.
     var wanted = new URLSearchParams(location.search).get('scene');
-    if (wanted && scenes[wanted]) scenes[wanted](); else showEmpty(true);
+    if (wanted) app.run(wanted);
   })();
   </script>
 </body>

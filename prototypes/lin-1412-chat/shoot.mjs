@@ -1,11 +1,11 @@
 /**
- * shoot.mjs — screenshot the LIN-1412 chat prototypes.
+ * shoot.mjs — screenshot the LIN-1412 chat prototypes (both shapes).
  *
  * Modelled on prototypes/swim-flow/shoot.mjs: no server, no fixtures, just
  * Playwright over the file:// page.
  *
- *   node prototypes/lin-1412-chat/shoot.mjs                 # the default set
- *   node prototypes/lin-1412-chat/shoot.mjs populated:dark:desktop
+ *   node prototypes/lin-1412-chat/shoot.mjs                   # both shapes, full matrix
+ *   node prototypes/lin-1412-chat/shoot.mjs b:populated:dark:desktop
  *
  * Console errors are reported — a prototype that throws is not evidence.
  */
@@ -17,22 +17,25 @@ try { ({ chromium } = await import('playwright')); }
 catch { ({ chromium } = await import('@playwright/test')); }
 
 const here = dirname(fileURLToPath(import.meta.url));
-const page1 = 'file://' + join(here, 'shape-a.html');
+const pageUrl = (shape) => 'file://' + join(here, `shape-${shape}.html`);
+
+// The SAME matrix for both shapes, so beat 4 can put them side by side.
+const MATRIX = [
+  { scene: 'empty', theme: 'light', w: 'desktop' },
+  { scene: 'populated', theme: 'light', w: 'desktop' },
+  { scene: 'populated', theme: 'dark', w: 'desktop' },
+  { scene: 'populated', theme: 'light', w: 'mobile' },
+  { scene: 'populated', theme: 'dark', w: 'mobile' },
+  { scene: 'thinking', theme: 'light', w: 'desktop' },
+  { scene: 'long', theme: 'light', w: 'desktop' },
+  { scene: 'error', theme: 'dark', w: 'desktop' },
+  { scene: 'limited', theme: 'light', w: 'desktop' }
+];
 
 const args = process.argv.slice(2);
 const combos = args.length
-  ? args.map(s => { const [scene, theme, w] = s.split(':'); return { scene, theme: theme || 'light', w: w || 'desktop' }; })
-  : [
-      { scene: 'empty', theme: 'light', w: 'desktop' },
-      { scene: 'populated', theme: 'light', w: 'desktop' },
-      { scene: 'populated', theme: 'dark', w: 'desktop' },
-      { scene: 'populated', theme: 'light', w: 'mobile' },
-      { scene: 'populated', theme: 'dark', w: 'mobile' },
-      { scene: 'thinking', theme: 'light', w: 'desktop' },
-      { scene: 'long', theme: 'light', w: 'desktop' },
-      { scene: 'error', theme: 'dark', w: 'desktop' },
-      { scene: 'limited', theme: 'light', w: 'desktop' }
-    ];
+  ? args.map(s => { const [shape, scene, theme, w] = s.split(':'); return { shape, scene, theme: theme || 'light', w: w || 'desktop' }; })
+  : ['a', 'b'].flatMap(shape => MATRIX.map(m => ({ shape, ...m })));
 
 // Scenes that need time to reach the moment worth capturing.
 const SETTLE = { empty: 300, populated: 500, thinking: 900, long: 1600, error: 1400, limited: 500 };
@@ -40,7 +43,7 @@ const SETTLE = { empty: 300, populated: 500, thinking: 900, long: 1600, error: 1
 const browser = await chromium.launch();
 let failures = 0;
 
-for (const { scene, theme, w } of combos) {
+for (const { shape, scene, theme, w } of combos) {
   const width = w === 'mobile' ? 430 : 1100;
   const page = await browser.newPage({ viewport: { width, height: 1200 }, deviceScaleFactor: 2 });
   const errors = [];
@@ -58,7 +61,7 @@ for (const { scene, theme, w } of combos) {
   const ignorable = url => /\/fonts\/[\w-]+\.woff2$/.test(url);
   page.on('requestfailed', r => { if (!ignorable(r.url())) errors.push(`request failed: ${r.url()}`); });
 
-  await page.goto(`${page1}?scene=${scene}&theme=${theme}`);
+  await page.goto(`${pageUrl(shape)}?scene=${scene}&theme=${theme}`);
   await page.waitForTimeout(SETTLE[scene] ?? 500);
 
   // The long-stream scene is the §9 proof: scroll the THREAD up mid-stream and
@@ -74,12 +77,14 @@ for (const { scene, theme, w } of combos) {
     await page.waitForTimeout(1500);
     const held = await page.evaluate(() => document.getElementById('thread').scrollTop);
     const jumpVisible = await page.isVisible('[data-testid="chat-jump-latest"]');
-    console.log(`  §9 proof — thread.scrollTop after 1.2s of streaming: ${held} (expect 0); jump-to-latest visible: ${jumpVisible}`);
+    console.log(`  §9 proof (shape ${shape}) — thread.scrollTop after 1.5s of streaming: ${held} (expect 0); jump-to-latest visible: ${jumpVisible}`);
     if (held !== 0 || !jumpVisible) { failures++; console.log('  ✗ §9 PROOF FAILED'); }
   }
 
-  const out = join(here, 'screenshots', `shape-a-${scene}-${theme}-${w}.png`);
-  await page.screenshot({ path: out, fullPage: true });
+  const out = join(here, 'screenshots', `shape-${shape}-${scene}-${theme}-${w}.png`);
+  // Shape B is a fixed 100dvh shell — a fullPage capture of it is just the
+  // viewport, so the flag only matters for Shape A's document-flow page.
+  await page.screenshot({ path: out, fullPage: shape === 'a' });
   console.log('wrote', out);
   if (errors.length) { failures++; console.log('  ✗ console errors:', errors.slice(0, 4)); }
   await page.close();

@@ -105,6 +105,9 @@
 .chat-md p { margin: 0 0 var(--space-2); }
 .chat-md ul, .chat-md ol { margin: 0 0 var(--space-2); padding-left: var(--space-4); }
 .chat-md li { margin-bottom: var(--space-1); }
+/* marked emits <p> inside a loose list item; without this the list breathes
+   twice and the rhythm stops being the scale's. */
+.chat-md li > p { margin: 0; }
 .chat-md a { color: var(--brand); }
 .chat-md blockquote {
   margin: 0 0 var(--space-2);
@@ -298,3 +301,72 @@
   .chat-composer--inline { flex-direction: column; align-items: stretch; }
   .chat-composer--inline .chat-composer__send { width: 100%; }
 }
+
+/* ── §3 the anchored full-page variant (Shape B) ──────────────────────────── */
+
+/* Opt-in, exactly like `.chat-thread--log` and `.chat-composer--inline`: a
+   surface adds `.chat-page` and gets the guide's three-region model — slim
+   header, the thread as the only scroller, the composer anchored to the
+   viewport bottom. A surface that does not opt in is unaffected.
+
+   `100dvh` rather than `100vh` is the §10 mobile-keyboard mechanism: the
+   dynamic viewport unit shrinks when the on-screen keyboard opens, so the
+   composer row stays above it instead of being pushed behind it. */
+.chat-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--bg);
+}
+.chat-page__inner {
+  width: 100%;
+  max-width: 120ch;
+  margin: 0 auto;
+  padding: 0 var(--space-3);
+  box-sizing: border-box;
+}
+
+.chat-page__header {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+/* The thread row: the ONE scroller on the page. The shared
+   `--chat-thread-max-height` cap is released here — in this shape the thread
+   is not a panel with a height, it is the page. */
+/* `min-width: 0` at every level is load-bearing, not defensive tidying: a flex
+   item defaults to `min-width: auto`, so it refuses to shrink below its
+   content's intrinsic width — and a `<pre>` with `white-space: pre` has a huge
+   one. Without these the whole shell is dragged wider than the viewport by one
+   long code line, and the page clips horizontally on mobile. */
+.chat-page__body { min-height: 0; min-width: 0; display: flex; }
+.chat-page__body > .chat-page__inner { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.chat-page__body .chat-thread-frame { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.chat-page__body .chat-thread {
+  min-width: 0;
+  --chat-thread-max-height: none;
+  --chat-thread-margin: 0;
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3) 0 var(--space-4);
+}
+
+/* §3's "~120px bottom padding so the last message clears the input bar" is
+   deliberately NOT reproduced. That rule exists because the guide assumes an
+   input that OVERLAYS the scroll container; here the composer is its own grid
+   row, so the last message can never be behind it and 120px of dead space
+   would just be dead space. What the rule is actually protecting — the last
+   message being readable — is asserted directly in verify.mjs instead. */
+.chat-page__footer {
+  border-top: 1px solid var(--line-soft);
+  padding-top: var(--space-3);
+  /* §10 — clear the home indicator / gesture bar on a touch device. */
+  padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
+  background: var(--bg);
+}
+
+/* The jump-to-latest sits above the composer row, not over it. */
+.chat-page__body .chat-jump { bottom: var(--space-4); }
