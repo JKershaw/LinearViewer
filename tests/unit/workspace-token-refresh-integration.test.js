@@ -34,10 +34,16 @@ import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import crypto from 'node:crypto';
-import { selectOwnerWorkspaceToken } from '../../lib/workspace-token-resolver.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { selectOwnerWorkspaceToken, classifyWorkspaceFailure, UNSCOPED } from '../../lib/workspace-token-resolver.js';
 import { refreshOwnerWorkspaceToken, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
 import { refreshAccessToken, TokenRefreshError } from '../../lib/token-refresh.js';
 import { GitHubProvider } from '../../lib/providers/github/index.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 // A minimal Mongo-shaped in-memory sessions collection, matching the real
 // shape sessionsCollection.find({}).toArray() yields (each row: { _id, session,
@@ -434,5 +440,210 @@ describe('LIN-1524 durable-only real-refresh witness (logged-out owner, unstubbe
     // into one. The collection stays empty; this is not an error case, it's
     // the correct behaviour for a logged-out owner.
     assert.equal(collection._raw().length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-1544 durable-credential resolve witness (guards LIN-1524; the I5 sibling
+// of I4): lifts I4's logged-out durable refresh up to the FULL
+// resolveWorkspaceAccess envelope — proving `reason: 'ok'` is what an owner's
+// headless proxy token gets AFTER logout, minted from the durable credential.
+// ---------------------------------------------------------------------------
+
+// The in-test mirror of server.js's `resolveWorkspaceAccess` refresh-on-resolve
+// composition (server.js:1318-1363). server.js itself is not import-safe (it
+// connects to a real DB and listens at module load — see this file's header),
+// so — exactly as I1–I4 reconstruct the persist/TTL composition rather than
+// importing the function — this reconstructs the selector → owner-guard →
+// refresh → classify pipeline from the SAME real lib pieces the server wires,
+// over the SAME real HTTP token seam. The Block-F source-grep below pins this
+// mirror to production so the two cannot silently drift. The cache and the
+// GitHub-only `resolveProvider`/`persistSession` mirror legs are not exercised
+// by a logged-out Linear owner (empty sessions, durable-only) and are omitted
+// for the same reason I4 omits them.
+async function resolveWorkspaceAccessMirror({ collection, urlKey, ownerAccountId, refreshAccessToken, persistSession, store }) {
+  const sessions = await collection.find().then(c => c.toArray());
+  const selected = selectOwnerWorkspaceToken(sessions, urlKey, ownerAccountId);
+
+  if (selected.token) {
+    return { token: selected.token, reason: 'ok', provider: selected.provider };
+  }
+
+  // Refresh-on-resolve, owner-scoped (never UNSCOPED) — server.js:1345-1363.
+  if (!selected.token && ownerAccountId !== UNSCOPED) {
+    try {
+      const refreshed = await refreshOwnerWorkspaceToken({
+        sessions,
+        urlKey,
+        ownerAccountId,
+        refreshAccessToken,
+        persistSession,
+        store,
+      });
+      if (refreshed) {
+        return { token: refreshed.token, reason: 'ok', provider: refreshed.provider };
+      }
+    } catch {
+      // Fall through to classification — never a 500, never cached.
+    }
+  }
+
+  const reason = classifyWorkspaceFailure({ sessions, urlKey, ownerAccountId, selectedReason: selected.reason });
+  return { token: selected.token, reason, provider: selected.provider };
+}
+
+// Extracts the body of `async function resolveWorkspaceAccess` from server.js
+// (the exact idiom + rationale as linear-token-isolation.test.js's Block F):
+// from the function keyword to the next TOP-LEVEL `\n}`. Relies on the repo's
+// consistent 2-space indentation (CLAUDE.md) — every inner brace is
+// space-prefixed, so only the function's own closing brace matches "\n}".
+function extractResolveWorkspaceAccessBody(src) {
+  const start = src.indexOf('async function resolveWorkspaceAccess');
+  assert.ok(start >= 0, 'async function resolveWorkspaceAccess not found in server.js');
+  const end = src.indexOf('\n}', start);
+  assert.ok(end >= 0, "could not find resolveWorkspaceAccess's top-level closing brace");
+  return src.slice(start, end + 2);
+}
+
+describe('LIN-1544 durable-credential resolve witness (logout -> headless resolve reason:ok, guards LIN-1524)', () => {
+  beforeEach(() => { _resetInflightForTests(); });
+
+  // Owner-scoped throughout: a single account, one workspace, one durable
+  // record. No second account is ever seeded, so a green run cannot come from
+  // borrowing another owner's credential (preserves LIN-1366 isolation).
+  const ACCOUNT = 'account-lin1544';
+  const URL_KEY = 'acme-lin1544';
+  const DURABLE_KEY = `${ACCOUNT}::${URL_KEY}`;
+
+  test('I5: owner logs out (live session row removed, durable record preserved) -> resolve returns reason:ok, token minted FROM the durable credential over real HTTP', async () => {
+    tokenServerBehavior = (req, res, body) => {
+      assert.equal(req.method, 'POST');
+      assert.ok(body.includes('grant_type=refresh_token'));
+      assert.ok(body.includes('refresh_token=durable-lin1544-refresh-token'));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        access_token: 'rotated-lin1544-access-token',
+        refresh_token: 'rotated-lin1544-refresh-token',
+        expires_in: 3600,
+        scope: 'read write',
+      }));
+    };
+
+    // Logout = the live session row is gone. Empty collection: nothing for the
+    // pure selector to find — exactly the post-logout state, durable-only.
+    const collection = inMemorySessionsCollection([]);
+    const persistSession = makePersistSessionRow(collection);
+    const refreshImpl = (refreshToken) => refreshAccessToken(refreshToken, { tokenUrl });
+
+    // The durable owner-credentials record SURVIVES logout (mirrors
+    // routes/auth.js logout keeping the credential — logout = zero durable
+    // deletes). Seeded with a stale/expired access token + a valid refresh
+    // token, keyed `${accountId}::${urlKey}` per OwnerCredentialStore.
+    const durableRecords = new Map([
+      [DURABLE_KEY, { provider: 'linear', scope: URL_KEY, token: 'stale-pre-logout-token', refreshToken: 'durable-lin1544-refresh-token', tokenExpiresAt: Date.now() - 10_000 }],
+    ]);
+    const storeCalls = [];
+    const store = {
+      async get(accountId, urlKey) { return durableRecords.get(`${accountId}::${urlKey}`) ?? null; },
+      async put(accountId, urlKey, credential) { storeCalls.push({ accountId, urlKey, credential }); durableRecords.set(`${accountId}::${urlKey}`, credential); },
+    };
+
+    // Pre-condition: with the live session row gone, the pure selector fails
+    // closed with `not_connected` — proving the token below is produced by the
+    // durable refresh path, NOT by session selection (a real logged-out case,
+    // not a fixture that still has a resolvable session row).
+    const preSelect = selectOwnerWorkspaceToken(await collection.find().then(c => c.toArray()), URL_KEY, ACCOUNT);
+    assert.equal(preSelect.reason, 'not_connected');
+    assert.equal(preSelect.token, null);
+
+    const result = await resolveWorkspaceAccessMirror({
+      collection,
+      urlKey: URL_KEY,
+      ownerAccountId: ACCOUNT,
+      refreshAccessToken: refreshImpl,
+      persistSession,
+      store,
+    });
+
+    // The deliverable: a logged-out owner's headless resolve returns reason:ok.
+    assert.equal(result.reason, 'ok');
+    assert.equal(result.token, 'rotated-lin1544-access-token');
+    assert.equal(result.provider, 'linear');
+
+    // Evidence the DURABLE-CREDENTIAL refresh path is what produced the token:
+    // the durable record was read AND rotated once, for the correct owner pair,
+    // with the freshly-rotated (not the seeded) refresh token.
+    assert.equal(storeCalls.length, 1);
+    assert.equal(storeCalls[0].accountId, ACCOUNT);
+    assert.equal(storeCalls[0].urlKey, URL_KEY);
+    assert.equal(storeCalls[0].credential.refreshToken, 'rotated-lin1544-refresh-token');
+    assert.notEqual(storeCalls[0].credential.refreshToken, 'durable-lin1544-refresh-token');
+
+    // The durable record survived logout and now holds the rotated credential.
+    const durableAfter = await store.get(ACCOUNT, URL_KEY);
+    assert.equal(durableAfter.refreshToken, 'rotated-lin1544-refresh-token');
+
+    // No session row existed to mirror into — the collection stays empty. The
+    // durable record alone carried the owner's authority across logout.
+    assert.equal(collection._raw().length, 0);
+  });
+
+  test('I5b (failing-first twin, permanent): the IDENTICAL logged-out resolve with NO durable record returns reason:owner_signed_out, not ok — so I5\'s pass is load-bearing on the durable-credential path', async () => {
+    // Same logged-out shape as I5 (empty sessions, same owner/workspace), but
+    // the durable record is ABSENT. This is what I5 would degrade to if the
+    // durable-credential path were removed — the exact regression LIN-1524
+    // closed and this witness guards. Encoded permanently (not a momentary
+    // toggle) so the contrast is a standing part of the suite, and it needs no
+    // runtime/source change to demonstrate the red.
+    const collection = inMemorySessionsCollection([]);
+    const persistSession = makePersistSessionRow(collection);
+    const refreshImpl = (refreshToken) => refreshAccessToken(refreshToken, { tokenUrl });
+
+    const store = {
+      async get() { return null; }, // no durable record for this owner
+      async put() { throw new Error('put must not be called — there is no durable record to rotate'); },
+    };
+
+    const result = await resolveWorkspaceAccessMirror({
+      collection,
+      urlKey: URL_KEY,
+      ownerAccountId: ACCOUNT,
+      refreshAccessToken: refreshImpl,
+      persistSession,
+      store,
+    });
+
+    // Without the durable credential, the logged-out owner falls straight to
+    // the honest failure classification — owner_signed_out (not_connected +
+    // no session row anywhere) — NEVER reason:ok.
+    assert.notEqual(result.reason, 'ok');
+    assert.equal(result.reason, 'owner_signed_out');
+    assert.equal(result.token, null);
+  });
+
+  test('I5c (Block-F anti-drift): the REAL server.js resolveWorkspaceAccess returns reason:ok inside the `if (refreshed)` block, gated behind the `ownerAccountId !== UNSCOPED` refresh guard', () => {
+    // Pins the in-test mirror above to production without importing the
+    // not-import-safe server.js. Whitespace-tolerant (normalises runs of
+    // whitespace to a single space) so it survives reflow/reformatting and
+    // pins BEHAVIOUR — the ordering of guard -> refresh -> ok-return — not an
+    // exact source string.
+    const flat = extractResolveWorkspaceAccessBody(SERVER_SRC).replace(/\s+/g, ' ');
+
+    const guardIdx = flat.indexOf('ownerAccountId !== UNSCOPED');
+    const refreshIdx = flat.indexOf('refreshOwnerWorkspaceToken(');
+    const ifRefreshedIdx = flat.indexOf('if (refreshed)');
+    const okReturnIdx = flat.indexOf("reason: 'ok'", ifRefreshedIdx);
+    const classifyIdx = flat.indexOf('classifyWorkspaceFailure(', ifRefreshedIdx);
+
+    // Refresh-on-resolve is owner-scoped: the UNSCOPED guard textually precedes
+    // the refresh call (an UNSCOPED caller never reaches the durable store).
+    assert.ok(guardIdx >= 0, 'the `ownerAccountId !== UNSCOPED` refresh guard is missing from resolveWorkspaceAccess');
+    assert.ok(refreshIdx > guardIdx, 'refreshOwnerWorkspaceToken must be called under the `ownerAccountId !== UNSCOPED` guard');
+
+    // The ok-envelope is gated on a SUCCESSFUL durable refresh, and is emitted
+    // BEFORE the classify fallthrough — i.e. a fresh durable-minted token wins.
+    assert.ok(ifRefreshedIdx > refreshIdx, 'the ok-envelope must sit inside the `if (refreshed)` success block');
+    assert.ok(okReturnIdx >= 0, "resolveWorkspaceAccess must return reason: 'ok' inside the `if (refreshed)` block");
+    assert.ok(classifyIdx === -1 || okReturnIdx < classifyIdx, "the `if (refreshed)` reason: 'ok' return must precede the classifyWorkspaceFailure fallthrough");
   });
 });
