@@ -581,6 +581,16 @@ export function createDashboardRoutes({
       const metrics = Array.isArray(l.telemetry?.metrics) ? l.telemetry.metrics : [];
       return {
         loopId: l.loopId,
+        // Lineage identity (LIN-1487): carry the read-only `lineageId` derived
+        // upstream (`lib/pipeline-loops.js` — `rootItemId ?? loopId`, emitted
+        // ungated by `lean`) through the projection so the client can fold a
+        // multi-wake lineage into one group at RENDER time. `runs[]` stays N
+        // entries — this is additive, never a payload-side fold — so the repaint
+        // signature and every per-run-keyed client site keep reading unfolded
+        // runs. Null only for stale docs materialized before the field existed;
+        // the client's `?? loopId` grouping fallback degrades those to a
+        // lineage-of-one.
+        lineageId: l.lineageId || null,
         issueIdentifier: l.issueIdentifier || null,
         issueTitle: l.issueTitle || '',
         issueUrl: l.issueUrl || null,

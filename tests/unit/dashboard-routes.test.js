@@ -456,6 +456,62 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(run.toolPeak, 10, 'peak tool count precomputed across ALL heartbeats');
   });
 
+  // ─── Lineage identity survives into the runs[] projection (LIN-1487, T1) ─────
+  // LIN-1477 pins `lineageId` DERIVATION (lib/pipeline-loops.js). This pins the
+  // one novel thing S2c adds: the derived id reaches the FEED's runs[] projection
+  // so the client can fold on it. Two workers sharing a rootItemId must project
+  // the same lineageId; a worker with no rootItemId projects lineageId === its
+  // own loopId (never null), matching pipeline-loops' `rootItemId ?? loopId`.
+  test('runs[] carries lineageId — shared rootItemId folds to one id; absent → loopId (LIN-1487)', async () => {
+    // Two workers in one session sharing a lineage (same rootItemId), plus a
+    // third standalone worker with no rootItemId. All three are children of the
+    // autopilot anchor, so all three enter runs[].
+    const wA = {
+      id: 'w-a', sessionId: 'sess-fold', rootItemId: 'lineage-root', issueIdentifier: 'LIN-901',
+      issueTitle: 'Wake 1', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO,
+      resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[done] one', timestamp: NOW_ISO }]
+    };
+    const wB = {
+      id: 'w-b', sessionId: 'sess-fold', rootItemId: 'lineage-root', issueIdentifier: 'LIN-901',
+      issueTitle: 'Wake 2', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO,
+      resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[done] two', timestamp: NOW_ISO }]
+    };
+    const wSolo = {
+      id: 'w-solo', sessionId: 'sess-fold', issueIdentifier: 'LIN-902',
+      issueTitle: 'Solo', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO,
+      resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[done] solo', timestamp: NOW_ISO }]
+    };
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-fold', 'LIN-900'), wA, wB, wSolo],
+        agentStatus: [
+          agentStatusDone('sess-fold', 'LIN-900'), agentStatusDone('w-a', 'LIN-901'),
+          agentStatusDone('w-b', 'LIN-901'), agentStatusDone('w-solo', 'LIN-902')
+        ]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const sess = findSession(res.jsonBody, 'sess-fold');
+    assert.ok(sess, 'session present');
+    // Invariant: the fold is presentation-only — runs[] keeps N entries.
+    assert.equal(sess.runCount, 3, 'runs[] stays unfolded — three worker runs');
+    const byId = id => sess.runs.find(r => r.loopId === id);
+    const a = byId('w-a'), b = byId('w-b'), solo = byId('w-solo');
+    assert.ok(a && b && solo, 'all three runs projected');
+    // Shared rootItemId → identical lineageId (this is what the client groups on).
+    assert.equal(a.lineageId, 'lineage-root');
+    assert.equal(b.lineageId, 'lineage-root');
+    assert.equal(a.lineageId, b.lineageId, 'the two wakes share one lineage id');
+    // No rootItemId → lineageId falls back to the run's own loopId, never null.
+    assert.equal(solo.lineageId, 'w-solo', 'a lineage-less run carries its own loopId as lineageId');
+  });
+
   test('a [failed] worker yields an error-status session', async () => {
     const failWorker = { id: 'wf', sessionId: 'sess-9', issueIdentifier: 'LIN-301', issueTitle: 'T', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[failed] broke', timestamp: NOW_ISO }] };
     const perWorkspace = {
