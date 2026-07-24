@@ -53,6 +53,18 @@ import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
+// LIN-1552 Session A: the session-auth issue write routes reuse the SAME
+// symbolic-ref primitives the proxy write path uses, the shared trashed-signal
+// detector, and the shared issue-write validator — no rules re-inlined here.
+import {
+  parseSourceNamespace,
+  resolveStateRef,
+  resolveProjectRef,
+  resolveTeamRef,
+  RefResolutionError,
+} from '../lib/proxy-ref-resolver.js';
+import { isTrashed } from '../lib/trashed-signal.js';
+import { validateIssueWriteFields, isValidPriority } from '../lib/issue-write-validation.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { isTerminalState, isBlocked } from '../lib/tree.js';
@@ -2455,6 +2467,197 @@ ${goal}`
     } catch (error) {
       console.error('Feedback submit error:', error);
       return jsonError(res, 500, 'Failed to submit feedback');
+    }
+  });
+
+  // ===========================================================================
+  // Issue write surface (session-auth) — LIN-1552 / LIN-1504 Session A
+  //
+  // POST  /workspace/:urlKey/api/issues            → create → 201 {success, issue}
+  // PATCH /workspace/:urlKey/api/issues/:issueId    → update → 200 {success, issue}
+  //
+  // Backend only (no UI). Modeled on POST /workspace/:urlKey/api/feedback above:
+  // resolve the workspace provider, take the call-scope token, gate the
+  // capability with a clean 422 (never 500), validate fields through the shared
+  // seam (lib/issue-write-validation.js), resolve symbolic refs via the shared
+  // proxy ref-resolver primitives, perform the provider write, and map a failed
+  // write to 502. This is the surface the in-app UI (Session B) will call.
+  // ===========================================================================
+
+  // Normalize a provider write result to `{ success, issue }`. Linear/GitHub
+  // return that shape already; the local provider returns a bare canonical issue
+  // (or null), so without this a successful local write would read as
+  // `success: undefined` and wrongly 502. Mirrors proxy.js's normalizeWritePayload.
+  function normalizeIssueWrite(result) {
+    if (result && typeof result === 'object' && 'success' in result) return result;
+    return { success: !!result, issue: result ?? null };
+  }
+
+  // Input-side symbolic-ref resolution, mirroring the proxy write path
+  // (routes/proxy.js resolveTeamInput/resolveStateInput/resolveProjectInput): a
+  // bare UUID short-circuits before any provider read, so existing UUID payloads
+  // pay no network cost; a symbolic ref triggers the scoped list fetch and
+  // resolves to a native id (or throws RefResolutionError → clean 422 below).
+  async function resolveIssueTeamRef(provider, token, rawRef) {
+    const { localRef } = parseSourceNamespace(rawRef);
+    if (UUID_REGEX.test(localRef)) return localRef;
+    const teams = await provider.fetchTeams(token);
+    return resolveTeamRef(teams, localRef);
+  }
+  async function resolveIssueProjectRef(provider, token, rawRef) {
+    const { localRef } = parseSourceNamespace(rawRef);
+    if (UUID_REGEX.test(localRef)) return localRef;
+    const projects = await provider.fetchProjectsList(token);
+    return resolveProjectRef(projects, localRef);
+  }
+  async function resolveIssueStateRef(provider, token, teamId, rawRef) {
+    const { localRef } = parseSourceNamespace(rawRef);
+    if (UUID_REGEX.test(localRef)) return localRef;
+    // States are team-scoped; without a team we cannot scope the symbolic match,
+    // so fail loud (422) rather than guess across teams.
+    if (!teamId) {
+      throw new RefResolutionError(
+        `Cannot resolve state '${localRef}' — the issue's team could not be determined`,
+        { status: 422 },
+      );
+    }
+    const states = await provider.states(token, teamId);
+    return resolveStateRef(states, localRef);
+  }
+
+  // Map a RefResolutionError to a clean 422 (with candidate ids for an ambiguous
+  // match). Returns true when handled so the catch can `if (...) return;`.
+  function issueRefResolutionFailed(res, err) {
+    if (!(err instanceof RefResolutionError)) return false;
+    jsonError(res, err.status || 422, err.message, err.candidates ? { candidates: err.candidates } : undefined);
+    return true;
+  }
+
+  /**
+   * Create an issue on the workspace provider (session-auth).
+   * @route POST /workspace/:urlKey/api/issues
+   */
+  router.post('/workspace/:urlKey/api/issues', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace;
+    const provider = getProviderForWorkspace(workspace);
+    const token = getWorkspaceCallScope(workspace);
+
+    // Capability gate — clean 422 (never 500) when the provider can't create.
+    if (!provider.supports('createIssue')) {
+      return jsonError(res, 422, "This workspace's provider does not support creating issues", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'createIssue', provider: provider.name,
+      });
+    }
+
+    const { title, description, teamId, projectId, stateId, priority } = req.body || {};
+
+    if (!teamId || typeof teamId !== 'string') {
+      return badRequest.json(res, 'Valid teamId is required');
+    }
+    if (!title || typeof title !== 'string') {
+      return badRequest.json(res, 'title is required');
+    }
+    // Shared validation seam (length caps + control-char guard + priority range)
+    // — 400 on failure. Unlike the proxy surface, this session-auth surface opts
+    // into priority rejection (validatePriority) so a bad priority is a clean 400,
+    // not a silent drop (LIN-1552 Session A spec).
+    const fieldError = validateIssueWriteFields({ title, description, priority }, { mode: 'create', validatePriority: true });
+    if (fieldError) {
+      return badRequest.json(res, fieldError);
+    }
+
+    try {
+      const resolvedTeamId = await resolveIssueTeamRef(provider, token, teamId);
+      const input = {
+        teamId: resolvedTeamId,
+        title,
+        // LIN-1552: stamp the creating account from the session (NOT
+        // linearUserId), mirroring the LIN-1376 owner-stamping convention.
+        createdBy: req.session?.accountId || null,
+      };
+      if (description) input.description = description;
+      if (projectId) input.projectId = await resolveIssueProjectRef(provider, token, projectId);
+      if (stateId) input.stateId = await resolveIssueStateRef(provider, token, resolvedTeamId, stateId);
+      if (priority !== undefined && isValidPriority(priority)) input.priority = priority;
+
+      const result = normalizeIssueWrite(await provider.createIssue(token, input));
+      if (!result.success || !result.issue) {
+        return jsonError(res, 502, 'Issue was not created', { detail: result || null });
+      }
+      return res.status(201).json({ success: true, issue: result.issue });
+    } catch (err) {
+      if (issueRefResolutionFailed(res, err)) return;
+      console.error('Workspace-api create issue error:', err.message);
+      return jsonError(res, 500, 'Failed to create issue');
+    }
+  });
+
+  /**
+   * Update an issue on the workspace provider (session-auth). Description edit is
+   * a full-body PATCH (replace, not append).
+   * @route PATCH /workspace/:urlKey/api/issues/:issueId
+   */
+  router.patch('/workspace/:urlKey/api/issues/:issueId', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace;
+    const provider = getProviderForWorkspace(workspace);
+    const token = getWorkspaceCallScope(workspace);
+
+    if (!provider.supports('updateIssue')) {
+      return jsonError(res, 422, "This workspace's provider does not support updating issues", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'updateIssue', provider: provider.name,
+      });
+    }
+
+    const { issueId } = req.params;
+    if (!isValidIssueId(issueId)) {
+      return badRequest.json(res, 'Invalid issue ID format');
+    }
+
+    // v1 edit fields only: title, description, state/status, priority. `stateId`
+    // is the primary field; `state`/`status` are accepted aliases (all resolve
+    // through the same symbolic state resolver).
+    const { title, description, priority } = req.body || {};
+    const stateId = req.body?.stateId ?? req.body?.state ?? req.body?.status;
+
+    const fieldError = validateIssueWriteFields({ title, description, priority }, { mode: 'update', validatePriority: true });
+    if (fieldError) {
+      return badRequest.json(res, fieldError);
+    }
+
+    // Reject a wholly empty body before any provider read (no-network 400).
+    const hasUpdatableField = [title, description, stateId, priority].some(v => v !== undefined);
+    if (!hasUpdatableField) {
+      return badRequest.json(res, 'No valid fields to update');
+    }
+
+    try {
+      // One guard read serves BOTH the trashed refusal (409) AND the team scope a
+      // symbolic stateId needs, mirroring the proxy update path.
+      const guard = await provider.issueWriteGuard(token, issueId);
+      if (isTrashed(guard)) {
+        return jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
+      }
+      const teamId = guard?.team?.id || null;
+
+      const input = {};
+      if (title) input.title = title;
+      if (description !== undefined) input.description = description; // full-body replace
+      if (stateId) input.stateId = await resolveIssueStateRef(provider, token, teamId, stateId);
+      if (priority !== undefined && isValidPriority(priority)) input.priority = priority;
+
+      if (Object.keys(input).length === 0) {
+        return badRequest.json(res, 'No valid fields to update');
+      }
+
+      const result = normalizeIssueWrite(await provider.updateIssue(token, issueId, input));
+      if (!result.success || !result.issue) {
+        return jsonError(res, 502, 'Issue was not updated', { detail: result || null });
+      }
+      return res.json({ success: true, issue: result.issue });
+    } catch (err) {
+      if (issueRefResolutionFailed(res, err)) return;
+      console.error('Workspace-api update issue error:', err.message);
+      return jsonError(res, 500, 'Failed to update issue');
     }
   });
 

@@ -105,6 +105,8 @@ describe('GitHubProjectsProvider capability profile (LIN-560)', () => {
     assert.deepEqual(provider.ui, {
       write: false,       // getCreateTaskUrl NOT overridden
       comments: false,    // fetchIssueComments NOT implemented
+      inlineCreate: false, // supports('createIssue') false — read-only V1 (LIN-1552)
+      inlineEdit: false,   // supports('updateIssue') false — read-only V1 (LIN-1552)
       estimates: false,   // no estimate mapping in V1
       subtasks: false,    // no item hierarchy
       attachments: true,  // item body (issue/PR) carries user-content uploads (LIN-771)

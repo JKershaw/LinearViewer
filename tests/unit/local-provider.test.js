@@ -30,6 +30,8 @@ describe('LocalProvider capability profile (LIN-356 step D)', () => {
     assert.deepEqual(provider.ui, {
       write: true,        // getCreateTaskUrl overridden
       comments: true,     // fetchIssueComments implemented
+      inlineCreate: true, // supports('createIssue') (LIN-1552)
+      inlineEdit: true,   // supports('updateIssue') (LIN-1552)
       estimates: false,
       subtasks: true,
       attachments: true,  // markdown bodies can embed upload links (LIN-771)
@@ -273,7 +275,9 @@ describe('LocalProvider proxy surface (LIN-583)', () => {
   });
 
   test('write-guard reads (issueWriteGuard/issueDescription/issueLabels)', async () => {
-    assert.deepEqual(await provider.issueWriteGuard(SCOPE, 'i1'), { id: 'i1', trashed: false });
+    // LIN-1553: the guard carries a synthetic team so the update routes can scope
+    // symbolic state resolution (local states are team-agnostic).
+    assert.deepEqual(await provider.issueWriteGuard(SCOPE, 'i1'), { id: 'i1', trashed: false, team: { id: 'local' } });
     assert.equal(await provider.issueWriteGuard(SCOPE, 'nope'), null);
     assert.deepEqual(await provider.issueDescription(SCOPE, 'i1'), { id: 'i1', description: 'd1', trashed: false });
     assert.deepEqual(await provider.issueLabels(SCOPE, 'i1'), { id: 'i1', trashed: false, labels: { nodes: [{ id: 'bug', name: 'bug' }] } });
@@ -485,7 +489,7 @@ describe('LocalProvider no-soft-delete boundary (LIN-582)', () => {
 
   test('proxy-surface reads always report trashed:false for a live issue', async () => {
     assert.equal((await provider.issueDetail(SCOPE, 'i1')).trashed, false);
-    assert.deepEqual(await provider.issueWriteGuard(SCOPE, 'i1'), { id: 'i1', trashed: false });
+    assert.deepEqual(await provider.issueWriteGuard(SCOPE, 'i1'), { id: 'i1', trashed: false, team: { id: 'local' } });
     assert.equal((await provider.issueDescription(SCOPE, 'i1')).trashed, false);
     assert.equal((await provider.issueLabels(SCOPE, 'i1')).trashed, false);
     assert.equal((await provider.relations(SCOPE, 'i1')).trashed, false);

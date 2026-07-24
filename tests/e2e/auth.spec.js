@@ -18,13 +18,16 @@ test.describe('Authentication Flow', () => {
     await expect(page.locator('[data-testid="landing-cta-linear"]')).toBeVisible();
   });
 
-  test('unauthenticated users see the shared nav sign-in but no authed chrome', async ({ page }) => {
+  test('unauthenticated home offers hero sign-in but no authed chrome', async ({ page }) => {
     await page.goto('/');
 
-    // LIN-980: the landing composes D's shared header nav (isLanding branch) —
-    // so it DOES carry a sign-in action, but none of the authenticated-only
-    // chrome (workspace/team selectors, reset, logout).
-    await expect(page.locator('nav.nav-bar a.login')).toBeVisible();
+    // LIN-1508: the homepage no longer renders the shared landing top bar — the
+    // hero carries the sign-in CTA directly (the bar was pure duplication and is
+    // kept only for the hero-less swipe/swim/ship previews). So sign-in is
+    // reachable via the hero, and none of the authenticated-only chrome
+    // (workspace/team selectors, reset, logout) — nor the top bar — is present.
+    await expect(page.locator('[data-testid="landing-cta-linear"]')).toBeVisible();
+    await expect(page.locator('nav.nav-bar')).toHaveCount(0);
     await expect(page.locator('[data-selector="workspace"]')).toHaveCount(0);
     await expect(page.locator('[data-selector="team"]')).toHaveCount(0);
     await expect(page.locator('.reset-view')).toHaveCount(0);

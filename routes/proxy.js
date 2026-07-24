@@ -18,6 +18,17 @@ import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateOpaqueDispatchField, validateDispatchPayload } from '../lib/dispatch-validation.js';
+// LIN-1552: the issue-write validation rules (length caps, control-char guard,
+// priority range) now live in one shared module so the session-auth workspace
+// API write routes (Session B) consume the same definition and cannot drift.
+import {
+  MAX_NAME_LENGTH,
+  MAX_DESCRIPTION_LENGTH,
+  MAX_COMMENT_LENGTH,
+  DANGEROUS_CHARS_REGEX,
+  isValidPriority,
+  validateIssueWriteFields,
+} from '../lib/issue-write-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
@@ -300,9 +311,9 @@ const proxyTokenCreationLimiter = rateLimit({
   skip: () => process.env.NODE_ENV === 'test'
 });
 
-const MAX_NAME_LENGTH = 1000;
 const MAX_SEARCH_LENGTH = 500;
-const MAX_DESCRIPTION_LENGTH = 100000;
+// MAX_NAME_LENGTH / MAX_DESCRIPTION_LENGTH now imported from
+// lib/issue-write-validation.js (LIN-1552) — one definition, both write surfaces.
 
 // LIN-583 test-only local-targeting seam. A proxy token minted for this urlKey
 // resolves to the LocalProvider (reached with the urlKey as the store partition
@@ -331,7 +342,7 @@ const PROXY_ATTACH_FAILED_MESSAGE = 'Proxy context was requested but a proxy tok
 // one. The agent exchanges it at POST /api/proxy/token for a multi-use working
 // token. BOOTSTRAP_TOKEN_TTL_SECONDS / WORKING_TOKEN_TTL_SECONDS are imported
 // from lib/proxy-tokens.js so every mint site shares one source of truth.
-const MAX_COMMENT_LENGTH = 50000;
+// MAX_COMMENT_LENGTH now imported from lib/issue-write-validation.js (LIN-1552).
 
 // Dispatch input limits. The prompt/url caps for the POST /dispatch payload now
 // live in lib/dispatch-validation.js (shared with the session-auth twin via
@@ -448,8 +459,8 @@ async function fetchWithTimeout(workFn, ms) {
   }
 }
 
-// Pattern to detect null bytes and dangerous control characters
-const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
+// DANGEROUS_CHARS_REGEX (null bytes / dangerous control characters) now imported
+// from lib/issue-write-validation.js (LIN-1552).
 
 // The proxy-context preamble (the "Workspace API access" block appended to
 // dispatched prompts) now lives in lib/proxy-preamble.js so non-proxy dispatch
@@ -2176,20 +2187,11 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, 'title is required');
       }
 
-      if (title.length > MAX_NAME_LENGTH) {
-        return badRequest.json(res, `title exceeds maximum length of ${MAX_NAME_LENGTH}`);
-      }
-
-      if (description && description.length > MAX_DESCRIPTION_LENGTH) {
-        return badRequest.json(res, 'description exceeds maximum length');
-      }
-
-      if (DANGEROUS_CHARS_REGEX.test(title)) {
-        return badRequest.json(res, 'title contains invalid characters');
-      }
-
-      if (description && DANGEROUS_CHARS_REGEX.test(description)) {
-        return badRequest.json(res, 'description contains invalid characters');
+      // LIN-1552: length + control-char validation via the shared seam
+      // (identical rules/messages/order to the former inline checks).
+      const createFieldError = validateIssueWriteFields({ title, description }, { mode: 'create' });
+      if (createFieldError) {
+        return badRequest.json(res, createFieldError);
       }
 
       const resolvedTeamId = await resolveTeamInput(provider, token, teamId);
@@ -2205,7 +2207,7 @@ One convention across every endpoint, so you can branch on the same fields every
       if (assigneeId && UUID_REGEX.test(assigneeId)) input.assigneeId = assigneeId;
       if (parentId && UUID_REGEX.test(parentId)) input.parentId = parentId;
       if (cycleId && UUID_REGEX.test(cycleId)) input.cycleId = cycleId;
-      if (priority !== undefined && Number.isInteger(priority) && priority >= 0 && priority <= 4) {
+      if (priority !== undefined && isValidPriority(priority)) {
         input.priority = priority;
       }
 
@@ -2260,20 +2262,11 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const { title, description, stateId, assigneeId, priority, projectId, parentId, cycleId } = req.body;
 
-      if (title && title.length > MAX_NAME_LENGTH) {
-        return badRequest.json(res, `title exceeds maximum length of ${MAX_NAME_LENGTH}`);
-      }
-
-      if (title && DANGEROUS_CHARS_REGEX.test(title)) {
-        return badRequest.json(res, 'title contains invalid characters');
-      }
-
-      if (description && description.length > MAX_DESCRIPTION_LENGTH) {
-        return badRequest.json(res, 'description exceeds maximum length');
-      }
-
-      if (description && DANGEROUS_CHARS_REGEX.test(description)) {
-        return badRequest.json(res, 'description contains invalid characters');
+      // LIN-1552: length + control-char validation via the shared seam
+      // (identical rules/messages/order to the former inline checks).
+      const updateFieldError = validateIssueWriteFields({ title, description }, { mode: 'update' });
+      if (updateFieldError) {
+        return badRequest.json(res, updateFieldError);
       }
 
       // Reject a wholly empty body before any read (preserves the no-network 400
@@ -2308,7 +2301,7 @@ One convention across every endpoint, so you can branch on the same fields every
       if (parentId === null) input.parentId = null;
       else if (parentId && UUID_REGEX.test(parentId)) input.parentId = parentId;
       if (cycleId && UUID_REGEX.test(cycleId)) input.cycleId = cycleId;
-      if (priority !== undefined && Number.isInteger(priority) && priority >= 0 && priority <= 4) {
+      if (priority !== undefined && isValidPriority(priority)) {
         input.priority = priority;
       }
 

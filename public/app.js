@@ -638,6 +638,27 @@ function init() {
   // Using event delegation: one listener on document handles all interactive
   // elements. Order matters - check more specific selectors first.
   document.addEventListener('click', (e) => {
+    // 0. Inline create/edit form toggle (LIN-1553) — reveal the hidden in-app
+    // issue form. Checked first so a trigger inside an expandable row doesn't
+    // also toggle the row. The button is a plain <button type="button">, so
+    // there's no native submit to guard here.
+    const inlineTrigger = e.target.closest('.inline-issue-trigger')
+    if (inlineTrigger) {
+      e.preventDefault()
+      e.stopPropagation()
+      const wrapper = inlineTrigger.closest('.inline-issue')
+      const form = wrapper && wrapper.querySelector('.inline-issue-form')
+      if (form) {
+        const nowHidden = form.classList.toggle('hidden')
+        inlineTrigger.setAttribute('aria-expanded', String(!nowHidden))
+        if (!nowHidden) {
+          const first = form.querySelector('input, textarea, select')
+          if (first) first.focus()
+        }
+      }
+      return
+    }
+
     // 1. Description toggle (show more/less) - must check before .project-description
     if (e.target.closest('.desc-toggle')) {
       e.stopPropagation()
@@ -828,6 +849,102 @@ function init() {
       setHidden(items, state.recentActivityCollapsed)
       setArrow(recentActivityHeader, !state.recentActivityCollapsed)
       return
+    }
+  })
+
+  // ==========================================================================
+  // LIN-1553: in-app create / edit issue submit. One delegated `submit` listener
+  // (bound once here in init(), same discipline as the click delegation above)
+  // handles every create/edit form — including forms rendered after load — so
+  // there is no per-form binding and no way to double-bind on re-render. The
+  // markup contract (data-inline-create / data-inline-edit, field `name`s,
+  // data-url-key / data-issue-id, [data-inline-status]) is what beat 2's render
+  // emits. Requests hit the Session A session-auth routes and, on success, the
+  // page reloads — matching the reload-after-write convention used elsewhere
+  // (e.g. the feedback widget). window.api (common.js, loaded before app.js)
+  // surfaces errors via toast and throws on non-2xx.
+  // ==========================================================================
+  document.addEventListener('submit', async (e) => {
+    const createForm = e.target.closest('form[data-inline-create]')
+    const editForm = e.target.closest('form[data-inline-edit]')
+    const form = createForm || editForm
+    if (!form) return
+
+    // Always stop the browser's native navigation for our forms.
+    e.preventDefault()
+
+    // Re-entrancy guard: ignore a second submit while one is in flight (matches
+    // the dataset.busy guard the footer feedback toggle uses).
+    if (form.dataset.busy === 'true') return
+    form.dataset.busy = 'true'
+
+    const statusEl = form.querySelector('[data-inline-status]')
+    const setStatus = (msg) => { if (statusEl) statusEl.textContent = msg }
+    const submitBtn = form.querySelector('[type="submit"]')
+    if (submitBtn) submitBtn.disabled = true
+
+    const urlKey = form.dataset.urlKey
+    // Read a field by its `name`; forms expose named controls on `.elements`.
+    const val = (name) => {
+      const el = form.elements[name]
+      return el ? el.value : undefined
+    }
+
+    // Reset transient state and re-enable the form (used on the error path so
+    // the user can correct input and retry).
+    const release = () => {
+      form.dataset.busy = 'false'
+      if (submitBtn) submitBtn.disabled = false
+    }
+
+    try {
+      setStatus('Saving…')
+
+      if (createForm) {
+        // POST /workspace/:urlKey/api/issues — v1 create body (routes/
+        // workspace-api.js:2540). The route ignores empty-string optionals
+        // (`if (description)` etc.) and rejects a missing title/teamId with 400.
+        const body = {
+          title: val('title'),
+          description: val('description'),
+          teamId: val('teamId'),
+          projectId: val('projectId'),
+          stateId: val('stateId'),
+          priority: Number(val('priority')),
+        }
+        await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/issues`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          toastOnError: true,
+        })
+      } else {
+        // PATCH /workspace/:urlKey/api/issues/:issueId — v1 edit body (routes/
+        // workspace-api.js:2600). `description` is the FULL body from the
+        // textarea (a full-body replace); `stateId` accepts a state name/keyword.
+        const issueId = editForm.dataset.issueId
+        const body = {
+          title: val('title'),
+          description: val('description'),
+          stateId: val('stateId'),
+          priority: Number(val('priority')),
+        }
+        await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/issues/${encodeURIComponent(issueId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          toastOnError: true,
+        })
+      }
+
+      // Refresh the view so the mutation is reflected (reload-after-write).
+      setStatus('Saved. Refreshing…')
+      window.location.reload()
+    } catch (err) {
+      // window.api already toasted the message; surface it inline too and
+      // re-enable the form for a retry (no hard crash).
+      setStatus((err && err.message) ? err.message : 'Something went wrong')
+      release()
     }
   })
 

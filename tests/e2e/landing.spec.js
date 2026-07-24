@@ -31,15 +31,20 @@ test.describe('Landing Page (bespoke showcase)', () => {
     await expect(page.locator('.landing-showcase')).toBeVisible();
   });
 
-  test('composes D’s shared header nav (not bespoke chrome)', async ({ page }) => {
+  test('drops the shared top bar on the homepage — hero is the sole sign-in path (LIN-1508)', async ({ page }) => {
     await page.goto('/');
-    // The unauthenticated nav is the SAME shared nav-bar the swipe/swim previews
-    // use, carrying a directly-reachable sign-in action.
-    const nav = page.locator('nav.nav-bar');
-    await expect(nav).toBeVisible();
-    await expect(nav.locator('a.login')).toBeVisible();
-    // The hero header itself carries no login/reset chrome.
-    await expect(page.locator('header.landing-hero a.login')).toHaveCount(0);
+    // The redundant landing top bar (projects / local workspace / sign in /
+    // GitHub) is removed on the homepage: the hero below already carries the
+    // primary sign-in CTAs, so the bar was pure duplication. It is preserved for
+    // the swipe/swim previews (see landing-swipe/landing-swim specs), which have
+    // no hero and rely on it as their only sign-in route.
+    await expect(page.locator('nav.nav-bar')).toHaveCount(0);
+    await expect(page.locator('nav a.login')).toHaveCount(0);
+    // The hero carries the directly-reachable Linear sign-in CTA instead.
+    const linearCta = page.locator('[data-testid="landing-cta-linear"]');
+    await expect(linearCta).toBeVisible();
+    await expect(linearCta).toHaveAttribute('href', '/auth/linear');
+    // The hero header itself carries no legacy reset chrome.
     await expect(page.locator('header .reset-view')).toHaveCount(0);
   });
 
