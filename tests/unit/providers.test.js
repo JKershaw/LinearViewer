@@ -398,6 +398,8 @@ describe('provider.ui surface (LIN-332)', () => {
     assert.deepStrictEqual(base.ui, {
       write: false,
       comments: false,
+      inlineCreate: false, // derived from supports('createIssue') — off on base (LIN-1552)
+      inlineEdit: false,   // derived from supports('updateIssue') — off on base (LIN-1552)
       estimates: false,
       subtasks: false,
       attachments: false, // read-attachments opt-in, off by default (LIN-649)
@@ -410,6 +412,8 @@ describe('provider.ui surface (LIN-332)', () => {
     assert.deepStrictEqual(linearProvider.ui, {
       write: true,      // getCreateTaskUrl is overridden
       comments: true,   // fetchIssueComments is implemented
+      inlineCreate: true, // supports('createIssue') (LIN-1552)
+      inlineEdit: true,   // supports('updateIssue') (LIN-1552)
       estimates: true,  // estimate is in ISSUE_FIELDS_FRAGMENT
       subtasks: true,   // children/parent are fetched
       attachments: true, // API read selects attachments + extracts md images (LIN-649)
@@ -474,7 +478,7 @@ describe('provider.ui surface (LIN-332)', () => {
     makeStubProvider({ write: true, displayName: 'Other' });
     // linearProvider.ui is unaffected by stub construction.
     assert.deepStrictEqual(linearProvider.ui, {
-      write: true, comments: true, estimates: true, subtasks: true, attachments: true, displayName: 'Linear',
+      write: true, comments: true, inlineCreate: true, inlineEdit: true, estimates: true, subtasks: true, attachments: true, displayName: 'Linear',
     });
   });
 });
