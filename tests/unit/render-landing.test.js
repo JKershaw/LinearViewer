@@ -24,10 +24,18 @@ test('leads with the Harbour brand hero (the settled top area)', () => {
   assert.ok(html.indexOf('landing-hero') < html.indexOf('landing-showcase'));
 });
 
-test('consumes D’s shared header nav rather than bespoke chrome', () => {
-  const html = renderLandingPage({});
-  assert.match(html, /<nav class="nav-bar"/);
-  assert.match(html, /class="nav-action login"/); // sign-in action
+test('drops the shared top bar on the homepage — the hero is the sole sign-in path', () => {
+  // LIN-1508: the homepage no longer renders the shared landing top bar
+  // (projects / local workspace / sign in / GitHub). It was pure duplication of
+  // the hero's CTAs. `minimalNav` scopes the removal to the homepage — the same
+  // bar is preserved for the swipe/swim/ship previews (their e2e specs pin it as
+  // their only sign-in route), so this asserts absence on the homepage only.
+  const html = renderLandingPage({ githubEnabled: true });
+  assert.ok(!html.includes('class="nav-bar"'), 'no landing top bar on the homepage');
+  assert.ok(!html.includes('nav-action login'), 'no top-bar sign-in action on the homepage');
+  // The hero still carries a directly-reachable Linear sign-in CTA.
+  assert.match(html, /data-testid="landing-cta-linear"/);
+  assert.match(html, /href="\/auth\/linear"/);
 });
 
 test('features fake-data glimpses of real surfaces', () => {
