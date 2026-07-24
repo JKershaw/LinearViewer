@@ -260,6 +260,41 @@
   color: var(--muted);
 }
 
+/* ── Lineage-continuous rendering (LIN-1478 S-C) ───────────────────────────
+   A multi-wake lineage folds visually into ONE continuous card — one outer
+   border/header region, unbroken transcript flow — while each constituent
+   `.sess-run` keeps its own status-coloured left accent and stays an
+   individually addressable segment (same testids/data-loop-id as an
+   unfolded run; only the outer chrome and inter-segment border change here).
+   A lineage of one renders with none of this (bare `.sess-run`), so
+   single-run sessions are visually unchanged. Semantic tokens only
+   (dark-safe, holds at narrow widths — no fixed widths introduced). */
+.sess-lineage {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.6rem;
+  background: var(--card-h, transparent);
+}
+.sess-lineage-runs { list-style: none; margin: 0; padding: 0; }
+.sess-lineage .sess-run {
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 0;
+  padding: 0.6rem 0;
+  margin-bottom: 0;
+  background: transparent;
+}
+.sess-lineage .sess-run + .sess-run {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 0.6rem;
+}
+/* The lineage's one reply box (hoisted from the tail run's footer, LIN-1478 /
+   LIN-1252) — reuses `.sess-inline-reply`'s own top-border/spacing, just
+   anchored at the container's end instead of inside a `.sess-run-body`. */
+.sess-lineage > .sess-inline-reply { margin-left: 0; margin-right: 0; }
+
 /* ── Per-run transcript (LIN-1133; LIN-1309) ──────────────────────────────
    Each run card contains its own scrollable transcript, now built from the
    shared chat.css bubble primitives (`.chat-thread`/`.chat-msg`) — the same

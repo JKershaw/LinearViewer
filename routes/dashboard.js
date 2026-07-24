@@ -38,6 +38,7 @@ import { armKeepalive } from '../lib/http-keepalive.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { createTaskDoneCache } from '../lib/task-done-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
 import { hasPaidEnvKey } from '../lib/openrouter.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import {
@@ -296,14 +297,14 @@ function loopIsWaiting(loop) {
  * ordinary standalone block is unaffected; a session with several independent
  * chains/workers evaluates each chain's own tail.
  *
+ * Exported for unit tests (LIN-1478) — the supersede characterization/agreement
+ * test asserts this against `lib/render-session.js`'s per-run mirror directly.
+ *
  * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
  * @returns {{waiting: boolean, message: string|null}}
  */
-function deriveSessionWaiting(enrichedLoops) {
-  const supersededLoopIds = new Set();
-  for (const l of enrichedLoops) {
-    if (l && l.followUpTo) supersededLoopIds.add(l.followUpTo);
-  }
+export function deriveSessionWaiting(enrichedLoops) {
+  const supersededLoopIds = computeSupersededLoopIds(enrichedLoops);
   let waiting = false;
   let message = null;
   for (const l of enrichedLoops) {
