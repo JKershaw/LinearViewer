@@ -536,7 +536,11 @@ describe('add-task link guard (LIN-341)', () => {
       isLanding: false,
       urlKey: 'test-workspace'
     });
-    assert.ok(result.includes('data-action="create-task"'), 'real project should have add-task link');
+    // LIN-1553: Linear now derives ui.inlineCreate (session-auth createIssue),
+    // so a real project renders the in-app create form instead of the external
+    // deep-link. Assert the create affordance via its stable container testid.
+    assert.ok(result.includes('data-testid="create-task"'), 'real project should have create-task affordance');
+    assert.ok(result.includes('data-testid="create-task-form"'), 'real project renders the in-app create form');
   });
 
   test('__no_project__ suppresses the add-task link (latent bug fixed)', () => {
@@ -544,7 +548,7 @@ describe('add-task link guard (LIN-341)', () => {
       isLanding: false,
       urlKey: 'test-workspace'
     });
-    assert.ok(!result.includes('data-action="create-task"'), 'no-project should NOT have add-task link');
+    assert.ok(!result.includes('data-testid="create-task"'), 'no-project should NOT have create-task affordance');
   });
 
   test('__periodicals__ suppresses the add-task link', () => {
@@ -552,7 +556,7 @@ describe('add-task link guard (LIN-341)', () => {
       isLanding: false,
       urlKey: 'test-workspace'
     });
-    assert.ok(!result.includes('data-action="create-task"'), 'periodicals should NOT have add-task link');
+    assert.ok(!result.includes('data-testid="create-task"'), 'periodicals should NOT have create-task affordance');
   });
 });
 
@@ -882,8 +886,9 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
       urlKey: 'ws',
       workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }]
     });
-    assert.ok(result.includes('data-action="create-task"'), 'add-task present for Linear');
-    assert.ok(result.includes('linear.app/'), 'Linear create URL preserved');
+    // LIN-1553: Linear's ui.inlineCreate is now true, so the project renders the
+    // in-app create form (the external linear.app deep-link is replaced for it).
+    assert.ok(result.includes('data-testid="create-task-form"'), 'in-app create form present for Linear');
 
     const detail = renderDetailsContent(stubTree().incomplete[0].issue, {
       isLanding: false,

@@ -62,4 +62,69 @@ test.describe('Local provider (no test-token mock)', () => {
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.line:has-text("Created via provider")').first()).toBeAttached();
   });
+
+  // ===========================================================================
+  // LIN-1553 — in-app create/edit UI end-to-end against the writable Local
+  // provider. Drives the real beat-2 markup + beat-3 client wiring through the
+  // Session A session-auth routes (POST/PATCH /workspace/:urlKey/api/issues) and
+  // asserts persistence via the same Local provider read seam the dashboard
+  // renders from. Selects through the beat-2 `data-testid` contract only.
+  // ===========================================================================
+  test('in-app create form creates a task through the Session A route and it persists', async ({ page }) => {
+    const CREATE_TITLE = 'Created via inline form';
+    const project = page.locator('.project').first();
+
+    // The Local provider derives ui.inlineCreate, so the create affordance is the
+    // in-app trigger + form (the external deep-link is replaced). Reveal it.
+    await project.locator('[data-testid="create-task-trigger"]').click();
+    const form = project.locator('[data-testid="create-task-form"]');
+    await expect(form).toBeVisible();
+
+    await form.locator('[data-testid="create-task-title"]').fill(CREATE_TITLE);
+    // teamId is a required v1 field; the Local provider has no teams and ignores
+    // the value, so any UUID satisfies the route's create contract.
+    await form.locator('[data-testid="create-task-teamId"]').fill('00000000-0000-0000-0000-0000000000aa');
+    // The symbolic ref resolver accepts a project NAME (or UUID). NOTE: the form
+    // prefills projectId with the provider's project id, which for the Local
+    // provider is a composite (non-UUID, non-name) id the resolver can't match —
+    // so we set the project by name here. (Follow-up: prefill/resolve local ids.)
+    await form.locator('[data-testid="create-task-projectId"]').fill('Local Project');
+    // Create it as started so the state clearly took (visible in In Progress).
+    await form.locator('[data-testid="create-task-stateId"]').fill('In Progress');
+
+    await form.locator('[data-testid="create-task-submit"]').click();
+    await page.waitForLoadState('networkidle');
+
+    // Persisted: read back through the Local provider on the reloaded dashboard,
+    // and it surfaces in the In Progress section (the started state took).
+    await expect(page.locator('.line', { hasText: CREATE_TITLE }).first()).toBeAttached();
+    await expect(page.locator('.in-progress-items .line', { hasText: CREATE_TITLE }).first()).toBeAttached();
+  });
+
+  test('in-app edit form updates an existing task title + state and it persists', async ({ page }) => {
+    const NEW_TITLE = 'Edited via inline form';
+
+    // Expand the seeded In Progress parent, then open its Details section (the
+    // edit affordance lives inside the collapsed Details content).
+    await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
+    await page.locator('.detail-toggle[data-toggle="details"]').first().click();
+    const trigger = page.locator('[data-testid="edit-issue-trigger"]').first();
+    await expect(trigger).toBeVisible();
+    await trigger.click();
+    const form = page.locator('[data-testid="edit-issue-form"]').first();
+    await expect(form).toBeVisible();
+
+    // Rename and move it to Done (a full-body description PATCH rides along).
+    await form.locator('[data-testid="edit-issue-title"]').fill(NEW_TITLE);
+    await form.locator('[data-testid="edit-issue-stateId"]').fill('Done');
+
+    await form.locator('[data-testid="edit-issue-submit"]').click();
+    await page.waitForLoadState('networkidle');
+
+    // Title persisted: the old title is gone, the new one renders.
+    await expect(page.locator('.line', { hasText: 'Local parent task' })).toHaveCount(0);
+    await expect(page.locator('.line', { hasText: NEW_TITLE }).first()).toBeAttached();
+    // State persisted: now Done, so it has left the In Progress section.
+    await expect(page.locator('.in-progress-items .line', { hasText: NEW_TITLE })).toHaveCount(0);
+  });
 });

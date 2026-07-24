@@ -290,20 +290,29 @@ test.describe('Detail Section Toggles', () => {
     await expect(viewLink).toContainText('View in Local');
   });
 
-  test('Create task link is visible for authenticated users', async ({ page, localWorkerUrlKey }) => {
+  test('Create task affordance is the in-app form for an inline-create provider (LIN-1553)', async ({ page }) => {
+    // The Local provider derives ui.inlineCreate (session-auth createIssue), so
+    // render.js replaces the external linear.app deep-link with an in-app create
+    // trigger + form (no target="_blank" link). The deep-link path remains only
+    // for providers that expose an external create URL but NOT in-app create.
     const project = page.locator('.project').first();
-    const projectId = await project.getAttribute('data-id');
 
-    // Link is now at end of task list, not hidden in project-meta
-    const createTaskLink = project.locator('[data-action="create-task"]');
-    await expect(createTaskLink).toBeVisible();
-    await expect(createTaskLink).toContainText('+ Add task');
+    // No external deep-link anchor for this provider.
+    await expect(project.locator('[data-action="create-task"]')).toHaveCount(0);
 
-    // href comes from the provider's getCreateTaskUrl (ui.write gating).
-    const href = await createTaskLink.getAttribute('href');
-    expect(href).toContain(`/workspace/${localWorkerUrlKey}/new?project=`);
-    expect(href).toContain(projectId);
-    await expect(createTaskLink).toHaveAttribute('target', '_blank');
+    // The in-app trigger is visible; the form exists but is hidden until clicked.
+    const trigger = project.locator('[data-testid="create-task-trigger"]');
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toContainText('+ Add task');
+
+    const form = project.locator('[data-testid="create-task-form"]');
+    await expect(form).toBeHidden();
+    await trigger.click();
+    await expect(form).toBeVisible();
+    // v1 field set is present.
+    for (const field of ['title', 'description', 'teamId', 'projectId', 'priority', 'stateId']) {
+      await expect(form.locator(`[data-testid="create-task-${field}"]`)).toBeAttached();
+    }
   });
 
 });
