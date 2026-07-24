@@ -74,7 +74,7 @@ makes this landable in stages across three live surfaces.
 |---|---|---|---|
 | 9.1 Auto-scroll only when at/near bottom | **All.** The at-bottom test runs inside `reveal()` (`public/chat.js:25-29`), the single function every shared consumer calls on every append | nothing | **S3's rule, re-targeted** — `public/collective.js:249-252`. See correction C1: the rule is right, the *measured box* is wrong |
 | 9.2 "Jump to latest ↓" + new-count | **All** — the control, its count, its visibility, its smooth-scroll click | placement slot only | **Nobody has it.** New |
-| 9.3 Pin a streaming message only if at bottom when it started | **All** — latched once at `beginStream()`, not re-tested per token | nothing | **Delete, don't adapt:** `public/task-chat.js:315` and `public/roadmap.js:776` scroll unconditionally per token |
+| 9.3 Pin a streaming message only if at bottom when it started | **All** — re-measured immediately before each repaint, never latched and never cached (**corrected in beat 2** — see §6) | nothing | **Delete, don't adapt:** `public/task-chat.js:315` and `public/roadmap.js:776` scroll unconditionally per token |
 | 9.4 Preserve scroll across re-render | **N/A today** — no surface re-renders a live thread in place | — | See correction C2 |
 | 9.5 Smooth for user-initiated, instant for programmatic | **All** | nothing | Confirmed safe: the only `scroll-behavior` in the repo is `auto !important` inside the reduced-motion block (`public/style.css:340`) — no global smooth scroll to fight |
 
@@ -318,3 +318,44 @@ prose.
 Not in scope either way, and stated so it does not drift in: the dispatch feedback list
 (`public/dispatch.js:890-906`) is a read-only log, not a chat surface — it belongs to LIN-1311's
 class, which needs its own re-grounding (its premise is stale at HEAD).
+
+
+---
+
+## 6. Corrections and outcomes from the prototype passes (beats 2–4)
+
+The prototypes are `prototypes/lin-1412-chat/` — see that README. Three things in the contract
+above changed because building it disproved them.
+
+**§9.3 was wrong as first written.** I specified the streaming pin as "latched once at
+`beginStream()`, not re-tested per token", following the guide's wording. A latch satisfies
+§9.3's sentence and still yanks a reader who scrolls up *mid*-stream — which §9.1 calls the
+cardinal sin and §1 ranks above it. Worse, a `follow` flag maintained by a scroll listener
+loses a race: assigning `scrollTop` queues its event for the next frame while a stream flush
+fires on a timer, so the flush reads a stale "still at the bottom" and undoes the reader's
+scroll before the listener runs. **The rule is: re-measure `isAtBottom()` immediately before
+each DOM mutation, never cache it** — and measure before, not after, because new content moves
+the bottom. The same code passed a screenshot run and failed an assertion run on timer phase
+alone.
+
+**§10 needed a second half.** "A wide code block scrolls inside its block" is only half the
+rule; the other half is "without breaking the page layout". A flex ancestor's default
+`min-width: auto` let one long code line drag a full-page shell wider than a 430px viewport
+and clip. Both shapes now assert no horizontal page overflow at mobile width.
+
+**§3's ~120px bottom clearance dissolves.** It presupposes an input that *overlays* the scroll
+container. In the three-row shell Shape B uses, the composer is its own row, so the number
+would be dead space; in Shape A there is nothing to clear. What the rule protects — the last
+message being readable, not hidden behind the input — is asserted directly instead.
+
+### The shape verdict
+
+**Not A-or-B: one behaviour layer, two layout variants, assigned per surface.** Task Chat and
+Collective's watch mode take Shape B; the session page and Roadmap take Shape A made
+compliant. The session page cannot take Shape B because it has one reply composer *per run*
+(`lib/render-session.js:199-210`, `public/session.js:169-192`), each with its own
+`followUpTo` target, and a single-composer page has one.
+
+The split is quantified: of the proposed change, **786 lines are shared by both shapes**
+(`chat-next.js` 482 + 304 of `chat-next.css`) and **68 lines are the shape** (the opt-in
+`.chat-page` block). The layout is the variable; the behaviour is the point.

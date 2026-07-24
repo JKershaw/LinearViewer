@@ -57,6 +57,7 @@ not block the implementation.
 | `mock-agent.js` | Fake transport — token-at-a-time, visible first-token delay, abortable, injectable failure. |
 | `verify.mjs` | Drives both pages and asserts the contract rule by rule. |
 | `shoot.mjs` | The screenshot matrix, and it re-runs the §9 proof. |
+| `compare.mjs` | Measures the two shapes side by side (reading area, answer visibility, composer reachability, scroller count). Analysis only — no pass/fail. |
 | `screenshots/` | Committed evidence, `shape-{a,b}-{scene}-{theme}-{width}.png`. |
 
 ## What is real and what is faked
@@ -87,7 +88,10 @@ in real Inter / JetBrains Mono under `file://`.
 4. **Two nested scrollers, permanently** — and the ambiguity about *which box* is exactly what
    produced the C1 bug in Collective.
 5. **Long answers are read through a keyhole** — 46% of the viewport vs Shape B's 65%.
-6. **Jump-to-latest sits inside a small panel**, overlapping the content it is helping you read.
+6. **Jump-to-latest sits inside a small panel.** (Beat 3 claimed this overlaps content in a way
+   Shape B avoids; `compare.mjs` measured it and the pill floats over message content in
+   **both** shapes — that is what a floating pill in a scroll container does. The claim is
+   withdrawn; the real difference is only that A's panel is 46% of the viewport to B's 65%.)
 
 ## What Shape B costs
 
