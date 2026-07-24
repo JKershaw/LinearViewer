@@ -102,6 +102,8 @@ describe('GitHubProvider capability profile (LIN-178)', () => {
     assert.deepEqual(provider.ui, {
       write: true,        // getCreateTaskUrl overridden
       comments: true,     // fetchIssueComments implemented
+      inlineCreate: true, // supports('createIssue') (LIN-1552)
+      inlineEdit: true,   // supports('updateIssue') (LIN-1552)
       estimates: false,   // no estimate field
       subtasks: false,    // no hierarchy
       attachments: true,  // issue/comment bodies carry user-content uploads (LIN-771)

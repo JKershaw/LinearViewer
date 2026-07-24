@@ -30,6 +30,8 @@ describe('LocalProvider capability profile (LIN-356 step D)', () => {
     assert.deepEqual(provider.ui, {
       write: true,        // getCreateTaskUrl overridden
       comments: true,     // fetchIssueComments implemented
+      inlineCreate: true, // supports('createIssue') (LIN-1552)
+      inlineEdit: true,   // supports('updateIssue') (LIN-1552)
       estimates: false,
       subtasks: true,
       attachments: true,  // markdown bodies can embed upload links (LIN-771)
