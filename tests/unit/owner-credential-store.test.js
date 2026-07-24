@@ -167,4 +167,81 @@ describe('owner-credential-store', () => {
     assert.strictEqual(await store.patch(null, 'workspace-1', { token: 'x' }), false);
     assert.strictEqual(await store.delete(null, 'workspace-1'), false);
   });
+
+  // -------------------------------------------------------------------------
+  // putIfRefreshToken — optimistic CAS (LIN-1546, S3). Against the same REAL
+  // MangoDB instance, since the whole point is the atomic conditional write.
+  // -------------------------------------------------------------------------
+
+  // OC9 — CAS WIN
+  test('putIfRefreshToken writes when the stored refreshToken still matches the witness (CAS win) and returns true', async () => {
+    const store = freshStore();
+    const accountId = randomUUID();
+    const urlKey = `acme-${randomUUID().slice(0, 8)}`;
+    await store.put(accountId, urlKey, sampleCredential({ token: 'access-0', refreshToken: 'R0' }));
+
+    const won = await store.putIfRefreshToken(accountId, urlKey, 'R0', {
+      provider: 'linear', scope: 'org-1', token: 'access-1', refreshToken: 'R1', tokenExpiresAt: Date.now() + 3600_000,
+    });
+    assert.strictEqual(won, true);
+
+    const fetched = await store.get(accountId, urlKey);
+    assert.strictEqual(fetched.refreshToken, 'R1', 'the rotated refreshToken must win');
+    assert.strictEqual(fetched.token, 'access-1', 'the rotated access token lands too');
+    assert.ok(fetched.createdAt instanceof Date, 'createdAt is preserved (no upsert re-init)');
+  });
+
+  // OC10 — CAS LOSE (witness no longer matches — a concurrent winner rotated it)
+  test('putIfRefreshToken does NOT write when the stored refreshToken has changed (CAS lose) and returns false, leaving the winner\'s record intact', async () => {
+    const store = freshStore();
+    const accountId = randomUUID();
+    const urlKey = `acme-${randomUUID().slice(0, 8)}`;
+    // The durable record already holds the WINNER's rotated token R1.
+    await store.put(accountId, urlKey, sampleCredential({ token: 'access-winner', refreshToken: 'R1' }));
+
+    // A race loser still holding the spent R0 tries to write its own R_loser.
+    const won = await store.putIfRefreshToken(accountId, urlKey, 'R0', {
+      provider: 'linear', scope: 'org-1', token: 'access-loser', refreshToken: 'R_loser', tokenExpiresAt: Date.now() + 3600_000,
+    });
+    assert.strictEqual(won, false, 'the loser must not win the CAS');
+
+    const fetched = await store.get(accountId, urlKey);
+    assert.strictEqual(fetched.refreshToken, 'R1', 'the winner\'s healthy credential must be untouched');
+    assert.strictEqual(fetched.token, 'access-winner');
+  });
+
+  // OC11 — CAS on a MISSING record: no upsert, returns false, never creates one
+  test('putIfRefreshToken on a missing record returns false and does NOT create one (no upsert)', async () => {
+    const store = freshStore();
+    const accountId = randomUUID();
+    const urlKey = `acme-${randomUUID().slice(0, 8)}`;
+
+    const won = await store.putIfRefreshToken(accountId, urlKey, 'R0', {
+      provider: 'linear', scope: 'org-1', token: 'access-1', refreshToken: 'R1', tokenExpiresAt: Date.now() + 3600_000,
+    });
+    assert.strictEqual(won, false);
+
+    const fetched = await store.get(accountId, urlKey);
+    assert.strictEqual(fetched, null, 'a CAS miss must never resurrect/create a record');
+  });
+
+  // OC12 — guards: missing accountId/urlKey/expectedRefreshToken all fail safe (no throw, no write)
+  test('putIfRefreshToken guards on accountId/urlKey/expectedRefreshToken (all fail safe, no throw)', async () => {
+    const store = freshStore();
+    const accountId = randomUUID();
+    const urlKey = `acme-${randomUUID().slice(0, 8)}`;
+    await store.put(accountId, urlKey, sampleCredential({ refreshToken: 'R0' }));
+    const next = { provider: 'linear', scope: 'org-1', token: 't', refreshToken: 'R1', tokenExpiresAt: Date.now() + 3600_000 };
+
+    assert.strictEqual(await store.putIfRefreshToken(null, urlKey, 'R0', next), false);
+    assert.strictEqual(await store.putIfRefreshToken(accountId, null, 'R0', next), false);
+    // A missing/empty witness must be refused as a safe miss — never treated as
+    // an unconditional write masquerading as a CAS.
+    assert.strictEqual(await store.putIfRefreshToken(accountId, urlKey, null, next), false);
+    assert.strictEqual(await store.putIfRefreshToken(accountId, urlKey, '', next), false);
+
+    // None of the guarded calls wrote anything — the seeded R0 is intact.
+    const fetched = await store.get(accountId, urlKey);
+    assert.strictEqual(fetched.refreshToken, 'R0');
+  });
 });

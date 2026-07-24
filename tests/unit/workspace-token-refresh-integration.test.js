@@ -144,6 +144,16 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
         storeCalls.push({ accountId, urlKey, credential });
         durableRecords.set(`${accountId}::${urlKey}`, credential);
       },
+      // LIN-1546: optimistic CAS — writes only if the stored refreshToken still
+      // matches the witness (it does here; no concurrent rotation in this test).
+      async putIfRefreshToken(accountId, urlKey, expected, next) {
+        const key = `${accountId}::${urlKey}`;
+        const current = durableRecords.get(key);
+        if (!current || current.refreshToken !== expected) return false;
+        storeCalls.push({ accountId, urlKey, credential: next });
+        durableRecords.set(key, next);
+        return true;
+      },
     };
 
     const result = await refreshOwnerWorkspaceToken({
@@ -416,6 +426,15 @@ describe('LIN-1524 durable-only real-refresh witness (logged-out owner, unstubbe
     const store = {
       async get(accountId, urlKey) { return durableRecords.get(`${accountId}::${urlKey}`) ?? null; },
       async put(accountId, urlKey, credential) { storeCalls.push({ accountId, urlKey, credential }); durableRecords.set(`${accountId}::${urlKey}`, credential); },
+      // LIN-1546: optimistic CAS — the durable write the seam actually uses now.
+      async putIfRefreshToken(accountId, urlKey, expected, next) {
+        const key = `${accountId}::${urlKey}`;
+        const current = durableRecords.get(key);
+        if (!current || current.refreshToken !== expected) return false;
+        storeCalls.push({ accountId, urlKey, credential: next });
+        durableRecords.set(key, next);
+        return true;
+      },
     };
 
     const result = await refreshOwnerWorkspaceToken({
@@ -546,6 +565,15 @@ describe('LIN-1544 durable-credential resolve witness (logout -> headless resolv
     const store = {
       async get(accountId, urlKey) { return durableRecords.get(`${accountId}::${urlKey}`) ?? null; },
       async put(accountId, urlKey, credential) { storeCalls.push({ accountId, urlKey, credential }); durableRecords.set(`${accountId}::${urlKey}`, credential); },
+      // LIN-1546: optimistic CAS — the durable write the seam actually uses now.
+      async putIfRefreshToken(accountId, urlKey, expected, next) {
+        const key = `${accountId}::${urlKey}`;
+        const current = durableRecords.get(key);
+        if (!current || current.refreshToken !== expected) return false;
+        storeCalls.push({ accountId, urlKey, credential: next });
+        durableRecords.set(key, next);
+        return true;
+      },
     };
 
     // Pre-condition: with the live session row gone, the pure selector fails

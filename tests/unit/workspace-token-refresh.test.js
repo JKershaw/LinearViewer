@@ -47,7 +47,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { selectExpiredOwnerRow, selectOwnerWorkspaceToken } from '../../lib/workspace-token-resolver.js';
-import { refreshOwnerWorkspaceToken, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
+import { refreshOwnerWorkspaceToken, refreshLinearOwnerCredential, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
 
 const NOW = Date.now();
@@ -77,6 +77,18 @@ function fakeStore(seed = {}) {
     async put(accountId, urlKey, credential) {
       calls.push({ accountId, urlKey, credential });
       records.set(`${accountId}::${urlKey}`, credential);
+    },
+    // LIN-1546: optimistic CAS. Models the real store — writes (and records the
+    // landed write into `calls`, so the existing "the durable write landed"
+    // assertions keep observing it) ONLY when the stored refreshToken still
+    // equals `expected`; a miss returns false and records nothing.
+    async putIfRefreshToken(accountId, urlKey, expected, next) {
+      const key = `${accountId}::${urlKey}`;
+      const current = records.get(key);
+      if (!current || current.refreshToken !== expected) return false;
+      calls.push({ accountId, urlKey, credential: next });
+      records.set(key, next);
+      return true;
     },
   };
 }
@@ -718,5 +730,200 @@ describe('ensureValidToken branch widening (LIN-1499, Block E — source-text pi
     const bodySlice = SERVER_SRC.slice(startIdx, endIdx);
     const removeWorkspaceCalls = (bodySlice.match(/removeWorkspace\(/g) || []).length;
     assert.equal(removeWorkspaceCalls, 1, "removeWorkspace should still be called from exactly one place inside ensureValidToken's catch — this pins that beat 2 did not touch or duplicate it");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block F (LIN-1546) — race-safe refresh rotation: the shared single-flight
+// seam + durable CAS + re-read recovery, driven directly at
+// `refreshLinearOwnerCredential`.
+//
+// Why the seam and not the human sites: server.js is not import-safe in a unit
+// test (it connects to Mongo and listens at module load — see Block E's
+// docstring). All three refresh entrants funnel their Linear rotation through
+// this ONE seam, so exercising the seam directly with two concurrent callers
+// IS the concurrent human×headless witness — and it is the seam's resolve-vs-
+// throw contract that decides whether the human catches' LIN-1545 delete guard
+// ever fires. A seam that RESOLVES (a race loser converging on the winner's
+// token) never reaches a delete; only a seam that THROWS EXPIRED does.
+//
+// These tests fake Linear's rotation directly: a spent refresh token yields
+// `invalid_grant` → TokenRefreshError('EXPIRED'). That premise ("reuse of a
+// rotated token → invalid_grant") is Linear-side and asserted nowhere else in
+// the repo (the pre-existing I2 witness passes with a SINGLE refresh and cannot
+// tell a spurious race-loss from a genuine revocation — the exact gap this
+// block closes).
+// ---------------------------------------------------------------------------
+
+describe('refreshLinearOwnerCredential (LIN-1546, Block F — race-safe rotation)', () => {
+  beforeEach(() => {
+    _resetInflightForTests();
+  });
+
+  test('F1 [same-process human×headless coalesce]: two concurrent entrants for the same owner+workspace share ONE refresh and ONE durable rotation; both end holding the SAME valid token — there is no loser to delete', async () => {
+    let callCount = 0;
+    let releaseRefresh;
+    const gate = new Promise(resolve => { releaseRefresh = resolve; });
+    const refreshAccessToken = async (refreshToken) => {
+      callCount++;
+      assert.equal(refreshToken, 'R0', 'the shared refresh must spend the read token exactly once');
+      await gate;
+      return { access_token: 'access-R1', refresh_token: 'R1', expires_in: 3600 };
+    };
+    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS } });
+
+    // Entrant 1 = the proactive human; entrant 2 = the headless resolve. Same
+    // key, launched concurrently — exactly the collision the ticket exists to
+    // make safe.
+    const human = refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+    const headless = refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+
+    releaseRefresh();
+    const [r1, r2] = await Promise.all([human, headless]);
+
+    assert.equal(callCount, 1, 'the two entrants must coalesce onto a single Linear round-trip, not race to spend R0');
+    assert.equal(r1.token, 'access-R1');
+    assert.equal(r2.token, 'access-R1');
+    assert.equal(r1.refreshToken, 'R1');
+    assert.equal(r2.refreshToken, 'R1');
+    // Exactly one durable rotation landed (the shared CAS write), and the store
+    // holds the winner's healthy R1 — never deleted.
+    assert.equal(store.calls.length, 1, 'exactly one durable rotation for the coalesced refresh');
+    assert.equal(store.calls[0].credential.refreshToken, 'R1');
+    const durable = await store.get('account-A', 'acme');
+    assert.equal(durable.refreshToken, 'R1', 'the healthy rotated credential survives — no spurious delete');
+  });
+
+  test('F2 [cross-process race loser converges, does NOT surface EXPIRED]: a spurious invalid_grant on a spent token, when the durable record has been rotated by the winner, RESOLVES to the winner\'s token — so no delete is ever triggered', async () => {
+    // Cross-dyno: separate processes share no inflight map, so this loser really
+    // does reach refreshAccessToken with the now-spent R0. The durable store,
+    // however, already holds the winner's R1.
+    let getCount = 0;
+    const store = {
+      calls: [],
+      async get() {
+        getCount++;
+        // First read (the entrant's own): still R0 (it read just before the
+        // winner's write landed). Re-read after the spurious EXPIRED: R1.
+        return getCount === 1
+          ? { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS }
+          : { provider: 'linear', scope: 'org-1', token: 'access-R1', refreshToken: 'R1', tokenExpiresAt: NOW + FAR_FUTURE_MS };
+      },
+      async putIfRefreshToken() { throw new Error('must not be called — the refresh itself failed with invalid_grant'); },
+    };
+    const refreshAccessToken = async (refreshToken) => {
+      assert.equal(refreshToken, 'R0', 'the loser presents the now-spent R0');
+      throw new TokenRefreshError('Refresh token expired or invalid', 'EXPIRED');
+    };
+
+    const result = await refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+
+    // The seam RESOLVED (did not throw) with the winner's token — the loser
+    // converges instead of concluding the credential is dead.
+    assert.equal(result.token, 'access-R1');
+    assert.equal(result.refreshToken, 'R1');
+    assert.equal(getCount, 2, 'the re-read on invalid_grant is what neutralizes the spurious EXPIRED');
+  });
+
+  test('F3 [CAS-lost to the 4th writer (OAuth re-login) converges, fails safe]: the network refresh succeeds but the durable record was replaced under us; the CAS misses and the seam converges on the replacement rather than clobbering it', async () => {
+    // Models routes/auth.js re-login (mints from an auth code, not a refresh):
+    // between our read of R0 and our CAS write, it replaced the record with
+    // R_relogin. The CAS on {refreshToken: R0} misses; we must re-read and
+    // return the live re-login token, never throw and never overwrite it.
+    let getCount = 0;
+    const store = {
+      casAttempts: [],
+      async get() {
+        getCount++;
+        return getCount === 1
+          ? { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS }
+          : { provider: 'linear', scope: 'org-1', token: 'access-relogin', refreshToken: 'R_relogin', tokenExpiresAt: NOW + FAR_FUTURE_MS };
+      },
+      async putIfRefreshToken(accountId, urlKey, expected) {
+        this.casAttempts.push(expected);
+        return false; // stored refreshToken is no longer R0 → CAS miss (fail safe)
+      },
+    };
+    const refreshAccessToken = async () => ({ access_token: 'access-R_loser', refresh_token: 'R_loser', expires_in: 3600 });
+
+    const result = await refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+
+    assert.deepEqual(store.casAttempts, ['R0'], 'the CAS is witnessed on the token we actually read');
+    assert.equal(result.token, 'access-relogin', 'converges on the re-login token, not our own now-orphaned refresh');
+    assert.equal(result.refreshToken, 'R_relogin');
+  });
+
+  test('F4 [genuine revocation still surfaces EXPIRED after the re-read]: when nobody rotated the record, a real invalid_grant re-throws EXPIRED so the caller\'s LIN-1545 delete guard can remove a genuinely dead credential', async () => {
+    let getCount = 0;
+    const store = {
+      async get() {
+        getCount++;
+        // Every read shows the SAME spent token — nobody rotated it. This is a
+        // genuine revocation, not a race.
+        return { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R_dead', tokenExpiresAt: NOW + PAST_MS };
+      },
+      async putIfRefreshToken() { throw new Error('must not be called — the refresh failed'); },
+      async delete() { throw new Error('the seam must never delete — deletes live in the human catches (LIN-1545)'); },
+    };
+    const refreshAccessToken = async () => { throw new TokenRefreshError('Refresh token expired or invalid', 'EXPIRED'); };
+
+    await assert.rejects(
+      () => refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store }),
+      (err) => {
+        assert.ok(err instanceof TokenRefreshError);
+        assert.equal(err.code, 'EXPIRED', 'a genuine revocation must still surface EXPIRED, so the caller deletes the dead credential');
+        return true;
+      }
+    );
+    assert.equal(getCount, 2, 'the re-read ran (and confirmed the token was unchanged) before concluding the credential is dead');
+  });
+
+  test('F5 [CAS miss + nothing to converge on → transient, NOT EXPIRED]: a successful refresh whose durable write is lost (record deleted under us, or a store blip) must fail TRANSIENTLY — never EXPIRED — because the credential is demonstrably alive (we just refreshed it), so the LIN-1545 delete guard must not fire', async () => {
+    let getCount = 0;
+    const store = {
+      async get() {
+        getCount++;
+        return getCount === 1
+          ? { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS }
+          : null; // a concurrent disconnect deleted it (or a store blip) before our CAS
+      },
+      async putIfRefreshToken() { return false; },
+    };
+    const refreshAccessToken = async () => ({ access_token: 'access-R_loser', refresh_token: 'R_loser', expires_in: 3600 });
+
+    await assert.rejects(
+      () => refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store }),
+      (err) => {
+        assert.ok(err instanceof TokenRefreshError);
+        assert.notEqual(err.code, 'EXPIRED', 'must not be definitive — a live-but-unpersistable credential must never be deleted');
+        assert.equal(err.code, 'UNKNOWN', 'a transient code so the caller 503s and keeps the credential + workspace');
+        return true;
+      }
+    );
+  });
+
+  test('F6 [transient blip is never re-read]: a NETWORK failure propagates untouched — it is not a race artifact, so the seam must NOT re-read or swallow it (the caller\'s transient-503 branch depends on seeing it)', async () => {
+    let getCount = 0;
+    const store = {
+      async get() { getCount++; return { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS }; },
+      async putIfRefreshToken() { throw new Error('must not be called'); },
+    };
+    const refreshAccessToken = async () => { throw new TokenRefreshError('boom', 'NETWORK'); };
+
+    await assert.rejects(
+      () => refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store }),
+      (err) => { assert.equal(err.code, 'NETWORK'); return true; }
+    );
+    assert.equal(getCount, 1, 'a transient blip triggers NO re-read — only a definitive EXPIRED does');
+  });
+
+  test('F7 [nothing to refresh → null, unchanged]: no durable record (or one without a refreshToken) resolves null without a network call', async () => {
+    const store = fakeStore(); // empty
+    let refreshCalled = false;
+    const refreshAccessToken = async () => { refreshCalled = true; return {}; };
+
+    const result = await refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+    assert.equal(result, null);
+    assert.equal(refreshCalled, false);
   });
 });

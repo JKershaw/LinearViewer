@@ -22,7 +22,7 @@ import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
-import { refreshOwnerWorkspaceToken } from './lib/workspace-token-refresh.js'
+import { refreshOwnerWorkspaceToken, refreshLinearOwnerCredential } from './lib/workspace-token-refresh.js'
 import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
@@ -71,7 +71,7 @@ import { renderLandingPage } from './lib/render-landing.js'
 import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, rotateOwnerCredential, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential } from './lib/workspace.js'
+import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential } from './lib/workspace.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createEnsurePATSession } from './lib/pat-session.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
@@ -641,16 +641,31 @@ async function ensureValidToken(req, res, next) {
       // Finding #4's legacy no-`accountId` session (a guaranteed durable
       // read-miss, since `store.get` fails closed on a missing accountId) —
       // it degrades to exactly today's pre-cutover failure mode, not a new one.
-      const durableRecord = await ownerCredentialStore.get(req.session.accountId, workspace.urlKey)
-      if (!durableRecord?.refreshToken) {
+      // LIN-1546: route the Linear rotation through the shared single-flight
+      // seam (durable read + refresh + CAS write + race re-read), so this
+      // proactive-human refresh COALESCES with a concurrent headless or
+      // reactive-401 refresh for the same owner+workspace instead of racing to
+      // spend the same rotating token — and a race loser converges on the
+      // winner's healthy token rather than surfacing a spurious EXPIRED that the
+      // catch below would honour with a durable delete (LIN-1545). A `null`
+      // return is the same explicit "no durable credential to refresh" failure
+      // as before — a deliberate miss, not a silent no-op — thrown into the SAME
+      // catch below that a real refresh failure has always fallen into.
+      const refreshed = await refreshLinearOwnerCredential({
+        ownerAccountId: req.session.accountId,
+        urlKey: workspace.urlKey,
+        refreshAccessToken,
+        store: ownerCredentialStore
+      })
+      if (!refreshed) {
         throw new Error(`No durable Linear credential to refresh workspace ${workspace.id}`)
       }
-      const newTokens = await refreshAccessToken(durableRecord.refreshToken)
-
-      // Update workspace tokens (session-side accessToken/tokenExpiresAt
-      // mirror only, LIN-1524) + persist the rotated refreshToken durably
-      // (LIN-1523/1524's rotation seam).
-      await rotateOwnerCredential({ accountId: req.session.accountId, workspace, tokenData: newTokens, store: ownerCredentialStore })
+      // Session-side mirror ONLY (accessToken/tokenExpiresAt), kept OUTSIDE the
+      // shared seam — this mutates THIS request's own session workspace, which
+      // the seam must never touch. The durable rotation already landed inside
+      // the seam; refreshToken stays durable-store-only (LIN-1524), never
+      // mirrored back into the session.
+      applyAccessTokenToWorkspace(workspace, refreshed.token, refreshed.expiresAt)
     }
 
     await saveSession(req.session)
@@ -936,14 +951,32 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
 }
 
 /**
- * Attempts to refresh an expired token and retry the request. `refreshToken`
- * is passed explicitly (LIN-1524) — Linear's rotating credential lives in the
- * durable store now, not on `workspace`, and the caller (handleUnauthorizedError)
- * already fetched the durable record to decide whether to call this at all.
+ * Attempts to refresh an expired token and retry the request. The caller
+ * (handleUnauthorizedError) has already confirmed a durable record exists to
+ * refresh from; LIN-1546 routes the actual rotation through the shared
+ * single-flight seam (durable read + refresh + CAS write + race re-read) rather
+ * than reading + refreshing + rotating inline, so this reactive-401 human
+ * refresh COALESCES with a concurrent proactive-human or headless refresh and a
+ * race loser converges on the winner's token instead of a spurious EXPIRED. The
+ * seam re-reads the durable record itself (a cheap redundant point-read past the
+ * caller's gate), which is what lets it coalesce on the shared key.
  */
-async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res, refreshToken) {
-  const tokenData = await refreshAccessToken(refreshToken);
-  await rotateOwnerCredential({ accountId: session.accountId, workspace, tokenData, store: ownerCredentialStore });
+async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res) {
+  const refreshed = await refreshLinearOwnerCredential({
+    ownerAccountId: session.accountId,
+    urlKey: workspace.urlKey,
+    refreshAccessToken,
+    store: ownerCredentialStore
+  });
+  // The durable record vanished between the caller's gate and here (rare): treat
+  // it as a non-definitive failure so the caller's catch 503s rather than
+  // deleting — a genuine EXPIRED still throws from inside the seam above.
+  if (!refreshed) {
+    throw new Error(`No durable Linear credential to refresh workspace ${workspace.id}`);
+  }
+  // Session-side mirror only (accessToken/tokenExpiresAt), outside the seam —
+  // the durable rotation already landed inside it.
+  applyAccessTokenToWorkspace(workspace, refreshed.token, refreshed.expiresAt);
   await saveSession(session);
   console.log('Token refreshed after 401, retrying request');
 
@@ -1010,7 +1043,7 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
   const durableRecord = await ownerCredentialStore.get(session.accountId, workspace.urlKey);
   if (durableRecord?.refreshToken) {
     try {
-      return await handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res, durableRecord.refreshToken);
+      return await handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res);
     } catch (refreshError) {
       console.error('Token refresh failed after 401:', refreshError);
       // LIN-1545 (S2): mirror the proactive path (S1). Only a DEFINITIVE
