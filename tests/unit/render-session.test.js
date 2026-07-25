@@ -756,3 +756,98 @@ describe('render-session: tail-anchored reply box + force safety (LIN-1478 beat 
     assert.ok(!html.includes('data-testid="session-lineage"'), 'no lineage wrapper for a group of one');
   });
 });
+
+// ── LIN-1567: the document <title> is a distinct sink from the body header ────
+// `renderPage` documents `title` as already-escaped text and interpolates it raw
+// into <title> (lib/components/page.js), so escaping is the caller's job. The
+// body header (render-session.js:510) already escapes the same expression, so
+// these assertions deliberately target the HEAD ONLY — a whole-document
+// "contains no <script>" check would pass on the strength of line 510 while the
+// title stayed vulnerable.
+describe('render-session: document <title> escaping (LIN-1567)', () => {
+  // Everything before </head>. The shared shell also emits the theme-prepaint
+  // <script> in here, so assertions name the payload rather than "any script".
+  function headOf(html) {
+    const end = html.indexOf('</head>');
+    assert.notEqual(end, -1, 'rendered document should have a </head>');
+    return html.slice(0, end);
+  }
+
+  // Inner text of the first <title> in the head. A payload that breaks out of
+  // the element leaves its tail OUTSIDE this capture — which is exactly the
+  // failure mode being pinned.
+  function titleOf(html) {
+    const m = headOf(html).match(/<title>([\s\S]*?)<\/title>/);
+    return m ? m[1] : null;
+  }
+
+  // LIN-1118 relaxed sessionId from a UUID to an opaque string, so `"`, `<`, `>`
+  // and `/` can all reach the title.
+  const HOSTILE = '"><script>alert(1)</script>';
+
+  test('a hostile sessionId cannot break out of <title> into live markup', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession({ sessionId: HOSTILE, seedIssue: null }), urlKey: 'ws-a', issueContext: [] },
+      {}
+    );
+    const head = headOf(html);
+    assert.ok(!head.includes('<script>alert(1)</script>'), 'raw script must not reach the document head');
+    const title = titleOf(html);
+    assert.ok(title != null, 'head should contain a <title>');
+    assert.ok(!/[<>]/.test(title), `<title> must hold no markup characters (got: ${JSON.stringify(title)})`);
+    assert.equal(title, 'Session · &quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;');
+  });
+
+  test('a hostile seedIssue is escaped too — it is the first branch of the ||', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession({ seedIssue: HOSTILE, sessionId: 'sess-abc' }), urlKey: 'ws-a', issueContext: [] },
+      {}
+    );
+    const head = headOf(html);
+    assert.ok(!head.includes('<script>alert(1)</script>'), 'raw script must not reach the document head');
+    assert.equal(titleOf(html), 'Session · &quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;');
+  });
+
+  test('the head carries exactly one <title> element', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession({ sessionId: '</title><script>alert(1)</script>', seedIssue: null }), urlKey: 'ws-a', issueContext: [] },
+      {}
+    );
+    const opens = (headOf(html).match(/<title>/g) || []).length;
+    const closes = (headOf(html).match(/<\/title>/g) || []).length;
+    assert.equal(opens, 1, 'one <title> open tag');
+    assert.equal(closes, 1, 'one </title> close tag — a payload must not forge a second');
+  });
+
+  test('the ordinary seedIssue title is unchanged (no over-escaping)', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession({ seedIssue: 'LIN-1567' }), urlKey: 'ws-a', issueContext: [] },
+      {}
+    );
+    assert.equal(titleOf(html), 'Session · LIN-1567');
+  });
+
+  test('the ordinary sessionId title is unchanged when there is no seedIssue', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession({ seedIssue: null, sessionId: 'sess-abc' }), urlKey: 'ws-a', issueContext: [] },
+      {}
+    );
+    assert.equal(titleOf(html), 'Session · sess-abc');
+  });
+
+  test('an ampersand is escaped once, not twice (double-encoding guard)', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession({ seedIssue: 'Tom & Jerry' }), urlKey: 'ws-a', issueContext: [] },
+      {}
+    );
+    assert.equal(titleOf(html), 'Session · Tom &amp; Jerry');
+  });
+
+  test('a missing session identity degrades to the bare prefix, not "undefined"', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession({ seedIssue: null, sessionId: null }), urlKey: 'ws-a', issueContext: [] },
+      {}
+    );
+    assert.equal(titleOf(html), 'Session · ');
+  });
+});
