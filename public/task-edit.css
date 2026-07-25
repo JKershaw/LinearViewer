@@ -1,0 +1,219 @@
+/* Dedicated task-edit page (LIN-1565).
+ *
+ * The first actual styling in-app task editing has ever had: the form this page
+ * replaces had ZERO CSS rules anywhere in public/ and rendered as raw browser
+ * defaults. Mobile-first, and semantic-token-only throughout (--text/--muted/
+ * --card/--line/--brand/--bg, --space-*, --radius-*, --font-*) so it is dark-safe
+ * under .theme-dark with no second colour vocabulary — the discipline the
+ * LIN-756/757/758 theme revert exists to protect.
+ *
+ * Typographic split, per the project's design principles: sans (--font-content)
+ * for human structure — labels, headings, controls — and mono (--font-structural)
+ * for machine facts, here the task identifier. */
+
+.task-edit-page {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 1rem 3rem;
+  /* Long unbroken tokens in a title (a URL, a UUID) must never force sideways
+     page scroll on a narrow viewport. */
+  overflow-x: hidden;
+}
+
+/* Breadcrumb back-link above the title, matching the session page's rhythm so
+   drill-down pages open with the same orientation cue. */
+.task-edit-back {
+  display: inline-block;
+  margin: 0.25rem 0 0.5rem;
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+.task-edit-back:hover { color: var(--brand); }
+
+/* Left-aligned page header with a hairline rule (overriding the global centered
+   `header`), same as the sibling drill-down page. */
+.task-edit-header {
+  text-align: left;
+  padding: 0 0 0.7rem;
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.task-edit-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-family: var(--font-content);
+  overflow-wrap: anywhere;
+}
+
+/* The task identifier is a machine fact — mono, dimmed, ahead of the title. */
+.task-edit-identifier {
+  font-family: var(--font-structural);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.task-edit-section { margin-bottom: var(--space-5); }
+.task-edit-muted { color: var(--muted); font-family: var(--font-content); }
+
+.task-edit-section > .section-header {
+  font-family: var(--font-content);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  margin: 0 0 var(--space-3) 0;
+  padding: 0 0 0.4rem 0.7rem;
+  border-left: 3px solid var(--brand);
+  border-bottom: 1px solid var(--line);
+}
+
+/* =============================================================================
+   Form
+   ============================================================================= */
+
+.task-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.task-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  /* Let a field shrink inside the two-up row rather than overflow it. */
+  min-width: 0;
+}
+
+.task-edit-label {
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.task-edit-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.7rem;
+  font-family: var(--font-content);
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  /* iOS zooms a focused control under 16px; 1rem keeps the page steady. */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.task-edit-input:hover { border-color: var(--brand); }
+
+/* Visible focus ring on every control (keyboard tab order through the four
+   fields is a stated acceptance behaviour for this page). */
+.task-edit-input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 25%, transparent);
+}
+
+/* A native select needs its own affordance back once appearance is reset. */
+select.task-edit-input {
+  cursor: pointer;
+  padding-right: 2rem;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+                    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 1.05rem) 50%, calc(100% - 0.7rem) 50%;
+  background-size: 0.35rem 0.35rem, 0.35rem 0.35rem;
+  background-repeat: no-repeat;
+}
+
+/* The description is the field people actually came to edit — give it room. */
+.task-edit-textarea {
+  min-height: 16rem;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.task-edit-hint {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* State + Priority sit side by side once there is width for it; stacked below. */
+.task-edit-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+/* =============================================================================
+   Actions
+   ============================================================================= */
+
+.task-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+.task-edit-submit {
+  padding: 0.5rem var(--space-4);
+  font-family: var(--font-content);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 40%, transparent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.task-edit-submit:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand) 22%, transparent);
+}
+
+.task-edit-submit:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.task-edit-submit:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.task-edit-cancel {
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+.task-edit-cancel:hover { color: var(--text); }
+
+.task-edit-status {
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--muted);
+  /* Live region: it must be able to wrap rather than stretch the action row. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* =============================================================================
+   Wider viewports
+   ============================================================================= */
+
+@media (min-width: 640px) {
+  .task-edit-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
