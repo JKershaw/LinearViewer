@@ -3,11 +3,13 @@
  *
  *   GET /workspace/:urlKey/task/:issueId/edit — the dedicated task-edit page
  *
- * A drill-down page in the `docs/view-tiers.md` sense — the sibling of
- * `/observation/session/:sessionId` — so it carries NO feature flag, no
- * `EXPERIMENTAL_VIEWS` entry, and no nav or footer link. It is reached from the
- * task row that owns it, and it replaces the hidden inline edit form LIN-1553
- * shipped inside the tree's collapsed Details panel.
+ * A DRILL-DOWN page — the sibling of `/observation/session/:sessionId`. The three
+ * tiers in `docs/view-tiers.md` classify views by how they are *discovered and
+ * gated* from the nav/footer; a drill-down is discovered from the record that
+ * owns it and so sits deliberately outside that model, exactly as the session
+ * page does. Concretely: NO feature flag, no `EXPERIMENTAL_VIEWS` entry, no nav
+ * or footer link. It replaces the hidden inline edit form LIN-1553 shipped inside
+ * the tree's collapsed Details panel.
  *
  * It owns no write path: the page's script submits to the existing session-auth
  * `PATCH /workspace/:urlKey/api/issues/:issueId` (routes/workspace-api.js),
