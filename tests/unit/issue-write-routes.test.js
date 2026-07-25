@@ -246,4 +246,34 @@ describe('PATCH /workspace/:urlKey/api/issues/:issueId (update)', () => {
     assert.strictEqual(status, 502);
     assert.match(body.error, /not updated/i);
   });
+
+  test('422 when the provider lacks issueWriteGuard — never 500 (LIN-1559 site 9)', async () => {
+    // `issueWriteGuard` is a ROUTE-INTERNAL read, deliberately off the declared
+    // PROVIDER_SURFACE, so the supports('updateIssue') gate above cannot speak for
+    // it: a provider can pass that gate and still lack this read. It used to throw
+    // a TypeError inside the route's try and answer 500 "Failed to update issue".
+    // This is the workspace-api twin of the proxy backstop.
+    const { provider, calls } = makeFakeProvider();
+    delete provider.issueWriteGuard;
+
+    const { status, body } = await patchIssue(buildApp({ provider }), ISSUE_ID, { title: 'x' });
+
+    assert.strictEqual(status, 422);
+    assert.notStrictEqual(status, 500);
+    assert.strictEqual(body.code, 'CAPABILITY_NOT_SUPPORTED');
+    assert.strictEqual(body.capability, 'issueWriteGuard');
+    assert.strictEqual(body.provider, PROVIDER_NAME);
+    assert.strictEqual(calls.updateIssue.length, 0); // declined before any write
+  });
+
+  test('the guard read is NOT declared on the capability surface (it is gated on existence)', async () => {
+    // Guards the inverse mistake: gating site 9 on supports('issueWriteGuard')
+    // would decline EVERY update on every provider, since these reads are
+    // deliberately undeclared (LIN-1557 owns the declaration question). A
+    // provider that implements the read but does not declare it must still write.
+    const { provider } = makeFakeProvider();
+    assert.strictEqual(provider.supports('issueWriteGuard'), false);
+    const { status } = await patchIssue(buildApp({ provider }), ISSUE_ID, { title: 'x' });
+    assert.strictEqual(status, 200);
+  });
 });

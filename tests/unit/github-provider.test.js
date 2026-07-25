@@ -21,6 +21,7 @@ import {
   GitHubProvider,
   githubProvider,
   githubStateToCanonical,
+  githubStateIdToCanonicalType,
 } from '../../lib/providers/github/index.js';
 import { createFakeGitHubClient } from '../../lib/providers/github/fake-client.js';
 import { createGitHubClient } from '../../lib/providers/github/client.js';
@@ -383,6 +384,254 @@ describe('GitHubProvider per-request client from binding credential (LIN-713)', 
   test('the bare-string (boot client) path is unchanged — still requires configure({ client })', async () => {
     const bare = new GitHubProvider();
     await assert.rejects(() => bare.fetchProjects(REPO), /client not configured/);
+  });
+});
+
+// =============================================================================
+// Write-path guard reads + the label RMW primitive (LIN-1559)
+// =============================================================================
+//
+// The four route-internal reads the proxy/session-auth write routes call
+// unconditionally. They are NOT capabilities (`supports()` stays false — the
+// declaration question is LIN-1557's), so nothing else pins their existence:
+// these tests are what keeps a GitHub-backed write route off the 500 it used to
+// answer. Each is exercised through BOTH `_clientFor` scope shapes, because the
+// shape production uses (a `{ repo, token }` binding credential) is not the one
+// the rest of this file's boot-client tests use.
+
+describe('GitHubProvider write-path guard reads (LIN-1559)', () => {
+  let provider;
+  beforeEach(() => { provider = makeProvider(); });
+
+  // --- issueWriteGuard ------------------------------------------------------
+
+  test('issueWriteGuard returns the trashed probe with a NON-NULL team.id', async () => {
+    const guard = await provider.issueWriteGuard(REPO, '1');
+    // team.id is load-bearing: the routes hand it to resolveStateInput, which
+    // 422s "the issue's team could not be determined" on a null. GitHub's
+    // states() ignores teamId, so the repo slug is a stable local placeholder.
+    assert.deepEqual(guard, { id: '1', trashed: false, team: { id: REPO } });
+    assert.notEqual(guard.team.id, null);
+  });
+
+  test('issueWriteGuard reports trashed:false — GitHub Issues has no soft-delete', async () => {
+    // Constant by design (mirroring LocalProvider), so the routes' 409 branch is
+    // dead-but-correct here rather than absent.
+    for (const n of ['1', '2', '3']) {
+      assert.equal((await provider.issueWriteGuard(REPO, n)).trashed, false);
+    }
+  });
+
+  test('issueWriteGuard returns null for a missing issue (the routes 404 on it)', async () => {
+    assert.equal(await provider.issueWriteGuard(REPO, '999'), null);
+  });
+
+  // --- issueDescription -----------------------------------------------------
+
+  test('issueDescription returns { id, description, trashed }', async () => {
+    assert.deepEqual(await provider.issueDescription(REPO, '1'),
+      { id: '1', description: 'something broke', trashed: false });
+  });
+
+  test('issueDescription floors an absent body at the empty string, never null', async () => {
+    // The routes do `merge(issue.description || '')`, but a null here would also
+    // read as "no description" to any future caller — '' is the honest shape.
+    const created = await provider.createIssue(REPO, { title: 'no body' });
+    const read = await provider.issueDescription(REPO, created.id);
+    assert.equal(read.description, '');
+  });
+
+  test('issueDescription returns null for a missing issue', async () => {
+    assert.equal(await provider.issueDescription(REPO, '999'), null);
+  });
+
+  // --- issueLabels ----------------------------------------------------------
+
+  test('issueLabels returns name-keyed { id, name } nodes matching labels()', async () => {
+    // id === name is what makes the routes' `currentLabelIds.includes(resolved)`
+    // comparison meaningful: resolveLabelInput resolves against labels(), which
+    // also keys id by name.
+    assert.deepEqual(await provider.issueLabels(REPO, '1'), {
+      id: '1', trashed: false, labels: { nodes: [{ id: 'bug', name: 'bug' }] },
+    });
+    const fromLabels = await provider.labels(REPO);
+    assert.ok(fromLabels.some(l => l.id === 'bug'), 'labels() must key id by name too');
+  });
+
+  test('issueLabels returns an empty node list for an unlabelled issue', async () => {
+    const read = await provider.issueLabels(REPO, '2');
+    assert.deepEqual(read.labels.nodes, []);
+  });
+
+  test('issueLabels returns null for a missing issue', async () => {
+    assert.equal(await provider.issueLabels(REPO, '999'), null);
+  });
+
+  // --- updateIssueLabels (the diff) -----------------------------------------
+
+  test('updateIssueLabels ADDS the labels missing from the current set', async () => {
+    const result = await provider.updateIssueLabels(REPO, '1', ['bug', 'enhancement']);
+    assert.equal(result.success, true);
+    assert.deepEqual(result.issue.labels.nodes.map(l => l.name).sort(), ['bug', 'enhancement']);
+    // Re-read proves it persisted, not just echoed.
+    const back = await provider.issueLabels(REPO, '1');
+    assert.deepEqual(back.labels.nodes.map(l => l.name).sort(), ['bug', 'enhancement']);
+  });
+
+  test('updateIssueLabels REMOVES labels absent from the requested set', async () => {
+    const result = await provider.updateIssueLabels(REPO, '1', []);
+    assert.equal(result.success, true);
+    assert.deepEqual(result.issue.labels.nodes, []);
+    assert.deepEqual((await provider.issueLabels(REPO, '1')).labels.nodes, []);
+  });
+
+  test('updateIssueLabels handles a mixed add+remove in one call', async () => {
+    const result = await provider.updateIssueLabels(REPO, '1', ['enhancement']);
+    assert.deepEqual(result.issue.labels.nodes.map(l => l.name), ['enhancement']);
+  });
+
+  test('updateIssueLabels is a genuine no-op for an unchanged set (zero write calls)', async () => {
+    // The diff must cost nothing when nothing changed — one REST call per CHANGED
+    // label is the whole point of the diff over a whole-set PATCH.
+    const client = provider.client;
+    let writes = 0;
+    const count = (fn) => (...args) => { writes++; return fn(...args); };
+    client.addLabel = count(client.addLabel);
+    client.removeLabel = count(client.removeLabel);
+
+    const result = await provider.updateIssueLabels(REPO, '1', ['bug']);
+    assert.equal(result.success, true);
+    assert.equal(writes, 0, 'an unchanged label set must issue no add/remove calls');
+    assert.deepEqual(result.issue.labels.nodes.map(l => l.name), ['bug']);
+  });
+
+  test('updateIssueLabels returns the issueUpdate envelope shape the routes echo', async () => {
+    // The routes call writeRejected (needs success === true) then
+    // flattenIssue(issueUpdate.issue) — so `issue` must be a canonical issue.
+    const result = await provider.updateIssueLabels(REPO, '2', ['bug']);
+    assert.deepEqual(Object.keys(result).sort(), ['issue', 'success']);
+    assert.equal(result.issue.identifier, '#2');
+    assert.ok(result.issue.labels.nodes, 'issue must carry the nested labels shape');
+  });
+
+  test('updateIssueLabels on a missing issue → { success: false } (never a throw)', async () => {
+    assert.deepEqual(await provider.updateIssueLabels(REPO, '999', ['bug']), { success: false, issue: null });
+  });
+
+  // --- both scope shapes ----------------------------------------------------
+
+  test('all four reads work through a { repo, token } binding credential', async () => {
+    // Production's shape (LIN-713): no boot client at all, the installation token
+    // builds the request-time client. A read that only worked through the bare
+    // slug would be dead in production.
+    const app = new GitHubProvider();
+    const fake = seededClient();
+    const tokensSeen = [];
+    app._clientForToken = (token) => { tokensSeen.push(token); return fake; };
+    const cred = { repo: REPO, token: 'ghs_install_token' };
+
+    const guard = await app.issueWriteGuard(cred, '1');
+    assert.deepEqual(guard, { id: '1', trashed: false, team: { id: REPO } });
+    assert.equal((await app.issueDescription(cred, '1')).description, 'something broke');
+    assert.deepEqual((await app.issueLabels(cred, '1')).labels.nodes, [{ id: 'bug', name: 'bug' }]);
+    const updated = await app.updateIssueLabels(cred, '1', ['enhancement']);
+    assert.deepEqual(updated.issue.labels.nodes.map(l => l.name), ['enhancement']);
+
+    // Every call authenticated with the credential's token, never a boot client.
+    assert.ok(tokensSeen.length >= 4);
+    assert.ok(tokensSeen.every(t => t === 'ghs_install_token'));
+  });
+
+  test('the reads stay OFF the declared capability surface (LIN-1557 owns that)', () => {
+    // This ticket implements them; it does NOT declare them. Mirrors the Linear
+    // pin in linear-provider-api.test.js and is why the route backstop keys on
+    // method existence rather than supports().
+    for (const m of ['issueWriteGuard', 'issueDescription', 'issueLabels', 'updateIssueLabels']) {
+      assert.equal(provider.supports(m), false, `${m} must not be declared`);
+      assert.equal(typeof provider[m], 'function', `${m} must be implemented`);
+    }
+  });
+});
+
+// =============================================================================
+// stateId → canonical state.type (LIN-1559 / LIN-1569)
+// =============================================================================
+//
+// Both PATCH routes resolve a symbolic state against states() and then pass the
+// provider its OWN state id as `input.stateId`. updateIssue only ever read
+// `patch.state.type`, so every stateId write was dropped — a 200 whose issue
+// never moved. Once the guard reads landed, that turned the old loud 500 into a
+// silent lie, which is why this ships in the same change.
+
+describe('GitHubProvider stateId mapping (LIN-1559 / LIN-1569)', () => {
+  let provider;
+  beforeEach(() => { provider = makeProvider(); });
+
+  test('githubStateIdToCanonicalType maps the ids states() emits', () => {
+    assert.equal(githubStateIdToCanonicalType('open'), 'unstarted');
+    assert.equal(githubStateIdToCanonicalType('closed'), 'completed');
+  });
+
+  test('githubStateIdToCanonicalType throws a 422-shaped error on an unknown id', () => {
+    // 422, not a bare throw: a UUID reaches here only because the routes' UUID
+    // fast-path skipped states(), so it is a CALLER error and must not become a
+    // 500. RefResolutionError is what both route mappers already turn into 422.
+    try {
+      githubStateIdToCanonicalType('11111111-1111-1111-1111-111111111111');
+      assert.fail('expected a throw');
+    } catch (err) {
+      assert.equal(err.name, 'RefResolutionError');
+      assert.equal(err.status, 422);
+      assert.match(err.message, /Cannot resolve state/);
+      assert.deepEqual(err.candidates, ['open', 'closed']);
+    }
+  });
+
+  test('updateIssue applies stateId:"closed" — the issue actually closes', async () => {
+    const updated = await provider.updateIssue(REPO, '1', { stateId: 'closed' });
+    assert.equal(updated.state.type, 'completed');
+    assert.equal((await provider.fetchIssueFields(REPO, '1')).state.type, 'completed');
+  });
+
+  test('updateIssue applies stateId:"open" — reopens a closed issue', async () => {
+    const updated = await provider.updateIssue(REPO, '2', { stateId: 'open' });
+    assert.equal(updated.state.type, 'unstarted');
+    assert.equal((await provider.fetchIssueFields(REPO, '2')).state.type, 'unstarted');
+  });
+
+  test('updateIssue applies stateId alongside other fields in one patch', async () => {
+    const updated = await provider.updateIssue(REPO, '1', { title: 'Both', stateId: 'closed' });
+    assert.equal(updated.title, 'Both');
+    assert.equal(updated.state.type, 'completed');
+  });
+
+  test('updateIssue throws on an unknown stateId rather than dropping the patch', async () => {
+    await assert.rejects(
+      () => provider.updateIssue(REPO, '1', { stateId: 'in-progress' }),
+      /Cannot resolve state/
+    );
+    // And nothing was written — no half-applied patch reported as a success.
+    assert.equal((await provider.fetchIssueFields(REPO, '1')).state.type, 'unstarted');
+  });
+
+  test('an unknown stateId still throws when a valid canonical state is also present', async () => {
+    // Fail loud on the part it cannot honour, rather than quietly honouring the
+    // other half and reporting a full success.
+    await assert.rejects(
+      () => provider.updateIssue(REPO, '1', { state: { type: 'completed' }, stateId: 'nonsense' }),
+      /Cannot resolve state/
+    );
+  });
+
+  test('an explicit canonical state still wins over stateId (existing path unchanged)', async () => {
+    const updated = await provider.updateIssue(REPO, '1', { state: { type: 'canceled' }, stateId: 'open' });
+    assert.equal(updated.state.type, 'canceled');
+  });
+
+  test('a patch with no state at all touches neither state nor state_reason', async () => {
+    const updated = await provider.updateIssue(REPO, '2', { title: 'Title only' });
+    assert.equal(updated.title, 'Title only');
+    assert.equal(updated.state.type, 'completed', 'the pre-existing closed state must survive');
   });
 });
 

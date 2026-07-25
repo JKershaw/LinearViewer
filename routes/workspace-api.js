@@ -2633,6 +2633,18 @@ ${goal}`
     try {
       // One guard read serves BOTH the trashed refusal (409) AND the team scope a
       // symbolic stateId needs, mirroring the proxy update path.
+      //
+      // LIN-1559: `issueWriteGuard` is a ROUTE-INTERNAL read, deliberately off the
+      // declared PROVIDER_SURFACE, so the `supports('updateIssue')` gate above
+      // cannot speak for it — a provider can pass that gate and still lack this
+      // read, which used to throw a TypeError inside this `try` and answer 500.
+      // Keyed on method existence (the property this route actually depends on),
+      // in this route's own inline 422 idiom rather than importing the proxy's.
+      if (typeof provider.issueWriteGuard !== 'function') {
+        return jsonError(res, 422, "This workspace's provider does not support updating issues", {
+          code: 'CAPABILITY_NOT_SUPPORTED', capability: 'issueWriteGuard', provider: provider.name,
+        });
+      }
       const guard = await provider.issueWriteGuard(token, issueId);
       if (isTrashed(guard)) {
         return jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
