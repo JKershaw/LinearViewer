@@ -208,6 +208,44 @@ describe('ProxyTokenStore', () => {
       assert.ok(second, 'Working token is multi-use');
     });
 
+    // LIN-1448 — the inheritance step, made visible.
+    //
+    // This line (`createdBy: doc.createdBy || null`) is where an ownerless
+    // bootstrap becomes an ownerless WORKING token, which is what turned two bad
+    // mints into four halted autopilot trees on 2026-07-25 (LIN-1576). The
+    // exchange deliberately still SUCCEEDS: while the LIN-1447 compat lane is on,
+    // ownerless tokens are a supported population, and refusing here would strand
+    // the host runner mid-flight rather than at a mint it can retry. Prevention
+    // belongs at the mint (provisionBootstrapToken / the broker-token lane);
+    // what belongs here is a breadcrumb, so the propagation is never silent.
+    test('LIN-1448: exchanging an OWNERLESS bootstrap still succeeds, but announces the inheritance', async (t) => {
+      const warnMock = t.mock.method(console, 'warn', () => {});
+      const boot = await store.createToken('workspace-1', { kind: 'bootstrap', scope: 'readWrite' });
+
+      const working = await store.exchangeBootstrapToken(boot.token);
+
+      assert.ok(working, 'the compat population must not be stranded mid-flight');
+      assert.equal(warnMock.mock.calls.length, 1);
+      const warned = warnMock.mock.calls[0].arguments.join(' ');
+      assert.match(warned, /LIN-1448/);
+      assert.match(warned, /owner/i);
+      assert.match(warned, /workspace-1/, 'names the workspace so the log is actionable');
+      assert.ok(!warned.includes(boot.token), 'never logs token bytes');
+      assert.ok(!warned.includes(working.token), 'never logs token bytes');
+    });
+
+    test('LIN-1448: exchanging an OWNED bootstrap is silent, and the owner is carried across', async (t) => {
+      const warnMock = t.mock.method(console, 'warn', () => {});
+      const boot = await store.createToken('workspace-1', { kind: 'bootstrap', scope: 'readWrite', createdBy: 'account-A' });
+
+      const working = await store.exchangeBootstrapToken(boot.token);
+
+      assert.ok(working);
+      const validated = await store.validateToken(working.token);
+      assert.equal(validated.createdBy, 'account-A', 'the healthy path is unchanged: the owner is inherited');
+      assert.equal(warnMock.mock.calls.length, 0, 'the healthy path stays noise-free');
+    });
+
     test('exchange consumes the bootstrap (second exchange fails)', async () => {
       const boot = await store.createToken('workspace-1', { kind: 'bootstrap' });
       const first = await store.exchangeBootstrapToken(boot.token);

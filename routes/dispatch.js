@@ -30,6 +30,7 @@ import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dis
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField, applyDefaultDispatchHarness } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
+import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -1107,7 +1108,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * authenticateDispatchToken) — never fabricated — so the exchanged working
    * token resolves under LIN-1366's owner-scoped selection.
    *
-   * TEMPORARY compat lane (LIN-1447, cleanup tracked by LIN-1448): a dispatch
+   * OWNERLESS COMPAT LANE (LIN-1447), now switchable (LIN-1448): a dispatch
    * token with no owner (minted before LIN-1397, or never re-minted) used to
    * fail closed here with a 503. But the host runner authenticates with
    * exactly such an ownerless legacy token, so that 503 dead-ended LIN-1446's
@@ -1115,12 +1116,53 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * proxy (HARBOUR_LOCAL_BASE) uncomposed. Mint proceeds for the ownerless
    * case the same way it does for an owner-stamped token (createdBy: null,
    * same as createToken already accepts) instead of rejecting it — owner-
-   * stamped tokens are completely unaffected. Remove this lane once no
-   * ownerless tokens remain in use; LIN-1448 checks the log line below first.
+   * stamped tokens are completely unaffected either way.
+   *
+   * LIN-1448 — WHY THIS IS A SWITCH AND NOT A DELETION. The lane's stated exit
+   * condition ("remove once no ownerless tokens remain in use / after it has
+   * been cold for a safe window") is unsatisfiable: this endpoint is the ONLY
+   * minter of the `refire-broker` label, so the lane can never go cold on its
+   * own. It is also the confirmed root cause of a ~100-minute halt of four
+   * autopilot trees on 2026-07-25 (LIN-1576) — every token it mints is
+   * createdBy:null, which selectOwnerWorkspaceToken fails closed on, so the
+   * token is dead on arrival for every workspace-scoped verb. That is exactly
+   * the reasoning the wake path below already acts on at the `no-token-owner`
+   * degrade, and this endpoint contradicted it.
+   *
+   * Removal alone is NOT the fix, though: the reason the lane exists is that the
+   * host runner's own consumer token is ownerless, so deleting it unconditionally
+   * would trade a silent failure for a loud one on the very next deploy. The fix
+   * is two-part and ordered — (1) re-issue the runner's dispatch token as OWNED
+   * (an on-host operator action: create a new token while signed in, which stamps
+   * req.session.accountId, and point the runner at it; `GET .../api/dispatch/tokens`
+   * now reports `hasOwner` so "are any ownerless tokens still live?" is answerable),
+   * then (2) set DISPATCH_OWNERLESS_BROKER_COMPAT=off to restore strict minting.
+   * Default stays compat-ON precisely so part 2 cannot take effect before part 1.
    */
   router.post('/api/dispatch/broker-token', authenticateDispatchToken, async (req, res) => {
     if (req.dispatchTokenOwner === null) {
-      console.warn(`Broker-token mint: ownerless legacy compat lane (LIN-1447) hit for urlKey=${req.dispatchUrlKey}`);
+      if (!ownerlessCompatEnabled()) {
+        // Strict lane (LIN-1448): refuse BEFORE minting. A minted ownerless token
+        // is dead on arrival at every workspace-scoped verb, so handing one back
+        // only disguises the miss — the same policy the wake path applies below.
+        console.warn(
+          `Broker-token mint refused: dispatch token has no owner ` +
+          `(urlKey=${req.dispatchUrlKey} label=${req.dispatchTokenLabel}) — ` +
+          `DISPATCH_OWNERLESS_BROKER_COMPAT is off (LIN-1448)`
+        );
+        return serviceUnavailable.json(
+          res,
+          'Dispatch token has no owner (LIN-1448)',
+          'A bootstrap minted for an ownerless dispatch token cannot resolve a workspace ' +
+          'credential, so it is refused rather than handed over dead. The workspace itself ' +
+          'is unaffected — re-issue this dispatch token from an account that has the ' +
+          'workspace connected, then point the runner at the new token.'
+        );
+      }
+      console.warn(
+        `Broker-token mint: ownerless legacy compat lane (LIN-1447) hit for ` +
+        `urlKey=${req.dispatchUrlKey} label=${req.dispatchTokenLabel}`
+      );
     }
 
     if (!proxyTokenStore) {
@@ -1234,10 +1276,14 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // ── STRUCTURAL misses: enqueue the wake anyway, token-less (LIN-1447) ──
       // Neither of these can be fixed by retrying, so suppressing the wake would
       // just strand the parent forever — the exact LIN-1428 stall. LIN-1447 landed
-      // this same tolerate-ownerless policy on POST /api/dispatch/broker-token
-      // (routes/dispatch.js above): an ownerless legacy token no longer 503s there,
-      // because the host runner authenticates with exactly such a token. Failing
-      // closed here would contradict that.
+      // a tolerate-ownerless policy on POST /api/dispatch/broker-token
+      // (routes/dispatch.js above), because the host runner authenticates with
+      // exactly such a token.
+      //
+      // LIN-1448 note: that lane is now switchable, and when it is switched off
+      // it adopts THIS branch's policy (refuse rather than hand back a token that
+      // cannot work) rather than the reverse. The degrade below is unaffected
+      // either way — this branch has never minted for an ownerless caller.
       if (!proxyTokenStore) return { token: null, reason: null, degraded: 'no-proxy-token-store' };
       // We deliberately do NOT mint for an ownerless caller. An ownerless bootstrap
       // mints fine and EXCHANGES fine (exchangeBootstrapToken has no owner check) —

@@ -26,7 +26,15 @@ function createMockCollection() {
       if (update.$set) Object.assign(docs[idx], update.$set);
       return { matchedCount: 1, modifiedCount: 1 };
     },
-    async find() { return { async toArray() { return docs.slice(); } }; },
+    // Cursor-shaped, NOT async: the real driver's find() returns a cursor
+    // synchronously and callers chain .toArray() off it directly
+    // (lib/dispatch-tokens.js's listTokens). An `async find()` here returns a
+    // promise with no .toArray, which listTokens swallows into an empty list —
+    // so the mock has to match the real call shape for listTokens to be testable.
+    find(query = {}) {
+      const matched = docs.filter(d => Object.keys(query).every(k => d[k] === query[k]));
+      return { async toArray() { return matched.slice(); } };
+    },
     async deleteOne() { return { deletedCount: 0 }; },
     async deleteMany() { return { deletedCount: 0 }; }
   };
@@ -48,6 +56,34 @@ describe('LIN-1397 — DispatchTokenStore createdBy plumbing', () => {
     const { token } = await store.createToken('acme', 'my-label');
     const validated = await store.validateToken(token);
     assert.equal(validated.createdBy, null);
+  });
+
+  // LIN-1448. The ticket's own removal precondition is "confirm zero legacy
+  // tokens are still live — check dispatch-token records for any without an
+  // owner". That was unanswerable from outside the database: listTokens returned
+  // label/createdAt/lastUsedAt and nothing about ownership. It is also the exact
+  // check that gates flipping DISPATCH_OWNERLESS_BROKER_COMPAT off, so it has to
+  // be readable by the operator doing the flip.
+  //
+  // A boolean, never the accountId: the answer needed is "is this token
+  // ownerless?", and listTokens is a metadata-only surface (no secrets, no ids)
+  // — the same privacy discipline the rest of this store keeps.
+  test('LIN-1448: listTokens reports hasOwner so ownerless legacy tokens are findable', async () => {
+    await store.createToken('acme', 'owned', 'account-A');
+    await store.createToken('acme', 'legacy-runner');
+
+    const tokens = await store.listTokens('acme');
+    const byLabel = Object.fromEntries(tokens.map(t => [t.label, t]));
+
+    assert.equal(byLabel.owned.hasOwner, true);
+    assert.equal(byLabel['legacy-runner'].hasOwner, false, 'a pre-LIN-1397 token is the thing being hunted');
+    // Ownership is exposed as a verdict only — never the owning account id.
+    const blob = JSON.stringify(tokens);
+    assert.ok(!blob.includes('account-A'), `listTokens must not leak the owner id: ${blob}`);
+    // Additive: the pre-existing metadata is untouched.
+    assert.equal(byLabel.owned.urlKey, undefined);
+    assert.ok(byLabel.owned.tokenId);
+    assert.ok(byLabel.owned.createdAt);
   });
 
   test('label-only two-arg call (the pre-LIN-1397 call shape) still works byte-identically', async () => {
