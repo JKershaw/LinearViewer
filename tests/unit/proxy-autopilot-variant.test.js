@@ -186,9 +186,12 @@ test('POST kickoff: a top-level kickoff omitting sessionId/subscription stays a 
 });
 
 test('POST kickoff: an invalid sessionId is a 400; an invalid subscription is a 400 (LIN-813/§6)', async () => {
+  // Since LIN-1118 sessionId is an opaque string, so 'not-a-uuid' is VALID and no
+  // longer the negative case. The rule still rejects on shape — here, the reserved
+  // value that would collide with the observation backfill marker.
   const bad = buildApp();
   const r1 = await request(bad.app, '/api/proxy/autopilot/kickoff', {
-    method: 'POST', body: { sessionId: 'not-a-uuid' },
+    method: 'POST', body: { sessionId: '__meta__' },
   });
   assert.equal(r1.status, 400);
   assert.match(r1.body.error, /sessionId/);
@@ -201,6 +204,18 @@ test('POST kickoff: an invalid sessionId is a 400; an invalid subscription is a 
   assert.equal(r2.status, 400);
   assert.match(r2.body.error, /subscription must be one of/);
   assert.equal(bad2.added.length, 0);
+});
+
+test('POST kickoff: a composite sessionId is accepted and stored verbatim (LIN-1118)', async () => {
+  const { app, added } = buildApp();
+  const composite = 'LIN-1117-autopilot-standalone-2026-07-07';
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST', body: { sessionId: composite, subscription: 'everything' },
+  });
+  assert.equal(status, 201);
+  assert.equal(added.length, 1);
+  // Stored blindly, exactly as supplied — no normalisation, no re-minting.
+  assert.equal(added[0].doc.sessionId, composite);
 });
 
 test("POST kickoff: 'coordinator' is NOT a launch-time variant — it 400s like any unknown variant (LIN-813)", async () => {

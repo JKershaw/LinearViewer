@@ -140,6 +140,52 @@ describe('LIN-901 — recommend-and-dispatch subscription is declared, not recon
     assert.match(res.body.error, /subscription must be one of/);
   });
 
+  // LIN-1118 — sessionId is an opaque string here too. This route had NO negative
+  // sessionId coverage before; without it the relaxation reads as removing the
+  // guard rather than replacing it.
+  test('a composite sessionId is accepted and forwarded verbatim (LIN-1118)', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const composite = 'LIN-1117-autopilot-standalone-2026-07-07';
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation', sessionId: composite
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.sessionId, composite);
+  });
+
+  test('an existing UUID sessionId is still accepted (pure relaxation)', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation', sessionId: SESSION_ID
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.sessionId, SESSION_ID);
+  });
+
+  test('rejects a malformed sessionId with 400 (LIN-1118)', async () => {
+    for (const [sessionId, pattern] of [
+      ['', /sessionId must not be empty/],
+      ['a'.repeat(129), /sessionId exceeds maximum length of 128/],
+      ['a\nb', /sessionId contains invalid characters/],
+      ['__meta__', /sessionId must not be a reserved value/],
+      [42, /sessionId must be a string/]
+    ]) {
+      const captured = {};
+      const app = buildApp(captured);
+      const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+        issueIdentifier: 'TEST-1', kind: 'implementation', sessionId
+      });
+
+      assert.equal(res.status, 400, `expected 400 for ${JSON.stringify(sessionId)}, got ${res.status}`);
+      assert.match(res.body.error, pattern);
+      assert.equal(captured.item, undefined, 'nothing is dispatched on a rejected sessionId');
+    }
+  });
+
   test('queueIfBusy is forwarded blindly and never defaulted on this path', async () => {
     const captured = {};
     const app = buildApp(captured);
