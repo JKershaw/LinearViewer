@@ -2113,6 +2113,144 @@ describe('ledger proportionality for low-risk changes (LIN-898)', () => {
   });
 });
 
+// =============================================================================
+// Pre-launch posture (LIN-1579): the proportional lane widens on what the
+// reviewer can NAME — a monitor for a claim unprovable in principle (any risk
+// surface), a rollback for a reversible runtime-logic change — and bookkeeping
+// closes on merge. Sibling of the LIN-898 block above, which stays unmodified:
+// if one of ITS floor assertions ever has to change, the wording went too far.
+// =============================================================================
+
+describe('named-discharge lanes and close-on-merge (LIN-1579)', () => {
+  const issue = {
+    id: 'nd-1', identifier: 'LIN-903', title: 'Bound an async wait',
+    description: 'work', url: 'https://linear.app/test/issue/LIN-903',
+    labels: [], createdAt: '2026-01-01T00:00:00.000Z'
+  };
+  const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+
+  const metaArgs = {
+    issueContext: 'CTX', identifier: 'LIN-903',
+    hasSubtasks: true, subtaskCount: 2, completedCount: 2, inProgressCount: 0, remainingCount: 0,
+    hasComments: true, commentCount: 2, aiHints: 'H',
+    actionVocabulary: 'plan, review, close-out, implementation, bug',
+    completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: true
+  };
+
+  test('(1) review authors the named-monitor discharge, regardless of risk surface', () => {
+    const review = generatePrompt('review', issue, context).prompt;
+    assert.ok(/name the monitor/i.test(review),
+      'review carries the named-monitor lane');
+    assert.ok(/discharges through normal post-merge observation \*\*regardless of risk surface\*\*/i.test(review),
+      'the named-monitor lane is not keyed on the risk surface');
+    assert.ok(/a log or oplog entry, a metric, a path that fails loudly, or a routed follow-up ticket that owns the watch/i.test(review),
+      'the monitor must be a specific, nameable thing');
+    // Misfire guard: unprovable-in-principle is not "this CI run did not cover it".
+    assert.ok(/a claim a test COULD have proven is not unprovable-in-principle/i.test(review),
+      'an untested claim is not an unprovable one');
+    assert.ok(/If no monitor can be named, it stays a hard gate item/i.test(review),
+      'no nameable monitor means no lane');
+  });
+
+  test('(2) review states the three-part reversibility test and requires the rollback be named', () => {
+    const review = generatePrompt('review', issue, context).prompt;
+    assert.ok(/name the rollback/i.test(review), 'review carries the named-rollback lane');
+    assert.ok(/a \*\*runtime-logic\*\* change that is genuinely reversible/i.test(review),
+      'the low-risk lane now reaches runtime-logic changes');
+    assert.ok(/the single commit to revert or the exact env var \/ flag and its safe value/i.test(review),
+      '(a) the rollback itself is named');
+    assert.ok(/no migration, no data already persisted in the new shape, no third party has already consumed the new behaviour/i.test(review),
+      '(b) the rollback is complete');
+    assert.ok(/it needs no coordinated release/i.test(review),
+      '(c) no coordinated release');
+    assert.ok(/"Everything is revertable in git" fails \(b\)/i.test(review),
+      'the lane cannot collapse into "git can revert anything"');
+  });
+
+  test('(3) close-out accepts a named-monitor and a named-rollback discharge, citing review\'s name', () => {
+    const closeout = generatePrompt('close-out', issue, context).prompt;
+    assert.ok(/\*\*A named monitor\*\*/.test(closeout), 'close-out accepts a named monitor');
+    assert.ok(/\*\*A named rollback\*\*/.test(closeout), 'close-out accepts a named rollback');
+    assert.ok(/Cite that monitor and proceed, whatever the risk surface/i.test(closeout),
+      'the named-monitor route is not keyed on the risk surface at discharge either');
+    // Self-certification boundary: close-out cites a name, it never supplies one.
+    assert.ok(/never a name you supply yourself/i.test(closeout),
+      'close-out cites review\'s name rather than authoring its own');
+    assert.ok(/naming it is not yours to do here/i.test(closeout),
+      'naming stays at review-authoring time');
+  });
+
+  test('(4) close-out verifies on the landed commit and closes the bookkeeping on merge', () => {
+    const closeout = generatePrompt('close-out', issue, context).prompt;
+    assert.ok(/Verify the change on the \*\*landed commit\*\* as this session's last step/i.test(closeout),
+      'verification happens on the landed commit, in the merging session');
+    assert.ok(/Close the bookkeeping here, not in a later pass/i.test(closeout),
+      'no separate verification pass');
+    assert.ok(/never as a follow-up whose only content is "confirm the merged change works"/i.test(closeout),
+      'no bookkeeping follow-up that only re-confirms the merge');
+    // Bound: "close on merge" must not become "close without verifying".
+    assert.ok(/needs real-world \*elapsed time\* to show up is not verifiable on the landed commit/i.test(closeout),
+      'an elapsed-time claim routes to the named monitor instead of closing unverified');
+  });
+
+  test('(5) HARD FLOORS not regressed: unnamed gets no lane, risky surfaces are not widened', () => {
+    const review = generatePrompt('review', issue, context).prompt;
+    const closeout = generatePrompt('close-out', issue, context).prompt;
+    // Naming is the price of both lanes — in both surfaces.
+    assert.ok(/an unnamed monitor or an unnamed rollback does NOT get the lane/i.test(review),
+      'review: naming is the price of the lane');
+    assert.ok(/An unnamed monitor or an unnamed rollback does NOT get the lane\./.test(closeout),
+      'close-out: an unnamed monitor/rollback is an undischarged item');
+    assert.ok(/"It can be reverted" or "we will notice" with nothing named is an undischarged item/i.test(closeout),
+      'hand-waved reversibility is not a discharge');
+    // The three surfaces the ticket deliberately did NOT widen.
+    assert.ok(/\*\*Data-path, security, and external-contract surfaces are NOT widened into this lane\*\*/.test(review),
+      'data-path / security / external-contract stay outside the rollback lane');
+    // Green CI floor and the self-certification floor are untouched (LIN-898's own
+    // assertions above cover these; re-checked here as the sibling block's floor).
+    assert.ok(/Green CI is never evidence for a ledger item/i.test(closeout),
+      'green CI still never discharges a ledger item');
+    assert.ok(/self-assessment is never that sign-off/i.test(review),
+      'a reviewer self-assessment is still never a human sign-off');
+    // Widening the lane must not shrink the ledger itself.
+    assert.ok(/Widening the lane never widens the \*ledger\*/i.test(review),
+      'every claim CI does not exercise is still enumerated');
+  });
+
+  test('(6) BOTH PATHS: the meta-prompt mirrors both named lanes and the close-on-merge rule', () => {
+    const p = buildMetaPromptTemplate(metaArgs);
+    // Review rule mirror.
+    assert.ok(/NAMING is the price of both lanes and an unnamed monitor or an unnamed rollback does not get either/i.test(p),
+      'meta Review rule makes naming the price of both lanes');
+    assert.ok(/\(i\) \*\*name the monitor\*\*/.test(p), 'meta Review rule carries the named-monitor lane');
+    assert.ok(/\(ii\) \*\*name the rollback\*\*/.test(p), 'meta Review rule carries the named-rollback lane');
+    assert.ok(/data-path, security, and external-contract surfaces are NOT widened into this lane/i.test(p),
+      'meta Review rule keeps the three surfaces out of the lane');
+    // Close-out rule mirror (clause 3a).
+    assert.ok(/two NAMED routes carry the same weight/i.test(p),
+      'meta Close-out rule accepts both named routes');
+    assert.ok(/an UNNAMED monitor or an UNNAMED rollback does NOT get the lane/i.test(p),
+      'meta Close-out rule refuses an unnamed discharge');
+    // Close-out rule mirror (clause 6 — close on merge).
+    assert.ok(/verify the change on the landed commit as this session's last step/i.test(p),
+      'meta Close-out rule verifies on the landed commit');
+    assert.ok(/close the bookkeeping on merge rather than holding the task open for a separate verification pass/i.test(p),
+      'meta Close-out rule closes bookkeeping on merge');
+  });
+
+  test('(7) completion signals stay coherent with the named lanes and close-on-merge', () => {
+    const sig = COMPLETION_SIGNALS['close-out'];
+    assert.ok(sig.signals.some(s => /An item review discharged by NAMING/.test(s)),
+      'a checkpoint reflects the named-monitor / named-rollback discharge');
+    assert.ok(sig.signals.some(s => /an unnamed monitor or rollback does NOT get the lane/i.test(s)),
+      'the checkpoint keeps naming as the price of the lane');
+    assert.ok(sig.signals.some(s => /verified on the landed commit as the merging session's last step/i.test(s)),
+      'a checkpoint reflects close-on-merge verification');
+    assert.ok(/naming a monitor or a rollback is accepted by citing that name/i.test(sig.readinessCheck),
+      'the readiness check names the discharge-by-naming route');
+  });
+});
+
 describe('meta-prompt Step 2: bug already investigated (LIN-366)', () => {
   const baseArgs = {
     issueContext: 'CTX', identifier: 'LIN-900',
