@@ -1315,6 +1315,15 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 //   store_unreachable → session store find() threw (dyno booting post-deploy) — transient
 //   session_expired   → a session referenced this workspace but its token expired — re-auth
 //   not_connected     → no session references this workspace — never connected
+//   token_ownerless   → the CALLER's own token carries no owner stamp (createdBy:
+//                       null), so it can never resolve one. Split out of
+//                       not_connected by LIN-1448 because the two are opposites —
+//                       this one says nothing about the workspace, which is
+//                       typically healthy and serving other tokens 200s in the
+//                       same second, and its remedy is to re-issue the token, not
+//                       to reconnect anything. Selection is unchanged (still fails
+//                       closed, still never borrows); only the diagnosis moved.
+//                       See LIN-1576 for what the collapsed code cost
 //   owner_mismatch    → the owner has no live token, but a DIFFERENT account does. A
 //                       SIGNAL, not a proof: it fires both when the owner account genuinely
 //                       no longer holds this workspace (re-auth cannot fix it) and when the

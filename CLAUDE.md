@@ -151,6 +151,7 @@ lib/
   workflow-config.js   Centralized workflow label configuration
   harbour-spawn.js     Spawns Claude Code sessions in Harbour OS (OSC escapes)
   harbour-feedback-tokens.js  Short-lived single-use feedback tokens for repo agents
+  ownerless-token-policy.js  The one switch governing whether ownerless (`createdBy: null`) tokens are still tolerated (LIN-1447/1448): read by BOTH the broker-token mint (routes/dispatch.js) and bootstrap provisioning (lib/proxy-preamble.js) so the two seams cannot drift, and so neither route has to import the other. Ownerlessness is inherited (the exchange copies it; a worker holding an ownerless token mints its children ownerless too), which is why the policy is one value and not a per-site judgement. Fails safe: only an explicit off-value turns strictness on, because the host runner still authenticates with an ownerless pre-LIN-1397 token and must be re-issued first
   yap-client.js        Thin server-side HTTP client for the Yap chat server (Collective; channel/nick helpers)
   audit.js             Workspace audit module (computes audit report from Linear)
   feature-defaults.js  Feature toggle keys, defaults, and helpers
@@ -386,6 +387,7 @@ GITHUB_APP_PRIVATE_KEY  GitHub App private key (PEM), used to sign the App JWT (
 GITHUB_APP_SLUG         GitHub App slug, used to build the install URL (required for GitHub login/binding)
 GITHUB_REDIRECT_URI     Callback URL for GitHub user-to-server OAuth (optional; falls back to the App's default callback when unset)
 GITHUB_PROJECTS_REDIRECT_URI  Callback URL for the github-projects provider (optional; falls back to GITHUB_REDIRECT_URI)
+DISPATCH_OWNERLESS_BROKER_COMPAT  Whether ownerless (createdBy:null) tokens are still tolerated (optional, default ON). Set to off/false/0/no to restore strict owner-required minting: POST /api/dispatch/broker-token 503s an ownerless caller instead of minting, and provisionBootstrapToken refuses an ownerless bootstrap instead of minting one that cannot resolve a workspace. Fails SAFE — only an explicit off-value switches strictness on, so an unset var or a typo leaves the compat lane running. ORDERING: the host runner authenticates with an ownerless pre-LIN-1397 dispatch token, so re-issue that token as OWNED (create one while signed in; `GET .../api/dispatch/tokens` reports `hasOwner`) BEFORE switching this off, or the runner's own mints start 503ing. See lib/ownerless-token-policy.js (LIN-1447/LIN-1448)
 YAP_BASE_URL            Yap chat server base URL for the experimental Collective live view (optional, defaults to https://yap.jkershaw.com)
 YAP_PASSWORD            Yap server password (optional, sent as Bearer auth on Yap calls)
 ```

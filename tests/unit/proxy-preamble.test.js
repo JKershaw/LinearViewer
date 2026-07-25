@@ -479,6 +479,102 @@ describe('provisionBootstrapToken (LIN-1429 — provisioning extracted from atta
     });
   });
 
+  // -------------------------------------------------------------------------
+  // LIN-1448 — an ownerless mint is a fault, and it is INHERITED.
+  //
+  // `createdBy: null` here does not just make one weak token: the exchanged
+  // working token copies the null (lib/proxy-tokens.js's exchangeBootstrapToken)
+  // and anything the resulting worker itself mints inherits it again, so two bad
+  // mints halted four autopilot trees on 2026-07-25 (LIN-1576). This seam is the
+  // choke point for the DISPATCHED mints, including the
+  // ownerless-worker-mints-a-child case at routes/proxy.js's kickoff — but NOT
+  // for routes/collective.js's prose branch or the session-auth token endpoint,
+  // which mint `kind: 'bootstrap'` directly and stay outside the switch until
+  // LIN-1582.
+  //
+  // The response is gated on the SAME switch as the LIN-1447 compat lane, and
+  // the ordering is the point: while the compat lane is on, ownerless tokens are
+  // a supported population, so refusing their mints here would half-remove the
+  // lane through a side door — exactly the "part 2 before part 1" the ticket
+  // forbids. So compat-on warns (visible and countable), compat-off refuses.
+  // -------------------------------------------------------------------------
+  describe('LIN-1448 — ownerless (createdBy-less) mints', () => {
+    const ENV = 'DISPATCH_OWNERLESS_BROKER_COMPAT';
+    const restore = (t) => {
+      const before = process.env[ENV];
+      t.after(() => {
+        if (before === undefined) delete process.env[ENV];
+        else process.env[ENV] = before;
+      });
+    };
+
+    test('compat ON (default): still mints, but warns — never silently', async (t) => {
+      restore(t);
+      delete process.env[ENV];
+      const warnMock = t.mock.method(console, 'warn', () => {});
+      const store = fakeStore({ token: 'TOK' });
+
+      const out = await provisionBootstrapToken({
+        proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', harness: 'claude-code'
+      });
+
+      assert.equal(out, 'TOK', 'the compat population keeps working');
+      assert.equal(store.calls.length, 1);
+      assert.equal(warnMock.mock.calls.length, 1, 'the mint is announced, so it can be counted');
+      const warned = warnMock.mock.calls[0].arguments.join(' ');
+      assert.match(warned, /LIN-1448/);
+      assert.match(warned, /owner/i);
+    });
+
+    test('compat OFF: refuses to mint — claude-code fails closed BEFORE the mint', async (t) => {
+      restore(t);
+      process.env[ENV] = 'off';
+      const store = fakeStore({ token: 'TOK' });
+
+      await assert.rejects(
+        () => provisionBootstrapToken({
+          proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', harness: 'claude-code'
+        }),
+        (err) => {
+          assert.equal(err.proxyAttachFailed, true, 'reuses the existing 503 convention, not a generic 500');
+          assert.match(err.message, /owner/i);
+          return true;
+        }
+      );
+      assert.equal(store.calls.length, 0, 'a token that cannot work is never created');
+    });
+
+    test('compat OFF: prose harness degrades to null, as every other miss does here', async (t) => {
+      restore(t);
+      process.env[ENV] = 'off';
+      const store = fakeStore({ token: 'TOK' });
+
+      const out = await provisionBootstrapToken({
+        proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', harness: 'opencode'
+      });
+
+      assert.strictEqual(out, null);
+      assert.equal(store.calls.length, 0);
+    });
+
+    test('an OWNED mint is untouched and silent under both settings', async (t) => {
+      restore(t);
+      const warnMock = t.mock.method(console, 'warn', () => {});
+      for (const value of [undefined, 'off']) {
+        if (value === undefined) delete process.env[ENV];
+        else process.env[ENV] = value;
+        const store = fakeStore({ token: 'TOK' });
+        const out = await provisionBootstrapToken({
+          proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host',
+          harness: 'claude-code', createdBy: 'account-A'
+        });
+        assert.equal(out, 'TOK');
+        assert.equal(store.calls[0].options.createdBy, 'account-A');
+      }
+      assert.equal(warnMock.mock.calls.length, 0, 'owner-stamped mints must stay noise-free');
+    });
+  });
+
   test('createdBy pass-through, plus kind/scope/label/ttl on the same options object', async () => {
     const store = fakeStore({ token: 'TOK123' });
     await provisionBootstrapToken({

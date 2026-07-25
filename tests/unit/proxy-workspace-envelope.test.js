@@ -64,6 +64,25 @@ test('workspaceUnavailableEnvelope: not_connected → config / not retryable', (
   assert.equal(env.retryable, false);
 });
 
+test('workspaceUnavailableEnvelope: token_ownerless → its own code, and steers AWAY from reconnecting (LIN-1448)', () => {
+  const env = workspaceUnavailableEnvelope('token_ownerless', 'acme');
+  assert.equal(env.error, 'Workspace not available');
+  assert.equal(env.code, 'TOKEN_HAS_NO_OWNER');
+  // config / non-retryable matches not_connected — the CODE is what had to
+  // change. Retrying cannot help (the token's owner stamp is immutable) and no
+  // human sign-in fixes it either; the token itself must be re-issued.
+  assert.equal(env.category, 'config');
+  assert.equal(env.retryable, false);
+  assert.deepEqual(env.context, { workspaceUrlKey: 'acme' });
+  // The detail is the whole reason this reason exists. On 2026-07-25 four
+  // sessions read `WORKSPACE_NOT_CONNECTED` as "reconnect the workspace" and the
+  // owner acted on it twice; it could never have helped (LIN-1576). So the copy
+  // must say the workspace is not the problem, and must name re-issuing.
+  assert.match(env.detail, /re-?issue/i, 'names the actual remedy');
+  assert.match(env.detail, /owner/i, 'names ownership as the cause');
+  assert.doesNotMatch(env.detail, /reconnect/i, 'must never suggest the remedy that cost the outage');
+});
+
 test('workspaceUnavailableEnvelope: owner_mismatch → config / not retryable (LIN-1413)', () => {
   const env = workspaceUnavailableEnvelope('owner_mismatch', 'acme');
   assert.equal(env.code, 'WORKSPACE_OWNER_MISMATCH');
@@ -178,7 +197,7 @@ test('the retargeted privacy regex still catches a genuine leak (demonstration)'
   // This is also where the digit requirement earns its keep: owner_mismatch's
   // own `code` (WORKSPACE_OWNER_MISMATCH, 24 chars, no digit) would have
   // false-tripped a pure length-only check.
-  for (const reason of ['store_unreachable', 'session_expired', 'not_connected', 'owner_mismatch', 'owner_signed_out']) {
+  for (const reason of ['store_unreachable', 'session_expired', 'not_connected', 'owner_mismatch', 'owner_signed_out', 'token_ownerless']) {
     const clean = workspaceUnavailableEnvelope(reason, 'acme');
     const blob = JSON.stringify(clean);
     assert.ok(!SENSITIVE_FIELD_NAME_LEAK.test(blob), `false positive (field name) on ${reason}: ${blob}`);

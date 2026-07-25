@@ -94,13 +94,31 @@ describe('selectOwnerWorkspaceToken (LIN-1366, Block A — pure selector)', () =
       // Even a session with a matching null accountId must not be borrowed.
       { session: { accountId: null, workspaces: [{ urlKey: 'acme', provider: 'linear', accessToken: 'tok-null-owner', tokenExpiresAt: NOW + FAR_FUTURE_MS }] } },
     ];
+    // LIN-1448: still fails closed, but under its OWN reason. It used to return
+    // `not_connected`, which is indistinguishable from a genuinely disconnected
+    // workspace — the ambiguity that cost ~100 minutes on 2026-07-25 (LIN-1576),
+    // during which four sessions independently concluded "a human must reconnect
+    // the workspace" and the owner acted on that twice, to no effect. Selection
+    // itself is unchanged: no token, no borrowing.
     const nullResult = selectOwnerWorkspaceToken(sessions, 'acme', null);
     assert.equal(nullResult.token, null);
-    assert.equal(nullResult.reason, 'not_connected');
+    assert.equal(nullResult.reason, 'token_ownerless');
 
     const emptyResult = selectOwnerWorkspaceToken(sessions, 'acme', '');
     assert.equal(emptyResult.token, null);
-    assert.equal(emptyResult.reason, 'not_connected');
+    assert.equal(emptyResult.reason, 'token_ownerless');
+  });
+
+  test('A4b (LIN-1448): a REAL owner with no session for the workspace still reports not_connected', () => {
+    // The counterweight to A4: the new reason must be scoped to "the token has no
+    // owner", never widened into "this owner has no session". Otherwise the fix
+    // just moves the ambiguity instead of removing it.
+    const sessions = [
+      sessionRow('account-B', 'acme', 'tokB', NOW + FAR_FUTURE_MS),
+    ];
+    const result = selectOwnerWorkspaceToken(sessions, 'acme', 'account-A');
+    assert.equal(result.token, null);
+    assert.equal(result.reason, 'not_connected');
   });
 
   test('A5: the UNSCOPED sentinel preserves legacy owner-blind selection (latest-expiring across ALL accounts)', () => {
@@ -301,6 +319,22 @@ describe('classifyWorkspaceFailure (LIN-1506, Block E — ordering witness)', ()
     const result = classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', selectedReason: 'store_unreachable' });
     assert.equal(result, 'store_unreachable');
   });
+
+  // LIN-1448. Both reclassifiers already return false for a falsy owner (C4 above,
+  // and detectOwnerSignedOut's own guard), so this is structurally safe — but it
+  // is the whole point of the new reason, so pin it: nothing may relabel
+  // `token_ownerless` back into a workspace-shaped reason on its way to the wire.
+  test('E6 (LIN-1448): token_ownerless passes through unchanged, even with another account live on the workspace', () => {
+    const sessions = [sessionRow('account-B', 'acme', 'tokB', NOW + FAR_FUTURE_MS)];
+    assert.equal(
+      classifyWorkspaceFailure({ sessions, urlKey: 'acme', ownerAccountId: null, selectedReason: 'token_ownerless' }),
+      'token_ownerless'
+    );
+    assert.equal(
+      classifyWorkspaceFailure({ sessions: [], urlKey: 'acme', ownerAccountId: '', selectedReason: 'token_ownerless' }),
+      'token_ownerless'
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -494,7 +528,11 @@ function makeRecordingResolver() {
   const resolveWorkspaceAccess = async (urlKey, ownerAccountId) => {
     calls.push({ urlKey, ownerAccountId });
     if (!ownerAccountId) {
-      return { token: null, reason: 'not_connected', provider: null };
+      // Mirrors the real selector's falsy-owner branch, which LIN-1448 moved off
+      // `not_connected` onto its own reason (see A4 / selectOwnerWorkspaceToken).
+      // Keep these two in step: this stub exists to thread a REAL reason to the
+      // wire, so a stale value here would silently stop testing anything.
+      return { token: null, reason: 'token_ownerless', provider: null };
     }
     // 'test-token' also drives /api/proxy/stack's own NODE_ENV=test mock-data
     // shortcut, so R3 never needs a real Linear connection either.
@@ -607,7 +645,7 @@ describe('req.proxyCreatedBy route wiring (LIN-1366, Block B)', () => {
     assert.equal(spy.calls[0].ownerAccountId, 'account-A');
   });
 
-  test('R4: anonymous/null-owner proxy token -> 503 WORKSPACE_NOT_CONNECTED end-to-end (exact envelope, verbatim)', async () => {
+  test('R4 (LIN-1448): anonymous/null-owner proxy token -> 503 TOKEN_HAS_NO_OWNER end-to-end (exact envelope, verbatim)', async () => {
     const spy = makeRecordingResolver();
     const { app, proxyTokenStore } = buildApp({ resolveWorkspaceAccess: spy.resolveWorkspaceAccess, provider: fakeLinearProvider() });
     // No createdBy -> legacy/anonymous mint, createdBy: null (LIN-1366's core checkpoint).
@@ -615,13 +653,21 @@ describe('req.proxyCreatedBy route wiring (LIN-1366, Block B)', () => {
 
     const { status, body } = await requestJson(app, '/api/proxy/issues', { token });
 
+    // Still 503, still fail-closed, still non-retryable — only the DIAGNOSIS
+    // changed. Before LIN-1448 this was WORKSPACE_NOT_CONNECTED, the same code a
+    // genuinely disconnected workspace returns, so a worker reading it could not
+    // tell "my credential is broken" from "the workspace is down" (LIN-1576).
     assert.equal(status, 503);
     assert.equal(body.error, 'Workspace not available');
-    assert.equal(body.code, 'WORKSPACE_NOT_CONNECTED');
+    assert.equal(body.code, 'TOKEN_HAS_NO_OWNER');
     assert.equal(body.category, 'config');
     assert.equal(body.retryable, false);
     assert.equal(body.context.workspaceUrlKey, 'acme');
     assert.equal(spy.calls[0].ownerAccountId, null);
+    // The remedy must be in the payload the worker actually reads, and must not
+    // send it down the reconnect-the-workspace path that wasted the outage.
+    assert.match(body.detail, /token/i);
+    assert.doesNotMatch(body.detail, /not connected/i);
   });
 
   test('R5 (LIN-1413): resolveWorkspaceAccess returning owner_mismatch -> 503 WORKSPACE_OWNER_MISMATCH end-to-end (exact envelope, verbatim)', async () => {

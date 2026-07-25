@@ -216,24 +216,40 @@ other bootstrap (see the Workspace API Proxy integration guide).
 }
 ```
 
-**Error Response (503) — dispatch token has no resolvable owner:**
+#### Token ownership, and what an ownerless dispatch token does here
+
+Every dispatch token carries a `createdBy` (the account that created it), stamped at creation.
+A token created before that field existed has `createdBy: null` — an **ownerless** token — and
+this endpoint stamps whatever it finds onto the bootstrap it mints, never fabricating an owner.
+
+That matters because an ownerless bootstrap is **dead on arrival**: it exchanges fine, then
+fails `503 TOKEN_HAS_NO_OWNER` on every workspace-scoped verb (while still returning `200` on
+`/instructions` and `/agent/status`), and anything the resulting session mints inherits the
+same defect. Ownerless tokens minted here were the confirmed cause of a multi-hour halt of
+four autopilot trees on 2026-07-25.
+
+Behaviour is therefore switchable, server-side, via `DISPATCH_OWNERLESS_BROKER_COMPAT`:
+
+| Server setting | Ownerless caller | Owner-stamped caller |
+| --- | --- | --- |
+| default (compat on) | `201`, mints an ownerless bootstrap, logs the hit | `201`, unaffected |
+| `off` | `503` before minting, naming ownership as the cause | `201`, unaffected |
+
+**Error Response (503) — ownerless caller, with the compat lane switched off:**
 ```json
 {
-  "error": "Workspace not available",
-  "code": "WORKSPACE_NOT_CONNECTED",
-  "category": "config",
-  "retryable": false,
-  "detail": "No active session for this workspace; it is not connected.",
-  "context": { "workspaceUrlKey": "workspace-key" }
+  "error": "Dispatch token has no owner (LIN-1448)",
+  "message": "A bootstrap minted for an ownerless dispatch token cannot resolve a workspace credential, so it is refused rather than handed over dead. The workspace itself is unaffected — re-issue this dispatch token from an account that has the workspace connected, then point the runner at the new token."
 }
 ```
 
-Every dispatch token now carries a `createdBy` (the account that created it), stamped at
-creation. A dispatch token created before this field existed has `createdBy: null`; this
-endpoint refuses to mint against a null owner rather than hand back a bootstrap that would
-only fail later at exchange time — re-create the dispatch token to pick up an owner. Callers
-should treat any non-2xx response from this endpoint (including this one) as "mint failed" and
-fall back to their own degraded-but-safe behavior.
+The fix on the consumer side is the same either way: **re-create the dispatch token** while
+signed in (which stamps an owner) and point the consumer at the new value. `GET
+/workspace/:urlKey/api/dispatch/tokens` reports `hasOwner` per token so you can tell which of
+your tokens still need re-issuing — an ownerless one is also flagged on the Dispatch page.
+
+Callers should treat any non-2xx response from this endpoint as "mint failed" and fall back to
+their own degraded-but-safe behavior.
 
 ### Signaling Completion (terminal markers)
 

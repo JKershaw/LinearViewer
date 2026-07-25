@@ -713,12 +713,19 @@ function renderDispatchTokenList(container, tokens, urlKey) {
     const lastUsed = t.lastUsedAt
       ? `last used ${new Date(t.lastUsedAt).toLocaleDateString()}`
       : 'never used'
+    // LIN-1448: an ownerless (pre-LIN-1397) token cannot mint a working broker
+    // bootstrap — anything it mints is dead on arrival at every workspace-scoped
+    // verb. `hasOwner === false` is the signal to re-issue it; older API responses
+    // omit the field entirely, so only an explicit false warns.
+    const ownerless = t.hasOwner === false
+      ? '<span class="token-ownerless" title="Minted before token ownership existed. Tokens it mints cannot access the workspace — re-issue this token and update the consumer.">no owner · re-issue</span>'
+      : ''
 
     return `
       <div class="card token-item" data-token-id="${escapeHtml(t.tokenId)}">
         <div class="token-info">
           <span class="token-label-text">${escapeHtml(t.label)}</span>
-          <div class="token-meta">created ${created} · ${lastUsed}</div>
+          <div class="token-meta">created ${created} · ${lastUsed}${ownerless ? ' · ' : ''}${ownerless}</div>
         </div>
         <button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
       </div>
