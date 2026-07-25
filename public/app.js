@@ -869,8 +869,7 @@ function init() {
   // above (`.inline-issue-trigger`) is SHARED with this create form and stays.
   // ==========================================================================
   document.addEventListener('submit', async (e) => {
-    const createForm = e.target.closest('form[data-inline-create]')
-    const form = createForm
+    const form = e.target.closest('form[data-inline-create]')
     if (!form) return
 
     // Always stop the browser's native navigation for our forms.
