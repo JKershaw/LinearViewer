@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LIN-1412 — Shape A: embedded panel on a shared spine</title>
+
+  <!-- The REAL token layer and the REAL shared chat primitives, not a copy.
+       chat-next.css loads last and is exactly the proposed delta. -->
+  <link rel="stylesheet" href="../../public/style.css" />
+  <link rel="stylesheet" href="../../public/common-actions.css" />
+  <link rel="stylesheet" href="../../public/chat.css" />
+  <link rel="stylesheet" href="./chat-next.css" />
+
+  <script>
+    // The real app applies .theme-dark pre-paint from a persisted preference
+    // (lib/components/page.js). Same hook, seeded from ?theme= for screenshots.
+    (function () {
+      var p = new URLSearchParams(location.search);
+      if (p.get('theme') === 'dark') document.documentElement.classList.add('theme-dark');
+    })();
+  </script>
+
+  <style>
+    /* HOST-PAGE CHROME ONLY — this block is the fake surrounding page, not part
+       of the proposed chat layer. Nothing here would ship. */
+
+    /* style.css declares its faces at root-absolute /fonts/*.woff2, which the
+       server resolves and file:// cannot. Same files, relative path, so the
+       prototype renders in the real Inter/JetBrains Mono rather than fallbacks. */
+    @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url('../../public/fonts/inter-400.woff2') format('woff2'); }
+    @font-face { font-family: 'Inter'; font-weight: 500; font-display: swap; src: url('../../public/fonts/inter-500.woff2') format('woff2'); }
+    @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url('../../public/fonts/inter-600.woff2') format('woff2'); }
+    @font-face { font-family: 'Inter'; font-weight: 700; font-display: swap; src: url('../../public/fonts/inter-700.woff2') format('woff2'); }
+    @font-face { font-family: 'JetBrains Mono'; font-weight: 400; font-display: swap; src: url('../../public/fonts/jetbrains-mono-400.woff2') format('woff2'); }
+    @font-face { font-family: 'JetBrains Mono'; font-weight: 500; font-display: swap; src: url('../../public/fonts/jetbrains-mono-500.woff2') format('woff2'); }
+    @font-face { font-family: 'JetBrains Mono'; font-weight: 600; font-display: swap; src: url('../../public/fonts/jetbrains-mono-600.woff2') format('woff2'); }
+    .proto-banner {
+      border: 1px dashed var(--line);
+      border-radius: var(--radius-sm);
+      padding: var(--space-2) var(--space-3);
+      margin-bottom: var(--space-4);
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+    }
+    .proto-rail {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+      padding-bottom: var(--space-3);
+      border-bottom: 1px dashed var(--line-soft);
+    }
+    .proto-rail button {
+      min-height: 40px;
+      padding: 0 var(--space-2);
+      font-family: var(--font-content);
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      background: none;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+    }
+    .proto-rail button:hover { color: var(--text); border-style: solid; }
+    .proto-facts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+      gap: var(--space-2) var(--space-3);
+      font-family: var(--font-structural);
+      font-size: var(--font-size-sm);
+    }
+    .proto-facts dt { color: var(--muted); }
+    .proto-facts dd { margin: 0 0 var(--space-2); color: var(--text); }
+    .proto-run { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+    .proto-run span.mono { font-family: var(--font-structural); font-size: var(--font-size-sm); color: var(--muted); }
+    .chat-hint { font-family: var(--font-content); font-size: var(--font-size-sm); color: var(--muted); }
+    /* The per-surface retuning seam (public/chat.css:40-42) — unchanged, still
+       the way a host page sets its own density. */
+    #thread { --chat-thread-max-height: 46vh; }
+    .proto-footer {
+      margin-top: var(--space-5);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--line-soft);
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+    }
+    .footer-theme-toggle {
+      font-family: var(--font-content);
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      min-height: 40px;
+      padding: 0 var(--space-2);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <main data-testid="shape-a">
+    <div class="proto-banner">
+      <strong>LIN-1412 · Shape A prototype</strong> — chat as an <em>embedded panel</em> inside a host
+      page, on the proposed shared behaviour layer. The page content above and below the panel is
+      deliberate: it is what makes §3's viewport-anchored input unreachable in this shape.
+    </div>
+
+    <header class="page-header">
+      <h1>Session · lin-1412-chat-design</h1>
+      <p class="page-header__subtitle">4 runs · claude-opus-5 · started 19:15</p>
+    </header>
+
+    <section class="section section--boxed">
+      <h2 class="section-header">Overview</h2>
+      <dl class="proto-facts">
+        <div><dt>runtime</dt><dd>12m 04s</dd></div>
+        <div><dt>runs</dt><dd>4</dd></div>
+        <div><dt>model</dt><dd>claude-opus-5</dd></div>
+        <div><dt>workspace</dt><dd>LinearViewer</dd></div>
+      </dl>
+    </section>
+
+    <section class="section section--boxed">
+      <h2 class="section-header">Runs</h2>
+      <div class="proto-run"><span class="status-pill status-pill--done">✓ done</span><span class="mono">run 1 · research · 3m 41s</span></div>
+      <div class="proto-run"><span class="status-pill status-pill--done">✓ done</span><span class="mono">run 2 · research · 4m 02s</span></div>
+      <div class="proto-run"><span class="status-pill status-pill--in-progress">◐ running</span><span class="mono">run 3 · design · 2m 18s</span></div>
+    </section>
+
+    <!-- ── the chat panel ────────────────────────────────────────────────── -->
+    <section class="section section--boxed" data-testid="chat-panel">
+      <h2 class="section-header">Conversation</h2>
+
+      <div class="proto-rail" data-testid="proto-rail">
+        <button type="button" data-scene="empty">empty</button>
+        <button type="button" data-scene="populated">populated</button>
+        <button type="button" data-scene="thinking">thinking → streaming</button>
+        <button type="button" data-scene="long">long stream (scroll proof)</button>
+        <button type="button" data-scene="error">error + retry</button>
+        <button type="button" data-scene="limited">rate-limited</button>
+      </div>
+
+      <ul class="chat-thread" id="thread" data-testid="chat-thread"></ul>
+
+      <p class="emptyState" id="empty" data-testid="chat-empty">○ ask this session anything — "what changed in run 3?", "why is the scroll check wrong?", "what is left to do?"</p>
+
+      <div class="chat-composer" data-testid="chat-composer">
+        <textarea class="chat-composer__input" id="composer-input" rows="1"
+                  placeholder="Message the session…" aria-label="Message the session"></textarea>
+        <div class="chat-composer__actions">
+          <button type="button" class="chat-composer__send" data-chat-send data-testid="chat-send">Send</button>
+          <span class="chat-hint">Enter sends · Shift+Enter for a newline</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Content BELOW the composer. Task Chat has exactly this (a "Saved chats"
+         section under its ask bar, lib/render-task-chat.js:105) and it is the
+         structural reason Shape A can never anchor the input to the viewport. -->
+    <section class="section section--boxed">
+      <h2 class="section-header">Task context</h2>
+      <p class="proto-facts" style="font-family: var(--font-content)">
+        LIN-1412 — Chat Interface Design. Brief and recap panels, the saved-chat list and the
+        per-run reply boxes all live below the conversation on the real surfaces.
+      </p>
+    </section>
+
+    <div class="proto-footer">
+      <button type="button" class="footer-theme-toggle">theme: light</button>
+      &nbsp; prototype · no server · <code>plans/lin-1412-design-notes.md</code>
+    </div>
+  </main>
+
+  <!-- Real vendored markdown + sanitizer, real client primitives, real chat.js. -->
+  <script src="../../public/marked.min.js"></script>
+  <script src="../../public/purify.min.js"></script>
+  <script src="../../public/common.js"></script>
+  <script src="../../public/chat.js"></script>
+  <script src="./chat-next.js"></script>
+  <script src="./mock-agent.js"></script>
+  <script src="./scenes.js"></script>
+
+  <script>
+  (function () {
+    'use strict';
+
+    // Shape A supplies its own elements; scenes.js owns the conversation, the
+    // states and the transport wiring, identically for both shapes.
+    var app = window.ChatScenes.init({
+      thread: document.getElementById('thread'),
+      composer: document.querySelector('.chat-composer'),
+      input: document.getElementById('composer-input'),
+      send: document.querySelector('[data-chat-send]'),
+      empty: document.getElementById('empty')
+    });
+
+    document.querySelector('[data-testid="proto-rail"]').addEventListener('click', function (e) {
+      var s = e.target.getAttribute('data-scene');
+      if (s) app.run(s);
+    });
+
+    var wanted = new URLSearchParams(location.search).get('scene');
+    if (wanted) app.run(wanted);
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>LIN-1412 — Shape B: viewport-anchored full-page chat</title>
+
+  <!-- Identical to Shape A: the real token layer, the real shared chat
+       primitives, and the same proposed delta. Only the layout differs. -->
+  <link rel="stylesheet" href="../../public/style.css" />
+  <link rel="stylesheet" href="../../public/common-actions.css" />
+  <link rel="stylesheet" href="../../public/chat.css" />
+  <link rel="stylesheet" href="./chat-next.css" />
+
+  <script>
+    (function () {
+      var p = new URLSearchParams(location.search);
+      if (p.get('theme') === 'dark') document.documentElement.classList.add('theme-dark');
+    })();
+  </script>
+
+  <style>
+    /* HOST-PAGE CHROME ONLY. Same font re-declaration as Shape A (style.css
+       declares its faces at root-absolute /fonts/*.woff2, which file:// cannot
+       resolve). */
+    @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url('../../public/fonts/inter-400.woff2') format('woff2'); }
+    @font-face { font-family: 'Inter'; font-weight: 500; font-display: swap; src: url('../../public/fonts/inter-500.woff2') format('woff2'); }
+    @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url('../../public/fonts/inter-600.woff2') format('woff2'); }
+    @font-face { font-family: 'Inter'; font-weight: 700; font-display: swap; src: url('../../public/fonts/inter-700.woff2') format('woff2'); }
+    @font-face { font-family: 'JetBrains Mono'; font-weight: 400; font-display: swap; src: url('../../public/fonts/jetbrains-mono-400.woff2') format('woff2'); }
+    @font-face { font-family: 'JetBrains Mono'; font-weight: 500; font-display: swap; src: url('../../public/fonts/jetbrains-mono-500.woff2') format('woff2'); }
+    @font-face { font-family: 'JetBrains Mono'; font-weight: 600; font-display: swap; src: url('../../public/fonts/jetbrains-mono-600.woff2') format('woff2'); }
+
+    /* COST, MADE LITERAL: a full-page chat has to opt OUT of the app's standard
+       page box. public/style.css:293-300 gives every page `padding: --space-5`
+       and `max-width: 120ch; margin: auto`; a viewport-anchored shell cannot
+       live inside that. Every other Harbour page shares that box. */
+    body { padding: 0; max-width: none; margin: 0; overflow: hidden; }
+
+    .protob-head {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      padding: var(--space-2) 0;
+    }
+    .protob-back {
+      font-family: var(--font-content);
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      text-decoration: none;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 var(--space-2);
+    }
+    .protob-title { font-size: 1rem; margin: 0; }
+    .protob-sub {
+      font-family: var(--font-structural);
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      margin: 0;
+    }
+    .protob-note {
+      font-family: var(--font-content);
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      margin: 0 0 var(--space-2);
+      flex-basis: 100%;
+      text-align: left;
+    }
+    .proto-rail {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-1);
+      padding: 0 0 var(--space-2);
+    }
+    .proto-rail button {
+      min-height: 40px;
+      padding: 0 var(--space-2);
+      font-family: var(--font-content);
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      background: none;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+    }
+    .proto-rail button:hover { color: var(--text); border-style: solid; }
+    .chat-hint { font-family: var(--font-content); font-size: var(--font-size-sm); color: var(--muted); }
+    .footer-theme-toggle {
+      font-family: var(--font-content);
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      min-height: 40px;
+      padding: 0 var(--space-2);
+      cursor: pointer;
+      margin-left: auto;
+    }
+  </style>
+</head>
+<body>
+  <main class="chat-page" data-testid="shape-b">
+
+    <!-- region 1: the slim header §3 permits -->
+    <header class="chat-page__header" data-testid="chat-page-header">
+      <div class="chat-page__inner">
+        <div class="protob-head">
+          <a class="protob-back" href="./shape-a.html" data-testid="chat-page-back">← session</a>
+          <h1 class="protob-title">Conversation</h1>
+          <p class="protob-sub">lin-1412-chat-design · run 3</p>
+          <button type="button" class="footer-theme-toggle">theme: light</button>
+          <p class="protob-note">
+            <strong>LIN-1412 · Shape B prototype</strong> — the guide's §3 model. Same conversation,
+            same states, same behaviour layer as Shape A; only the layout differs. The
+            <code>← session</code> link is the IA cost made visible: the run this is about is now a
+            navigation away.
+          </p>
+        </div>
+        <div class="proto-rail" data-testid="proto-rail">
+          <button type="button" data-scene="empty">empty</button>
+          <button type="button" data-scene="populated">populated</button>
+          <button type="button" data-scene="thinking">thinking → streaming</button>
+          <button type="button" data-scene="long">long stream (scroll proof)</button>
+          <button type="button" data-scene="error">error + retry</button>
+          <button type="button" data-scene="limited">rate-limited</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- region 2: the history — the page's one scroller -->
+    <div class="chat-page__body">
+      <div class="chat-page__inner">
+        <ul class="chat-thread" id="thread" data-testid="chat-thread"></ul>
+        <p class="emptyState" id="empty" data-testid="chat-empty">○ ask this session anything — "what changed in run 3?", "why is the scroll check wrong?", "what is left to do?"</p>
+      </div>
+    </div>
+
+    <!-- region 3: the composer, anchored to the viewport bottom -->
+    <footer class="chat-page__footer" data-testid="chat-page-footer">
+      <div class="chat-page__inner">
+        <div class="chat-composer" data-testid="chat-composer">
+          <textarea class="chat-composer__input" id="composer-input" rows="1"
+                    placeholder="Message the session…" aria-label="Message the session"></textarea>
+          <div class="chat-composer__actions">
+            <button type="button" class="chat-composer__send" data-chat-send data-testid="chat-send">Send</button>
+            <span class="chat-hint">Enter sends · Shift+Enter for a newline</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <script src="../../public/marked.min.js"></script>
+  <script src="../../public/purify.min.js"></script>
+  <script src="../../public/common.js"></script>
+  <script src="../../public/chat.js"></script>
+  <script src="./chat-next.js"></script>
+  <script src="./mock-agent.js"></script>
+  <script src="./scenes.js"></script>
+
+  <script>
+  (function () {
+    'use strict';
+
+    // Byte-identical wiring to Shape A — same scenes module, same options.
+    var app = window.ChatScenes.init({
+      thread: document.getElementById('thread'),
+      composer: document.querySelector('.chat-composer'),
+      input: document.getElementById('composer-input'),
+      send: document.querySelector('[data-chat-send]'),
+      empty: document.getElementById('empty')
+    });
+
+    document.querySelector('[data-testid="proto-rail"]').addEventListener('click', function (e) {
+      var s = e.target.getAttribute('data-scene');
+      if (s) app.run(s);
+    });
+
+    var wanted = new URLSearchParams(location.search).get('scene');
+    if (wanted) app.run(wanted);
+  })();
+  </script>
+</body>
+</html>

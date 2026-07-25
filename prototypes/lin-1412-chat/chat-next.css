@@ -1,0 +1,372 @@
+/**
+ * chat-next.css — the PROPOSED additions to public/chat.css (LIN-1412, beat 2).
+ *
+ * Design prototype, not production code. Loaded AFTER the real public/chat.css
+ * so this file is exactly the delta the change would add: nothing here restates
+ * a rule chat.css already gets right (the thread, the speaker pill, the surface
+ * body, the composer layout, the streaming caret and the `--chat-thread-*`
+ * retuning seam all stay as they are).
+ *
+ * Every value is a semantic token or a sanctioned scale step (§13.10). The two
+ * exceptions are stated inline and are the §2 proposal itself.
+ */
+
+/* ── §2 applied: message prose ────────────────────────────────────────────── */
+
+/* The §5 15px floor, KEPT for the text you read. 0.9375rem × 16px = 15px exactly.
+   The chrome you scan — pills, timestamps, notes, the --row/log line — stays at
+   --font-size-sm (0.85em), which is the half of §5 this proposal overrules. */
+.chat-msg__text {
+  font-size: 0.9375rem;
+  /* The 720px column, OVERRULED and replaced: the thread keeps the page's 120ch
+     (code, tables and log rows need it); prose alone takes a ~80ch measure. */
+  max-width: 80ch;
+}
+/* Machine facts stay mono, prose stays sans — the LIN-785/782 split, applied
+   inside a message rather than per-element. Resolves the live disagreement
+   between chat.css (sans) and session.css:321-323 (mono) in favour of sans. */
+.chat-md code,
+.chat-md pre,
+.chat-md kbd,
+.chat-msg__time {
+  font-family: var(--font-structural);
+}
+
+/* ── §3 vertical rhythm: 24px between speakers, 8px within ────────────────── */
+
+/* The thread's own gap supplies the 8px; a turn that opens a new speaker group
+   adds 16px. 8 + 16 = 24 = --space-4, with no value off the scale. */
+.chat-thread { --chat-thread-gap: var(--space-2); }
+.chat-msg + .chat-msg:not(.chat-msg--stacked) { margin-top: var(--space-3); }
+
+/* §4.5 — identity once per group: a stacked turn drops its pill and timestamp
+   but keeps the body aligned with the group above it. */
+.chat-msg--stacked > .chat-msg__who,
+.chat-msg--stacked > .chat-msg__time { display: none; }
+
+/* ── §9 jump-to-latest ────────────────────────────────────────────────────── */
+
+.chat-thread-frame { position: relative; }
+
+.chat-jump {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  z-index: var(--z-base);
+  min-height: 40px;                      /* Harbour's own floor (LIN-786) */
+  padding: 0 var(--space-3);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: background var(--motion-fast) ease-out;
+}
+.chat-jump:hover { background: var(--inset); }
+.chat-jump[hidden] { display: none; }
+
+/* Announcements are for assistive tech, not for the eye. */
+.chat-status {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── §8 message entrance ──────────────────────────────────────────────────── */
+
+/* --motion-base (240ms) rather than a one-off 180ms token: §13.10 outranks a
+   40ms deviation from §8's 150–200ms. Neutralised by the global
+   prefers-reduced-motion block in public/style.css:335-342. */
+.chat-msg { animation: chat-msg-in var(--motion-base) ease-out both; }
+@keyframes chat-msg-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── §4 rendered markdown ─────────────────────────────────────────────────── */
+
+/* The gap `.markdown-content` was supposed to fill and never did — it matches
+   no rule in the repo (public/session.css:319 is a comment). */
+.chat-md > :first-child { margin-top: 0; }
+.chat-md > :last-child { margin-bottom: 0; }
+.chat-md h1, .chat-md h2, .chat-md h3, .chat-md h4 {
+  font-family: var(--font-content);
+  font-size: 1rem;
+  line-height: 1.4;
+  margin: var(--space-3) 0 var(--space-2);
+}
+.chat-md h3, .chat-md h4 { font-size: 0.9375rem; color: var(--muted); }
+.chat-md p { margin: 0 0 var(--space-2); }
+.chat-md ul, .chat-md ol { margin: 0 0 var(--space-2); padding-left: var(--space-4); }
+.chat-md li { margin-bottom: var(--space-1); }
+/* marked emits <p> inside a loose list item; without this the list breathes
+   twice and the rhythm stops being the scale's. */
+.chat-md li > p { margin: 0; }
+.chat-md a { color: var(--brand); }
+.chat-md blockquote {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+}
+.chat-md code {
+  font-size: 0.875em;
+  background: var(--inset);
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-sm);
+}
+.chat-md table {
+  border-collapse: collapse;
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-sm);
+}
+.chat-md th, .chat-md td {
+  border: 1px solid var(--line-soft);
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+}
+
+/* ── §4.3 code blocks ─────────────────────────────────────────────────────── */
+
+.chat-code {
+  margin: 0 0 var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--inset);
+  overflow: hidden;
+  /* The block owns the full thread measure even though prose is capped at 80ch. */
+  max-width: 100%;
+}
+.chat-code__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+.chat-code__copy {
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.chat-code__copy:hover { color: var(--text); border-color: var(--line); }
+.chat-code pre {
+  margin: 0;
+  padding: var(--space-2);
+  /* §10 — the wide-code-block case scrolls INSIDE its block. The research
+     flagged public/session.css:310's `overflow-x: hidden` as a clip risk;
+     this is the answer to it. */
+  overflow-x: auto;
+  white-space: pre;
+}
+.chat-code pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+/* ── §4.6 message actions ─────────────────────────────────────────────────── */
+
+/* Absolutely positioned, so a toolbar that is invisible at rest also costs no
+   vertical rhythm — an `opacity: 0` bar still occupies its 40px and silently
+   doubles the gap between turns. */
+.chat-msg { position: relative; }
+.chat-msg__actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: var(--space-1);
+  padding-left: var(--space-2);
+  background: linear-gradient(to right, transparent, var(--bg) var(--space-2));
+  opacity: 0;
+  transition: opacity var(--motion-fast) ease-out;
+}
+.chat-msg:hover .chat-msg__actions,
+.chat-msg:focus-within .chat-msg__actions { opacity: 1; }
+.chat-msg__action {
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.chat-msg__action:hover { color: var(--text); }
+/* Never hidden from the keyboard. */
+@media (pointer: coarse) { .chat-msg__actions { opacity: 1; } }
+
+/* ── §7.5 per-turn error + Retry ──────────────────────────────────────────── */
+
+.chat-msg--failed .chat-msg__body.surface {
+  border-color: var(--red);
+  background: color-mix(in srgb, var(--red) 8%, var(--card));
+}
+.chat-msg__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--red);
+}
+.chat-msg__retry {
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* §7.6 — blocked input says why, and keeps the draft. */
+.chat-notice {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--amber);
+}
+.chat-notice[hidden] { display: none; }
+
+/* ── §6 composer ──────────────────────────────────────────────────────────── */
+
+.chat-composer__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-2);
+  font-family: var(--font-content);
+  font-size: 0.9375rem;                  /* same 15px floor as message prose */
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  resize: none;                          /* §6.1 — it grows itself */
+  overflow-y: hidden;
+}
+/* §6.7 — the global :focus-visible ring (public/style.css:330-333) is inherited,
+   never suppressed. A border change may accompany it; it may not replace it. */
+.chat-composer__input:focus-visible { border-color: var(--brand); }
+
+/* §6.8 — Harbour's own 40px floor (LIN-786), which today's chat send buttons
+   miss at ~24px. Scoped to the chat send, NOT to the shared .action-btn, which
+   dispatch/proxy/settings/audit also use. */
+.chat-composer__send {
+  min-height: 40px;
+  min-width: 40px;
+  padding: 0 var(--space-3);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
+}
+.chat-composer__send:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
+.chat-composer__send:disabled { opacity: 0.45; cursor: default; }
+/* §6.4 — Stop is the same control, renamed, and it is never dimmed. */
+.chat-composer__send[data-mode="stop"] {
+  color: var(--red);
+  border-color: var(--red);
+  opacity: 1;
+}
+
+/* §10 — full width with comfortable padding on small screens. */
+@media (max-width: 600px) {
+  .chat-msg__text { max-width: 100%; }
+  .chat-composer--inline { flex-direction: column; align-items: stretch; }
+  .chat-composer--inline .chat-composer__send { width: 100%; }
+}
+
+/* ── §3 the anchored full-page variant (Shape B) ──────────────────────────── */
+
+/* Opt-in, exactly like `.chat-thread--log` and `.chat-composer--inline`: a
+   surface adds `.chat-page` and gets the guide's three-region model — slim
+   header, the thread as the only scroller, the composer anchored to the
+   viewport bottom. A surface that does not opt in is unaffected.
+
+   `100dvh` rather than `100vh` is the §10 mobile-keyboard mechanism: the
+   dynamic viewport unit shrinks when the on-screen keyboard opens, so the
+   composer row stays above it instead of being pushed behind it. */
+.chat-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--bg);
+}
+.chat-page__inner {
+  width: 100%;
+  max-width: 120ch;
+  margin: 0 auto;
+  padding: 0 var(--space-3);
+  box-sizing: border-box;
+}
+
+.chat-page__header {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+/* The thread row: the ONE scroller on the page. The shared
+   `--chat-thread-max-height` cap is released here — in this shape the thread
+   is not a panel with a height, it is the page. */
+/* `min-width: 0` at every level is load-bearing, not defensive tidying: a flex
+   item defaults to `min-width: auto`, so it refuses to shrink below its
+   content's intrinsic width — and a `<pre>` with `white-space: pre` has a huge
+   one. Without these the whole shell is dragged wider than the viewport by one
+   long code line, and the page clips horizontally on mobile. */
+.chat-page__body { min-height: 0; min-width: 0; display: flex; }
+.chat-page__body > .chat-page__inner { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.chat-page__body .chat-thread-frame { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.chat-page__body .chat-thread {
+  min-width: 0;
+  --chat-thread-max-height: none;
+  --chat-thread-margin: 0;
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3) 0 var(--space-4);
+}
+
+/* §3's "~120px bottom padding so the last message clears the input bar" is
+   deliberately NOT reproduced. That rule exists because the guide assumes an
+   input that OVERLAYS the scroll container; here the composer is its own grid
+   row, so the last message can never be behind it and 120px of dead space
+   would just be dead space. What the rule is actually protecting — the last
+   message being readable — is asserted directly in verify.mjs instead. */
+.chat-page__footer {
+  border-top: 1px solid var(--line-soft);
+  padding-top: var(--space-3);
+  /* §10 — clear the home indicator / gesture bar on a touch device. */
+  padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
+  background: var(--bg);
+}
+
+/* The jump-to-latest sits above the composer row, not over it. */
+.chat-page__body .chat-jump { bottom: var(--space-4); }
