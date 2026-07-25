@@ -88,6 +88,19 @@ describe('renderTaskEditPage — the four v1 fields', () => {
       'submit button ships disabled');
   });
 
+  test('the title field is focused on arrival, and it is the ONLY autofocus', () => {
+    // The ticket's own metric is "interactions before you can type": without
+    // this the page arrives with focus on <body>, which is no better than the
+    // inline form it replaced (that one focused its first control from JS).
+    // Server-rendered, so it holds during the pre-arm window above too.
+    const html = render();
+    assert.ok(/<input[^>]*data-testid="task-edit-title"[^>]*>/.test(html));
+    const titleInput = html.match(/<input[^>]*data-testid="task-edit-title"[^>]*>/)[0];
+    assert.ok(/\sautofocus[\s>]/.test(titleInput), 'the title input carries autofocus');
+    // A second autofocus would make which field wins browser-dependent.
+    assert.strictEqual((html.match(/\sautofocus[\s>]/g) || []).length, 1);
+  });
+
   test('links back to the dashboard from both the breadcrumb and Cancel', () => {
     const html = render();
     assert.ok(html.includes('href="/workspace/acme/" data-testid="task-edit-back"'));
