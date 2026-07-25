@@ -322,6 +322,47 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await expect(page.locator('.next-run-direction-summary')).toContainText('next ranked item');
     });
 
+    // LIN-1566 review F1. The chooser is driven by mouse everywhere else in this
+    // file, and that modality gap is exactly what shipped a focus bug: activating a
+    // chip used to repaint the row via innerHTML, destroying the focused element and
+    // dropping focus to <body> — so a keyboard user was thrown back to chip 0 on
+    // every switch, with nothing for an AT to announce the swap against. These two
+    // tests pin the behaviour (focus survives activation), not the implementation.
+    test('keyboard activation switches direction AND keeps focus on the chip (F1)', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+      const chips = page.locator('.next-run-direction');
+      await expect(chips.first()).toBeVisible({ timeout: 5000 });
+
+      await chips.nth(1).focus();
+      await expect(chips.nth(1)).toBeFocused();
+
+      await page.keyboard.press('Enter');
+
+      // The activation worked...
+      await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('.next-run-goal-preview').first()).toContainText('Start TEST-2');
+      // ...and the user is still on the control they just used, not on <body>.
+      await expect(chips.nth(1)).toBeFocused();
+      expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('BUTTON');
+    });
+
+    test('Space activation also preserves focus, and the summary is a live region', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+      const chips = page.locator('.next-run-direction');
+      await expect(chips.first()).toBeVisible({ timeout: 5000 });
+
+      await chips.nth(2).focus();
+      await page.keyboard.press('Space');
+
+      await expect(chips.nth(2)).toHaveAttribute('aria-pressed', 'true');
+      await expect(chips.nth(2)).toBeFocused();
+
+      // Focus does not move to the new goals, so the summary is what announces the
+      // switch. It only announces because the node persists across selections — an
+      // innerHTML-replaced live region is a new node and is not reliably read out.
+      await expect(page.locator('.next-run-direction-summary')).toHaveAttribute('aria-live', 'polite');
+    });
+
     test('continue-until-stopped is offered under every direction and inside none', async ({ page }) => {
       await page.locator('#next-run-generate').click();
       const chips = page.locator('.next-run-direction');

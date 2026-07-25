@@ -204,8 +204,22 @@
   }
 
   // The chooser: one chip per direction (single-select; selection is a click, never
-  // a hover) plus the selected direction's one-line summary. Repainted on every
-  // selection — the click listener is delegated to the container, which persists.
+  // a hover) plus the selected direction's one-line summary.
+  //
+  // Painting is deliberately split in two, and the split is load-bearing for
+  // keyboard access (LIN-1566 review F1). A `<button>` fires `click` on Enter and
+  // Space, so activating a chip from the keyboard runs the same handler a mouse
+  // does. If that handler rebuilt the row via `innerHTML`, it would destroy the very
+  // element the user is focused on — focus falls to `<body>`, and the next Tab throws
+  // them back to chip 0 with nothing for an AT to announce the change against.
+  //
+  // So `renderDirections()` builds the structure ONLY when the direction set itself
+  // changes (a fresh generation), and `syncDirectionSelection()` mutates the existing
+  // nodes in place on every selection. That is the established house pattern —
+  // public/live-console.js:147 and public/ship.js:1197-1202 both toggle `aria-pressed`
+  // on the live node rather than repainting. Do not "simplify" these back into one
+  // innerHTML paint on selection; the keyboard e2e test in tests/e2e/next-run.spec.js
+  // pins the behaviour, not the structure.
   function renderDirections() {
     if (!directionsEl) return;
     if (!currentDirections.length) {
@@ -221,10 +235,29 @@
         '</button>';
     }).join('');
     var current = currentDirections[selectedDirection] || {};
+    // aria-live on the summary: the goals swap without focus moving anywhere new, so
+    // this is the only thing that announces the switch to a screen reader. It works
+    // precisely BECAUSE the node persists — an innerHTML-replaced live region is a
+    // fresh node and is not reliably announced.
     directionsEl.innerHTML =
       '<div class="next-run-direction-row" role="group" aria-label="choose a direction">' + chips + '</div>' +
-      '<p class="next-run-direction-summary">' + escapeHtml(current.summary || '') + '</p>';
+      '<p class="next-run-direction-summary" aria-live="polite">' + escapeHtml(current.summary || '') + '</p>';
     directionsEl.hidden = false;
+  }
+
+  // In-place selection update: no node is removed, so the activated chip keeps focus.
+  function syncDirectionSelection() {
+    if (!directionsEl) return;
+    var chips = directionsEl.querySelectorAll('.next-run-direction');
+    for (var i = 0; i < chips.length; i++) {
+      var index = parseInt(chips[i].getAttribute('data-index'), 10);
+      chips[i].setAttribute('aria-pressed', index === selectedDirection ? 'true' : 'false');
+    }
+    // Not `summaryEl` — that name is already the page's #next-run-summary intro.
+    var directionSummary = directionsEl.querySelector('.next-run-direction-summary');
+    if (directionSummary) {
+      directionSummary.textContent = (currentDirections[selectedDirection] || {}).summary || '';
+    }
   }
 
   function renderOptions(options, directions) {
@@ -446,7 +479,10 @@
       var index = parseInt(chip.getAttribute('data-index'), 10);
       if (isNaN(index) || index === selectedDirection) return;
       selectedDirection = index;
-      renderDirections();
+      // Mutate the chooser in place rather than repainting it — the chip that fired
+      // this event may be the focused element (Enter/Space activation), and removing
+      // it would silently drop focus to <body>. See renderDirections().
+      syncDirectionSelection();
       renderOptionCards(visibleOptions());
     });
   }

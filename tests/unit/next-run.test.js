@@ -574,8 +574,11 @@ describe('resolveDirections (LIN-1566)', () => {
   });
 
   test('matches an option tag to a declared name case-insensitively', () => {
-    const resolved = resolveDirections([opt('FINISH the Migration'), OPEN], DECLARED);
-    assert.deepEqual(resolved.map(d => d.name), ['finish the migration']);
+    // The second (correctly-cased) option is what keeps this above the two-direction
+    // floor, so the assertion is about case-folding and not about the F2 collapse
+    // guard below. Without it a single surviving direction would resolve to [].
+    const resolved = resolveDirections([opt('FINISH the Migration'), opt('clear the blockers'), OPEN], DECLARED);
+    assert.deepEqual(resolved.map(d => d.name), ['finish the migration', 'clear the blockers']);
     assert.deepEqual(resolved[0].optionIndexes, [0]);
   });
 
@@ -593,8 +596,41 @@ describe('resolveDirections (LIN-1566)', () => {
   });
 
   test('drops a declared direction that ends up holding nothing', () => {
-    const resolved = resolveDirections([opt('finish the migration'), OPEN], DECLARED);
-    assert.deepEqual(resolved.map(d => d.name), ['finish the migration']);
+    // Three declared, two tagged: the empty one is dropped and the other two survive,
+    // so the drop is observable without tripping the F2 two-direction floor.
+    const declared = [...DECLARED, { name: 'reduce flake', summary: 'Stabilise CI.' }];
+    const resolved = resolveDirections([opt('finish the migration'), opt('clear the blockers'), OPEN], declared);
+    assert.deepEqual(resolved.map(d => d.name), ['finish the migration', 'clear the blockers']);
+  });
+
+  // ── F2 (LIN-1566 review): a chooser needs something to choose between ──────────
+  // One chip that filters nothing is chrome for a no-op control — the same
+  // degradation the `placed === 0` branch already rejects, reached from the other
+  // side. Both collapse to [] so the page renders its flat list.
+
+  test('a grouping that collapses to ONE direction falls back to the flat list', () => {
+    // Every concrete option carries the same declared tag, nothing reaches the
+    // catch-all, and the second declared direction is dropped as empty — one chip.
+    const resolved = resolveDirections(
+      [opt('finish the migration'), opt('finish the migration'), OPEN],
+      DECLARED
+    );
+    assert.deepEqual(resolved, []);
+  });
+
+  test('one declared direction plus a catch-all is a real choice and survives', () => {
+    // The floor is about usable choices, not about the catch-all being special: one
+    // declared name + a populated catch-all is two chips, so it must NOT collapse.
+    const resolved = resolveDirections([opt('finish the migration'), opt(''), OPEN], DECLARED);
+    assert.deepEqual(resolved.map(d => d.name), ['finish the migration', CATCH_ALL_DIRECTION]);
+  });
+
+  test('a single declared direction holding everything also collapses', () => {
+    const resolved = resolveDirections(
+      [opt('only one'), opt('only one'), OPEN],
+      [{ name: 'only one', summary: 'The sole direction.' }]
+    );
+    assert.deepEqual(resolved, []);
   });
 
   test('the continue-until-stopped option is in NO direction (A4)', () => {
