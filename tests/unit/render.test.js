@@ -1090,3 +1090,82 @@ describe('Per-task Chat deep-link (LIN-1007)', () => {
       'identifier falls back to issue.id (matches the sibling sections)');
   });
 });
+
+// =============================================================================
+// Task-edit link gate (LIN-1565)
+// =============================================================================
+//
+// The edit affordance in a task's Details panel used to be an inline form; it is
+// now a link to the dedicated task-edit page. The GATE did not change — it is
+// still `provider.ui.inlineEdit`, read off `ui.*` exclusively per the LIN-177
+// convention — but nothing pinned it before, so a regression in either the gate
+// or the href would have been silent. The page's route reads the SAME flag
+// (tests/unit/task-edit-route.test.js), so these two suites together assert the
+// link and its destination can never disagree about who may edit.
+
+describe('task-edit link (LIN-1565)', () => {
+  let seq = 0;
+  function providerWith(inlineEdit) {
+    const name = `edit-gate-stub-${++seq}`;
+    registerProvider({
+      name,
+      ui: { write: true, comments: true, inlineEdit, displayName: 'Stub Tracker' },
+    });
+    return { name, ui: { write: true, comments: true, inlineEdit, displayName: 'Stub Tracker' } };
+  }
+  const issue = {
+    id: 'issue-uuid-1',
+    identifier: 'STB-7',
+    title: 'A task',
+    state: { type: 'started' },
+    labels: { nodes: [] },
+  };
+  function render(inlineEdit, opts = {}) {
+    return renderDetailsContent(issue, {
+      isLanding: false, urlKey: 'ws', provider: providerWith(inlineEdit), ...opts
+    });
+  }
+
+  test('inlineEdit true ⇒ the link renders with the right href', () => {
+    const html = render(true);
+    assert.ok(html.includes('data-testid="issue-edit-link"'), 'edit link present');
+    assert.ok(html.includes('href="/workspace/ws/task/issue-uuid-1/edit"'),
+      'href points at the task-edit page for this issue');
+  });
+
+  test('inlineEdit false ⇒ no link at all', () => {
+    const html = render(false);
+    assert.ok(!html.includes('issue-edit-link'), 'no edit affordance for a read-only provider');
+    assert.ok(!html.includes('/edit"'), 'no edit href leaks through');
+  });
+
+  test('the landing page never renders the link', () => {
+    const html = renderDetailsContent(issue, {
+      isLanding: true, urlKey: 'ws', provider: providerWith(true)
+    });
+    assert.ok(!html.includes('issue-edit-link'));
+  });
+
+  test('no urlKey ⇒ no link (there is no page to link to)', () => {
+    const html = renderDetailsContent(issue, {
+      isLanding: false, urlKey: null, provider: providerWith(true)
+    });
+    assert.ok(!html.includes('issue-edit-link'));
+  });
+
+  test('urlKey and issue id are URL-encoded in the href', () => {
+    const spicy = { id: 'a b/1', identifier: 'A B/1', title: 'Spicy', state: { type: 'started' }, labels: { nodes: [] } };
+    const html = renderDetailsContent(spicy, {
+      isLanding: false, urlKey: 'w s/k', provider: providerWith(true)
+    });
+    assert.ok(html.includes('href="/workspace/w%20s%2Fk/task/a%20b%2F1/edit"'),
+      'urlKey and issue id are percent-encoded, no raw spaces or slashes');
+  });
+
+  test('the inline edit FORM is gone — only the link remains', () => {
+    const html = render(true);
+    assert.ok(!html.includes('data-inline-edit'), 'no inline edit form markup');
+    assert.ok(!html.includes('edit-issue-trigger'), 'no inline edit toggle');
+    assert.ok(!html.includes('edit-issue-form'), 'no inline edit form');
+  });
+});
