@@ -139,7 +139,11 @@ describe('REFUSE: write endpoints reject a trashed target with 409 (surfaces 3, 
   test('a shared refuseIfTrashed guard exists and returns 409', () => {
     assert.match(proxySource, /async function refuseIfTrashed/);
     const start = proxySource.indexOf('async function refuseIfTrashed');
-    const body = proxySource.slice(start, start + 400);
+    // 600, not 400: LIN-1559 prepended the missing-read backstop line ahead of
+    // the guard read, pushing the 409 refusal past a 400-char window. The
+    // assertions below are what this test protects; the window is just how far it
+    // reads to find them.
+    const body = proxySource.slice(start, start + 600);
     assert.match(body, /status\(409\)|jsonError\(res, 409/, 'refusal must be a 409');
     assert.match(body, /isTrashed\(issue\)/);
   });

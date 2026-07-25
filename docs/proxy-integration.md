@@ -1476,6 +1476,8 @@ Note for aggregating consumers: `feedbackCount` is no longer additive across row
 | 403 | `This endpoint requires a read-write token` | Write endpoint called with read-only token |
 | 404 | `Issue not found` / `Cycle not found` | Resource doesn't exist — or, on the task-automation context endpoints, the target is trashed |
 | 409 | `Issue is trashed; refusing to modify a deleted issue` | Write target is a trashed (soft-deleted) issue |
+| 422 | `This workspace's provider does not support this` (`code: CAPABILITY_NOT_SUPPORTED`) | The workspace's backend cannot perform this operation. `capability` names the specific provider operation that is missing — sometimes the write itself (`createRelation`, `uploadFile`), sometimes an internal read the write depends on. **Never retryable, and never a 500** — branch on `code`, not on the `capability` value, and treat any value as "this backend can't do this". |
+| 422 | `Cannot resolve <kind> '<ref>'` | A symbolic reference (state / label / project / team) could not be resolved against this workspace's backend; `candidates` lists the accepted values when the ref was ambiguous or the vocabulary is small. **Never retryable** — fix the reference. |
 | 429 | `Too many proxy requests` | Rate limit exceeded (60/minute) |
 | 500 | `Failed to ...` | Server error |
 | 502 | `Failed to ...` | Upstream write was rejected (the create/update did not land) |

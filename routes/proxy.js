@@ -715,6 +715,40 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   }
 
   /**
+   * Backstop for the ROUTE-INTERNAL reads a write path calls unconditionally —
+   * `issueWriteGuard` / `issueDescription` / `issueLabels` / `updateIssueLabels`
+   * (LIN-1559).
+   *
+   * These are deliberately OFF the declared PROVIDER_SURFACE (route-internal
+   * data-fetch, not capabilities), so `denyIfUnsupported` cannot gate them:
+   * `supports()` is false for all four on EVERY provider, Linear included. Keyed
+   * on plain method EXISTENCE instead, which is the property the route actually
+   * depends on. A provider that passes the capability gate for the write itself
+   * but lacks the read used to guard it previously threw a TypeError inside the
+   * route's `try` and surfaced as a 500 "Linear API request failed" — a server
+   * error, naming the wrong backend, for a request that can never succeed. This
+   * is how the GitHub bug arose, so the guard is deliberately per-method and
+   * provider-agnostic: any future provider that implements a write without its
+   * guard reads declines cleanly instead of 500ing.
+   *
+   * Reuses `denyIfUnsupported`'s exact 422 CAPABILITY_NOT_SUPPORTED envelope +
+   * audit write, so callers see one decline shape for "this workspace's provider
+   * cannot do this", whichever half is missing.
+   *
+   * @returns {boolean} true if a decline response was sent (caller returns early)
+   */
+  function denyIfMissingRead(activeProvider, method, req, res, endpoint) {
+    if (typeof activeProvider?.[method] === 'function') return false;
+    logEvent(req, endpoint, 422);
+    jsonError(res, 422, `This workspace's provider does not support this`, {
+      code: 'CAPABILITY_NOT_SUPPORTED',
+      capability: method,
+      provider: activeProvider?.name,
+    });
+    return true;
+  }
+
+  /**
    * Helper to log a proxy event (fire and forget). `note` is an optional
    * free-text breadcrumb (e.g. the free-tier key-source signal from LIN-961);
    * it is additive and leaves the numeric `status` untouched.
@@ -2266,6 +2300,8 @@ One convention across every endpoint, so you can branch on the same fields every
    * not-found error maps to the usual status, preserving existing behaviour.
    */
   async function refuseIfTrashed(activeProvider, token, issueId, req, res, endpoint) {
+    // Site 1 (LIN-1559). Returning true also serves the caller's early return.
+    if (denyIfMissingRead(activeProvider, 'issueWriteGuard', req, res, endpoint)) return true;
     const issue = await activeProvider.issueWriteGuard(token, issueId);
     if (isTrashed(issue)) {
       logEvent(req, endpoint, 409);
@@ -2311,6 +2347,7 @@ One convention across every endpoint, so you can branch on the same fields every
       // LIN-556: one guard read serves both the trashed refusal AND the team
       // scope a symbolic stateId needs (e.g. `done` → the team's completed
       // state). Replaces the former post-build refuseIfTrashed call.
+      if (denyIfMissingRead(provider, 'issueWriteGuard', req, res, '/api/proxy/issues/:id')) return; // site 2
       const guard = await provider.issueWriteGuard(token, issueId);
       if (isTrashed(guard)) {
         logEvent(req, '/api/proxy/issues/:id', 409);
@@ -2371,6 +2408,8 @@ One convention across every endpoint, so you can branch on the same fields every
       logEvent(req, endpoint, 400);
       return badRequest.json(res, 'Invalid issue ID format');
     }
+
+    if (denyIfMissingRead(provider, 'issueDescription', req, res, endpoint)) return; // site 3
 
     let newDescription;
     try {
@@ -2618,6 +2657,7 @@ One convention across every endpoint, so you can branch on the same fields every
       // could reference it — an orphaned, wasted Linear asset per call.
       const bodyBudget = body ? body.length + 2 : 0; // "\n\n" separator before the embed
       if (resolvedTarget === 'description') {
+        if (denyIfMissingRead(provider, 'issueDescription', req, res, endpoint)) return; // site 4
         const issue = await provider.issueDescription(token, issueId);
         if (!issue) {
           logEvent(req, endpoint, 404);
@@ -2776,6 +2816,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const resolvedLabelId = await resolveLabelInput(provider, token, labelId);
 
       // Fetch current labels (the read half of the label read-modify-write).
+      if (denyIfMissingRead(provider, 'issueLabels', req, res, '/api/proxy/issues/labels')) return; // site 5
       const issue = await provider.issueLabels(token, issueId);
       if (!issue) {
         logEvent(req, '/api/proxy/issues/labels', 404);
@@ -2792,6 +2833,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return res.json({ success: true, message: 'Label already present' });
       }
 
+      if (denyIfMissingRead(provider, 'updateIssueLabels', req, res, '/api/proxy/issues/labels')) return; // site 6
       const issueUpdate = await provider.updateIssueLabels(token, issueId, [...currentLabelIds, resolvedLabelId]);
       if (writeRejected(req, res, '/api/proxy/issues/labels', issueUpdate, 'Label was not added')) return;
       flattenIssue(issueUpdate.issue);
@@ -2830,6 +2872,7 @@ One convention across every endpoint, so you can branch on the same fields every
       const resolvedLabelId = await resolveLabelInput(provider, token, labelId);
 
       // Fetch current labels (the read half of the label read-modify-write).
+      if (denyIfMissingRead(provider, 'issueLabels', req, res, '/api/proxy/issues/labels')) return; // site 7
       const issue = await provider.issueLabels(token, issueId);
       if (!issue) {
         logEvent(req, '/api/proxy/issues/labels', 404);
@@ -2848,6 +2891,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return res.json({ success: true, message: 'Label not present' });
       }
 
+      if (denyIfMissingRead(provider, 'updateIssueLabels', req, res, '/api/proxy/issues/labels')) return; // site 8
       const issueUpdate = await provider.updateIssueLabels(token, issueId, filtered);
       if (writeRejected(req, res, '/api/proxy/issues/labels', issueUpdate, 'Label was not removed')) return;
       flattenIssue(issueUpdate.issue);
