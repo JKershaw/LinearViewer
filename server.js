@@ -101,6 +101,7 @@ import { createDashboardRoutes, sessionIsTerminal } from './routes/dashboard.js'
 import { createSessionsFeedCache } from './lib/sessions-feed-cache.js'
 import { fetchIssueContext } from './lib/linear.js'
 import { createTaskChatRoutes } from './routes/task-chat.js'
+import { createTaskEditRoutes } from './routes/task-edit.js'
 import { createNextRunRoutes } from './routes/next-run.js'
 import { createLiveConsoleRoutes } from './routes/live-console.js'
 import { createFlightCompanionRoutes } from './routes/flight-companion.js'
@@ -1555,6 +1556,11 @@ app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatu
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore }))
+
+// Mount the task-edit page (LIN-1565) — the dedicated drill-down that replaces
+// the inline edit form formerly hidden inside a tree row's Details panel. No
+// feature flag: it is a drill-down page, gated only on the provider's ui.inlineEdit.
+app.use(createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
 
 // Mount next-run routes (experimental "suggest the next autopilot run" — LIN-603).
 app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, reportHistoryStore }))

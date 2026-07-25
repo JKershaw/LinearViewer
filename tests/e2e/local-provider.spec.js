@@ -101,26 +101,40 @@ test.describe('Local provider (no test-token mock)', () => {
     await expect(page.locator('.in-progress-items .line', { hasText: CREATE_TITLE }).first()).toBeAttached();
   });
 
-  test('in-app edit form updates an existing task title + state and it persists', async ({ page }) => {
-    const NEW_TITLE = 'Edited via inline form';
+  // LIN-1565 ported this from the inline form (which no longer exists) onto the
+  // dedicated task-edit page. Same two persistence assertions, read back through
+  // the same Local provider seam — but ONE interaction from the row to a focused
+  // edit field instead of four, and a real state <select> instead of a free-text
+  // box. Selects through the page's `data-testid` contract only.
+  test('task-edit page updates an existing task title + state and it persists', async ({ page }) => {
+    const NEW_TITLE = 'Edited via the task edit page';
 
     // Expand the seeded In Progress parent, then open its Details section (the
-    // edit affordance lives inside the collapsed Details content).
+    // edit link lives inside the collapsed Details content, beside Comments).
     await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
     await page.locator('.detail-toggle[data-toggle="details"]').first().click();
-    const trigger = page.locator('[data-testid="edit-issue-trigger"]').first();
-    await expect(trigger).toBeVisible();
-    await trigger.click();
-    const form = page.locator('[data-testid="edit-issue-form"]').first();
+
+    // One click: the link navigates to the task's own edit page.
+    await page.locator('[data-testid="issue-edit-link"]').first().click();
+    const form = page.locator('[data-testid="task-edit-form"]');
     await expect(form).toBeVisible();
 
     // Rename and move it to Done (a full-body description PATCH rides along).
-    await form.locator('[data-testid="edit-issue-title"]').fill(NEW_TITLE);
-    await form.locator('[data-testid="edit-issue-stateId"]').fill('Done');
+    // The Local provider implements states(), so State is a real <select> whose
+    // option values are LOCAL_STATES names — selectOption asserts that too.
+    await form.locator('[data-testid="task-edit-title"]').fill(NEW_TITLE);
+    await form.locator('[data-testid="task-edit-stateId"]').selectOption('Done');
 
-    await form.locator('[data-testid="edit-issue-submit"]').click();
+    await form.locator('[data-testid="task-edit-submit"]').click();
     await page.waitForLoadState('networkidle');
 
+    // Saving returns to the dashboard, which re-reads through the provider.
+    // Assert the NAVIGATION, not the tree's shape: this test moves the only
+    // in-progress task to Done, and renderInProgressSection returns '' when it
+    // has nothing to show — so the In Progress section is legitimately absent
+    // here, and keying on it would make the check order-dependent on whichever
+    // sibling test last left a started task in the partition.
+    await expect(page).toHaveURL(/\/workspace\/[^/]+\/$/);
     // Title persisted: the old title is gone, the new one renders.
     await expect(page.locator('.line', { hasText: 'Local parent task' })).toHaveCount(0);
     await expect(page.locator('.line', { hasText: NEW_TITLE }).first()).toBeAttached();

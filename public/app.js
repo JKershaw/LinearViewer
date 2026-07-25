@@ -853,21 +853,23 @@ function init() {
   })
 
   // ==========================================================================
-  // LIN-1553: in-app create / edit issue submit. One delegated `submit` listener
-  // (bound once here in init(), same discipline as the click delegation above)
-  // handles every create/edit form — including forms rendered after load — so
-  // there is no per-form binding and no way to double-bind on re-render. The
-  // markup contract (data-inline-create / data-inline-edit, field `name`s,
-  // data-url-key / data-issue-id, [data-inline-status]) is what beat 2's render
-  // emits. Requests hit the Session A session-auth routes and, on success, the
-  // page reloads — matching the reload-after-write convention used elsewhere
-  // (e.g. the feedback widget). window.api (common.js, loaded before app.js)
-  // surfaces errors via toast and throws on non-2xx.
+  // LIN-1553: in-app create issue submit. One delegated `submit` listener (bound
+  // once here in init(), same discipline as the click delegation above) handles
+  // every create form — including forms rendered after load — so there is no
+  // per-form binding and no way to double-bind on re-render. The markup contract
+  // (data-inline-create, field `name`s, data-url-key, [data-inline-status]) is
+  // what render.js emits. Requests hit the Session A session-auth routes and, on
+  // success, the page reloads — matching the reload-after-write convention used
+  // elsewhere (e.g. the feedback widget). window.api (common.js, loaded before
+  // app.js) surfaces errors via toast and throws on non-2xx.
+  //
+  // The EDIT half of this handler moved to public/task-edit.js in LIN-1565, along
+  // with the form it drove: editing is its own page now, so its one form is on
+  // the page at load and needs no delegation. NOTE the reveal-toggle handler
+  // above (`.inline-issue-trigger`) is SHARED with this create form and stays.
   // ==========================================================================
   document.addEventListener('submit', async (e) => {
-    const createForm = e.target.closest('form[data-inline-create]')
-    const editForm = e.target.closest('form[data-inline-edit]')
-    const form = createForm || editForm
+    const form = e.target.closest('form[data-inline-create]')
     if (!form) return
 
     // Always stop the browser's native navigation for our forms.
@@ -900,42 +902,23 @@ function init() {
     try {
       setStatus('Saving…')
 
-      if (createForm) {
-        // POST /workspace/:urlKey/api/issues — v1 create body (routes/
-        // workspace-api.js:2540). The route ignores empty-string optionals
-        // (`if (description)` etc.) and rejects a missing title/teamId with 400.
-        const body = {
-          title: val('title'),
-          description: val('description'),
-          teamId: val('teamId'),
-          projectId: val('projectId'),
-          stateId: val('stateId'),
-          priority: Number(val('priority')),
-        }
-        await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/issues`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          toastOnError: true,
-        })
-      } else {
-        // PATCH /workspace/:urlKey/api/issues/:issueId — v1 edit body (routes/
-        // workspace-api.js:2600). `description` is the FULL body from the
-        // textarea (a full-body replace); `stateId` accepts a state name/keyword.
-        const issueId = editForm.dataset.issueId
-        const body = {
-          title: val('title'),
-          description: val('description'),
-          stateId: val('stateId'),
-          priority: Number(val('priority')),
-        }
-        await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/issues/${encodeURIComponent(issueId)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          toastOnError: true,
-        })
+      // POST /workspace/:urlKey/api/issues — v1 create body (routes/
+      // workspace-api.js). The route ignores empty-string optionals
+      // (`if (description)` etc.) and rejects a missing title/teamId with 400.
+      const body = {
+        title: val('title'),
+        description: val('description'),
+        teamId: val('teamId'),
+        projectId: val('projectId'),
+        stateId: val('stateId'),
+        priority: Number(val('priority')),
       }
+      await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/issues`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        toastOnError: true,
+      })
 
       // Refresh the view so the mutation is reflected (reload-after-write).
       setStatus('Saved. Refreshing…')
