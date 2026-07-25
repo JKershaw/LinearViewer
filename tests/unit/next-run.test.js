@@ -29,6 +29,10 @@ import {
   CONTINUE_UNTIL_STOPPED_OPTION,
   REQUIRED_SIZES,
   TSHIRT_SIZES,
+  resolveDirections,
+  MAX_DIRECTIONS,
+  MAX_GENERATED_OPTIONS,
+  CATCH_ALL_DIRECTION,
 } from '../../lib/next-run.js';
 import { buildRoadmapModel } from '../../lib/roadmap.js';
 
@@ -307,6 +311,50 @@ describe('NEXT_RUN_SYSTEM_PROMPT alignment ranking (LIN-779)', () => {
   });
 });
 
+describe('NEXT_RUN_SYSTEM_PROMPT direction guidance (LIN-1566)', () => {
+  test('asks for 2-3 named directions and a verbatim per-option tag', () => {
+    const system = buildNextRunMessages(MODEL)[0].content;
+    // The schema carries the grouping axis…
+    assert.match(system, /"directions"/);
+    assert.match(system, /"direction":\s+string/);
+    // …and the rules pin the count, the inference, and the verbatim tag.
+    assert.match(system, /2-3 "directions"/);
+    assert.match(system, /Infer them from the provided state/);
+    assert.match(system, /copied verbatim/);
+  });
+
+  test('states the total option cap, so a 3x3 reply cannot be silently truncated', () => {
+    // parseNextRunResponse slices at MAX_GENERATED_OPTIONS. Without this rule a
+    // model reading "2-3 directions x 2-3 options" could return 9 and lose its
+    // last direction entirely to the cap. Interpolated from the constant so the
+    // prompt and the cap cannot drift apart.
+    const system = buildNextRunMessages(MODEL)[0].content;
+    assert.match(system, new RegExp(`AT MOST ${MAX_GENERATED_OPTIONS} options in total`));
+  });
+
+  test('states that S/M/L coverage is GLOBAL, not per direction (D3)', () => {
+    // Without this the model balances sizes inside each direction, which needs
+    // 3 x N options and blows the MAX_GENERATED_OPTIONS cap.
+    const system = buildNextRunMessages(MODEL)[0].content;
+    assert.match(system, /ALL your options TAKEN TOGETHER/);
+    assert.match(system, /NOT required within each direction/);
+    // The original per-size guarantee is reaffirmed, not replaced.
+    assert.match(system, /Provide AT LEAST ONE option for each size S, M, and L/);
+  });
+
+  test('never uses the word "theme" for the grouping (D4)', () => {
+    const system = buildNextRunMessages(MODEL)[0].content;
+    assert.doesNotMatch(system, /theme/i);
+  });
+
+  test('leaves the continue-until-stopped exclusion rule intact', () => {
+    // Directions are a grouping over concrete goals; the open-ended option is
+    // still added deterministically and is still not the model's to return.
+    const system = buildNextRunMessages(MODEL)[0].content;
+    assert.match(system, /Do NOT include a "continue until stopped" \/ open-ended option/);
+  });
+});
+
 describe('buildNextRunSummary (LIN-638)', () => {
   test('summarises in-progress/queued counts, velocity, next item, and risks', () => {
     const out = buildNextRunSummary(RICH_MODEL, 'Acme');
@@ -430,7 +478,174 @@ describe('parseNextRunResponse (LIN-642)', () => {
 
   test('analysis defaults to empty string when absent or on garbage', () => {
     assert.equal(parseNextRunResponse(JSON.stringify({ options: [] })).analysis, '');
-    assert.deepEqual(parseNextRunResponse('garbage'), { analysis: '', options: [] });
+    // `directions: []` rides on the unparseable path too (LIN-1566) — the caller
+    // always gets the key, and empty means "no usable grouping" (the flat list).
+    assert.deepEqual(parseNextRunResponse('garbage'), { analysis: '', directions: [], options: [] });
+  });
+});
+
+describe('parseNextRunResponse directions (LIN-1566)', () => {
+  test('extracts declared directions and each option\'s direction tag', () => {
+    const raw = JSON.stringify({
+      analysis: 'a',
+      directions: [
+        { name: 'finish the migration', summary: 'Close out the provider migration.' },
+        { name: 'clear the blockers', summary: 'Unblock the critical path.' },
+      ],
+      options: [
+        { goal: 'g1', reasoning: 'r', size: 'M', title: 'T1', direction: 'finish the migration' },
+        { goal: 'g2', reasoning: 'r', size: 'S', title: 'T2', direction: 'clear the blockers' },
+      ],
+    });
+    const { directions, options } = parseNextRunResponse(raw);
+    assert.deepEqual(directions, [
+      { name: 'finish the migration', summary: 'Close out the provider migration.' },
+      { name: 'clear the blockers', summary: 'Unblock the critical path.' },
+    ]);
+    assert.equal(options[0].direction, 'finish the migration');
+    assert.equal(options[1].direction, 'clear the blockers');
+  });
+
+  test('back-compat: a reply with no grouping parses to [] / \'\' and unchanged options', () => {
+    // Today's fixtures carry no directions at all; they must still parse cleanly.
+    const raw = JSON.stringify({ options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
+    const { directions, options } = parseNextRunResponse(raw);
+    assert.deepEqual(directions, []);
+    assert.equal(options.length, 1);
+    assert.equal(options[0].direction, '');
+    assert.equal(options[0].title, 'T');
+  });
+
+  test('trims names/summaries, drops blanks, and dedupes case-insensitively', () => {
+    const raw = JSON.stringify({
+      directions: [
+        { name: '  finish the migration  ', summary: '  Close it out.  ' },
+        { name: 'Finish The Migration', summary: 'A duplicate under another casing.' },
+        { name: '   ', summary: 'blank name' },
+        { name: 'clear the blockers' },
+      ],
+      options: [],
+    });
+    const { directions } = parseNextRunResponse(raw);
+    assert.deepEqual(directions, [
+      { name: 'finish the migration', summary: 'Close it out.' },
+      { name: 'clear the blockers', summary: '' },
+    ]);
+  });
+
+  test('caps the declared directions and tolerates a non-array / garbage value', () => {
+    const many = Array.from({ length: MAX_DIRECTIONS + 3 }, (_, i) => ({ name: `d${i}`, summary: 's' }));
+    assert.equal(parseNextRunResponse(JSON.stringify({ directions: many, options: [] })).directions.length, MAX_DIRECTIONS);
+    assert.deepEqual(parseNextRunResponse(JSON.stringify({ directions: 'nope', options: [] })).directions, []);
+    assert.deepEqual(parseNextRunResponse(JSON.stringify({ directions: [1, null, 'x'], options: [] })).directions, []);
+  });
+
+  test('a non-string option direction normalizes to the empty tag, not a crash', () => {
+    const raw = JSON.stringify({
+      directions: [{ name: 'd', summary: 's' }],
+      options: [{ goal: 'g', size: 'M', title: 'T', direction: 42 }],
+    });
+    assert.equal(parseNextRunResponse(raw).options[0].direction, '');
+  });
+});
+
+describe('resolveDirections (LIN-1566)', () => {
+  // Shorthand: a concrete option carrying just the fields the resolver reads.
+  const opt = (direction) => ({ title: 't', goal: 'g', size: 'M', direction });
+  const OPEN = { ...CONTINUE_UNTIL_STOPPED_OPTION };
+  const DECLARED = [
+    { name: 'finish the migration', summary: 'Close it out.' },
+    { name: 'clear the blockers', summary: 'Unblock the path.' },
+  ];
+
+  test('partitions options into the declared directions, in declared order', () => {
+    const options = [
+      opt('clear the blockers'),
+      opt('finish the migration'),
+      opt('finish the migration'),
+      OPEN,
+    ];
+    const resolved = resolveDirections(options, DECLARED);
+    assert.deepEqual(resolved.map(d => d.name), ['finish the migration', 'clear the blockers']);
+    assert.deepEqual(resolved[0].optionIndexes, [1, 2]);
+    assert.deepEqual(resolved[1].optionIndexes, [0]);
+    // Summaries ride along for the chooser.
+    assert.equal(resolved[0].summary, 'Close it out.');
+  });
+
+  test('matches an option tag to a declared name case-insensitively', () => {
+    const resolved = resolveDirections([opt('FINISH the Migration'), OPEN], DECLARED);
+    assert.deepEqual(resolved.map(d => d.name), ['finish the migration']);
+    assert.deepEqual(resolved[0].optionIndexes, [0]);
+  });
+
+  test('blank and undeclared tags land in the trailing catch-all', () => {
+    const options = [
+      opt('finish the migration'),
+      opt(''),                    // untagged (e.g. a deterministic size fill)
+      opt('a name never declared'),
+      { title: 't', goal: 'g', size: 'L' }, // no direction field at all
+      OPEN,
+    ];
+    const resolved = resolveDirections(options, DECLARED);
+    assert.equal(resolved[resolved.length - 1].name, CATCH_ALL_DIRECTION);
+    assert.deepEqual(resolved[resolved.length - 1].optionIndexes, [1, 2, 3]);
+  });
+
+  test('drops a declared direction that ends up holding nothing', () => {
+    const resolved = resolveDirections([opt('finish the migration'), OPEN], DECLARED);
+    assert.deepEqual(resolved.map(d => d.name), ['finish the migration']);
+  });
+
+  test('the continue-until-stopped option is in NO direction (A4)', () => {
+    const options = [opt('finish the migration'), opt(''), OPEN];
+    const openIndex = options.length - 1;
+    const resolved = resolveDirections(options, DECLARED);
+    assert.ok(resolved.length > 0);
+    for (const d of resolved) {
+      assert.ok(!d.optionIndexes.includes(openIndex), `${d.name} must not hold the open option`);
+    }
+  });
+
+  test('optionIndexes partition every concrete option exactly once', () => {
+    const options = [
+      opt('finish the migration'),
+      opt('clear the blockers'),
+      opt('unknown'),
+      opt(''),
+      opt('finish the migration'),
+      OPEN,
+    ];
+    const resolved = resolveDirections(options, DECLARED);
+    const flat = resolved.flatMap(d => d.optionIndexes);
+    // No index twice…
+    assert.equal(new Set(flat).size, flat.length);
+    // …and every concrete option covered, the open one excluded.
+    const concrete = options
+      .map((o, i) => (o.continueUntilStopped ? null : i))
+      .filter(i => i !== null);
+    assert.deepEqual([...flat].sort((a, b) => a - b), concrete);
+  });
+
+  test('returns [] when nothing was declared — the flat-list fallback (A5)', () => {
+    assert.deepEqual(resolveDirections([opt('anything'), OPEN], []), []);
+    assert.deepEqual(resolveDirections([opt(''), OPEN], undefined), []);
+  });
+
+  test('returns [] when no option matches a declared name (one "other" pile is worse than flat)', () => {
+    const resolved = resolveDirections([opt(''), opt('never declared'), OPEN], DECLARED);
+    assert.deepEqual(resolved, []);
+  });
+
+  test('returns [] when there are no concrete options at all', () => {
+    assert.deepEqual(resolveDirections([OPEN], DECLARED), []);
+  });
+
+  test('tolerates null/garbage input without throwing', () => {
+    assert.deepEqual(resolveDirections(null, null), []);
+    assert.deepEqual(resolveDirections(undefined, DECLARED), []);
+    assert.deepEqual(resolveDirections('nope', DECLARED), []);
+    assert.deepEqual(resolveDirections([null, undefined, OPEN], DECLARED), []);
   });
 });
 
@@ -712,5 +927,130 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
     assert.equal(last.continueUntilStopped, true);
     assert.equal(last.size, 'XL');
     assert.equal(last.goal, '');
+  });
+});
+
+describe('generateGoalSuggestions directions (LIN-1566)', () => {
+  const realFetch = global.fetch;
+  afterEach(() => { global.fetch = realFetch; });
+
+  function mockStreamResponse(text) {
+    const enc = new TextEncoder();
+    const blocks = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 10 } })}\n\n`,
+      'data: [DONE]\n\n',
+    ];
+    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+  }
+
+  const ISSUES = [
+    { id: 'i1', identifier: 'LIN-1', title: 'In-flight work', state: { type: 'started' }, estimate: 2 },
+    { id: 'i2', identifier: 'LIN-2', title: 'Next up', state: { type: 'unstarted' }, estimate: 1 },
+  ];
+
+  // A grouped reply covering only M and S, so the deterministic L fill is
+  // synthesized AFTER parsing — the case that proves resolver placement.
+  const GROUPED_REPLY = JSON.stringify({
+    analysis: 'a',
+    directions: [
+      { name: 'finish started work', summary: 'Close out what is in flight.' },
+      { name: 'open the queue', summary: 'Start the next ranked item.' },
+    ],
+    options: [
+      { goal: 'Finish LIN-1.', reasoning: 'r', size: 'M', title: 'Finish LIN-1', referencedTaskIds: ['LIN-1'], direction: 'finish started work' },
+      { goal: 'Start LIN-2.', reasoning: 'r', size: 'S', title: 'Start LIN-2', referencedTaskIds: ['LIN-2'], direction: 'open the queue' },
+    ],
+  });
+
+  test('returns the resolved grouping alongside the flat options', async () => {
+    global.fetch = mock.fn(async () => mockStreamResponse(GROUPED_REPLY));
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: ISSUES, organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    );
+    assert.ok(Array.isArray(result.directions));
+    assert.ok(result.directions.length >= 2);
+    assert.deepEqual(result.directions.slice(0, 2).map(d => d.name), ['finish started work', 'open the queue']);
+    // The flat array stays authoritative and unchanged in shape.
+    assert.ok(result.options.length > result.directions.length);
+  });
+
+  test('the grouping covers the deterministic size fills — proof the resolver runs LAST', async () => {
+    // ensureSizeCoverage pushes the missing-L fill after parsing, so a fill carries
+    // no direction of its own. Resolving before that point would silently orphan it.
+    global.fetch = mock.fn(async () => mockStreamResponse(GROUPED_REPLY));
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: ISSUES, organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    );
+    const fillIndex = result.options.findIndex(o => o.synthesized);
+    assert.ok(fillIndex >= 0, 'expected a deterministic size fill');
+    const holder = result.directions.find(d => d.optionIndexes.includes(fillIndex));
+    assert.ok(holder, 'the size fill must be inside some direction');
+    assert.equal(holder.name, CATCH_ALL_DIRECTION);
+  });
+
+  test('every concrete option is grouped exactly once and the open option never is', async () => {
+    global.fetch = mock.fn(async () => mockStreamResponse(GROUPED_REPLY));
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: ISSUES, organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    );
+    const flat = result.directions.flatMap(d => d.optionIndexes);
+    assert.equal(new Set(flat).size, flat.length);
+    const concrete = result.options
+      .map((o, i) => (o.continueUntilStopped ? null : i))
+      .filter(i => i !== null);
+    assert.deepEqual([...flat].sort((a, b) => a - b), concrete);
+  });
+
+  test('an ungrouped reply returns directions: [] and the same options as before (A5)', async () => {
+    // Byte-for-byte the pre-LIN-1566 contract: the only difference is the new key.
+    const flatReply = JSON.stringify({
+      analysis: 'a',
+      options: [{ goal: 'Finish LIN-1.', reasoning: 'r', size: 'M', title: 'Finish LIN-1', referencedTaskIds: ['LIN-1'] }],
+    });
+    global.fetch = mock.fn(async () => mockStreamResponse(flatReply));
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: ISSUES, organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    );
+    assert.deepEqual(result.directions, []);
+    // Size coverage and the trailing open option are untouched by grouping.
+    const concrete = result.options.filter(o => !o.continueUntilStopped);
+    const sizes = new Set(concrete.map(o => o.size));
+    for (const s of REQUIRED_SIZES) assert.ok(sizes.has(s), `missing size ${s}`);
+    const last = result.options[result.options.length - 1];
+    assert.equal(last.continueUntilStopped, true);
+    assert.equal(last.goal, '');
+  });
+
+  test('an LLM failure still yields the size-guaranteed set with no grouping', async () => {
+    global.fetch = mock.fn(async () => { throw new Error('upstream down'); });
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: ISSUES, organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    ).catch(() => null);
+    // streamChat swallowing vs. throwing is out of scope here — assert only that
+    // IF it resolves, the grouped path degrades rather than half-renders.
+    if (result) {
+      assert.deepEqual(result.directions, []);
+      assert.equal(result.options[result.options.length - 1].continueUntilStopped, true);
+    }
+  });
+
+  test('the per-option direction tag survives the whole post-parse pipeline', async () => {
+    // Grouping only works because every stage after the parser copies options by
+    // spread. If a stage is ever "tidied" into an explicit field list this fails.
+    global.fetch = mock.fn(async () => mockStreamResponse(GROUPED_REPLY));
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: ISSUES, organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    );
+    const tagged = result.options.find(o => o.title === 'Finish LIN-1');
+    assert.equal(tagged.direction, 'finish started work');
+    // …and the enrichment that runs after it is still applied.
+    assert.deepEqual(tagged.referencedTasks, [{ id: 'LIN-1', title: 'In-flight work' }]);
   });
 });

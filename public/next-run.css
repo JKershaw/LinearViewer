@@ -77,6 +77,70 @@
   white-space: pre-wrap;
 }
 
+/* Direction chooser (LIN-1566) — pick a direction, then a goal within it. A
+   wrapping chip row, so it is responsive with no breakpoint (this file carries no
+   @media rules) and readable on a narrow viewport. Selection is a click on a chip
+   (aria-pressed), never a hover state — mirroring the .lc-chip / ship.js
+   single-select precedent, but on this page's own token family. */
+.next-run-directions {
+  margin: 0 0 var(--space-2);
+}
+
+.next-run-direction-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.next-run-direction {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border, var(--fg-vdim));
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.next-run-direction:hover {
+  background: var(--bg-muted, var(--bg));
+}
+
+/* Selected state reads like an opened option card (LIN-861 vocabulary): stronger
+   border, full-strength text — not a new accent colour. */
+.next-run-direction[aria-pressed="true"] {
+  border-color: var(--border-strong, var(--fg-dim));
+  background: var(--bg-muted, var(--bg));
+  color: var(--fg);
+}
+
+/* The direction's name is a human-facing label → sans (--font-content). */
+.next-run-direction-name {
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+}
+
+/* The goal count is a machine fact → mono (--font-structural), per the
+   mono-facts / sans-labels split (LIN-976). */
+.next-run-direction-count {
+  font-family: var(--font-structural);
+  font-size: 0.75em;
+  color: var(--fg-dim);
+}
+
+.next-run-direction-summary {
+  margin: var(--space-1) 0 0;
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.next-run-direction-summary:empty {
+  display: none;
+}
+
 .next-run-options {
   list-style: none;
   margin: 0;

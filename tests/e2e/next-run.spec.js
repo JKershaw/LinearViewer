@@ -151,16 +151,33 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       expect(href).not.toContain('goal=');
     });
 
+    // LIN-1566: goals are now grouped under directions and only the selected
+    // direction's cards are on screen, so the S/M/L guarantee is asserted by
+    // walking every direction and accumulating what is offered. That is also the
+    // UI-level proof of D3 — coverage is global across the generation, NOT per
+    // direction (no single direction is required to hold all three).
     test('guarantees at least one option for each size S/M/L (LIN-642)', async ({ page }) => {
       await page.locator('#next-run-generate').click();
       await expect(page.locator('.next-run-option').first()).toBeVisible({ timeout: 5000 });
 
-      // Every concrete size must be represented at least once (the open option is XL).
-      for (const size of ['S', 'M', 'L']) {
-        await expect(
-          page.locator('.next-run-size', { hasText: new RegExp(`^${size}$`) })
-        ).not.toHaveCount(0);
+      const chips = page.locator('.next-run-direction');
+      const chipCount = await chips.count();
+      const seen = new Set();
+
+      for (let i = 0; i < Math.max(chipCount, 1); i++) {
+        if (chipCount) await chips.nth(i).click();
+        await expect(page.locator('.next-run-option').first()).toBeVisible();
+        for (const size of await page.locator('.next-run-size').allTextContents()) {
+          seen.add(size.trim());
+        }
       }
+
+      // Every concrete size represented at least once across the generation
+      // (the always-offered open option is the XL).
+      for (const size of ['S', 'M', 'L']) {
+        expect(seen.has(size), `size ${size} was not offered under any direction`).toBe(true);
+      }
+      expect(seen.has('XL')).toBe(true);
     });
 
     test('cards show a standalone headline title, not the goal first line (LIN-642)', async ({ page }) => {
@@ -239,6 +256,125 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await expect(body).toBeVisible();
       // The panel shows the deterministic grounding blob (velocity line is always present).
       await expect(body).toContainText('Velocity');
+    });
+  });
+
+  // LIN-1566: goal options are grouped under a small set of named directions —
+  // choose a direction first, a concrete goal second. The mock declares two
+  // directions and deliberately leaves the deterministic L fill untagged, so the
+  // resolver's trailing catch-all is exercised for real.
+  test.describe('Direction chooser', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+    });
+
+    test('the chooser is hidden until a generation returns', async ({ page }) => {
+      await expect(page.locator('#next-run-directions')).toBeHidden();
+    });
+
+    test('renders a chip per direction, above the cards, with the first selected', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+
+      const chooser = page.locator('#next-run-directions');
+      await expect(chooser).toBeVisible({ timeout: 5000 });
+
+      // The mock's two declared directions, plus the catch-all holding the
+      // untagged deterministic size fill.
+      const chips = page.locator('.next-run-direction');
+      await expect(chips).toHaveCount(3);
+      await expect(chips.nth(0)).toContainText('finish started work');
+      await expect(chips.nth(1)).toContainText('start the next queued item');
+      await expect(chips.nth(2)).toContainText('other');
+
+      // Single-select: exactly one chip is pressed, and it is the first (so the
+      // page never lands on "generated, but nothing visible").
+      await expect(page.locator('.next-run-direction[aria-pressed="true"]')).toHaveCount(1);
+      await expect(chips.nth(0)).toHaveAttribute('aria-pressed', 'true');
+
+      // The chooser sits above the option list in DOM order — on a narrow
+      // viewport the directions are what you meet first, not the goals.
+      await expect(page.locator('#next-run-directions ~ #next-run-options')).toHaveCount(1);
+
+      // The selected direction's summary is shown without needing a hover.
+      await expect(page.locator('.next-run-direction-summary')).toContainText('already in flight');
+    });
+
+    test('clicking a direction swaps the visible goals', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+      const chips = page.locator('.next-run-direction');
+      await expect(chips.first()).toBeVisible({ timeout: 5000 });
+
+      // Direction 1 shows the in-progress goal (TEST-1) and not the queued one.
+      const previews = page.locator('.next-run-goal-preview');
+      await expect(previews.first()).toContainText('Finish TEST-1');
+      await expect(page.locator('.next-run-option')).toHaveCount(2); // 1 goal + open
+
+      await chips.nth(1).click();
+
+      // Selection moved, and the visible goal moved with it.
+      await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'true');
+      await expect(chips.nth(0)).toHaveAttribute('aria-pressed', 'false');
+      await expect(page.locator('.next-run-direction[aria-pressed="true"]')).toHaveCount(1);
+      await expect(previews.first()).toContainText('Start TEST-2');
+      await expect(page.locator('.next-run-goal-preview', { hasText: 'Finish TEST-1' })).toHaveCount(0);
+      await expect(page.locator('.next-run-direction-summary')).toContainText('next ranked item');
+    });
+
+    test('continue-until-stopped is offered under every direction and inside none', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+      const chips = page.locator('.next-run-direction');
+      await expect(chips.first()).toBeVisible({ timeout: 5000 });
+
+      const count = await chips.count();
+      for (let i = 0; i < count; i++) {
+        await chips.nth(i).click();
+        // Always exactly one, always last — it belongs to no direction.
+        await expect(page.locator('.next-run-option-open')).toHaveCount(1);
+        await expect(page.locator('.next-run-option').last()).toHaveClass(/next-run-option-open/);
+      }
+
+      // The chip counts cover only the concrete goals, never the open option.
+      const counts = await page.locator('.next-run-direction-count').allTextContents();
+      const total = counts.reduce((n, t) => n + Number(t.trim()), 0);
+      const concrete = await page.locator('.next-run-option:not(.next-run-option-open)').count();
+      expect(total).toBe(3); // the mock's two tagged goals + the catch-all fill
+      expect(concrete).toBeGreaterThan(0);
+    });
+
+    test('a response with no grouping renders the flat list, chooser hidden (A5)', async ({ page }) => {
+      // Serve the real mock minus its `directions` key — exactly what an older or
+      // degraded generation returns. The page must fall back to today's behaviour.
+      await page.route('**/api/next-run/suggest', async route => {
+        const res = await route.fetch();
+        const body = await res.json();
+        delete body.directions;
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.locator('#next-run-generate').click();
+      await expect(page.locator('.next-run-option').first()).toBeVisible({ timeout: 5000 });
+
+      await expect(page.locator('#next-run-directions')).toBeHidden();
+      await expect(page.locator('.next-run-direction')).toHaveCount(0);
+
+      // Every option is on screen at once, as it was before grouping existed.
+      await expect(page.locator('.next-run-option')).toHaveCount(4);
+      await expect(page.locator('.next-run-option-open')).toHaveCount(1);
+      for (const size of ['S', 'M', 'L']) {
+        await expect(page.locator('.next-run-size', { hasText: new RegExp(`^${size}$`) })).not.toHaveCount(0);
+      }
+    });
+
+    test('no copy on the page calls a direction a "theme" (D4)', async ({ page }) => {
+      await page.locator('#next-run-generate').click();
+      await expect(page.locator('.next-run-direction').first()).toBeVisible({ timeout: 5000 });
+
+      // Scoped to this page's own content — the shared footer's `theme: light`
+      // control is deliberately out of scope (it is the site-wide theme toggle).
+      const copy = await page.locator('main.next-run-page').innerText();
+      expect(copy.toLowerCase()).not.toContain('theme');
     });
   });
 
@@ -380,6 +516,38 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       expect(goalParam).toContain('Parent task in progress');
     });
 
+    // LIN-1566: grouping is a display filter only. A card reached by switching
+    // direction must dispatch exactly what the flat page dispatched — same single
+    // goal string, same referenced-task block, same issue-less autopilot item.
+    test('a card reached via a second direction dispatches an unchanged payload', async ({ page }) => {
+      const chips = page.locator('.next-run-direction');
+      await expect(chips.first()).toBeVisible({ timeout: 5000 });
+      await chips.nth(1).click();
+
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card.locator('.next-run-goal-preview')).toContainText('Start TEST-2');
+      await card.locator('.next-run-option-head').click();
+      await card.locator('.next-run-dispatch-toggle').click();
+
+      const autopilotReq = page.waitForRequest(req =>
+        req.url().includes('/api/autopilot-prompt') && req.method() === 'GET');
+      const dispatchReq = page.waitForRequest(req =>
+        req.url().includes('/api/dispatch') && req.method() === 'POST');
+      await card.locator('.next-run-dispatch[data-target="cli"]').click();
+
+      // The goal handed to the kickoff still carries the referenced task id+title.
+      const goalParam = new URL((await autopilotReq).url()).searchParams.get('goal') || '';
+      expect(goalParam).toContain('Referenced tasks:');
+      expect(goalParam).toContain('TEST-2');
+
+      // And the dispatch itself is the same shape: one issue-less autopilot item.
+      const body = JSON.parse((await dispatchReq).postData() || '{}');
+      expect(body.kind).toBe('autopilot');
+      expect(body.target).toBe('cli');
+      expect(body.issueId == null).toBe(true);
+      expect(body.attachProxy).toBe(true);
+    });
+
     test('the continue-until-stopped option dispatches with no goal', async ({ page }) => {
       const card = page.locator('.next-run-option-open');
       await expect(card).toBeVisible({ timeout: 5000 });
@@ -471,6 +639,36 @@ test.describe('Suggested Next Run Page (experimental)', () => {
         expect(o.title.length).toBeGreaterThan(0);
         expect(Array.isArray(o.referencedTaskIds)).toBe(true);
       }
+    });
+
+    // LIN-1566: the mock must be in shape-parity with the live generator — it is
+    // the only response the e2e suite ever sees, so a mock missing `directions`
+    // would let every grouped test pass against the flat fallback.
+    test('returns a resolved directions grouping in parity with the live generator', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      const res = await page.request.post(SUGGEST_API, { data: {} });
+      const body = await res.json();
+
+      expect(Array.isArray(body.directions)).toBe(true);
+      expect(body.directions.length).toBeGreaterThan(0);
+      for (const d of body.directions) {
+        expect(typeof d.name).toBe('string');
+        expect(d.name.length).toBeGreaterThan(0);
+        expect(Array.isArray(d.optionIndexes)).toBe(true);
+        expect(d.optionIndexes.length).toBeGreaterThan(0);
+      }
+
+      // Invariant 2: optionIndexes partition every concrete option exactly once.
+      const flat = body.directions.flatMap(d => d.optionIndexes);
+      expect(new Set(flat).size).toBe(flat.length);
+      const concreteIndexes = body.options
+        .map((o, i) => (o.continueUntilStopped ? null : i))
+        .filter(i => i !== null);
+      expect([...flat].sort((a, b) => a - b)).toEqual(concreteIndexes);
+
+      // Invariant 3: the open-ended option is in no direction.
+      const openIndex = body.options.findIndex(o => o.continueUntilStopped);
+      expect(flat).not.toContain(openIndex);
     });
   });
 });

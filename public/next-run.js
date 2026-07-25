@@ -12,6 +12,13 @@
  * single page-level expandable panel shows the exact grounding context the model
  * saw (shared across options, not per-option).
  *
+ * Above the cards sits the direction chooser (LIN-1566): the generation groups its
+ * goals under a few named directions, so you pick a direction first and a concrete
+ * goal second — fewer undifferentiated headline rows to scroll past on a phone.
+ * Single-select, click-driven (no hover affordance), and purely a display filter:
+ * the card markup, the goal it dispatches, and the dispatch path itself are all
+ * identical to the ungrouped page.
+ *
  * Accepting an option (LIN-640): when the proxy feature is on, each card offers an
  * inline `Dispatch ▾` disclosure (parity with the projects/swipe views) that builds
  * the autopilot kickoff via /api/autopilot-prompt and dispatches it in place via
@@ -34,6 +41,7 @@
   var generateBtn = document.getElementById('next-run-generate');
   var feedbackEl = document.getElementById('next-run-feedback');
   var optionsEl = document.getElementById('next-run-options');
+  var directionsEl = document.getElementById('next-run-directions');
   var summaryEl = document.getElementById('next-run-summary');
   var analysisEl = document.getElementById('next-run-analysis');
   var analysisBodyEl = document.getElementById('next-run-analysis-body');
@@ -169,9 +177,68 @@
       });
   }
 
-  function renderOptions(options) {
-    optionsEl.innerHTML = '';
-    if (!options || !options.length) {
+  // ── Direction grouping (LIN-1566) ───────────────────────────────────────────
+  // The response's flat `options` array stays authoritative; `directions` is the
+  // server-resolved grouping over it, each entry owning the `optionIndexes` it
+  // covers. The client renders those indexes and never re-derives groups by
+  // matching direction names itself, so normalisation lives in exactly one place
+  // (lib/next-run.js resolveDirections). An empty `directions` means the reply
+  // carried no usable grouping — the flat list then renders exactly as it did
+  // before this feature existed.
+  var currentOptions = [];
+  var currentDirections = [];
+  var selectedDirection = 0;
+
+  // Which options are visible for the current selection: the selected direction's
+  // goals, then the continue-until-stopped option, which sits OUTSIDE every
+  // direction and is offered whichever direction is chosen. Ungrouped → the whole
+  // list in its original order, untouched.
+  function visibleOptions() {
+    if (!currentDirections.length) return currentOptions.slice();
+    var dir = currentDirections[selectedDirection] || currentDirections[0] || {};
+    var picked = (dir.optionIndexes || []).map(function (i) {
+      return currentOptions[i];
+    }).filter(Boolean);
+    var open = currentOptions.filter(function (o) { return o && o.continueUntilStopped; });
+    return picked.concat(open);
+  }
+
+  // The chooser: one chip per direction (single-select; selection is a click, never
+  // a hover) plus the selected direction's one-line summary. Repainted on every
+  // selection — the click listener is delegated to the container, which persists.
+  function renderDirections() {
+    if (!directionsEl) return;
+    if (!currentDirections.length) {
+      directionsEl.innerHTML = '';
+      directionsEl.hidden = true;
+      return;
+    }
+    var chips = currentDirections.map(function (d, i) {
+      return '<button type="button" class="next-run-direction" data-index="' + i + '"' +
+        ' aria-pressed="' + (i === selectedDirection ? 'true' : 'false') + '">' +
+        '<span class="next-run-direction-name">' + escapeHtml(d.name || '') + '</span>' +
+        '<span class="next-run-direction-count">' + ((d.optionIndexes || []).length) + '</span>' +
+        '</button>';
+    }).join('');
+    var current = currentDirections[selectedDirection] || {};
+    directionsEl.innerHTML =
+      '<div class="next-run-direction-row" role="group" aria-label="choose a direction">' + chips + '</div>' +
+      '<p class="next-run-direction-summary">' + escapeHtml(current.summary || '') + '</p>';
+    directionsEl.hidden = false;
+  }
+
+  function renderOptions(options, directions) {
+    currentOptions = Array.isArray(options) ? options : [];
+    currentDirections = Array.isArray(directions) ? directions : [];
+    // The first direction is selected on arrival, so a generation never lands on a
+    // "generated, but nothing visible" dead end. The chooser sits above the cards
+    // either way, so the directions are still what you meet first on a phone.
+    selectedDirection = 0;
+
+    if (!currentOptions.length) {
+      currentDirections = [];
+      renderDirections();
+      optionsEl.innerHTML = '';
       if (emptyState) {
         emptyState.textContent = '○ no suggestions returned — try again';
         emptyState.hidden = false;
@@ -180,6 +247,14 @@
     }
     if (emptyState) emptyState.hidden = true;
 
+    renderDirections();
+    renderOptionCards(visibleOptions());
+  }
+
+  // Card building is untouched by grouping: the same cards, re-parented under
+  // whichever direction is selected.
+  function renderOptionCards(options) {
+    optionsEl.innerHTML = '';
     options.forEach(function (opt) {
       var li = document.createElement('li');
       li.className = 'next-run-option' + (opt.continueUntilStopped ? ' next-run-option-open' : '');
@@ -362,6 +437,20 @@
     dispatchGoal(btn);
   });
 
+  // Direction selection (LIN-1566), delegated for the same reason: directionsEl
+  // persists across generations and re-paints, the chips inside it do not.
+  if (directionsEl) {
+    directionsEl.addEventListener('click', function (e) {
+      var chip = e.target.closest('.next-run-direction');
+      if (!chip) return;
+      var index = parseInt(chip.getAttribute('data-index'), 10);
+      if (isNaN(index) || index === selectedDirection) return;
+      selectedDirection = index;
+      renderDirections();
+      renderOptionCards(visibleOptions());
+    });
+  }
+
   if (contextToggle && contextBody) {
     contextToggle.addEventListener('click', function () {
       var open = contextToggle.getAttribute('aria-expanded') !== 'true';
@@ -385,7 +474,7 @@
     }).then(function (res) {
       renderSummary(res && res.summary);
       renderAnalysis(res && res.analysis);
-      renderOptions(res && res.options);
+      renderOptions(res && res.options, res && res.directions);
       renderContext(res && res.context);
       if (res && res.model && res.model !== 'mock') {
         setFeedback('generated with ' + res.model);
