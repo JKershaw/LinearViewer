@@ -78,4 +78,11 @@
       if (submitBtn) submitBtn.disabled = false;
     }
   });
+
+  // Arm the form. The renderer ships Save DISABLED so the form cannot be
+  // natively submitted in the window between its markup being parsed and this
+  // end-of-body script running — a submit there would GET
+  // `…/edit?title=…&stateId=…` and silently discard the edit. Enabling here, and
+  // only here, means the button is live exactly when the handler above is.
+  if (submitBtn) submitBtn.disabled = false;
 })();

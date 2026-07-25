@@ -78,6 +78,16 @@ describe('renderTaskEditPage — the four v1 fields', () => {
     assert.ok(html.includes(`data-issue-id="${ISSUE.id}"`));
   });
 
+  test('Save renders DISABLED so the form cannot natively submit before JS arms it', () => {
+    // Saving is entirely JS-driven (there is no server-side form POST), so a
+    // native submit in the window before the end-of-body script runs would GET
+    // `…/edit?title=…&stateId=…` and silently discard the edit. public/task-edit.js
+    // enables the button as the last thing it does, so enabled ⇔ handler attached.
+    const html = render();
+    assert.ok(/<button type="submit"[^>]*data-testid="task-edit-submit"[^>]*disabled>/.test(html),
+      'submit button ships disabled');
+  });
+
   test('links back to the dashboard from both the breadcrumb and Cancel', () => {
     const html = render();
     assert.ok(html.includes('href="/workspace/acme/" data-testid="task-edit-back"'));

@@ -129,7 +129,12 @@ test.describe('Local provider (no test-token mock)', () => {
     await page.waitForLoadState('networkidle');
 
     // Saving returns to the dashboard, which re-reads through the provider.
-    await expect(page.locator('.in-progress-items').first()).toBeAttached();
+    // Assert the NAVIGATION, not the tree's shape: this test moves the only
+    // in-progress task to Done, and renderInProgressSection returns '' when it
+    // has nothing to show — so the In Progress section is legitimately absent
+    // here, and keying on it would make the check order-dependent on whichever
+    // sibling test last left a started task in the partition.
+    await expect(page).toHaveURL(/\/workspace\/[^/]+\/$/);
     // Title persisted: the old title is gone, the new one renders.
     await expect(page.locator('.line', { hasText: 'Local parent task' })).toHaveCount(0);
     await expect(page.locator('.line', { hasText: NEW_TITLE }).first()).toBeAttached();
