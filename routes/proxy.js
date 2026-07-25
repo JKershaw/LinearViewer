@@ -17,7 +17,7 @@ import rateLimit from 'express-rate-limit';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
-import { validateOpaqueDispatchField, validateDispatchPayload } from '../lib/dispatch-validation.js';
+import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload } from '../lib/dispatch-validation.js';
 // LIN-1552: the issue-write validation rules (length caps, control-char guard,
 // priority range) now live in one shared module so the session-auth workspace
 // API write routes (Session B) consume the same definition and cannot drift.
@@ -1365,7 +1365,7 @@ POST ${baseUrl}/api/proxy/dispatch
   → "abort" (optional, default false) requests an abort/cancel/close of an existing session instead of running a prompt: set "abort": true and "abortTo" to the "id" of the dispatch whose session should be cancelled. "prompt" is NOT required for an abort, and the consumer flips the running session to a terminal cancelled state. The abort item's OWN "target" must be poll-eligible (cli/web/dash) — eligibility is the abort item's target, NOT the substrate of the session being aborted (so you can abort a "dash" session with a "cli" abort item). Mutually exclusive with "followUpTo". See LIN-743.
   → "abortTo" (required when "abort" is true) is the dispatch id (UUID) of the session to abort. Stored + forwarded blindly; the consumer owns session liveness.
   → "cascade" (optional boolean, default false) is a modifier on an "abort": when true, "abortTo" names the ROOT session of a subtree and Harbour deterministically walks the descendant "sessionId"-tree and emits ONE ordinary abort per discovered session (root + every worker/child-autopilot under it). Requires "abort" (cascade:true without it is rejected 400); mutually exclusive with "force". The response is { "success": true, "cascade": true, "closed": [ { "id", "abortTo", "target" }, ... ], "count": N } instead of a single queued item. The emitted aborts are plain (no "force", no "sessionId"), so the runner cancels each and SKIPS any human-continued session — posting a distinct terminal-benign "[skipped] human-continued session <id> (<phase>)." marker (NOT "[aborted]"): treat it as terminal-benign — the session is still live, do not retry it and do not treat it as a close. Aborting an already-terminal session is a safe no-op. Use "force" on a single targeted abort to override that skip deliberately. See LIN-946/LIN-951.
-  → "sessionId" (optional) is the autopilot dispatch id that spawned this worker. Pass it on every worker dispatch the autopilot fans out so the run reconstructs as one session across all touched tasks (incl. epic descent / breakdown spin-offs). UUID, stored + forwarded blindly, ANY target (unlike followUpTo). See LIN-591.
+  → "sessionId" (optional) is the autopilot dispatch id that spawned this worker. Pass it on every worker dispatch the autopilot fans out so the run reconstructs as one session across all touched tasks (incl. epic descent / breakdown spin-offs). An OPAQUE string, not a UUID (LIN-1118): non-empty, max 128 chars, no control characters, "__meta__" reserved — a readable id like "LIN-1117-autopilot-standalone-2026-07-07" is valid, and so is any existing UUID. Stored + forwarded blindly, ANY target (unlike followUpTo). NOTE a sessionId that is not a real dispatch id groups fine but can never receive an up-chain wake. See LIN-591.
   → "waitForFollowUps" (optional boolean, default false; cli/web only) is the opt-in completion hold: when true the runner holds the session open at completion to receive in-session follow-ups (beats) instead of finalizing. The runner owns the behaviour — this flag is stored + forwarded blindly. Set it for a worker you intend to keep feeding in-session; leave it false (omit) for an orchestrator/sub-orchestrator that must finalize normally and stay free to run its own watch loop. See LIN-795/LIN-797.
   → By default a proxy-context block is appended to the prompt so the worker inherits this workspace's API access. Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out. EXCEPTION: when "followUpTo" is set the block is NOT appended by default — a follow-up beat resumes a warm session that already received the proxy context on its first beat, so re-appending it is redundant. Pass "appendProxyContext": true to force it back on for a follow-up.
   → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "abort": false, "abortTo": null, "cascade": false, "sessionId": null, "dispatchedAt": "..." } (a "cascade": true request instead returns { "success": true, "cascade": true, "closed": [...], "count": N })
@@ -1375,7 +1375,7 @@ POST ${baseUrl}/api/proxy/recommend-and-dispatch
   → Fused verb: runs /recommend and forwards the recommended prompt straight into a dispatch, server-side. "issueIdentifier" is required; target defaults to "cli".
   → "model" (optional) is threaded onto the dispatched item, same meaning as on POST /dispatch — the EXECUTION model the runner passes to its own CLI (OpenRouter "provider/model" convention, e.g. "anthropic/claude-opus-4.8"), opaque and forwarded blindly. Set it to route a cheaper/pricier model per task (e.g. Sonnet for implementation, Opus for review); omit to keep the consumer default. See LIN-438.
   → "harness" (optional) is threaded onto the dispatched item, same meaning as on POST /dispatch — the EXECUTION harness the runner should use (e.g. "opencode"), opaque and forwarded blindly. Combine with "model" to pick a specific OpenRouter-backed model for a non-default harness; omit to keep the consumer's own default. See LIN-1084.
-  → "sessionId" (optional) is the autopilot dispatch id driving this run; stamp it on every fan-out so the whole multi-task run reconstructs as one session. UUID, any target. See LIN-591.
+  → "sessionId" (optional) is the autopilot dispatch id driving this run; stamp it on every fan-out so the whole multi-task run reconstructs as one session. An OPAQUE string, not a UUID (LIN-1118): non-empty, max 128 chars, no control characters, "__meta__" reserved; existing UUIDs stay valid. Any target. See LIN-591.
   → The prompt body NEVER returns to you — you only get the task header. This keeps the prompt out of your context (the point of the verb); learn what was chosen from "kind"/"promptName", then watch the item via GET /dispatch/{id}.
   → "kind" is derived from the recommendation's own action signal (falling back to "custom") — no need to read the prompt to classify the task.
   → Set "noDescend": true to dispatch the named issue's OWN next step and NOT descend into an open child (deterministic). Use it to drive a parent whose deliverables live in its own description while a child is out of scope / separately tracked; the dispatched item then references the parent, and "deferredVia" is just [parent].
@@ -4177,9 +4177,11 @@ One convention across every endpoint, so you can branch on the same fields every
       // Both are stored + forwarded blindly onto the dispatched item (same contract
       // as POST /dispatch); validate shape only. This is a guide capability, not a
       // variant — any autopilot can use it contextually.
-      if (sessionId !== undefined && sessionId !== null && !UUID_REGEX.test(sessionId)) {
+      // Opaque string, not a UUID (LIN-1118) — shared rule, same as POST /dispatch.
+      const kickoffSessionIdError = validateSessionId(sessionId);
+      if (kickoffSessionIdError) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, 'Invalid sessionId format');
+        return badRequest.json(res, kickoffSessionIdError.error);
       }
       if (subscription !== undefined && !isValidSubscription(subscription)) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
@@ -4731,11 +4733,13 @@ One convention across every endpoint, so you can branch on the same fields every
       // Autopilot session reference (LIN-591): the autopilot dispatchId that is
       // driving this run, stamped onto the spawned worker so the dashboard can
       // reconstruct the session. This is the verb the autopilot actually drives,
-      // so it is the important one. Optional UUID; stored + forwarded blindly,
-      // no target restriction (sessions span all targets).
-      if (sessionId !== undefined && sessionId !== null && !UUID_REGEX.test(sessionId)) {
+      // so it is the important one. Optional opaque string (LIN-1118, was
+      // UUID-only); stored + forwarded blindly, no target restriction (sessions
+      // span all targets).
+      const recommendSessionIdError = validateSessionId(sessionId);
+      if (recommendSessionIdError) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'Invalid sessionId format');
+        return badRequest.json(res, recommendSessionIdError.error);
       }
 
       // Resolve the subscription edge once for both dispatch paths below (LIN-900

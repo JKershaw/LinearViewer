@@ -491,7 +491,7 @@ workers cannot be regrouped into one run by issue alone. `sessionId` carries tha
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `sessionId` | string (UUID) | No | The `id` of the autopilot dispatch that spawned this worker. |
+| `sessionId` | string (opaque) | No | The `id` of the autopilot dispatch that spawned this worker, or any opaque grouping key. |
 
 The autopilot stamps its own dispatch id as `sessionId` on every worker it dispatches;
 the dashboard then reconstructs the run as one **session** (the autopilot dispatch plus
@@ -502,10 +502,22 @@ verbatim — it owns no grouping logic.
 
 - **Any target.** Unlike `followUpTo`, `sessionId` has **no** `cli`/`web` restriction —
   a session groups workers regardless of target.
-- **Optional and validated.** `sessionId` must be a well-formed UUID when present; the
-  store does **not** verify the referenced autopilot dispatch exists.
+- **Optional, and an opaque string — not a UUID** (LIN-1118). Any non-empty string of up
+  to **128 characters** with no control characters is accepted, so a deterministic,
+  readable id like `LIN-1117-autopilot-standalone-2026-07-07` is as valid as a UUID and
+  far easier to trace through logs. `__meta__` is **reserved** (it collides with the
+  observation store's backfill marker). Existing UUID values remain valid — this is a
+  relaxation, not a migration. The store does **not** verify the referenced autopilot
+  dispatch exists.
 - **Independent of `followUpTo`.** The two are orthogonal: a worker may both resume a
   session (`followUpTo`) and belong to an autopilot run (`sessionId`).
+- **A `sessionId` that is not a real dispatch id cannot receive an up-chain wake.** The
+  `subscription` edge below wakes a parent by re-dispatching to the parent's `sessionId`
+  as a follow-up target, which only resolves when that value *is* a live dispatch id. A
+  synthetic or composite `sessionId` still groups perfectly, but an `everything`
+  subscription pointed at one dead-ends at the runner (`[failed] no live session to
+  resume`). Use a real dispatch id when you want the wake; use whatever you like when you
+  only want the grouping.
 
 ## Completion hold (`waitForFollowUps`)
 

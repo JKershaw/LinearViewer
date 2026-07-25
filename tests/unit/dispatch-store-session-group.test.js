@@ -99,3 +99,34 @@ test('a pre-field row (sessionGroupId absent) round-trips as null everywhere, ne
   const status = await store.getItemStatus('acme', 'legacy-1');
   assert.equal(status.sessionGroupId, null);
 });
+
+// LIN-1118 — a composite/opaque sessionId now reaches the store, so the two
+// downstream ID behaviours it feeds must be ASSERTED, not left to luck.
+test('a composite sessionId is stored verbatim and becomes the durable sessionGroupId', async () => {
+  const store = makeStore();
+  const composite = 'LIN-1117-autopilot-standalone-2026-07-07';
+  const doc = await store.addItem('acme', { prompt: 'work', sessionId: composite });
+
+  // Opaque all the way down: no parsing, no normalisation, no re-minting.
+  assert.equal(doc.sessionId, composite);
+  assert.equal(doc.sessionGroupId, composite);
+
+  const status = await store.getItemStatus('acme', doc._id);
+  assert.equal(status.sessionGroupId, composite);
+});
+
+test('rootItemId does NOT inherit a composite sessionId (guards the LIN-1461 sibling collapse)', async () => {
+  // rootItemId keeps exactly two tiers — inherited anchor ?? own _id. A sessionId
+  // tier would give every sibling worker an autopilot fans out one identical
+  // rootItemId. Widening sessionId's shape must not tempt a later refactor into
+  // adding that tier.
+  const store = makeStore();
+  const composite = 'LIN-1117-autopilot-standalone-2026-07-07';
+  const a = await store.addItem('acme', { prompt: 'sibling a', sessionId: composite });
+  const b = await store.addItem('acme', { prompt: 'sibling b', sessionId: composite });
+
+  assert.equal(a.rootItemId, a._id);
+  assert.equal(b.rootItemId, b._id);
+  assert.notEqual(a.rootItemId, composite);
+  assert.notEqual(a.rootItemId, b.rootItemId, 'siblings sharing a sessionId keep distinct lineage anchors');
+});

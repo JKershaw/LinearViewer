@@ -128,9 +128,43 @@ describe('validateDispatchPayload — id / combination rules', () => {
   test('force is valid alongside abort', () => {
     assert.strictEqual(validateDispatchPayload({ force: true, abort: true, abortTo: UUID }), null);
   });
-  test('malformed sessionId', () => {
-    assert.deepEqual(validateDispatchPayload({ prompt: 'x', sessionId: 'nope' }),
-      { error: 'Invalid sessionId format' });
+  // sessionId is an OPAQUE grouping key, not a UUID (LIN-1118). These replace the
+  // old 'malformed sessionId' test, whose subject ('nope') is now legitimately
+  // valid — the relaxation is the point of the ticket.
+  test('an existing UUID sessionId still passes (pure relaxation)', () => {
+    assert.strictEqual(validateDispatchPayload({ prompt: 'x', sessionId: UUID }), null);
+  });
+  test('a composite/deterministic sessionId passes', () => {
+    assert.strictEqual(
+      validateDispatchPayload({ prompt: 'x', sessionId: 'LIN-1117-autopilot-standalone-2026-07-07' }), null);
+    // A colon is deliberately allowed: urlKey is [a-z0-9-]{1,50} and cannot
+    // contain one, so the `${urlKey}:${sessionId}` doc-key prefix stays unambiguous.
+    assert.strictEqual(validateDispatchPayload({ prompt: 'x', sessionId: 'run:1' }), null);
+  });
+  test('a non-string sessionId is still rejected', () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', sessionId: 42 }),
+      { error: 'sessionId must be a string' });
+  });
+  test('sessionId is capped at 128 chars, not the 1000-char default', () => {
+    assert.strictEqual(validateDispatchPayload({ prompt: 'x', sessionId: 'a'.repeat(128) }), null);
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', sessionId: 'a'.repeat(129) }),
+      { error: 'sessionId exceeds maximum length of 128' });
+  });
+  test('an empty sessionId is rejected (would be silently coerced to null at the store)', () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', sessionId: '' }),
+      { error: 'sessionId must not be empty' });
+  });
+  test('control characters are rejected — including \\t \\n \\r, which the prompt rule allows', () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', sessionId: 'a\x00b' }),
+      { error: 'sessionId contains invalid characters' });
+    for (const ws of ['a\nb', 'a\tb', 'a\rb']) {
+      assert.deepEqual(validateDispatchPayload({ prompt: 'x', sessionId: ws }),
+        { error: 'sessionId contains invalid characters' });
+    }
+  });
+  test("the reserved value '__meta__' is rejected (observation backfill-marker collision)", () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', sessionId: '__meta__' }),
+      { error: 'sessionId must not be a reserved value' });
   });
 });
 
@@ -144,5 +178,11 @@ describe('validateDispatchPayload — check ORDER (first error is load-bearing)'
   test('a model violation is reported before a dangerous-char prompt violation', () => {
     const r = validateDispatchPayload({ prompt: 'bad\x00', model: 0 });
     assert.deepEqual(r, { error: 'model must be a string' });
+  });
+  test('sessionId keeps its LAST position — an earlier violation still wins', () => {
+    // LIN-1118 swapped the rule, not its slot. A payload violating both issueId
+    // and sessionId must still surface the issueId error first.
+    const r = validateDispatchPayload({ prompt: 'x', issueId: 'nope', sessionId: '__meta__' });
+    assert.deepEqual(r, { error: 'Invalid issueId format' });
   });
 });
