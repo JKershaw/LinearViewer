@@ -487,10 +487,16 @@ describe('provisionBootstrapToken (LIN-1429 — provisioning extracted from atta
   // and anything the resulting worker itself mints inherits it again, so two bad
   // mints halted four autopilot trees on 2026-07-25 (LIN-1576). This seam is the
   // choke point for the DISPATCHED mints, including the
-  // ownerless-worker-mints-a-child case at routes/proxy.js's kickoff — but NOT
-  // for routes/collective.js's prose branch or the session-auth token endpoint,
-  // which mint `kind: 'bootstrap'` directly and stay outside the switch until
-  // LIN-1582.
+  // ownerless-worker-mints-a-child case at routes/proxy.js's kickoff.
+  //
+  // It is not the ONLY bootstrap mint site, and since LIN-1582 it no longer has to
+  // be: routes/collective.js's prose branch now routes through this same helper,
+  // the session-auth token endpoint refuses ahead of its own mint, and
+  // ProxyTokenStore.createToken refuses an ownerless bootstrap structurally — so
+  // with the lane off, ownerless inheritance is impossible rather than merely
+  // unused, and a future direct mint cannot reopen the gap. Those refusals are
+  // pinned in tests/unit/proxy-tokens.test.js, tests/unit/collective-mcp-token.test.js,
+  // and tests/unit/proxy-token-route-ownerless.test.js respectively.
   //
   // The response is gated on the SAME switch as the LIN-1447 compat lane, and
   // the ordering is the point: while the compat lane is on, ownerless tokens are

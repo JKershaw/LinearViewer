@@ -235,6 +235,12 @@ Behaviour is therefore switchable, server-side, via `DISPATCH_OWNERLESS_BROKER_C
 | default (compat on) | `201`, mints an ownerless bootstrap, logs the hit | `201`, unaffected |
 | `off` | `503` before minting, naming ownership as the cause | `201`, unaffected |
 
+With the lane `off` the refusal is not specific to this endpoint: the proxy token store itself
+refuses any `kind: 'bootstrap'` mint with no owner, so **no** server-side path can produce one
+(LIN-1582). An already-issued ownerless bootstrap still exchanges normally — the exchange mints
+a standard working token, so a consumer holding one is never stranded mid-flight; it is the next
+*mint* that is refused.
+
 **Error Response (503) — ownerless caller, with the compat lane switched off:**
 ```json
 {
