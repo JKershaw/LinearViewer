@@ -2166,6 +2166,102 @@ describe('plan-review template + the six checks in both paths (LIN-1602)', () =>
 });
 
 // =============================================================================
+// The plan-review GATE and the revision half, in the handwritten `plan` template
+// (LIN-1603, items 2.1/2.2 — the routing that reads them is pinned in
+// tests/unit/openrouter.test.js). Two ordering facts are load-bearing and are
+// asserted by index, not by presence:
+//   - the gate sits AFTER the session-fit answer, because criterion (a) reads it;
+//   - the revision half sits BEFORE Strategy Framing, because a revising planner
+//     must see the verdict before re-deriving the framing the findings are about.
+// The third property is negative and the easiest to erode: the gate must stay
+// GATED — a plan meeting none of the criteria hands straight to implementation.
+// =============================================================================
+
+describe('plan-review gate + revision half in the plan template (LIN-1603)', () => {
+  const issue = {
+    id: 'pg-1', identifier: 'LIN-904', title: 'Add the gate',
+    description: 'work', url: 'https://linear.app/test/issue/LIN-904',
+    labels: [], createdAt: '2026-01-01T00:00:00.000Z'
+  };
+  const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+  const plan = () => generatePrompt('plan', issue, context).prompt;
+
+  test('the gate names all four criteria and requires the decision be written down', () => {
+    const p = plan();
+    assert.ok(/### Plan-review Gate/.test(p), 'the plan carries a plan-review gate section');
+    assert.ok(/\*\*\(a\)\*\* The session-fit answer above is "needs multiple sessions"/.test(p), 'criterion (a)');
+    assert.ok(/\*\*\(b\)\*\* Strategy Framing names a routed-around contract gap/.test(p), 'criterion (b)');
+    assert.ok(/\*\*\(c\)\*\* Any step in the plan relaxes a validation, a contract, or a guard/.test(p), 'criterion (c)');
+    assert.ok(/\*\*\(d\)\*\* The plan touches credential, merge-rule, or dispatch-contract surfaces/.test(p), 'criterion (d)');
+    assert.ok(/"plan-review due: yes" or "plan-review due: no", naming which of \(a\)–\(d\) fired/.test(p),
+      'the decision must be recorded in the description, in the form the router reads');
+  });
+
+  test('the gate is sited AFTER the session-fit answer — criterion (a) reads it', () => {
+    const p = plan();
+    const sessionFit = p.indexOf('phrased as either "fits one session" or "needs multiple sessions."');
+    const gate = p.indexOf('### Plan-review Gate');
+    assert.ok(sessionFit > -1 && gate > -1, 'both landmarks must be present');
+    assert.ok(sessionFit < gate,
+      'the gate must follow the session-fit answer, or criterion (a) would read an answer that does not exist yet');
+  });
+
+  test('the gate stays GATED — none of (a)–(d) hands straight to implementation', () => {
+    const p = plan();
+    assert.ok(/None of \(a\)–\(d\) firing is the common result: that plan hands directly to implementation, exactly as today/.test(p),
+      'the common case must route as it did before the gate existed');
+    assert.ok(/gated step, not a universal one/.test(p), 'the prompt must say the step is gated, not universal');
+    assert.ok(/do not volunteer it for a plan that meets none of the criteria/.test(p),
+      'the over-fire guard must be explicit, not implied by omission');
+  });
+
+  test('the revision half sits BEFORE Strategy Framing and recognises a prior verdict by substance', () => {
+    const p = plan();
+    const revise = p.indexOf('### Revising After a Plan Review');
+    const framing = p.indexOf('### Strategy Framing');
+    assert.ok(revise > -1 && framing > -1, 'both sections must be present');
+    assert.ok(revise < framing,
+      'the revision half must precede Strategy Framing so a revising planner reads the verdict first');
+    assert.ok(/a \`plan-review\` comment recording an explicit \*\*Approve\*\* \/ \*\*Request Changes\*\* \/ \*\*Needs Discussion\*\*/.test(p),
+      'the prior verdict is recognised by its substance (the verdict vocabulary)');
+    assert.ok(/headed \`### Plan Review Verdict\` where one is used/.test(p),
+      'the header is named as a disambiguator — "where one is used", not as a requirement');
+  });
+
+  test('the revision must address every finding and record what changed', () => {
+    const p = plan();
+    assert.ok(/this pass is a \*\*revision\*\*, not a fresh plan/.test(p),
+      'a plan with a verdict on the trail is a revision, not a re-plan from scratch');
+    assert.ok(/Where you disagree with a finding, answer it explicitly with your reasoning/.test(p),
+      'a disagreed-with finding must be answered, not silently dropped');
+    assert.ok(/\*\*Record what changed\*\*/.test(p),
+      'the revision must record which findings it addressed, so the next review can check it');
+  });
+
+  test('the plan-review template EMITS the disambiguating header (the producer half of 2.5)', () => {
+    // Without this the header has two consumers (the close-out exclusions and the
+    // plan's revision half) and no producer.
+    const { prompt } = generatePrompt('plan-review', issue, context);
+    assert.ok(/add a comment headed \`### Plan Review Verdict\`/.test(prompt),
+      'plan-review must head its verdict comment with the disambiguator');
+    assert.ok(/an Approve here must never be mistaken for authorization to close the task out/.test(prompt),
+      'the template must say why the header exists — the close-out confusion it prevents');
+  });
+
+  test('the gate did not disturb the pre-existing plan apparatus', () => {
+    // Regression guard: two additive sections were spliced into the middle of this
+    // template; the ordering invariants around them must still hold.
+    const p = plan();
+    const framing = p.indexOf('### Strategy Framing');
+    const scope = p.indexOf('### Scope Assessment');
+    assert.ok(framing > -1 && scope > -1 && framing < scope,
+      'Strategy Framing must still precede Scope Assessment (the LIN-279 invariant)');
+    assert.ok(/Surface Assessment/.test(p), 'the prerequisite-refactor rule must survive');
+    assert.ok(/completeness check/i.test(p), 'the completeness check must survive');
+  });
+});
+
+// =============================================================================
 // Ledger proportionality: low-risk changes discharge via post-merge observation
 // (LIN-898). Fix at review-AUTHORING time, not close-out discharge time; the
 // three hard floors (missing-ledger blocks, green-CI-never-discharges, no
