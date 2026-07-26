@@ -1112,6 +1112,32 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     }
   });
 
+  /**
+   * GET /workspace/:urlKey/api/proxy/credential-health
+   * Per-token credential health over the recent window (LIN-1586).
+   *
+   * Session-authenticated + workspace-scoped, exactly like the events endpoint
+   * above — same auth, same workspace resolution, same error envelope. It reads
+   * the audit rows the Event Log already shows, folded into the one verdict the
+   * rows cannot state on their own: a token that is still succeeding on
+   * workspace-free calls while every workspace-scoped call it makes reports
+   * `token_ownerless` is dead as a workspace credential.
+   *
+   * Returns verdicts and counts only — no account ids, no free text beyond the
+   * label the token list already shows.
+   */
+  router.get('/workspace/:urlKey/api/proxy/credential-health', workspaceFromUrl, async (req, res) => {
+    const { workspace } = req;
+
+    try {
+      const result = await proxyEventStore.listCredentialHealth(workspace.urlKey);
+      res.json(result);
+    } catch (err) {
+      console.error('Proxy credential health error:', err.message);
+      jsonError(res, 500, 'Failed to read credential health');
+    }
+  });
+
   // =========================================================================
   // Consumer API - Agent Instructions (llms.txt)
   // =========================================================================

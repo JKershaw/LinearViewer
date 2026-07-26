@@ -444,6 +444,51 @@ describe('collectKpiStats', () => {
   });
 });
 
+// LIN-1586 pins the PROJECTION half of the LIN-1539/LIN-1540 verdict, the half
+// the aggregation-path privacy test below explicitly does not cover. `note` is
+// free text; /kpis is unauthenticated, so free text fails open there. Beat 1
+// adds a SECOND reader of `note` (the credential-health read, which is
+// session-authenticated and workspace-scoped) — the moment a field has two
+// readers, "the other one doesn't read it" stops being obvious, so the guard is
+// asserted here rather than assumed.
+describe('PROXY_FIELDS keeps the free-text note out of the unauthenticated read (LIN-1586)', () => {
+  // The find() fallback is the branch PROXY_FIELDS governs; a spy records the
+  // projection the collection is actually handed.
+  function createProjectionSpy(docs = []) {
+    const calls = [];
+    return {
+      _calls: calls,
+      find(query = {}, options) {
+        calls.push({ query, options });
+        return { toArray: async () => docs };
+      },
+      async countDocuments() { return docs.length; }
+    };
+  }
+
+  test('the proxy-event projection omits note entirely', async () => {
+    const proxyEvents = createProjectionSpy([
+      { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: daysAgo(0), urlKey: 'acme', note: 'SENSITIVE-NOTE-BREADCRUMB' }
+    ]);
+    await collectKpiStats(buildCollections({ proxyEvents }), { now: NOW });
+
+    const projection = proxyEvents._calls.at(-1)?.options?.projection;
+    assert.ok(projection, 'the proxy-event read must be projected, not a raw find({})');
+    assert.strictEqual(projection.note, undefined, 'note must stay out of PROXY_FIELDS');
+    assert.deepStrictEqual(Object.keys(projection).sort(),
+      ['endpoint', 'method', 'status', 'timestamp', 'urlKey']);
+  });
+
+  test('a note in the source docs still never reaches the serialized stats', async () => {
+    // The emit half, on the find() branch (its aggregate-branch twin lives below).
+    const proxyEvents = createProjectionSpy([
+      { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: daysAgo(0), urlKey: 'acme', note: 'SENSITIVE-NOTE-BREADCRUMB' }
+    ]);
+    const stats = await collectKpiStats(buildCollections({ proxyEvents }), { now: NOW });
+    assert.ok(!JSON.stringify(stats).includes('SENSITIVE-NOTE-BREADCRUMB'), 'proxy event note leaked');
+  });
+});
+
 // The headline outcome metric (LIN-1596). One seed, exercised here through the
 // mock (find) path and again below through real MangoDB's aggregation path, so
 // the two shapes — a raw `feedback[]` vs a single derived `terminalEntry` —

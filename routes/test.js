@@ -525,7 +525,11 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         // set-session calls establish, via the existing fallback this file
         // already uses for the identical problem (see resolveTestPrefsAccountId
         // below) — never a fabricated or arbitrary id.
-        createdBy: await resolveTestPrefsAccountId(req)
+        // LIN-1586: ?ownerless=true mints the pre-LIN-1397 shape (no createdBy)
+        // so a spec can drive the `no owner · re-issue` badge. Opt-in only —
+        // every existing caller keeps the owner-stamped token above, which is
+        // what owner-scoped workspace resolution needs.
+        createdBy: req.query.ownerless === 'true' ? null : await resolveTestPrefsAccountId(req)
       })
       res.json({ tokenId: result.tokenId, token: result.token, scope: result.scope, kind: result.kind })
     } catch (err) {
@@ -538,6 +542,30 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       await proxyTokenStore.clear(req.query.urlKey || 'test-workspace')
       res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // LIN-1586: seed a proxy-event row directly.
+  //
+  // The genuine `token_ownerless` row cannot be manufactured through the real
+  // proxy in tests — NODE_ENV=test short-circuits resolveWorkspaceAccess and
+  // resolveProviderAccess, so the 503 path that writes the note is unreachable.
+  // Seeding the audit row is therefore how a spec exercises what the Event Log
+  // and the health panel DRAW; it makes no claim about how the row is produced.
+  router.get('/test/seed-proxy-event', async (req, res) => {
+    try {
+      const event = await proxyEventStore.recordEvent({
+        urlKey: req.query.urlKey || 'test-workspace',
+        tokenId: req.query.tokenId || null,
+        tokenLabel: req.query.tokenLabel || null,
+        method: req.query.method || 'GET',
+        endpoint: req.query.endpoint || '/api/proxy/me',
+        status: req.query.status ? parseInt(req.query.status, 10) : 200,
+        note: req.query.note || null
+      })
+      res.json({ id: event._id, status: event.status, note: event.note })
     } catch (err) {
       res.status(500).json({ error: err.message })
     }

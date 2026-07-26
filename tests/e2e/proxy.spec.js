@@ -2385,3 +2385,202 @@ test.describe('Proxy token mint — feature gate + prompt-proxy TTL (LIN-525)', 
     expect(days).toBeGreaterThan(30);
   });
 });
+
+// ===========================================================================
+// LIN-1586 (Beat 1 of LIN-1577) — the ownerless credential fault, made visible
+// where the proxy-event rows already are.
+//
+// The rows are SEEDED through /test/seed-proxy-event rather than produced by a
+// real 503. Manufacturing a genuine `token_ownerless` row is unreachable under
+// test: NODE_ENV=test short-circuits resolveWorkspaceAccess (server.js) and
+// resolveProviderAccess (routes/proxy.js), so the path that writes the note
+// never runs. What these specs assert is what the page DRAWS given the row —
+// which is the whole of Beat 1. An E2E claiming to produce the 503 itself would
+// be theatre, and is deliberately not attempted.
+// ===========================================================================
+
+const OWNERLESS_NOTE = 'token_ownerless';
+const FREE_TIER_NOTE = 'free-tier fallback: no paid/OAuth key resolved';
+
+test.describe('Proxy credential-fault visibility (LIN-1586)', () => {
+  const featuresOn = () => `features=${encodeURIComponent(JSON.stringify({ proxy: true }))}`;
+  const featuresOff = () => `features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`;
+
+  // Seed one audit row. Defaults to a row that is inert for the predicate so a
+  // test only has to name the part it cares about.
+  async function seedEvent(page, { tokenId = 'tok-1', tokenLabel = 'worker', status = 200, note = null, endpoint = '/api/proxy/me', method = 'GET' } = {}) {
+    const params = new URLSearchParams({ urlKey: URL_KEY, tokenId, tokenLabel, status: String(status), endpoint, method });
+    if (note) params.set('note', note);
+    const resp = await page.request.get(`/test/seed-proxy-event?${params}`);
+    expect(resp.status()).toBe(200);
+  }
+
+  // The pair that IS the fault: a workspace-free success (201, the shape a
+  // dispatched worker's /agent/status post takes) alongside an ownerless 503.
+  async function seedDeadCredential(page, { tokenId = 'tok-dead', tokenLabel = 'dying-worker' } = {}) {
+    await seedEvent(page, { tokenId, tokenLabel, status: 201, endpoint: '/api/proxy/agent/status', method: 'POST' });
+    await seedEvent(page, { tokenId, tokenLabel, status: 503, endpoint: '/api/proxy/issues/LIN-1', note: OWNERLESS_NOTE });
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?${featuresOn()}&urlKey=${URL_KEY}`);
+  });
+
+  test.describe('B1 — the note reaches the event row', () => {
+    test('the Event Log renders the reason on the row that carries it', async ({ page }) => {
+      await seedEvent(page, { status: 503, endpoint: '/api/proxy/issues/LIN-1', note: OWNERLESS_NOTE });
+
+      await page.goto(PROXY_PAGE_URL);
+      await page.click('#proxy-events-collapsible summary');
+
+      const row = page.locator('.proxy-event-item', { hasText: '/api/proxy/issues/LIN-1' });
+      await expect(row.locator('.proxy-event-note')).toHaveText(OWNERLESS_NOTE);
+      // The reason names the fault; the pill still says only that it failed.
+      await expect(row.locator('.status-pill--error')).toBeVisible();
+    });
+
+    test('a note-less row draws no note element at all', async ({ page }) => {
+      await seedEvent(page, { status: 200, endpoint: '/api/proxy/teams' });
+
+      await page.goto(PROXY_PAGE_URL);
+      await page.click('#proxy-events-collapsible summary');
+
+      const row = page.locator('.proxy-event-item', { hasText: '/api/proxy/teams' });
+      await expect(row).toBeVisible();
+      await expect(row.locator('.proxy-event-note')).toHaveCount(0);
+    });
+
+    test('note text is escaped, not interpreted as markup', async ({ page }) => {
+      // `note` is free text on a template that escapes every other dynamic
+      // value; an injected tag must render as characters and mint no element.
+      await seedEvent(page, { status: 503, endpoint: '/api/proxy/xss', note: '<img src=x onerror=alert(1)>' });
+
+      await page.goto(PROXY_PAGE_URL);
+      await page.click('#proxy-events-collapsible summary');
+
+      const row = page.locator('.proxy-event-item', { hasText: '/api/proxy/xss' });
+      await expect(row.locator('.proxy-event-note')).toHaveText('<img src=x onerror=alert(1)>');
+      await expect(row.locator('.proxy-event-note img')).toHaveCount(0);
+    });
+  });
+
+  test.describe('B2/B3 — the ownerless badge on the proxy token list', () => {
+    test('an ownerless token wears the same "no owner · re-issue" badge as the dispatch list', async ({ page }) => {
+      await page.goto(`/test/create-proxy-token?label=legacy-runner&ownerless=true&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresOn()}&urlKey=${URL_KEY}`);
+
+      await page.goto(PROXY_PAGE_URL);
+      await page.click('#proxy-tokens-collapsible summary');
+
+      const row = page.locator('.proxy-token-list .token-item', { hasText: 'legacy-runner' });
+      await expect(row.locator('.token-ownerless')).toHaveText('no owner · re-issue');
+    });
+
+    test('an owned token wears no badge', async ({ page }) => {
+      await page.goto(`/test/create-proxy-token?label=owned-runner&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresOn()}&urlKey=${URL_KEY}`);
+
+      await page.goto(PROXY_PAGE_URL);
+      await page.click('#proxy-tokens-collapsible summary');
+
+      const row = page.locator('.proxy-token-list .token-item', { hasText: 'owned-runner' });
+      await expect(row).toBeVisible();
+      await expect(row.locator('.token-ownerless')).toHaveCount(0);
+    });
+
+    test('the tokens API reports hasOwner as a verdict, never the account id', async ({ page }) => {
+      await page.goto(`/test/create-proxy-token?label=legacy-runner&ownerless=true&urlKey=${URL_KEY}`);
+      await page.goto(`/test/create-proxy-token?label=owned-runner&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresOn()}&urlKey=${URL_KEY}`);
+
+      const resp = await page.request.get(`${API_PREFIX}/tokens`);
+      expect(resp.status()).toBe(200);
+      const { tokens } = await resp.json();
+      const byLabel = Object.fromEntries(tokens.map(t => [t.label, t]));
+      expect(byLabel['legacy-runner'].hasOwner).toBe(false);
+      expect(byLabel['owned-runner'].hasOwner).toBe(true);
+      expect(JSON.stringify(tokens)).not.toContain('createdBy');
+    });
+  });
+
+  test.describe('B4/B5 — the credential-health endpoint', () => {
+    test('names the dead credential with its counts and verdict', async ({ page }) => {
+      await seedDeadCredential(page);
+
+      const resp = await page.request.get(`${API_PREFIX}/credential-health`);
+      expect(resp.status()).toBe(200);
+      const body = await resp.json();
+      expect(body.windowMs).toBe(15 * 60 * 1000);
+
+      const dead = body.tokens.find(t => t.tokenId === 'tok-dead');
+      expect(dead).toMatchObject({
+        tokenLabel: 'dying-worker',
+        ownerlessCount: 1,
+        okCount: 1,
+        verdict: 'credential_dead'
+      });
+    });
+
+    test('plain 503s and the free-tier sentence are not this fault', async ({ page }) => {
+      // 24 logEvent(…, 503) sites, one note; and `note` has another writer
+      // whose text must never be mistaken for the reason token.
+      await seedEvent(page, { tokenId: 'tok-noisy', tokenLabel: 'noisy', status: 200 });
+      await seedEvent(page, { tokenId: 'tok-noisy', tokenLabel: 'noisy', status: 503 });
+      await seedEvent(page, { tokenId: 'tok-noisy', tokenLabel: 'noisy', status: 200, note: FREE_TIER_NOTE });
+
+      const resp = await page.request.get(`${API_PREFIX}/credential-health`);
+      const body = await resp.json();
+      const entry = body.tokens.find(t => t.tokenId === 'tok-noisy');
+      expect(entry.ownerlessCount).toBe(0);
+      expect(entry.verdict).toBe('ok');
+    });
+
+    test('requires a session — an unauthenticated read does not get workspace data', async ({ request }) => {
+      const resp = await request.get(`${API_PREFIX}/credential-health`);
+      expect(resp.status()).not.toBe(200);
+    });
+  });
+
+  test.describe('B6 — the health panel above the Event Log', () => {
+    test('the panel sits above the Event Log and names the dead credential', async ({ page }) => {
+      await seedDeadCredential(page);
+
+      await page.goto(PROXY_PAGE_URL);
+      const panel = page.locator('#proxy-health-panel');
+      await expect(panel).toBeVisible();
+
+      const item = panel.locator('.proxy-health-item', { hasText: 'dying-worker' });
+      await expect(item).toBeVisible();
+      // Same wording as the token list and the dispatch list — one fault, one phrase.
+      await expect(item.locator('.token-ownerless')).toHaveText('no owner · re-issue');
+      await expect(item).toContainText('1 ownerless');
+      await expect(item).toContainText('last 15 min');
+
+      // Above, not below: the fault is the first thing on the way to the rows.
+      const panelBox = await page.locator('.proxy-health-section').boundingBox();
+      const eventsBox = await page.locator('#proxy-events-collapsible').boundingBox();
+      expect(panelBox.y).toBeLessThan(eventsBox.y);
+    });
+
+    test('a healthy workspace shows the empty state, not an empty box', async ({ page }) => {
+      await seedEvent(page, { status: 200 });
+
+      await page.goto(PROXY_PAGE_URL);
+      await expect(page.locator('#proxy-health-panel .proxy-health-empty'))
+        .toHaveText('No credential faults in the last 15 min');
+    });
+
+    test('the panel is not visible when the proxy flag is off (the page redirects)', async ({ page }) => {
+      // Beat 1 ships behind the flag the Proxy page already hard-redirects on.
+      // Un-gating is Beat 2's Live Console job, not a side effect of this work.
+      await seedDeadCredential(page);
+      await page.goto(`/test/set-session?${featuresOff()}&urlKey=${URL_KEY}`);
+
+      await page.goto(PROXY_PAGE_URL);
+      await expect(page).toHaveURL(/\/settings$/);
+      await expect(page.locator('#proxy-health-panel')).toHaveCount(0);
+    });
+  });
+});

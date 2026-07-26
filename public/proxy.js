@@ -22,6 +22,7 @@
   const eventsCollapsible = document.getElementById('proxy-events-collapsible');
   const eventsCount = document.getElementById('proxy-events-count');
   const eventsPager = document.getElementById('proxy-events-pager');
+  const healthPanel = document.getElementById('proxy-health-panel');
   const eventsPagerInfo = eventsPager?.querySelector('.proxy-events-pager-info');
   const eventsPrevBtn = eventsPager?.querySelector('.proxy-events-prev');
   const eventsNextBtn = eventsPager?.querySelector('.proxy-events-next');
@@ -247,11 +248,17 @@ This will return all available endpoints with examples. Your token scope is: ${s
       formatTimeAgo(t.createdAt),
       t.lastUsedAt ? `used ${formatTimeAgo(t.lastUsedAt)}` : 'never used'
     ].join(' \u00B7 ');
+    // LIN-1586, mirroring the dispatch-token badge shipped by LIN-1448 (same
+    // class, same copy, same title \u2014 one wording for one fault). Older API
+    // responses omit `hasOwner` entirely, so only an explicit false warns.
+    const ownerless = t.hasOwner === false
+      ? ' \u00B7 <span class="token-ownerless" title="Minted before token ownership existed. Tokens it mints cannot access the workspace \u2014 re-issue this token and update the consumer.">no owner \u00B7 re-issue</span>'
+      : '';
 
     return `<div class="surface token-item">
       <div class="token-info">
         <div class="token-label-text">${escapeHtml(t.label)}${scopeBadge}${consumedBadge}${expiryBadge}</div>
-        <div class="token-meta">${escapeHtml(meta)}</div>
+        <div class="token-meta">${escapeHtml(meta)}${ownerless}</div>
       </div>
       <button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
     </div>`;
@@ -313,6 +320,50 @@ This will return all available endpoints with examples. Your token scope is: ${s
   }
 
   // =========================================================================
+  // Credential Health (LIN-1586)
+  //
+  // Names the fault the Event Log can only spell out row by row: a token still
+  // succeeding on workspace-free calls while its workspace-scoped calls report
+  // `token_ownerless`. Not collapsible and loaded on init — the whole point is
+  // that a human opening the page sees it without going looking.
+  // =========================================================================
+
+  async function loadCredentialHealth() {
+    if (!healthPanel) return;
+
+    let data;
+    try {
+      // on401:false — the inline empty state below reports failure; no redirect.
+      data = await window.api(`${apiBase}/credential-health`, { on401: false });
+    } catch {
+      healthPanel.innerHTML = '<div class="proxy-health-empty">Failed to load credential health</div>';
+      return;
+    }
+
+    const tokens = (data && data.tokens) || [];
+    const dead = tokens.filter(t => t.verdict === 'credential_dead');
+    const windowLabel = `last ${Math.round((data?.windowMs || 0) / 60000)} min`;
+
+    if (!dead.length) {
+      healthPanel.innerHTML =
+        `<div class="proxy-health-empty">No credential faults in the ${escapeHtml(windowLabel)}</div>`;
+      return;
+    }
+
+    healthPanel.innerHTML = dead.map(t => {
+      const label = t.tokenLabel || t.tokenId;
+      const counts = `${t.ownerlessCount} ownerless · ${t.okCount} ok · ${windowLabel}`;
+      return `<div class="surface proxy-health-item" data-token-id="${escapeHtml(t.tokenId)}">
+        <div class="proxy-health-info">
+          <div class="proxy-health-label">${escapeHtml(label)} <span class="token-ownerless" title="This token's workspace-scoped calls report token_ownerless while its workspace-free calls still succeed. Re-issue it and update the consumer.">no owner · re-issue</span></div>
+          <div class="proxy-health-meta">${escapeHtml(counts)}</div>
+        </div>
+        ${statusDotPill('error', 'credential dead')}
+      </div>`;
+    }).join('');
+  }
+
+  // =========================================================================
   // Event Log
   // =========================================================================
 
@@ -344,10 +395,19 @@ This will return all available endpoints with examples. Your token scope is: ${s
       // Run-status dot pill (LIN-854): ok(2xx)→done, warn(3xx)→running, error(4xx+)→error.
       const state = e.status < 300 ? 'done' : e.status < 400 ? 'running' : 'error';
       const label = e.tokenLabel ? ` · ${escapeHtml(e.tokenLabel)}` : '';
+      // LIN-1586: the reason already reaches the browser — listEvents projects
+      // `note` and the route returns it unmodified — it was simply never drawn,
+      // so a 503 row read as an anonymous failure. `note` is FREE TEXT (a reason
+      // token from LIN-1540, an English sentence from LIN-961), hence escaped
+      // like every other dynamic value in this template.
+      const note = e.note
+        ? `<span class="proxy-event-note" title="${escapeHtml(e.note)}">${escapeHtml(e.note)}</span>`
+        : '';
       return `<div class="proxy-event-item">
         <span class="proxy-event-method">${escapeHtml(e.method)}</span>
         <span class="proxy-event-endpoint">${escapeHtml(e.endpoint)}</span>
         ${statusDotPill(state, e.status)}
+        ${note}
         <span class="proxy-event-meta">${formatTimeAgo(e.timestamp)}${label}</span>
       </div>`;
     }).join('');
@@ -457,4 +517,5 @@ This will return all available endpoints with examples. Your token scope is: ${s
   // =========================================================================
   refreshTokenCount();
   refreshEventsCount();
+  loadCredentialHealth();
 })();
