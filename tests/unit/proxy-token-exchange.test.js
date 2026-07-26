@@ -113,6 +113,19 @@ describe('LIN-376 — POST /api/proxy/token (bootstrap exchange)', () => {
     assert.ok(events.some(e => e.endpoint === '/api/proxy/token' && e.status === 200 && e.urlKey === 'acme'));
   });
 
+  // LIN-1587 R1 — the exchange must no longer flatten every bootstrap's own
+  // label to the literal 'exchanged'; the working token should inherit it, so
+  // per-site lanes (dispatch-bootstrap, refire-broker, wake-bootstrap,
+  // kickoff-bootstrap, collective, feedback-triage) survive into the Event Log.
+  test('the working token inherits the bootstrap\'s own per-site label, not a hard-coded "exchanged"', async () => {
+    const boot = await store.createToken('acme', { kind: 'bootstrap', scope: 'readWrite', label: 'refire-broker' });
+    const res = await post(app, '/api/proxy/token', boot.token);
+
+    assert.equal(res.status, 200);
+    const working = await store.validateToken(res.body.token);
+    assert.equal(working.label, 'refire-broker', 'label must survive the exchange, not collapse to "exchanged"');
+  });
+
   test('a second exchange of the same bootstrap 401s (consumed)', async () => {
     const boot = await store.createToken('acme', { kind: 'bootstrap' });
     const first = await post(app, '/api/proxy/token', boot.token);

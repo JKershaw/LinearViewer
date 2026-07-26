@@ -1581,7 +1581,6 @@ One convention across every endpoint, so you can branch on the same fields every
 
     try {
       const working = await proxyTokenStore.exchangeBootstrapToken(bootstrap, {
-        label: 'exchanged',
         ttl: WORKING_TOKEN_TTL_SECONDS
       });
       if (!working) {
