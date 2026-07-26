@@ -716,6 +716,58 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   }
 
   /**
+   * Shared refusal responder for the duplicate-dispatch guard (LIN-1656),
+   * mirroring `denyIfUnsupported` above: one construction site for the 409 so
+   * every creating route replies identically and a new one inherits the shape
+   * instead of having to remember it.
+   *
+   * The BODY itself is built once further up, by `createDispatchItem`, and
+   * carried on `err.duplicateDispatch` — `{ code, id, issueIdentifier, kind,
+   * dispatchedAt, retryAfter }`. This just labels it, audits it, and picks the
+   * right transport. `code` is the programmatic discriminator callers branch on;
+   * 409 is already taken on this router by the trashed-issue refusal, so the
+   * status alone is not enough to tell them apart.
+   *
+   * `id` is the load-bearing field: it names the LIVE dispatch, so a refused
+   * orchestrator can WATCH that one instead of guessing. This is exactly why the
+   * plan chose 409 over a `{deduped:true}` 200 — a wake is addressed to the
+   * original dispatcher's edge, so a success shape would leave the second
+   * orchestrator standing by forever on an edge it does not own.
+   *
+   * KEEPALIVE CAVEAT (`lib/http-keepalive.js`). On a long handler the keepalive
+   * may already have flushed `200 + Content-Type` before the guard fires, at
+   * which point the HTTP status is committed and cannot be changed — `send` then
+   * moves the real status into the body as `statusCode`. So a keepalive-armed
+   * caller MUST pass its keepalive here rather than touching `res` directly, and
+   * the `Retry-After` header is set only while headers are still open (setting one
+   * after flush throws ERR_HTTP_HEADERS_SENT and would turn a clean refusal into a
+   * crash). The body's `retryAfter` is the authoritative copy either way; the
+   * header is the standards-friendly duplicate, matching what `standardHeaders`
+   * already emits on the rate limiters.
+   *
+   * @param {*} err - the caught error (a non-duplicate error passes straight through)
+   * @param {import('express').Request} req
+   * @param {import('express').Response} res
+   * @param {string} endpoint - audit-log endpoint tag
+   * @param {{send: Function}} [keepalive] - pass when the handler armed one
+   * @returns {boolean} true if a refusal was sent (caller returns early)
+   */
+  function refuseIfDuplicateDispatch(err, req, res, endpoint, keepalive = null) {
+    if (!err || !err.duplicateDispatch) return false;
+    const refusal = err.duplicateDispatch;
+    logEvent(req, endpoint, 409);
+    if (!res.headersSent) {
+      res.set('Retry-After', String(refusal.retryAfter));
+    }
+    if (keepalive) {
+      keepalive.send(409, { error: err.message, ...refusal });
+    } else {
+      jsonError(res, 409, err.message, refusal);
+    }
+    return true;
+  }
+
+  /**
    * Backstop for the ROUTE-INTERNAL reads a write path calls unconditionally —
    * `issueWriteGuard` / `issueDescription` / `issueLabels` / `updateIssueLabels`
    * (LIN-1559).
@@ -4440,6 +4492,11 @@ One convention across every endpoint, so you can branch on the same fields every
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
       });
     } catch (err) {
+      // An issue-scoped kickoff (kind 'autopilot') can duplicate like any other
+      // fresh dispatch — LIN-1656. A stack-walk kickoff carries no issueIdentifier
+      // and can never be refused. Ahead of the generic 500: a 500 here is worse
+      // than no guard, since a caller cannot tell it from a real fault.
+      if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/autopilot/kickoff')) return;
       // Fail closed (LIN-1175): a claude-code dispatch whose out-of-band bootstrap
       // token could not be minted must be REFUSED, never launched credential-less.
       // attachProxyContext flags this as proxyAttachFailed (same convention as the
@@ -4718,6 +4775,9 @@ One convention across every endpoint, so you can branch on the same fields every
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
       });
     } catch (err) {
+      // Duplicate-dispatch refusal (LIN-1656) — see the responder. Ahead of the
+      // generic 500 so an orchestrator can branch on `code` and adopt the `id`.
+      if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/dispatch')) return;
       // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
       if (err && err.proxyAttachFailed) {
         logEvent(req, '/api/proxy/dispatch', 503);
@@ -4967,6 +5027,11 @@ One convention across every endpoint, so you can branch on the same fields every
             override: true
           });
         } catch (err) {
+          // Duplicate-dispatch refusal (LIN-1656). This is the verb-OVERRIDE arm,
+          // which creates its dispatch BEFORE `armKeepalive` runs, so it replies on
+          // plain `res` — no keepalive to thread. (The LLM arm below is armed and
+          // must pass one.)
+          if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch')) return;
           // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
           if (err && err.proxyAttachFailed) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
@@ -5141,6 +5206,12 @@ One convention across every endpoint, so you can branch on the same fields every
         });
       } catch (err) {
         keepalive.stop();
+        // Duplicate-dispatch refusal (LIN-1656). Keepalive is ARMED on this arm, so
+        // the refusal must ride `keepalive.send` — if the 25s flush already fired,
+        // the 200 is committed and the real 409 travels as `statusCode` in the body
+        // (same contract as the 503 below). The responder also skips the
+        // `Retry-After` header once headers are sent.
+        if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
         // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
         if (err && err.proxyAttachFailed) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 503);

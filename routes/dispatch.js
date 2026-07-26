@@ -563,6 +563,22 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         ...(spawn ? { spawn } : {})
       });
     } catch (err) {
+      // Duplicate-dispatch refusal (LIN-1656): a fresh dispatch for this
+      // issue+kind already exists from the last few minutes. Same tagged-throw
+      // convention as `proxyAttachFailed` just below, and it must sit ahead of the
+      // generic 500 — a 500 would be indistinguishable from a real fault, which is
+      // worse than having no guard at all.
+      //
+      // The body is constructed once by `createDispatchItem` and carried on the
+      // error, so this is a relay, not a second construction site: `code`
+      // (DUPLICATE_DISPATCH) is what a caller branches on, and `id` names the LIVE
+      // dispatch to watch instead of re-dispatching. `Retry-After` duplicates the
+      // body's `retryAfter` for standards-friendly clients. This route is
+      // session-auth'd (no proxy audit log), so there is no logEvent to write.
+      if (err && err.duplicateDispatch) {
+        res.set('Retry-After', String(err.duplicateDispatch.retryAfter));
+        return jsonError(res, 409, err.message, err.duplicateDispatch);
+      }
       // Proxy-context attach failure (LIN-1162): a requested `attachProxy:true`
       // could not mint/append its block. Surface it (503, transient — mirrors the
       // client's old token-rate-limit message) rather than the generic 500, and

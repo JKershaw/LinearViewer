@@ -47,7 +47,7 @@ function createMockCollection() {
   };
 }
 
-function buildApp(captured, { workspacePreferencesStore } = {}) {
+function buildApp(captured, { workspacePreferencesStore, findRecentFreshDispatch } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -70,7 +70,11 @@ function buildApp(captured, { workspacePreferencesStore } = {}) {
       addItem: async (urlKey, item) => {
         captured.item = item;
         return { _id: 'disp-1', dispatchedAt: '2026-07-06T00:00:00.000Z', ...item };
-      }
+      },
+      // LIN-1656: only wired when a test asks for it. Every other test here keeps
+      // an addItem-ONLY store, which is exactly the documented fail-open the guard
+      // depends on — a store without the read capability dispatches unguarded.
+      ...(findRecentFreshDispatch ? { findRecentFreshDispatch } : {})
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore,
@@ -93,7 +97,7 @@ async function call(app, method, path, body) {
     const text = await res.text();
     let parsed;
     try { parsed = JSON.parse(text); } catch { parsed = text; }
-    return { status: res.status, body: parsed };
+    return { status: res.status, body: parsed, retryAfterHeader: res.headers.get('retry-after') };
   } finally {
     await new Promise(resolve => server.close(resolve));
   }
@@ -335,5 +339,103 @@ describe('LIN-1099 — POST /api/proxy/recommend-and-dispatch resolves dispatchD
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.strictEqual(captured.item.model, null);
     assert.strictEqual(captured.item.harness, 'claude-code');
+  });
+});
+
+/**
+ * LIN-1656 — route-level: every proxy surface that CREATES a dispatch maps the
+ * factory's tagged refusal to a real 409 with the body intact.
+ *
+ * A 500 here would be worse than having no guard at all: the caller cannot
+ * distinguish it from a genuine fault, so it would retry into the guard or halt.
+ * The body is the contract — an orchestrator branches on `code` and then WATCHES
+ * the dispatch named by `id` instead of re-dispatching, which is the whole reason
+ * the refusal is a 409 and not a success-shaped `{deduped:true}` 200.
+ *
+ * There are FOUR creation call sites on this router, not three: the fused verb has
+ * two, and they differ in transport — the verb-override arm answers on plain `res`
+ * (it runs before `armKeepalive`), while the recommendation-derived arm is armed
+ * and must answer through `keepalive.send`.
+ */
+const PRIOR = { id: 'live-dispatch-id', dispatchedAt: new Date(Date.now() - 137_000) };
+const alwaysDuplicate = async () => PRIOR;
+
+function assertRefusal(res, { kind }) {
+  assert.equal(res.status, 409, JSON.stringify(res.body));
+  assert.equal(res.body.code, 'DUPLICATE_DISPATCH',
+    'callers branch on `code` — 409 alone is ambiguous, the trashed-issue refusal already uses it');
+  assert.equal(res.body.id, PRIOR.id,
+    'the refusal must name the LIVE dispatch so the caller can adopt and watch it');
+  assert.equal(res.body.kind, kind, 'the RESOLVED kind, so the caller knows what collided');
+  assert.equal(res.body.dispatchedAt, PRIOR.dispatchedAt.toISOString());
+  assert.ok(res.body.retryAfter > 0 && res.body.retryAfter <= 300);
+  assert.equal(res.retryAfterHeader, String(res.body.retryAfter),
+    'the standard header must mirror the body field');
+  assert.ok(res.body.error, 'a human-readable message rides alongside the machine fields');
+}
+
+describe('LIN-1656 — the proxy creation routes surface the duplicate refusal as 409', () => {
+  test('POST /api/proxy/dispatch', async () => {
+    const captured = {};
+    const app = buildApp(captured, { findRecentFreshDispatch: alwaysDuplicate });
+    const res = await call(app, 'post', '/api/proxy/dispatch', {
+      prompt: 'run me', kind: 'implementation', issueIdentifier: 'TEST-14'
+    });
+
+    assertRefusal(res, { kind: 'implementation' });
+    assert.equal(captured.item, undefined, 'a refused dispatch must never reach addItem');
+  });
+
+  test('POST /api/proxy/recommend-and-dispatch — the verb-override arm (plain res, pre-keepalive)', async () => {
+    const captured = {};
+    const app = buildApp(captured, { findRecentFreshDispatch: alwaysDuplicate });
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation'
+    });
+
+    assertRefusal(res, { kind: 'implementation' });
+    assert.equal(captured.item, undefined);
+  });
+
+  test('POST /api/proxy/recommend-and-dispatch — the recommendation-derived arm (keepalive armed)', async () => {
+    const captured = {};
+    const app = buildApp(captured, { findRecentFreshDispatch: alwaysDuplicate });
+    // No `kind`: the descent resolves TEST-14 to an `implement` action, landing on
+    // the LLM-derived creation seam whose catch must answer via keepalive.send.
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-14'
+    });
+
+    assertRefusal(res, { kind: 'implementation' });
+    assert.equal(captured.item, undefined);
+  });
+
+  test('POST /api/proxy/autopilot/kickoff — an issue-scoped kickoff can collide like any other fresh dispatch', async () => {
+    const captured = {};
+    const app = buildApp(captured, { findRecentFreshDispatch: alwaysDuplicate });
+    const res = await call(app, 'post', '/api/proxy/autopilot/kickoff', {
+      issueIdentifier: 'TEST-14'
+    });
+
+    assertRefusal(res, { kind: 'autopilot' });
+    assert.equal(captured.item, undefined);
+  });
+
+  test('with no recent prior every one of those routes still dispatches (201)', async () => {
+    // The control the whole matrix rests on: a guard that refused everything would
+    // pass all four cases above. These prove the routes are not simply broken.
+    const noPrior = async () => null;
+    for (const [path, body] of [
+      ['/api/proxy/dispatch', { prompt: 'run me', kind: 'implementation', issueIdentifier: 'TEST-14' }],
+      ['/api/proxy/recommend-and-dispatch', { issueIdentifier: 'TEST-1', kind: 'implementation' }],
+      ['/api/proxy/recommend-and-dispatch', { issueIdentifier: 'TEST-14' }],
+      ['/api/proxy/autopilot/kickoff', { issueIdentifier: 'TEST-14' }]
+    ]) {
+      const captured = {};
+      const app = buildApp(captured, { findRecentFreshDispatch: noPrior });
+      const res = await call(app, 'post', path, body);
+      assert.equal(res.status, 201, `${path}: ${JSON.stringify(res.body)}`);
+      assert.ok(captured.item, `${path}: the item must be enqueued`);
+    }
   });
 });
