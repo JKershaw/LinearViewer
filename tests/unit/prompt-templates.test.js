@@ -102,9 +102,9 @@ describe('getPromptLabels', () => {
     assert.ok(labels.includes('retro'));
   });
 
-  test('has exactly 15 templates', () => {
+  test('has exactly 16 templates', () => {
     const labels = getPromptLabels();
-    assert.strictEqual(labels.length, 15);
+    assert.strictEqual(labels.length, 16);
   });
 });
 
@@ -117,7 +117,7 @@ describe('defer recommend-meta action', () => {
     // The no-body cost contract is structural: defer has no PROMPT_TEMPLATES entry,
     // so it cannot produce a prompt and cannot inflate the template count.
     assert.ok(!('defer' in PROMPT_TEMPLATES), 'defer must not be a prompt template');
-    assert.strictEqual(getPromptLabels().length, 15, 'defer must not change the template count');
+    assert.strictEqual(getPromptLabels().length, 16, 'defer must not change the template count');
   });
 
   test('defer is registered in RECOMMEND_META_ACTIONS and the dispatch vocabulary', () => {
@@ -276,8 +276,10 @@ describe('PROMPT_TEMPLATES', () => {
       'design',
       'spike',
       'context',
+      'plan-review',
       'implementation',
       'review',
+      'close-out',
       'retro'
     ];
     for (const labelName of expectedTemplates) {
@@ -2010,6 +2012,156 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.ok(/then `close-out` once review has approved/i.test(step0), 'priority line sequences review→close-out');
     const step3 = buildMetaPromptTemplate({ ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0, isTerminal: false, hasOpenChildren: false });
     assert.ok(/Recommend `close-out` — the ledger-gated finish/i.test(step3), 'Step 3 landed-guard offers close-out after approval');
+  });
+});
+
+// =============================================================================
+// plan-review template: registration + the six checks in BOTH paths (LIN-1602)
+//
+// The acceptance criterion is that the six checks are present AND ORDERED in
+// both prompt paths, so the assertions below anchor on CONTENT, never on list
+// numbering. Two traps make numbering useless here:
+//   1. The rendered body opens with formatReadOnlyWorkflow's own `1./2./3.`
+//      list, ABOVE the checks — a bare `^\d\. \*\*` scan anchors on that and
+//      proves nothing. Every ordering assertion is therefore scoped to the
+//      `### The Six Checks` section.
+//   2. The two paths number differently — the template emits `1.`…`6.` as
+//      separate lines, the meta-prompt rule numbers `(1)`…`(6)` inline inside a
+//      single bullet — so no shared numbering regex can span both. Each path is
+//      sliced to its own region and checked separately against shared anchors.
+// The anchors are case- and hyphen-tolerant because the two paths legitimately
+// differ in casing (`Prerequisite refactor` vs `prerequisite-refactor`).
+// =============================================================================
+
+import { formatReadOnlyWorkflow, formatDiscussionReference } from '../../lib/prompt-formatters.js';
+
+describe('plan-review template + the six checks in both paths (LIN-1602)', () => {
+  const issue = {
+    id: 'pr-1', identifier: 'LIN-903', title: 'Verify the plan',
+    description: 'a plan', url: 'https://linear.app/test/issue/LIN-903',
+    labels: [], createdAt: '2026-01-01T00:00:00.000Z'
+  };
+  const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+
+  // The six checks, in their committed order. Content anchors only.
+  const SIX_CHECKS = [
+    { label: 'completeness check', re: /completeness check/i },
+    { label: 'Strategy Framing', re: /strategy framing/i },
+    { label: 'history signal', re: /history signal/i },
+    { label: 'session-fit', re: /session-fit/i },
+    { label: 'relaxation guard', re: /relaxation guard/i },
+    { label: 'prerequisite-refactor necessity', re: /prerequisite[- ]refactor/i }
+  ];
+
+  /** Assert the six anchors are present and strictly increasing WITHIN one path's region. */
+  const assertSixChecksOrdered = (region, pathName) => {
+    let prev = -1;
+    for (const { label, re } of SIX_CHECKS) {
+      const at = region.search(re);
+      assert.ok(at > -1, `${pathName}: missing the "${label}" check`);
+      assert.ok(at > prev, `${pathName}: "${label}" is out of order (index ${at} follows ${prev})`);
+      prev = at;
+    }
+  };
+
+  test('plan-review is a registered first-class template (key, name===key, UNIVERSAL, AI-recommendable, completion signal)', () => {
+    assert.ok('plan-review' in PROMPT_TEMPLATES, 'plan-review is a PROMPT_TEMPLATES key');
+    const t = PROMPT_TEMPLATES['plan-review'];
+    // The display name MUST equal the key: parseRecommendedAction reads the emitted
+    // `→ **name**` and _DISPATCH_KIND_BY_ALIAS maps it back (the close-out precedent).
+    assert.strictEqual(t.name, 'plan-review');
+    assert.strictEqual(t.category, PROMPT_CATEGORIES.UNIVERSAL);
+    assert.ok(t.aiHint, 'has an aiHint so it is AI-recommendable');
+    assert.ok(COMPLETION_SIGNALS['plan-review'], 'has a registered completion signal');
+    assert.strictEqual(t.completionSignals, COMPLETION_SIGNALS['plan-review'], 'template wires its completion signal');
+  });
+
+  test('(a) handwritten path: the six checks are present and ordered inside "### The Six Checks"', () => {
+    const { prompt } = generatePrompt('plan-review', issue, context);
+    const start = prompt.indexOf('### The Six Checks');
+    const end = prompt.indexOf('### Verdict');
+    assert.ok(start > -1, 'the body has a "### The Six Checks" section');
+    assert.ok(end > start, 'the checks section is closed by "### Verdict"');
+    const section = prompt.slice(start, end);
+    // Trap 1: the decoy list from formatReadOnlyWorkflow sits ABOVE the section.
+    assert.ok(!section.includes('**Fetch details**'),
+      'the checks section excludes formatReadOnlyWorkflow\'s own numbered list');
+    assertSixChecksOrdered(section, 'handwritten');
+  });
+
+  test('(b) meta path: the Plan-review quality rule carries the same six checks in the same order', () => {
+    const meta = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-903', hasSubtasks: false, subtaskCount: 0,
+      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
+      aiHints: 'H', actionVocabulary: 'plan, plan-review, implementation', completionSignals: 'S'
+    });
+    const rules = meta.split('\n').filter(l => l.startsWith('- **'));
+    const ruleIdx = rules.findIndex(r => r.startsWith('- **Plan-review prompts**'));
+    assert.ok(ruleIdx > -1, 'the meta-prompt carries a Plan-review quality rule');
+    // S2 placement: adjacent to the Plan-prompts rule.
+    const planIdx = rules.findIndex(r => r.startsWith('- **Plan prompts**'));
+    assert.strictEqual(ruleIdx, planIdx + 1, 'the Plan-review rule sits adjacent to the Plan-prompts rule');
+    // Trap 2: scoped to the single bullet, so the template's line numbering is irrelevant.
+    assertSixChecksOrdered(rules[ruleIdx], 'meta');
+  });
+
+  test('(c) both paths carry the verdict vocabulary and the verify-don\'t-redesign, write-only stance', () => {
+    const { prompt } = generatePrompt('plan-review', issue, context);
+    const meta = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-903', hasSubtasks: false, subtaskCount: 0,
+      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
+      aiHints: 'H', actionVocabulary: 'plan, plan-review, implementation', completionSignals: 'S'
+    });
+    const rule = meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Plan-review prompts**'));
+    for (const [pathName, text] of [['handwritten', prompt], ['meta', rule]]) {
+      assert.ok(/Approve/.test(text) && /Request Changes/.test(text) && /Needs Discussion/.test(text),
+        `${pathName}: carries the Approve / Request Changes / Needs Discussion vocabulary`);
+      assert.ok(/second planner/i.test(text), `${pathName}: forbids becoming a second planner`);
+      assert.ok(/do not add requirements/i.test(text), `${pathName}: verifies against the plan's own claims`);
+      assert.ok(/claims verified; proceed to implementation/i.test(text),
+        `${pathName}: cheap-when-clean line`);
+    }
+    // Write-only: no plan edits, no implementing, no follow-ups filed.
+    assert.ok(/You do NOT edit the plan, do NOT implement any part of it, and do NOT file follow-up tickets/i.test(prompt),
+      'handwritten: plan-review is write-only');
+    assert.ok(/no edits to the plan, no implementing, and no follow-up tickets filed/i.test(rule),
+      'meta: plan-review is write-only');
+  });
+
+  test('(d) plan-review uses the shared read-only workflow (verify → comment, no status write)', () => {
+    const { prompt } = generatePrompt('plan-review', issue, context);
+    assert.ok(prompt.includes(formatReadOnlyWorkflow(issue, { useLinear: true })),
+      'the body embeds the shared formatReadOnlyWorkflow block verbatim');
+    assert.ok(!/Set LIN-903 status to "In Progress"/.test(prompt), 'read-only: no status write step');
+  });
+
+  test('(e1) the template\'s OWN strings emit no literal "Linear" — every mention is attributable to a shared formatter', () => {
+    const { prompt } = generatePrompt('plan-review', issue, context);
+    // Not a bare absence check: this template legitimately inherits tracker
+    // mentions from the shared formatters. Subtract exactly what they emit and
+    // assert the template's own prose adds none.
+    let own = prompt;
+    for (const shared of [formatReadOnlyWorkflow(issue, { useLinear: true }), formatDiscussionReference(issue, { useLinear: true })]) {
+      assert.ok(shared && own.includes(shared), 'the shared formatter output is present to subtract');
+      own = own.replace(shared, '');
+    }
+    assert.strictEqual((own.match(/\bLinear\b/g) || []).length, 0,
+      'the plan-review template body contributes no literal "Linear" of its own');
+  });
+
+  test('(e2) Linear byte-parity: applyPromptCapabilities is a no-op, and a non-Linear provider renames cleanly', () => {
+    const i = { ...issue, labels: ['plan-review'] };
+    // The no-op asserted directly: rendered output is byte-identical with vs
+    // without an explicit Linear provider ui (the LIN-177 S4/S5 loop).
+    const base = generatePrompt('plan-review', i, context, {}).prompt;
+    const withUi = generatePrompt('plan-review', i, context, {}, { ...DEFAULT_PROMPT_UI }).prompt;
+    assert.strictEqual(withUi, base, 'plan-review must be byte-identical for Linear');
+    assert.strictEqual(applyPromptCapabilities(base, resolvePromptUi({}, null)), base,
+      'the capability post-pass is a no-op on the Linear floor');
+    // And nothing leaks for a provider with a different display name.
+    const local = generatePrompt('plan-review', i, context, {},
+      { write: true, comments: true, subtasks: true, displayName: 'Local' }).prompt;
+    assert.ok(!local.includes('Linear'), 'no Linear leaks for a non-Linear provider');
   });
 });
 

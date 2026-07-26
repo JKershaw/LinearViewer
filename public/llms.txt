@@ -182,7 +182,7 @@ relationship between the tasks, not as a label.
 - `.prompt-copy` - copy button (inside container)
 - `.prompt-download` - download button (inside container); saves the prompt as a `.md` file. Use this instead of copy for very large prompts (e.g. retro on an epic) that exceed clipboard limits. The file matches what copy yields, including the `+proxy` block when that toggle is on. Filename: `<identifier>-<promptName>.md`.
 
-### Available Prompt Templates (14 total)
+### Available Prompt Templates (16 total)
 
 **Default Prompts** (shown for every issue, including completed/canceled):
 - `look-into` - look into: Quick overview and context for any task
@@ -199,7 +199,9 @@ relationship between the tasks, not as a label.
 - `design` - design: Evaluate approaches and recommend architecture
 - `spike` - spike: Time-boxed exploration for proof-of-concept
 - `context` - context: Synthesize current state when joining mid-task
+- `plan-review` - plan-review: Verify a plan's grounding claims with fresh context before implementation starts
 - `review` - review: Verify implementation before merge
+- `close-out` - close-out: Discharge the review ledger, then merge, set Done, post the summary, and file follow-ups
 - `retro` - retro: Retrospective look-back (or in-flight reorient) — reconstruct what happened, assess downstream effects/risks, surface lessons; presents findings without writing back
 
 ### More Prompts Inline
