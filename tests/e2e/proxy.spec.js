@@ -2385,3 +2385,104 @@ test.describe('Proxy token mint — feature gate + prompt-proxy TTL (LIN-525)', 
     expect(days).toBeGreaterThan(30);
   });
 });
+
+// LIN-1586 (Beat 1 of LIN-1577): make the ownerless-credential fault visible
+// on the existing proxy-event surfaces. A genuine `token_ownerless` 503 is
+// unreachable under NODE_ENV=test (resolveWorkspaceAccess/resolveProviderAccess
+// short-circuit first — see routes/proxy.js), so events are seeded directly
+// through the /test/create-proxy-event seam rather than driven end-to-end.
+test.describe('Proxy Credential Health (LIN-1586)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+  });
+
+  test('credential-health API requires a session (401 with no cookie)', async ({ request }) => {
+    const resp = await request.get(`${API_PREFIX}/credential-health`);
+    expect(resp.status()).toBe(401);
+  });
+
+  test('verdict is credential-dead when a token has both an ownerless note and a success event in-window', async ({ page, request }) => {
+    const tokenResp = await page.goto(`/test/create-proxy-token?scope=read&label=worker&urlKey=${URL_KEY}`);
+    const { tokenId } = await tokenResp.json();
+
+    await page.goto(`/test/create-proxy-event?urlKey=${URL_KEY}&tokenId=${tokenId}&tokenLabel=worker&status=503&note=${encodeURIComponent('token_ownerless')}`);
+    await page.goto(`/test/create-proxy-event?urlKey=${URL_KEY}&tokenId=${tokenId}&tokenLabel=worker&status=201`);
+
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+    const resp = await request.get(`${API_PREFIX}/credential-health`, { headers: { Cookie: cookieHeader } });
+    expect(resp.status()).toBe(200);
+    const data = await resp.json();
+    const token = data.tokens.find(t => t.tokenId === tokenId);
+    expect(token).toBeTruthy();
+    expect(token.ownerlessCount).toBe(1);
+    expect(token.okCount).toBe(1);
+    expect(token.verdict).toBe('credential-dead');
+  });
+
+  test('verdict stays ok with only a success event (no ownerless note)', async ({ page, request }) => {
+    const tokenResp = await page.goto(`/test/create-proxy-token?scope=read&label=healthy&urlKey=${URL_KEY}`);
+    const { tokenId } = await tokenResp.json();
+    await page.goto(`/test/create-proxy-event?urlKey=${URL_KEY}&tokenId=${tokenId}&tokenLabel=healthy&status=200`);
+
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+    const resp = await request.get(`${API_PREFIX}/credential-health`, { headers: { Cookie: cookieHeader } });
+    const data = await resp.json();
+    const token = data.tokens.find(t => t.tokenId === tokenId);
+    expect(token.verdict).toBe('ok');
+  });
+
+  test('Event Log renders the note text on an event row', async ({ page }) => {
+    await page.goto(`/test/create-proxy-event?urlKey=${URL_KEY}&status=200&note=${encodeURIComponent('free-tier fallback: no paid/OAuth key resolved')}`);
+
+    await page.goto(PROXY_PAGE_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('#proxy-events-collapsible summary').click();
+    await page.waitForSelector('.proxy-event-item');
+
+    await expect(page.locator('.proxy-events-list')).toContainText('free-tier fallback: no paid/OAuth key resolved');
+  });
+
+  test('token list shows the "no owner · re-issue" badge for an ownerless token', async ({ page }) => {
+    await page.goto(`/test/create-proxy-token?scope=read&label=legacy-runner&urlKey=${URL_KEY}&ownerless=true`);
+
+    await page.goto(PROXY_PAGE_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('#proxy-tokens-collapsible summary').click();
+    await page.waitForSelector('.token-item');
+
+    const ownerlessBadge = page.locator('.token-ownerless');
+    await expect(ownerlessBadge).toBeVisible();
+    await expect(ownerlessBadge).toContainText('no owner · re-issue');
+  });
+
+  test('an owned token does NOT show the ownerless badge', async ({ page }) => {
+    await page.goto(`/test/create-proxy-token?scope=read&label=owned-token&urlKey=${URL_KEY}`);
+
+    await page.goto(PROXY_PAGE_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('#proxy-tokens-collapsible summary').click();
+    await page.waitForSelector('.token-item');
+
+    await expect(page.locator('.token-ownerless')).toHaveCount(0);
+  });
+
+  test('Credential Health panel is present on the page, above the Event Log', async ({ page }) => {
+    await page.goto(PROXY_PAGE_URL);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByRole('heading', { name: 'Credential Health' })).toBeVisible();
+
+    // "above the Event Log" (B6): the panel's section must precede the Event
+    // Log section in DOM order, not just be present somewhere on the page.
+    const sectionTitles = await page.locator('.proxy-section-header').allTextContents();
+    const healthIdx = sectionTitles.findIndex(t => t.includes('Credential Health'));
+    const eventsIdx = sectionTitles.findIndex(t => t.includes('Event Log'));
+    expect(healthIdx).toBeGreaterThanOrEqual(0);
+    expect(eventsIdx).toBeGreaterThanOrEqual(0);
+    expect(healthIdx).toBeLessThan(eventsIdx);
+  });
+});

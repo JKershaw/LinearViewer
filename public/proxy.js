@@ -18,6 +18,7 @@
   const tokenList = document.querySelector('.proxy-token-list');
   const tokensCollapsible = document.getElementById('proxy-tokens-collapsible');
   const tokensCount = document.getElementById('proxy-tokens-count');
+  const credentialHealthList = document.querySelector('.proxy-credential-health-list');
   const eventsList = document.querySelector('.proxy-events-list');
   const eventsCollapsible = document.getElementById('proxy-events-collapsible');
   const eventsCount = document.getElementById('proxy-events-count');
@@ -247,11 +248,17 @@ This will return all available endpoints with examples. Your token scope is: ${s
       formatTimeAgo(t.createdAt),
       t.lastUsedAt ? `used ${formatTimeAgo(t.lastUsedAt)}` : 'never used'
     ].join(' \u00B7 ');
+    // LIN-1448/LIN-1586: an ownerless (pre-LIN-1397) token cannot resolve a
+    // workspace \u2014 `hasOwner === false` is the signal to re-issue it; older API
+    // responses omit the field entirely, so only an explicit false warns.
+    const ownerless = t.hasOwner === false
+      ? ' <span class="token-ownerless" title="Minted before token ownership existed. Tokens it mints cannot access the workspace \u2014 re-issue this token and update the consumer.">no owner \u00B7 re-issue</span>'
+      : '';
 
     return `<div class="surface token-item">
       <div class="token-info">
         <div class="token-label-text">${escapeHtml(t.label)}${scopeBadge}${consumedBadge}${expiryBadge}</div>
-        <div class="token-meta">${escapeHtml(meta)}</div>
+        <div class="token-meta">${escapeHtml(meta)}${ownerless}</div>
       </div>
       <button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
     </div>`;
@@ -313,6 +320,39 @@ This will return all available endpoints with examples. Your token scope is: ${s
   }
 
   // =========================================================================
+  // Credential Health
+  // =========================================================================
+
+  async function loadCredentialHealth() {
+    if (!credentialHealthList) return;
+
+    try {
+      // on401:false — failure surfaces on the inline empty state below.
+      const data = await window.api(`${apiBase}/credential-health`, { on401: false });
+      renderCredentialHealth(data.tokens || []);
+    } catch {
+      credentialHealthList.innerHTML = '<div class="proxy-credential-health-empty">Failed to load credential health</div>';
+    }
+  }
+
+  function renderCredentialHealth(tokens) {
+    if (!tokens.length) {
+      credentialHealthList.innerHTML = '<div class="proxy-credential-health-empty">No recent proxy activity</div>';
+      return;
+    }
+
+    credentialHealthList.innerHTML = tokens.map(t => {
+      const state = t.verdict === 'credential-dead' ? 'error' : 'done';
+      const label = t.tokenLabel ? escapeHtml(t.tokenLabel) : escapeHtml(t.tokenId);
+      return `<div class="proxy-credential-health-item">
+        <span class="proxy-credential-health-label">${label}</span>
+        ${statusDotPill(state, t.verdict)}
+        <span class="proxy-credential-health-meta">${t.okCount} ok · ${t.ownerlessCount} ownerless</span>
+      </div>`;
+    }).join('');
+  }
+
+  // =========================================================================
   // Event Log
   // =========================================================================
 
@@ -344,11 +384,12 @@ This will return all available endpoints with examples. Your token scope is: ${s
       // Run-status dot pill (LIN-854): ok(2xx)→done, warn(3xx)→running, error(4xx+)→error.
       const state = e.status < 300 ? 'done' : e.status < 400 ? 'running' : 'error';
       const label = e.tokenLabel ? ` · ${escapeHtml(e.tokenLabel)}` : '';
+      const note = e.note ? ` · ${escapeHtml(e.note)}` : '';
       return `<div class="proxy-event-item">
         <span class="proxy-event-method">${escapeHtml(e.method)}</span>
         <span class="proxy-event-endpoint">${escapeHtml(e.endpoint)}</span>
         ${statusDotPill(state, e.status)}
-        <span class="proxy-event-meta">${formatTimeAgo(e.timestamp)}${label}</span>
+        <span class="proxy-event-meta">${formatTimeAgo(e.timestamp)}${label}${note}</span>
       </div>`;
     }).join('');
   }
@@ -457,4 +498,5 @@ This will return all available endpoints with examples. Your token scope is: ${s
   // =========================================================================
   refreshTokenCount();
   refreshEventsCount();
+  loadCredentialHealth();
 })();

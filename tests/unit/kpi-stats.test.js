@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import {
-  collectKpiStats, categorizeProxyEvent, PROXY_PHASES,
+  collectKpiStats, categorizeProxyEvent, PROXY_PHASES, PROXY_FIELDS,
   ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS, WEEKLY_WINDOW_WEEKS
 } from '../../lib/kpi-stats.js';
 
@@ -622,5 +622,15 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     assert.ok(!serialized.includes('secret-workspace'), 'workspace urlKey leaked');
     assert.ok(!serialized.includes('CONFIDENTIAL-FEEDBACK-BODY'), 'feedback content leaked');
     assert.ok(!serialized.includes('SENSITIVE-NOTE-BREADCRUMB'), 'proxy event note leaked');
+  });
+
+  // LIN-1586: pins the PROJECTION half the test above documents as not yet
+  // covered — the `find` fallback branch of loadProxyBins never sees `note`
+  // in the first place, because it isn't in the projection. This guard
+  // exists precisely because LIN-1586 adds a second `note` reader
+  // (ProxyEventStore.listCredentialHealth) elsewhere in the codebase; the
+  // /kpis boundary must stay independent of that and keep omitting it.
+  test('PROXY_FIELDS omits note (the find-fallback projection boundary)', () => {
+    assert.ok(!Object.prototype.hasOwnProperty.call(PROXY_FIELDS, 'note'), 'PROXY_FIELDS must not project note — /kpis is unauthenticated');
   });
 });

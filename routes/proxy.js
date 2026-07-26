@@ -1085,6 +1085,24 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     }
   });
 
+  /**
+   * GET /workspace/:urlKey/api/proxy/credential-health
+   * Per-token credential-death verdicts for this workspace within a recent
+   * window (LIN-1586/LIN-1577 Beat 1).
+   */
+  router.get('/workspace/:urlKey/api/proxy/credential-health', workspaceFromUrl, async (req, res) => {
+    const { workspace } = req;
+
+    try {
+      const windowMs = req.query.windowMs ? Math.max(parseInt(req.query.windowMs, 10), 1) : undefined;
+      const result = await proxyEventStore.listCredentialHealth(workspace.urlKey, windowMs ? { windowMs } : {});
+      res.json(result);
+    } catch (err) {
+      console.error('List proxy credential health error:', err.message);
+      jsonError(res, 500, 'Failed to list credential health');
+    }
+  });
+
   // =========================================================================
   // Consumer API - Agent Instructions (llms.txt)
   // =========================================================================

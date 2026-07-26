@@ -389,4 +389,28 @@ describe('ProxyTokenStore', () => {
       assert.ok(validated, 'Token should still be valid');
     });
   });
+
+  // LIN-1586: mirrors tests/unit/dispatch-tokens.test.js's LIN-1448 coverage —
+  // hasOwner is a verdict-only surface (never the account id) so an ownerless
+  // proxy token (which cannot resolve a workspace) is findable.
+  describe('hasOwner (LIN-1586)', () => {
+    test('listTokens reports hasOwner true/false/absent', async () => {
+      await store.createToken('workspace-1', { label: 'owned', createdBy: 'account-A' });
+      await store.createToken('workspace-1', { label: 'legacy-runner' });
+
+      const tokens = await store.listTokens('workspace-1');
+      const byLabel = Object.fromEntries(tokens.map(t => [t.label, t]));
+
+      assert.strictEqual(byLabel.owned.hasOwner, true);
+      assert.strictEqual(byLabel['legacy-runner'].hasOwner, false, 'a token created with no createdBy is the thing being hunted');
+    });
+
+    test('listTokens never leaks the owning account id', async () => {
+      await store.createToken('workspace-1', { label: 'owned', createdBy: 'account-A' });
+
+      const tokens = await store.listTokens('workspace-1');
+      const blob = JSON.stringify(tokens);
+      assert.ok(!blob.includes('account-A'), `listTokens must not leak the owner id: ${blob}`);
+    });
+  });
 });

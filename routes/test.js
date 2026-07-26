@@ -525,7 +525,10 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         // set-session calls establish, via the existing fallback this file
         // already uses for the identical problem (see resolveTestPrefsAccountId
         // below) — never a fabricated or arbitrary id.
-        createdBy: await resolveTestPrefsAccountId(req)
+        // ?ownerless=true (LIN-1586) opts a spec OUT of that fallback, to
+        // deliberately mint a pre-LIN-1397-shaped token (createdBy: null) for
+        // exercising the `hasOwner: false` / "no owner · re-issue" UI path.
+        createdBy: req.query.ownerless === 'true' ? null : await resolveTestPrefsAccountId(req)
       })
       res.json({ tokenId: result.tokenId, token: result.token, scope: result.scope, kind: result.kind })
     } catch (err) {
@@ -538,6 +541,28 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       await proxyTokenStore.clear(req.query.urlKey || 'test-workspace')
       res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to seed a proxy event for testing (LIN-1586: the credential-health
+  // panel and its note-rendering can't be reached by driving real proxy calls —
+  // a genuine `token_ownerless` 503 is unreachable under NODE_ENV=test because
+  // resolveWorkspaceAccess/resolveProviderAccess short-circuit before that path
+  // — so this seams a row directly through the real store.
+  router.get('/test/create-proxy-event', async (req, res) => {
+    try {
+      const doc = await proxyEventStore.recordEvent({
+        urlKey: req.query.urlKey || 'test-workspace',
+        tokenId: req.query.tokenId || null,
+        tokenLabel: req.query.tokenLabel || null,
+        method: req.query.method || 'GET',
+        endpoint: req.query.endpoint || '/api/proxy/issues',
+        status: req.query.status ? parseInt(req.query.status, 10) : 200,
+        note: req.query.note || null
+      })
+      res.json({ id: doc._id })
     } catch (err) {
       res.status(500).json({ error: err.message })
     }
