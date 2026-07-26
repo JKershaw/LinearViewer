@@ -80,8 +80,9 @@ import {
   RefResolutionError,
 } from '../lib/proxy-ref-resolver.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
-import { badRequest, jsonError, notFound, unauthorized, workspaceUnavailableEnvelope } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, serviceUnavailable, unauthorized, workspaceUnavailableEnvelope } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
 
 /**
@@ -995,6 +996,32 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // for a working token. Bootstrap is forced single-use in the store and carries
       // the outlives-the-queue TTL.
       const wantBootstrap = bootstrap === true || bootstrap === 'true';
+
+      // LIN-1582 — refuse an ownerless BOOTSTRAP mint before attempting it, when
+      // the compat lane is off. The store now refuses this structurally
+      // (lib/proxy-tokens.js), so without this pre-check the throw would land in
+      // the catch below and surface as a generic 500 "Failed to create token" —
+      // misreporting a deliberate policy decision as a server fault. Shaped like
+      // the broker lane's refusal (routes/dispatch.js): a 503 whose detail names
+      // the remedy, because the caller's own session is what lacks an owner and
+      // no retry can fix that. Scoped INSIDE the bootstrap case on purpose: the
+      // non-bootstrap branch shares the createToken call below via a ternary
+      // spread and must stay byte-identical, ownerless session or not.
+      if (wantBootstrap && !req.session?.accountId && !ownerlessCompatEnabled()) {
+        console.warn(
+          `Proxy token mint refused: bootstrap requested by a session with no account owner ` +
+          `(urlKey=${workspace.urlKey}) — DISPATCH_OWNERLESS_BROKER_COMPAT is off (LIN-1448/LIN-1582)`
+        );
+        return serviceUnavailable.json(
+          res,
+          'Session has no account owner (LIN-1448)',
+          'A bootstrap minted for a session with no account owner cannot resolve a workspace ' +
+          'credential, and the working token it is exchanged for inherits the miss. Sign in ' +
+          'again, or use an account that has this workspace connected, before requesting a ' +
+          'bootstrap token.'
+        );
+      }
+
       // LIN-525 #5: short-TTL the auto-minted prompt-proxy tokens so they
       // self-prune instead of standing for the 90-day default.
       const isPromptProxy = (label || '') === PROMPT_PROXY_LABEL;
