@@ -2206,6 +2206,8 @@ describe('named-discharge lanes and close-on-merge (LIN-1579)', () => {
     // The three surfaces the ticket deliberately did NOT widen.
     assert.ok(/\*\*Data-path, security, and external-contract surfaces are NOT widened into this lane\*\*/.test(review),
       'data-path / security / external-contract stay outside the rollback lane');
+    assert.ok(/one on a data-path, security, or external-contract surface with no complete rollback\) — such an item stays a hard gate/i.test(closeout),
+      'close-out: an item on a data-path/security/external-contract surface with no complete rollback stays a hard gate item');
     // Green CI floor and the self-certification floor are untouched (LIN-898's own
     // assertions above cover these; re-checked here as the sibling block's floor).
     assert.ok(/Green CI is never evidence for a ledger item/i.test(closeout),
