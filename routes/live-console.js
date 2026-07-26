@@ -23,7 +23,7 @@ import { Router } from 'express';
 import { renderLiveConsolePage } from '../lib/render-live-console.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { buildConsoleFeed, DEFAULT_PAGE_SIZE } from '../lib/live-console.js';
+import { buildConsoleFeed, DEFAULT_PAGE_SIZE, isLoopActive } from '../lib/live-console.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
 
 // Live window: peak memory tracks recent activity, not the 30-day retention.
@@ -42,9 +42,11 @@ const MAX_HISTORY_PAGE = 100;
  * @param {Object}   deps.dispatchQueueStore - dispatch store (loops → lanes/heartbeats/evidence)
  * @param {Function} deps.getOpenRouterSource - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo - () → deploy metadata
+ * @param {Object}   [deps.proxyEventStore] - LIN-1588: Beat 1's credential-health
+ *   read (`listCredentialHealth`). Optional — absent, lanes resolve `unknown`.
  * @returns {Router}
  */
-export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, dispatchQueueStore, getOpenRouterSource, getDeployInfo }) {
+export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, dispatchQueueStore, getOpenRouterSource, getDeployInfo, proxyEventStore }) {
   const router = Router();
 
   function connectedWorkspaces(req, workspace) {
@@ -89,6 +91,42 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
       }
     }
     return { statusItems, sourceTotal, sourceHasMore };
+  }
+
+  // LIN-1588 (Beat 2 of LIN-1577): resolve per-session credential state by
+  // REUSING Beat 1's verdict — `listCredentialHealth` (lib/proxy-events.js) is
+  // called here and its `tokens[]` folded into the tokenId → verdict index the
+  // pure transform takes as an injected input. The rule itself is never
+  // re-derived: this route owns the read and the fold, nothing more.
+  //
+  // The empty-set short-circuit is the load-bearing part of the cost contract
+  // (see the header): ~99.86% of dispatches carry no joinable agent-status row
+  // (LIN-1585), so on the ordinary poll no active lane has a token and this
+  // issues NO additional query at all. The extra read appears only when a lane
+  // genuinely carries a credential to ask about.
+  //
+  // Failure discipline mirrors `mergeAcross`: a workspace whose read throws
+  // contributes nothing, degrading its lanes to `unknown` rather than blanking
+  // the feed. `windowMs` is left at Beat 1's default on purpose — a lane older
+  // than the credential window SHOULD resolve `unknown`.
+  async function readCredentialIndex(workspaces, loops) {
+    if (!proxyEventStore) return {};
+    const tokenIds = new Set();
+    for (const lp of loops) {
+      if (isLoopActive(lp) && lp.agentTokenId != null) tokenIds.add(lp.agentTokenId);
+    }
+    if (tokenIds.size === 0) return {};
+
+    const tokens = await mergeAcross(workspaces, async (ws) => {
+      const { tokens: rows } = await proxyEventStore.listCredentialHealth(ws.urlKey, {});
+      return rows || [];
+    }, 'credential-health');
+
+    const index = {};
+    for (const row of tokens) {
+      if (row && row.tokenId != null && tokenIds.has(row.tokenId)) index[row.tokenId] = row.verdict;
+    }
+    return index;
   }
 
   // ─── HTML page ────────────────────────────────────────────────────────────
@@ -169,11 +207,17 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
           : Promise.resolve([]),
       ]);
 
+      // Sequenced after the loops read, not parallel with it: the credential
+      // question is only asked about tokens the loops actually carry, which is
+      // what lets the ordinary poll skip the query entirely.
+      const credentialByToken = await readCredentialIndex(workspaces, loops);
+
       const feed = buildConsoleFeed({ statusItems: statusRead.statusItems, loops }, {
         now,
         pageSize: DEFAULT_PAGE_SIZE,
         sourceHasMore: statusRead.sourceHasMore,
         sourceTotal: statusRead.sourceTotal,
+        credentialByToken,
       });
       res.json(feed);
     } catch (error) {

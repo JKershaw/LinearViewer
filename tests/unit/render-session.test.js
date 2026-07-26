@@ -851,3 +851,134 @@ describe('render-session: document <title> escaping (LIN-1567)', () => {
     assert.equal(titleOf(html), 'Session · ');
   });
 });
+
+// ─── per-session credential state (LIN-1588, Beat 2 of LIN-1577) ─────────────
+//
+// C3 ships on the DEFAULT path: /observation/session/:sessionId is first-class
+// and un-flagged (LIN-595), so unlike the Live Console lane badge this markup
+// reaches every user with no flag to hide behind. Two consequences these tests
+// pin: the ordinary state must read as calm and normal rather than as an alarm,
+// and the attacker-influenced `agentTokenLabel` must be escaped at the call site
+// (this file is raw-by-contract — 8aa32eaf, LIN-1567).
+
+describe('render-session: credential state (LIN-1588)', () => {
+  function withTokens(tokenId, label = 'dispatch-bootstrap') {
+    return fixtureSession({
+      loops: fixtureSession().loops.map(l => ({ ...l, agentTokenId: tokenId, agentTokenLabel: label }))
+    });
+  }
+
+  test('the credential line always renders — never blank, even with no token anywhere', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-testid="session-credential"/);
+  });
+
+  test('no agentTokenId → unknown (the ORDINARY case), and never healthy', () => {
+    // ~99.86% of dispatches carry no joinable agent-status row (LIN-1585), so
+    // this is the normal render for the vast majority of sessions.
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-testid="session-credential"[^>]*data-state="unknown"/);
+    assert.doesNotMatch(html, /data-testid="session-credential"[^>]*data-state="ok"/);
+  });
+
+  test('a token with no entry in the index → unknown, never a false ok', () => {
+    const html = renderSessionPage(
+      { session: withTokens('tok-1'), urlKey: 'ws-a', issueContext: [], credentialByToken: { 'other-token': 'ok' } }
+    );
+    assert.match(html, /data-testid="session-credential"[^>]*data-state="unknown"/);
+  });
+
+  test('verdict credential_dead → dead', () => {
+    const html = renderSessionPage(
+      { session: withTokens('tok-1'), urlKey: 'ws-a', issueContext: [], credentialByToken: { 'tok-1': 'credential_dead' } }
+    );
+    assert.match(html, /data-testid="session-credential"[^>]*data-state="dead"/);
+  });
+
+  test('verdict ok → ok, and the copy does not overclaim health', () => {
+    const html = renderSessionPage(
+      { session: withTokens('tok-1'), urlKey: 'ws-a', issueContext: [], credentialByToken: { 'tok-1': 'ok' } }
+    );
+    assert.match(html, /data-testid="session-credential"[^>]*data-state="ok"/);
+    // Beat 1's `ok` means "no death evidence in the last 15 min", not "verified
+    // healthy" — the visible copy must not say the stronger thing.
+    assert.match(html, /no faults seen/);
+    assert.doesNotMatch(html, /data-testid="session-credential"[^>]*>healthy/);
+  });
+
+  test('ONE dead run makes the whole session dead — the "which of my trees is dead?" rollup', () => {
+    const session = fixtureSession({
+      loops: [
+        { ...fixtureSession().loops[0], agentTokenId: 'tok-live', agentTokenLabel: 'dispatch-bootstrap' },
+        { ...fixtureSession().loops[1], agentTokenId: 'tok-dead', agentTokenLabel: 'dispatch-bootstrap' }
+      ]
+    });
+    const html = renderSessionPage({
+      session, urlKey: 'ws-a', issueContext: [],
+      credentialByToken: { 'tok-live': 'ok', 'tok-dead': 'credential_dead' }
+    });
+    assert.match(html, /data-testid="session-credential"[^>]*data-state="dead"/);
+  });
+
+  test('a session of only-unknown runs is never promoted to ok', () => {
+    const session = fixtureSession({
+      loops: fixtureSession().loops.map(l => ({ ...l, agentTokenId: null, agentTokenLabel: null }))
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], credentialByToken: { 'tok-1': 'ok' } });
+    assert.match(html, /data-testid="session-credential"[^>]*data-state="unknown"/);
+  });
+
+  test('a hostile agentTokenLabel is escaped at the call site, in BOTH the line and the run chip', () => {
+    const hostile = '"><img src=x onerror=alert(1)>';
+    const html = renderSessionPage({
+      session: withTokens('tok-1', hostile),
+      urlKey: 'ws-a', issueContext: [],
+      credentialByToken: { 'tok-1': 'credential_dead' }
+    });
+    assert.doesNotMatch(html, /<img src=x onerror/, 'the label never becomes live markup');
+    assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/, 'it is present, escaped');
+  });
+
+  test('a run carrying a resolved credential gets a chip; an unknown run does not', () => {
+    const dead = renderSessionPage({
+      session: withTokens('tok-1'), urlKey: 'ws-a', issueContext: [],
+      credentialByToken: { 'tok-1': 'credential_dead' }
+    });
+    assert.match(dead, /data-testid="session-run-credential"/);
+
+    // The ordinary path adds no per-run chip — an `unknown` chip on every run
+    // would be pure noise, and the Overview line already states it once.
+    const unknown = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    assert.doesNotMatch(unknown, /data-testid="session-run-credential"/);
+  });
+
+  test('the ordinary page is otherwise unchanged: existing chips and rows still render', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-testid="session-run-runtime"/);
+    assert.match(html, /data-testid="session-run-metrics"/);
+    assert.match(html, /data-testid="session-run-artifacts"/);
+    assert.match(html, /data-testid="session-seed"/);
+    assert.match(html, /data-testid="session-tasks"/);
+  });
+
+  test('a run with NO telemetry still renders its credential chip (and no empty chip row otherwise)', () => {
+    const session = fixtureSession({
+      loops: [{ ...fixtureSession().loops[0], telemetry: null, agentTokenId: 'tok-1', agentTokenLabel: 'dispatch-bootstrap' }]
+    });
+    const html = renderSessionPage({
+      session, urlKey: 'ws-a', issueContext: [], credentialByToken: { 'tok-1': 'credential_dead' }
+    });
+    assert.match(html, /data-testid="session-run-credential"/);
+
+    // …and with neither telemetry nor a resolved credential, no chip row at all.
+    const bare = fixtureSession({ loops: [{ ...fixtureSession().loops[0], telemetry: null }] });
+    const bareHtml = renderSessionPage({ session: bare, urlKey: 'ws-a', issueContext: [] });
+    assert.doesNotMatch(bareHtml, /class="sess-chips"/);
+  });
+
+  test('the not-found body is untouched by the credential work', () => {
+    const html = renderSessionPage({ session: null, sessionId: 'nope', urlKey: 'ws-a' });
+    assert.match(html, /data-testid="session-not-found"/);
+    assert.doesNotMatch(html, /data-testid="session-credential"/);
+  });
+});

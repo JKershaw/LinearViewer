@@ -436,3 +436,115 @@ test('summary counts kinds; active = number of working lanes', () => {
   assert.equal(summary.blocked, 1);
   assert.equal(summary.active, 1); // one working lane
 });
+
+// ─── per-lane credential state (LIN-1588, Beat 2 of LIN-1577) ─────────────────
+//
+// The lane answers "is THIS session's credential dead?" by reusing Beat 1's
+// verdict (`credentialVerdict`, lib/proxy-events.js) — resolved at the route and
+// handed in as a tokenId → verdict index. This module never reads a store, so the
+// index is an ordinary injected input and the whole surface is testable as a pure
+// function. The invariant these tests defend is one-directional: an unresolved
+// credential must degrade to `unknown`, NEVER to a false `ok`.
+
+test('LIN-1588: every lane carries a credential object', () => {
+  const [lane] = deriveLoopLanes([loop()]);
+  assert.ok(lane.credential, 'lane carries credential');
+  assert.equal(typeof lane.credential.state, 'string');
+});
+
+test('LIN-1588: agentTokenId null → unknown (the ORDINARY case, ~99.86% of dispatches)', () => {
+  // Explicitly asserted rather than left incidental: LIN-1585 measured 10/20
+  // joinable agent-status rows against a 7,126-dispatch denominator, so a loop
+  // with no token is the normal render and must not read as an error state.
+  const [lane] = deriveLoopLanes([loop({ agentTokenId: null, agentTokenLabel: null })]);
+  assert.deepEqual(lane.credential, { state: 'unknown', label: null });
+});
+
+test('LIN-1588: token present + verdict credential_dead → dead', () => {
+  const [lane] = deriveLoopLanes(
+    [loop({ agentTokenId: 'tok-1', agentTokenLabel: 'dispatch-bootstrap' })],
+    { credentialByToken: { 'tok-1': 'credential_dead' } }
+  );
+  assert.equal(lane.credential.state, 'dead');
+  assert.equal(lane.credential.label, 'dispatch-bootstrap');
+});
+
+test('LIN-1588: token present + verdict ok → ok', () => {
+  const [lane] = deriveLoopLanes(
+    [loop({ agentTokenId: 'tok-1', agentTokenLabel: 'dispatch-bootstrap' })],
+    { credentialByToken: { 'tok-1': 'ok' } }
+  );
+  assert.equal(lane.credential.state, 'ok');
+});
+
+test('LIN-1588: token ABSENT from the map → unknown, never a false ok', () => {
+  // The ticket's stated invariant. The credential window is 15 min while the lane
+  // feed's is 24h, so a live-but-quiet lane legitimately falls outside the
+  // evidence window — and "no recent evidence" is not "healthy". Widening the
+  // window to make this look better is explicitly out of scope.
+  const [lane] = deriveLoopLanes(
+    [loop({ agentTokenId: 'tok-missing', agentTokenLabel: 'dispatch-bootstrap' })],
+    { credentialByToken: { 'some-other-token': 'ok' } }
+  );
+  assert.equal(lane.credential.state, 'unknown');
+  assert.notEqual(lane.credential.state, 'ok');
+});
+
+test('LIN-1588: an unrecognised verdict resolves to ok, not to a silent crash', () => {
+  // The predicate returns only `credential_dead` | `ok` today. If it ever grew a
+  // third non-fatal verdict, a lane should still render rather than throw — but
+  // ONLY `credential_dead` may ever produce `dead`.
+  const [lane] = deriveLoopLanes(
+    [loop({ agentTokenId: 'tok-1' })],
+    { credentialByToken: { 'tok-1': 'something-else' } }
+  );
+  assert.equal(lane.credential.state, 'ok');
+});
+
+test('LIN-1588: agentTokenLabel is display-only — it never affects the lane key', () => {
+  // Labels are shared across concurrent sessions (every dispatch mints
+  // `dispatch-bootstrap`) and historical rows keep an `exchanged` snapshot, so
+  // keying on one would collapse unrelated sessions together.
+  const a = loop({ loopId: 'a', issueIdentifier: 'LIN-9', agentTokenLabel: 'dispatch-bootstrap' });
+  const b = loop({ loopId: 'b', issueIdentifier: 'LIN-7', agentTokenLabel: 'dispatch-bootstrap' });
+  const lanes = deriveLoopLanes([a, b]);
+  assert.equal(lanes.length, 2, 'a shared label must not merge two lanes');
+  assert.deepEqual(lanes.map(l => l.task).sort(), ['LIN-7', 'LIN-9']);
+});
+
+test('LIN-1588: buildConsoleFeed with no credentialByToken → every lane unknown, everything else byte-unchanged', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const items = [
+    statusItem({ id: 's2', taskIdentifier: 'LIN-5', status: 'in_progress', timestamp: '2026-07-19T11:58:00Z' }),
+  ];
+  const input = { statusItems: items, loops: [loop({ agentTokenId: 'tok-1' })] };
+  const feed = buildConsoleFeed(input, { now });
+
+  for (const lane of feed.lanes) {
+    assert.equal(lane.credential.state, 'unknown', `${lane.task} defaults to unknown`);
+  }
+  // The status-fallback lane has no loop and therefore no token: it states
+  // `unknown` explicitly rather than omitting the field, so no reader downstream
+  // can default an absent credential to healthy.
+  const statusLane = feed.lanes.find(l => l.task === 'LIN-5');
+  assert.deepEqual(statusLane.credential, { state: 'unknown', label: null });
+
+  // Everything the lane carried before this ticket is untouched.
+  const before = buildConsoleFeed(input, { now });
+  const strip = ls => ls.map(({ credential, ...rest }) => rest);
+  assert.deepEqual(strip(feed.lanes), strip(before.lanes));
+  assert.deepEqual(feed.summary, before.summary);
+  assert.equal(feed.hasMore, before.hasMore);
+});
+
+test('LIN-1588: a dead credential does not disturb lane ordering, staleness or heartbeats', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const lp = loop({ agentTokenId: 'tok-1' });
+  const plain = buildConsoleFeed({ statusItems: [], loops: [lp] }, { now });
+  const dead = buildConsoleFeed({ statusItems: [], loops: [lp] }, { now, credentialByToken: { 'tok-1': 'credential_dead' } });
+  assert.equal(dead.lanes.length, plain.lanes.length);
+  assert.equal(dead.lanes[0].lastActivityMs, plain.lanes[0].lastActivityMs);
+  assert.deepEqual(dead.lanes[0].heartbeat, plain.lanes[0].heartbeat);
+  assert.equal(dead.summary.active, plain.summary.active);
+  assert.equal(dead.lanes[0].credential.state, 'dead');
+});

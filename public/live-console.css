@@ -153,6 +153,23 @@
 }
 .lc-lane-hb:empty { display: none; }
 
+/* Per-session credential state (LIN-1588). Three states, and `unknown` is the
+   ordinary one (~99.86% of dispatches carry no joinable token) — so it is quiet
+   and dim rather than alarming, while still being visually DISTINCT from `ok`:
+   absence of evidence must never read as health. `ok` is deliberately neutral
+   slate, not green — Beat 1's verdict only means "no death evidence in the last
+   15 min". Only `dead` earns colour and weight. */
+.lc-lane-cred {
+  font-family: var(--font-structural);
+  font-size: 0.7rem;
+  white-space: nowrap;
+  color: var(--slate-dim);
+}
+.lc-lane-cred:empty { display: none; }
+.lc-lane-cred[data-state="unknown"] { color: var(--slate-dim); opacity: 0.75; }
+.lc-lane-cred[data-state="ok"]      { color: var(--muted); }
+.lc-lane-cred[data-state="dead"]    { color: var(--red-dim); font-weight: 600; }
+
 /* The breathing "alive" bar down the left edge of a working lane. */
 .lc-lane-bar {
   position: absolute;

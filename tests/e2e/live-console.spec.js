@@ -241,3 +241,95 @@ test.describe('Live Console (experimental)', () => {
     });
   });
 });
+
+// ─── per-lane credential state (LIN-1588, Beat 2 of LIN-1577) ────────────────
+//
+// The lane badge answers, at a glance across the whole fleet, which working
+// session is authenticated-but-stranded. The verdict is Beat 1's
+// (`credentialVerdict`, lib/proxy-events.js), resolved at the route and injected
+// into the pure transform — nothing here re-derives it.
+//
+// A genuine `token_ownerless` row cannot be produced under NODE_ENV=test (the
+// 503 path that writes the note is short-circuited), so the audit rows are seeded
+// through Beat 1's own `/test/seed-proxy-event` seam.
+test.describe('Live Console lane credential (LIN-1588)', () => {
+  // A running worker whose agent-status row carries a token → a lane with a
+  // non-null agentTokenId. The tokenId forwarding in /test/seed-agent-status is
+  // itself part of this ticket; without it no lane could leave `unknown`.
+  async function seedRunningLaneWithToken(page, { task, tokenId, tokenLabel = 'dispatch-bootstrap' }) {
+    const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+      data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: task, issueTitle: 'Credential lane', target: 'cli' },
+    });
+    expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+    const workerId = (await worker.json()).item.id;
+    const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`)).json();
+    await page.request.post(`/api/dispatch/take/${workerId}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (tokenId) {
+      // `dispatchId` is required, not decorative: taking the worker moves it to
+      // history with `resolvedAt` stamped, which closes the timestamp window
+      // `_matchAgentStatusToLoop` would otherwise use — a status row seeded even
+      // milliseconds later falls outside it. The dispatchId exact-match path is
+      // the deterministic one.
+      const seeded = await page.request.post('/test/seed-agent-status', {
+        data: { urlKey: URL_KEY, taskIdentifier: task, action: 'implementation', status: 'in_progress', summary: `on ${task}`, tokenId, tokenLabel, dispatchId: workerId },
+      });
+      expect(seeded.status(), `agent-status seed failed: ${await seeded.text()}`).toBe(200);
+    }
+    return workerId;
+  }
+
+  test('a stranded worker is badged dead on its lane', async ({ page }) => {
+    await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+    await clearFeed(page, URL_KEY);
+    await page.request.get(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+
+    const tokenId = 'lin1588-lane-dead';
+    await seedRunningLaneWithToken(page, { task: 'LIN-1588', tokenId });
+    // Both rows the predicate requires within its 15-min window: the ownerless
+    // breadcrumb AND a sub-400 success proving the worker itself is still alive.
+    await page.request.get(`/test/seed-proxy-event?urlKey=${URL_KEY}&tokenId=${tokenId}&status=503&note=token_ownerless&endpoint=/api/proxy/issues`);
+    await page.request.get(`/test/seed-proxy-event?urlKey=${URL_KEY}&tokenId=${tokenId}&status=201&endpoint=/api/proxy/agent/status`);
+
+    await page.goto(PAGE_URL);
+    await page.waitForSelector('[data-testid="live-console-lane"]');
+
+    const badge = page.locator('[data-testid="live-console-lane-credential"]').first();
+    await expect(badge).toHaveAttribute('data-state', 'dead');
+    await expect(badge).toContainText('dead');
+  });
+
+  test('a lane with no token renders unknown — the ordinary case, and never healthy', async ({ page }) => {
+    await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+    await clearFeed(page, URL_KEY);
+    await page.request.get(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+
+    await page.request.post('/test/seed-agent-status', {
+      data: { urlKey: URL_KEY, taskIdentifier: 'LIN-1588-NOTOK', action: 'implementation', status: 'in_progress', summary: 'no credential identity' },
+    });
+
+    await page.goto(PAGE_URL);
+    await page.waitForSelector('[data-testid="live-console-lane"]');
+
+    const badge = page.locator('[data-testid="live-console-lane-credential"]').first();
+    await expect(badge).toHaveAttribute('data-state', 'unknown');
+    // The one direction this must never fail in.
+    await expect(badge).not.toHaveAttribute('data-state', 'ok');
+  });
+
+  test('the events endpoint carries credential state on every lane', async ({ page }) => {
+    await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+    await clearFeed(page, URL_KEY);
+    await page.request.post('/test/seed-agent-status', {
+      data: { urlKey: URL_KEY, taskIdentifier: 'LIN-1588-API', action: 'implementation', status: 'in_progress', summary: 'lane shape' },
+    });
+
+    const resp = await page.request.get(EVENTS_API);
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    expect(body.lanes.length).toBeGreaterThan(0);
+    for (const lane of body.lanes) {
+      expect(lane.credential, `lane ${lane.task} carries credential`).toBeTruthy();
+      expect(['dead', 'ok', 'unknown']).toContain(lane.credential.state);
+    }
+  });
+});

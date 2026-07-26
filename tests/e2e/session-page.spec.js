@@ -684,3 +684,117 @@ test.describe('Lineage-continuous rendering (LIN-1478)', () => {
 // PAT mode the server auto-recreates a session on the next visit, so "no
 // session" is not reproducible from an e2e. The 404 test above already exercises
 // this route's own missing-session handling behind a valid session.
+
+// ─── per-session credential state (LIN-1588, Beat 2 of LIN-1577) ─────────────
+//
+// The triage question this answers, verbatim from 2026-07-25: "which of my four
+// trees is dead?" A worker whose workspace token lost its owner keeps
+// authenticating — it looks alive — while every workspace-scoped call 503s. Beat
+// 1 made that visible per TOKEN on the Proxy page; this makes it visible per
+// SESSION, where the human already is.
+//
+// A genuine `token_ownerless` row is unreachable under NODE_ENV=test (it
+// short-circuits resolveWorkspaceAccess/resolveProviderAccess, so the 503 path
+// that writes the note never runs). The audit rows are therefore seeded directly
+// via Beat 1's own seam — the spec exercises what the page DRAWS and makes no
+// claim about how the row is produced.
+test.describe('Session credential state (LIN-1588)', () => {
+  // Drive a worker to `running` and stamp its agent-status row with a token, so
+  // pipeline-loops joins a NON-NULL agentTokenId onto the loop.
+  async function seedSessionWithToken(page, { tokenId, tokenLabel = 'dispatch-bootstrap' }) {
+    const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+      data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-1588', issueTitle: 'Credential seed', target: 'cli' }
+    });
+    expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+    const anchorId = (await anchor.json()).item.id;
+
+    const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+      data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-1588', issueTitle: 'Credential worker', target: 'cli', sessionId: anchorId }
+    });
+    expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+    const workerId = (await worker.json()).item.id;
+
+    const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`)).json();
+    await page.request.post(`/api/dispatch/take/${workerId}`, { headers: { Authorization: `Bearer ${token}` } });
+
+    if (tokenId) {
+      // The LIN-1588 widening of this seam: tokenId/tokenLabel/dispatchId now
+      // forward to recordStatus, which is the only way an E2E can reach a
+      // non-null agentTokenId at all. `dispatchId` is load-bearing — taking the
+      // worker stamps `resolvedAt`, closing the timestamp window
+      // `_matchAgentStatusToLoop` falls back to, so only the exact-match path
+      // joins a status row seeded afterwards.
+      const seeded = await page.request.post('/test/seed-agent-status', {
+        data: { urlKey: URL_KEY, taskIdentifier: 'LIN-1588', action: 'implementation', status: 'in_progress', summary: 'working the credential path', tokenId, tokenLabel, dispatchId: workerId }
+      });
+      expect(seeded.status(), `agent-status seed failed: ${await seeded.text()}`).toBe(200);
+    }
+    return { anchorId, workerId };
+  }
+
+  // The two rows Beat 1's predicate requires INSIDE its 15-min window: an
+  // ownerless breadcrumb AND a sub-400 success (the live-worker signal). Either
+  // alone is deliberately not enough.
+  async function seedDeadCredential(page, tokenId) {
+    await page.request.get(`/test/seed-proxy-event?urlKey=${URL_KEY}&tokenId=${tokenId}&status=503&note=token_ownerless&endpoint=/api/proxy/issues`);
+    await page.request.get(`/test/seed-proxy-event?urlKey=${URL_KEY}&tokenId=${tokenId}&status=201&endpoint=/api/proxy/agent/status`);
+  }
+
+  test('a session whose credential is dead says so on the page', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await page.request.get(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+
+    const tokenId = 'lin1588-dead-token';
+    await seedSessionWithToken(page, { tokenId });
+    await seedDeadCredential(page, tokenId);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const cred = page.locator('[data-testid="session-credential"]');
+    await expect(cred).toBeVisible();
+    await expect(cred).toHaveAttribute('data-state', 'dead');
+    // The run that owns the token is named too, so a multi-run session points at
+    // WHICH worker is stranded rather than just flagging the session.
+    await expect(page.locator('[data-testid="session-run-credential"]').first()).toBeVisible();
+  });
+
+  test('the ordinary session — no token — renders unknown, calmly, and never healthy', async ({ page }) => {
+    // ~99.86% of dispatches carry no joinable agent-status row (LIN-1585), so
+    // this is what almost every real page load looks like. It must not read as
+    // an alarm, and it must not read as `ok` either.
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await page.request.get(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+
+    await seedSessionWithToken(page, { tokenId: null });
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const cred = page.locator('[data-testid="session-credential"]');
+    await expect(cred).toBeVisible();
+    await expect(cred).toHaveAttribute('data-state', 'unknown');
+    await expect(cred).toContainText('unknown');
+    // No per-run chip on the ordinary path — the line states it once.
+    await expect(page.locator('[data-testid="session-run-credential"]')).toHaveCount(0);
+  });
+
+  test('a token with NO recent proxy events stays unknown — absence of evidence is not health', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await page.request.get(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+
+    // A real token on the loop, but nothing in the credential window to judge it by.
+    await seedSessionWithToken(page, { tokenId: 'lin1588-silent-token' });
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('[data-testid="session-credential"]')).toHaveAttribute('data-state', 'unknown');
+  });
+});

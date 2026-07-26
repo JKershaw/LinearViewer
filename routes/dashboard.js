@@ -433,6 +433,10 @@ export function createDashboardRoutes({
   // simply skipped, e.g. in tests that don't wire them).
   briefCacheStore = null,
   recapCacheStore = null,
+  // LIN-1588 (Beat 2 of LIN-1577): Beat 1's credential-health read, used ONLY by
+  // the per-session page (never the feed poll). Default null → the credential
+  // line renders `unknown`, exactly as it does for a session with no token.
+  proxyEventStore = null,
   freeTierStore,
   getWorkspaceAccessToken,
   fetchIssueContext,
@@ -1000,8 +1004,14 @@ export function createDashboardRoutes({
       const anchorTarget = (anchorLoop && anchorLoop.target) || null;
       const canReply = anchorTarget !== 'dash' && anchorTarget !== 'local';
 
+      // LIN-1588: per-session credential state, REUSING Beat 1's verdict. One
+      // bounded read on a PAGE-LOAD path — never the ~5s feed poll — and skipped
+      // entirely when no run in this session carries a token (the ordinary case,
+      // ~99.86% per LIN-1585), so the common page load is unchanged.
+      const credentialByToken = await readSessionCredentials(workspace.urlKey, session);
+
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, urlKey: workspace.urlKey, canReply, sessionTerminal },
+        { session, sessionId, issueContext, waiting, waitingMessage, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken },
         pageOptions
       );
       res.send(html);
@@ -1009,6 +1019,47 @@ export function createDashboardRoutes({
       next(error);
     }
   });
+
+  /**
+   * Resolve credential verdicts for the tokens THIS session's runs carry
+   * (LIN-1588, Beat 2 of LIN-1577).
+   *
+   * Reuse, not re-derivation: the rule is `credentialVerdict` in
+   * lib/proxy-events.js and executes inside Beat 1's own `listCredentialHealth`.
+   * This only performs the read and folds `tokens[]` into a tokenId → verdict
+   * index for the renderer.
+   *
+   * Skipped entirely when no loop carries a token — the ~99.86% case (LIN-1585) —
+   * so an ordinary session page issues no extra query. Single workspace, single
+   * page load, so no cross-workspace merge is needed here (unlike the Live
+   * Console feed). A failed read degrades to `{}`, i.e. `unknown`, never a
+   * fabricated `ok`: this page must not 500 because an audit read hiccuped.
+   *
+   * @param {string} urlKey
+   * @param {Object} session - the non-lean session
+   * @returns {Promise<Object<string, string>>} tokenId → verdict
+   */
+  async function readSessionCredentials(urlKey, session) {
+    if (!proxyEventStore) return {};
+    const loops = Array.isArray(session && session.loops) ? session.loops : [];
+    const tokenIds = new Set();
+    for (const lp of loops) {
+      if (lp && lp.agentTokenId != null) tokenIds.add(lp.agentTokenId);
+    }
+    if (tokenIds.size === 0) return {};
+
+    try {
+      const { tokens } = await proxyEventStore.listCredentialHealth(urlKey, {});
+      const index = {};
+      for (const row of tokens || []) {
+        if (row && row.tokenId != null && tokenIds.has(row.tokenId)) index[row.tokenId] = row.verdict;
+      }
+      return index;
+    } catch (err) {
+      console.error('Session credential-health read failed:', err?.message || err);
+      return {};
+    }
+  }
 
   // Retired experimental dashboard (LIN-509) → 302 to the first-class page.
   router.get('/workspace/:urlKey/dashboard', workspaceFromUrl, (req, res) => {

@@ -260,6 +260,27 @@
   color: var(--muted);
 }
 
+/* Per-session credential state (LIN-1588, Beat 2 of LIN-1577). This page is
+   first-class and un-flagged, so the ORDINARY state (`unknown` — ~99.86% of
+   dispatches carry no joinable token, LIN-1585) must read as calm and normal:
+   it is muted, not alarming. It stays visually DISTINCT from `ok` all the same,
+   because absence of evidence is not evidence of health. `ok` is neutral rather
+   than green — Beat 1's verdict only means "no death evidence in the last 15
+   min" — and only `dead` gets colour and weight. */
+.sess-cred[data-state="unknown"] { color: var(--muted); }
+.sess-cred[data-state="ok"]      { color: var(--text); }
+.sess-cred[data-state="dead"]    { color: var(--red-dim); font-weight: 600; }
+.sess-cred-label {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  color: var(--slate-dim);
+  font-weight: 400;
+}
+.sess-chip--cred[data-state="dead"] {
+  color: var(--red-dim);
+  border-color: var(--red-dim);
+}
+
 /* ── Lineage-continuous rendering (LIN-1478 S-C) ───────────────────────────
    A multi-wake lineage folds visually into ONE continuous card — one outer
    border/header region, unbroken transcript flow — while each constituent

@@ -35,6 +35,23 @@
   const PULSE_WINDOW_MS = 3 * 60 * 1000; // time span the flowing strip covers (right=now)
   const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // LIN-1588 — credential state → lane badge text and hover title (colour lives
+  // in live-console.css via [data-state]). `unknown` is the ORDINARY case, not an
+  // alarm, so its copy is a quiet "?" rather than a warning; `ok` deliberately
+  // does not claim health — Beat 1's verdict means only "no death evidence in the
+  // last 15 minutes", so the badge says `cred ok` and the title says what it
+  // actually proves.
+  const CRED_TEXT = {
+    dead:    '⚠ cred dead',
+    ok:      'cred ok',
+    unknown: 'cred ?',
+  };
+  const CRED_TITLE = {
+    dead:    'credential dead — this worker is authenticated but its workspace token has no owner',
+    ok:      'no credential failures seen in the last 15 min',
+    unknown: 'no recent credential evidence for this session',
+  };
+
   // Kind → glyph (colour lives in live-console.css via [data-kind]).
   const KIND = {
     done:     { glyph: '✓' },
@@ -312,6 +329,7 @@
         <span class="lc-lane-mid">
           <span class="lc-lane-action"></span>
           <span class="lc-lane-hb" data-testid="live-console-heartbeat"></span>
+          <span class="lc-lane-cred" data-testid="live-console-lane-credential"></span>
           <span class="lc-lane-summary"></span>
         </span>
         <span class="lc-lane-ws"></span>
@@ -326,6 +344,19 @@
     task.setAttribute('title', `open ${lane.workspaceName || lane.workspaceUrlKey} in Observation`);
     li.querySelector('.lc-lane-action').textContent = lane.action || 'working';
     li.querySelector('.lc-lane-hb').textContent = fmtHeartbeat(lane.heartbeat); // live tick
+    // LIN-1588: per-session credential state. A lane arriving WITHOUT the field
+    // (an older payload mid-deploy) is read as `unknown`, never as healthy —
+    // the one direction this default is allowed to fail in.
+    const cred = li.querySelector('.lc-lane-cred');
+    const credState = (lane.credential && lane.credential.state) || 'unknown';
+    cred.textContent = CRED_TEXT[credState] || CRED_TEXT.unknown;
+    cred.setAttribute('data-state', credState);
+    // The label is a DISPLAY-ONLY hint (shared across concurrent sessions and
+    // mixed with historical snapshots) — it titles the badge and is never used
+    // as a key. textContent/setAttribute, like every sibling field, so a hostile
+    // label cannot become markup.
+    const credLabel = (lane.credential && lane.credential.label) || null;
+    cred.setAttribute('title', credLabel ? `${CRED_TITLE[credState] || CRED_TITLE.unknown} (${credLabel})` : (CRED_TITLE[credState] || CRED_TITLE.unknown));
     const sum = li.querySelector('.lc-lane-summary');
     sum.textContent = lane.summary || '';
     sum.setAttribute('title', lane.summary || '');

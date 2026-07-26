@@ -605,7 +605,22 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         status: body.status || 'completed',
         summary: body.summary || 'Shipped the change and verified it against CI.',
         // Optional: let tests control the timestamp for deterministic ordering/paging.
-        timestamp: body.timestamp
+        timestamp: body.timestamp,
+        // LIN-1588: forward the credential identity so a spec can build a loop
+        // with a NON-NULL `agentTokenId` (lib/pipeline-loops.js joins it off the
+        // matched agent-status row). Without this, no E2E could reach any
+        // credential state but `unknown`. Purely additive — all three are
+        // undefined when omitted, and `recordStatus` only persists them when
+        // supplied, so every existing caller's document is byte-identical.
+        //
+        // `dispatchId` rides along because it is what makes that join
+        // DETERMINISTIC: `_matchAgentStatusToLoop` exact-matches on it and only
+        // falls back to timestamp-window matching without it — and the window's
+        // upper bound is the loop's resolvedAt, which a taken worker has already
+        // passed by the time a spec seeds its status row.
+        tokenId: body.tokenId,
+        tokenLabel: body.tokenLabel,
+        dispatchId: body.dispatchId
       })
       res.send('ok')
     } catch (err) {
