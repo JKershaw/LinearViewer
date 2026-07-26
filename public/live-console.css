@@ -179,6 +179,23 @@
   font-size: 0.72rem;
   color: var(--amber-dim);
 }
+/* The lane's credential state (LIN-1588). Three states, and `unknown` is the
+   ORDINARY one — so it reads as quiet/dim (absence of evidence), never as a
+   fault and never as healthy. Only `dead` is allowed to be loud: it is the one
+   state a human is meant to act on. */
+.lc-lane-cred {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  color: var(--slate-dim);
+}
+.lc-lane-cred[data-state="unknown"] { color: var(--slate-dim); }
+.lc-lane-cred[data-state="ok"] { color: var(--green-dim); }
+.lc-lane-cred[data-state="dead"] {
+  color: var(--red-dim);
+  font-weight: 600;
+}
+
 .lc-lane-summary {
   font-family: var(--font-content);
   font-size: 0.85rem;

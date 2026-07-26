@@ -39,6 +39,7 @@ import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { createTaskDoneCache } from '../lib/task-done-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
+import { collectAgentTokenIds, foldCredentialIndex } from '../lib/credential-state.js';
 import { hasPaidEnvKey } from '../lib/openrouter.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import {
@@ -433,6 +434,11 @@ export function createDashboardRoutes({
   // simply skipped, e.g. in tests that don't wire them).
   briefCacheStore = null,
   recapCacheStore = null,
+  // LIN-1588: the proxy-event store, source of Beat 1's per-token credential
+  // verdict. Read ONLY by the per-session page (a page load, never the feed
+  // poll). Default null → the credential line degrades to `unknown`, which is
+  // also its ordinary rendering, so an unwired test sees no behaviour change.
+  proxyEventStore = null,
   freeTierStore,
   getWorkspaceAccessToken,
   fetchIssueContext,
@@ -1000,8 +1006,16 @@ export function createDashboardRoutes({
       const anchorTarget = (anchorLoop && anchorLoop.target) || null;
       const canReply = anchorTarget !== 'dash' && anchorTarget !== 'local';
 
+      // Per-session credential state (LIN-1588, Beat 2). One bounded, single-
+      // workspace Mongo read on a PAGE-LOAD path — never the feed poll, whose
+      // no-LLM/no-fan-out cost contract is untouched — and skipped entirely when
+      // no run in this session carries a credential identity (the ordinary case
+      // per LIN-1585). The verdict itself is Beat 1's, computed inside
+      // `listCredentialHealth`; nothing here re-derives it.
+      const credentialByToken = await readSessionCredentials(workspace.urlKey, session);
+
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, urlKey: workspace.urlKey, canReply, sessionTerminal },
+        { session, sessionId, issueContext, waiting, waitingMessage, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken },
         pageOptions
       );
       res.send(html);
@@ -1009,6 +1023,40 @@ export function createDashboardRoutes({
       next(error);
     }
   });
+
+  /**
+   * Resolve the credential verdicts for the tokens THIS session's runs carry
+   * (LIN-1588, Beat 2 of LIN-1577).
+   *
+   * Reuse by call: the rule lives in Beat 1's `listCredentialHealth`
+   * (lib/proxy-events.js) and executes there; this only reads it and folds the
+   * result to the `tokenId → verdict` index the renderer resolves against.
+   *
+   * Skipped entirely when no run carries a non-null `agentTokenId` — per
+   * LIN-1585 that is ~99.86% of sessions — so the common page load pays nothing.
+   * Beat 1's own 15-minute window is used unwidened: a session older than it has
+   * no recent evidence, and `unknown` is the honest answer for that, not a
+   * reason to ask a longer question.
+   *
+   * Degrades to `{}` (→ every run `unknown`) on a failed read rather than
+   * failing the page: the credential line is a diagnostic, not the content.
+   *
+   * @param {string} urlKey
+   * @param {Object} session - the non-lean reconstructed session
+   * @returns {Promise<Object<string, string>>} tokenId → verdict
+   */
+  async function readSessionCredentials(urlKey, session) {
+    if (!proxyEventStore) return {};
+    const loops = Array.isArray(session && session.loops) ? session.loops : [];
+    if (!collectAgentTokenIds(loops).size) return {};
+    try {
+      const { tokens } = await proxyEventStore.listCredentialHealth(urlKey);
+      return foldCredentialIndex(tokens || []);
+    } catch (err) {
+      console.error('Session page credential-health read failed:', err.message);
+      return {};
+    }
+  }
 
   // Retired experimental dashboard (LIN-509) → 302 to the first-class page.
   router.get('/workspace/:urlKey/dashboard', workspaceFromUrl, (req, res) => {

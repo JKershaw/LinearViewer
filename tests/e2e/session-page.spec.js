@@ -679,6 +679,81 @@ test.describe('Lineage-continuous rendering (LIN-1478)', () => {
   });
 });
 
+// ── Credential state (LIN-1588, Beat 2 of LIN-1577) ──────────────────────────
+//
+// This page is NOT flag-gated, so the credential line ships on the default path
+// and must always render — calmly as `unknown` in the ordinary case (~99.86% of
+// dispatches carry no joinable credential identity, LIN-1585), and loudly as
+// `dead` when Beat 1's verdict says the session's token is stranded.
+
+// Seed an autopilot session whose worker carries a credential identity. The
+// `dispatchId` is load-bearing: claiming the item stamps `resolvedAt`, closing
+// the loop's match window, so a status row seeded after the take can only attach
+// via the matcher's EXACT dispatchId branch (lib/pipeline-loops.js).
+async function seedSessionWithCredential(page, { tokenId, tokenLabel = 'dispatch-bootstrap' }) {
+  const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-1588', issueTitle: 'Credential seed', target: 'cli' }
+  });
+  expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+  const anchorId = (await anchor.json()).item.id;
+
+  const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-1588', issueTitle: 'Credential worker', target: 'cli', sessionId: anchorId }
+  });
+  expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+  const workerId = (await worker.json()).item.id;
+
+  const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`)).json();
+  await page.request.post(`/api/dispatch/take/${workerId}`, { headers: { Authorization: `Bearer ${token}` } });
+  await page.request.post('/test/seed-agent-status', {
+    data: { urlKey: URL_KEY, taskIdentifier: 'LIN-1588', action: 'implementation', status: 'in_progress', summary: 'working the task', tokenId, tokenLabel, dispatchId: workerId }
+  });
+  return anchorId;
+}
+
+// Beat 1 calls a token dead only with BOTH an exactly-`token_ownerless` note and
+// a success (<400) in the window — seed both.
+async function seedDeadCredential(page, tokenId) {
+  await page.request.get(`/test/seed-proxy-event?urlKey=${URL_KEY}&tokenId=${tokenId}&status=503&note=token_ownerless&endpoint=/api/proxy/issues`);
+  await page.request.get(`/test/seed-proxy-event?urlKey=${URL_KEY}&tokenId=${tokenId}&status=201&endpoint=/api/proxy/agent/status`);
+}
+
+test.describe('Session credential state (LIN-1588)', () => {
+  test('an ordinary session with no credential identity shows the line as `unknown`', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await page.request.get(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+    await seedSessionWithTranscript(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const line = page.locator('[data-testid="session-credential"]');
+    await expect(line).toBeVisible();
+    await expect(line).toHaveAttribute('data-state', 'unknown');
+    await expect(line).toContainText('unknown');
+  });
+
+  test('a session whose credential is dead says so', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await page.request.get(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+    await seedSessionWithCredential(page, { tokenId: 'tok-sess-dead' });
+    await seedDeadCredential(page, 'tok-sess-dead');
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const line = page.locator('[data-testid="session-credential"]');
+    await expect(line).toHaveAttribute('data-state', 'dead');
+    await expect(line).toContainText('re-issue the token');
+    // The run that carries the token also earns its own chip.
+    await expect(page.locator('[data-testid="session-run-credential"]').first()).toBeVisible();
+  });
+});
+
 // Note: cross-workspace / no-session isolation is workspaceFromUrl's contract
 // (shared middleware, covered by existing specs) and is not re-tested here — in
 // PAT mode the server auto-recreates a session on the next visit, so "no

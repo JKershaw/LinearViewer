@@ -19,6 +19,39 @@ async function clearFeed(page, key) {
   await page.request.get(`/test/clear-agent-status?urlKey=${key}`);
   await page.request.get(`/test/clear-dispatch-queue?urlKey=${key}`);
   await page.request.get(`/test/clear-dispatch-history?urlKey=${key}`);
+  // LIN-1588: lane credential state reads the proxy-event audit rows, which
+  // persist in the dev store the same way dispatch state does.
+  await page.request.get(`/test/clear-proxy-events?urlKey=${key}`);
+}
+
+// LIN-1588: drive a RUNNING loop that carries a credential identity.
+// `/test/seed-agent-status` forwards tokenId/tokenLabel (widened for this
+// ticket), and the loop reconstruction lifts them onto the loop as
+// agentTokenId/agentTokenLabel — the only way an E2E can produce a non-null
+// agentTokenId, since NODE_ENV=test short-circuits the real 503 path.
+async function seedRunningLoopWithToken(page, key, { task, tokenId = null, tokenLabel = null }) {
+  const worker = await page.request.post(`/workspace/${key}/api/dispatch`, {
+    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: task, issueTitle: `${task} worker`, target: 'cli' },
+  });
+  expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+  const workerId = (await worker.json()).item.id;
+  const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${key}`)).json();
+  await page.request.post(`/api/dispatch/take/${workerId}`, { headers: { Authorization: `Bearer ${token}` } });
+  // `dispatchId` is load-bearing, not decoration: claiming the item stamps
+  // `resolvedAt`, which closes the loop's window — so a status row seeded after
+  // the take can only attach via the matcher's EXACT dispatchId branch.
+  await page.request.post('/test/seed-agent-status', {
+    data: { urlKey: key, taskIdentifier: task, action: 'implementation', status: 'in_progress', summary: `working ${task}`, tokenId, tokenLabel, dispatchId: workerId },
+  });
+  return workerId;
+}
+
+// Seed the audit rows Beat 1's predicate folds into `credential_dead`: within
+// the window, a token needs BOTH an exactly-`token_ownerless` note AND a
+// success (<400). Anything less is not a death, by design.
+async function seedDeadCredential(page, key, tokenId) {
+  await page.request.get(`/test/seed-proxy-event?urlKey=${key}&tokenId=${tokenId}&status=503&note=token_ownerless&endpoint=/api/proxy/issues`);
+  await page.request.get(`/test/seed-proxy-event?urlKey=${key}&tokenId=${tokenId}&status=201&endpoint=/api/proxy/agent/status`);
 }
 
 test.beforeEach(({ workerUrlKey }) => {
@@ -219,6 +252,51 @@ test.describe('Live Console (experimental)', () => {
         await moreBtn.click();
         await expect(page.locator('#live-console-history [data-testid="live-console-event"]').first()).toBeVisible();
       }
+    });
+  });
+
+  // LIN-1588 (Beat 2 of LIN-1577): per-session credential state on the lane, so
+  // "which of my four trees is dead?" is answerable from the rail rather than by
+  // opening the BLOCKED park a stranded worker wrote.
+  test.describe('Lane credential state', () => {
+    test('a lane whose session has no credential identity reads `unknown`', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+      // No tokenId — the ORDINARY case (~99.86% of dispatches, LIN-1585).
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-1588A' });
+
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-lane"]');
+      const badge = page.locator('[data-testid="live-console-lane-credential"]').first();
+      await expect(badge).toHaveAttribute('data-state', 'unknown');
+      await expect(badge).toContainText('unknown');
+    });
+
+    test('a lane whose credential is dead is badged `dead`', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-1588B', tokenId: 'tok-dead-e2e', tokenLabel: 'dispatch-bootstrap' });
+      await seedDeadCredential(page, URL_KEY, 'tok-dead-e2e');
+
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-lane"]');
+      const badge = page.locator('[data-testid="live-console-lane-credential"]').first();
+      await expect(badge).toHaveAttribute('data-state', 'dead');
+      await expect(badge).toContainText('credential dead');
+    });
+
+    test('a token with recent successes but NO ownerless breadcrumb is not dead', async ({ page }) => {
+      // Negative control: this isolates the badge from a hardcoded "any token is
+      // dead" — the ownerless note is half of Beat 1's conjunction.
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-1588C', tokenId: 'tok-live-e2e', tokenLabel: 'dispatch-bootstrap' });
+      await page.request.get(`/test/seed-proxy-event?urlKey=${URL_KEY}&tokenId=tok-live-e2e&status=200&endpoint=/api/proxy/me`);
+
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-lane"]');
+      const badge = page.locator('[data-testid="live-console-lane-credential"]').first();
+      await expect(badge).toHaveAttribute('data-state', 'ok');
     });
   });
 

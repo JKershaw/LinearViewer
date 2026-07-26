@@ -605,7 +605,22 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         status: body.status || 'completed',
         summary: body.summary || 'Shipped the change and verified it against CI.',
         // Optional: let tests control the timestamp for deterministic ordering/paging.
-        timestamp: body.timestamp
+        timestamp: body.timestamp,
+        // LIN-1588: the credential identity LIN-1587 propagates onto the loop
+        // (`agentTokenId`/`agentTokenLabel`). Additive and optional — omitted,
+        // recordStatus receives undefined and stores null exactly as before, so
+        // every existing caller is unchanged. Without this no E2E could produce
+        // a loop with a non-null agentTokenId, and the credential surfaces could
+        // only ever be exercised in their `unknown` state.
+        tokenId: body.tokenId,
+        tokenLabel: body.tokenLabel,
+        // Also optional, and forwarded for the same reason: `dispatchId` is how a
+        // real runner attributes a status entry to its dispatch, and it is the
+        // matcher's EXACT branch (lib/pipeline-loops.js `_matchAgentStatusToLoop`).
+        // Without it a seeded entry can only window-match, and claiming an item
+        // stamps `resolvedAt` — so a row seeded after the take falls outside the
+        // window and silently fails to decorate the loop.
+        dispatchId: body.dispatchId
       })
       res.send('ok')
     } catch (err) {

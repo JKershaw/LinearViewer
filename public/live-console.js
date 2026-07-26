@@ -304,6 +304,27 @@
   }
 
   // ─── Lanes (keyed reconcile so pulses breathe continuously) ─────────────────
+
+  // LIN-1588: the lane's credential badge. Three states, and `unknown` is the
+  // ORDINARY one (~99.86% of dispatches carry no joinable credential identity)
+  // — so it is styled as quiet/absent-of-evidence, never as healthy. A lane with
+  // no `credential` at all (a status-only fallback lane, which has no session
+  // identity to resolve) reads as `unknown` for the same reason.
+  const CRED_TEXT = {
+    dead: '⚠ credential dead',
+    ok: '✓ credential ok',
+    unknown: '○ credential unknown',
+  };
+  const CRED_TITLE = {
+    dead: 'This session’s credential is dead: its workspace-scoped calls report token_ownerless while its workspace-free calls still succeed. Re-issue the token.',
+    ok: 'No credential-death evidence in the last 15 minutes. Not a verified-healthy check.',
+    unknown: 'No recent credential evidence for this session — the ordinary case, not a fault.',
+  };
+  function credState(lane) {
+    const s = lane && lane.credential && lane.credential.state;
+    return s === 'dead' || s === 'ok' ? s : 'unknown';
+  }
+
   function laneNode(lane) {
     const shimmer = REDUCED_MOTION ? '' : ' lc-lane--pulse';
     const li = nodeFromHtml(`<li class="lc-lane${shimmer}" data-testid="live-console-lane">
@@ -311,6 +332,7 @@
         <a class="lc-lane-task" href="#"></a>
         <span class="lc-lane-mid">
           <span class="lc-lane-action"></span>
+          <span class="lc-lane-cred" data-testid="live-console-lane-credential"></span>
           <span class="lc-lane-hb" data-testid="live-console-heartbeat"></span>
           <span class="lc-lane-summary"></span>
         </span>
@@ -325,6 +347,15 @@
     task.setAttribute('href', obsHref(lane.workspaceUrlKey));
     task.setAttribute('title', `open ${lane.workspaceName || lane.workspaceUrlKey} in Observation`);
     li.querySelector('.lc-lane-action').textContent = lane.action || 'working';
+    // Credential badge — textContent like every sibling field, so a hostile
+    // token label could not become markup even if one were shown here (it is
+    // deliberately not: the label is display-only and adds nothing to a rail
+    // already keyed by workspace+task).
+    const cred = li.querySelector('.lc-lane-cred');
+    const state = credState(lane);
+    cred.textContent = CRED_TEXT[state];
+    cred.setAttribute('data-state', state);
+    cred.setAttribute('title', CRED_TITLE[state]);
     li.querySelector('.lc-lane-hb').textContent = fmtHeartbeat(lane.heartbeat); // live tick
     const sum = li.querySelector('.lc-lane-summary');
     sum.textContent = lane.summary || '';

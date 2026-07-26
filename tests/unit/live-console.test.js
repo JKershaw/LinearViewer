@@ -329,6 +329,86 @@ test('a stale lineage (no recent beat) does NOT rescue the lane — negative con
   assert.deepEqual(feed.lanes, [], 'no recent lineage beat, no rescue — the lane still drops as stale');
 });
 
+// ─── per-lane credential state (LIN-1588, Beat 2 of LIN-1577) ─────────────────
+//
+// The lane answers "which of my four trees is dead?" without the human having to
+// open the BLOCKED park a stranded worker wrote. The verdict itself is Beat 1's
+// (lib/proxy-events.js) and is INJECTED here as a tokenId → verdict index — this
+// module performs no read, so its purity/`now`-injection is untouched.
+
+test('a lane carries a credential state', () => {
+  const [lane] = deriveLoopLanes([loop({ agentTokenId: 'tok-1', agentTokenLabel: 'dispatch-bootstrap' })],
+    { credentialByToken: { 'tok-1': 'ok' } });
+  assert.deepEqual(lane.credential, { state: 'ok', label: 'dispatch-bootstrap' });
+});
+
+test('agentTokenId: null → unknown (the ORDINARY case, ~99.86% of dispatches)', () => {
+  const [lane] = deriveLoopLanes([loop({ agentTokenId: null, agentTokenLabel: null })], { credentialByToken: {} });
+  assert.equal(lane.credential.state, 'unknown');
+  assert.equal(lane.credential.label, null);
+});
+
+test('token present with verdict credential_dead → dead', () => {
+  const [lane] = deriveLoopLanes([loop({ agentTokenId: 'tok-dead' })], { credentialByToken: { 'tok-dead': 'credential_dead' } });
+  assert.equal(lane.credential.state, 'dead');
+});
+
+test('token present with verdict ok → ok', () => {
+  const [lane] = deriveLoopLanes([loop({ agentTokenId: 'tok-ok' })], { credentialByToken: { 'tok-ok': 'ok' } });
+  assert.equal(lane.credential.state, 'ok');
+});
+
+test('token ABSENT from the map → unknown, never a false ok/healthy', () => {
+  // The ticket's stated invariant: no recent events ⇒ no evidence ⇒ no verdict.
+  const [lane] = deriveLoopLanes([loop({ agentTokenId: 'tok-missing' })], { credentialByToken: { 'tok-other': 'ok' } });
+  assert.equal(lane.credential.state, 'unknown');
+});
+
+test('agentTokenLabel is display text only — it never affects the lane key', () => {
+  // Labels are shared across concurrent sessions (every dispatch mints
+  // `dispatch-bootstrap`) and historical rows keep `'exchanged'`, so two lanes
+  // sharing a label must remain two lanes.
+  const lanes = deriveLoopLanes([
+    loop({ loopId: 'a', issueIdentifier: 'LIN-1', agentTokenId: 'tok-a', agentTokenLabel: 'dispatch-bootstrap' }),
+    loop({ loopId: 'b', issueIdentifier: 'LIN-2', agentTokenId: 'tok-b', agentTokenLabel: 'dispatch-bootstrap' }),
+  ], { credentialByToken: { 'tok-a': 'credential_dead', 'tok-b': 'ok' } });
+  assert.equal(lanes.length, 2, 'a shared label does not collapse two lanes');
+  const byTask = Object.fromEntries(lanes.map(l => [l.task, l.credential.state]));
+  assert.deepEqual(byTask, { 'LIN-1': 'dead', 'LIN-2': 'ok' });
+});
+
+test('deriveLoopLanes with no options at all still resolves a credential (back-compat call shape)', () => {
+  const [lane] = deriveLoopLanes([loop({ agentTokenId: 'tok-1' })]);
+  assert.equal(lane.credential.state, 'unknown');
+});
+
+test('buildConsoleFeed with no credentialByToken → every lane unknown, rest of the lane byte-unchanged', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const lp = loop({ agentTokenId: 'tok-1', agentTokenLabel: 'dispatch-bootstrap' });
+  const { lanes } = buildConsoleFeed({ statusItems: [], loops: [lp] }, { now });
+  assert.equal(lanes[0].credential.state, 'unknown');
+  // Every pre-existing lane field is untouched by the addition.
+  const { credential, ...rest } = lanes[0];
+  assert.deepEqual(rest, {
+    workspaceUrlKey: 'acme',
+    workspaceName: 'Acme',
+    task: 'LIN-9',
+    action: 'implementation',
+    summary: 'editing lib/foo.js',
+    sinceMs: Date.parse('2026-07-19T11:50:00.000Z'),
+    lastActivityMs: Date.parse('2026-07-19T11:59:00.000Z'),
+    heartbeat: { toolCount: 12, elapsedSeconds: 540, breakdown: { Bash: 7, Read: 5 }, total: 15 },
+  });
+});
+
+test('buildConsoleFeed threads credentialByToken through to the lanes', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const lp = loop({ agentTokenId: 'tok-dead' });
+  const { lanes } = buildConsoleFeed({ statusItems: [], loops: [lp] },
+    { now, credentialByToken: { 'tok-dead': 'credential_dead' } });
+  assert.equal(lanes[0].credential.state, 'dead');
+});
+
 // ─── evidence events from [evidence] artifacts ────────────────────────────────
 
 test('normalizeEvidenceEvents turns produced artifacts into linked evidence events', () => {
