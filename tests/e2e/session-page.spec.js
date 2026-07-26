@@ -719,6 +719,16 @@ async function seedDeadCredential(page, tokenId) {
 }
 
 test.describe('Session credential state (LIN-1588)', () => {
+  // These specs seed a deliberately NON-terminal run (a live worker is the whole
+  // point of a credential check) plus proxy-event audit rows, and the dev store
+  // persists both across files. Clearing only on the way IN would leave that
+  // state as the next spec file's starting condition — so this block also
+  // clears on the way OUT.
+  test.afterEach(async ({ page }) => {
+    await clearRuns(page);
+    await page.request.get(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+  });
+
   test('an ordinary session with no credential identity shows the line as `unknown`', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);

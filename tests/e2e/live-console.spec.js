@@ -259,6 +259,14 @@ test.describe('Live Console (experimental)', () => {
   // "which of my four trees is dead?" is answerable from the rail rather than by
   // opening the BLOCKED park a stranded worker wrote.
   test.describe('Lane credential state', () => {
+    // Same discipline as the session-page credential specs: these seed a live
+    // (non-terminal) run plus proxy-event rows, both of which persist in the dev
+    // store, so the block clears on the way OUT as well as in — otherwise its
+    // leftovers become the next spec file's starting condition.
+    test.afterEach(async ({ page }) => {
+      await clearFeed(page, URL_KEY);
+    });
+
     test('a lane whose session has no credential identity reads `unknown`', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
