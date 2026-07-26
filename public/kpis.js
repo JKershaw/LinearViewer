@@ -120,6 +120,50 @@
     }
   }
 
+  // --- Work landed, weekly (the headline number's evidence) ---
+  // The share of resolved dispatch lineages that ended [done], per week inside
+  // the 30-day window. `weeklyRate` is a 0–1 ratio (null for an empty bucket);
+  // the sample size rides in the tooltip footer so a 100% week off two samples
+  // reads honestly rather than as a triumph.
+  const outcomes = data.dispatchOutcomes;
+  if (outcomes && !emptyUnless('chart-outcome-trend', sum(outcomes.weeklyResolved || []))) {
+    new Chart(document.getElementById('chart-outcome-trend'), {
+      type: 'bar',
+      data: {
+        labels: outcomes.weeks.map(function (w) { return 'wk ' + shortDay(w); }),
+        datasets: [{
+          label: 'landed',
+          data: outcomes.weeklyRate.map(function (r) {
+            return r === null ? null : Math.round(r * 1000) / 10;
+          }),
+          backgroundColor: COLORS.green
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) { return ctx.parsed.y + '% landed'; },
+              footer: function (items) {
+                return 'n = ' + (outcomes.weeklyResolved[items[0].dataIndex] || 0) + ' resolved';
+              }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: {
+            beginAtZero: true,
+            max: 100,
+            grid: { color: COLORS.grid },
+            ticks: { precision: 0, callback: function (v) { return v + '%'; } }
+          }
+        }
+      }
+    });
+  }
+
   // --- Dispatched work by kind, weekly stacked bars ---
   const weekly = data.dispatchByWeek;
   const kindPalette = [COLORS.blue, COLORS.green, COLORS.yellow, COLORS.red, COLORS.dim];

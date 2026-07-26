@@ -48,6 +48,18 @@ function buildStats(overrides = {}) {
         { label: 'research', counts: [1, 0, 2, 1, 1] }
       ]
     },
+    dispatchOutcomes: {
+      windowDays: 30,
+      total: 63,
+      resolved: 47,
+      done: 41,
+      failed: 4,
+      aborted: 2,
+      rate: 0.872,
+      weeks: ['2026-05-13', '2026-05-20', '2026-05-27', '2026-06-03'],
+      weeklyRate: [0.5, null, 1, 0.875],
+      weeklyResolved: [2, 0, 3, 8]
+    },
     funnel: { dispatched: 20, taken: 15, reported: 12, completed: 9 },
     dispatchKinds: [{ label: 'autopilot', count: 4 }, { label: 'research', count: 3 }],
     stepOutcomes: { completed: 5, failed: 1, blocked: 0, other: 2 },
@@ -107,9 +119,10 @@ describe('renderKpisPage', () => {
     const html = renderKpisPage(buildStats());
 
     for (const id of [
-      'chart-proxy-phases', 'chart-dispatch-weekly', 'chart-dispatch-kinds',
-      'chart-funnel', 'chart-step-outcomes', 'chart-proxy-status',
-      'chart-top-endpoints', 'chart-hour-of-day', 'chart-free-tier'
+      'chart-proxy-phases', 'chart-outcome-trend', 'chart-dispatch-weekly',
+      'chart-dispatch-kinds', 'chart-funnel', 'chart-step-outcomes',
+      'chart-proxy-status', 'chart-top-endpoints', 'chart-hour-of-day',
+      'chart-free-tier'
     ]) {
       assert.ok(html.includes(`id="${id}"`), `missing canvas ${id}`);
     }
@@ -126,6 +139,66 @@ describe('renderKpisPage', () => {
     assert.ok(html.includes('class="kpi-range-btn" data-range="24h"'));
     // Only the hero chart gets a toggle
     assert.strictEqual(html.match(/kpi-range-toggle/g).length, 1);
+  });
+
+  test('renders the headline outcome number with its slices and coverage label', () => {
+    const html = renderKpisPage(buildStats());
+
+    assert.ok(html.includes('class="card kpi-headline"'), 'headline rides the shared .card primitive');
+    assert.ok(html.includes('>87%</a>'), '0.872 renders as a rounded percentage, not a raw ratio');
+    assert.ok(html.includes('of dispatched work landed · 30d'));
+    assert.ok(html.includes('done 41 · failed 4 · aborted 2'), 'the three slices stay legible');
+    assert.ok(
+      html.includes('47 of 63 dispatches resolved · 30d'),
+      'the coverage sub-label is mandatory: the rate must not read as covering all dispatched work'
+    );
+  });
+
+  test('the headline links to the chart box that substantiates it', () => {
+    const html = renderKpisPage(buildStats());
+
+    assert.ok(html.includes('<a class="kpi-headline-value" href="#kpi-outcome-evidence">'), 'headline value is the link');
+    // The anchor must sit on the SECTION WRAPPER: emptyUnless() replaces the
+    // canvas with a note, which would destroy a canvas-borne id.
+    assert.ok(
+      html.includes('class="section section--boxed kpi-chart-box" id="kpi-outcome-evidence"'),
+      'anchor id belongs on the chart box wrapper'
+    );
+    assert.ok(
+      !html.includes('<canvas id="kpi-outcome-evidence"'),
+      'anchor id must NOT be on the canvas'
+    );
+    // Exactly one anchor target, and only the outcome box carries one.
+    assert.strictEqual(html.match(/id="kpi-outcome-evidence"/g).length, 1);
+  });
+
+  test('renders an em dash with no anchor when the rate is unavailable', () => {
+    const html = renderKpisPage(buildStats({
+      dispatchOutcomes: {
+        windowDays: 30, total: 4, resolved: 0, done: 0, failed: 0, aborted: 0,
+        rate: null, weeks: ['2026-05-13', '2026-05-20', '2026-05-27', '2026-06-03'],
+        weeklyRate: [null, null, null, null], weeklyResolved: [0, 0, 0, 0]
+      }
+    }));
+
+    assert.ok(html.includes('<span class="kpi-headline-value">—</span>'), 'empty state renders a dash');
+    // A link to an empty chart is a dead end.
+    assert.ok(!html.includes('href="#kpi-outcome-evidence"'), 'no anchor when there is no rate');
+    assert.ok(html.includes('of dispatched work landed · 30d'), 'the label stays intact');
+    assert.ok(html.includes('0 of 4 dispatches resolved · 30d'), 'coverage still tells the truth');
+  });
+
+  test('the headline sits above the volume cards and is not one of them', () => {
+    const html = renderKpisPage(buildStats());
+
+    assert.ok(
+      html.indexOf('kpi-headline') < html.indexOf('data-section="kpi-cards"'),
+      'headline renders above the stat card grid'
+    );
+    // It is a ratio, not a count — it must not join the .kpi-cards grid (the
+    // e2e count of 11 volume cards depends on this).
+    const cardsBlock = html.slice(html.indexOf('data-section="kpi-cards"'));
+    assert.ok(!cardsBlock.slice(0, cardsBlock.indexOf('</div>')).includes('kpi-headline'));
   });
 
   test('embeds the stats payload for the client script', () => {

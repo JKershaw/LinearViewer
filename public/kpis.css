@@ -18,6 +18,48 @@
   margin-bottom: var(--space-4);
 }
 
+/* Headline outcome number — the page's one ratio, above the volume cards.
+   Chrome comes from `.card`; only the headline's own type scale lives here. */
+.kpi-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: var(--space-4);
+}
+
+.kpi-headline-value {
+  font-family: var(--font-structural);
+  font-size: 2.6rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--fg);
+  align-self: flex-start;
+  text-decoration: none;
+}
+
+a.kpi-headline-value:hover {
+  text-decoration: underline;
+}
+
+.kpi-headline-label {
+  font-family: var(--font-content);
+  font-size: 0.95rem;
+  color: var(--fg);
+}
+
+.kpi-headline-slices,
+.kpi-headline-coverage {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--fg-dim);
+}
+
+/* The evidence link's target. Offsets the jump so the chart box's heading is
+   not flush against the viewport edge on arrival. */
+#kpi-outcome-evidence {
+  scroll-margin-top: var(--space-3);
+}
+
 /* Stat cards */
 .kpi-cards {
   display: grid;
@@ -159,6 +201,10 @@
 
   .kpi-card-value {
     font-size: 1.25rem;
+  }
+
+  .kpi-headline-value {
+    font-size: 2rem;
   }
 
   .kpi-chart-canvas {
