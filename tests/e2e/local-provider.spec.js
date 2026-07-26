@@ -157,6 +157,12 @@ test.describe('Local provider (no test-token mock)', () => {
 
     const form = page.locator('[data-testid="task-edit-form"]');
     await expect(form).toBeVisible();
+    // Capture the edit URL so the read-back below can return DIRECTLY. Walking
+    // the tree a second time is not just longer, it is wrong: the dashboard
+    // restores its collapse state from localStorage, so after the save the row
+    // comes back already expanded and a second click would COLLAPSE it, hiding
+    // the details toggle the edit link lives under.
+    const editUrl = page.url();
     const textarea = form.locator('[data-testid="task-edit-description"]');
     const preview = form.locator('[data-testid="task-edit-preview"]');
     await expect(textarea).toHaveValue('Seeded parent');
@@ -183,9 +189,7 @@ test.describe('Local provider (no test-token mock)', () => {
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(/\/workspace\/[^/]+\/$/);
 
-    await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
-    await page.locator('.detail-toggle[data-toggle="details"]').first().click();
-    await page.locator('[data-testid="issue-edit-link"]').first().click();
+    await page.goto(editUrl);
     await expect(page.locator('[data-testid="task-edit-description"]')).toHaveValue('Seeded parent');
   });
 });
