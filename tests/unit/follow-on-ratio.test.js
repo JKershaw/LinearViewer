@@ -371,12 +371,39 @@ describe('D. companion instruments', () => {
     assert.equal(r.diagnostics.pctWithPlanMarker, 0.5);
   });
 
-  test('the plan marker reads comments too, is overridable, and is echoed into the result', () => {
+  test('the plan marker reads the DESCRIPTION ONLY — a comment never sets it', () => {
+    // F2. The two session-fit phrases are mandated into the DESCRIPTION by the
+    // `plan` template (lib/prompt-template-defs.js:242) — the true positive —
+    // but they also appear in the instruction text of `plan-review` (:782) and
+    // `breakdown` (:364), and a plan-review verdict lands as a COMMENT. Since
+    // `plan-review` is the gate LIN-1600 ships, baseline-window issues never met
+    // it and re-read-window issues will: reading comments would inflate the
+    // after-period planScoped/primary denominator and bias the ratio DOWN, in
+    // the direction of the pre-registered hypothesis, on the primary instrument.
+    // That is differential misclassification aligned with the treatment.
+    const viaComment = run([source('s', DONE, {
+      comments: [{ id: 'c1', body: 'Plan complete. Session fit: fits one session', createdAt: DONE }],
+    })]);
+    assert.equal(viaComment.planScoped.denominator, 0, 'a comment must not set the plan marker');
+    assert.equal(viaComment.diagnostics.pctWithPlanMarker, 0);
+    assert.equal(viaComment.denominator, 1, 'the headline denominator is untouched by the scoping');
+
+    // The realistic contamination shape, stated as its own assertion: a
+    // plan-review verdict comment on an issue the `plan` step never ran on.
+    const reviewed = run([source('s', DONE, {
+      description: 'Fix the thing.',
+      comments: [{ id: 'c1', body: '## Review\nCheck #4: does it fit one session? Yes.\n\n### What CI Did Not Prove\n- x', createdAt: DONE }],
+    })]);
+    assert.equal(reviewed.planScoped.denominator, 0, 'a plan-review comment is not evidence the plan step ran');
+    assert.equal(reviewed.diagnostics.pctWithReviewLedger, 1, 'while the ledger marker DOES still read comments — that is where review posts it');
+
+    // The description surface still works, both markers.
+    assert.equal(run([source('s', DONE, { description: PLANNED })]).planScoped.denominator, 1);
+  });
+
+  test('the plan marker is overridable and the ruler actually applied is echoed into the result', () => {
     // It is a heuristic, not a schema, so a baseline must record which ruler it
     // used — otherwise a later re-read moves because the ruler changed.
-    const viaComment = run([source('s', DONE, { comments: [{ id: 'c1', body: 'Plan complete. Session fit: fits one session', createdAt: DONE }] })]);
-    assert.equal(viaComment.planScoped.denominator, 1);
-
     const custom = /## Bespoke Plan Marker/;
     const r = run([
       source('hit', DONE, { description: '## Bespoke Plan Marker\nbody' }),
@@ -384,6 +411,60 @@ describe('D. companion instruments', () => {
     ], { planMarker: custom });
     assert.equal(r.planScoped.denominator, 1, 'the override replaces the default entirely');
     assert.equal(r.definition.planMarker, String(custom));
+    assert.equal(r.definition.planMarkerScope, 'description');
+    assert.equal(r.definition.reviewLedgerMarkerScope, 'description+comments');
+  });
+
+  test('a /g-flagged marker override does NOT under-count — regex state is never carried', () => {
+    // F1. `RegExp.prototype.test` advances `lastIndex` on a /g (or /y) regex and
+    // resumes from there next call, so N identical sources alternate hit/miss.
+    // Measured at the PR head: /gi gave planScoped.denominator 2 of 3. This
+    // matters because `options.planMarker` is the documented resolution path for
+    // the plan-marker heuristic — the person handing in a fresh regex is exactly
+    // the person likely to write /gi — and it corrupts `primary`, the instrument
+    // LIN-1600 designates as the decision metric.
+    const three = [
+      source('s1', DONE, { description: PLANNED }),
+      source('s2', DONE, { description: PLANNED }),
+      source('s3', DONE, { description: PLANNED }),
+    ];
+    const stateless = run(three, { planMarker: /needs multiple sessions/i });
+    assert.equal(stateless.planScoped.denominator, 3, 'the control: all three are plan-marked');
+
+    for (const flags of ['g', 'gi', 'y', 'gy']) {
+      const pattern = new RegExp('needs multiple sessions', flags);
+      const r = run(three, { planMarker: pattern });
+      assert.equal(r.planScoped.denominator, 3, `/${flags} must count all three, not alternate`);
+      assert.equal(r.primary.denominator, 3, `/${flags} must not corrupt the primary instrument`);
+      assert.equal(pattern.lastIndex, 0, 'and the caller\'s own regex is never mutated');
+      assert.ok(!/[gy]/.test(r.definition.planMarker.split('/').pop()), 'the ruler recorded is the one applied, stripped of statefulness');
+    }
+
+    // Both overridable patterns are affected — the class is exactly two, and
+    // they are fixed together.
+    const ledger = { comments: [{ id: 'c', body: '### What CI Did Not Prove\n- x', createdAt: DONE }] };
+    const ledgered = run(
+      [source('s1', DONE, ledger), source('s2', DONE, ledger), source('s3', DONE, ledger)],
+      { reviewLedgerMarker: /### What CI Did Not Prove/g },
+    );
+    assert.equal(ledgered.diagnostics.pctWithReviewLedger, 1, 'a /g review-ledger override must not alternate either');
+  });
+
+  test('a duplicate issue row does not inflate the denominator', () => {
+    // F3. buildPeerIndex dedupes by id; the denominator loop walked the raw list,
+    // so one real completion arriving twice counted twice. Cursor paging over a
+    // mutating collection is the plausible route, and the number is meant to be
+    // quotable. Deduped on entry, and the count surfaced rather than swallowed.
+    const done = source('s', DONE, { relations: [outgoing('related', 'p')] });
+    const p = peer('p', '2026-06-12T00:00:00.000Z');
+    const r = run([done, done, p, p]);
+    assert.equal(r.denominator, 1, 'one real completion');
+    assert.equal(r.numerator, 1, 'and one real follow-on edge');
+    assert.equal(r.scale.totalIssues, 2, 'scale reports the deduped population');
+    assert.equal(r.diagnostics.duplicateInputs, 2, 'both duplicate rows are reported');
+    // Distinct issues that merely look alike are untouched.
+    assert.equal(run([source('a', DONE), source('b', DONE)]).denominator, 2);
+    assert.equal(run([source('a', DONE), source('b', DONE)]).diagnostics.duplicateInputs, 0);
   });
 });
 
@@ -503,6 +584,25 @@ describe('F. clock-freedom, loudness and __internal', () => {
     assert.throws(() => run([], { windowEnd: 42 }), /windowEnd/);
   });
 
+  test('a window that cannot contain anything THROWS rather than reading as "no data"', () => {
+    // F4. Inverted bounds used to return `denominator: 0, ratio: null`, which is
+    // indistinguishable from a genuinely empty window — a typo presented as a
+    // finding. An empty half-open window is the same mistake in the same
+    // predicate, so both are refused together rather than the witness patched.
+    assert.throws(
+      () => run([source('s', '2026-06-15T00:00:00.000Z')], { windowStart: WINDOW.windowEnd, windowEnd: WINDOW.windowStart }),
+      /windowEnd must be after windowStart/,
+      'inverted bounds',
+    );
+    assert.throws(
+      () => run([], { windowStart: WINDOW.windowStart, windowEnd: WINDOW.windowStart }),
+      /windowEnd must be after windowStart/,
+      'an empty half-open window',
+    );
+    // One millisecond of window is legitimate and still measures.
+    assert.equal(run([], { windowStart: WINDOW.windowStart, windowEnd: '2026-06-01T00:00:00.001Z' }).denominator, 0);
+  });
+
   test('all three predicate arms come back from one pass, so the choice needs no second run', () => {
     // LIN-1600 §6(ii) is open, and a re-measurement costs ~29 minutes of
     // rate-limited network, so every arm is computed from the single pass.
@@ -522,7 +622,10 @@ describe('F. clock-freedom, loudness and __internal', () => {
   });
 
   test('__internal helpers behave as the module relies on', () => {
-    const { peerOf, toMs, rate, typeCounted, buildPeerIndex, hasPlanMarker, hasReviewLedger, requireInstant, textOf } = __internal;
+    const {
+      peerOf, toMs, rate, typeCounted, buildPeerIndex, dedupeById, hasPlanMarker, hasReviewLedger,
+      requireInstant, textOf, descriptionOf, nonGlobal,
+    } = __internal;
 
     // the highest-consequence predicate: both arms, and a shape it cannot read
     assert.equal(peerOf(outgoing('related', 'p')).id, 'p');
@@ -550,9 +653,34 @@ describe('F. clock-freedom, loudness and __internal', () => {
     assert.equal(hasPlanMarker({ description: 'Session fit: fits one session' }), true);
     assert.equal(hasPlanMarker({ description: '## Implementation Plan (LIN-1)' }), true);
     assert.equal(hasPlanMarker({ description: 'no marker here' }), false);
+    assert.equal(hasPlanMarker({ description: '', comments: [{ body: 'fits one session' }] }), false, 'F2: comments are not a plan-marker surface');
     assert.equal(hasReviewLedger({ comments: [{ body: '### What CI Did Not Prove\n- x' }] }), true);
     assert.equal(hasReviewLedger({ description: '' }), false);
     assert.equal(textOf({ description: 'a', comments: [{ body: 'b' }] }), 'a\nb');
+    assert.equal(descriptionOf({ description: 'a', comments: [{ body: 'b' }] }), 'a', 'the narrow surface reads no further');
+    assert.equal(descriptionOf({ comments: [{ body: 'b' }] }), '');
+    assert.equal(descriptionOf(null), '');
+
+    // F1: statelessness is a property of the copy, and the original is untouched
+    const global = /x/gi;
+    const copy = nonGlobal(global);
+    assert.notEqual(copy, global, 'a stateful pattern is copied, never mutated');
+    assert.equal(copy.global, false);
+    assert.equal(copy.sticky, false);
+    assert.equal(copy.ignoreCase, true, 'non-stateful flags survive');
+    assert.equal(copy.source, 'x');
+    assert.equal(global.global, true, 'the caller keeps the object it handed in');
+    assert.deepEqual([copy.test('x'), copy.test('x'), copy.test('x')], [true, true, true], 'and it cannot alternate');
+    const plain = /x/i;
+    assert.equal(nonGlobal(plain), plain, 'an already-stateless pattern is returned as-is, allocating nothing');
+    assert.equal(nonGlobal(/x/y).sticky, false, 'sticky is stateful too');
+
+    // F3: first occurrence wins; rows with no usable id cannot be compared
+    const dupe = { id: 'd', description: '' };
+    const deduped = dedupeById([dupe, dupe, { id: 'e' }, null, 'not an issue', { id: '' }]);
+    assert.deepEqual(deduped.issues.map((x) => (x && typeof x === 'object' ? x.id : x)), ['d', 'e', null, 'not an issue', '']);
+    assert.equal(deduped.duplicates, 1);
+    assert.deepEqual(dedupeById(null), { issues: [], duplicates: 0 });
 
     assert.equal(requireInstant('2026-06-10T00:00:00.000Z', 'x'), Date.parse('2026-06-10T00:00:00.000Z'));
     assert.throws(() => requireInstant(undefined, 'x'), /x must be a parseable ISO instant/);

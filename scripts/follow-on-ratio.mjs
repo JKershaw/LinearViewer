@@ -310,6 +310,7 @@ function render(result, meta) {
   L.push(`  fully matured sources           ${num(d.maturedSources)}`);
   L.push(`  unresolved peers                ${num(d.unresolvedPeers)}   (relation present, peer createdAt unreadable)`);
   L.push(`  completed but undated           ${num(d.undated)}`);
+  L.push(`  duplicate input rows            ${num(d.duplicateInputs)}   (deduped on entry; non-zero means the paged read double-returned)`);
   L.push(`  skipped (fetch failed)          ${num(d.skipped)}`);
   L.push('');
   L.push('  DEFINITION (pinned on LIN-1600 — recorded so the re-read is apples-to-apples)');
@@ -320,7 +321,7 @@ function render(result, meta) {
   L.push(`  excluded      ${result.definition.excluded.join('; ')}`);
   L.push(`  counting      ${result.definition.numeratorCounting}`);
   L.push(`  maturity      ${result.definition.maturityDays} days`);
-  L.push(`  plan marker   ${result.definition.planMarker}`);
+  L.push(`  plan marker   ${result.definition.planMarker}   (matched against the ${result.definition.planMarkerScope} only)`);
   L.push('');
   L.push(`  read: ${meta.listCalls} list calls + ${meta.detailCalls} detail reads`);
   L.push('  Known limits are in the header of lib/follow-on-ratio.js — read them before');
