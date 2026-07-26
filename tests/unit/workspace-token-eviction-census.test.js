@@ -99,3 +99,160 @@ describe('LIN-1507 witness D(ii) — source assertions for the 3 non-injectable 
     assert.equal(count, 3, 'expected exactly 3 session.destroy( sites in server.js — update this test if that count changes');
   });
 });
+
+/**
+ * LIN-1518: the sibling census for the OTHER half of the class.
+ *
+ * The census above pins "session destroyed". This one pins "a workspace leaves
+ * the session while the session itself SURVIVES" — the arm the destroy census
+ * structurally cannot see, because there is no `session.destroy(` on it to
+ * anchor to. LIN-1507 fixed 1 of the 3 instances (routes/workspace.js's
+ * remove-one-of-many); the two `remaining > 0` arms in server.js kept returning
+ * without evicting, so the removed workspace's cache entries (BOTH the
+ * owner-scoped key and the legacy owner-blind `urlKey::*` key) went on
+ * resolving for up to the full 30s TTL after the workspace had left.
+ *
+ * Severity, deliberately not inflated: this is NOT a revocation leak. At both
+ * server.js sites the workspace is removed precisely BECAUSE its token failed
+ * refresh, so the cached copy is a DEAD credential. What it actually is, is an
+ * honesty regression against LIN-1506 — for up to 30s `resolveWorkspaceAccess`
+ * answers `{ reason: 'ok', token: <dead> }` where the failure taxonomy would
+ * otherwise give a truthful reason. Do not re-grade these tests as a
+ * live-credential-leak guard; that would misdescribe what they protect.
+ *
+ * `removeWorkspace(` is the right anchor because it is the one shared mechanism
+ * by which a workspace leaves a session — all three instances of the class call
+ * it, so a fourth teardown path added later cannot dodge this census.
+ *
+ * Same honesty caveat as the destroy census above: these are SOURCE-TEXT
+ * assertions, not behavioural ones. `ensureValidToken` and
+ * `handleWorkspaceRemoval` are module-private (server.js exports nothing,
+ * connects to a real DB, and calls app.listen() at module scope), so they
+ * cannot be driven directly. This proves the call is present, unconditional,
+ * and ordered before the branch — NOT that it is reached at runtime with the
+ * right urlKey/accountId. See LIN-1514 (make resolveWorkspaceAccess
+ * importable): if that lands, replace these with real behavioural tests. Do
+ * NOT substitute a real-logout-vs-real-resolve end-to-end test — LIN-1507
+ * established that shape is flaky by construction.
+ */
+
+// The bare `removeWorkspace()` inside LIN-1507's prose comment in
+// handleWorkspaceRemoval is not a call site, so the lookahead excludes an
+// empty argument list rather than counting mentions in comments.
+function countWorkspaceRemovals(source) {
+  return (source.match(/\bremoveWorkspace\((?!\))/g) || []).length;
+}
+
+const KNOWN_WORKSPACE_REMOVAL_COUNT = 3;
+
+describe('LIN-1518 — removeWorkspace( census (the "session survives" half of the class)', () => {
+  test('the total count of removeWorkspace( call sites across server.js + routes/workspace.js is exactly 3', () => {
+    const counts = {
+      'server.js': countWorkspaceRemovals(read('server.js')),
+      'routes/workspace.js': countWorkspaceRemovals(read('routes/workspace.js')),
+    };
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+
+    assert.equal(
+      total,
+      KNOWN_WORKSPACE_REMOVAL_COUNT,
+      `Found ${total} removeWorkspace( call site(s) (${JSON.stringify(counts)}), expected exactly ` +
+      `${KNOWN_WORKSPACE_REMOVAL_COUNT}. A NEW path that drops a workspace from session.workspaces needs a ` +
+      'matching evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, accountId), per LIN-1518: a cached ' +
+      'workspace token must not outlive the workspace\'s membership of the session that granted it — including ' +
+      'when the session SURVIVES the removal (the remaining>0 arms), which the session.destroy( census above ' +
+      'cannot see. Capture urlKey/accountId into locals BEFORE removeWorkspace(, which drops the workspace. ' +
+      'Existing sites: server.js (ensureValidToken catch, handleWorkspaceRemoval) and routes/workspace.js ' +
+      '(/workspace/:urlKey/remove, remove-one-of-many).'
+    );
+  });
+
+  test('ensureValidToken evicts before its remaining>0 branch, so BOTH arms are covered', () => {
+    const source = read('server.js');
+    const catchIdx = source.indexOf('} catch (error) {\n    console.error(`Token refresh failed for workspace');
+    assert.notEqual(catchIdx, -1, 'expected to find ensureValidToken\'s catch block in server.js');
+    const nextFnIdx = source.indexOf('\n// Apply middleware to all routes except auth and logout', catchIdx);
+    assert.notEqual(nextFnIdx, -1, 'expected to find the end of ensureValidToken');
+    const catchBody = source.slice(catchIdx, nextFnIdx);
+
+    const evictIdx = catchBody.indexOf('evictWorkspaceTokenPair(evictWorkspaceToken');
+    const remainingCheckIdx = catchBody.indexOf('if (remaining > 0)');
+    const destroyIdx = catchBody.indexOf('session.destroy(');
+    assert.notEqual(evictIdx, -1, 'expected an evictWorkspaceTokenPair( call in ensureValidToken\'s catch block');
+    assert.notEqual(remainingCheckIdx, -1, 'expected the `if (remaining > 0)` branch in ensureValidToken\'s catch block');
+    assert.notEqual(destroyIdx, -1, 'expected a session.destroy( call in ensureValidToken\'s catch block');
+    assert.ok(
+      evictIdx < remainingCheckIdx && evictIdx < destroyIdx,
+      'the cache eviction must be wired BEFORE the remaining>0/destroy branch so it covers BOTH arms — not just ' +
+      'the destroy one. Inside the destroy arm alone is the LIN-1518 defect.'
+    );
+  });
+
+  test('ensureValidToken\'s eviction is NOT gated on isDefinitiveRevocation (it tracks the removal, not the revocation)', () => {
+    // The durable delete above it IS so gated (LIN-1545 S1): deleting the
+    // SHARED durable credential on a transient blip would flip every headless
+    // worker on the workspace to WORKSPACE_NOT_CONNECTED. The cache entry is
+    // the opposite case — removeWorkspace has already run unconditionally by
+    // this point, so the entry is stale on every failure that reaches here.
+    // Nesting the eviction under that guard would silently restore the defect
+    // for the non-definitive failures. Pinned via indentation: the statement
+    // sits at the catch block's own 4-space level, not the 6-space level it
+    // would occupy inside the isDefinitiveRevocation( block.
+    const source = read('server.js');
+    assert.ok(
+      source.includes('\n    evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, accountId)\n'),
+      'expected ensureValidToken\'s eviction to sit unconditionally at the catch block\'s base indentation ' +
+      '(4 spaces). A deeper indent means it was nested inside a guard — most likely isDefinitiveRevocation( — ' +
+      'which reintroduces LIN-1518 for every non-definitive refresh failure.'
+    );
+  });
+
+  test('handleWorkspaceRemoval evicts before its remaining>0 branch, so BOTH arms are covered', () => {
+    const source = read('server.js');
+    const startIdx = source.indexOf('async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable = true) {');
+    assert.notEqual(startIdx, -1, 'expected to find handleWorkspaceRemoval in server.js');
+    const endIdx = source.indexOf('\n/**\n * Attempts to refresh an expired token and retry the request.', startIdx);
+    assert.notEqual(endIdx, -1, 'expected to find the end of handleWorkspaceRemoval');
+    const fnBody = source.slice(startIdx, endIdx);
+
+    const evictIdx = fnBody.indexOf('evictWorkspaceTokenPair(evictWorkspaceToken');
+    const remainingCheckIdx = fnBody.indexOf('if (remaining > 0)');
+    const destroyIdx = fnBody.indexOf('session.destroy(');
+    assert.notEqual(evictIdx, -1, 'expected an evictWorkspaceTokenPair( call in handleWorkspaceRemoval');
+    assert.notEqual(remainingCheckIdx, -1, 'expected the `if (remaining > 0)` branch in handleWorkspaceRemoval');
+    assert.notEqual(destroyIdx, -1, 'expected a session.destroy( call in handleWorkspaceRemoval');
+    assert.ok(
+      evictIdx < remainingCheckIdx && evictIdx < destroyIdx,
+      'the cache eviction must be wired BEFORE the remaining>0/destroy branch so it covers BOTH arms — not just ' +
+      'the destroy one. Inside the destroy arm alone is the LIN-1518 defect.'
+    );
+  });
+
+  test('handleWorkspaceRemoval\'s eviction is guarded on removedWorkspace ALONE, never on deleteDurable', () => {
+    // `deleteDurable` (LIN-1545 S2) governs whether the SHARED durable
+    // credential is revoked — it is false on the transient-blip path precisely
+    // so a blip does not revoke it. The session's own cache entry has no such
+    // consideration: removeWorkspace ran unconditionally above, so the entry is
+    // stale either way. Reusing the durable guard here would leave the
+    // transient path unevicted. The `removedWorkspace` guard itself is real and
+    // must stay — the lookup can miss, and urlKey would be read off undefined.
+    const source = read('server.js');
+    const startIdx = source.indexOf('async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable = true) {');
+    assert.notEqual(startIdx, -1, 'expected to find handleWorkspaceRemoval in server.js');
+    const endIdx = source.indexOf('\n/**\n * Attempts to refresh an expired token and retry the request.', startIdx);
+    const fnBody = source.slice(startIdx, endIdx);
+
+    const evictIdx = fnBody.indexOf('evictWorkspaceTokenPair(evictWorkspaceToken');
+    const guardIdx = fnBody.lastIndexOf('if (removedWorkspace) {', evictIdx);
+    assert.ok(
+      guardIdx !== -1,
+      'expected handleWorkspaceRemoval\'s eviction to be guarded on `if (removedWorkspace) {` alone. If this now ' +
+      'reads `removedWorkspace && deleteDurable`, the transient-refresh-blip path removes the workspace without ' +
+      'evicting its cache entries — LIN-1518, reintroduced.'
+    );
+    assert.ok(
+      !fnBody.slice(guardIdx, evictIdx).includes('deleteDurable'),
+      'the eviction guard must not mention deleteDurable — that flag scopes the DURABLE credential delete only.'
+    );
+  });
+});
