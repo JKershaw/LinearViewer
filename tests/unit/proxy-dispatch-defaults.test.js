@@ -47,7 +47,7 @@ function createMockCollection() {
   };
 }
 
-function buildApp(captured, { workspacePreferencesStore, findRecentFreshDispatch } = {}) {
+function buildApp(captured, { workspacePreferencesStore, findRecentFreshDispatch, recordedEvents } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -59,7 +59,7 @@ function buildApp(captured, { workspacePreferencesStore, findRecentFreshDispatch
         tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1'
       })
     },
-    proxyEventStore: { recordEvent: async () => {} },
+    proxyEventStore: { recordEvent: async event => { if (recordedEvents) recordedEvents.push(event); } },
     resolveWorkspaceAccess: async () => ({ token: 'test-token', reason: 'ok' }),
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
@@ -419,6 +419,64 @@ describe('LIN-1656 — the proxy creation routes surface the duplicate refusal a
 
     assertRefusal(res, { kind: 'autopilot' });
     assert.equal(captured.item, undefined);
+  });
+
+  /**
+   * The owner's landing condition 2, end to end on the wire (LIN-1656 review
+   * blocker): the SAME request differs only by `force`, and that alone decides
+   * 409 vs 201. Asserted as a pair on purpose — either half alone could pass
+   * with the hatch broken (a 201 could come from a missing guard; a 409 from a
+   * guard that ignores `force`).
+   *
+   * This also exercises the validation relaxation: before it, `{force: true}`
+   * with no `followUpTo`/`abort` never reached the factory at all — it was
+   * rejected 400 "force requires followUpTo or abort" by validateDispatchPayload.
+   */
+  test('POST /api/proxy/dispatch — force: true overrides the refusal (201), the identical request without it is refused (409)', async () => {
+    const body = { prompt: 'run me', kind: 'implementation', issueIdentifier: 'TEST-14' };
+
+    const refused = {};
+    const withoutForce = await call(
+      buildApp(refused, { findRecentFreshDispatch: alwaysDuplicate }), 'post', '/api/proxy/dispatch', body);
+    assertRefusal(withoutForce, { kind: 'implementation' });
+    assert.equal(refused.item, undefined);
+
+    const captured = {};
+    const withForce = await call(
+      buildApp(captured, { findRecentFreshDispatch: alwaysDuplicate }), 'post', '/api/proxy/dispatch',
+      { ...body, force: true });
+
+    assert.equal(withForce.status, 201, JSON.stringify(withForce.body));
+    assert.ok(captured.item, 'a forced dispatch must reach addItem');
+    assert.equal(captured.item.force, true, 'the flag is stored and forwarded to the runner');
+    assert.equal(captured.item.issueIdentifier, 'TEST-14');
+  });
+
+  /**
+   * LIN-1656 review, finding 2 — the refusal must be countable in the audit log,
+   * not just diagnosable on the wire.
+   *
+   * `409` on this router is already taken by the trashed-issue refusal, so a note-
+   * less audit row makes "the guard fired 40 times" and "40 writes hit trashed
+   * issues" indistinguishable on the Proxy page. Ledger item 4 — the production
+   * false-refusal rate, the number that decides whether the 5-minute window is
+   * right — is only measurable because of this. Follows the `workspaceUnavailable`
+   * precedent (LIN-1540 threads its reason through the same `note` channel).
+   */
+  test('the refusal writes a DUPLICATE_DISPATCH audit note carrying the colliding id', async () => {
+    const recordedEvents = [];
+    const app = buildApp({}, { findRecentFreshDispatch: alwaysDuplicate, recordedEvents });
+    const res = await call(app, 'post', '/api/proxy/dispatch', {
+      prompt: 'run me', kind: 'implementation', issueIdentifier: 'TEST-14'
+    });
+
+    assert.equal(res.status, 409);
+    const refusals = recordedEvents.filter(e => e.status === 409);
+    assert.equal(refusals.length, 1, 'exactly one audit row for the refusal');
+    assert.equal(refusals[0].note, `DUPLICATE_DISPATCH ${PRIOR.id}`,
+      'the note is what separates a guard refusal from the trashed-issue 409 that shares its status');
+    // The row still identifies the call it describes — the note is additive.
+    assert.equal(refusals[0].endpoint, '/api/proxy/dispatch');
   });
 
   test('with no recent prior every one of those routes still dispatches (201)', async () => {

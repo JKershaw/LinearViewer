@@ -975,11 +975,74 @@ describe('createDispatchItem — duplicate-dispatch guard, negatives (LIN-1656)'
   });
 
   // The lookup is evidence, not a gate on dispatching at all: a store whose read
-  // fails must not take the dispatch path down with it.
-  test('a lookup that throws fails OPEN — the dispatch still lands', async () => {
+  // fails must not take the dispatch path down with it. BOTH throw shapes, because
+  // the fail-open is a published invariant other store implementations will be
+  // written against, and the obvious spelling
+  // (`Promise.resolve(store.find…()).catch()`) evaluates the call before the
+  // wrapper exists and so silently protects only the async one (LIN-1656 review,
+  // finding 1). Async is the in-repo shape; sync is the one that regressed.
+  test('an ASYNC-rejecting lookup fails OPEN — the dispatch still lands', async () => {
     const store = capturingStore();
     store.findRecentFreshDispatch = async () => { throw new Error('db unavailable'); };
     await freshDispatch(store);
     assert.equal(store.captured.item.issueIdentifier, 'LIN-1');
+  });
+
+  test('a SYNCHRONOUSLY-throwing lookup also fails OPEN — the dispatch still lands', async () => {
+    const store = capturingStore();
+    // Not `async`: throws on the calling stack, before any promise exists.
+    store.findRecentFreshDispatch = () => { throw new Error('sync boom'); };
+    await freshDispatch(store);
+    assert.equal(store.captured.item.issueIdentifier, 'LIN-1',
+      'a store whose lookup throws synchronously must not take the creation path down with it');
+  });
+});
+
+/**
+ * LIN-1656 — `force: true` is the operator escape hatch past the guard (owner
+ * condition 2, raised as the review blocker on PR #1023).
+ *
+ * Why it exists: deliberate re-dispatch is the recovery playbook for a wedged
+ * task, and this guard's only failure mode is silently refusing legitimate work.
+ * A refusal an operator cannot override turns a 5-minute window into a 5-minute
+ * outage on the rescue path.
+ *
+ * Why it lives in the GATE rather than the predicate: so it inherits the property
+ * the other gate negatives (N2/N3/N6) assert — a forced dispatch never even
+ * consults the lookup. That is testable, and a predicate-level check would not be.
+ */
+describe('createDispatchItem — force bypasses the duplicate guard (LIN-1656)', () => {
+  test('a forced duplicate dispatches, where the identical unforced request is refused', async () => {
+    const store = realStore();
+    await freshDispatch(store);
+    // The control: without `force` this exact shape is a 409.
+    await assert.rejects(() => freshDispatch(store), err => err.status === 409);
+    assert.equal(store.addItemCalls, 1);
+
+    const forced = await freshDispatch(store, { fields: { force: true } });
+    assert.equal(store.addItemCalls, 2, 'an explicit forced re-dispatch must always succeed');
+    assert.equal(forced.force, true, 'the flag is still stored and forwarded to the runner');
+  });
+
+  test('a forced dispatch never even consults the lookup', async () => {
+    const store = alwaysDuplicateStore();
+    await freshDispatch(store, { fields: { force: true } });
+    assert.equal(store.captured.item.force, true, 'the flag is still stored and forwarded');
+    assert.equal(store.lookupCalls, 0,
+      'force belongs in the entry gate, so it short-circuits before the read');
+  });
+
+  test('force: false and an absent force are NOT a bypass', async () => {
+    // Pins the exact `!== true` comparison: only an explicit boolean true opts out.
+    for (const fields of [{ force: false }, { force: undefined }, {}]) {
+      const store = realStore();
+      await freshDispatch(store);
+      await assert.rejects(
+        () => freshDispatch(store, { fields }),
+        err => err.status === 409,
+        `force: ${JSON.stringify(fields.force)} must not bypass the guard`
+      );
+      assert.equal(store.addItemCalls, 1);
+    }
   });
 });

@@ -916,7 +916,10 @@ test.describe('Dispatch API', () => {
     expect(byPrompt['Implement the thing'].force).toBe(false);
   });
 
-  test('POST /api/dispatch rejects force:true without followUpTo', async ({ request }) => {
+  // Bare `force` with no verb to override at all. Since LIN-1656 an issueIdentifier
+  // is a third qualifying verb (the duplicate-guard rescue hatch); this body carries
+  // none of the three, so the rejection stands.
+  test('POST /api/dispatch rejects force:true with no followUpTo, abort or issueIdentifier', async ({ request }) => {
     await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {

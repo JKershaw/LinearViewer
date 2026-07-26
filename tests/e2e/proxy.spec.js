@@ -853,7 +853,11 @@ test.describe('Proxy API - Dispatch', () => {
     expect((await watchOriginal.json()).force).toBe(false);
   });
 
-  test('force requires followUpTo (400)', async ({ request }) => {
+  // No followUpTo, no abort, and (since LIN-1656) no issueIdentifier either — with
+  // none of the three there is no guard for `force` to override, so it is still
+  // rejected. An issue-scoped fresh dispatch DOES accept it: that is the
+  // duplicate-guard rescue hatch, pinned in tests/unit/dispatch-factory.test.js.
+  test('force with no followUpTo, abort or issueIdentifier (400)', async ({ request }) => {
     const resp = await request.post('/api/proxy/dispatch', {
       headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
       data: { prompt: 'resume please', force: true }

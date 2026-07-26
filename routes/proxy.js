@@ -29,7 +29,7 @@ import {
   isValidPriority,
   validateIssueWriteFields,
 } from '../lib/issue-write-validation.js';
-import { createDispatchItem } from '../lib/dispatch-factory.js';
+import { createDispatchItem, DUPLICATE_DISPATCH_CODE } from '../lib/dispatch-factory.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
 // route owns no GraphQL. Provider SELECTION for the consumer read + write data
@@ -755,7 +755,15 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   function refuseIfDuplicateDispatch(err, req, res, endpoint, keepalive = null) {
     if (!err || !err.duplicateDispatch) return false;
     const refusal = err.duplicateDispatch;
-    logEvent(req, endpoint, 409);
+    // The `note` is what makes the guard COUNTABLE, following the
+    // `workspaceUnavailable` precedent (LIN-1540 threads its reason so 503s are
+    // countable by reason). 409 on this router is already taken by the
+    // trashed-issue refusal, so without a note the Proxy page cannot tell "the
+    // guard fired 40 times" from "40 writes hit trashed issues" — and the
+    // production false-refusal rate is only measurable because of this line.
+    // Carries the colliding id, so a refusal is diagnosable from the log alone
+    // and not just from the wire body the caller received.
+    logEvent(req, endpoint, 409, `${DUPLICATE_DISPATCH_CODE} ${refusal.id}`);
     if (!res.headersSent) {
       res.set('Retry-After', String(refusal.retryAfter));
     }
@@ -1500,7 +1508,7 @@ POST ${baseUrl}/api/proxy/dispatch
   → "harness" (optional) is the EXECUTION harness the runner should use to RUN this prompt — e.g. "claude-code" (the default) or "opencode". Like "model" it is an opaque string (length + safety validated, no registry check) and forwarded blindly; the runner owns its own harness registry and defaulting. Combine with "model" to run a specific OpenRouter-backed model through a non-default harness (e.g. "harness": "opencode", "model": "openai/gpt-5.4-mini"). Omit it (or null) to keep the consumer's own default/precedence chain — Harbour does not interpose a per-workspace default here. See LIN-1084.
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
-  → "force" (optional, default false) overrides a runner-side guard, so it is meaningful alongside a verb that HAS one — and ONLY such a verb (a bare "force": true on a fresh dispatch is rejected 400 "force requires followUpTo or abort"): (1) with "followUpTo" it bypasses the active-session guard so a follow-up can resume a session wedged or sleeping in an active phase (Claude infra wobble, long-running sleep) — asserting the prior process is effectively dead (see LIN-546); (2) with a single "abort" it is the escape hatch that force-closes even a human-continued session the runner would otherwise skip (see cascade + "[skipped]" below). Mutually exclusive with "cascade" (a cascade emits its own plain, unforced aborts): "force" + "cascade" is rejected (400). The runner reads it as "item.force" off the polled/claimed item. See LIN-559/LIN-946.
+  → "force" (optional, default false) overrides a guard, so it is meaningful alongside a verb that HAS one — and ONLY such a verb (a bare "force": true with no "followUpTo", no "abort" and no "issueIdentifier" is rejected 400 "force requires followUpTo, abort, or an issueIdentifier", because there would be no guard for it to override): (1) with "followUpTo" it bypasses the active-session guard so a follow-up can resume a session wedged or sleeping in an active phase (Claude infra wobble, long-running sleep) — asserting the prior process is effectively dead (see LIN-546); (2) with a single "abort" it is the escape hatch that force-closes even a human-continued session the runner would otherwise skip (see cascade + "[skipped]" below); (3) OPERATOR RESCUE HATCH — on an issue-scoped fresh dispatch it bypasses the duplicate guard below, for a human recovering a wedged task who has confirmed the colliding dispatch is not doing the work. This is NOT the answer to a 409 you were just handed: adopt the returned "id" and watch it, as that refusal says. Mutually exclusive with "cascade" (a cascade emits its own plain, unforced aborts): "force" + "cascade" is rejected (400). The runner reads it as "item.force" off the polled/claimed item. See LIN-559/LIN-946/LIN-1656.
   → "abort" (optional, default false) requests an abort/cancel/close of an existing session instead of running a prompt: set "abort": true and "abortTo" to the "id" of the dispatch whose session should be cancelled. "prompt" is NOT required for an abort, and the consumer flips the running session to a terminal cancelled state. The abort item's OWN "target" must be poll-eligible (cli/web/dash) — eligibility is the abort item's target, NOT the substrate of the session being aborted (so you can abort a "dash" session with a "cli" abort item). Mutually exclusive with "followUpTo". See LIN-743.
   → "abortTo" (required when "abort" is true) is the dispatch id (UUID) of the session to abort. Stored + forwarded blindly; the consumer owns session liveness.
   → "cascade" (optional boolean, default false) is a modifier on an "abort": when true, "abortTo" names the ROOT session of a subtree and Harbour deterministically walks the descendant "sessionId"-tree and emits ONE ordinary abort per discovered session (root + every worker/child-autopilot under it). Requires "abort" (cascade:true without it is rejected 400); mutually exclusive with "force". The response is { "success": true, "cascade": true, "closed": [ { "id", "abortTo", "target" }, ... ], "count": N } instead of a single queued item. The emitted aborts are plain (no "force", no "sessionId"), so the runner cancels each and SKIPS any human-continued session — posting a distinct terminal-benign "[skipped] human-continued session <id> (<phase>)." marker (NOT "[aborted]"): treat it as terminal-benign — the session is still live, do not retry it and do not treat it as a close. Aborting an already-terminal session is a safe no-op. Use "force" on a single targeted abort to override that skip deliberately. See LIN-946/LIN-951.
