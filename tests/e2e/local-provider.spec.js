@@ -141,4 +141,170 @@ test.describe('Local provider (no test-token mock)', () => {
     // State persisted: now Done, so it has left the In Progress section.
     await expect(page.locator('.in-progress-items .line', { hasText: NEW_TITLE })).toHaveCount(0);
   });
+
+  // LIN-1575: the description field grew a Write/Preview toggle (marked +
+  // DOMPurify via window.renderMarkdown — the same vendored pair every other
+  // Markdown surface already loads, no new dependency). Proves two things: (1)
+  // Preview actually renders the Markdown, and (2) opening Preview — the editor
+  // being "touched" — never mutates the underlying textarea, so a save with the
+  // description otherwise untouched round-trips it byte-identical, never
+  // HTML-ified. The seeded description is plain text ("Seeded parent"), so this
+  // also proves render/round-trip work for the common no-Markdown-syntax case.
+  test('description Preview renders live and saving round-trips the untouched doc unchanged', async ({ page }) => {
+    await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
+    await page.locator('.detail-toggle[data-toggle="details"]').first().click();
+    await page.locator('[data-testid="issue-edit-link"]').first().click();
+
+    const form = page.locator('[data-testid="task-edit-form"]');
+    await expect(form).toBeVisible();
+    // Capture the edit URL so the read-back below can return DIRECTLY. Walking
+    // the tree a second time is not just longer, it is wrong: the dashboard
+    // restores its collapse state from localStorage, so after the save the row
+    // comes back already expanded and a second click would COLLAPSE it, hiding
+    // the details toggle the edit link lives under.
+    const editUrl = page.url();
+    const textarea = form.locator('[data-testid="task-edit-description"]');
+    const preview = form.locator('[data-testid="task-edit-preview"]');
+    await expect(textarea).toHaveValue('Seeded parent');
+    await expect(preview).toBeHidden();
+
+    // Preview: textarea hides, the rendered pane shows, and it actually rendered
+    // (not just echoed) the current content.
+    await form.locator('[data-testid="task-edit-tab-preview"]').click();
+    await expect(textarea).toBeHidden();
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText('Seeded parent');
+
+    // Back to Write: the textarea returns with its value untouched by the
+    // render/sanitize round trip.
+    await form.locator('[data-testid="task-edit-tab-write"]').click();
+    await expect(textarea).toBeVisible();
+    await expect(preview).toBeHidden();
+    await expect(textarea).toHaveValue('Seeded parent');
+
+    // Save with the description untouched (only having opened Preview), then
+    // come back and confirm it persisted byte-identical — the editor never
+    // rewrote the stored Markdown to HTML or anything else.
+    await form.locator('[data-testid="task-edit-submit"]').click();
+    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/workspace\/[^/]+\/$/);
+
+    await page.goto(editUrl);
+    await expect(page.locator('[data-testid="task-edit-description"]')).toHaveValue('Seeded parent');
+  });
+
+  // LIN-1575 review. The case above seeds the PLAIN string "Seeded parent", so
+  // `toContainText('Seeded parent')` cannot tell rendering from echoing — the
+  // reviewer proved it by replacing the render call with
+  // `preview.textContent = textarea.value` and watching the whole suite stay
+  // green. This case closes that hole with a real Markdown document, and closes
+  // the round-trip's blind spot too: the existing one saves from the WRITE tab,
+  // which is not the flow the feature invites.
+  //
+  // A whole-string ``` fence is deliberately NOT used as the fixture:
+  // `window.renderMarkdown` runs `stripCodeBlockWrapper` first, which unwraps one
+  // — a real fidelity gap, but an inherited one recorded on the ticket and out of
+  // this pass's scope. The fenced block below sits inside a larger document, so
+  // it is untouched by that helper.
+  const MARKDOWN = [
+    '# Heading',
+    '',
+    'Some **bold** text and `inline code`.',
+    '',
+    '- top bullet',
+    '  - nested bullet',
+    '',
+    '1. first',
+    '2. second',
+    '',
+    '> quoted line',
+    '',
+    '```js',
+    'const x = 1;',
+    '```',
+    '',
+    '[a link](https://example.com)',
+  ].join('\n');
+
+  test('description Preview renders real Markdown, styles it, and saving from Preview round-trips the raw source', async ({ page }) => {
+    await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
+    await page.locator('.detail-toggle[data-toggle="details"]').first().click();
+    await page.locator('[data-testid="issue-edit-link"]').first().click();
+
+    const form = page.locator('[data-testid="task-edit-form"]');
+    await expect(form).toBeVisible();
+    const editUrl = page.url();
+
+    const textarea = form.locator('[data-testid="task-edit-description"]');
+    const preview = form.locator('[data-testid="task-edit-preview"]');
+    await textarea.fill(MARKDOWN);
+
+    // The tabs are real tabs (review finding 2). getByRole only resolves these
+    // if `role="tab"`/`role="tablist"` are actually on the elements, so this is
+    // a genuine assertion of the ARIA fix, not a selector convenience.
+    await expect(page.getByRole('tablist', { name: 'Description view' })).toBeVisible();
+    const writeTab = page.getByRole('tab', { name: 'Write' });
+    const previewTab = page.getByRole('tab', { name: 'Preview' });
+    await expect(writeTab).toHaveAttribute('aria-selected', 'true');
+    await expect(previewTab).toHaveAttribute('aria-selected', 'false');
+    // Each tab points at the element it reveals.
+    await expect(writeTab).toHaveAttribute('aria-controls', 'task-edit-description');
+    await expect(previewTab).toHaveAttribute('aria-controls', 'task-edit-description-preview');
+
+    await previewTab.click();
+    await expect(preview).toBeVisible();
+    await expect(previewTab).toHaveAttribute('aria-selected', 'true');
+    await expect(writeTab).toHaveAttribute('aria-selected', 'false');
+
+    // RENDERED, not echoed. Every one of these is an element marked-up by
+    // `marked`; none of them can exist if the pane is fed textContent.
+    await expect(preview.locator('h1')).toHaveText('Heading');
+    await expect(preview.locator('strong')).toHaveText('bold');
+    await expect(preview.locator('code').first()).toHaveText('inline code');
+    await expect(preview.locator('ul > li')).toHaveCount(2); // top + nested
+    await expect(preview.locator('ul ul > li')).toHaveText('nested bullet');
+    await expect(preview.locator('ol > li')).toHaveCount(2);
+    await expect(preview.locator('blockquote')).toContainText('quoted line');
+    await expect(preview.locator('pre > code')).toContainText('const x = 1;');
+    await expect(preview.locator('a[href="https://example.com"]')).toHaveText('a link');
+    // Sanitized on the way through: DOMPurify is in the pipeline, so the raw
+    // Markdown source must not survive as literal syntax in the output.
+    await expect(preview).not.toContainText('**bold**');
+
+    // STYLED (review finding 1). The pane used to borrow `.comment-body`, which
+    // styles p/code/a only — lists did not indent, fenced blocks had no box, and
+    // blockquotes had no rule. Assert the treatment exists rather than exact
+    // values, so a token or spacing tweak doesn't fail this for the wrong reason.
+    const styles = await preview.evaluate((el) => {
+      const px = (v) => parseFloat(v) || 0;
+      const ul = el.querySelector('ul');
+      const pre = el.querySelector('pre');
+      const quote = el.querySelector('blockquote');
+      return {
+        ulPaddingLeft: px(getComputedStyle(ul).paddingLeft),
+        prePadding: px(getComputedStyle(pre).paddingLeft),
+        preBackground: getComputedStyle(pre).backgroundColor,
+        quotePaddingLeft: px(getComputedStyle(quote).paddingLeft),
+        quoteBorderLeft: px(getComputedStyle(quote).borderLeftWidth),
+      };
+    });
+    expect(styles.ulPaddingLeft).toBeGreaterThan(0);
+    expect(styles.prePadding).toBeGreaterThan(0);
+    expect(styles.preBackground).not.toBe('rgba(0, 0, 0, 0)');
+    expect(styles.quotePaddingLeft).toBeGreaterThan(0);
+    expect(styles.quoteBorderLeft).toBeGreaterThan(0);
+
+    // Save WHILE PREVIEW IS THE SHOWING TAB — the flow a preview toggle invites,
+    // and the one CI did not cover. The textarea is `hidden` here; a hidden
+    // control is still submitted, and the toggle never writes to it, so the
+    // stored value must come back as the raw Markdown that went in — not HTML,
+    // not re-serialized Markdown.
+    await expect(textarea).toBeHidden();
+    await form.locator('[data-testid="task-edit-submit"]').click();
+    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/workspace\/[^/]+\/$/);
+
+    await page.goto(editUrl);
+    await expect(page.locator('[data-testid="task-edit-description"]')).toHaveValue(MARKDOWN);
+  });
 });

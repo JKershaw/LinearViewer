@@ -64,6 +64,61 @@ describe('renderTaskEditPage — the four v1 fields', () => {
     assert.ok(html.includes('<option value="2" selected>High</option>'));
   });
 
+  test('description carries a Write/Preview toggle and an initially-hidden preview pane (LIN-1575)', () => {
+    const html = render();
+    assert.ok(html.includes('data-testid="task-edit-tab-write"'));
+    assert.ok(html.includes('data-testid="task-edit-tab-preview"'));
+    // Write is the tab active on arrival — the textarea, not the preview, is
+    // what the server renders visible.
+    const writeTab = html.match(/<button[^>]*data-testid="task-edit-tab-write"[^>]*>/)[0];
+    assert.ok(/aria-selected="true"/.test(writeTab));
+    // The preview pane ships `hidden` — the plain textarea is always what's
+    // live at first paint, never a fresh-page flash of an empty preview.
+    assert.ok(/<div class="task-edit-preview" id="task-edit-description-preview" data-task-edit-preview data-testid="task-edit-preview" hidden><\/div>/.test(html));
+  });
+
+  // LIN-1575 review, finding 2. `aria-selected` is only honoured on roles like
+  // tab/option/row/treeitem; on a bare <button> the UA drops it, so the first
+  // cut announced "Write, button / Preview, button" with no active state and no
+  // relationship to the pane each one reveals. Pinning all three attributes
+  // together is the point — re-adding `aria-selected` alone would silently
+  // reproduce the bug.
+  test('the Write/Preview toggle is a real ARIA tablist, not aria-selected on bare buttons (LIN-1575)', () => {
+    const html = render();
+
+    const tablist = html.match(/<div[^>]*data-testid="task-edit-desc-tabs"[^>]*>/)[0];
+    assert.ok(/role="tablist"/.test(tablist), 'the tab container needs role="tablist"');
+    assert.ok(/aria-label="[^"]+"/.test(tablist), 'the tablist needs an accessible name');
+
+    for (const [tab, controls, selected] of [
+      ['write', 'task-edit-description', 'true'],
+      ['preview', 'task-edit-description-preview', 'false'],
+    ]) {
+      const btn = html.match(new RegExp(`<button[^>]*data-testid="task-edit-tab-${tab}"[^>]*>`))[0];
+      assert.ok(/role="tab"/.test(btn), `the ${tab} tab needs role="tab"`);
+      assert.ok(new RegExp(`aria-selected="${selected}"`).test(btn), `${tab} aria-selected should be ${selected}`);
+      assert.ok(
+        new RegExp(`aria-controls="${controls}"`).test(btn),
+        `the ${tab} tab must point at the element it reveals`
+      );
+      // An aria-controls target that doesn't exist is worse than none at all.
+      assert.ok(html.includes(`id="${controls}"`), `nothing on the page has id="${controls}"`);
+    }
+  });
+
+  // LIN-1575 review, finding 1. `.comment-body` is the COMMENT stylesheet
+  // (p/code/a only), so borrowing it left the preview without list, fenced-code
+  // or blockquote treatment — worse than the dashboard renders the very same
+  // description. The rules now live on `.task-edit-preview` (public/task-edit.css);
+  // this pins the class contract those rules hang off, and that the comment
+  // stylesheet is not silently reintroduced.
+  test('the preview pane owns its Markdown typography and does not borrow .comment-body (LIN-1575)', () => {
+    const html = render();
+    const pane = html.match(/<div[^>]*data-testid="task-edit-preview"[^>]*>/)[0];
+    assert.ok(/class="task-edit-preview"/.test(pane));
+    assert.ok(!/comment-body/.test(pane), '.comment-body styles p/code/a only — see public/task-edit.css');
+  });
+
   test('renders NO field beyond the v1 four (the PATCH route reads no others)', () => {
     const html = render();
     for (const name of ['assigneeId', 'labelIds', 'estimate', 'cycleId', 'projectId', 'teamId']) {
@@ -233,6 +288,14 @@ describe('renderTaskEditPage — shell wiring', () => {
     assert.ok(html.includes('src="/task-edit.js"'));
     // common.js must come first — task-edit.js depends on window.api.
     assert.ok(html.indexOf('src="/common.js"') < html.indexOf('src="/task-edit.js"'));
+  });
+
+  test('loads the vendored marked + purify pair before task-edit.js (LIN-1575, no new dependency)', () => {
+    const html = render();
+    assert.ok(html.includes('src="/marked.min.js"'));
+    assert.ok(html.includes('src="/purify.min.js"'));
+    assert.ok(html.indexOf('src="/marked.min.js"') < html.indexOf('src="/task-edit.js"'));
+    assert.ok(html.indexOf('src="/purify.min.js"') < html.indexOf('src="/task-edit.js"'));
   });
 
   test('renders the identifier as a machine fact beside the title', () => {
