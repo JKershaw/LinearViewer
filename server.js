@@ -709,6 +709,20 @@ async function ensureValidToken(req, res, next) {
       await ownerCredentialStore.delete(accountId, workspace.urlKey)
     }
 
+    // LIN-1518: hoisted above the branch for exactly the reason the durable
+    // delete above was — `workspace` is gone from session.workspaces after
+    // removeWorkspace regardless of `remaining`, so its cached token must be
+    // evicted in BOTH arms. This previously sat inside the destroy arm only,
+    // so a remove-one-of-many refresh failure left the cache serving that
+    // workspace for up to the full TTL. Not a revocation leak — the token is
+    // dead (it just failed refresh), so what leaks is an honesty regression
+    // against LIN-1506: resolveWorkspaceAccess answers `{ reason: 'ok',
+    // token: <dead> }` where the taxonomy would otherwise give a real reason.
+    // Deliberately NOT gated on isDefinitiveRevocation: eviction tracks the
+    // session-side removal, which happens on every non-transient failure that
+    // reaches here, not just a definitively-revoked one.
+    evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, accountId)
+
     if (remaining > 0) {
       // Switch to another workspace
       await saveSession(req.session)
@@ -716,7 +730,6 @@ async function ensureValidToken(req, res, next) {
     }
 
     // No workspaces left, destroy session.
-    evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, accountId)
     req.session.destroy(() => res.redirect('/'))
   }
 }
@@ -931,15 +944,23 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
     await ownerCredentialStore.delete(session.accountId, removedWorkspace.urlKey);
   }
 
+  // accountId is still live here — only `workspaces`/`activeWorkspaceId` were
+  // touched above, and destroy()'s callback runs after the session data is gone.
+  // LIN-1518: hoisted above the branch, same reasoning as the durable delete
+  // directly above — `removedWorkspace` has left session.workspaces either way,
+  // so the cache must not keep answering for it in the remaining>0 arm either
+  // (previously it did, for up to the full TTL: an honesty regression against
+  // LIN-1506's taxonomy, not a live-credential leak). Deliberately NOT gated on
+  // `deleteDurable`: that flag governs revoking the SHARED durable credential
+  // on a transient blip, whereas this session's own cached entry is stale the
+  // moment removeWorkspace ran — which is unconditional.
+  if (removedWorkspace) {
+    evictWorkspaceTokenPair(evictWorkspaceToken, removedWorkspace.urlKey, session.accountId);
+  }
+
   if (remaining > 0) {
     await saveSession(session);
     return res.redirect('/');
-  }
-
-  // accountId is still live here — only `workspaces`/`activeWorkspaceId` were
-  // touched above, and destroy()'s callback runs after the session data is gone.
-  if (removedWorkspace) {
-    evictWorkspaceTokenPair(evictWorkspaceToken, removedWorkspace.urlKey, session.accountId);
   }
 
   return new Promise((resolve) => {

@@ -51,6 +51,26 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('The token authenticates the channel; it is not permission to merge.'));
   });
 
+  test('restates the named-discharge lanes, not an unqualified human sign-off (LIN-1579)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    // The old blanket clause contradicted every other surface once the lane widened.
+    assert.ok(!/a human sign-off for\s+risky merges/.test(text),
+      'drops the unqualified "human sign-off for risky merges" clause');
+    // An unprovable item discharges through the monitor review named — no box to tick.
+    assert.ok(/discharges through the \*\*named\*\* monitor review wrote for it/.test(text),
+      'a ledger item unprovable before merge discharges via its named monitor');
+    assert.ok(/reversible runtime-logic change through the \*\*named\*\* rollback/.test(text),
+      'a reversible runtime-logic change discharges via its named rollback');
+    assert.ok(/no human has to tick a box for\s+either/.test(text),
+      'neither named lane requires a fresh human sign-off');
+    // The floor the widening does NOT touch.
+    assert.ok(/a human naming the exact precondition is still required for an item review left\s+undischarged on a security, data-path, or external-contract surface/.test(text),
+      'undischarged items on risky surfaces still need a human naming the precondition');
+    // Naming is review's job — the orchestrator cites, it never supplies.
+    assert.ok(/you cite a name, you never supply one/.test(text),
+      'the orchestrator cites review\'s name rather than authoring its own');
+  });
+
   test('defaults to write/merge-gated mode', () => {
     assert.strictEqual(AUTOPILOT_MODE_DEFAULT, 'write');
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });

@@ -25,6 +25,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createCollectiveRoutes } from '../../routes/collective.js';
 import { WorkspacePreferencesStore } from '../../lib/workspace-preferences.js';
+import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../../lib/proxy-tokens.js';
 
 function createMockCollection() {
   const docs = [];
@@ -59,7 +60,7 @@ function mintingStore(minted) {
   };
 }
 
-function buildApp(captured, { workspacePreferencesStore, proxyTokenStore } = {}) {
+function buildApp(captured, { workspacePreferencesStore, proxyTokenStore, accountId } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createCollectiveRoutes({
@@ -76,7 +77,11 @@ function buildApp(captured, { workspacePreferencesStore, proxyTokenStore } = {})
     workspacePreferencesStore,
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey };
+      // `accountId` is what stamps a mint's `createdBy` (LIN-1376). Left unset by
+      // default, matching the historical fixture — the LIN-1582 tests below opt in
+      // to an owned session explicitly.
       req.session = { linearUserId: 'u1', features: { collective: true }, workspaces: WORKSPACES };
+      if (accountId !== undefined) req.session.accountId = accountId;
       next();
     },
   }));
@@ -205,6 +210,135 @@ describe('LIN-1173 — Collective fan-out token delivery via attachProxyContext'
     // bravo (opencode): inline prose, no field.
     assert.strictEqual(byKey.bravo.bootstrapToken, null);
     assert.ok(byKey.bravo.prompt.includes('boot_bravo'));
+  });
+});
+
+// LIN-1582 — the prose branch's mint is now governed by the ownerless switch.
+//
+// Before this, the prose branch called proxyTokenStore.createToken directly while
+// the claude-code branch above went through attachProxyContext →
+// provisionBootstrapToken, so with DISPATCH_OWNERLESS_BROKER_COMPAT=off the prose
+// branch could still mint an ownerless bootstrap — silently, with the
+// ownerlessness then inherited by the exchanged working token (the LIN-1576 shape).
+// Both branches now share provisionBootstrapToken; their only remaining divergence
+// is shouldUseMcpTokenField, which decides throw-vs-null.
+//
+// The load-bearing distinction from the claude-code path pinned at :168 is that
+// prose mode stays GRACEFUL: a refused mint drops the access block and the
+// participant is still dispatched ok:true, because a prose prompt that carries no
+// token never claims to have one. Failing the participant would be a regression,
+// not extra safety.
+describe('LIN-1582 — Collective prose branch under the ownerless switch', () => {
+  const ENV = 'DISPATCH_OWNERLESS_BROKER_COMPAT';
+  const restore = (t) => {
+    const before = process.env[ENV];
+    t.after(() => {
+      if (before === undefined) delete process.env[ENV];
+      else process.env[ENV] = before;
+    });
+  };
+
+  test('owned session: mint options are byte-identical to the pre-LIN-1582 inline call', async (t) => {
+    restore(t);
+    process.env[ENV] = 'off';
+    const workspacePreferencesStore = await prefsWith({ alpha: { harness: 'opencode' } });
+    const minted = [];
+    const captured = [];
+    const app = buildApp(captured, {
+      workspacePreferencesStore, proxyTokenStore: mintingStore(minted), accountId: 'account-A',
+    });
+
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#room', characters: [{ workspaceUrlKey: 'alpha' }], target: 'cli',
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(minted.length, 1, 'exactly one mint, as before');
+    // The four forwarded options plus the owner stamp — this is the equivalence
+    // the swap to provisionBootstrapToken has to preserve.
+    assert.deepEqual(minted[0], {
+      urlKey: 'alpha',
+      opts: {
+        kind: 'bootstrap',
+        scope: 'readWrite',
+        label: 'collective',
+        ttl: BOOTSTRAP_TOKEN_TTL_SECONDS,
+        createdBy: 'account-A',
+      },
+    });
+    // ...and the prose block still carries the token inline.
+    const { item } = captured[0];
+    assert.ok(item.prompt.includes('## Workspace API access (auto-appended)'), 'access block present');
+    assert.ok(item.prompt.includes('boot_alpha'), 'token embedded inline');
+    assert.strictEqual(item.bootstrapToken, null, 'prose path carries no structured field');
+  });
+
+  test('compat ON + ownerless session: still mints and still embeds, but warns', async (t) => {
+    restore(t);
+    delete process.env[ENV];
+    const warnMock = t.mock.method(console, 'warn', () => {});
+    const workspacePreferencesStore = await prefsWith({ alpha: { harness: 'opencode' } });
+    const minted = [];
+    const captured = [];
+    const app = buildApp(captured, { workspacePreferencesStore, proxyTokenStore: mintingStore(minted) });
+
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#room', characters: [{ workspaceUrlKey: 'alpha' }], target: 'cli',
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(minted.length, 1, 'the compat population is still served');
+    assert.equal(minted[0].opts.createdBy, null);
+    assert.ok(captured[0].item.prompt.includes('boot_alpha'), 'prose block unchanged under compat');
+
+    const warned = warnMock.mock.calls.map(c => c.arguments.join(' ')).join('\n');
+    assert.match(warned, /LIN-1448/, 'the ownerless mint is countable, never silent');
+    assert.ok(!warned.includes('boot_alpha'), 'never logs token bytes');
+  });
+
+  test('compat OFF + ownerless session: no mint, no access block, participant still dispatched', async (t) => {
+    restore(t);
+    process.env[ENV] = 'off';
+    const workspacePreferencesStore = await prefsWith({ alpha: { harness: 'opencode' } });
+    const minted = [];
+    const captured = [];
+    const app = buildApp(captured, { workspacePreferencesStore, proxyTokenStore: mintingStore(minted) });
+
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#room', characters: [{ workspaceUrlKey: 'alpha' }], target: 'cli',
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(minted.length, 0, 'the ownerless bootstrap is never minted');
+    // Graceful, NOT fail-closed — contrast the claude-code case at :168.
+    assert.equal(captured.length, 1, 'the participant is still enqueued');
+    assert.equal(res.body.dispatched[0].ok, true, 'a token-less prose participant is not a failure');
+    const { item } = captured[0];
+    assert.ok(!item.prompt.includes('## Workspace API access (auto-appended)'),
+      'the token-dependent block is dropped rather than emitted token-less');
+    assert.ok(!item.prompt.includes('boot_alpha'));
+    assert.strictEqual(item.bootstrapToken, null);
+    // The discussion itself still works — the participant just lacks Linear access.
+    assert.ok(item.prompt.includes('#room'), 'the participant prompt is otherwise intact');
+  });
+
+  test('compat OFF + owned session: the claude-code branch still gets its field token', async (t) => {
+    restore(t);
+    process.env[ENV] = 'off';
+    const workspacePreferencesStore = await prefsWith({ alpha: { harness: 'claude-code' } });
+    const minted = [];
+    const captured = [];
+    const app = buildApp(captured, {
+      workspacePreferencesStore, proxyTokenStore: mintingStore(minted), accountId: 'account-A',
+    });
+
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#room', characters: [{ workspaceUrlKey: 'alpha' }], target: 'cli',
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(captured[0].item.bootstrapToken, 'boot_alpha', 'the owned dispatch path is untouched');
+    assert.equal(minted[0].opts.createdBy, 'account-A');
   });
 });
 

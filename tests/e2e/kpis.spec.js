@@ -12,9 +12,41 @@ test.describe('KPIs page', () => {
     await page.goto('/kpis');
 
     await expect(page.locator('h2')).toHaveText('instance kpis');
+    // The headline outcome number sits ABOVE .kpi-cards and is deliberately not
+    // one of them — it is a ratio, not a volume count — so this stays 11.
     await expect(page.locator('.kpi-cards .kpi-card')).toHaveCount(11);
     await expect(page.locator('.kpi-card-label').first()).toHaveText('workspaces');
     await expect(page.locator('.kpi-card-label', { hasText: 'autopilot runs' })).toBeVisible();
+  });
+
+  test('headlines the dispatch outcome rate with a coverage sub-label', async ({ page }) => {
+    await page.goto('/kpis');
+
+    const headline = page.locator('.kpi-headline');
+    await expect(headline).toBeVisible();
+    await expect(headline.locator('.kpi-headline-value')).toBeVisible();
+    await expect(headline.locator('.kpi-headline-label')).toHaveText(/of dispatched work landed · 30d/);
+    // The rate must never be readable as covering all dispatched work.
+    await expect(headline.locator('.kpi-headline-coverage')).toHaveText(/\d+ of \d+ dispatches resolved · 30d/);
+    await expect(headline.locator('.kpi-headline-slices')).toHaveText(/done \d+ · failed \d+ · aborted \d+/);
+  });
+
+  test('the headline number links to the evidence behind it', async ({ page }) => {
+    await page.goto('/kpis');
+
+    const evidence = page.locator('#kpi-outcome-evidence');
+    await expect(evidence).toHaveClass(/kpi-chart-box/);
+
+    const link = page.locator('a.kpi-headline-value');
+    const data = await page.evaluate(() => window.__KPI_DATA__.dispatchOutcomes.rate);
+    if (data === null) {
+      // No rate → no anchor: a link to an empty chart is a dead end.
+      await expect(link).toHaveCount(0);
+      return;
+    }
+    await expect(link).toHaveAttribute('href', '#kpi-outcome-evidence');
+    await link.click();
+    await expect(evidence).toBeInViewport();
   });
 
   test('loads Chart.js and the embedded data payload', async ({ page }) => {
@@ -30,6 +62,12 @@ test.describe('KPIs page', () => {
     expect(data.proxyCategories.days.length).toBe(30);
     expect(data.proxyCategoriesHourly.hours.length).toBe(24);
     expect(data.dispatchByWeek.weeks.length).toBe(5);
+    // The outcome trend uses 4 weekly buckets, NOT the 5-week span above: the
+    // history TTL is 30 days, so a 35-day span under-fills its oldest bucket.
+    expect(data.dispatchOutcomes.weeks.length).toBe(4);
+    expect(data.dispatchOutcomes.weeklyRate.length).toBe(4);
+    expect(data.dispatchOutcomes.weeklyResolved.length).toBe(4);
+    expect(data.dispatchOutcomes.windowDays).toBe(30);
     expect(data.funnel).toBeTruthy();
     expect(data.hourOfDay.length).toBe(24);
   });
@@ -40,7 +78,7 @@ test.describe('KPIs page', () => {
     // Each chart box ends up with either a live canvas or a "no data yet"
     // note — never an empty hole.
     const boxes = page.locator('.kpi-chart-box');
-    await expect(boxes).toHaveCount(9);
+    await expect(boxes).toHaveCount(10);
     const count = await boxes.count();
     for (let i = 0; i < count; i++) {
       const box = boxes.nth(i);

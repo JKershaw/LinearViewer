@@ -22,9 +22,8 @@ import { renderCollectivePage } from '../lib/render-collective.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { normalizeYapChannel, nickFromWorkspaceName, randomChannelName } from '../lib/yap-client.js';
-import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
-import { attachProxyContext, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
+import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
 import { jsonError, notFound } from '../lib/errors.js';
 import {
   buildCollectiveParticipantPrompt,
@@ -343,16 +342,38 @@ export function createCollectiveRoutes({
               });
             }
             // Prose harnesses: byte-identical bespoke Linear-access block. Mint a
-            // best-effort single-use BOOTSTRAP and embed it inline (unchanged from
-            // HEAD); an absent store / failed mint drops the block, as before.
+            // best-effort single-use BOOTSTRAP and embed it inline; an absent
+            // store / failed mint drops the block, as before.
+            //
+            // LIN-1582: this mint goes through provisionBootstrapToken — the same
+            // helper the claude-code branch above reaches via attachProxyContext —
+            // rather than calling proxyTokenStore.createToken inline. Before, this
+            // was the one Collective mint the DISPATCH_OWNERLESS_BROKER_COMPAT
+            // switch did not govern, so with the lane off it still minted an
+            // ownerless bootstrap whose ownerlessness the exchanged working token
+            // inherited (the LIN-1576 failure shape). The forwarded token options
+            // are byte-identical to the inline call it replaces (kind/scope/label/
+            // ttl/createdBy), and because shouldUseMcpTokenField is false on this
+            // branch by construction, `useMcp` stays false: a refusal or a failed
+            // mint degrades to `null` and simply drops the access block, exactly
+            // as the inline try/catch did. Prose mode never throws, so a
+            // participant is never failed over a missing token — that fail-closed
+            // posture belongs to the claude-code branch alone (LIN-1175).
             let proxyToken = null;
-            if (proxyTokenStore) {
-              try {
-                const minted = await proxyTokenStore.createToken(ws.urlKey, { kind: 'bootstrap', scope: 'readWrite', label: 'collective', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy: req.session?.accountId || null });
-                proxyToken = minted?.token || null;
-              } catch (err) {
-                console.error(`Collective: proxy token mint failed for ${ws.urlKey}:`, err.message);
-              }
+            try {
+              proxyToken = await provisionBootstrapToken({
+                proxyTokenStore,
+                urlKey: ws.urlKey,
+                baseUrl: proxyBaseUrl,
+                label: 'collective',
+                harness: resolvedHarness,
+                createdBy: req.session?.accountId || null,
+              });
+            } catch (err) {
+              // Unreachable on this branch (prose mode returns null instead of
+              // throwing), kept so a future harness-resolution change cannot turn
+              // a best-effort mint into a failed participant.
+              console.error(`Collective: proxy token mint failed for ${ws.urlKey}:`, err.message);
             }
             return {
               prompt: buildPrompt({ proxyBaseUrl: proxyToken ? proxyBaseUrl : null, proxyToken }),

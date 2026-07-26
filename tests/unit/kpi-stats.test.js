@@ -15,7 +15,8 @@ import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import {
   collectKpiStats, categorizeProxyEvent, PROXY_PHASES,
-  ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS, WEEKLY_WINDOW_WEEKS
+  ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS, WEEKLY_WINDOW_WEEKS,
+  OUTCOME_WINDOW_WEEKS, OUTCOME_WINDOW_DAYS
 } from '../../lib/kpi-stats.js';
 
 // Minimal in-memory mock of the collection surface kpi-stats uses:
@@ -488,6 +489,164 @@ describe('PROXY_FIELDS keeps the free-text note out of the unauthenticated read 
   });
 });
 
+// The headline outcome metric (LIN-1596). One seed, exercised here through the
+// mock (find) path and again below through real MangoDB's aggregation path, so
+// the two shapes — a raw `feedback[]` vs a single derived `terminalEntry` —
+// are proven to produce identical numbers rather than assumed to.
+const marker = (message, days) => ({
+  message,
+  timestamp: new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
+});
+
+// A mixed seed covering every rule the metric encodes: the three slices, the
+// two exclusions, abort attribution, and follow-up lineage collapsing.
+function outcomeSeed() {
+  return [
+    // --- the three slices ---
+    { _id: 'h-done', rootItemId: 'h-done', status: 'taken', dispatchedAt: daysAgo(3), feedback: [marker('heartbeat: still going', 3), marker('[done] landed it', 2)] },
+    { _id: 'h-failed', rootItemId: 'h-failed', status: 'taken', dispatchedAt: daysAgo(3), feedback: [marker('[failed] remote-control never connected', 2)] },
+    // --- abort: the marker lives on the abort ROW, targeting h-target ---
+    { _id: 'h-abortrow', rootItemId: 'h-abortrow', abort: true, abortTo: 'h-target', status: 'taken', dispatchedAt: daysAgo(3), feedback: [marker('[aborted] cascade cancel', 2)] },
+    { _id: 'h-target', rootItemId: 'h-target', status: 'taken', dispatchedAt: daysAgo(3), feedback: [] },
+    // --- exclusions ---
+    { _id: 'h-skipped', rootItemId: 'h-skipped', status: 'taken', dispatchedAt: daysAgo(3), feedback: [marker('[skipped] human-continued session', 2)] },
+    { _id: 'h-unconfirmed', rootItemId: 'h-unconfirmed', status: 'taken', dispatchedAt: daysAgo(3), feedback: [marker('[ended·unconfirmed] session ended without a sentinel', 2)] },
+    { _id: 'h-nofeedback', rootItemId: 'h-nofeedback', status: 'taken', dispatchedAt: daysAgo(3), feedback: [] },
+    // --- one lineage, two rows: the later marker wins, counted ONCE ---
+    { _id: 'h-lin1', rootItemId: 'h-lin1', status: 'taken', dispatchedAt: daysAgo(6), feedback: [marker('[failed] first attempt', 6)] },
+    { _id: 'h-lin2', rootItemId: 'h-lin1', followUpTo: 'h-lin1', status: 'taken', dispatchedAt: daysAgo(5), feedback: [marker('[done] follow-up landed it', 5)] }
+  ];
+}
+
+describe('collectKpiStats — dispatch outcomes (find path)', () => {
+  async function outcomes(history, queue = []) {
+    const stats = await collectKpiStats(buildCollections({
+      dispatchHistory: createMockCollection(history),
+      dispatchQueue: createMockCollection(queue)
+    }), { now: NOW });
+    return stats.dispatchOutcomes;
+  }
+
+  test('computes the three slices and the landed rate from a mixed seed', async () => {
+    const result = await outcomes(outcomeSeed());
+
+    // done: h-done + the h-lin1 lineage. failed: h-failed. aborted: h-target.
+    assert.strictEqual(result.done, 2);
+    assert.strictEqual(result.failed, 1);
+    assert.strictEqual(result.aborted, 1);
+    assert.strictEqual(result.resolved, 4);
+    assert.strictEqual(result.rate, 0.5);
+    assert.strictEqual(result.windowDays, OUTCOME_WINDOW_DAYS);
+  });
+
+  test('excludes [skipped] from BOTH numerator and denominator', async () => {
+    const result = await outcomes(outcomeSeed());
+    // 6 lineages in `total`: h-done, h-failed, h-target, h-unconfirmed,
+    // h-nofeedback, h-lin1. The abort ROW and the [skipped] row are both gone.
+    assert.strictEqual(result.total, 6);
+    // A skipped-only instance has nothing to report at all.
+    const onlySkipped = await outcomes([outcomeSeed().find(d => d._id === 'h-skipped')]);
+    assert.strictEqual(onlySkipped.total, 0);
+    assert.strictEqual(onlySkipped.resolved, 0);
+    assert.strictEqual(onlySkipped.rate, null);
+  });
+
+  test('[ended·unconfirmed] and empty feedback land in total but not resolved', async () => {
+    const result = await outcomes(outcomeSeed().filter(d => ['h-unconfirmed', 'h-nofeedback'].includes(d._id)));
+    assert.strictEqual(result.total, 2);
+    assert.strictEqual(result.resolved, 0);
+    assert.strictEqual(result.rate, null, 'no resolved lineages → null, never 0');
+  });
+
+  test('attributes an abort row\'s [aborted] to its target and drops the abort row itself', async () => {
+    const result = await outcomes(outcomeSeed().filter(d => ['h-abortrow', 'h-target'].includes(d._id)));
+    // One cancelled task = ONE aborted lineage, not an [aborted] row plus an
+    // unresolved target (the LIN-1257 case).
+    assert.strictEqual(result.total, 1);
+    assert.strictEqual(result.resolved, 1);
+    assert.strictEqual(result.aborted, 1);
+    assert.strictEqual(result.rate, 0);
+  });
+
+  test('never lets an EARLIER harvested abort override a LATER genuine terminal', async () => {
+    // The shared F1 guard (LIN-1261), inherited by consuming the seam.
+    const result = await outcomes([
+      { _id: 'ab', rootItemId: 'ab', abort: true, abortTo: 'tgt', status: 'taken', dispatchedAt: daysAgo(3), feedback: [marker('[aborted] too late', 4)] },
+      { _id: 'tgt', rootItemId: 'tgt', status: 'taken', dispatchedAt: daysAgo(5), feedback: [marker('[done] already finished', 2)] }
+    ]);
+    assert.strictEqual(result.done, 1);
+    assert.strictEqual(result.aborted, 0);
+  });
+
+  test('counts a two-row follow-up lineage ONCE, taking the later marker', async () => {
+    const result = await outcomes(outcomeSeed().filter(d => ['h-lin1', 'h-lin2'].includes(d._id)));
+    assert.strictEqual(result.total, 1, 'the anti-inflation rule: rows collapse to one lineage');
+    assert.strictEqual(result.resolved, 1);
+    assert.strictEqual(result.done, 1);
+    assert.strictEqual(result.failed, 0, 'the earlier [failed] is superseded');
+    assert.strictEqual(result.rate, 1);
+  });
+
+  test('pre-LIN-1468 rows with no rootItemId degrade to per-row counting', async () => {
+    const result = await outcomes([
+      { _id: 'old1', status: 'taken', dispatchedAt: daysAgo(2), feedback: [marker('[done] a', 1)] },
+      { _id: 'old2', status: 'taken', dispatchedAt: daysAgo(2), feedback: [marker('[failed] b', 1)] }
+    ]);
+    assert.strictEqual(result.total, 2);
+    assert.strictEqual(result.rate, 0.5);
+  });
+
+  test('rate is null on an empty instance, and queue rows contribute unresolved lineages', async () => {
+    const empty = await outcomes([]);
+    assert.strictEqual(empty.rate, null);
+    assert.strictEqual(empty.total, 0);
+    assert.deepStrictEqual(empty.weeklyRate, new Array(OUTCOME_WINDOW_WEEKS).fill(null));
+
+    // Queue rows never carry feedback (addFeedback writes only to history).
+    const queued = await outcomes([], [{ _id: 'q1', rootItemId: 'q1', dispatchedAt: daysAgo(0) }]);
+    assert.strictEqual(queued.total, 1);
+    assert.strictEqual(queued.resolved, 0);
+    assert.strictEqual(queued.rate, null);
+  });
+
+  test('buckets each lineage into exactly one week, keyed on its EARLIEST dispatch', async () => {
+    const result = await outcomes([
+      { _id: 'w-new', rootItemId: 'w-new', status: 'taken', dispatchedAt: daysAgo(1), feedback: [marker('[done] recent', 0)] },
+      // Dispatched 20d ago, finished 1d ago: the lineage belongs to the OLD
+      // bucket (dispatch time), and its follow-up must not double-count it.
+      { _id: 'w-old', rootItemId: 'w-old', status: 'taken', dispatchedAt: daysAgo(20), feedback: [marker('[failed] slow burn', 19)] },
+      { _id: 'w-oldfu', rootItemId: 'w-old', followUpTo: 'w-old', status: 'taken', dispatchedAt: daysAgo(2), feedback: [marker('[done] eventually', 1)] }
+    ]);
+
+    assert.strictEqual(result.weeks.length, OUTCOME_WINDOW_WEEKS);
+    assert.strictEqual(result.weeklyResolved.length, OUTCOME_WINDOW_WEEKS);
+    assert.deepStrictEqual(result.weeklyResolved, [0, 1, 0, 1], 'one lineage per bucket, keyed on earliest dispatch');
+    assert.deepStrictEqual(result.weeklyRate, [null, 1, null, 1]);
+    assert.strictEqual(result.total, 2);
+  });
+
+  test('excludes lineages dispatched outside the 30-day window', async () => {
+    const result = await outcomes([
+      { _id: 'stale', rootItemId: 'stale', status: 'taken', dispatchedAt: daysAgo(45), feedback: [marker('[done] ancient', 44)] }
+    ]);
+    assert.strictEqual(result.total, 0);
+    assert.strictEqual(result.rate, null);
+  });
+
+  test('privacy: a terminal marker\'s free-text tail never reaches the stats', async () => {
+    const stats = await collectKpiStats(buildCollections({
+      dispatchHistory: createMockCollection([
+        { _id: 'h1', urlKey: 'secret-workspace', status: 'taken', rootItemId: 'h1', dispatchedAt: daysAgo(1), feedback: [marker('[done] MARKER-FREE-TEXT-TAIL', 0)] }
+      ])
+    }), { now: NOW });
+
+    const serialized = JSON.stringify(stats);
+    assert.strictEqual(stats.dispatchOutcomes.done, 1, 'the marker was read');
+    assert.ok(!serialized.includes('MARKER-FREE-TEXT-TAIL'), 'marker free-text leaked');
+    assert.ok(!serialized.includes('secret-workspace'), 'workspace urlKey leaked');
+  });
+});
+
 // The production read path runs DB-side aggregation (group proxy events by
 // method/endpoint/status/UTC-hour; drop dispatch feedback[] to a count) instead
 // of pulling whole collections into memory — that full read is what pushed
@@ -667,5 +826,83 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     assert.ok(!serialized.includes('secret-workspace'), 'workspace urlKey leaked');
     assert.ok(!serialized.includes('CONFIDENTIAL-FEEDBACK-BODY'), 'feedback content leaked');
     assert.ok(!serialized.includes('SENSITIVE-NOTE-BREADCRUMB'), 'proxy event note leaked');
+  });
+
+  // --- dispatch outcomes (LIN-1596) through the aggregation path ---
+
+  test('derives the outcome slices in-DB, matching the find path exactly', async () => {
+    const collections = await realCollections({ dispatchHistory: outcomeSeed() });
+    const stats = await collectKpiStats(collections, { now: NOW });
+
+    assert.strictEqual(stats.dispatchOutcomes.done, 2);
+    assert.strictEqual(stats.dispatchOutcomes.failed, 1);
+    assert.strictEqual(stats.dispatchOutcomes.aborted, 1);
+    assert.strictEqual(stats.dispatchOutcomes.resolved, 4);
+    assert.strictEqual(stats.dispatchOutcomes.total, 6);
+    assert.strictEqual(stats.dispatchOutcomes.rate, 0.5);
+  });
+
+  test('parity: one seed yields identical dispatchOutcomes on both load paths', async () => {
+    // The ONLY shape difference is `feedback[]` vs the derived `terminalEntry`,
+    // absorbed at a single helper. This pins that the abort harvest, the F1
+    // guard, lineage grouping and weekly bucketing all agree across the two.
+    const seed = outcomeSeed();
+    const aggregated = await collectKpiStats(await realCollections({ dispatchHistory: seed }), { now: NOW });
+    const found = await collectKpiStats(
+      buildCollections({ dispatchHistory: createMockCollection(seed) }),
+      { now: NOW }
+    );
+
+    assert.deepStrictEqual(aggregated.dispatchOutcomes, found.dispatchOutcomes);
+  });
+
+  test('projection returns no raw feedback array, only the single derived entry', async () => {
+    // The standing guard on the /kpis timeout fix (ea7abb56): the fattest field
+    // in the collection must never cross the wire, even though the outcome
+    // metric now needs the marker inside it.
+    const collections = await realCollections({
+      dispatchHistory: [{
+        _id: 'h1', rootItemId: 'h1', status: 'taken', dispatchedAt: daysAgo(2),
+        feedback: [
+          { message: 'heartbeat', timestamp: daysAgo(2).toISOString(), telemetry: 'BULKY-HEARTBEAT-PAYLOAD' },
+          { message: '[done] finished', timestamp: daysAgo(1).toISOString() }
+        ]
+      }]
+    });
+
+    const projected = await collections.dispatchHistory.aggregate([
+      {
+        $project: {
+          feedbackCount: { $size: { $ifNull: ['$feedback', []] } },
+          terminalEntry: {
+            $last: {
+              $filter: {
+                input: {
+                  $map: {
+                    input: { $ifNull: ['$feedback', []] },
+                    as: 'f',
+                    in: { message: '$$f.message', timestamp: '$$f.timestamp' }
+                  }
+                },
+                as: 'entry',
+                cond: {
+                  $regexMatch: {
+                    input: { $ifNull: ['$$entry.message', ''] },
+                    regex: '^\\s*\\[(done|complete|failed|aborted|skipped)\\]',
+                    options: 'i'
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]).toArray();
+
+    assert.strictEqual(projected.length, 1);
+    assert.ok(!('feedback' in projected[0]), 'raw feedback array leaked into the projection');
+    assert.strictEqual(projected[0].feedbackCount, 2);
+    assert.deepStrictEqual(Object.keys(projected[0].terminalEntry).sort(), ['message', 'timestamp']);
+    assert.ok(!JSON.stringify(projected).includes('BULKY-HEARTBEAT-PAYLOAD'), 'non-terminal entry content leaked');
   });
 });

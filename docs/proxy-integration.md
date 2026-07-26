@@ -107,6 +107,24 @@ durable prompt — which is persisted in the dispatch queue/history and is reada
 what lets a leaked prompt leak nothing usable. A workspace operator can mint a bootstrap via
 `POST /workspace/:urlKey/api/proxy/tokens` with `"bootstrap": true`.
 
+**Bootstrap mints require an owner when strict mode is on.** A bootstrap carries the `createdBy`
+of the account that minted it, and the working token it is exchanged for inherits that owner —
+so an *ownerless* bootstrap produces a working token that can never resolve a workspace
+credential. When the server runs with `DISPATCH_OWNERLESS_BROKER_COMPAT=off`, a
+`"bootstrap": true` request from a session with no account owner is refused with `503` rather
+than handed back dead (LIN-1582):
+
+```json
+{
+  "error": "Session has no account owner (LIN-1448)",
+  "message": "A bootstrap minted for a session with no account owner cannot resolve a workspace credential, and the working token it is exchanged for inherits the miss. Sign in again, or use an account that has this workspace connected, before requesting a bootstrap token."
+}
+```
+
+Signing in again (which stamps the owner) is the fix. This applies **only** to bootstrap
+requests: creating an ordinary `read`/`readWrite`/`singleUse` token is unaffected, as is
+exchanging a bootstrap that was already issued.
+
 > **Note for existing consumers:** every dispatched prompt now leads with this exchange step. If
 > your harness passes the prompt to an LLM agent (the common case), no code change is needed — the
 > agent follows the exchange instruction in the prompt. Only a consumer that programmatically

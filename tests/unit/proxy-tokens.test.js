@@ -281,6 +281,170 @@ describe('ProxyTokenStore', () => {
         /kind must be/
       );
     });
+
+    // LIN-1587 R1 — the exchanged working token inherits the bootstrap's OWN
+    // label (e.g. 'dispatch-bootstrap'/'refire-broker'/'collective') instead of
+    // being flattened to the literal 'exchanged', so per-site lanes survive
+    // the exchange into the Event Log / agent-status snapshot.
+    test('LIN-1587: exchange inherits the bootstrap\'s own label when no override is given', async () => {
+      const boot = await store.createToken('workspace-1', {
+        kind: 'bootstrap',
+        scope: 'readWrite',
+        label: 'dispatch-bootstrap'
+      });
+      const working = await store.exchangeBootstrapToken(boot.token);
+      assert.strictEqual(working.label, 'dispatch-bootstrap');
+    });
+
+    test('LIN-1587: an explicit options.label still overrides the bootstrap\'s own label', async () => {
+      const boot = await store.createToken('workspace-1', {
+        kind: 'bootstrap',
+        scope: 'readWrite',
+        label: 'dispatch-bootstrap'
+      });
+      const working = await store.exchangeBootstrapToken(boot.token, { label: 'custom-override' });
+      assert.strictEqual(working.label, 'custom-override');
+    });
+
+    test('LIN-1587: a bootstrap with no label at all (e.g. a pre-existing legacy record) falls back to \'exchanged\'', async () => {
+      // createToken always defaults an omitted label to 'default', so the only
+      // way to exercise a genuinely label-less bootstrap doc is to strip the
+      // field directly on the stored record, same as the expired-bootstrap test
+      // above manipulates `expiresAt`.
+      const boot = await store.createToken('workspace-1', { kind: 'bootstrap', scope: 'readWrite' });
+      const docs = collection._docs();
+      delete docs[0].label;
+      const working = await store.exchangeBootstrapToken(boot.token);
+      assert.strictEqual(working.label, 'exchanged');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // LIN-1582 — the STRUCTURAL ownerless-bootstrap refusal.
+  //
+  // LIN-1448 gated the two dispatched mint sites and called
+  // provisionBootstrapToken "the choke point every bootstrap mint passes through".
+  // It wasn't: routes/collective.js's prose branch, the session-auth token
+  // endpoint, and the test-only /test/create-proxy-token all called createToken
+  // with kind:'bootstrap' directly, so with the lane off they could still mint an
+  // ownerless bootstrap — and ownerlessness is inherited by the exchanged working
+  // token and by anything that worker mints (the LIN-1576 shape). Refusing in the
+  // store makes the claim true for every present AND future mint site.
+  //
+  // The `kind === 'bootstrap'` scope is load-bearing in two directions, and both
+  // are pinned below: non-bootstrap minting must stay untouched (LIN-1447), and
+  // exchangeBootstrapToken's internal mint is kind:'standard', so an
+  // already-issued ownerless bootstrap must stay exchangeable rather than
+  // stranding the compat population mid-flight.
+  // ---------------------------------------------------------------------------
+  describe('LIN-1582 — ownerless bootstrap mints are refused structurally', () => {
+    const ENV = 'DISPATCH_OWNERLESS_BROKER_COMPAT';
+    const restore = (t) => {
+      const before = process.env[ENV];
+      t.after(() => {
+        if (before === undefined) delete process.env[ENV];
+        else process.env[ENV] = before;
+      });
+    };
+
+    test('compat OFF + bootstrap + no createdBy → refused, and NOTHING is inserted', async (t) => {
+      restore(t);
+      process.env[ENV] = 'off';
+
+      await assert.rejects(
+        () => store.createToken('workspace-1', { kind: 'bootstrap', scope: 'readWrite' }),
+        (err) => {
+          assert.match(err.message, /LIN-1582/);
+          assert.match(err.message, /owner/i);
+          return true;
+        }
+      );
+      // The refusal must precede the write — a rejected mint that still landed a
+      // row would leave a live ownerless credential behind the error.
+      assert.equal(collection._docs().length, 0, 'no token document may be written');
+    });
+
+    test('compat OFF + bootstrap + createdBy present → mints, unchanged', async (t) => {
+      restore(t);
+      process.env[ENV] = 'off';
+
+      const result = await store.createToken('workspace-1', {
+        kind: 'bootstrap', scope: 'readWrite', createdBy: 'account-A'
+      });
+
+      assert.equal(result.kind, 'bootstrap');
+      assert.equal(result.singleUse, true, 'still forced single-use');
+      assert.equal(collection._docs()[0].createdBy, 'account-A');
+    });
+
+    test('compat OFF + kind:standard + no createdBy → mints (non-bootstrap is untouched)', async (t) => {
+      restore(t);
+      process.env[ENV] = 'off';
+
+      // LIN-1447's constraint: the switch governs bootstrap minting only. An
+      // ownerless standard token is a weak credential, but refusing it here would
+      // break every ordinary mint path the switch was never scoped to.
+      const result = await store.createToken('workspace-1', { scope: 'read' });
+
+      assert.equal(result.kind, 'standard');
+      assert.ok(await store.validateToken(result.token), 'the standard token works');
+    });
+
+    test('compat ON (default) + bootstrap + no createdBy → still mints (compat preserved)', async (t) => {
+      restore(t);
+      delete process.env[ENV];
+
+      const result = await store.createToken('workspace-1', { kind: 'bootstrap', scope: 'readWrite' });
+
+      assert.equal(result.kind, 'bootstrap');
+      assert.equal(collection._docs()[0].createdBy, null, 'the compat population is still mintable');
+    });
+
+    test('a typo in the env value leaves the compat lane running (fails safe)', async (t) => {
+      restore(t);
+      // Accidental strictness costs the host runner its mint path (LIN-1447's
+      // original outage); accidental leniency is the status quo. Only a
+      // recognised off-value may switch strictness on.
+      process.env[ENV] = 'offf';
+
+      const result = await store.createToken('workspace-1', { kind: 'bootstrap', scope: 'readWrite' });
+      assert.equal(result.kind, 'bootstrap');
+    });
+
+    test('compat OFF: an already-issued ownerless bootstrap STILL exchanges', async (t) => {
+      restore(t);
+      // Mint the ownerless bootstrap while the lane is on — this is the
+      // pre-existing population the switch is draining, not a new mint.
+      delete process.env[ENV];
+      const boot = await store.createToken('workspace-1', { kind: 'bootstrap', scope: 'readWrite' });
+
+      // Now flip strictness on. The exchange mints kind:'standard', so the
+      // bootstrap-scoped guard must not catch it: refusing here would strand a
+      // live consumer mid-flight rather than at a mint it could retry, which is
+      // exactly what LIN-1448 refused to do.
+      process.env[ENV] = 'off';
+      t.mock.method(console, 'warn', () => {});
+
+      const working = await store.exchangeBootstrapToken(boot.token);
+
+      assert.ok(working, 'the exchange must remain reachable with the lane off');
+      assert.equal(working.kind, 'standard');
+      assert.equal(working.urlKey, 'workspace-1');
+      assert.ok(await store.validateToken(working.token), 'the working token authenticates');
+    });
+
+    test('compat OFF: an OWNED bootstrap exchanges and carries its owner across', async (t) => {
+      restore(t);
+      process.env[ENV] = 'off';
+
+      const boot = await store.createToken('workspace-1', {
+        kind: 'bootstrap', scope: 'readWrite', createdBy: 'account-A'
+      });
+      const working = await store.exchangeBootstrapToken(boot.token);
+
+      const validated = await store.validateToken(working.token);
+      assert.equal(validated.createdBy, 'account-A', 'the healthy path is entirely unchanged');
+    });
   });
 
   describe('token expiry', () => {
