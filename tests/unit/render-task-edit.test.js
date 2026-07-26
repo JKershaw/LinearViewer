@@ -64,6 +64,19 @@ describe('renderTaskEditPage — the four v1 fields', () => {
     assert.ok(html.includes('<option value="2" selected>High</option>'));
   });
 
+  test('description carries a Write/Preview toggle and an initially-hidden preview pane (LIN-1575)', () => {
+    const html = render();
+    assert.ok(html.includes('data-testid="task-edit-tab-write"'));
+    assert.ok(html.includes('data-testid="task-edit-tab-preview"'));
+    // Write is the tab active on arrival — the textarea, not the preview, is
+    // what the server renders visible.
+    const writeTab = html.match(/<button[^>]*data-testid="task-edit-tab-write"[^>]*>/)[0];
+    assert.ok(/aria-selected="true"/.test(writeTab));
+    // The preview pane ships `hidden` — the plain textarea is always what's
+    // live at first paint, never a fresh-page flash of an empty preview.
+    assert.ok(/<div class="task-edit-preview comment-body" data-task-edit-preview data-testid="task-edit-preview" hidden><\/div>/.test(html));
+  });
+
   test('renders NO field beyond the v1 four (the PATCH route reads no others)', () => {
     const html = render();
     for (const name of ['assigneeId', 'labelIds', 'estimate', 'cycleId', 'projectId', 'teamId']) {
@@ -233,6 +246,14 @@ describe('renderTaskEditPage — shell wiring', () => {
     assert.ok(html.includes('src="/task-edit.js"'));
     // common.js must come first — task-edit.js depends on window.api.
     assert.ok(html.indexOf('src="/common.js"') < html.indexOf('src="/task-edit.js"'));
+  });
+
+  test('loads the vendored marked + purify pair before task-edit.js (LIN-1575, no new dependency)', () => {
+    const html = render();
+    assert.ok(html.includes('src="/marked.min.js"'));
+    assert.ok(html.includes('src="/purify.min.js"'));
+    assert.ok(html.indexOf('src="/marked.min.js"') < html.indexOf('src="/task-edit.js"'));
+    assert.ok(html.indexOf('src="/purify.min.js"') < html.indexOf('src="/task-edit.js"'));
   });
 
   test('renders the identifier as a machine fact beside the title', () => {

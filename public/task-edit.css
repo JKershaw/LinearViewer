@@ -138,6 +138,59 @@ select.task-edit-input {
   line-height: 1.5;
 }
 
+/* Write/Preview toggle (LIN-1575): the label and the two tab buttons share a row
+   above the textarea. */
+.task-edit-desc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.task-edit-desc-tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.task-edit-tab {
+  padding: 0.25rem 0.65rem;
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.task-edit-tab:hover { color: var(--text); border-color: var(--brand); }
+
+.task-edit-tab[aria-selected="true"] {
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+}
+
+.task-edit-tab:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Rendered Markdown preview — same box footprint as the textarea it stands in
+   for, so toggling tabs doesn't jump the layout. `.comment-body` (style.css)
+   supplies the actual Markdown typography (p/code/a rules). */
+.task-edit-preview {
+  min-height: 16rem;
+  box-sizing: border-box;
+  padding: 0.55rem 0.7rem;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
 .task-edit-hint {
   margin: 0;
   font-family: var(--font-content);

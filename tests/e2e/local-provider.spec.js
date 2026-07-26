@@ -141,4 +141,51 @@ test.describe('Local provider (no test-token mock)', () => {
     // State persisted: now Done, so it has left the In Progress section.
     await expect(page.locator('.in-progress-items .line', { hasText: NEW_TITLE })).toHaveCount(0);
   });
+
+  // LIN-1575: the description field grew a Write/Preview toggle (marked +
+  // DOMPurify via window.renderMarkdown — the same vendored pair every other
+  // Markdown surface already loads, no new dependency). Proves two things: (1)
+  // Preview actually renders the Markdown, and (2) opening Preview — the editor
+  // being "touched" — never mutates the underlying textarea, so a save with the
+  // description otherwise untouched round-trips it byte-identical, never
+  // HTML-ified. The seeded description is plain text ("Seeded parent"), so this
+  // also proves render/round-trip work for the common no-Markdown-syntax case.
+  test('description Preview renders live and saving round-trips the untouched doc unchanged', async ({ page }) => {
+    await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
+    await page.locator('.detail-toggle[data-toggle="details"]').first().click();
+    await page.locator('[data-testid="issue-edit-link"]').first().click();
+
+    const form = page.locator('[data-testid="task-edit-form"]');
+    await expect(form).toBeVisible();
+    const textarea = form.locator('[data-testid="task-edit-description"]');
+    const preview = form.locator('[data-testid="task-edit-preview"]');
+    await expect(textarea).toHaveValue('Seeded parent');
+    await expect(preview).toBeHidden();
+
+    // Preview: textarea hides, the rendered pane shows, and it actually rendered
+    // (not just echoed) the current content.
+    await form.locator('[data-testid="task-edit-tab-preview"]').click();
+    await expect(textarea).toBeHidden();
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText('Seeded parent');
+
+    // Back to Write: the textarea returns with its value untouched by the
+    // render/sanitize round trip.
+    await form.locator('[data-testid="task-edit-tab-write"]').click();
+    await expect(textarea).toBeVisible();
+    await expect(preview).toBeHidden();
+    await expect(textarea).toHaveValue('Seeded parent');
+
+    // Save with the description untouched (only having opened Preview), then
+    // come back and confirm it persisted byte-identical — the editor never
+    // rewrote the stored Markdown to HTML or anything else.
+    await form.locator('[data-testid="task-edit-submit"]').click();
+    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/workspace\/[^/]+\/$/);
+
+    await page.locator('.in-progress-items .line', { hasText: 'Local parent task' }).first().click();
+    await page.locator('.detail-toggle[data-toggle="details"]').first().click();
+    await page.locator('[data-testid="issue-edit-link"]').first().click();
+    await expect(page.locator('[data-testid="task-edit-description"]')).toHaveValue('Seeded parent');
+  });
 });

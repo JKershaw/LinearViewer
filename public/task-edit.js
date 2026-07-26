@@ -14,6 +14,14 @@
  *
  * Loaded AFTER common.js — window.api IS available. It surfaces errors via toast
  * and throws on non-2xx.
+ *
+ * Description Write/Preview toggle (LIN-1575): the textarea is the only editor —
+ * Preview just renders its current value read-only via window.renderMarkdown
+ * (common.js, backed by the vendored marked.min.js + purify.min.js also loaded on
+ * this page). Switching tabs never mutates the textarea's value, so submit always
+ * reads the raw Markdown the user actually typed, and a missing/failed
+ * marked/DOMPurify load degrades renderMarkdown to escaped plain text rather than
+ * breaking anything — Write always works even if Preview looks flat.
  */
 (function () {
   'use strict';
@@ -23,6 +31,35 @@
 
   var statusEl = form.querySelector('[data-task-edit-status]');
   var submitBtn = form.querySelector('[type="submit"]');
+
+  // ── Description Write/Preview toggle ──────────────────────────────────────
+  (function initDescPreview() {
+    var textarea = form.querySelector('[data-testid="task-edit-description"]');
+    var preview = form.querySelector('[data-task-edit-preview]');
+    var writeTab = form.querySelector('[data-desc-tab="write"]');
+    var previewTab = form.querySelector('[data-desc-tab="preview"]');
+    if (!textarea || !preview || !writeTab || !previewTab) return;
+
+    function showWrite() {
+      preview.hidden = true;
+      textarea.hidden = false;
+      writeTab.setAttribute('aria-selected', 'true');
+      previewTab.setAttribute('aria-selected', 'false');
+      textarea.focus();
+    }
+
+    function showPreview() {
+      var render = typeof window.renderMarkdown === 'function' ? window.renderMarkdown : null;
+      preview.innerHTML = render ? render(textarea.value) : window.escapeHtml(textarea.value || '');
+      textarea.hidden = true;
+      preview.hidden = false;
+      previewTab.setAttribute('aria-selected', 'true');
+      writeTab.setAttribute('aria-selected', 'false');
+    }
+
+    writeTab.addEventListener('click', showWrite);
+    previewTab.addEventListener('click', showPreview);
+  })();
 
   function setStatus(msg) {
     if (statusEl) statusEl.textContent = msg;
