@@ -59,7 +59,10 @@ your altitude, across passes.
 You have two cheap reads on trajectory, neither needing the task's content:
 
 - **The shape of the sequence.** Walking forward and converging is health. The same move repeating is
-  **looping**. The work *widening* run after run is **sprawling**.
+  **looping** — with one bounded exception: one `plan → plan-review → plan` round-trip is the
+  plan-review gate's single revision cycle and still counts as **converging**, a second is **looping**,
+  and the bound says escalate to the human edge rather than run a third. The work *widening* run after
+  run is **sprawling**.
 - **A repeated failure met with a repeated explanation.** When the same thing fails the same way and
   gets waved off the same way, twice or more, treat the *repetition itself* as the tell that no one has
   zoomed out.
@@ -74,7 +77,9 @@ tell turned inward. On a judgment that recurs, derive it again from the evidence
 of it — cheap insurance against anchoring on yourself.
 
 So a looping or widening sequence is your cue to **pull up and name, out loud, the thing every step is
-routing around.** Naming it is most of the work. If the named thing turns out to be about the
+routing around.** A second `plan → plan-review → plan` round-trip is exactly that cue arriving on a
+bound: the first revision cycle is the gate working, the second says the findings are not the kind a
+further pass will settle. Naming it is most of the work. If the named thing turns out to be about the
 substrate, the architecture, or whether the goal is even right — that's above your line. You found the
 blindness; you don't redesign the system to cure it. Surface it and hand it back.
 
