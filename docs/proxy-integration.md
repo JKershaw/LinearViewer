@@ -886,7 +886,7 @@ Returns the **Autopilot kickoff** as **plain text** (`text/plain`) — the brief
 
 | Query param | Default | Description |
 |-------------|---------|-------------|
-| `mode` | `write` | `write` allows implementation/review/close-out kinds and an evidence-gated merge (review writes the Not-Proven-by-CI ledger; `close-out` discharges or accepts each item, then merges and sets Done); `readonly` restricts dispatched work to investigation/research/planning/retro (no code, PRs, or issue writes). |
+| `mode` | `write` | `write` allows implementation/review/close-out kinds and an evidence-gated merge (review writes the Not-Proven-by-CI ledger; `close-out` discharges or accepts each item, then merges and sets Done); `readonly` restricts dispatched work to investigation/research/planning/plan-review/retro (no code, PRs, or issue writes). |
 | `variant` | `standard` | `standard` is the normal orchestrator. `stepper` swaps in the **beat-stepping** disposition (see [Stepper variant](./autopilot-kickoff.md#stepper-variant)): decompose a task's worker prompt into 3–6 ordered beats and drip-feed them into one warm session, challenging each before advancing. Orthogonal to `mode` — they compose. |
 | `goal` | _(none)_ | Optional free-text focus for the run. Omitted ⇒ walk the stack under the precedence policy. |
 
