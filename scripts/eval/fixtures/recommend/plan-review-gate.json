@@ -1,0 +1,186 @@
+{
+  "name": "Plan-Review-Gate",
+  "note": "Deliberately-synthetic fixtures (LIN-1603) for the plan-review GATE and its routing branch in lib/prompts/meta-prompt-template.js — the Step-3 decision that sits between the plan-exists check and the session-fit routing. The gate is DUE when the plan (a) answers 'needs multiple sessions', (b) names a routed-around contract gap with a ticket identifier, (c) relaxes any validation/contract/guard, or (d) touches credential, merge-rule, or dispatch-contract surfaces; otherwise plan hands straight to implementation exactly as before the gate existed. The risk being measured here is OVER-FIRING, not under-firing: plan-review exists to protect the throughput of the work that needs it, so PR-1603-clean-small is the load-bearing case — a clean single-surface plan must still reach `implementation` with zero added dispatches. The two verdict-on-trail cases cover the one-cycle loop bound: a first Request Changes routes back to `plan` (the revision pass), a SECOND on the same task escalates to the human edge via `blocked` — never a third plan-review. Honest scope, mirroring closeout-review.json: this is live SHAPE-COVERAGE under continuous measurement, NOT a self-reproducing red test — the authoritative red→green guard is the deterministic structural test in tests/unit/openrouter.test.js ('plan-review gate and routing (LIN-1603)'), and the A/B measurement of the gate's marginal effect is scripts/eval-plan-review.mjs. Known from that harness (haiku-4.5, K=4): the gate fires reliably when the plan RECORDS its decision ('plan-review due: yes', which the plan template now instructs) and does not fire when the router must re-derive criteria (a)-(d) from plan prose — so PR-1603-gated-recorded carries the recorded line and PR-1603-gated-rederive deliberately does not, to keep that difference measured rather than assumed. Each target is a childless In-Progress leaf (no children/focusedChild) so the descent terminates on it.",
+  "targets": [
+    {
+      "id": "PR-1603-gated-recorded",
+      "role": "plan on record whose own text records 'plan-review due: yes' for criterion (d), credential surface, still unimplemented (expect -> plan-review; the designed primary path — the plan writes the decision, the router reads it)",
+      "expect": ["plan-review"],
+      "descentExpect": "PR-1603-gated-recorded"
+    },
+    {
+      "id": "PR-1603-gated-rederive",
+      "role": "plan on record that MEETS criterion (c) — it drops a validation assertion — but predates the gate, so it records no decision and the router must judge the criteria itself (expect -> plan-review; the fallback path, measured because scripts/eval-plan-review.mjs shows it is the weak one)",
+      "expect": ["plan-review"],
+      "descentExpect": "PR-1603-gated-rederive"
+    },
+    {
+      "id": "PR-1603-clean-small",
+      "role": "clean single-surface plan, gate met by NONE of (a)-(d), decision recorded as 'plan-review due: no' (expect -> implementation, NOT plan-review; this is the over-fire guard and the phase's acceptance criterion — zero added dispatches on a clean plan)",
+      "expect": ["implementation"],
+      "descentExpect": "PR-1603-clean-small"
+    },
+    {
+      "id": "PR-1603-verdict-approve",
+      "role": "gated plan whose trail already carries a plan-review Approve, work still unimplemented (expect -> implementation: an Approve routes on session-fit exactly as before, and must NOT trigger a second plan-review — nor be read as close-out evidence)",
+      "expect": ["implementation"],
+      "descentExpect": "PR-1603-verdict-approve"
+    },
+    {
+      "id": "PR-1603-request-changes-1",
+      "role": "gated plan whose trail carries ONE plan-review Request Changes (expect -> plan: the revision pass, the single exception to 'completed prep ⇒ never re-emit the prep verb')",
+      "expect": ["plan"],
+      "descentExpect": "PR-1603-request-changes-1"
+    },
+    {
+      "id": "PR-1603-request-changes-2",
+      "role": "same plan after one revision cycle, trail carries a SECOND Request Changes on the same unaddressed finding (expect -> blocked: the one-cycle bound escalates to the human edge; a third plan-review or another plan is the failure this case exists to catch)",
+      "expect": ["blocked"],
+      "descentExpect": "PR-1603-request-changes-2"
+    }
+  ],
+  "bundles": {
+    "PR-1603-gated-recorded": {
+      "issue": {
+        "id": "pr-1603-gated-recorded-uuid",
+        "identifier": "PR-1603-gated-recorded",
+        "title": "Let a worker mint a child proxy token for its own subtask",
+        "description": "## Implementation Plan\n\n- Extend the token exchange in `routes/dispatch.js` so a working token can mint one scoped child token, inheriting scope and ownership.\n- Record the parent token id on the child for the audit trail.\n- Tests: unit-cover inheritance and the single-use bootstrap invariant.\n\n**Surfaces:** the token exchange in `routes/dispatch.js`; the child-token record shape. No dependency arrows between them.\n\n**Session fit:** fits one focused session.\n\n**plan-review due:** yes — (d) the plan touches the credential surface (token minting). None of (a), (b) or (c) fired.",
+        "url": "https://linear.app/linearviewer/issue/PR-1603-gated-recorded",
+        "state": { "name": "In Progress", "type": "started" },
+        "createdAt": "2026-07-20T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [],
+      "focusedChild": null
+    },
+    "PR-1603-gated-rederive": {
+      "issue": {
+        "id": "pr-1603-gated-rederive-uuid",
+        "identifier": "PR-1603-gated-rederive",
+        "title": "Accept legacy timestamps in the agent-status intake",
+        "description": "## Implementation Plan\n\n- Widen the `timestamp` validation in the `routes/proxy.js` agent-status POST to accept a bare epoch integer in addition to ISO-8601 (older runners send the former).\n- Drop the strict `isFinite` assertion that currently 400s those payloads.\n- Tests: unit-cover both accepted shapes.\n\n**Surfaces:** the agent-status intake validator. Single surface, no arrows.\n\n**Session fit:** fits one focused session.",
+        "url": "https://linear.app/linearviewer/issue/PR-1603-gated-rederive",
+        "state": { "name": "In Progress", "type": "started" },
+        "createdAt": "2026-07-20T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [],
+      "focusedChild": null
+    },
+    "PR-1603-clean-small": {
+      "issue": {
+        "id": "pr-1603-clean-small-uuid",
+        "identifier": "PR-1603-clean-small",
+        "title": "Footer deploy label should read \"deployed\", not \"deploy\"",
+        "description": "## Implementation Plan\n\n- One string in `lib/components/footer.js`: \"deploy\" → \"deployed\".\n- Tests: the existing footer unit test asserts the label; update its expectation.\n\n**Surfaces:** the footer label. Single surface, no arrows, no dependents beyond the one test.\n\n**Session fit:** fits one focused session.\n\n**plan-review due:** no — none of (a)-(d): one session, no routed-around contract gap, nothing relaxed, and no credential / merge-rule / dispatch-contract surface.",
+        "url": "https://linear.app/linearviewer/issue/PR-1603-clean-small",
+        "state": { "name": "In Progress", "type": "started" },
+        "createdAt": "2026-07-21T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [],
+      "focusedChild": null
+    },
+    "PR-1603-verdict-approve": {
+      "issue": {
+        "id": "pr-1603-verdict-approve-uuid",
+        "identifier": "PR-1603-verdict-approve",
+        "title": "Cache the workspace audit report for 60s",
+        "description": "## Implementation Plan\n\n- Add a 60s in-process cache around `computeAuditReport` in `lib/audit.js`, keyed by workspace id.\n- Invalidate on the existing audit-refresh path.\n- Tests: unit-cover the hit/miss and the TTL boundary.\n\n**Surfaces:** the audit-report cache; the refresh invalidation path (cache → invalidation).\n\n**Session fit:** fits one focused session.\n\n**plan-review due:** yes — (c) the cache relaxes the freshness guarantee the refresh path currently gives.",
+        "url": "https://linear.app/linearviewer/issue/PR-1603-verdict-approve",
+        "state": { "name": "In Progress", "type": "started" },
+        "createdAt": "2026-07-22T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [
+        {
+          "body": "### Plan Review Verdict\n\n1. Completeness — re-ran the search for the concept (cached audit reads): `lib/audit.js` is the only seam; `lib/kpi-stats.js` computes its own aggregate and does not read this path. The plan's surface list matches what I found.\n2. Strategy Framing — no routed-around contract gap; the plan states \"none identified\" and that is correct here.\n3. History signal — `git log --oneline -15 -- lib/audit.js` shows two commits, neither protecting a freshness invariant the plan misses.\n4. Session-fit — no nameable catches; \"fits one focused session\" holds.\n5. Relaxation guard — the freshness relaxation IS named, and the plan names the invalidation path that bounds it.\n6. Prerequisite refactor — none claimed, none needed.\n\nClaims verified; proceed to implementation.\n\n**Verdict: Approve.**",
+          "createdAt": "2026-07-22T01:00:00.000Z",
+          "user": "reviewer"
+        }
+      ],
+      "focusedChild": null
+    },
+    "PR-1603-request-changes-1": {
+      "issue": {
+        "id": "pr-1603-request-changes-1-uuid",
+        "identifier": "PR-1603-request-changes-1",
+        "title": "Add a per-workspace rate limit to the recap endpoint",
+        "description": "## Implementation Plan\n\n- Add an in-process token bucket in `routes/proxy.js` around the recap read.\n- Key it on workspace id; 30/min.\n\n**Strategy Framing:** the clean fix is the shared limiter middleware, but that needs the limiter-registry refactor, which is not scheduled. A local bucket is cheaper now; the duplicated limiter is the tax on every future limit change.\n\n**Session fit:** fits one focused session.\n\n**plan-review due:** yes — (b) the plan routes around a tracked contract gap.",
+        "url": "https://linear.app/linearviewer/issue/PR-1603-request-changes-1",
+        "state": { "name": "In Progress", "type": "started" },
+        "createdAt": "2026-07-23T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [
+        {
+          "body": "### Plan Review Verdict\n\n1. Completeness — re-ran the search: `lib/kpi-stats.js` reads the same recap seam and is NOT in the plan's surface list. A missed sibling, neither folded in nor marked out-of-scope with a named identifier.\n2. Strategy Framing — the plan describes the routed-around gap but names no ticket identifier for it, so the trade-off is not auditable. A bare description is not enough.\n\nBoth findings are Request Changes under the relevant check.\n\n**Verdict: Request Changes.**",
+          "createdAt": "2026-07-23T01:00:00.000Z",
+          "user": "reviewer"
+        }
+      ],
+      "focusedChild": null
+    },
+    "PR-1603-request-changes-2": {
+      "issue": {
+        "id": "pr-1603-request-changes-2-uuid",
+        "identifier": "PR-1603-request-changes-2",
+        "title": "Add a per-workspace rate limit to the recap endpoint",
+        "description": "## Implementation Plan\n\n- Add an in-process token bucket in `routes/proxy.js` around the recap read.\n- Key it on workspace id; 30/min.\n- **Revised after plan review:** folded in the `lib/kpi-stats.js` sibling surface, which reads the same recap seam.\n\n**Strategy Framing:** the clean fix is the shared limiter middleware; a local bucket is cheaper now.\n\n**Session fit:** fits one focused session.\n\n**plan-review due:** yes — (b) the plan routes around a tracked contract gap.\n\n**Revision notes:** addresses the missed-sibling finding. Does not address the identifier finding — I do not think the routed-around gap warrants a ticket.",
+        "url": "https://linear.app/linearviewer/issue/PR-1603-request-changes-2",
+        "state": { "name": "In Progress", "type": "started" },
+        "createdAt": "2026-07-24T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [
+        {
+          "body": "### Plan Review Verdict\n\n1. Completeness — `lib/kpi-stats.js` reads the same recap seam and is missing from the surface list.\n2. Strategy Framing — the routed-around gap names no ticket identifier, so the trade-off is not auditable.\n\n**Verdict: Request Changes.**",
+          "createdAt": "2026-07-24T01:00:00.000Z",
+          "user": "reviewer"
+        },
+        {
+          "body": "Revised the plan: folded in the `lib/kpi-stats.js` surface. On the second finding — I do not agree the routed-around gap needs an identifier; there is no ticket for it and I do not think one is warranted.",
+          "createdAt": "2026-07-24T02:00:00.000Z",
+          "user": "planner"
+        },
+        {
+          "body": "### Plan Review Verdict\n\nThe sibling surface is now folded in — that finding is discharged. The routed-around gap still names no identifier, and the revision declines to file one, so the trade-off remains unauditable: this is the SAME finding as the first pass, answered by disagreement rather than by a change either of us can check later. That disagreement is not one more planning pass will settle.\n\n**Verdict: Request Changes.**",
+          "createdAt": "2026-07-24T03:00:00.000Z",
+          "user": "reviewer"
+        }
+      ],
+      "focusedChild": null
+    }
+  }
+}

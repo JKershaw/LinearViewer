@@ -872,6 +872,161 @@ describe('buildMetaPromptTemplate close-out routing gate (LIN-812)', () => {
         `${label} must require an actual review verdict before close-out`);
     }
   });
+
+  // ---------------------------------------------------------------------------
+  // The plan-review carve-out (LIN-1603 item 2.5) — the same failure SHAPE as the
+  // LIN-823 bug-commentary exclusion above, one step earlier in the pipeline.
+  // `plan-review` deliberately reuses review's Approve / Request Changes / Needs
+  // Discussion vocabulary, so an Approve on a PLAN could otherwise satisfy the
+  // close-out evidence check and authorize the merge + Done transition on work that
+  // was never built. Deterministic and model-free: this pins the prose in BOTH
+  // close-out decision points, exactly as the bug carve-out is pinned.
+  // ---------------------------------------------------------------------------
+  test('a plan-review verdict is NOT close-out evidence — in both Step 0 and Step 3 (LIN-1603)', () => {
+    const step0 = build({ isTerminal: false, hasSubtasks: true, subtaskCount: 1, completedCount: 1, hasOpenChildren: false });
+    const step3 = build({ isTerminal: false, hasSubtasks: false, hasOpenChildren: false });
+    for (const [label, text] of [['Step 0', step0], ['Step 3', step3]]) {
+      assert.ok(/a \`plan-review\` verdict is NOT a review verdict either/i.test(text),
+        `${label} must exclude a plan-review verdict from review evidence`);
+      assert.ok(/would authorize \`close-out\` on unimplemented work/i.test(text),
+        `${label} must name the failure it prevents: close-out on unimplemented work`);
+      // The header is the DISAMBIGUATOR, never the thing the gate keys on (LIN-810):
+      // the exclusion must hold for a plan-review verdict posted WITHOUT the header.
+      assert.ok(/whether or not that header is present/i.test(text),
+        `${label} must exclude the plan verdict on substance, not on the presence of the header`);
+      assert.ok(/the header is a disambiguator between the two verdict kinds, not the thing the gate keys on/i.test(text),
+        `${label} must state the header is not a required format (LIN-810)`);
+      // Regression guard: the plan-review exclusion must not have displaced the
+      // bug-commentary one — both carve-outs live in this same sentence chain.
+      assert.ok(/a \`bug\`'s own investigation commentary is NOT a review verdict/i.test(text),
+        `${label} must still carry the LIN-823 bug-commentary exclusion`);
+    }
+  });
+});
+
+// =============================================================================
+// Plan-review gate + routing branch (LIN-1603, items 2.4 and 2.3) — the gate is
+// GATED, never universal: it exists to protect the throughput of the work that
+// needs it, so the risk being guarded here is OVER-firing. These pin (a) that the
+// branch is sited between the plan-exists gate and the session-fit routing, (b)
+// that a gate-not-met plan still falls through to the unchanged session-fit
+// routes, and (c) the one-cycle revision bound with its human-edge escalation.
+// The eval (scripts/eval-plan-review.mjs) measures the same two properties under
+// load; these are the deterministic half.
+// =============================================================================
+describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () => {
+  function build(overrides = {}) {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
+      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: true, commentCount: 2, aiHints: 'hints',
+      actionVocabulary: getAIRecommendationActionNames().join(', '),
+      isTerminal: false, hasOpenChildren: false, ...overrides
+    });
+  }
+
+  test('the gate is sited AFTER the plan-exists check and BEFORE the session-fit routing', () => {
+    const text = build();
+    const planGate = text.indexOf('check whether a plan exists');
+    const reviewGate = text.indexOf('the plan-review gate');
+    const sessionFit = text.indexOf('Otherwise route on the session-fit answer');
+    assert.ok(planGate > -1 && reviewGate > -1 && sessionFit > -1,
+      'all three landmarks must be present in Step 3');
+    assert.ok(planGate < reviewGate,
+      'the plan-review gate must come after the plan-exists check — it reads a plan that exists');
+    assert.ok(reviewGate < sessionFit,
+      'the gate must come BEFORE the session-fit routing, or a gated plan would already have been routed');
+  });
+
+  test('all four gate criteria are stated, keyed to what the plan says', () => {
+    const text = build();
+    assert.ok(/\(a\) the session-fit answer is "needs multiple sessions"/i.test(text),
+      'criterion (a): the multi-session answer');
+    assert.ok(/\(b\) it names a routed-around contract gap with a ticket identifier/i.test(text),
+      'criterion (b): a named routed-around contract gap');
+    assert.ok(/\(c\) any step relaxes a validation, a contract, or a guard/i.test(text),
+      'criterion (c): a relaxed validation/contract/guard');
+    assert.ok(/\(d\) it touches credential, merge-rule, or dispatch-contract surfaces/i.test(text),
+      'criterion (d): credential / merge-rule / dispatch-contract surfaces');
+    // The plan writes the decision down (item 2.1); the router may read it directly.
+    assert.ok(/plan-review due: yes/i.test(text),
+      'the router must recognise the decision the plan phase records');
+  });
+
+  test('gate NOT met ⇒ no plan-review and no added dispatch — the over-fire guard', () => {
+    const text = build();
+    assert.ok(/When none of \(a\)–\(d\) holds, do NOT emit \`plan-review\`/i.test(text),
+      'the gate must state the negative case explicitly, not leave it implied');
+    assert.ok(/fall straight through to the session-fit routing below, exactly as before this gate existed/i.test(text),
+      'a gate-not-met plan must reach its old destination unchanged (zero added dispatches)');
+    assert.ok(/gated, not universal/i.test(text),
+      'the prose must say the step is gated rather than universal');
+    // The unchanged destinations themselves must survive alongside the new branch.
+    assert.ok(/fits one session.*\`implementation\`.*needs multiple sessions.*\`breakdown\`/is.test(text),
+      'both pre-existing session-fit routes must remain intact');
+  });
+
+  test('gate met + no verdict on the trail ⇒ plan-review, and only then', () => {
+    const text = build();
+    assert.ok(/Recommend \`plan-review\` when ALL of these hold: a plan exists; the gate is met; and NO plan-review verdict is on the trail yet/i.test(text),
+      'all three conditions must be required together');
+    assert.ok(/Do NOT re-emit \`plan-review\` on a plan that already has one/i.test(text),
+      'a plan that already carries a verdict must not be re-reviewed');
+  });
+
+  test('the revision loop is bounded at one cycle, escalating to the human edge on the second', () => {
+    const text = build();
+    assert.ok(/\*\*Request Changes \/ Needs Discussion \(the first one\)\*\* → \`plan\`/i.test(text),
+      'the first Request Changes must route back to plan for the revision pass');
+    assert.ok(/A SECOND Request Changes \/ Needs Discussion on the same task\*\* → \*\*stop and escalate to the human edge: recommend \`blocked\`/i.test(text),
+      'the second must escalate to the human edge via blocked');
+    assert.ok(/Do NOT emit a third \`plan-review\`, and do NOT emit another \`plan\`/i.test(text),
+      'neither a third plan-review nor a further plan may be emitted after the second verdict');
+    assert.ok(/One revision cycle \(plan → plan-review → revised plan → plan-review\) is \*converging\*; a second is \*looping\*/i.test(text),
+      'the bound must name converging vs looping, matching the kickoff and handbook wording');
+  });
+
+  test('Approve routes on session-fit as before, and is explicitly not close-out evidence', () => {
+    const text = build();
+    assert.ok(/\*\*Approve\*\* → route on the session-fit answer exactly as today/i.test(text),
+      'an approved plan must rejoin the unchanged session-fit routing');
+    assert.ok(/this Approve authorizes implementation only — it is never close-out evidence/i.test(text),
+      'the carve-out must also be stated at the producing end of the verdict');
+  });
+
+  test('the Completed-prep rule carries the one exception the revision branch needs', () => {
+    const text = build();
+    // "Completed prep ⇒ never re-emit the prep verb" would otherwise out-argue the
+    // Request-Changes → `plan` branch, since a plan already exists on the trail.
+    assert.ok(/ONE exception, and only one: a \`plan-review\` that recorded \*\*Request Changes\*\* or \*\*Needs Discussion\*\* makes the plan's deliverable un-settled again/i.test(text),
+      'the never-re-emit-prep rule must name the revision pass as its single exception');
+    assert.ok(/Completed prep ⇒ never re-emit the prep verb/i.test(text),
+      'the rule itself must survive the exception');
+  });
+
+  test('S2 parity — the Plan-prompts quality rule carries the gate and the revision half', () => {
+    const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Plan prompts**'));
+    assert.ok(rule, 'the meta-prompt must carry a Plan-prompts quality rule');
+    assert.ok(/plan-review due: yes.*plan-review due: no/is.test(rule),
+      'the rule must require the recorded gate decision');
+    assert.ok(/placed AFTER the Scope Assessment \/ session-fit step/i.test(rule),
+      'the rule must pin the gate BELOW session-fit, since criterion (a) reads that answer');
+    assert.ok(/revise against a prior plan-review verdict/i.test(rule),
+      'the rule must carry the revision half (item 2.2 parity)');
+    assert.ok(/never a required format to key on/i.test(rule),
+      'the header must stay a disambiguator in the meta path too (LIN-810)');
+  });
+
+  test('the emitted action is dispatchable — `→ **plan-review**` round-trips to a valid kind', () => {
+    // The routing branch is only real if what the recommender emits survives the
+    // wire: parseRecommendedAction reads the `→ **name**` line, and the dispatch
+    // layer must accept the result as a kind.
+    assert.strictEqual(parseRecommendedAction('The gate is met.\n\n→ **plan-review**'), 'plan-review');
+    assert.strictEqual(deriveDispatchKind('plan-review'), 'plan-review');
+    assert.ok(isValidDispatchKind('plan-review'), 'plan-review must be a dispatchable kind');
+    assert.ok(getAIRecommendationActionNames().includes('plan-review'),
+      'plan-review must be in the vocabulary the meta-prompt is given');
+  });
 });
 
 // =============================================================================
