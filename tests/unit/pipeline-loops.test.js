@@ -298,13 +298,31 @@ describe('_buildLoops', () => {
 
   test('history loop + completed agentStatus → agentState=complete, stage=agentAction', () => {
     const hist = historyItem({ id: 'h-1', promptName: 'plan' });
-    const fmn = agentStatusEntry({ action: 'review', status: 'completed' });
+    const fmn = agentStatusEntry({ action: 'review', status: 'completed', tokenId: 'tok-1', tokenLabel: 'dispatch-bootstrap' });
     const loops = _buildLoops({ historyItems: [hist], agentStatusEntries: [fmn], now: NOW });
     assert.strictEqual(loops[0].agentState, 'complete');
     assert.strictEqual(loops[0].stage, 'review');
     assert.strictEqual(loops[0].agentAction, 'review');
     assert.strictEqual(loops[0].agentStatus, 'completed');
     assert.strictEqual(loops[0].agentSummary, 'Done.');
+    // LIN-1587 R2 — credential identity carried off the matched agent-status entry.
+    assert.strictEqual(loops[0].agentTokenId, 'tok-1');
+    assert.strictEqual(loops[0].agentTokenLabel, 'dispatch-bootstrap');
+  });
+
+  test('LIN-1587 R2: no agentStatus match → agentTokenId/agentTokenLabel are null, never undefined', () => {
+    const hist = historyItem({ id: 'h-1' });
+    const loops = _buildLoops({ historyItems: [hist], now: NOW });
+    assert.strictEqual(loops[0].agentTokenId, null);
+    assert.strictEqual(loops[0].agentTokenLabel, null);
+  });
+
+  test('LIN-1587 R2: matched agentStatus entry with no tokenId/tokenLabel → null, never undefined', () => {
+    const hist = historyItem({ id: 'h-1' });
+    const fmn = agentStatusEntry({ action: 'review', status: 'completed' }); // no tokenId/tokenLabel
+    const loops = _buildLoops({ historyItems: [hist], agentStatusEntries: [fmn], now: NOW });
+    assert.strictEqual(loops[0].agentTokenId, null);
+    assert.strictEqual(loops[0].agentTokenLabel, null);
   });
 
   test('history loop with status:expired → agentState=error regardless of agentStatus', () => {
@@ -781,6 +799,17 @@ describe('lean projection (LIN-622)', () => {
     for (const [label, loop] of [['default', full[0]], ['lean', lean[0]]]) {
       assert.strictEqual(loop.terminalStatus, 'done', `${label}: terminalStatus`);
       assert.strictEqual(loop.terminalCompletedAt, TERMINAL_TS, `${label}: terminalCompletedAt`);
+    }
+  });
+
+  test('_buildLoops carries agentTokenId + agentTokenLabel on every loop (lean and default, LIN-1587 R2)', () => {
+    const hist = historyItem({ id: 'h-1' });
+    const fmn = agentStatusEntry({ tokenId: 'tok-42', tokenLabel: 'wake-bootstrap' });
+    const full = _buildLoops({ historyItems: [hist], agentStatusEntries: [fmn], now: NOW });
+    const lean = _buildLoops({ historyItems: [hist], agentStatusEntries: [fmn], now: NOW, lean: true });
+    for (const [label, loop] of [['default', full[0]], ['lean', lean[0]]]) {
+      assert.strictEqual(loop.agentTokenId, 'tok-42', `${label}: agentTokenId`);
+      assert.strictEqual(loop.agentTokenLabel, 'wake-bootstrap', `${label}: agentTokenLabel`);
     }
   });
 

@@ -281,6 +281,42 @@ describe('ProxyTokenStore', () => {
         /kind must be/
       );
     });
+
+    // LIN-1587 R1 — the exchanged working token inherits the bootstrap's OWN
+    // label (e.g. 'dispatch-bootstrap'/'refire-broker'/'collective') instead of
+    // being flattened to the literal 'exchanged', so per-site lanes survive
+    // the exchange into the Event Log / agent-status snapshot.
+    test('LIN-1587: exchange inherits the bootstrap\'s own label when no override is given', async () => {
+      const boot = await store.createToken('workspace-1', {
+        kind: 'bootstrap',
+        scope: 'readWrite',
+        label: 'dispatch-bootstrap'
+      });
+      const working = await store.exchangeBootstrapToken(boot.token);
+      assert.strictEqual(working.label, 'dispatch-bootstrap');
+    });
+
+    test('LIN-1587: an explicit options.label still overrides the bootstrap\'s own label', async () => {
+      const boot = await store.createToken('workspace-1', {
+        kind: 'bootstrap',
+        scope: 'readWrite',
+        label: 'dispatch-bootstrap'
+      });
+      const working = await store.exchangeBootstrapToken(boot.token, { label: 'custom-override' });
+      assert.strictEqual(working.label, 'custom-override');
+    });
+
+    test('LIN-1587: a bootstrap with no label at all (e.g. a pre-existing legacy record) falls back to \'exchanged\'', async () => {
+      // createToken always defaults an omitted label to 'default', so the only
+      // way to exercise a genuinely label-less bootstrap doc is to strip the
+      // field directly on the stored record, same as the expired-bootstrap test
+      // above manipulates `expiresAt`.
+      const boot = await store.createToken('workspace-1', { kind: 'bootstrap', scope: 'readWrite' });
+      const docs = collection._docs();
+      delete docs[0].label;
+      const working = await store.exchangeBootstrapToken(boot.token);
+      assert.strictEqual(working.label, 'exchanged');
+    });
   });
 
   describe('token expiry', () => {
