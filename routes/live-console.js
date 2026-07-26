@@ -23,8 +23,9 @@ import { Router } from 'express';
 import { renderLiveConsolePage } from '../lib/render-live-console.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { buildConsoleFeed, DEFAULT_PAGE_SIZE } from '../lib/live-console.js';
+import { buildConsoleFeed, DEFAULT_PAGE_SIZE, isLoopActive } from '../lib/live-console.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
+import { collectAgentTokenIds, foldCredentialIndex } from '../lib/credential-state.js';
 
 // Live window: peak memory tracks recent activity, not the 30-day retention.
 const FEED_WINDOW_MS = 24 * 60 * 60 * 1000;      // 24h
@@ -40,11 +41,15 @@ const MAX_HISTORY_PAGE = 100;
  * @param {Function} deps.workspaceFromUrl - middleware: session + req.workspace
  * @param {Object}   deps.agentStatusStore - agent status store (listStatus)
  * @param {Object}   deps.dispatchQueueStore - dispatch store (loops → lanes/heartbeats/evidence)
+ * @param {Object}   [deps.proxyEventStore] - proxy-event store; source of Beat 1's
+ *   per-token credential verdict (LIN-1588). Optional: unwired (tests) → every
+ *   lane's credential resolves to `unknown`, exactly as it does when no lane
+ *   carries a token.
  * @param {Function} deps.getOpenRouterSource - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo - () → deploy metadata
  * @returns {Router}
  */
-export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, dispatchQueueStore, getOpenRouterSource, getDeployInfo }) {
+export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, dispatchQueueStore, proxyEventStore = null, getOpenRouterSource, getDeployInfo }) {
   const router = Router();
 
   function connectedWorkspaces(req, workspace) {
@@ -89,6 +94,37 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
       }
     }
     return { statusItems, sourceTotal, sourceHasMore };
+  }
+
+  // LIN-1588 (Beat 2): resolve the per-token credential verdict for the tokens
+  // the CURRENT working lanes actually carry, so a stranded worker is visible on
+  // the lane rail instead of only in the BLOCKED park it wrote.
+  //
+  // Reuse, not reimplementation: the verdict is computed exactly once, inside
+  // Beat 1's own `listCredentialHealth` (lib/proxy-events.js). This function
+  // only reads it and folds it to an index the pure transform can be handed.
+  //
+  // Cost contract: the read is SKIPPED ENTIRELY when no active loop carries a
+  // non-null `agentTokenId` — the ~99.86% case per LIN-1585 — so the ordinary
+  // poll issues no additional query at all and stays "pure Mongo reads + a
+  // deterministic transform" (see the header). The window is Beat 1's own 15-min
+  // default and is deliberately NOT widened to make more lanes resolve: a lane
+  // older than the credential window has no recent evidence, and `unknown` is
+  // the honest answer for that.
+  async function readCredentialIndex(workspaces, loops) {
+    if (!proxyEventStore) return {};
+    const tokenIds = collectAgentTokenIds(loops, isLoopActive);
+    if (!tokenIds.size) return {};
+
+    // Per-workspace failure discipline matches mergeAcross: a workspace whose
+    // read fails contributes nothing, so its lanes fall back to `unknown`
+    // rather than the feed losing every verdict.
+    const rows = await mergeAcross(workspaces, async (ws) => {
+      const { tokens } = await proxyEventStore.listCredentialHealth(ws.urlKey);
+      return tokens || [];
+    }, 'credential-health');
+
+    return foldCredentialIndex(rows.filter(t => t && tokenIds.has(t.tokenId)));
   }
 
   // ─── HTML page ────────────────────────────────────────────────────────────
@@ -169,11 +205,18 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
           : Promise.resolve([]),
       ]);
 
+      // Depends on `loops`, so it runs after the read above rather than inside
+      // the Promise.all — it is the empty-set short-circuit that keeps the
+      // ordinary poll free, and there is nothing to ask for until we know which
+      // tokens the working lanes carry.
+      const credentialByToken = await readCredentialIndex(workspaces, loops);
+
       const feed = buildConsoleFeed({ statusItems: statusRead.statusItems, loops }, {
         now,
         pageSize: DEFAULT_PAGE_SIZE,
         sourceHasMore: statusRead.sourceHasMore,
         sourceTotal: statusRead.sourceTotal,
+        credentialByToken,
       });
       res.json(feed);
     } catch (error) {

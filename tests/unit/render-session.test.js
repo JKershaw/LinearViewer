@@ -851,3 +851,108 @@ describe('render-session: document <title> escaping (LIN-1567)', () => {
     assert.equal(titleOf(html), 'Session · ');
   });
 });
+
+// ── Credential state (LIN-1588, Beat 2 of LIN-1577) ───────────────────────────
+//
+// The session page is NOT flag-gated — it ships on the default path — so the
+// ORDINARY state (`unknown`, ~99.86% of dispatches per LIN-1585) has to render
+// calmly and always, never blank and never as healthy. The verdict itself is
+// Beat 1's, resolved at the route and injected here as a tokenId → verdict index.
+
+describe('render-session: credential state (LIN-1588)', () => {
+  // Extract the Overview credential cell's inner text + state attribute.
+  function credLine(html) {
+    const m = html.match(/data-state="([^"]*)" data-testid="session-credential"[^>]*>([\s\S]*?)<\/span>/);
+    return m ? { state: m[1], text: m[2] } : null;
+  }
+
+  test('the line renders for the ordinary null-token session as `unknown`, never blank', () => {
+    // Neither loop in the fixture carries agentTokenId — the common case.
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    const line = credLine(html);
+    assert.ok(line, 'the credential line is always rendered');
+    assert.equal(line.state, 'unknown');
+    assert.match(line.text, /unknown/);
+  });
+
+  test('a session whose run carries a dead token renders `dead`', () => {
+    const session = fixtureSession();
+    session.loops[0].agentTokenId = 'tok-1';
+    session.loops[0].agentTokenLabel = 'dispatch-bootstrap';
+    const html = renderSessionPage(
+      { session, urlKey: 'ws-a', issueContext: [], credentialByToken: { 'tok-1': 'credential_dead' } }
+    );
+    assert.equal(credLine(html).state, 'dead');
+    assert.match(html, /data-testid="session-credential"[^>]*>dead/);
+  });
+
+  test('a session whose run carries a healthy token renders `ok`', () => {
+    const session = fixtureSession();
+    session.loops[0].agentTokenId = 'tok-1';
+    const html = renderSessionPage(
+      { session, urlKey: 'ws-a', issueContext: [], credentialByToken: { 'tok-1': 'ok' } }
+    );
+    assert.equal(credLine(html).state, 'ok');
+  });
+
+  test('a token with no verdict in the index renders `unknown`, never a false `ok`', () => {
+    const session = fixtureSession();
+    session.loops[0].agentTokenId = 'tok-unseen';
+    const html = renderSessionPage(
+      { session, urlKey: 'ws-a', issueContext: [], credentialByToken: { 'tok-other': 'ok' } }
+    );
+    assert.equal(credLine(html).state, 'unknown');
+  });
+
+  test('ONE dead run makes the session dead — it is not averaged away by healthy siblings', () => {
+    // "Which of my four trees is dead?" is the question the page answers; a
+    // rollup that lets three ok runs outvote one dead run would not answer it.
+    const session = fixtureSession();
+    session.loops[0].agentTokenId = 'tok-ok';
+    session.loops[1].agentTokenId = 'tok-dead';
+    const html = renderSessionPage(
+      { session, urlKey: 'ws-a', issueContext: [], credentialByToken: { 'tok-ok': 'ok', 'tok-dead': 'credential_dead' } }
+    );
+    assert.equal(credLine(html).state, 'dead');
+  });
+
+  test('a hostile agentTokenLabel is escaped at the call site (Overview line)', () => {
+    const session = fixtureSession();
+    session.loops[0].agentTokenId = 'tok-1';
+    session.loops[0].agentTokenLabel = '<img src=x onerror="alert(1)">';
+    const html = renderSessionPage(
+      { session, urlKey: 'ws-a', issueContext: [], credentialByToken: { 'tok-1': 'credential_dead' } }
+    );
+    assert.ok(!html.includes('<img src=x'), 'the raw tag never reaches the document');
+    assert.match(html, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/);
+  });
+
+  test('a hostile agentTokenLabel is escaped in the per-run chip too', () => {
+    const session = fixtureSession();
+    session.loops[1].agentTokenId = 'tok-2';
+    session.loops[1].agentTokenLabel = '"><script>alert(1)</script>';
+    const html = renderSessionPage(
+      { session, urlKey: 'ws-a', issueContext: [], credentialByToken: { 'tok-2': 'ok' } }
+    );
+    assert.ok(!html.includes('<script>alert(1)</script>'), 'the raw script never reaches the document');
+    assert.match(html, /data-testid="session-run-credential"/);
+  });
+
+  test('only a run carrying its own token gets a chip', () => {
+    const session = fixtureSession();
+    session.loops[0].agentTokenId = 'tok-1';
+    const html = renderSessionPage(
+      { session, urlKey: 'ws-a', issueContext: [], credentialByToken: { 'tok-1': 'ok' } }
+    );
+    const chips = html.match(/data-testid="session-run-credential"/g) || [];
+    assert.equal(chips.length, 1, 'the tokenless second run gets no chip');
+  });
+
+  test('omitting credentialByToken entirely leaves every pre-existing surface untouched', () => {
+    // Back-compat pin: the only difference a caller that never passes the index
+    // sees is the added Overview row.
+    const withIndex = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], credentialByToken: {} });
+    const without = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    assert.equal(withIndex, without);
+  });
+});

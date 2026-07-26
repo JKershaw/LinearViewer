@@ -82,7 +82,18 @@ test.describe("The Ship's Biscuit (experimental)", () => {
   test.describe('Generation', () => {
     test.beforeEach(async ({ page }) => {
       // Start from a clean slate so quiet-window behaviour is deterministic.
+      //
+      // `isQuiet` is `sources.length === 0` over FOUR source kinds, not just the
+      // agent-status log: observation sessions, status, task snapshots and
+      // roadmap reports (lib/ship-biscuit.js). Clearing agent-status alone left
+      // the observation read-model behind, so any earlier spec in the same shard
+      // that materialised a session (any agent-status write fires the
+      // materializer) made this window silently non-quiet — a real ordering
+      // dependency this suite carried, exposed when LIN-1588's new tests shifted
+      // Playwright's shard balance and put session-page.spec.js in front of it.
       await page.goto(`/test/clear-agent-status?urlKey=${URL_KEY}`);
+      await page.goto(`/test/clear-observation-sessions?urlKey=${URL_KEY}`);
+      await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
       await page.goto(`/test/clear-ship-biscuit?urlKey=${URL_KEY}`);
       await page.goto(`/test/set-session?${featuresParam({ shipBiscuit: true })}&urlKey=${URL_KEY}`);
     });
