@@ -914,6 +914,8 @@ Requires a `readWrite` scoped token. Builds the kickoff **and dispatches it** in
 
 Dispatched as `kind:"autopilot"`, so the server appends the session-id self-reference block to the prompt and the returned `id` is this run's session id. Pass that id as `sessionId` on every worker dispatch the run fans out (`POST /dispatch`, `POST /recommend-and-dispatch`) so all the work reconstructs as one session.
 
+An **issue-scoped** kickoff can be refused `409 DUPLICATE_DISPATCH` by the [duplicate guard](#enqueue-a-dispatch) — its kind is `autopilot`, so a second scoped run launched for the same task within 5 minutes hits it. Adopt the returned `id` and watch that run rather than starting a rival one. A **general** (stack-walk) kickoff carries no `issueIdentifier` and can never be refused.
+
 ```json
 {
   "success": true,
@@ -1302,6 +1304,28 @@ Returns `201`:
 { "id": "uuid", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "dispatchedAt": "2026-06-06T11:32:25.111Z" }
 ```
 
+Returns `409` — **duplicate dispatch** (LIN-1656). A *fresh* dispatch for an `issueIdentifier` + `kind` this workspace already dispatched within the last **5 minutes** is refused, because two independent orchestrators (an autopilot run and a human on the board) can otherwise start the same step minutes apart and duplicate the work:
+
+```json
+{
+  "error": "A dispatch for this issue and kind was created moments ago",
+  "code": "DUPLICATE_DISPATCH",
+  "id": "the-live-dispatch-id",
+  "issueIdentifier": "LIN-42",
+  "kind": "implementation",
+  "dispatchedAt": "2026-07-26T19:50:08.578Z",
+  "retryAfter": 163
+}
+```
+
+A `Retry-After` header carries the same value as `retryAfter` (seconds until the window clears).
+
+**This is not a failure — it means someone else is already doing this exact step.** Adopt the `id` from the body and watch it with `GET /api/proxy/dispatch/{id}` exactly as if you had dispatched it yourself. Do not retry, do not re-word the prompt and resend, and do not count it as an error against the endpoint. Only if you genuinely need a second, independent run should you wait `retryAfter` seconds and dispatch again — the window is self-clearing, so nothing is ever permanently blocked.
+
+Branch on `code`, not on the status: `409` is also used by the trashed-issue refusal.
+
+**Never refused:** a `followUpTo` beat (that *is* the intended second dispatch), an `abort`, a different `kind` on the same issue (the normal research → plan → implementation pipeline), the same issue+kind in a different workspace, and any dispatch carrying no `issueIdentifier`.
+
 #### Recommend and Dispatch (fused)
 
 ```
@@ -1495,6 +1519,7 @@ Note for aggregating consumers: `feedbackCount` is no longer additive across row
 | 403 | `This endpoint requires a read-write token` | Write endpoint called with read-only token |
 | 404 | `Issue not found` / `Cycle not found` | Resource doesn't exist — or, on the task-automation context endpoints, the target is trashed |
 | 409 | `Issue is trashed; refusing to modify a deleted issue` | Write target is a trashed (soft-deleted) issue |
+| 409 | `A dispatch for this issue and kind was created moments ago` (`code: DUPLICATE_DISPATCH`) | A fresh dispatch for this `issueIdentifier` + `kind` already exists from the last 5 minutes (creation endpoints only: `/dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff`). **Retryable after `retryAfter` seconds**, but usually you should not: the body's `id` is the live dispatch — adopt and watch it instead. Branch on `code`, since 409 is shared with the trashed-issue refusal. Follow-ups, aborts, other kinds, and other workspaces are never refused. See LIN-1656. |
 | 422 | `This workspace's provider does not support this` (`code: CAPABILITY_NOT_SUPPORTED`) | The workspace's backend cannot perform this operation. `capability` names the specific provider operation that is missing — sometimes the write itself (`createRelation`, `uploadFile`), sometimes an internal read the write depends on. **Never retryable, and never a 500** — branch on `code`, not on the `capability` value, and treat any value as "this backend can't do this". |
 | 422 | `Cannot resolve <kind> '<ref>'` | A symbolic reference (state / label / project / team) could not be resolved against this workspace's backend; `candidates` lists the accepted values when the ref was ambiguous or the vocabulary is small. **Never retryable** — fix the reference. |
 | 429 | `Too many proxy requests` | Rate limit exceeded (60/minute) |
