@@ -131,6 +131,18 @@
   margin-top: 0.15rem;
 }
 
+/* LIN-1448: an ownerless (pre-LIN-1397) token is a live fault, not a neutral
+   fact — anything it mints is dead on arrival at every workspace verb.
+   --amber-dim, not --amber, because this is TEXT: the raw hue fails AA on the
+   light surface, and the -dim companion is themed for light and dark alike.
+   LIN-1586 hoisted this from dispatch.css (where it was scoped `.token-list
+   .token-ownerless`) into the shared home of `.token-item`/`.token-meta`, so
+   the proxy token list and the health panel reuse the ONE definition rather
+   than growing a second copy. Both pages load this stylesheet. */
+.token-ownerless {
+  color: var(--amber-dim);
+}
+
 /* Red - revoke button */
 .token-revoke {
   color: var(--red);

@@ -370,6 +370,60 @@ describe('ProxyTokenStore', () => {
     });
   });
 
+  // LIN-1586, mirroring tests/unit/dispatch-tokens.test.js (LIN-1448). The
+  // operator question is the same on both lists — "which of my tokens are
+  // ownerless?" — and it was unanswerable from outside the database for proxy
+  // tokens: listTokens returned label/scope/dates and nothing about ownership.
+  // An ownerless token is what workspace-token selection reports as
+  // `token_ownerless`, the fault Beat 1 is making visible.
+  describe('listTokens ownership verdict (LIN-1586)', () => {
+    test('reports hasOwner so ownerless tokens are findable on the list', async () => {
+      await store.createToken('acme', { label: 'owned', createdBy: 'account-A' });
+      await store.createToken('acme', { label: 'legacy-runner' });
+
+      const tokens = await store.listTokens('acme');
+      const byLabel = Object.fromEntries(tokens.map(t => [t.label, t]));
+
+      assert.strictEqual(byLabel.owned.hasOwner, true);
+      assert.strictEqual(byLabel['legacy-runner'].hasOwner, false, 'an ownerless token is the thing being hunted');
+    });
+
+    test('a doc with no createdBy field at all reads as hasOwner:false', async () => {
+      // The pre-LIN-1397 row shape: the key is absent, not null.
+      await store.createToken('acme', { label: 'seed' });
+      const docs = collection._docs();
+      delete docs[0].createdBy;
+
+      const [token] = await store.listTokens('acme');
+      assert.strictEqual(token.hasOwner, false);
+    });
+
+    test('ownership is a verdict — the owning account id never reaches the list', async () => {
+      await store.createToken('acme', { label: 'owned', createdBy: 'account-A' });
+      const tokens = await store.listTokens('acme');
+      const blob = JSON.stringify(tokens);
+      assert.ok(!blob.includes('account-A'), `listTokens must not leak the owner id: ${blob}`);
+      assert.ok(!blob.includes('createdBy'), `listTokens must not expose the owner field: ${blob}`);
+    });
+
+    test('the pre-existing metadata is untouched (additive field only)', async () => {
+      await store.createToken('acme', { label: 'owned', scope: 'readWrite', createdBy: 'account-A' });
+      const [token] = await store.listTokens('acme');
+
+      assert.deepStrictEqual(Object.keys(token).sort(), [
+        'consumed', 'createdAt', 'expiresAt', 'hasOwner', 'kind',
+        'label', 'lastUsedAt', 'scope', 'singleUse', 'tokenId'
+      ]);
+      assert.strictEqual(token.label, 'owned');
+      assert.strictEqual(token.scope, 'readWrite');
+      assert.strictEqual(token.kind, 'standard');
+      assert.strictEqual(token.urlKey, undefined, 'the workspace key stays off this surface');
+      assert.strictEqual(token.tokenHash, undefined, 'the hash stays off this surface');
+      assert.ok(token.tokenId);
+      assert.ok(token.createdAt);
+    });
+  });
+
   describe('revocation', () => {
     test('revoked token cannot be validated', async () => {
       const result = await store.createToken('workspace-1');
