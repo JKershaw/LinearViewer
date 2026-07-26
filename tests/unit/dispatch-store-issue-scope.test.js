@@ -18,15 +18,18 @@ import { createMockCollection } from '../fixtures/mock-collection.js';
 // getting realistic top-level-equality matching from the underlying mock.
 function capturing(collection) {
   const queries = [];
+  const findOpts = [];
   return {
     collection: {
       ...collection,
-      find(query) {
+      find(query, options) {
         queries.push(query);
-        return collection.find(query);
+        findOpts.push(options);
+        return collection.find(query, options);
       }
     },
-    queries
+    queries,
+    findOpts
   };
 }
 
@@ -37,7 +40,13 @@ function makeStore() {
     collection: main.collection,
     historyCollection: history.collection
   });
-  return { store, mainQueries: main.queries, historyQueries: history.queries };
+  return {
+    store,
+    mainQueries: main.queries,
+    historyQueries: history.queries,
+    mainFindOpts: main.findOpts,
+    historyFindOpts: history.findOpts
+  };
 }
 
 test('listItems pushes issueIdentifier into the query', async () => {
@@ -127,4 +136,77 @@ test('listHistory pushes a since window into the query and excludes older rows',
     'the since window must ride into the query so a real DB filters server-side');
   assert.equal(result.total, 1, 'only the in-window row is materialised');
   assert.equal(result.items[0].id, 'r');
+});
+
+// LIN-1656: the duplicate-dispatch guard's read. Two properties matter and both
+// are asserted on the QUERY, not just the result — a lookup that filtered in JS
+// would return the same answers here while scanning the whole workspace on a real
+// DB, and a missing clause is the difference between refusing a duplicate and
+// refusing legitimate work.
+test('findRecentFreshDispatch pushes the whole predicate into BOTH collections', async () => {
+  const { store, mainQueries, historyQueries } = makeStore();
+  const since = new Date('2026-07-26T11:55:00.000Z');
+
+  await store.findRecentFreshDispatch('acme', {
+    issueIdentifier: 'LIN-1',
+    kind: 'implementation',
+    since
+  });
+
+  assert.equal(mainQueries.length, 1, 'the live queue must be read');
+  assert.equal(historyQueries.length, 1,
+    'history must be read too — a claimed dispatch has already left the queue, which is the common case');
+
+  for (const query of [mainQueries[0], historyQueries[0]]) {
+    assert.equal(query.urlKey, 'acme');
+    assert.equal(query.issueIdentifier, 'LIN-1');
+    assert.equal(query.kind, 'implementation',
+      'kind is mandatory — same-issue different-kind pairs are the normal pipeline');
+    assert.strictEqual(query.followUpTo, null, 'a follow-up is the INTENDED second dispatch');
+    assert.deepEqual(query.abort, { $ne: true }, 'a cascade emits one abort per descendant by design');
+    assert.deepEqual(query.dispatchedAt, { $gte: since },
+      'the window must ride into the query — and it keys on dispatchedAt, never status');
+  }
+});
+
+test('findRecentFreshDispatch projects the prompt away on both reads', async () => {
+  const { store, mainFindOpts, historyFindOpts } = makeStore();
+
+  await store.findRecentFreshDispatch('acme', {
+    issueIdentifier: 'LIN-1', kind: 'plan', since: new Date(0)
+  });
+
+  // An untrimmed dispatch doc carries an 8-30 KB prompt this caller never reads;
+  // the cost contract is asserted, not merely intended.
+  assert.deepEqual(mainFindOpts[0], { projection: { prompt: 0 } });
+  assert.deepEqual(historyFindOpts[0], { projection: { prompt: 0 } });
+});
+
+test('findRecentFreshDispatch returns the NEWEST match across the two collections, as a real Date', async () => {
+  const { store } = makeStore();
+  const base = new Date('2026-07-26T12:00:00.000Z');
+  const row = (id, dispatchedAt) => ({
+    _id: id, urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'implementation',
+    followUpTo: null, abort: false, prompt: 'x', dispatchedAt
+  });
+  await store.collection.insertOne(row('older-queued', base));
+  await store.historyCollection.insertOne(row('newer-archived', new Date(base.getTime() + 60_000)));
+
+  const hit = await store.findRecentFreshDispatch('acme', {
+    issueIdentifier: 'LIN-1', kind: 'implementation', since: new Date(base.getTime() - 1000)
+  });
+
+  assert.equal(hit.id, 'newer-archived');
+  // NOT the formatters' ISO string: the guard does date arithmetic on this, and a
+  // string comparison inside a date comparison is a silent-wrong-answer shape.
+  assert.ok(hit.dispatchedAt instanceof Date);
+  assert.equal(hit.dispatchedAt.getTime(), base.getTime() + 60_000);
+});
+
+test('findRecentFreshDispatch returns null when its required inputs are missing', async () => {
+  const { store, mainQueries } = makeStore();
+  assert.equal(await store.findRecentFreshDispatch('acme', { kind: 'plan', since: new Date(0) }), null);
+  assert.equal(await store.findRecentFreshDispatch('acme', { issueIdentifier: 'LIN-1', since: new Date(0) }), null);
+  assert.equal(await store.findRecentFreshDispatch(null, { issueIdentifier: 'LIN-1', kind: 'plan', since: new Date(0) }), null);
+  assert.equal(mainQueries.length, 0, 'an unkeyable lookup must not issue a query at all');
 });

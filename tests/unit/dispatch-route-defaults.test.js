@@ -44,7 +44,7 @@ function createMockCollection() {
   };
 }
 
-function buildApp(captured, { workspacePreferencesStore } = {}) {
+function buildApp(captured, { workspacePreferencesStore, findRecentFreshDispatch } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createDispatchRoutes({
@@ -52,7 +52,11 @@ function buildApp(captured, { workspacePreferencesStore } = {}) {
       addItem: async (urlKey, item) => {
         captured.item = item;
         return { _id: 'disp-1', dispatchedAt: '2026-07-06T00:00:00.000Z', ...item };
-      }
+      },
+      // LIN-1656: wired only when a test asks for it, so every other test here
+      // keeps an addItem-ONLY store — the documented fail-open (a store without
+      // the read capability dispatches unguarded).
+      ...(findRecentFreshDispatch ? { findRecentFreshDispatch } : {})
     },
     dispatchTokenStore: {},
     workspaceFromUrl: (req, res, next) => {
@@ -81,7 +85,7 @@ async function call(app, method, path, body) {
     const text = await res.text();
     let parsed;
     try { parsed = JSON.parse(text); } catch { parsed = text; }
-    return { status: res.status, body: parsed };
+    return { status: res.status, body: parsed, retryAfterHeader: res.headers.get('retry-after') };
   } finally {
     await new Promise(resolve => server.close(resolve));
   }
@@ -232,5 +236,47 @@ describe('LIN-1094 — precedence: per-kind override > workspace-wide > null', (
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.strictEqual(captured.item.model, null);
     assert.strictEqual(captured.item.harness, null);
+  });
+});
+
+/**
+ * LIN-1656 — route-level: the board's own dispatch route maps the factory's
+ * tagged refusal to a 409, beside its existing `proxyAttachFailed` branch and
+ * ahead of the generic 500.
+ *
+ * This is the HUMAN half of the collision the guard exists for: the measured case
+ * is an autopilot dispatch racing a person driving the board on the same issue.
+ * Both ends must refuse, and both must say the same thing.
+ */
+describe('LIN-1656 — the board dispatch route surfaces the duplicate refusal as 409', () => {
+  const PRIOR = { id: 'live-dispatch-id', dispatchedAt: new Date(Date.now() - 137_000) };
+
+  test('a duplicate is refused with the machine-readable body and nothing is enqueued', async () => {
+    const captured = {};
+    const app = buildApp(captured, { findRecentFreshDispatch: async () => PRIOR });
+    const res = await call(app, 'post', PATH, {
+      prompt: 'run me', promptName: 'implementation', issueIdentifier: 'LIN-1'
+    });
+
+    assert.equal(res.status, 409, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'DUPLICATE_DISPATCH');
+    assert.equal(res.body.id, PRIOR.id, 'names the live dispatch to watch instead of re-dispatching');
+    assert.equal(res.body.issueIdentifier, 'LIN-1');
+    assert.equal(res.body.kind, 'implementation', 'the kind resolved from promptName, as stored');
+    assert.equal(res.body.dispatchedAt, PRIOR.dispatchedAt.toISOString());
+    assert.ok(res.body.retryAfter > 0 && res.body.retryAfter <= 300);
+    assert.equal(res.retryAfterHeader, String(res.body.retryAfter));
+    assert.equal(captured.item, undefined, 'a refused dispatch must never reach addItem');
+  });
+
+  test('with no recent prior the same request still dispatches (201)', async () => {
+    const captured = {};
+    const app = buildApp(captured, { findRecentFreshDispatch: async () => null });
+    const res = await call(app, 'post', PATH, {
+      prompt: 'run me', promptName: 'implementation', issueIdentifier: 'LIN-1'
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(captured.item.issueIdentifier, 'LIN-1');
   });
 });

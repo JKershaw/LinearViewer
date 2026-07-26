@@ -409,8 +409,14 @@ test.describe('Swipe Dispatched Sessions', () => {
   });
 
   test('accordion header shows the baked-in session count', async ({ page, localWorkerUrlKey }) => {
-    await dispatchForIssue(page, localWorkerUrlKey, 'TEST-14');
-    await dispatchForIssue(page, localWorkerUrlKey, 'TEST-14');
+    // Two DIFFERENT kinds, matching the sibling test below. Two *identical*
+    // fresh dispatches seconds apart is exactly what the duplicate-dispatch
+    // guard now refuses (LIN-1656) — and correctly so: in production that is
+    // two orchestrators doing the same step, not two sessions. Same-issue
+    // different-kind is the normal pipeline and still produces two sessions,
+    // which is all this test is counting.
+    await dispatchForIssue(page, localWorkerUrlKey, 'TEST-14', 'research');
+    await dispatchForIssue(page, localWorkerUrlKey, 'TEST-14', 'implementation');
 
     await openSwipeAt(page, localWorkerUrlKey, 'TEST-14');
 

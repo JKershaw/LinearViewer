@@ -11,8 +11,10 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createDispatchItem } from '../../lib/dispatch-factory.js';
+import { createDispatchItem, DUPLICATE_DISPATCH_WINDOW_MS } from '../../lib/dispatch-factory.js';
 import { WorkspacePreferencesStore } from '../../lib/workspace-preferences.js';
+import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { createMockCollection as createDocCollection } from '../fixtures/mock-collection.js';
 
 function createMockCollection() {
   const docs = [];
@@ -726,5 +728,321 @@ describe('createDispatchItem — presetConfig snapshot semantics (LIN-1390)', ()
     });
     assert.notStrictEqual(store.captured.item.presetConfig, sourceConfig);
     assert.deepEqual(store.captured.item.presetConfig, sourceConfig);
+  });
+});
+
+/**
+ * LIN-1656 — the duplicate-dispatch guard.
+ *
+ * Two independent orchestrators (the autopilot loop and a human/companion driving
+ * the board) can each dispatch the same issue+kind minutes apart, because nothing
+ * on the creation path checked whether a live dispatch already existed. The guard
+ * refuses a FRESH dispatch when an equivalent one was created inside a 5-minute
+ * recency window.
+ *
+ * THE MATRIX IS WEIGHTED TO THE NEGATIVES ON PURPOSE. Wrong in the permissive
+ * direction, this guard merely does nothing; wrong in the restrictive direction it
+ * silently blocks legitimate work — the exact failure that got the `status: taken`
+ * shape rejected at a measured 9.0% false-refusal rate. So 8 of these 13 cases
+ * prove the guard does NOT fire, and they are built so that a maximally
+ * restrictive guard would fail them:
+ *
+ *   - Cases whose discrimination happens in the STORE QUERY (different kind,
+ *     different urlKey, an abort row as the prior, the window edges) run against a
+ *     REAL DispatchQueueStore over mock collections. A fake that answered "no
+ *     duplicate" would pass vacuously; a real store must actually filter.
+ *   - Cases whose discrimination happens in the factory's ENTRY GATE (followUpTo
+ *     set, abort requested, no issueIdentifier) run against `alwaysDuplicateStore`
+ *     — a store that reports a duplicate for EVERY lookup. They can only pass if
+ *     the gate short-circuits before the lookup runs, so an "always refuse" guard
+ *     fails them by construction.
+ */
+
+const PRIOR = { id: 'prior-dispatch-id', dispatchedAt: new Date('2026-07-26T12:00:00.000Z') };
+
+// A capturing store whose duplicate lookup ALWAYS reports a prior, with a call
+// counter. Used by the entry-gate negatives: if the gate ever lets the lookup run
+// for them, they refuse and the test fails.
+function alwaysDuplicateStore() {
+  const store = capturingStore();
+  let lookupCalls = 0;
+  store.findRecentFreshDispatch = async (urlKey, opts) => {
+    lookupCalls++;
+    store.lastLookup = { urlKey, ...opts };
+    return PRIOR;
+  };
+  Object.defineProperty(store, 'lookupCalls', { get: () => lookupCalls });
+  return store;
+}
+
+// A real store over mock collections, with addItem call-counted so a refusal can
+// be proven to have written nothing.
+function realStore() {
+  const store = new DispatchQueueStore({
+    collection: createDocCollection(),
+    historyCollection: createDocCollection()
+  });
+  let addItemCalls = 0;
+  const rawAddItem = store.addItem.bind(store);
+  store.addItem = async (...args) => { addItemCalls++; return rawAddItem(...args); };
+  Object.defineProperty(store, 'addItemCalls', { get: () => addItemCalls });
+  return store;
+}
+
+// The ordinary fresh-dispatch shape: an implementation dispatch for one issue.
+function freshDispatch(store, over = {}) {
+  return createDispatchItem({
+    store,
+    urlKey: over.urlKey || 'acme',
+    kind: over.kind,
+    now: over.now,
+    prompt: 'x',
+    finalizePrompt: over.finalizePrompt,
+    fields: { promptName: 'implementation', issueIdentifier: 'LIN-1', ...(over.fields || {}) }
+  });
+}
+
+describe('createDispatchItem — duplicate-dispatch guard, positives (LIN-1656)', () => {
+  // P1
+  test('a second fresh dispatch for the same issue+kind inside the window is refused, and nothing is enqueued', async () => {
+    const store = realStore();
+    await freshDispatch(store);
+    assert.equal(store.addItemCalls, 1);
+
+    await assert.rejects(() => freshDispatch(store), err => err.status === 409);
+    assert.equal(store.addItemCalls, 1, 'a refused dispatch must not reach addItem');
+  });
+
+  // P2
+  test('the refusal carries the machine-readable fields a caller branches on', async () => {
+    const store = realStore();
+    const first = await freshDispatch(store);
+
+    const err = await freshDispatch(store).then(() => null, e => e);
+    assert.ok(err, 'expected a refusal');
+    assert.equal(err.status, 409);
+    assert.equal(err.duplicateDispatch.code, 'DUPLICATE_DISPATCH');
+    assert.equal(err.duplicateDispatch.id, first._id,
+      'the refusal must name the LIVE dispatch so the caller can watch it instead of re-dispatching');
+    assert.equal(err.duplicateDispatch.issueIdentifier, 'LIN-1');
+    assert.equal(err.duplicateDispatch.kind, 'implementation');
+    assert.equal(err.duplicateDispatch.dispatchedAt, first.dispatchedAt.toISOString());
+    assert.ok(err.duplicateDispatch.retryAfter > 0 && err.duplicateDispatch.retryAfter <= 300,
+      `retryAfter must be in (0, 300], got ${err.duplicateDispatch.retryAfter}`);
+    assert.match(err.message, /created moments ago/);
+  });
+
+  // P3 — pins the PLACEMENT: refusing after finalizePrompt would mint and orphan a
+  // single-use bootstrap credential nobody can exchange.
+  test('the refusal precedes finalizePrompt, so no bootstrap credential is minted', async () => {
+    const store = realStore();
+    await freshDispatch(store);
+
+    let mints = 0;
+    await assert.rejects(
+      () => freshDispatch(store, {
+        finalizePrompt: () => { mints++; return { prompt: 'x', bootstrapToken: 'tok' }; }
+      }),
+      err => err.status === 409
+    );
+    assert.equal(mints, 0, 'finalizePrompt must never run on a refused dispatch');
+  });
+
+  // P4 — the COMMON real case: the runner polls every ~5s, so a 2-minute-old
+  // dispatch has already been claimed and archived. A queue-only lookup fails here.
+  test('a prior that has been taken (and so lives only in history) still refuses', async () => {
+    const store = realStore();
+    const first = await freshDispatch(store);
+    await store.takeItem(first._id, 'acme');
+    assert.equal((await store.listItems('acme')).length, 0, 'the prior must have left the queue');
+
+    const err = await freshDispatch(store).then(() => null, e => e);
+    assert.ok(err, 'a history-only prior must still refuse');
+    assert.equal(err.duplicateDispatch.id, first._id);
+  });
+});
+
+describe('createDispatchItem — duplicate-dispatch guard, negatives (LIN-1656)', () => {
+  // N1 — the normal pipeline runs research → plan → implementation on one issue
+  // within minutes. Real store: the `kind` clause in the query must do this.
+  test('a different kind for the same issue in the same instant is allowed', async () => {
+    const store = realStore();
+    await freshDispatch(store, { kind: 'implementation' });
+    await freshDispatch(store, { kind: 'plan' });
+    await freshDispatch(store, { kind: 'review' });
+    assert.equal(store.addItemCalls, 3, 'same-issue different-kind pairs are the normal pipeline');
+  });
+
+  // N2 — a follow-up IS the intended second dispatch (beat drips, wakes).
+  // alwaysDuplicateStore: only the entry gate can save this.
+  test('a followUpTo dispatch with an identical issue+kind is allowed, and never even consults the lookup', async () => {
+    const store = alwaysDuplicateStore();
+    await freshDispatch(store, { fields: { followUpTo: 'prior-id' } });
+    assert.equal(store.captured.item.followUpTo, 'prior-id');
+    assert.equal(store.lookupCalls, 0, 'the gate must short-circuit before the lookup');
+  });
+
+  // N3, both directions.
+  test('an abort dispatch is allowed (a cascade emits one per descendant in the same second)', async () => {
+    const store = alwaysDuplicateStore();
+    await freshDispatch(store, { fields: { abort: true, abortTo: 'some-session' } });
+    assert.equal(store.captured.item.abort, true);
+    assert.equal(store.lookupCalls, 0, 'the gate must short-circuit before the lookup');
+  });
+
+  test('an existing abort row is never matchable as the prior', async () => {
+    const store = realStore();
+    await freshDispatch(store, { fields: { abort: true, abortTo: 'some-session' } });
+    await freshDispatch(store);
+    assert.equal(store.addItemCalls, 2, 'an abort row must not block the real dispatch that follows it');
+  });
+
+  // N4 — the window edges, with an injected clock. The store stamps dispatchedAt
+  // from its OWN clock, so the prior is seeded directly to control it.
+  describe('the recency window edges', () => {
+    const t0 = new Date('2026-07-26T12:00:00.000Z');
+    const seedPrior = store => store.collection.insertOne({
+      _id: 'prior', urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'implementation',
+      followUpTo: null, abort: false, prompt: 'x', dispatchedAt: t0,
+      expiresAt: new Date(t0.getTime() + 86_400_000)
+    });
+
+    test('299s after the prior is still inside the window and refuses', async () => {
+      const store = realStore();
+      await seedPrior(store);
+      await assert.rejects(
+        () => freshDispatch(store, { now: () => t0.getTime() + 299_000 }),
+        err => err.status === 409 && err.duplicateDispatch.id === 'prior'
+      );
+      assert.equal(store.addItemCalls, 0);
+    });
+
+    test('301s after the prior is outside the window and dispatches', async () => {
+      const store = realStore();
+      await seedPrior(store);
+      await freshDispatch(store, { now: () => t0.getTime() + 301_000 });
+      assert.equal(store.addItemCalls, 1, 'the window is self-clearing — nothing is permanently blocked');
+    });
+
+    test('the window is the documented 5 minutes', () => {
+      assert.equal(DUPLICATE_DISPATCH_WINDOW_MS, 5 * 60 * 1000);
+    });
+  });
+
+  // N5 — urlKey is the first clause; a duplicate elsewhere is not a duplicate.
+  test('the same issue+kind dispatched to a different workspace is allowed', async () => {
+    const store = realStore();
+    await freshDispatch(store, { urlKey: 'acme' });
+    await freshDispatch(store, { urlKey: 'other-workspace' });
+    assert.equal(store.addItemCalls, 2);
+  });
+
+  // N6 — collective fan-out and a stack-walk kickoff carry no issue identity.
+  test('a dispatch with no issueIdentifier is allowed, and never consults the lookup', async () => {
+    const store = alwaysDuplicateStore();
+    await freshDispatch(store, { fields: { issueIdentifier: null } });
+    await freshDispatch(store, { fields: { issueIdentifier: undefined } });
+    assert.equal(store.lookupCalls, 0, 'there is nothing to key on, so the gate must short-circuit');
+  });
+
+  // N7 — the documented fail-open. This seam has never hard-required a read
+  // capability; failing closed would turn a store-shape mismatch into a total
+  // dispatch outage (and every addItem-only route fake would start refusing).
+  test('a store without the lookup capability skips the guard and dispatches', async () => {
+    const store = capturingStore();  // addItem only — no findRecentFreshDispatch
+    await freshDispatch(store);
+    await freshDispatch(store);
+    assert.equal(store.captured.item.issueIdentifier, 'LIN-1');
+  });
+
+  // N8 — the anti-vacuous-green pin (LIN-1431's trap). Without this, every
+  // negative above could still pass with the guard deleted entirely.
+  test('the ordinary fresh path DOES consult the lookup, with the resolved kind and the window', async () => {
+    const store = capturingStore();
+    let lookups = 0;
+    let seen = null;
+    store.findRecentFreshDispatch = async (urlKey, opts) => { lookups++; seen = { urlKey, ...opts }; return null; };
+
+    const now = new Date('2026-07-26T12:00:00.000Z').getTime();
+    await freshDispatch(store, { now: () => now });
+
+    assert.equal(lookups, 1, 'the guard must actually run on the ordinary path');
+    assert.equal(seen.urlKey, 'acme');
+    assert.equal(seen.issueIdentifier, 'LIN-1');
+    assert.equal(seen.kind, 'implementation',
+      'the RESOLVED kind (derived from promptName), never the callers raw/absent kind');
+    assert.equal(seen.since.getTime(), now - DUPLICATE_DISPATCH_WINDOW_MS);
+  });
+
+  // The lookup is evidence, not a gate on dispatching at all: a store whose read
+  // fails must not take the dispatch path down with it. BOTH throw shapes, because
+  // the fail-open is a published invariant other store implementations will be
+  // written against, and the obvious spelling
+  // (`Promise.resolve(store.find…()).catch()`) evaluates the call before the
+  // wrapper exists and so silently protects only the async one (LIN-1656 review,
+  // finding 1). Async is the in-repo shape; sync is the one that regressed.
+  test('an ASYNC-rejecting lookup fails OPEN — the dispatch still lands', async () => {
+    const store = capturingStore();
+    store.findRecentFreshDispatch = async () => { throw new Error('db unavailable'); };
+    await freshDispatch(store);
+    assert.equal(store.captured.item.issueIdentifier, 'LIN-1');
+  });
+
+  test('a SYNCHRONOUSLY-throwing lookup also fails OPEN — the dispatch still lands', async () => {
+    const store = capturingStore();
+    // Not `async`: throws on the calling stack, before any promise exists.
+    store.findRecentFreshDispatch = () => { throw new Error('sync boom'); };
+    await freshDispatch(store);
+    assert.equal(store.captured.item.issueIdentifier, 'LIN-1',
+      'a store whose lookup throws synchronously must not take the creation path down with it');
+  });
+});
+
+/**
+ * LIN-1656 — `force: true` is the operator escape hatch past the guard (owner
+ * condition 2, raised as the review blocker on PR #1023).
+ *
+ * Why it exists: deliberate re-dispatch is the recovery playbook for a wedged
+ * task, and this guard's only failure mode is silently refusing legitimate work.
+ * A refusal an operator cannot override turns a 5-minute window into a 5-minute
+ * outage on the rescue path.
+ *
+ * Why it lives in the GATE rather than the predicate: so it inherits the property
+ * the other gate negatives (N2/N3/N6) assert — a forced dispatch never even
+ * consults the lookup. That is testable, and a predicate-level check would not be.
+ */
+describe('createDispatchItem — force bypasses the duplicate guard (LIN-1656)', () => {
+  test('a forced duplicate dispatches, where the identical unforced request is refused', async () => {
+    const store = realStore();
+    await freshDispatch(store);
+    // The control: without `force` this exact shape is a 409.
+    await assert.rejects(() => freshDispatch(store), err => err.status === 409);
+    assert.equal(store.addItemCalls, 1);
+
+    const forced = await freshDispatch(store, { fields: { force: true } });
+    assert.equal(store.addItemCalls, 2, 'an explicit forced re-dispatch must always succeed');
+    assert.equal(forced.force, true, 'the flag is still stored and forwarded to the runner');
+  });
+
+  test('a forced dispatch never even consults the lookup', async () => {
+    const store = alwaysDuplicateStore();
+    await freshDispatch(store, { fields: { force: true } });
+    assert.equal(store.captured.item.force, true, 'the flag is still stored and forwarded');
+    assert.equal(store.lookupCalls, 0,
+      'force belongs in the entry gate, so it short-circuits before the read');
+  });
+
+  test('force: false and an absent force are NOT a bypass', async () => {
+    // Pins the exact `!== true` comparison: only an explicit boolean true opts out.
+    for (const fields of [{ force: false }, { force: undefined }, {}]) {
+      const store = realStore();
+      await freshDispatch(store);
+      await assert.rejects(
+        () => freshDispatch(store, { fields }),
+        err => err.status === 409,
+        `force: ${JSON.stringify(fields.force)} must not bypass the guard`
+      );
+      assert.equal(store.addItemCalls, 1);
+    }
   });
 });

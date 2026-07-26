@@ -53,9 +53,18 @@ test.describe('Dispatch Queue', () => {
     // These tests verify real badge polling behavior, so remove the count mock
     await page.unroute('**/api/dispatch/count');
 
-    // Clear dispatch queue and tokens before each test
+    // Clear dispatch queue, tokens and history before each test.
+    //
+    // History is NOT optional (LIN-1656): creation now READS history for the
+    // duplicate-dispatch guard, so a test that clears only the queue leaves its
+    // own taken rows behind. This describe takes a `blocked` dispatch for
+    // BLOCKED_ISSUE_ID and four later tests re-dispatch the same issue+kind via
+    // revealPrompt() well inside the 5-minute window — without this line they
+    // 409 and only some of them fail, which reads as unrelated flake. Matches the
+    // six sibling describes in this file that already clear all three.
     await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
     await page.goto(`/test/clear-dispatch-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
 
     // Set up test session with dispatch feature enabled
     await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
@@ -907,7 +916,10 @@ test.describe('Dispatch API', () => {
     expect(byPrompt['Implement the thing'].force).toBe(false);
   });
 
-  test('POST /api/dispatch rejects force:true without followUpTo', async ({ request }) => {
+  // Bare `force` with no verb to override at all. Since LIN-1656 an issueIdentifier
+  // is a third qualifying verb (the duplicate-guard rescue hatch); this body carries
+  // none of the three, so the rejection stands.
+  test('POST /api/dispatch rejects force:true with no followUpTo, abort or issueIdentifier', async ({ request }) => {
     await request.get(`/test/set-session?urlKey=${URL_KEY}`);
 
     const response = await request.post(`${API_PREFIX}/api/dispatch`, {

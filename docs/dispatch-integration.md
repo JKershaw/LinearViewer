@@ -387,9 +387,11 @@ live session (the dispatch runner keys this off the `id` it received from
   target session is still busy in an active phase (the consumer's liveness gate guards
   against colliding with a running process). Set `force: true` to bypass that guard and
   resume anyway — it asserts the prior process is effectively dead (wedged on Claude infra
-  wobble, or parked in a long `sleep`). It is **only** meaningful alongside `followUpTo`:
-  `force: true` without a `followUpTo` is rejected (`400`). The consumer reads it as
-  `item.force` off the polled/claimed item. (Liveness contract: LIN-546; API plumbing: LIN-559.)
+  wobble, or parked in a long `sleep`). It is only meaningful alongside a verb that has a
+  guard for it to override — `followUpTo`, an `abort`, or (LIN-1656) an issue-scoped fresh
+  dispatch, where it is the operator hatch past the duplicate guard; with none of the three
+  it is rejected (`400`). The consumer reads it as `item.force` off the polled/claimed item.
+  (Liveness contract: LIN-546; API plumbing: LIN-559.)
 
 **Sending a follow-up** (dispatch a custom item, then a second referencing its `id`):
 
@@ -409,6 +411,13 @@ curl -s -X POST "$BASE/api/proxy/dispatch" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d "{\"prompt\": \"Pick this back up\", \"followUpTo\": \"$ORIG\", \"force\": true}"
 ```
+
+Step 1 is a **fresh** dispatch, so — if it carries an `issueIdentifier` — it can be refused
+`409 DUPLICATE_DISPATCH` when this workspace already dispatched that issue + `kind` in the
+last 5 minutes (LIN-1656; see the [proxy API reference](proxy-integration.md#enqueue-a-dispatch) for the
+body and what to do with it — adopt the returned `id` and watch that dispatch). Step 2 carries
+a `followUpTo`, so it is **never** refused by that guard: a follow-up *is* the intended second
+dispatch. The example above passes no `issueIdentifier` at all, so neither call can be refused.
 
 ## Aborting a session
 

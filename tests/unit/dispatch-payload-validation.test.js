@@ -121,12 +121,32 @@ describe('validateDispatchPayload — id / combination rules', () => {
     assert.deepEqual(validateDispatchPayload({ prompt: 'x', force: true, cascade: true, abort: true, abortTo: UUID }),
       { error: 'force and cascade are mutually exclusive' });
   });
-  test('force requires followUpTo or abort', () => {
+  test('force with no verb to override at all is rejected', () => {
+    // No followUpTo, no abort, and no issueIdentifier: nothing has a guard for
+    // `force` to beat, so the flag really would be stored inert — the original
+    // reason the rule exists (LIN-559).
     assert.deepEqual(validateDispatchPayload({ prompt: 'x', force: true }),
-      { error: 'force requires followUpTo or abort' });
+      { error: 'force requires followUpTo, abort, or an issueIdentifier' });
   });
   test('force is valid alongside abort', () => {
     assert.strictEqual(validateDispatchPayload({ force: true, abort: true, abortTo: UUID }), null);
+  });
+  // LIN-1656: the duplicate-dispatch guard reads `force` on an issue-scoped FRESH
+  // dispatch, so that shape is the third verb with a guard for `force` to override
+  // — and validation must let it through to the factory. Without this the owner's
+  // required escape hatch is unreachable: the request 400s before the guard runs.
+  test('force is valid on a fresh issue-scoped dispatch (the duplicate-guard hatch)', () => {
+    assert.strictEqual(
+      validateDispatchPayload({ prompt: 'x', force: true, issueIdentifier: 'LIN-42' }), null);
+  });
+  test('the relaxation is scoped to force — cascade exclusion still holds with an issueIdentifier', () => {
+    // Deliberately NOT relaxed: `force`/`cascade` is about a cascade emitting its
+    // own plain unforced aborts, which LIN-1656 does not touch.
+    assert.deepEqual(
+      validateDispatchPayload({
+        prompt: 'x', force: true, cascade: true, abort: true, abortTo: UUID, issueIdentifier: 'LIN-42'
+      }),
+      { error: 'force and cascade are mutually exclusive' });
   });
   // sessionId is an OPAQUE grouping key, not a UUID (LIN-1118). These replace the
   // old 'malformed sessionId' test, whose subject ('nope') is now legitimately

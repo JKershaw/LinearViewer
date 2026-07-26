@@ -29,7 +29,7 @@ import {
   isValidPriority,
   validateIssueWriteFields,
 } from '../lib/issue-write-validation.js';
-import { createDispatchItem } from '../lib/dispatch-factory.js';
+import { createDispatchItem, DUPLICATE_DISPATCH_CODE } from '../lib/dispatch-factory.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
 // route owns no GraphQL. Provider SELECTION for the consumer read + write data
@@ -712,6 +712,66 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       capability: method,
       provider: activeProvider.name,
     });
+    return true;
+  }
+
+  /**
+   * Shared refusal responder for the duplicate-dispatch guard (LIN-1656),
+   * mirroring `denyIfUnsupported` above: one construction site for the 409 so
+   * every creating route replies identically and a new one inherits the shape
+   * instead of having to remember it.
+   *
+   * The BODY itself is built once further up, by `createDispatchItem`, and
+   * carried on `err.duplicateDispatch` — `{ code, id, issueIdentifier, kind,
+   * dispatchedAt, retryAfter }`. This just labels it, audits it, and picks the
+   * right transport. `code` is the programmatic discriminator callers branch on;
+   * 409 is already taken on this router by the trashed-issue refusal, so the
+   * status alone is not enough to tell them apart.
+   *
+   * `id` is the load-bearing field: it names the LIVE dispatch, so a refused
+   * orchestrator can WATCH that one instead of guessing. This is exactly why the
+   * plan chose 409 over a `{deduped:true}` 200 — a wake is addressed to the
+   * original dispatcher's edge, so a success shape would leave the second
+   * orchestrator standing by forever on an edge it does not own.
+   *
+   * KEEPALIVE CAVEAT (`lib/http-keepalive.js`). On a long handler the keepalive
+   * may already have flushed `200 + Content-Type` before the guard fires, at
+   * which point the HTTP status is committed and cannot be changed — `send` then
+   * moves the real status into the body as `statusCode`. So a keepalive-armed
+   * caller MUST pass its keepalive here rather than touching `res` directly, and
+   * the `Retry-After` header is set only while headers are still open (setting one
+   * after flush throws ERR_HTTP_HEADERS_SENT and would turn a clean refusal into a
+   * crash). The body's `retryAfter` is the authoritative copy either way; the
+   * header is the standards-friendly duplicate, matching what `standardHeaders`
+   * already emits on the rate limiters.
+   *
+   * @param {*} err - the caught error (a non-duplicate error passes straight through)
+   * @param {import('express').Request} req
+   * @param {import('express').Response} res
+   * @param {string} endpoint - audit-log endpoint tag
+   * @param {{send: Function}} [keepalive] - pass when the handler armed one
+   * @returns {boolean} true if a refusal was sent (caller returns early)
+   */
+  function refuseIfDuplicateDispatch(err, req, res, endpoint, keepalive = null) {
+    if (!err || !err.duplicateDispatch) return false;
+    const refusal = err.duplicateDispatch;
+    // The `note` is what makes the guard COUNTABLE, following the
+    // `workspaceUnavailable` precedent (LIN-1540 threads its reason so 503s are
+    // countable by reason). 409 on this router is already taken by the
+    // trashed-issue refusal, so without a note the Proxy page cannot tell "the
+    // guard fired 40 times" from "40 writes hit trashed issues" — and the
+    // production false-refusal rate is only measurable because of this line.
+    // Carries the colliding id, so a refusal is diagnosable from the log alone
+    // and not just from the wire body the caller received.
+    logEvent(req, endpoint, 409, `${DUPLICATE_DISPATCH_CODE} ${refusal.id}`);
+    if (!res.headersSent) {
+      res.set('Retry-After', String(refusal.retryAfter));
+    }
+    if (keepalive) {
+      keepalive.send(409, { error: err.message, ...refusal });
+    } else {
+      jsonError(res, 409, err.message, refusal);
+    }
     return true;
   }
 
@@ -1448,7 +1508,7 @@ POST ${baseUrl}/api/proxy/dispatch
   → "harness" (optional) is the EXECUTION harness the runner should use to RUN this prompt — e.g. "claude-code" (the default) or "opencode". Like "model" it is an opaque string (length + safety validated, no registry check) and forwarded blindly; the runner owns its own harness registry and defaulting. Combine with "model" to run a specific OpenRouter-backed model through a non-default harness (e.g. "harness": "opencode", "model": "openai/gpt-5.4-mini"). Omit it (or null) to keep the consumer's own default/precedence chain — Harbour does not interpose a per-workspace default here. See LIN-1084.
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
-  → "force" (optional, default false) overrides a runner-side guard, so it is meaningful alongside a verb that HAS one — and ONLY such a verb (a bare "force": true on a fresh dispatch is rejected 400 "force requires followUpTo or abort"): (1) with "followUpTo" it bypasses the active-session guard so a follow-up can resume a session wedged or sleeping in an active phase (Claude infra wobble, long-running sleep) — asserting the prior process is effectively dead (see LIN-546); (2) with a single "abort" it is the escape hatch that force-closes even a human-continued session the runner would otherwise skip (see cascade + "[skipped]" below). Mutually exclusive with "cascade" (a cascade emits its own plain, unforced aborts): "force" + "cascade" is rejected (400). The runner reads it as "item.force" off the polled/claimed item. See LIN-559/LIN-946.
+  → "force" (optional, default false) overrides a guard, so it is meaningful alongside a verb that HAS one — and ONLY such a verb (a bare "force": true with no "followUpTo", no "abort" and no "issueIdentifier" is rejected 400 "force requires followUpTo, abort, or an issueIdentifier", because there would be no guard for it to override): (1) with "followUpTo" it bypasses the active-session guard so a follow-up can resume a session wedged or sleeping in an active phase (Claude infra wobble, long-running sleep) — asserting the prior process is effectively dead (see LIN-546); (2) with a single "abort" it is the escape hatch that force-closes even a human-continued session the runner would otherwise skip (see cascade + "[skipped]" below); (3) OPERATOR RESCUE HATCH — on an issue-scoped fresh dispatch it bypasses the duplicate guard below, for a human recovering a wedged task who has confirmed the colliding dispatch is not doing the work. This is NOT the answer to a 409 you were just handed: adopt the returned "id" and watch it, as that refusal says. Mutually exclusive with "cascade" (a cascade emits its own plain, unforced aborts): "force" + "cascade" is rejected (400). The runner reads it as "item.force" off the polled/claimed item. See LIN-559/LIN-946/LIN-1656.
   → "abort" (optional, default false) requests an abort/cancel/close of an existing session instead of running a prompt: set "abort": true and "abortTo" to the "id" of the dispatch whose session should be cancelled. "prompt" is NOT required for an abort, and the consumer flips the running session to a terminal cancelled state. The abort item's OWN "target" must be poll-eligible (cli/web/dash) — eligibility is the abort item's target, NOT the substrate of the session being aborted (so you can abort a "dash" session with a "cli" abort item). Mutually exclusive with "followUpTo". See LIN-743.
   → "abortTo" (required when "abort" is true) is the dispatch id (UUID) of the session to abort. Stored + forwarded blindly; the consumer owns session liveness.
   → "cascade" (optional boolean, default false) is a modifier on an "abort": when true, "abortTo" names the ROOT session of a subtree and Harbour deterministically walks the descendant "sessionId"-tree and emits ONE ordinary abort per discovered session (root + every worker/child-autopilot under it). Requires "abort" (cascade:true without it is rejected 400); mutually exclusive with "force". The response is { "success": true, "cascade": true, "closed": [ { "id", "abortTo", "target" }, ... ], "count": N } instead of a single queued item. The emitted aborts are plain (no "force", no "sessionId"), so the runner cancels each and SKIPS any human-continued session — posting a distinct terminal-benign "[skipped] human-continued session <id> (<phase>)." marker (NOT "[aborted]"): treat it as terminal-benign — the session is still live, do not retry it and do not treat it as a close. Aborting an already-terminal session is a safe no-op. Use "force" on a single targeted abort to override that skip deliberately. See LIN-946/LIN-951.
@@ -1456,6 +1516,7 @@ POST ${baseUrl}/api/proxy/dispatch
   → "waitForFollowUps" (optional boolean, default false; cli/web only) is the opt-in completion hold: when true the runner holds the session open at completion to receive in-session follow-ups (beats) instead of finalizing. The runner owns the behaviour — this flag is stored + forwarded blindly. Set it for a worker you intend to keep feeding in-session; leave it false (omit) for an orchestrator/sub-orchestrator that must finalize normally and stay free to run its own watch loop. See LIN-795/LIN-797.
   → By default a proxy-context block is appended to the prompt so the worker inherits this workspace's API access. Reporting is handled by the runner's Stop hook, not the prompt. Set "appendProxyContext": false to opt out. EXCEPTION: when "followUpTo" is set the block is NOT appended by default — a follow-up beat resumes a warm session that already received the proxy context on its first beat, so re-appending it is redundant. Pass "appendProxyContext": true to force it back on for a follow-up.
   → { "id": "...", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "...", "target": "cli", "abort": false, "abortTo": null, "cascade": false, "sessionId": null, "dispatchedAt": "..." } (a "cascade": true request instead returns { "success": true, "cascade": true, "closed": [...], "count": N })
+  → DUPLICATE GUARD — a FRESH dispatch for an issue+kind already dispatched to this workspace within the last 5 MINUTES is refused 409: { "error": "...", "code": "DUPLICATE_DISPATCH", "id": "<the live dispatch>", "issueIdentifier": "LIN-42", "kind": "plan", "dispatchedAt": "...", "retryAfter": 163 } (plus a "Retry-After" header). Someone else — another orchestrator, or a human on the board — already started this exact step. WHAT TO DO: adopt the "id" in the body and WATCH that dispatch via GET /dispatch/{id} exactly as if you had dispatched it yourself. Do NOT retry, do NOT re-word the prompt and resend, do NOT treat it as a failure or an instrument breakage. The window is self-clearing: "retryAfter" is the seconds until it lifts, if you genuinely still need a second run. Never refused: a "followUpTo" beat, an "abort", a different "kind" on the same issue (the normal research → plan → implementation pipeline), the same issue+kind in a different workspace, or a dispatch carrying no "issueIdentifier". Match on "code" — 409 alone is ambiguous, the trashed-issue refusal uses it too. See LIN-1656.
 
 POST ${baseUrl}/api/proxy/recommend-and-dispatch
   Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "model": "anthropic/claude-opus-4.8", "harness": "opencode", "appendProxyContext": true, "noDescend": false, "kind": "review", "sessionId": "...", "waitForFollowUps": false }
@@ -1469,6 +1530,7 @@ POST ${baseUrl}/api/proxy/recommend-and-dispatch
   → "waitForFollowUps" (optional boolean, default false; cli/web only) is threaded onto the dispatched item, same meaning as on POST /dispatch — the opt-in completion hold. Set it when this dispatch is a worker you intend to keep feeding in-session; leave it false for an orchestrator/sub-orchestrator. See LIN-795/LIN-797.
   → VERB OVERRIDE — pass "kind" (a prompt template key: plan, implementation, review, research, design, breakdown, look-into, triage, scoping, spike, context, retro, blocked) to PIN the step when the engine's chosen verb is demonstrably wrong. The server still WRITES the body — you pick the verb, never the words. Override pins the NAMED issue with NO descent and skips the LLM entirely; response carries "override": true. Use sparingly and only on a clear engine miss (see the autopilot manual); it is not the everyday path. Invalid keys (incl. defer/custom/autopilot/periodical) get a 400.
   → { "id": "...", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "...", "target": "cli", "sessionId": null, "dispatchedAt": "..." }
+  → The duplicate guard documented under POST /dispatch applies here too, keyed on the kind this verb RESOLVES (the recommendation's own action, or your "kind" override). Same 409 "DUPLICATE_DISPATCH" body, same response: adopt the returned "id" and watch it. See LIN-1656.
 
 POST ${baseUrl}/api/proxy/autopilot/kickoff
   Body: { "goal": "...", "mode": "write|readonly", "variant": "standard|stepper", "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "sessionId": "...", "subscription": "terminal-only|everything" }
@@ -1480,6 +1542,7 @@ POST ${baseUrl}/api/proxy/autopilot/kickoff
   → Dispatched as kind:"autopilot", so the returned "id" IS this run's session id. Pass that id as "sessionId" on every worker dispatch the run fans out (the kickoff body also tells the run its own id). The orchestrator itself is launched WITHOUT "waitForFollowUps" (default false) so it finalizes normally and stays free to run its watch loop.
   → The prompt body NEVER returns to you — only the header. The GET twin (GET /api/proxy/autopilot/kickoff?goal=&mode=&variant=) stays a text-only preview/inspect form that does NOT enqueue anything.
   → { "id": "...", "sessionId": "...", "status": "queued", "kind": "autopilot", "promptName": "Autopilot (stack walk)", "mode": "write", "variant": "standard", "issueIdentifier": null, "target": "cli", "dispatchedAt": "..." }
+  → An ISSUE-SCOPED kickoff can hit the duplicate guard documented under POST /dispatch (its kind is "autopilot"): a 409 "DUPLICATE_DISPATCH" means a run for this task is already underway — adopt the returned "id" and watch it rather than launching a second one. A GENERAL (stack-walk) kickoff carries no "issueIdentifier" and can never be refused. See LIN-1656.
 
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
   → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
@@ -4440,6 +4503,11 @@ One convention across every endpoint, so you can branch on the same fields every
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
       });
     } catch (err) {
+      // An issue-scoped kickoff (kind 'autopilot') can duplicate like any other
+      // fresh dispatch — LIN-1656. A stack-walk kickoff carries no issueIdentifier
+      // and can never be refused. Ahead of the generic 500: a 500 here is worse
+      // than no guard, since a caller cannot tell it from a real fault.
+      if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/autopilot/kickoff')) return;
       // Fail closed (LIN-1175): a claude-code dispatch whose out-of-band bootstrap
       // token could not be minted must be REFUSED, never launched credential-less.
       // attachProxyContext flags this as proxyAttachFailed (same convention as the
@@ -4718,6 +4786,9 @@ One convention across every endpoint, so you can branch on the same fields every
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
       });
     } catch (err) {
+      // Duplicate-dispatch refusal (LIN-1656) — see the responder. Ahead of the
+      // generic 500 so an orchestrator can branch on `code` and adopt the `id`.
+      if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/dispatch')) return;
       // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
       if (err && err.proxyAttachFailed) {
         logEvent(req, '/api/proxy/dispatch', 503);
@@ -4967,6 +5038,11 @@ One convention across every endpoint, so you can branch on the same fields every
             override: true
           });
         } catch (err) {
+          // Duplicate-dispatch refusal (LIN-1656). This is the verb-OVERRIDE arm,
+          // which creates its dispatch BEFORE `armKeepalive` runs, so it replies on
+          // plain `res` — no keepalive to thread. (The LLM arm below is armed and
+          // must pass one.)
+          if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch')) return;
           // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
           if (err && err.proxyAttachFailed) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
@@ -5141,6 +5217,12 @@ One convention across every endpoint, so you can branch on the same fields every
         });
       } catch (err) {
         keepalive.stop();
+        // Duplicate-dispatch refusal (LIN-1656). Keepalive is ARMED on this arm, so
+        // the refusal must ride `keepalive.send` — if the 25s flush already fired,
+        // the 200 is committed and the real 409 travels as `statusCode` in the body
+        // (same contract as the 503 below). The responder also skips the
+        // `Retry-After` header once headers are sent.
+        if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
         // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
         if (err && err.proxyAttachFailed) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
