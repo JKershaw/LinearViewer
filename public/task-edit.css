@@ -3,9 +3,13 @@
  * The first actual styling in-app task editing has ever had: the form this page
  * replaces had ZERO CSS rules anywhere in public/ and rendered as raw browser
  * defaults. Mobile-first, and semantic-token-only throughout (--text/--muted/
- * --card/--line/--brand/--bg, --space-*, --radius-*, --font-*) so it is dark-safe
- * under .theme-dark with no second colour vocabulary — the discipline the
- * LIN-756/757/758 theme revert exists to protect.
+ * --card/--line/--brand/--bg, --space-*, --radius-*, --font-*, plus --bg-muted/
+ * --fg-dim/--fg-vdim/--blue in the Markdown preview block, mirroring the tokens
+ * the dashboard's description rules already use) so it is dark-safe under
+ * .theme-dark with no second colour vocabulary — the discipline the
+ * LIN-756/757/758 theme revert exists to protect. Every one of those is
+ * re-declared under .theme-dark in style.css; verified rendered dark, not
+ * assumed.
  *
  * Typographic split, per the project's design principles: sans (--font-content)
  * for human structure — labels, headings, controls — and mono (--font-structural)
@@ -179,8 +183,11 @@ select.task-edit-input {
 }
 
 /* Rendered Markdown preview — same box footprint as the textarea it stands in
-   for, so toggling tabs doesn't jump the layout. `.comment-body` (style.css)
-   supplies the actual Markdown typography (p/code/a rules). */
+   for, so toggling tabs doesn't jump the layout.
+   Font size and line-height match `.task-edit-textarea` (1rem / 1.5) rather than
+   shrinking: the two panes are the SAME document, so text that changes size when
+   you flip tabs is the mismatch this pane exists to remove. 1rem is also what
+   stops iOS zooming the focused control next door. */
 .task-edit-preview {
   min-height: 16rem;
   box-sizing: border-box;
@@ -189,6 +196,91 @@ select.task-edit-input {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   overflow-wrap: anywhere;
+  font-family: var(--font-content);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* Markdown typography for the preview.
+ *
+ * This pane's whole job is "see how this will render", so it has to match the
+ * surfaces that actually render a description — `.issue-description
+ * .desc-full-content` (style.css) on the dashboard and `.swipe-accordion-body`
+ * (swipe.css). It previously borrowed `.comment-body`, the COMMENT stylesheet,
+ * which styles p/code/a and nothing else: nested bullets did not indent, fenced
+ * blocks had no box, and blockquotes had no rule — the preview undersold what
+ * the user would actually get.
+ *
+ * These rules are a deliberate local copy of the dashboard's, not a widening of
+ * the shared class. `.comment-body` still has other consumers (public/app.js's
+ * comment list, pinned by tests/e2e/interactions.spec.js), and adding element
+ * rules to it would change every one of them to fix this one pane. A shared
+ * `.markdown-body` layer is the real answer — `.desc-full-content`,
+ * `.swipe-accordion-body` and `.comment-body` each hand-roll a different subset
+ * today — but that is its own task (recorded on LIN-1575's review; LIN-1032 is
+ * about to add a fourth surface).
+ *
+ * Element coverage tracks the dashboard's on purpose. `table` is NOT styled
+ * here for the same reason: no description surface in the app styles tables, so
+ * styling it here would make the preview diverge from the thing it is
+ * previewing. Recorded as part of the shared-layer gap above. */
+.task-edit-preview > :first-child { margin-top: 0; }
+.task-edit-preview > :last-child { margin-bottom: 0; }
+
+.task-edit-preview p { margin: 0.5em 0; }
+
+.task-edit-preview ul,
+.task-edit-preview ol {
+  margin: 0.5em 0;
+  /* Markers sit INSIDE the pane's padding; without this they hang outside it. */
+  padding-left: 1.5em;
+}
+
+.task-edit-preview li { margin: 0.25em 0; }
+
+.task-edit-preview code {
+  background: var(--bg-muted);
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+}
+
+.task-edit-preview pre {
+  background: var(--bg-muted);
+  padding: 0.75em;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+
+/* The <pre> already carries the block treatment; the inner <code> must not
+   double up its own background and padding on top of it. */
+.task-edit-preview pre code {
+  background: none;
+  padding: 0;
+}
+
+.task-edit-preview blockquote {
+  border-left: 3px solid var(--fg-vdim);
+  margin: 0.5em 0;
+  padding-left: 1em;
+  color: var(--fg-dim);
+}
+
+.task-edit-preview a { color: var(--blue); }
+
+/* A pasted screenshot must not blow the pane's width out. Note this preview does
+   NOT rewrite Linear-hosted image URLs through the /api/image relay the way
+   public/app.js does, so on a Linear workspace such an image previews broken —
+   a known gap recorded on the ticket, not something this rule papers over. */
+.task-edit-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  margin: var(--space-2) 0;
+  display: block;
 }
 
 .task-edit-hint {

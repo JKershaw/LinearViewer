@@ -74,7 +74,49 @@ describe('renderTaskEditPage — the four v1 fields', () => {
     assert.ok(/aria-selected="true"/.test(writeTab));
     // The preview pane ships `hidden` — the plain textarea is always what's
     // live at first paint, never a fresh-page flash of an empty preview.
-    assert.ok(/<div class="task-edit-preview comment-body" data-task-edit-preview data-testid="task-edit-preview" hidden><\/div>/.test(html));
+    assert.ok(/<div class="task-edit-preview" id="task-edit-description-preview" data-task-edit-preview data-testid="task-edit-preview" hidden><\/div>/.test(html));
+  });
+
+  // LIN-1575 review, finding 2. `aria-selected` is only honoured on roles like
+  // tab/option/row/treeitem; on a bare <button> the UA drops it, so the first
+  // cut announced "Write, button / Preview, button" with no active state and no
+  // relationship to the pane each one reveals. Pinning all three attributes
+  // together is the point — re-adding `aria-selected` alone would silently
+  // reproduce the bug.
+  test('the Write/Preview toggle is a real ARIA tablist, not aria-selected on bare buttons (LIN-1575)', () => {
+    const html = render();
+
+    const tablist = html.match(/<div[^>]*data-testid="task-edit-desc-tabs"[^>]*>/)[0];
+    assert.ok(/role="tablist"/.test(tablist), 'the tab container needs role="tablist"');
+    assert.ok(/aria-label="[^"]+"/.test(tablist), 'the tablist needs an accessible name');
+
+    for (const [tab, controls, selected] of [
+      ['write', 'task-edit-description', 'true'],
+      ['preview', 'task-edit-description-preview', 'false'],
+    ]) {
+      const btn = html.match(new RegExp(`<button[^>]*data-testid="task-edit-tab-${tab}"[^>]*>`))[0];
+      assert.ok(/role="tab"/.test(btn), `the ${tab} tab needs role="tab"`);
+      assert.ok(new RegExp(`aria-selected="${selected}"`).test(btn), `${tab} aria-selected should be ${selected}`);
+      assert.ok(
+        new RegExp(`aria-controls="${controls}"`).test(btn),
+        `the ${tab} tab must point at the element it reveals`
+      );
+      // An aria-controls target that doesn't exist is worse than none at all.
+      assert.ok(html.includes(`id="${controls}"`), `nothing on the page has id="${controls}"`);
+    }
+  });
+
+  // LIN-1575 review, finding 1. `.comment-body` is the COMMENT stylesheet
+  // (p/code/a only), so borrowing it left the preview without list, fenced-code
+  // or blockquote treatment — worse than the dashboard renders the very same
+  // description. The rules now live on `.task-edit-preview` (public/task-edit.css);
+  // this pins the class contract those rules hang off, and that the comment
+  // stylesheet is not silently reintroduced.
+  test('the preview pane owns its Markdown typography and does not borrow .comment-body (LIN-1575)', () => {
+    const html = render();
+    const pane = html.match(/<div[^>]*data-testid="task-edit-preview"[^>]*>/)[0];
+    assert.ok(/class="task-edit-preview"/.test(pane));
+    assert.ok(!/comment-body/.test(pane), '.comment-body styles p/code/a only — see public/task-edit.css');
   });
 
   test('renders NO field beyond the v1 four (the PATCH route reads no others)', () => {
