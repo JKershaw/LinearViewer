@@ -253,6 +253,17 @@ test.describe('Live Console (experimental)', () => {
 // 503 path that writes the note is short-circuited), so the audit rows are seeded
 // through Beat 1's own `/test/seed-proxy-event` seam.
 test.describe('Live Console lane credential (LIN-1588)', () => {
+  // Same discipline as the sibling session-page suite: agent-status writes fire
+  // the observation-sessions materializer, and `clearFeed` above does not reach
+  // those rows — so a spec later in this shard would inherit a workspace that
+  // looks busy. Clear what we seeded, including the materialized sessions.
+  test.afterEach(async ({ page }) => {
+    await clearFeed(page, URL_KEY);
+    await page.request.get(`/test/clear-observation-sessions?urlKey=${URL_KEY}`);
+    await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
+    await page.request.get(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+  });
+
   // A running worker whose agent-status row carries a token → a lane with a
   // non-null agentTokenId. The tokenId forwarding in /test/seed-agent-status is
   // itself part of this ticket; without it no lane could leave `unknown`.
@@ -293,7 +304,10 @@ test.describe('Live Console lane credential (LIN-1588)', () => {
     await page.goto(PAGE_URL);
     await page.waitForSelector('[data-testid="live-console-lane"]');
 
-    const badge = page.locator('[data-testid="live-console-lane-credential"]').first();
+    // Scoped to THIS task's lane, not `.first()` — a residual lane from another
+    // spec in the same shard would otherwise decide what we assert on.
+    const lane = page.locator('[data-testid="live-console-lane"]', { hasText: 'LIN-1588' }).first();
+    const badge = lane.locator('[data-testid="live-console-lane-credential"]');
     await expect(badge).toHaveAttribute('data-state', 'dead');
     await expect(badge).toContainText('dead');
   });
@@ -310,7 +324,8 @@ test.describe('Live Console lane credential (LIN-1588)', () => {
     await page.goto(PAGE_URL);
     await page.waitForSelector('[data-testid="live-console-lane"]');
 
-    const badge = page.locator('[data-testid="live-console-lane-credential"]').first();
+    const lane = page.locator('[data-testid="live-console-lane"]', { hasText: 'LIN-1588-NOTOK' }).first();
+    const badge = lane.locator('[data-testid="live-console-lane-credential"]');
     await expect(badge).toHaveAttribute('data-state', 'unknown');
     // The one direction this must never fail in.
     await expect(badge).not.toHaveAttribute('data-state', 'ok');

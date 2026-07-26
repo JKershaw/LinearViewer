@@ -699,6 +699,18 @@ test.describe('Lineage-continuous rendering (LIN-1478)', () => {
 // via Beat 1's own seam — the spec exercises what the page DRAWS and makes no
 // claim about how the row is produced.
 test.describe('Session credential state (LIN-1588)', () => {
+  // These are the first tests in this file to WRITE agent-status rows (the others
+  // drive workers through dispatch feedback only). `recordStatus` fires the
+  // observation-sessions materializer on write, so leaving rows behind would hand
+  // the next spec in this shard a workspace that is no longer quiet — and
+  // `ship-biscuit.spec.js`, which shares this shard, clears agent-status but not
+  // the materialized sessions. Clean up after ourselves rather than widening
+  // another feature's teardown.
+  test.afterEach(async ({ page }) => {
+    await clearRuns(page);
+    await page.request.get(`/test/clear-proxy-events?urlKey=${URL_KEY}`);
+  });
+
   // Drive a worker to `running` and stamp its agent-status row with a token, so
   // pipeline-loops joins a NON-NULL agentTokenId onto the loop.
   async function seedSessionWithToken(page, { tokenId, tokenLabel = 'dispatch-bootstrap' }) {
