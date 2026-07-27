@@ -10,7 +10,9 @@
  * the cards sit the deterministic `summary` intro (LIN-638) and the model's global
  * `analysis` preamble (LIN-642 — "how I chose", vs each card's "why this one"). A
  * single page-level expandable panel shows the exact grounding context the model
- * saw (shared across options, not per-option).
+ * saw (shared across options, not per-option). Above all of it, the `degraded`
+ * notice (LIN-1665) says so when the reply could not be parsed and the cards are
+ * therefore deterministic fallbacks rather than generated suggestions.
  *
  * Above the cards sits the direction chooser (LIN-1566): the generation groups its
  * goals under a few named directions, so you pick a direction first and a concrete
@@ -45,6 +47,7 @@
   var summaryEl = document.getElementById('next-run-summary');
   var analysisEl = document.getElementById('next-run-analysis');
   var analysisBodyEl = document.getElementById('next-run-analysis-body');
+  var degradedEl = document.getElementById('next-run-degraded');
   var emptyState = document.getElementById('next-run-empty');
   var contextSection = document.getElementById('next-run-context-section');
   var contextToggle = document.getElementById('next-run-context-toggle');
@@ -446,6 +449,25 @@
     analysisEl.hidden = false;
   }
 
+  // Degradation notice (LIN-1665). A generation whose reply could not be parsed
+  // still returns cards — the deterministic S/M/L fills plus continue-until-stopped —
+  // and, because those fills carry no direction tag, no chooser. That is exactly what
+  // a genuinely ungrouped-but-successful generation looks like, so without this the
+  // page presents a failed run as a normal one. Cleared on every generation, so a
+  // later healthy run removes a previous warning.
+  function renderDegraded(degraded) {
+    if (!degradedEl) return;
+    if (!degraded) {
+      degradedEl.hidden = true;
+      degradedEl.textContent = '';
+      return;
+    }
+    degradedEl.textContent = degraded.truncated
+      ? '⚠ the model\'s reply was cut off before it finished, so none of its suggestions could be read. The options below are deterministic fallbacks, not generated ones — generate again, or pick a different model in settings.'
+      : '⚠ the model\'s reply could not be read, so none of its suggestions survived. The options below are deterministic fallbacks, not generated ones — generate again, or pick a different model in settings.';
+    degradedEl.hidden = false;
+  }
+
   // Single page-level grounding panel: shows the exact context the model saw. It
   // grounds the WHOLE generation, so it is shared (one panel), not per-option.
   function renderContext(context) {
@@ -508,6 +530,7 @@
       body: JSON.stringify({}),
       on401: false
     }).then(function (res) {
+      renderDegraded(res && res.degraded);
       renderSummary(res && res.summary);
       renderAnalysis(res && res.analysis);
       renderOptions(res && res.options, res && res.directions);

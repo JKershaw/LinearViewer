@@ -30,11 +30,14 @@ import {
   REQUIRED_SIZES,
   TSHIRT_SIZES,
   resolveDirections,
+  assessNextRunOutcome,
   MAX_DIRECTIONS,
   MAX_GENERATED_OPTIONS,
   CATCH_ALL_DIRECTION,
+  NEXT_RUN_PROSE_MAX_TOKENS,
 } from '../../lib/next-run.js';
 import { buildRoadmapModel } from '../../lib/roadmap.js';
+import { DEFAULT_MODEL, REASONING_MIN_TOKENS } from '../../lib/openrouter.js';
 
 const MODEL = {
   velocity: { tasksPerWeek: 3.5, pointsPerWeek: 8, trend: 'increasing' },
@@ -1088,5 +1091,224 @@ describe('generateGoalSuggestions directions (LIN-1566)', () => {
     assert.equal(tagged.direction, 'finish started work');
     // …and the enrichment that runs after it is still applied.
     assert.deepEqual(tagged.referencedTasks, [{ id: 'LIN-1', title: 'In-flight work' }]);
+  });
+});
+
+// ─── LIN-1665 ────────────────────────────────────────────────────────────────
+//
+// The reported bug: /next-run showed ~4 flat cards (one deterministic fill per
+// S/M/L plus continue-until-stopped) and no direction chooser, looking exactly
+// like a successful ungrouped generation. Root cause was upstream of rendering —
+// a reply truncated against a bare `max_tokens` that a reasoning model's hidden
+// tokens were billed inside, parsed all-or-nothing to zero options, then refilled
+// deterministically with no signal that anything had failed.
+//
+// These cover both halves: the reasoning-budget split on the request, and the
+// degradation signal on the response.
+
+describe('generateGoalSuggestions reasoning budget (LIN-1665)', () => {
+  const realFetch = global.fetch;
+  afterEach(() => { global.fetch = realFetch; });
+
+  function mockStreamResponse(text) {
+    const enc = new TextEncoder();
+    const blocks = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 10 } })}\n\n`,
+      'data: [DONE]\n\n',
+    ];
+    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+  }
+
+  const REPLY = JSON.stringify({ analysis: 'a', options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
+
+  async function capturedBody(model) {
+    let sent = null;
+    global.fetch = mock.fn(async (_url, init) => {
+      sent = JSON.parse(init.body);
+      return mockStreamResponse(REPLY);
+    });
+    await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme' },
+      { apiKey: 'test-key', ...(model ? { model } : {}) }
+    );
+    return sent;
+  }
+
+  test('reserves reasoning headroom ON TOP of the prose budget for a reasoning model', async () => {
+    // The defect: 1600 was the WHOLE completion budget, and a gpt-5.x model bills
+    // its hidden reasoning inside it — measured 516 reasoning tokens, JSON cut
+    // mid-document. The prose budget must now survive the reasoning run.
+    const body = await capturedBody(DEFAULT_MODEL);
+    assert.deepEqual(body.reasoning, { max_tokens: REASONING_MIN_TOKENS });
+    assert.equal(body.max_tokens, NEXT_RUN_PROSE_MAX_TOKENS + REASONING_MIN_TOKENS);
+    assert.ok(body.max_tokens > NEXT_RUN_PROSE_MAX_TOKENS, 'prose budget must not be the whole cap');
+  });
+
+  test('the default model IS the reasoning path — no model argument, same split', async () => {
+    // routes/next-run.js can resolve to the default; a fix that only applied to an
+    // explicitly-passed model would leave the common path unfixed.
+    const body = await capturedBody(null);
+    assert.equal(body.model, DEFAULT_MODEL);
+    assert.deepEqual(body.reasoning, { max_tokens: REASONING_MIN_TOKENS });
+  });
+
+  test('a non-reasoning model keeps a bare max_tokens — request body unchanged', async () => {
+    // Behavior preservation: the split is opt-in per model. A model with no hidden
+    // reasoning must not receive an unsupported `reasoning` field or a widened cap.
+    const body = await capturedBody('anthropic/claude-opus-4.8');
+    assert.equal('reasoning' in body, false);
+    assert.equal(body.max_tokens, NEXT_RUN_PROSE_MAX_TOKENS);
+  });
+
+  test('an explicit maxTokens is still honoured as the PROSE budget', async () => {
+    let sent = null;
+    global.fetch = mock.fn(async (_url, init) => { sent = JSON.parse(init.body); return mockStreamResponse(REPLY); });
+    await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme' },
+      { apiKey: 'test-key', model: 'anthropic/claude-opus-4.8', maxTokens: 900 }
+    );
+    assert.equal(sent.max_tokens, 900);
+  });
+});
+
+describe('assessNextRunOutcome (LIN-1665)', () => {
+  test('any parsed option is a success, whatever the finish reason', () => {
+    assert.deepEqual(assessNextRunOutcome([{ goal: 'g' }], 'stop'), { ok: true, truncated: false, reason: null });
+    // A reply that ran long but still yielded usable options is NOT a degradation:
+    // the options are real, so flagging them would cry wolf on a working page.
+    assert.deepEqual(assessNextRunOutcome([{ goal: 'g' }], 'length'), { ok: true, truncated: false, reason: null });
+  });
+
+  test('zero options with finish_reason length reports truncation', () => {
+    assert.deepEqual(assessNextRunOutcome([], 'length'), { ok: false, truncated: true, reason: 'truncated' });
+  });
+
+  test('zero options from a complete reply reports unparseable', () => {
+    assert.deepEqual(assessNextRunOutcome([], 'stop'), { ok: false, truncated: false, reason: 'unparseable' });
+    assert.deepEqual(assessNextRunOutcome([], null), { ok: false, truncated: false, reason: 'unparseable' });
+  });
+
+  test('is total — a missing/non-array options value degrades rather than throwing', () => {
+    assert.equal(assessNextRunOutcome(undefined, 'stop').ok, false);
+    assert.equal(assessNextRunOutcome(null, 'length').truncated, true);
+  });
+});
+
+describe('generateGoalSuggestions degraded signal (LIN-1665)', () => {
+  const realFetch = global.fetch;
+  const realError = console.error;
+  afterEach(() => { global.fetch = realFetch; console.error = realError; });
+
+  // finish_reason is a parameter here, unlike the always-'stop' helper above: the
+  // truncation case is the whole point.
+  function mockStreamResponse(text, finishReason = 'stop') {
+    const enc = new TextEncoder();
+    const blocks = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: finishReason }], usage: { completion_tokens: 3600 } })}\n\n`,
+      'data: [DONE]\n\n',
+    ];
+    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+  }
+
+  const ISSUES = [
+    { id: 'i1', identifier: 'LIN-1', title: 'In-flight work', state: { type: 'started' }, estimate: 2 },
+    { id: 'i2', identifier: 'LIN-2', title: 'Next up', state: { type: 'unstarted' }, estimate: 1 },
+  ];
+
+  // A real reply cut mid-document: a well-formed opening, two COMPLETE options, and
+  // no closing braces. extractJsonObject parses all-or-nothing, so every complete
+  // option ahead of the cut is discarded with the broken tail.
+  const TRUNCATED_REPLY =
+    '{"analysis":"Finish what is in flight before opening anything new.",' +
+    '"directions":[{"name":"finish started work","summary":"Close out what is in flight."},' +
+    '{"name":"open the queue","summary":"Start the next ranked item."}],' +
+    '"options":[{"title":"Finish LIN-1","goal":"Drive LIN-1 to completion.","reasoning":"WIP first.",' +
+    '"size":"M","referencedTaskIds":["LIN-1"],"direction":"finish started work"},' +
+    '{"title":"Start LIN-2","goal":"Open LIN-2 and get it to a reviewable state.","reasoning":"Next ranked.",' +
+    '"size":"S","referencedTaskIds":["LIN-2"],"direction":"open the qu';
+
+  async function generateFrom(raw, finishReason) {
+    console.error = () => {}; // the generator logs the collapse; keep test output clean
+    global.fetch = mock.fn(async () => mockStreamResponse(raw, finishReason));
+    return generateGoalSuggestions(
+      { projects: [], issues: ISSUES, organizationName: 'Acme' },
+      { apiKey: 'test-key', urlKey: 'acme' }
+    );
+  }
+
+  test('a truncated reply reproduces the reported page state AND flags it', async () => {
+    // The end-to-end regression for LIN-1665, asserting the user-visible outcome of
+    // the full buildNextRunMessages → streamChat → parse → fills → resolve pipeline.
+    const result = await generateFrom(TRUNCATED_REPLY, 'length');
+
+    // 1. The page still has something to offer — the fallback is preserved, not
+    //    replaced by an error. Exactly the reported shape: one fill per S/M/L plus
+    //    the open option, and every concrete card deterministic.
+    const concrete = result.options.filter(o => !o.continueUntilStopped);
+    assert.equal(result.options.length, 4);
+    assert.equal(concrete.length, 3);
+    assert.ok(concrete.every(o => o.synthesized), 'every concrete option should be a deterministic fill');
+    assert.deepEqual(concrete.map(o => o.size).sort(), [...REQUIRED_SIZES].sort());
+    const last = result.options[result.options.length - 1];
+    assert.equal(last.continueUntilStopped, true);
+    assert.equal(last.goal, '');
+    assert.equal(last.size, 'XL');
+
+    // 2. Grouped directions are genuinely absent — the fills carry no direction tag,
+    //    so this is the flat fallback, not a chooser rendered over nothing.
+    assert.deepEqual(result.directions, []);
+
+    // 3. …and the collapse is no longer silent. This is the whole bug: without it
+    //    the three assertions above are also true of a healthy ungrouped reply.
+    assert.deepEqual(result.degraded, { reason: 'truncated', truncated: true, finishReason: 'length' });
+  });
+
+  test('an unreadable but complete reply is flagged as unparseable, not truncated', async () => {
+    const result = await generateFrom('I could not do that. No JSON here.', 'stop');
+    assert.deepEqual(result.degraded, { reason: 'unparseable', truncated: false, finishReason: 'stop' });
+    assert.equal(result.options.length, 4);
+    assert.deepEqual(result.directions, []);
+  });
+
+  test('a healthy grouped generation carries degraded: null — no false positives', async () => {
+    const grouped = JSON.stringify({
+      analysis: 'a',
+      directions: [
+        { name: 'finish started work', summary: 'Close out what is in flight.' },
+        { name: 'open the queue', summary: 'Start the next ranked item.' },
+      ],
+      options: [
+        { goal: 'Finish LIN-1.', reasoning: 'r', size: 'M', title: 'Finish LIN-1', referencedTaskIds: ['LIN-1'], direction: 'finish started work' },
+        { goal: 'Start LIN-2.', reasoning: 'r', size: 'S', title: 'Start LIN-2', referencedTaskIds: ['LIN-2'], direction: 'open the queue' },
+      ],
+    });
+    const result = await generateFrom(grouped, 'stop');
+    assert.equal(result.degraded, null);
+    assert.ok(result.directions.length >= 2, 'the grouped path must still group');
+  });
+
+  test('a healthy UNGROUPED reply is not flagged — no grouping is not a failure', async () => {
+    // The documented A5 path (LIN-1566): a model may legitimately decline to declare
+    // directions. Flagging it would mislabel a working generation as broken.
+    const flat = JSON.stringify({
+      analysis: 'a',
+      options: [{ goal: 'Finish LIN-1.', reasoning: 'r', size: 'M', title: 'Finish LIN-1', referencedTaskIds: ['LIN-1'] }],
+    });
+    const result = await generateFrom(flat, 'stop');
+    assert.deepEqual(result.directions, []);
+    assert.equal(result.degraded, null);
+  });
+
+  test('the healthy response shape is otherwise unchanged (behavior preservation)', async () => {
+    const raw = JSON.stringify({ analysis: 'WIP first.', options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
+    const result = await generateFrom(raw, 'stop');
+    for (const key of ['analysis', 'directions', 'options', 'model', 'summary', 'context']) {
+      assert.ok(key in result, `missing pre-existing key ${key}`);
+    }
+    assert.equal(result.analysis, 'WIP first.');
+    assert.equal(result.summary, buildNextRunSummary(buildRoadmapModel([], ISSUES), 'Acme'));
+    assert.equal(result.context, formatNextRunContext(buildRoadmapModel([], ISSUES), 'Acme'));
   });
 });
