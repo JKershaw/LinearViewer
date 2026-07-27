@@ -448,6 +448,26 @@
   background: var(--raised);
 }
 
+/* ---- Archive ------------------------------------------------------------- */
+
+.lx-archive__link {
+  display: inline-block;
+  margin-top: var(--space-2);
+  padding: 0.7rem 1.4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text);
+  text-decoration: none;
+  font-family: var(--font-structural);
+  font-size: 0.9rem;
+}
+
+.lx-archive__link:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
 /* ---- Desktop: multi-column where it earns its keep ----------------------- */
 @media (min-width: 760px) {
   .landing-showcase {

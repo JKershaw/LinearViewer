@@ -8,6 +8,7 @@
  * - Serving static landing page for unauthenticated users
  */
 import 'dotenv/config'
+import path from 'node:path'
 import express from 'express'
 import { installAsyncErrorForwarding } from './lib/async-errors.js'
 
@@ -1191,6 +1192,21 @@ app.get('/privacy', (req, res) => {
 
 app.get('/terms', (req, res) => {
   res.send(renderTermsOfService({ deployInfo: getDeployInfo() }))
+})
+
+// =============================================================================
+// Archive Pages (public, no auth required)
+// =============================================================================
+// Numbered standalone HTML documents preserved verbatim under docs/archive/
+// (archive #1 is "The Harbour Archive" museum page, January–July 2026). Served
+// as-is: each file is a self-contained snapshot, so it bypasses the shared
+// shell/nav/footer deliberately. The :n(\d+) param keeps the lookup digits-only.
+app.get('/archive/:n(\\d+)', (req, res) => {
+  res.sendFile(`${req.params.n}.html`, { root: path.resolve('docs/archive') }, (err) => {
+    if (err && !res.headersSent) {
+      res.status(404).send(renderErrorPage('Not Found', `There is no archive #${req.params.n}.`))
+    }
+  })
 })
 
 // Static design-token reference + visual-regression baseline (LIN-457).
