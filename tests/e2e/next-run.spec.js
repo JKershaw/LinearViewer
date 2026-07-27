@@ -297,6 +297,30 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await expect(notice).not.toContainText('cut off');
     });
 
+    test('the notice does not outlive the run that produced it (LIN-1665)', async ({ page }) => {
+      // Degrade once, then let the next generation fail outright. The warning
+      // describes cards that are no longer on screen, so it must be gone — a stale
+      // amber notice sitting above a fresh error is its own misreport.
+      let calls = 0;
+      await page.route('**/api/next-run/suggest', async route => {
+        calls += 1;
+        if (calls === 1) {
+          const res = await route.fetch();
+          const body = await res.json();
+          body.degraded = { reason: 'truncated', truncated: true, finishReason: 'length' };
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+        }
+        return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Failed to generate suggestions' }) });
+      });
+
+      await page.locator('#next-run-generate').click();
+      await expect(page.locator('#next-run-degraded')).toBeVisible({ timeout: 5000 });
+
+      await page.locator('#next-run-generate').click();
+      await expect(page.locator('#next-run-feedback')).toHaveClass(/error/, { timeout: 5000 });
+      await expect(page.locator('#next-run-degraded')).toBeHidden();
+    });
+
     test('a healthy generation shows no degradation notice (LIN-1665)', async ({ page }) => {
       // The false-positive guard: the mock is a healthy generation and carries
       // degraded: null, so the notice must stay hidden through a normal run.

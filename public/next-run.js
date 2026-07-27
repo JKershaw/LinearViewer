@@ -453,8 +453,9 @@
   // still returns cards — the deterministic S/M/L fills plus continue-until-stopped —
   // and, because those fills carry no direction tag, no chooser. That is exactly what
   // a genuinely ungrouped-but-successful generation looks like, so without this the
-  // page presents a failed run as a normal one. Cleared on every generation, so a
-  // later healthy run removes a previous warning.
+  // page presents a failed run as a normal one. Cleared when a generation STARTS,
+  // not only when one returns: the notice describes the run that produced the cards
+  // on screen, so it must not outlive them into an in-flight or failed retry.
   function renderDegraded(degraded) {
     if (!degradedEl) return;
     if (!degraded) {
@@ -523,6 +524,7 @@
     generateBtn.disabled = true;
     generateBtn.textContent = 'generating…';
     setFeedback('');
+    renderDegraded(null);
 
     api('/workspace/' + encodeURIComponent(urlKey) + '/api/next-run/suggest', {
       method: 'POST',
