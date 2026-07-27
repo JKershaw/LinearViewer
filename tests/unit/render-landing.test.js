@@ -58,6 +58,14 @@ test('has a distinct Harbour OS section linking os.harbour.cat', () => {
   assert.match(html, /href="https:\/\/os\.harbour\.cat"/);
 });
 
+test('has an archive section linking the Harbour Archive at /archive/1', () => {
+  const html = renderLandingPage({});
+  assert.match(html, /data-testid="landing-archive"/);
+  assert.match(html, /href="\/archive\/1"/);
+  // Placed at the end of the showcase, after the Harbour OS section.
+  assert.ok(html.indexOf('data-testid="landing-os"') < html.indexOf('data-testid="landing-archive"'));
+});
+
 test('does NOT render the fake project-tree structure', () => {
   const html = renderLandingPage({});
   assert.ok(!html.includes('project-header'), 'no tree project headers');
