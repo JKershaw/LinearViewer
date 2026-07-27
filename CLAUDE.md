@@ -207,7 +207,7 @@ tests/
   screenshots/         Reference images for visual specs
   visual/              Playwright visual-regression specs
 docs/
-  archive/                     Numbered standalone HTML documents served verbatim at /archive/:n, public, linked from the landing page (archive #1 = "The Harbour Archive" museum page, Jan–Jul 2026)
+  archive/                     Numbered standalone HTML documents served verbatim at /archive/:n, public; the landing page links the latest (archives #1–#2 = first and second editions of "The Harbour Archive" museum page, Jan–Jul 2026)
   dispatch-integration.md      Dispatch consumer integration guide
   proxy-integration.md         Linear API proxy consumer integration guide
   prompt-change-validation.md  Prompt-behavior change validation process

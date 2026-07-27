@@ -58,10 +58,10 @@ test('has a distinct Harbour OS section linking os.harbour.cat', () => {
   assert.match(html, /href="https:\/\/os\.harbour\.cat"/);
 });
 
-test('has an archive section linking the Harbour Archive at /archive/1', () => {
+test('has an archive section linking the latest Harbour Archive edition', () => {
   const html = renderLandingPage({});
   assert.match(html, /data-testid="landing-archive"/);
-  assert.match(html, /href="\/archive\/1"/);
+  assert.match(html, /href="\/archive\/2"/);
   // Placed at the end of the showcase, after the Harbour OS section.
   assert.ok(html.indexOf('data-testid="landing-os"') < html.indexOf('data-testid="landing-archive"'));
 });
