@@ -33,7 +33,8 @@ import {
 } from '../../lib/prompts/roadmap-gap-template.js';
 import {
   buildRoadmapDigestMessages,
-  buildRoadmapDigestPrompt
+  buildRoadmapDigestPrompt,
+  summarizeRoadmapPosition
 } from '../../lib/prompts/roadmap-digest-template.js';
 
 // =============================================================================
@@ -495,6 +496,58 @@ describe('buildRoadmapDigestMessages (digest — synthesis layer)', () => {
     gap: 'Where they agree: onboarding. Where they diverge: none material. Questions: should mini-foreman serve intent-legibility?'
   };
 
+  // A model in the shape projectTimeline() actually produces (LIN-1110): every
+  // milestone carries the five forecast fields house policy keeps out of this
+  // layer. "Dormant Atlas" is listed FIRST and is the larger, further-along
+  // project — but it has nothing in flight, so the activity ranking must put
+  // "Harbour OS" ahead of it.
+  const POSITION_MODEL = {
+    velocity: { tasksPerWeek: 4, pointsPerWeek: 7 },
+    milestones: [
+      {
+        name: 'Dormant Atlas',
+        progressPercent: 90,
+        totalTasks: 20,
+        remainingTasks: 2,
+        completedTasks: 18,
+        tasksInQueue: [{ stateType: 'unstarted' }, { stateType: 'unstarted' }],
+        projectedStart: '2026-07-27T00:00:00.000Z',
+        projectedEnd: '2026-09-14T00:00:00.000Z',
+        weeksRemaining: 7,
+        confidenceLow: 4,
+        confidenceHigh: 10
+      },
+      {
+        name: 'Harbour OS',
+        progressPercent: 40,
+        totalTasks: 10,
+        remainingTasks: 6,
+        completedTasks: 4,
+        tasksInQueue: [
+          { stateType: 'started' },
+          { stateType: 'unstarted', subtasks: [{ stateType: 'started' }] },
+          { stateType: 'unstarted' }
+        ],
+        projectedStart: '2026-07-27T00:00:00.000Z',
+        projectedEnd: '2026-11-02T00:00:00.000Z',
+        weeksRemaining: 14,
+        confidenceLow: 10,
+        confidenceHigh: 18
+      }
+    ],
+    criticalPaths: new Map([
+      ['Harbour OS', { path: ['a', 'b', 'c'], length: 3, blockers: ['a'] }],
+      ['Dormant Atlas', { path: [], length: 0, blockers: [] }]
+    ])
+  };
+
+  // Prose inputs deliberately free of dates and week-words, so a leak assertion
+  // over the whole message cannot false-fail on the layers being synthesised.
+  const LEAK_SAFE_INPUTS = {
+    technical: 'Shipped the onboarding flow. Two tasks are blocked on review.',
+    product: 'Harbour OS consolidates the new-user pathway.'
+  };
+
   test('returns [system, user] messages array', () => {
     const messages = buildRoadmapDigestMessages(FULL_INPUTS);
     assert.ok(Array.isArray(messages));
@@ -516,13 +569,15 @@ describe('buildRoadmapDigestMessages (digest — synthesis layer)', () => {
       'digest should explicitly forbid field labels in the output');
   });
 
-  test('covers the five story beats including a heading/direction beat (LIN-416)', () => {
+  test('covers the six story beats including position and the two split forces (LIN-1110)', () => {
     const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
     assert.ok(/what we shipped|shipped/i.test(system), 'should cover what shipped');
-    assert.ok(/where we are/i.test(system), 'should cover where we are now');
+    assert.ok(/where we are along the roadmap|roadmap position/i.test(system),
+      'should cover where we are along the roadmap (the new position beat)');
     assert.ok(/where this is heading|direction of travel|heading/i.test(system),
-      'should cover where the work is heading (the new beat)');
-    assert.ok(/the one risk|single most important risk/i.test(system), 'should cover the one risk');
+      'should cover where the work is heading');
+    assert.ok(/pulling us sideways/i.test(system), 'should cover what is pulling us sideways');
+    assert.ok(/slowing us down/i.test(system), 'should cover what is slowing us down');
     assert.ok(/the one decision|single open question/i.test(system), 'should cover the one decision');
   });
 
@@ -548,11 +603,33 @@ describe('buildRoadmapDigestMessages (digest — synthesis layer)', () => {
       'digest must not emit a reasoning block — it is a clean lede');
   });
 
-  test('THE RISK slot unifies delivery risk and alignment/drift risk', () => {
+  test('splits the risk beat into sideways pull and delivery friction, each with its own sources (LIN-1110)', () => {
     const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
-    assert.ok(/unif/i.test(system), 'should instruct unifying the two risk kinds');
-    assert.ok(/delivery risk/i.test(system) && /(alignment|drift)/i.test(system),
-      'should name both delivery risk and alignment/drift risk');
+
+    // The two forces are separate beats now, not one unified risk sentence.
+    assert.ok(!/unif/i.test(system), 'must not still instruct unifying the two risk kinds');
+
+    const sideways = system.match(/- What's pulling us sideways:[^\n]*/)?.[0];
+    const friction = system.match(/- What's slowing us down:[^\n]*/)?.[0];
+    assert.ok(sideways, 'should carry a distinct pulling-us-sideways beat');
+    assert.ok(friction, 'should carry a distinct slowing-us-down beat');
+
+    // Each names its own sources: sideways ← north-star reading / gap analysis,
+    // slowing-down ← the technical narrative.
+    assert.ok(/north.star reading/i.test(sideways) && /gap analysis/i.test(sideways),
+      'sideways beat should draw from the north-star reading and the gap analysis');
+    assert.ok(/(alignment|drift)/i.test(sideways), 'sideways beat should be the alignment force');
+    assert.ok(/technical narrative/i.test(friction),
+      'slowing-down beat should draw from the technical narrative');
+    assert.ok(/blocker|stale|bottleneck/i.test(friction),
+      'slowing-down beat should be the delivery-friction force');
+
+    // Two beats create two slots to fill — the anti-manufacture escape must be
+    // present in EACH, or the split trades one vague risk for two invented ones.
+    assert.ok(/do not manufacture one/i.test(sideways),
+      'sideways beat must keep the do-not-manufacture escape');
+    assert.ok(/do not manufacture one/i.test(friction),
+      'slowing-down beat must keep the do-not-manufacture escape');
   });
 
   test('THE DECISION slot escalates the open question without answering it', () => {
@@ -561,10 +638,25 @@ describe('buildRoadmapDigestMessages (digest — synthesis layer)', () => {
       'should ask for the open decision and forbid answering it');
   });
 
-  test('caps length for a scannable lede', () => {
-    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
-    assert.ok(/150 words|under ~150|brevity/i.test(system),
-      'should cap the digest to a short lede');
+  test('states the same length budget in BOTH messages, and the old cap in neither (LIN-1110)', () => {
+    // The budget lives twice — once in the system prompt, once in the user
+    // message's closing line — in two different messages. A guard that reads
+    // only messages[0] lets them drift, which is how the old ~150 could have
+    // survived at the user end while the system prompt said 250.
+    const [system, user] = buildRoadmapDigestMessages(FULL_INPUTS).map(m => m.content);
+
+    assert.ok(/250/.test(system), 'system prompt should state the ~250-word target');
+    assert.ok(/250/.test(user), 'user message should state the ~250-word target');
+    assert.ok(/320/.test(system), 'system prompt should state the ~320-word ceiling');
+
+    // Phrase-matched, not a bare /150/, so an unrelated future number cannot
+    // false-fail this.
+    assert.ok(!/~?\s*150\s*words/i.test(system) && !/~?\s*150\s*words/i.test(user),
+      'the old ~150-word cap must be gone from both messages');
+
+    // The number is derived from this intent sentence; they must stay together.
+    assert.ok(/absorb in under a minute/i.test(system),
+      'the governing "under a minute" intent must survive the re-derivation');
   });
 
   test('user message embeds the prior layers it synthesises', () => {
@@ -580,7 +672,7 @@ describe('buildRoadmapDigestMessages (digest — synthesis layer)', () => {
     assertCrossCuttingRules(buildRoadmapDigestMessages(FULL_INPUTS)[0].content, 'digest');
   });
 
-  test('degrades cleanly with no north star (risk from delivery only)', () => {
+  test('degrades cleanly with no north star (sideways beat suppressed, friction only) (LIN-1110)', () => {
     const messages = buildRoadmapDigestMessages({
       technical: SAMPLE_TECH,
       product: SAMPLE_PRODUCT,
@@ -589,13 +681,179 @@ describe('buildRoadmapDigestMessages (digest — synthesis layer)', () => {
     });
     const system = messages[0].content;
     const user = messages[1].content;
-    assert.ok(/no north star is set/i.test(system),
-      'system should acknowledge the missing north star and adjust the risk/decision slots');
-    assert.ok(/delivery risk only/i.test(system),
-      'system should tell it to draw the risk from delivery only');
+
+    // The sideways beat draws EXCLUSIVELY from the north-star reading and the
+    // gap analysis, neither of which exists here — so it is suppressed, not
+    // redrawn from delivery signals. The beat bullet itself stays in THE STORY
+    // TO TELL unconditionally by design, so /pulling us sideways/ alone proves
+    // nothing: the discriminating assertion is the skip instruction inside the
+    // no-north-star clause, matched as one clause rather than three loose ORs.
+    const clause = system.match(/- No north star is set[^\n]*/)?.[0];
+    assert.ok(clause, 'system should acknowledge the missing north star');
+    assert.ok(/skip[^\n]*pulling us sideways|pulling us sideways[^\n]*(skip|omit)/i.test(clause),
+      'the clause must tell the model to skip the pulling-us-sideways beat');
+    assert.ok(/omit it rather than drawing it from delivery/i.test(clause),
+      'suppression must be explicit about not substituting delivery signals');
+    assert.ok(/no alignment decision is forced/i.test(clause),
+      'the decision half of the clause must survive unchanged in substance');
+    assert.ok(/slowing us down/i.test(clause),
+      'the delivery-friction beat still applies and should be said so');
+
+    // The abolished wording must not coexist with the new rule.
+    assert.ok(!/delivery risk only/i.test(system),
+      'the old unified "delivery risk only" instruction must be gone');
+
     // The user message must not fabricate empty NS sections.
     assert.ok(!/NORTH STAR READING/.test(user), 'should omit the ns-reading section when absent');
     assert.ok(!/GAP ANALYSIS/.test(user), 'should omit the gap section when absent');
+  });
+
+  // ---------------------------------------------------------------------------
+  // The deterministic position input (LIN-1110)
+  // ---------------------------------------------------------------------------
+
+  test('embeds a deterministic position block when a roadmap model is supplied (LIN-1110)', () => {
+    const [system, user] = buildRoadmapDigestMessages({ ...FULL_INPUTS, roadmapModel: POSITION_MODEL })
+      .map(m => m.content);
+
+    assert.ok(/ROADMAP POSITION \(deterministic/.test(user),
+      'user message should carry a labelled deterministic position section');
+    assert.ok(/Harbour OS: 40% complete \(4\/10 tasks done, 6 remaining, 2 in progress\)/.test(user),
+      'position block should carry the whitelisted current-state counts');
+    assert.ok(/Harbour OS: 3 tasks deep, 1 blockers/.test(user),
+      'position block should carry critical-path depth from the Map');
+    assert.ok(!/Dormant Atlas: 0 tasks deep/.test(user),
+      'critical paths of length <= 1 are not meaningful and must be filtered out');
+
+    // Deterministic ground truth precedes the prose interpreting it.
+    assert.ok(user.indexOf('ROADMAP POSITION') < user.indexOf('TECHNICAL NARRATIVE'),
+      'the position section must be ordered first');
+
+    // The beat is told to use the figures, and told what it may never do with them.
+    assert.ok(/citing at least one concrete number/i.test(system),
+      'position beat should require a concrete figure when one is available');
+    assert.ok(/NEVER turn these figures into a date, an ETA, a number of weeks remaining/i.test(system),
+      'position beat must forbid converting the figures into a forecast');
+  });
+
+  test('ranks the position block by activity, not input order or size (LIN-1110)', () => {
+    const block = summarizeRoadmapPosition(POSITION_MODEL);
+    const names = block.split('\n')
+      .map(l => l.match(/^ {2}(.+?):/)?.[1])
+      .filter(n => n === 'Harbour OS' || n === 'Dormant Atlas');
+
+    // "Dormant Atlas" is listed first in the model and is bigger and further
+    // along; "Harbour OS" has work in flight, so it must lead.
+    assert.strictEqual(names[0], 'Harbour OS', 'the most active project must be ranked first');
+    assert.ok(names.includes('Dormant Atlas'), 'the other projects are still listed');
+
+    // The prompt is what enforces brevity over the ranked list.
+    const system = buildRoadmapDigestMessages({ ...FULL_INPUTS, roadmapModel: POSITION_MODEL })[0].content;
+    assert.ok(/lead with the first project named there/i.test(system),
+      'the prompt should tell the model to lead with the ranked-first project');
+    assert.ok(/do not enumerate a percentage for every project/i.test(system),
+      'the prompt should forbid listing every project');
+  });
+
+  test('the position whitelist leaks no forecast field (LIN-1110)', () => {
+    const block = summarizeRoadmapPosition(POSITION_MODEL);
+    const [system, user] = buildRoadmapDigestMessages({ ...LEAK_SAFE_INPUTS, roadmapModel: POSITION_MODEL })
+      .map(m => m.content);
+    const both = `${system}\n${user}`;
+
+    // Field names and their values — neither may reach the prompt.
+    for (const key of ['projectedStart', 'projectedEnd', 'weeksRemaining', 'confidenceLow', 'confidenceHigh']) {
+      assert.ok(!both.includes(key), `forecast field name "${key}" must not reach the prompt`);
+    }
+    for (const value of ['2026-09-14', '2026-11-02', '2026-07-27']) {
+      assert.ok(!both.includes(value), `projected date "${value}" must not reach the prompt`);
+    }
+    assert.ok(!/\d{4}-\d{2}-\d{2}/.test(both), 'no ISO-date-shaped string may reach the prompt');
+
+    // "weeks" is asserted against the BLOCK, not the whole prompt: the system
+    // prompt legitimately uses the word inside its own prohibition.
+    assert.ok(!/week/i.test(block), 'the position block must carry no week counts');
+    assert.ok(!/confidence/i.test(block), 'the position block must carry no confidence range');
+    assert.ok(!/tasksPerWeek|pointsPerWeek/.test(both),
+      'velocity is excluded — a rate invites forecasting by arithmetic');
+  });
+
+  test('softens the position beat and omits the section when there is no model (LIN-1110)', () => {
+    const cases = [
+      ['no roadmapModel', {}],
+      ['empty milestones', { roadmapModel: { milestones: [] } }],
+      ['empty model', { roadmapModel: {} }]
+    ];
+
+    for (const [label, extra] of cases) {
+      const messages = buildRoadmapDigestMessages({ ...FULL_INPUTS, ...extra });
+      assert.strictEqual(messages.length, 2, `${label}: still a valid two-message array`);
+      const [system, user] = messages.map(m => m.content);
+
+      assert.ok(!/ROADMAP POSITION/.test(user),
+        `${label}: must never emit an empty labelled position section`);
+      assert.ok(/where we are along the roadmap/i.test(system),
+        `${label}: the position beat is softened, not dropped`);
+      assert.ok(/describe it qualitatively/i.test(system),
+        `${label}: the softened beat should read position from the prose`);
+      assert.ok(/Do not state figures you were not given/i.test(system),
+        `${label}: the softened beat must forbid inventing figures`);
+    }
+  });
+
+  test('composes the two degradations independently — no north star AND no position (LIN-1110)', () => {
+    const [system, user] = buildRoadmapDigestMessages({
+      technical: SAMPLE_TECH,
+      product: SAMPLE_PRODUCT,
+      trajectory: SAMPLE_TRAJECTORY
+      // no northStar / nsReading / gap, and no roadmapModel — the furthest
+      // degradation: the fresh-workspace shape, a five-beat delivery-only digest
+      // with a prose-sourced position beat.
+    }).map(m => m.content);
+
+    const clause = system.match(/- No north star is set[^\n]*/)?.[0];
+    assert.ok(clause && /skip/i.test(clause), 'sideways beat suppressed');
+    assert.ok(/describe it qualitatively/i.test(system), 'position beat softened');
+    assert.ok(!/ROADMAP POSITION/.test(user), 'no position section');
+    assert.ok(/slowing us down/i.test(system), 'the friction beat survives both degradations');
+    assert.ok(/what we shipped/i.test(system) && /the one decision/i.test(system),
+      'the remaining beats are unaffected');
+  });
+
+  test('caps the position block at five projects with a tail line (LIN-1110)', () => {
+    const many = {
+      milestones: Array.from({ length: 7 }, (_, i) => ({
+        name: `Project ${i}`,
+        progressPercent: i * 10,
+        totalTasks: 10,
+        remainingTasks: 10 - i,
+        completedTasks: i
+      }))
+    };
+    const block = summarizeRoadmapPosition(many);
+    const projectLines = block.split('\n').filter(l => /^ {2}Project \d/.test(l));
+
+    assert.strictEqual(projectLines.length, 5, 'at most five projects are listed');
+    assert.ok(/\+2 more projects not listed/.test(block), 'the remainder collapses to a tail line');
+  });
+
+  test('summarizeRoadmapPosition is total — never throws, returns "" when empty (LIN-1110)', () => {
+    assert.strictEqual(summarizeRoadmapPosition(undefined), '');
+    assert.strictEqual(summarizeRoadmapPosition(null), '');
+    assert.strictEqual(summarizeRoadmapPosition({}), '');
+    assert.strictEqual(summarizeRoadmapPosition({ milestones: [] }), '');
+    assert.strictEqual(summarizeRoadmapPosition({ milestones: null, criticalPaths: null }), '');
+
+    // A milestone missing every field must still render rather than throw.
+    const bare = summarizeRoadmapPosition({ milestones: [{}] });
+    assert.ok(/Untitled: 0% complete \(0\/0 tasks done, 0 remaining, 0 in progress\)/.test(bare));
+
+    // criticalPaths as a plain object is handled identically to a Map.
+    const asObject = summarizeRoadmapPosition({
+      criticalPaths: { 'Harbour OS': { length: 4 } }
+    });
+    assert.ok(/Harbour OS: 4 tasks deep, 0 blockers/.test(asObject),
+      'plain-object criticalPaths and a missing blockers array both degrade');
   });
 
   test('backward-compatible buildRoadmapDigestPrompt returns a string', () => {

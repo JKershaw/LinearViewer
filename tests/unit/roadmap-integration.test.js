@@ -21,6 +21,7 @@ import {
 import { renderRoadmapPage } from '../../lib/render-roadmap.js';
 import { summarizeRoadmapModel, buildRoadmapNarrativeMessages, buildRoadmapNarrativePrompt } from '../../lib/prompts/roadmap-narrative-template.js';
 import { buildRoadmapChatMessages, buildRoadmapChatPrompt } from '../../lib/prompts/roadmap-chat-template.js';
+import { summarizeRoadmapPosition } from '../../lib/prompts/roadmap-digest-template.js';
 
 // =============================================================================
 // Shared test data factory
@@ -860,6 +861,67 @@ describe('prompt pipeline end-to-end', () => {
     assert.strictEqual(messages[1].content, 'How is Beta going?');
     assert.strictEqual(messages[2].content, 'Beta has 1 remaining task.');
     assert.strictEqual(messages[3].content, 'What blocks it?');
+  });
+});
+
+// =============================================================================
+// Anti-forecast guard: real projectTimeline output → digest position block
+// =============================================================================
+
+describe('summarizeRoadmapPosition against a real model (LIN-1110)', () => {
+  // The digest layer is governed by a standing no-forecast policy, and the
+  // milestones it derives its position block from are projectTimeline() output,
+  // which carries projectedStart / projectedEnd / weeksRemaining /
+  // confidenceLow / confidenceHigh. The template's own unit tests prove the
+  // whitelist against a hand-built fixture; this proves it against whatever
+  // projectTimeline actually produces today, so a sixth projection field added
+  // later fails here rather than silently leaking. It matters more than usual
+  // because the roadmap e2e spec runs in testMode, which returns the mock layer
+  // before buildMessages() is ever called — no e2e test can reach this path.
+  function realTimedModel() {
+    const projects = [{ id: 'proj-1', name: 'Alpha' }];
+    const issues = [
+      createIssue({ completedAt: daysAgo(3), state: { name: 'Done', type: 'completed' } }),
+      createIssue({ completedAt: daysAgo(9), state: { name: 'Done', type: 'completed' } }),
+      createIssue({ completedAt: daysAgo(20), state: { name: 'Done', type: 'completed' } }),
+      createIssue({ state: { name: 'In Progress', type: 'started' } }),
+      createIssue({ state: { name: 'Todo', type: 'unstarted' } }),
+      createIssue({ state: { name: 'Todo', type: 'unstarted' } })
+    ];
+    // Local mirror helper: buildRoadmapModel(issues, projects) — argument order
+    // is reversed relative to lib/roadmap.js's real buildRoadmapModel(projects,
+    // issues). It calls the REAL projectTimeline, which is the point.
+    return buildRoadmapModel(issues, projects);
+  }
+
+  test('the fixture genuinely carries forecast fields (the guard has teeth)', () => {
+    const model = realTimedModel();
+    const milestone = model.milestones[0];
+    assert.ok(milestone, 'fixture should produce a milestone');
+    for (const field of ['projectedStart', 'projectedEnd', 'weeksRemaining', 'confidenceLow', 'confidenceHigh']) {
+      assert.ok(field in milestone, `real projectTimeline output should carry ${field}`);
+    }
+    assert.ok(milestone.weeksRemaining > 0, 'fixture should have a non-trivial projection to leak');
+  });
+
+  test('emits current-state position and no forecast from real projectTimeline output', () => {
+    const model = realTimedModel();
+    const milestone = model.milestones[0];
+    const block = summarizeRoadmapPosition(model);
+
+    // It actually said something — otherwise the assertions below are vacuous.
+    assert.ok(block.includes('Alpha'), 'position block should name the project');
+    assert.ok(/\d+% complete \(\d+\/\d+ tasks done, \d+ remaining, \d+ in progress\)/.test(block),
+      'position block should carry the whitelisted current-state counts');
+
+    for (const field of ['projectedStart', 'projectedEnd', 'weeksRemaining', 'confidenceLow', 'confidenceHigh']) {
+      assert.ok(!block.includes(field), `forecast field name "${field}" must not reach the prompt`);
+    }
+    assert.ok(!block.includes(milestone.projectedEnd), 'the projected end date must not reach the prompt');
+    assert.ok(!block.includes(milestone.projectedStart), 'the projected start date must not reach the prompt');
+    assert.ok(!/\d{4}-\d{2}-\d{2}/.test(block), 'no ISO-date-shaped string may reach the prompt');
+    assert.ok(!/week/i.test(block), 'no week count may reach the prompt');
+    assert.ok(!/confidence/i.test(block), 'no confidence range may reach the prompt');
   });
 });
 

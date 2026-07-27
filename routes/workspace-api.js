@@ -3405,7 +3405,11 @@ ${goal}`
               product: product.text,
               trajectory: trajectory.text || '',
               nsReading: nsReading.text || '',
-              gap: gap.text || ''
+              gap: gap.text || '',
+              // LIN-1110: the digest's deterministic position input. Serialized
+              // to a whitelisted current-state slice inside the template, so
+              // this stays one property and no derivation logic lands here.
+              roadmapModel
             })
           });
         }

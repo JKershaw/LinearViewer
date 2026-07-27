@@ -109,7 +109,7 @@ calls.
 3a. Trajectory    summary + tech + product → trajectory   ┐ run in
 3b. North Star    summary + north_star     → ns_reading   ┘ either order
 4. Gap            north_star + trajectory + ns_reading → gap
-5. Digest         tech + product + trajectory + ns_reading + gap (+ north_star) → digest   (generates last, renders first)
+5. Digest         tech + product + trajectory + ns_reading + gap (+ north_star) (+ position) → digest   (generates last, renders first)
 ```
 
 Each output is streamed to the UI as it generates. Partial states are sensible products: if layer N fails or has not run yet, layers 1..N-1 still ship.
@@ -192,24 +192,34 @@ Added after the original five-layer design, the digest is the answer to a
 structural problem the five layers created: five full-length, equal-weight
 sections in pipeline order, with the most actionable finding (the gap) buried
 last and no top-level read for someone who wants the picture in under a minute.
-The digest reads *all* the layers above it and tells the story of where the
-project stands as a short connected narrative — a few flowing paragraphs, not a
-labelled form. It weaves five beats into one throughline:
+The digest reads *all* the layers above it — and, since LIN-1110, one
+deterministic input of its own — and tells the story of where the project stands
+as a short connected narrative — a few flowing paragraphs, not a labelled form.
+It weaves six beats into one throughline:
 
 - **what we shipped** — what was actually delivered (headline, not a list).
-- **where we are now** — the current state of the work.
+- **where we are along the roadmap** — position against the plan: how far
+  through the work we are, what is in flight, the shape of it right now. This is
+  the one beat with a deterministic source — a compact position block derived
+  from the roadmap model (see the LIN-1110 note below). Position, never ETA.
 - **where this is heading** — the (hedged) direction of travel, drawn from the
   trajectory layer; the one beat that answers "are we close / what's our
   heading?" at the top of the page. Earned optimism about the far outlook is
   allowed; dates and numeric forecasts are not.
-- **the one risk** — the single most important risk, deliberately *unifying* the
-  two notions of risk that otherwise live apart: delivery risk (blockers, stale
-  or unassigned critical-path work — surfaced in layer 1) and alignment risk
-  (drift — surfaced in layers 3b/4). It names which kind it is.
+- **what's pulling us sideways** — the alignment force: drift away from the north
+  star, competing pulls, scope moving away from stated intent. Sourced
+  *exclusively* from the north-star reading and the gap analysis (layers 3b/4).
+- **what's slowing us down** — the delivery friction: blockers, stale or
+  unassigned critical-path work, bottlenecks. Sourced from layer 1.
 - **the one decision** — the open question the human must adjudicate, hoisted out
   of the gap analysis's "questions this raises" (where it was a buried
   parenthetical) to the top of the page. It states the question; it does not
   answer it.
+
+Each force beat carries its own "if there is genuinely no material force here,
+say so plainly — do not manufacture one" escape. Two beats create two slots to
+fill, so the escape has to be stated per beat or the split trades one vague risk
+sentence for two invented ones.
 
 > **Update (LIN-416): narrative lede, not a four-slot form.** The digest was
 > originally a rigid form emitting four verbatim labelled slots (`SHIPPED:` /
@@ -224,6 +234,55 @@ labelled form. It weaves five beats into one throughline:
 > empirical read is untouched; the digest just inherits trajectory's existing
 > aspirational license for the far outlook.
 
+> **Update (LIN-1110): narrative and roadmap-focused — six beats, ~250 words,
+> and the layer's first deterministic input.** The ask recurred three weeks
+> after LIN-416: the lede was still too compressed to orient a reader, and it
+> could not reliably say where the work stood. Three changes, this layer only.
+>
+> **The risk beat split in two.** "The one risk" forced one force where the
+> report explicitly asked for several, and it collapsed two genuinely different
+> questions — *what is pulling us sideways* (alignment) and *what is slowing us
+> down* (delivery) — into one sentence. They are now separate beats with
+> separate sources. The old "name which kind it is" instruction is deliberately
+> dropped: with separate beats the beat itself carries the kind, and keeping it
+> produced label-like prose in a layer whose whole point is that it does not read
+> as a form.
+>
+> **The length target moved with the beat count**, from ~150 words to ~250 with
+> a hard ceiling of ~320. The number is *derived*, not drifted: the governing
+> intent — "a lede a busy reader can absorb in under a minute" — is unchanged and
+> stays adjacent to the number in the prompt, and six beats at ~40 words each is
+> where it lands. If a reviewer later trims a beat, the budget should move with
+> it. The budget is stated in **two messages** (system and user), so a guard on
+> it has to read both.
+>
+> **The digest now receives model data.** This is the first time this layer has
+> — the "reads *all* the layers above it" framing needs that qualifier. Position
+> facts previously reached the digest only if layer 1 happened to mention a
+> percentage, which was non-deterministic on precisely the fact the ticket
+> existed to guarantee, and invited the model to invent a number under pressure
+> to fill the beat. `buildRoadmapDigestMessages` takes one new optional input,
+> `roadmapModel`, and `summarizeRoadmapPosition()` (in the digest template, with
+> the layer that consumes it) serializes a compact position block: per project
+> name, progress percent, done/total/remaining and in-progress count, plus
+> critical-path depth. Projects are ranked deterministically by **activity, not
+> size** (in-progress desc → remaining desc → percent desc → name asc), capped at
+> five with a "+N more" tail, and the prompt tells the model to lead with the
+> first and give the rest at most a clause — determinism in the serializer,
+> brevity in the prompt.
+>
+> **The whitelist is load-bearing.** The milestones that block is derived from
+> are `projectTimeline()` output, so they carry `projectedStart`,
+> `projectedEnd`, `weeksRemaining`, `confidenceLow` and `confidenceHigh` —
+> exactly the numbers house policy forbids here. The serializer therefore reads
+> a **whitelist** of fields by name; never a blacklist, never a spread, which
+> would leak the next projection field anyone adds. Velocity is excluded for the
+> same reason one step removed: a rate invites forecasting by arithmetic. Two
+> tests pin this — one against a hand-built fixture, one against real
+> `projectTimeline` output in `roadmap-integration.test.js`. The latter is not
+> optional: the roadmap e2e spec runs in `testMode`, which returns the mock layer
+> *before* `buildMessages()` is called, so no e2e test can reach this code.
+
 Two deliberate differences from the other layers:
 
 - **It generates last but renders first.** It needs every layer above as input,
@@ -237,10 +296,34 @@ Two deliberate differences from the other layers:
   slot-filling) but to print only the lede, because a reasoning dump at the very
   top of the page would defeat the "legible at a glance" purpose.
 
-Degradation: with no north star there is no ns_reading or gap, so THE RISK draws
-on delivery risk only and THE DECISION reports that no alignment decision is
-forced. The digest still runs from layers 1/2/3a. It needs at least layers 1 and
-2 to have produced content; if they failed, the digest is skipped.
+Degradation: the digest has two optional inputs, and they degrade
+**independently** — neither branch nests inside the other.
+
+- **No north star** → no ns_reading and no gap, which are the *only* sources for
+  the "what's pulling us sideways" beat. That beat is therefore **suppressed
+  outright**, leaving a five-beat, delivery-only digest, and the decision beat
+  reports that no alignment decision is forced. It is deliberately *not* redrawn
+  from delivery signals or from parallel project activity: sideways pull is a
+  claim about intent, and inferring it from anything else is exactly the
+  manufactured risk the per-beat escape exists to prevent.
+- **No position data** (no model passed, no projects, or nothing meaningful in
+  it) → no labelled position section is emitted at all, and the position beat
+  **softens** to prose-sourced, with an explicit instruction not to state figures
+  it was not given. Softened, not dropped: the layers below can still support a
+  qualitative read, and a fresh workspace's digest should still say where things
+  stand.
+
+Both absent at once — the fresh-workspace shape — is the furthest degradation: a
+five-beat, delivery-only, prose-sourced-position digest. The digest still runs
+from layers 1/2/3a. It needs at least layers 1 and 2 to have produced content; if
+they failed, the digest is skipped.
+
+Projection policy: this layer is now covered by the same house rule as the
+narrative layer, enforced by a second mechanism. `PROJECTION_RISK_TYPES`
+(`roadmap-narrative-template.js`) filters *risk types* out of layer 1's summary;
+the digest's position whitelist (`summarizeRoadmapPosition`) keeps *milestone
+forecast fields* out of the synthesis layer. Two arms of one policy on different
+data — they should not be merged or made to import each other.
 
 Cost note: the digest is a sixth LLM call, so a full run consumes one more
 free-tier unit than before. Acceptable for an occasional, button-driven feature.
