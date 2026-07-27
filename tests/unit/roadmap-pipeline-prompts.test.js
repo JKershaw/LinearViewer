@@ -569,16 +569,42 @@ describe('buildRoadmapDigestMessages (digest — synthesis layer)', () => {
       'digest should explicitly forbid field labels in the output');
   });
 
-  test('covers the six story beats including position and the two split forces (LIN-1110)', () => {
-    const system = buildRoadmapDigestMessages(FULL_INPUTS)[0].content;
-    assert.ok(/what we shipped|shipped/i.test(system), 'should cover what shipped');
-    assert.ok(/where we are along the roadmap|roadmap position/i.test(system),
-      'should cover where we are along the roadmap (the new position beat)');
-    assert.ok(/where this is heading|direction of travel|heading/i.test(system),
-      'should cover where the work is heading');
-    assert.ok(/pulling us sideways/i.test(system), 'should cover what is pulling us sideways');
-    assert.ok(/slowing us down/i.test(system), 'should cover what is slowing us down');
-    assert.ok(/the one decision|single open question/i.test(system), 'should cover the one decision');
+  test('covers the six story beats in ALL THREE carriers of the beat list (LIN-1110)', () => {
+    // The beat enumeration lives in three places — THINK FIRST and THE STORY TO
+    // TELL in the system prompt, and the user message's closing line — and two of
+    // them went stale silently once already (the plan's Addition 4). A guard that
+    // reads only the system message, or only the STORY block, lets the other two
+    // drift back to the old five beats while the suite stays green. So each
+    // carrier is extracted and asserted on its own.
+    const [system, user] = buildRoadmapDigestMessages(FULL_INPUTS).map(m => m.content);
+
+    const carriers = {
+      'THINK FIRST line': system.match(/THINK FIRST[^\n]*/)?.[0],
+      'THE STORY TO TELL block': system.match(/THE STORY TO TELL[\s\S]*?\n\nRULES:/)?.[0],
+      'user message closing line': user.match(/Write the at-a-glance lede:[\s\S]*$/)?.[0]
+    };
+
+    // Beats are phrased slightly differently per carrier (first person in the
+    // bullets, third person in THINK FIRST), so match the beat, not the wording.
+    const beats = [
+      [/shipped/i, 'what shipped'],
+      [/along the roadmap|roadmap position|where the work stands/i, 'where we are along the roadmap'],
+      [/is heading|direction of travel/i, 'where this is heading'],
+      [/pulling (us|it) sideways/i, "what's pulling us sideways"],
+      [/slowing (us|it) down/i, "what's slowing us down"],
+      [/the one decision/i, 'the one decision']
+    ];
+
+    for (const [name, text] of Object.entries(carriers)) {
+      assert.ok(text, `should still carry a ${name} to assert the beat list against`);
+      for (const [pattern, beat] of beats) {
+        assert.ok(pattern.test(text), `${name} should cover "${beat}"`);
+      }
+      // The split is part of the same drift surface: no carrier may fall back to
+      // the single pre-LIN-1110 risk beat.
+      assert.ok(!/the one risk/i.test(text),
+        `${name} must not still enumerate the old unified "the one risk" beat`);
+    }
   });
 
   test('reasons internally but does not print the reasoning (LIN-416)', () => {
