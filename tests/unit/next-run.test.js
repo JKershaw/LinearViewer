@@ -37,7 +37,7 @@ import {
   NEXT_RUN_PROSE_MAX_TOKENS,
 } from '../../lib/next-run.js';
 import { buildRoadmapModel } from '../../lib/roadmap.js';
-import { DEFAULT_MODEL, REASONING_MIN_TOKENS } from '../../lib/openrouter.js';
+import { DEFAULT_MODEL } from '../../lib/openrouter.js';
 
 const MODEL = {
   velocity: { tasksPerWeek: 3.5, pointsPerWeek: 8, trend: 'increasing' },
@@ -1103,10 +1103,10 @@ describe('generateGoalSuggestions directions (LIN-1566)', () => {
 // tokens were billed inside, parsed all-or-nothing to zero options, then refilled
 // deterministically with no signal that anything had failed.
 //
-// These cover both halves: the reasoning-budget split on the request, and the
-// degradation signal on the response.
+//   These cover two things: the bare `max_tokens` cap on the request, and the
+//   degradation signal on the response.
 
-describe('generateGoalSuggestions reasoning budget (LIN-1665)', () => {
+describe('generateGoalSuggestions request budget (LIN-1665)', () => {
   const realFetch = global.fetch;
   afterEach(() => { global.fetch = realFetch; });
 
@@ -1135,33 +1135,30 @@ describe('generateGoalSuggestions reasoning budget (LIN-1665)', () => {
     return sent;
   }
 
-  test('reserves reasoning headroom ON TOP of the prose budget for a reasoning model', async () => {
-    // The defect: 1600 was the WHOLE completion budget, and a gpt-5.x model bills
-    // its hidden reasoning inside it — measured 516 reasoning tokens, JSON cut
-    // mid-document. The prose budget must now survive the reasoning run.
+  test('uses a bare max_tokens with no reasoning field — the provider does not honour reasoning.max_tokens', async () => {
+    // The defect: sending `reasoning: {max_tokens: N}` to gpt-5.4-mini switches
+    // reasoning ON (the model otherwise spends 0), and the field is advisory, not
+    // a cap — OpenRouter ignores it and the run consumes the entire `max_tokens`
+    // emitting zero characters. The fix: a bare cap, no `reasoning` field.
     const body = await capturedBody(DEFAULT_MODEL);
-    assert.deepEqual(body.reasoning, { max_tokens: REASONING_MIN_TOKENS });
-    assert.equal(body.max_tokens, NEXT_RUN_PROSE_MAX_TOKENS + REASONING_MIN_TOKENS);
-    assert.ok(body.max_tokens > NEXT_RUN_PROSE_MAX_TOKENS, 'prose budget must not be the whole cap');
+    assert.equal('reasoning' in body, false);
+    assert.equal(body.max_tokens, NEXT_RUN_PROSE_MAX_TOKENS);
   });
 
-  test('the default model IS the reasoning path — no model argument, same split', async () => {
-    // routes/next-run.js can resolve to the default; a fix that only applied to an
-    // explicitly-passed model would leave the common path unfixed.
+  test('the default path (no explicit model) is the same — no reasoning field, bare cap', async () => {
     const body = await capturedBody(null);
     assert.equal(body.model, DEFAULT_MODEL);
-    assert.deepEqual(body.reasoning, { max_tokens: REASONING_MIN_TOKENS });
+    assert.equal('reasoning' in body, false);
+    assert.equal(body.max_tokens, NEXT_RUN_PROSE_MAX_TOKENS);
   });
 
-  test('a non-reasoning model keeps a bare max_tokens — request body unchanged', async () => {
-    // Behavior preservation: the split is opt-in per model. A model with no hidden
-    // reasoning must not receive an unsupported `reasoning` field or a widened cap.
+  test('a non-reasoning model also gets a bare cap — same request shape bar the model id', async () => {
     const body = await capturedBody('anthropic/claude-opus-4.8');
     assert.equal('reasoning' in body, false);
     assert.equal(body.max_tokens, NEXT_RUN_PROSE_MAX_TOKENS);
   });
 
-  test('an explicit maxTokens is still honoured as the PROSE budget', async () => {
+  test('an explicit maxTokens is honoured as the cap', async () => {
     let sent = null;
     global.fetch = mock.fn(async (_url, init) => { sent = JSON.parse(init.body); return mockStreamResponse(REPLY); });
     await generateGoalSuggestions(
