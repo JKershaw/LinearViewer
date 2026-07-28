@@ -114,7 +114,7 @@ describe('flattenIssue', () => {
 });
 
 describe('flattenIssue attachments (LIN-649)', () => {
-  test('maps formal Linear attachment nodes to the canonical shape, dropping url', () => {
+  test('maps formal Linear attachment nodes to the canonical shape with url (LIN-1673)', () => {
     const issue = {
       id: 'i1',
       description: '',
@@ -125,11 +125,28 @@ describe('flattenIssue attachments (LIN-649)', () => {
     };
     flattenIssue(issue);
     assert.deepStrictEqual(issue.attachments, [
-      { id: 'att:att-1', title: 'screenshot', contentType: 'image/png', kind: 'image' },
-      { id: 'att:att-2', title: 'spec', contentType: null, kind: 'file' },
+      { id: 'att:att-1', title: 'screenshot', contentType: 'image/png', kind: 'image', url: 'https://uploads.linear.app/a/b.png' },
+      { id: 'att:att-2', title: 'spec', contentType: null, kind: 'file', url: 'https://example.com/spec.pdf' },
     ]);
-    // No backend url leaks onto any attachment.
-    assert.ok(issue.attachments.every(a => !('url' in a)), 'no url on attachments');
+    // Formal attachments carry url; md: attachments do not (tested separately below).
+    assert.ok(issue.attachments.every(a => 'url' in a), 'url present on formal attachments');
+  });
+
+  test('formal attachment url is not gated on the relay allowlist (LIN-1673)', () => {
+    const issue = {
+      id: 'i1',
+      description: '',
+      attachments: { nodes: [
+        { id: 'att-gh', title: 'PR #11', url: 'https://github.com/x/y/pull/11' },
+        { id: 'att-figma', title: 'Designs', url: 'https://www.figma.com/file/abc/def' },
+      ] },
+    };
+    flattenIssue(issue);
+    assert.strictEqual(issue.attachments.length, 2);
+    assert.strictEqual(issue.attachments[0].url, 'https://github.com/x/y/pull/11',
+      'off-allowlist url still projected — metadata, not relay');
+    assert.strictEqual(issue.attachments[1].url, 'https://www.figma.com/file/abc/def',
+      'Figma/Drive/Slack urls projected — projection never gates on the relay SSRF allowlist');
   });
 
   test('extracts a markdown-embedded image from the description (host-anchored, LIN-770)', () => {
@@ -179,6 +196,16 @@ describe('flattenIssue attachments (LIN-649)', () => {
     assert.strictEqual('attachments' in issue, false);
   });
 
+  test('omits url on markdown attachments (narrower policy — lin-1673 only widens att:)', () => {
+    const issue = {
+      id: 'i1',
+      attachments: { nodes: [] },
+      description: '![pasted](https://uploads.linear.app/a/shot.jpg) and [spec.md](https://uploads.linear.app/b/spec)',
+    };
+    flattenIssue(issue);
+    assert.strictEqual(issue.attachments.length, 2);
+    assert.ok(issue.attachments.every(a => !('url' in a)), 'url absent on md: attachments — narrower policy');
+  });
   test('attachment normalization is idempotent', () => {
     const issue = {
       id: 'i1',
@@ -362,7 +389,7 @@ describe('collectIssueAttachments — pure provider-agnostic collector (LIN-771)
       { id: 'att-9', title: 't', url: 'https://uploads.linear.app/b.gif' },
     ] });
     assert.deepStrictEqual(flat, [
-      { id: 'att:att-9', title: 't', contentType: 'image/gif', kind: 'image' },
+      { id: 'att:att-9', title: 't', contentType: 'image/gif', kind: 'image', url: 'https://uploads.linear.app/b.gif' },
     ]);
   });
 

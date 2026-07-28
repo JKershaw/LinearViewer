@@ -2788,6 +2788,27 @@ describe('cross-path Attachments section parity (LIN-772)', () => {
     );
   });
 
+  test('the section tells agents that formal attachments carry url metadata (LIN-1673)', () => {
+    const section = formatAttachmentsSection(ctxWith);
+    assert.ok(
+      /`att:`.*attachments.*carry.*`url`|`url`.*`att:`/i.test(section),
+      'tells agents that formal att: attachments carry a url field'
+    );
+    assert.ok(
+      /ATTACHMENT_HOST_NOT_ALLOWED/.test(section),
+      'names the specific error code an agent sees when the relay blocks a host'
+    );
+    assert.ok(
+      /`md:`.*do not carry `url`/i.test(section),
+      'explicitly states md: attachments do not carry url — narrower policy, not blanket'
+    );
+    assert.ok(
+      /`id` routes the relay.*`url` names the target/i.test(section) ||
+      /`id`.*routes.*relay.*`url`.*names.*target/i.test(section),
+      'distinguishes id (relay fetch handle) from url (target identifier)'
+    );
+  });
+
   test('section self-gates to empty for absent / non-array / handle-less input', () => {
     assert.strictEqual(formatAttachmentsSection(), '', 'no context → empty');
     assert.strictEqual(formatAttachmentsSection({}), '', 'no attachments field → empty');
