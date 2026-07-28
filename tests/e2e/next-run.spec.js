@@ -257,6 +257,78 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       // The panel shows the deterministic grounding blob (velocity line is always present).
       await expect(body).toContainText('Velocity');
     });
+
+    // LIN-1665: a generation whose reply could not be parsed still returns cards —
+    // deterministic S/M/L fills plus continue-until-stopped, and no chooser, because
+    // fills carry no direction tag. That is pixel-identical to a healthy ungrouped
+    // generation, so the page has to say which one it is looking at.
+    test('a degraded generation is called out above the fallback cards (LIN-1665)', async ({ page }) => {
+      // Serve the real mock's shape with the wire flag the collapsed live path sets.
+      await page.route('**/api/next-run/suggest', async route => {
+        const res = await route.fetch();
+        const body = await res.json();
+        body.degraded = { reason: 'truncated', truncated: true, finishReason: 'length' };
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.locator('#next-run-generate').click();
+      const notice = page.locator('#next-run-degraded');
+      await expect(notice).toBeVisible({ timeout: 5000 });
+      await expect(notice).toContainText('cut off');
+      await expect(notice).toContainText('deterministic fallbacks');
+
+      // The notice REPLACES nothing: the options are still offered, so a degraded
+      // generation is still a usable page rather than a dead end.
+      await expect(page.locator('.next-run-option').first()).toBeVisible();
+    });
+
+    test('an unparseable degradation reads differently from a truncated one (LIN-1665)', async ({ page }) => {
+      await page.route('**/api/next-run/suggest', async route => {
+        const res = await route.fetch();
+        const body = await res.json();
+        body.degraded = { reason: 'unparseable', truncated: false, finishReason: 'stop' };
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.locator('#next-run-generate').click();
+      const notice = page.locator('#next-run-degraded');
+      await expect(notice).toBeVisible({ timeout: 5000 });
+      await expect(notice).toContainText('could not be read');
+      await expect(notice).not.toContainText('cut off');
+    });
+
+    test('the notice does not outlive the run that produced it (LIN-1665)', async ({ page }) => {
+      // Degrade once, then let the next generation fail outright. The warning
+      // describes cards that are no longer on screen, so it must be gone — a stale
+      // amber notice sitting above a fresh error is its own misreport.
+      let calls = 0;
+      await page.route('**/api/next-run/suggest', async route => {
+        calls += 1;
+        if (calls === 1) {
+          const res = await route.fetch();
+          const body = await res.json();
+          body.degraded = { reason: 'truncated', truncated: true, finishReason: 'length' };
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+        }
+        return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Failed to generate suggestions' }) });
+      });
+
+      await page.locator('#next-run-generate').click();
+      await expect(page.locator('#next-run-degraded')).toBeVisible({ timeout: 5000 });
+
+      await page.locator('#next-run-generate').click();
+      await expect(page.locator('#next-run-feedback')).toHaveClass(/error/, { timeout: 5000 });
+      await expect(page.locator('#next-run-degraded')).toBeHidden();
+    });
+
+    test('a healthy generation shows no degradation notice (LIN-1665)', async ({ page }) => {
+      // The false-positive guard: the mock is a healthy generation and carries
+      // degraded: null, so the notice must stay hidden through a normal run.
+      await expect(page.locator('#next-run-degraded')).toBeHidden();
+      await page.locator('#next-run-generate').click();
+      await expect(page.locator('.next-run-option').first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('#next-run-degraded')).toBeHidden();
+    });
   });
 
   // LIN-1566: goal options are grouped under a small set of named directions —
@@ -710,6 +782,11 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       // Invariant 3: the open-ended option is in no direction.
       const openIndex = body.options.findIndex(o => o.continueUntilStopped);
       expect(flat).not.toContain(openIndex);
+
+      // LIN-1665: same parity reason — the healthy mock carries the healthy VALUE of
+      // the degradation flag rather than omitting the key, so a client that reads it
+      // is exercised against the shape the live generator actually returns.
+      expect(body.degraded).toBeNull();
     });
   });
 });

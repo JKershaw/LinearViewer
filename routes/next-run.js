@@ -111,7 +111,11 @@ function buildMockResponse() {
   const analysis = 'Started work is the priority to keep WIP low; the queue then offers the next ranked item, and a larger direction is available if there is appetite for it.';
   const context = formatNextRunContext(roadmapModel, 'Test Workspace');
   const summary = buildNextRunSummary(roadmapModel, 'Test Workspace');
-  return { analysis, directions, options, context, summary };
+  // The mock is a healthy generation, so it carries the healthy value of the
+  // degradation signal (LIN-1665) rather than omitting the key — same shape-parity
+  // reason `directions` is resolved above: a mock missing the field would let the
+  // degraded-path assertions pass against a response the live path never returns.
+  return { analysis, directions, options, context, summary, degraded: null };
 }
 
 /**
