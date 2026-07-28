@@ -357,8 +357,9 @@ Response includes full context: description, comments, children, parent, relatio
     "attachments": [{ "id": "md:aHR0cHM6…", "title": "screenshot", "contentType": "image/png", "kind": "image" }]
   }],
   "attachments": [
-    { "id": "att:uuid", "title": "design.png", "contentType": "image/png", "kind": "image" },
-    { "id": "att:uuid", "title": "spec.pdf", "contentType": null, "kind": "file" }
+    { "id": "att:uuid", "title": "design.png", "contentType": "image/png", "kind": "image", "url": "https://cdn.linear.app/y/design.png" },
+    { "id": "att:uuid", "title": "PR #11", "contentType": null, "kind": "file", "url": "https://github.com/x/y/pull/11" },
+    { "id": "att:uuid", "title": "spec.pdf", "contentType": null, "kind": "file", "url": null }
   ]
 }
 ```
@@ -371,16 +372,17 @@ The task and each comment may carry an `attachments` array. It is **omitted enti
 
 | Field | Meaning |
 |-------|---------|
-| `id` | Opaque, server-resolvable handle (see below). **Not** a URL. |
+| `id` | Opaque, server-resolvable handle (see below). **Not** a URL — hand it to the relay, don't dereference it. |
 | `title` | Human label (`null` when none). |
 | `contentType` | MIME type when known (e.g. `image/png`), else `null`. |
 | `kind` | `"image"` or `"file"`. |
+| `url` | The attachment's target URL — present on `att:`-prefixed handles only (formal attachment entities); `null` when unavailable. Absent on `md:`-prefixed handles (markdown-embedded images/files). |
 
 Attachments come from three sources, all normalized into the same shape: **formal attachment entities** on the issue (handle prefix `att:`); **markdown-embedded images** (`![](…)`, filtered to image extensions); and **markdown-linked non-image files** (`[text](…)`, e.g. `[spec.md](…)`/`[App.jsx](…)`) pointing at a Linear upload host (handle prefix `md:`, `kind: "file"`, `contentType: null`). Both markdown sources are discovered in the issue description and in comment bodies (the backend has no per-comment attachment entity, so comments carry only the markdown kinds).
 
 Because upload URLs are **extension-less**, a file link's type can't be known at discovery time — `contentType` is `null` and `kind` is `"file"`; the relay (below) is the sole type-gate, so an attachment can be discovered yet rejected at relay if its type isn't on the allowlist.
 
-Following the no-deep-link policy, **no attachment exposes a backend URL** — the `id` is an opaque handle, not a link you can dereference. Fetch the bytes through the Bearer-authed, server-side relay below, which resolves the handle and streams the bytes; treat `id` as something to hand back to that relay, not as something to GET directly.
+Following the wire policy, **formal (`att:`) attachments carry a `url` field** identifying the link target (LIN-1673) — metadata that lets an agent identify where a link attachment points even when the relay blocks the host. **Markdown (`md:`) attachments do not carry `url`** — their source is embedded in the opaque handle. Regardless of handle kind, the `id` is always an opaque handle, not a link you can dereference. Fetch the bytes through the Bearer-authed, server-side relay below, which resolves the handle and streams the bytes; treat `id` as something to hand back to that relay, not as something to GET directly.
 
 ##### Fetch Attachment Bytes (relay)
 
