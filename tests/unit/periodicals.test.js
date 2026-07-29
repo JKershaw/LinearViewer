@@ -9,22 +9,23 @@ import { PERIODICALS, getPeriodicals, buildPeriodicalNodes, withAutopilotTail, P
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
 describe('periodicals registry', () => {
-  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, Design & Interface, Performance / Scale, Data & Fetch Architecture, and Integration & Surface Maturity (14 templates)', () => {
-    assert.strictEqual(PERIODICALS.length, 14);
+  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, Design & Interface, Performance / Scale, Data & Fetch Architecture, Integration & Surface Maturity, and Onboarding & Cold-Start (15 templates)', () => {
+    assert.strictEqual(PERIODICALS.length, 15);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains the 11 corrective reviews plus the advisory Stability Review, Recent Headwinds report, and Integration & Surface Maturity review', () => {
+  test('contains the 12 corrective reviews plus the advisory Stability Review, Recent Headwinds report, and Integration & Surface Maturity review', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
     // id -> [title, mode]. The code-surface / supply-chain / interface /
-    // performance / data reviews are 'corrective' (they mint fix-tasks); the
-    // Stability Review (LIN-453), the Recent Headwinds report (LIN-542), and
-    // Integration & Surface Maturity (LIN-1336) are the three 'advisory'
-    // entries — trajectory or portfolio governors that report for a human
-    // to act on. The Design & Interface Review (LIN-520) is corrective with an
-    // advisory tail: it mints fix-tasks for objective breakage only. The
+    // performance / data / onboarding reviews are 'corrective' (they mint
+    // fix-tasks); the Stability Review (LIN-453), the Recent Headwinds report
+    // (LIN-542), and Integration & Surface Maturity (LIN-1336) are the three
+    // 'advisory' entries — trajectory or portfolio governors that report for
+    // a human to act on. The Design & Interface Review (LIN-520) and the
+    // Onboarding & Cold-Start Review (LIN-1689) are corrective with an
+    // advisory tail: each mints fix-tasks for objective breakage only. The
     // Performance / Scale Review (LIN-1038) is corrective at the measured-symptom
     // altitude; the Data & Fetch Architecture review (LIN-1039) is corrective at
     // the static-cause altitude behind it.
@@ -42,7 +43,8 @@ describe('periodicals registry', () => {
       'design-review': ['Design & Interface Review', 'corrective'],
       'performance-scale': ['Performance / Scale Review', 'corrective'],
       'data-fetch-architecture': ['Data & Fetch Architecture', 'corrective'],
-      'integration-surface-maturity': ['Integration & Surface Maturity', 'advisory']
+      'integration-surface-maturity': ['Integration & Surface Maturity', 'advisory'],
+      'onboarding-journey': ['Onboarding & Cold-Start Review', 'corrective']
     };
 
     for (const [id, [title, mode]] of Object.entries(expected)) {
@@ -936,6 +938,77 @@ describe('Integration & Surface Maturity specifics (LIN-1336)', () => {
     assert.match(prompt, /META surface/i);
     assert.match(prompt, /self-audit/i);
     assert.match(prompt, /Low confidence/i);
+  });
+});
+
+describe('Onboarding & Cold-Start Review specifics (LIN-1689)', () => {
+  const template = PERIODICALS.find(t => t.id === 'onboarding-journey');
+  const prompt = template.generatePrompt();
+
+  test('is a corrective review, with an advisory tail, whose evidence is a performed walk', () => {
+    assert.strictEqual(template.mode, 'corrective');
+    assert.match(prompt, /performed cold-start journey/i);
+    assert.match(prompt, /zero state/i);
+    assert.match(prompt, /proceeded/i);
+    assert.match(prompt, /had to guess/i);
+    assert.match(prompt, /hard-block/i);
+  });
+
+  test('pins the destination from the project\'s own stated purpose and treats a change as a reportable delta', () => {
+    assert.match(prompt, /project's own stated purpose/i);
+    assert.match(prompt, /freeze/i);
+    assert.match(prompt, /reportable delta/i);
+  });
+
+  test('simulates first-time use and logs every reach outside the journey surface as a finding', () => {
+    assert.match(prompt, /simulate first-time/i);
+    assert.match(prompt, /not an enforced sandbox|discipline, not/i);
+    assert.match(prompt, /\breach\b/i);
+    assert.match(prompt, /finding in its own right/i);
+  });
+
+  test('separates hard blocks from friction and marks credential/browser-gated steps capability-gated', () => {
+    assert.match(prompt, /hard block/i);
+    assert.match(prompt, /friction/i);
+    assert.match(prompt, /capability-gated/i);
+    assert.match(prompt, /browser/i);
+    assert.match(prompt, /credential/i);
+  });
+
+  test('does not assume funnel telemetry exists', () => {
+    assert.match(prompt, /funnel telemetry/i);
+    assert.match(prompt, /do not assume/i);
+  });
+
+  test('names the "Mind the altitude" deferrals so it does not double-flag its siblings', () => {
+    assert.match(prompt, /Design & Interface Review/);
+    assert.match(prompt, /Documentation Review/);
+    assert.match(prompt, /Comprehension-Debt Review/);
+    assert.match(prompt, /Integration & Surface Maturity/);
+    assert.match(prompt, /do not double-flag/i);
+  });
+
+  test('mints fix-tasks for objective breakage only, keeps subjective friction advisory', () => {
+    assert.match(prompt, /objective breakage/i);
+    assert.match(prompt, /top ~3 by severity/i);
+  });
+
+  test('stays project-agnostic: entry paths are framed as illustrative examples, not this project\'s baked-in journeys', () => {
+    assert.match(prompt, /illustrative examples/i);
+    assert.match(prompt, /hosted or signed-up visitor/i);
+  });
+
+  test('trend-aware: delta framing, first-run baseline, trend ledger', () => {
+    assert.match(prompt, /trend-aware/i);
+    assert.match(prompt, /new, unchanged, improved, worsened, or resolved/i);
+    assert.match(prompt, /point-in-time snapshot/i);
+    assert.match(prompt, /baseline/i);
+    assert.match(prompt, /trend ledger/i);
+  });
+
+  test('stays general: no file literals or repo-specific symbols leak in', () => {
+    assert.doesNotMatch(prompt, /harbour\.cat|OAuth|linear\.app/i);
+    assert.doesNotMatch(prompt, /docs\/north-star/i);
   });
 });
 
