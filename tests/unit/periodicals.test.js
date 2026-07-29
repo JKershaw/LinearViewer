@@ -87,7 +87,7 @@ describe('periodicals registry', () => {
 // `review` forever (LIN-386), so the task now ends itself.
 //
 // One half of the Stage-2 contract — *minting a bounded set of follow-up tasks*
-// — is shared only by the 11 CORRECTIVE reviews, which turn findings into
+// — is shared only by the 12 CORRECTIVE reviews, which turn findings into
 // fix-work. The advisory reviews (Stability, Recent Headwinds, Integration &
 // Surface Maturity) deliberately mint NO follow-ups: each is a governor that
 // hands its read to a human. So the follow-up-creation assertion is scoped to
@@ -144,7 +144,7 @@ describe('shared two-stage contract (all periodicals)', () => {
       });
 
       // LIN-700: the Stage-1 scaffold scopes by discovery, not recall. These
-      // four pins lock the four generic wordings across all 12 builders (the
+      // four pins lock the four generic wordings across all 15 builders (the
       // shared helper/vocab renders each once, so the loop covers every one).
       test('LIN-700: Stage 1 scopes by discovery from three sources, not recall', () => {
         assert.match(prompt, /from what you discover, not from what a review/i);
@@ -991,6 +991,16 @@ describe('Onboarding & Cold-Start Review specifics (LIN-1689)', () => {
   test('mints fix-tasks for objective breakage only, keeps subjective friction advisory', () => {
     assert.match(prompt, /objective breakage/i);
     assert.match(prompt, /top ~3 by severity/i);
+    // The minting bullet must name onboarding's OWN breakage classes, not the
+    // Design & Interface Review's — otherwise the corrective half is pointed
+    // at territory the altitude bullet above just deferred away.
+    assert.match(prompt, /dead link/i);
+    assert.match(prompt, /documented command that doesn't exist/i);
+    assert.match(prompt, /hard-blocks with no workaround/i);
+    assert.match(prompt, /404\/500 mid-journey/i);
+    assert.doesNotMatch(prompt, /contrast failure/i);
+    assert.doesNotMatch(prompt, /mobile overflow/i);
+    assert.doesNotMatch(prompt, /subjective design-direction call/i);
   });
 
   test('stays project-agnostic: entry paths are framed as illustrative examples, not this project\'s baked-in journeys', () => {
