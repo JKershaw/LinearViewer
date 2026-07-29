@@ -672,26 +672,6 @@
     };
   }
 
-  // First-paint fit zoom (LIN-1221 F1). Mirror of lib/ship-layout.js
-  // computeFitZoom — pick the largest scale at which the content box fits the
-  // viewport (with padding), clamped to [minZoom, maxZoom]; never zoom IN on
-  // fit (maxZoom default 1). Keep in sync with the pure version.
-  function computeFitZoom(opts) {
-    var contentWidth = opts.contentWidth, contentHeight = opts.contentHeight;
-    var availWidth = opts.availWidth, availHeight = opts.availHeight;
-    var pad = opts.pad === undefined ? 24 : opts.pad;
-    var minZoom = opts.minZoom === undefined ? 0.3 : opts.minZoom;
-    var maxZoom = opts.maxZoom === undefined ? 1 : opts.maxZoom;
-    if (!(contentWidth > 0) || !(contentHeight > 0) ||
-        !(availWidth > 0) || !(availHeight > 0)) {
-      return Math.min(1, maxZoom);
-    }
-    var usableW = Math.max(1, availWidth - 2 * pad);
-    var usableH = Math.max(1, availHeight - 2 * pad);
-    var raw = Math.min(usableW / contentWidth, usableH / contentHeight);
-    return Math.max(minZoom, Math.min(maxZoom, raw));
-  }
-
   // =============================================================================
   // Card markup (matches swim's .swim-box)
   // =============================================================================
@@ -699,6 +679,7 @@
   // Canonical client escaper lives in common.js (window.escapeHtml, LIN-422),
   // loaded before this file on the ship page.
   const escapeHtml = window.escapeHtml;
+  const computeFitZoom = window.computeFitZoom;
 
   function stateIndicator(stateType) {
     if (isTerminalState(stateType)) return '<span class="swim-box-state done status-pill__char status-pill--done">✓</span>';
