@@ -333,7 +333,7 @@ a.swipe-relation-issue:hover {
 .swipe-relation-done { color: var(--green); }
 .swipe-relation-in-progress { color: var(--yellow); }
 .swipe-relation-todo { color: var(--fg-dim); }
-.swipe-relation-backlog { color: var(--fg-vdim); }
+.swipe-relation-backlog { color: var(--slate-dim); }
 
 /* Expandable Accordion Sections — grouped into Details / Insights / Work
    clusters (LIN-1224) so the stack reads as three scannable groups instead of

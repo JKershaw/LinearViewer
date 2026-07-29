@@ -80,14 +80,14 @@
 }
 
 .collective-char-kind {
-  color: var(--fg-vdim);
+  color: var(--fg-dim);
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   text-transform: lowercase;
 }
 
 .collective-char-none {
-  color: var(--fg-vdim);
+  color: var(--fg-dim);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
   margin: 0 0 var(--space-2);
@@ -140,7 +140,7 @@
 }
 
 .collective-preset-seats {
-  color: var(--fg-vdim);
+  color: var(--fg-dim);
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   flex: 1;
@@ -152,7 +152,7 @@
 }
 
 .collective-preset-none {
-  color: var(--fg-vdim);
+  color: var(--fg-dim);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
   margin: 0;
@@ -184,16 +184,15 @@
   align-self: flex-start;
 }
 
-/* Retained per-page variant of the canonical empty state (LIN-476, Phase B.1).
-   The markup now composes `.emptyState <variant>` via renderEmptyState(); the
-   base carries only `color: var(--fg-dim)`. Collective's look genuinely diverges
-   (vdim foreground, mono, sm) so every declaration below is a real override or
-   net-new — none duplicate the base, so nothing is removed. The class names also
-   survive as hooks (`collective.js` toggles `.hidden` on the transcript empty by
-   id; this rule keeps the byte-identical visual treatment). */
+/* Retained per-page variant of the canonical empty state (LIN-476, Phase B.1,
+     LIN-1680). The markup composes `.emptyState <variant>` via
+   renderEmptyState(); the base carries the correct `color: var(--fg-dim)`.
+   Collective's look genuinely diverges (font-content, sm) so the font-family and
+   font-size below are real overrides — the color override was removed in LIN-1680
+   so the base's readable color cascades through. The class names also survive as
+   hooks (`collective.js` toggles `.hidden` on the transcript empty by id). */
 .collective-empty,
 .collective-transcript-empty {
-  color: var(--fg-vdim);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
 }

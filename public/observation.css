@@ -138,7 +138,7 @@
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--faint);
+  color: var(--fg-dim);
 }
 
 /* Active-section eyebrow live running count (LIN-929) — `Active · N running`.
@@ -771,7 +771,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
 }
 .obs-act-raw { font-family: var(--font-structural); font-size: 0.76rem; color: var(--muted); }
 /* §6.3: an empty burst ("no tools") reads quietly — no chip fill, dimmed. */
-.obs-act-idle { background: transparent; padding-left: 0; padding-right: 0; color: var(--faint); }
+.obs-act-idle { background: transparent; padding-left: 0; padding-right: 0; color: var(--fg-dim); }
 
 /* Produced-artifacts (net-new): icon-led links out to the evidence. */
 .obs-artifacts { list-style: none; margin: 0.15rem 0 0; padding: 0; }

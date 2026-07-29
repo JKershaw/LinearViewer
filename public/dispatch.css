@@ -193,7 +193,7 @@
   font-family: var(--font-structural);
   font-size: 1em;
   line-height: 1;
-  color: var(--fg-vdim);
+  color: var(--fg-dim);
 }
 
 .queue-recent-star.is-favorite {

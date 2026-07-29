@@ -302,7 +302,7 @@
 }
 
 .proxy-collapsible-count {
-  color: var(--fg-vdim);
+  color: var(--fg-dim);
 }
 
 .proxy-collapsible[open] > .proxy-collapsible-summary {
