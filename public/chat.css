@@ -114,7 +114,7 @@
 
 /* Trailing timestamp, used by row/log-style turns. */
 .chat-msg__time {
-  color: var(--fg-vdim);
+  color: var(--fg-dim);
   flex-shrink: 0;
   font-size: var(--font-size-sm);
 }
@@ -149,7 +149,7 @@
 .chat-note {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  color: var(--fg-vdim);
+  color: var(--fg-dim);
   padding-left: var(--space-2);
   white-space: pre-wrap;
   word-break: break-word;

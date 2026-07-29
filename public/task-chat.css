@@ -106,7 +106,6 @@
 }
 
 .task-chat-empty {
-  color: var(--fg-vdim);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
 }
@@ -169,7 +168,6 @@
 
 .task-chat-saved-empty,
 .task-chat-saved-unavailable {
-  color: var(--fg-vdim);
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
 }
