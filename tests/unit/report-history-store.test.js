@@ -286,3 +286,78 @@ describe('ReportHistoryStore.clear', () => {
     assert.strictEqual((await store.list('ws-2')).total, 1);
   });
 });
+
+describe('ReportHistoryStore.listFull', () => {
+  let store;
+  beforeEach(() => { store = new ReportHistoryStore({ collection: createMockCollection() }); });
+
+  test('returns newest-first order', async () => {
+    const a = await store.save('ws-1', {
+      model: 'm', northStar: 'first', narrative: sampleNarrative('a'),
+      orientation: [{ identifier: 'LIN-1', bearing: 'N', reason: 'r', archived: false }]
+    });
+    store.collection._docs.find(d => d._id === a.id).generatedAt = new Date(Date.now() - 20000);
+    const b = await store.save('ws-1', {
+      model: 'm', northStar: 'second', narrative: sampleNarrative('b'),
+      orientation: [{ identifier: 'LIN-2', bearing: 'S', reason: 'r', archived: false }]
+    });
+    store.collection._docs.find(d => d._id === b.id).generatedAt = new Date(Date.now() - 10000);
+    const c = await store.save('ws-1', {
+      model: 'm', northStar: 'third', narrative: sampleNarrative('c'),
+      orientation: [{ identifier: 'LIN-3', bearing: 'E', reason: 'r', archived: false }]
+    });
+
+    const result = await store.listFull('ws-1');
+    assert.strictEqual(result.length, 3);
+    assert.strictEqual(result[0].id, c.id);
+    assert.strictEqual(result[1].id, b.id);
+    assert.strictEqual(result[2].id, a.id);
+  });
+
+  test('includes empty-orientation runs, newest position preserved', async () => {
+    const older = await store.save('ws-1', {
+      model: 'm', northStar: 'old', narrative: sampleNarrative('old'),
+      orientation: [{ identifier: 'LIN-1', bearing: 'N', reason: 'r', archived: false }]
+    });
+    store.collection._docs.find(d => d._id === older.id).generatedAt = new Date(Date.now() - 10000);
+    // Newest run — but saved with no bearings (degraded: no north star / free tier / stream failure)
+    const newest = await store.save('ws-1', {
+      model: 'm', northStar: 'new', narrative: sampleNarrative('new'), orientation: []
+    });
+
+    const result = await store.listFull('ws-1');
+    assert.strictEqual(result.length, 2);
+    // Newest-first: the empty-orientation run is the newest and must be first
+    assert.strictEqual(result[0].id, newest.id);
+    assert.deepStrictEqual(result[0].orientation, []);
+    assert.strictEqual(result[1].id, older.id);
+    assert.strictEqual(result[1].orientation.length, 1);
+  });
+
+  test('empty workspace returns empty array', async () => {
+    const result = await store.listFull('ws-empty');
+    assert.deepStrictEqual(result, []);
+  });
+
+  test('returns full records — narrative and orientation present', async () => {
+    await store.save('ws-1', {
+      model: 'anthropic/claude-x',
+      northStar: 'aim',
+      narrative: sampleNarrative('x'),
+      orientation: [{ identifier: 'LIN-1', bearing: 'N', reason: 'direct', archived: false }]
+    });
+
+    const result = await store.listFull('ws-1');
+    assert.strictEqual(result.length, 1);
+    const rec = result[0];
+    assert.strictEqual(rec.model, 'anthropic/claude-x');
+    assert.strictEqual(rec.northStar, 'aim');
+    assert.strictEqual(rec.narrative.technical, 'tech x');
+    assert.strictEqual(rec.narrative.product, 'product x');
+    assert.strictEqual(rec.narrative.trajectory, 'trajectory x');
+    assert.strictEqual(rec.narrative.northStarReading, 'ns reading x');
+    assert.strictEqual(rec.narrative.gap, 'gap x');
+    assert.strictEqual(rec.orientation.length, 1);
+    assert.strictEqual(rec.orientation[0].bearing, 'N');
+  });
+});
