@@ -185,13 +185,12 @@
 }
 
 /* Retained per-page variant of the canonical empty state (LIN-476, Phase B.1,
-     LIN-1680). The markup now composes `.emptyState <variant>` via
+     LIN-1680). The markup composes `.emptyState <variant>` via
    renderEmptyState(); the base carries the correct `color: var(--fg-dim)`.
    Collective's look genuinely diverges (font-content, sm) so the font-family and
    font-size below are real overrides — the color override was removed in LIN-1680
    so the base's readable color cascades through. The class names also survive as
-   hooks (`collective.js` toggles `.hidden` on the transcript empty by id; this
-   rule keeps the byte-identical visual treatment). */
+   hooks (`collective.js` toggles `.hidden` on the transcript empty by id). */
 .collective-empty,
 .collective-transcript-empty {
   font-family: var(--font-content);
