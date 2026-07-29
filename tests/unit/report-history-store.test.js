@@ -360,4 +360,27 @@ describe('ReportHistoryStore.listFull', () => {
     assert.strictEqual(rec.orientation.length, 1);
     assert.strictEqual(rec.orientation[0].bearing, 'N');
   });
+
+  test('scopes by workspace', async () => {
+    const a = await store.save('ws-1', {
+      model: 'm', northStar: 'ws1', narrative: sampleNarrative('ws1'),
+      orientation: [{ identifier: 'LIN-1', bearing: 'N', reason: 'r', archived: false }]
+    });
+    store.collection._docs.find(d => d._id === a.id).generatedAt = new Date(Date.now() - 10000);
+    const b = await store.save('ws-1', {
+      model: 'm', northStar: 'ws1b', narrative: sampleNarrative('ws1b'),
+      orientation: [{ identifier: 'LIN-2', bearing: 'S', reason: 'r', archived: false }]
+    });
+    await store.save('ws-2', {
+      model: 'm', northStar: 'ws2', narrative: sampleNarrative('ws2'),
+      orientation: [{ identifier: 'LIN-3', bearing: 'E', reason: 'r', archived: false }]
+    });
+
+    const result = await store.listFull('ws-1');
+    assert.strictEqual(result.length, 2);
+    assert.strictEqual(result[0].id, b.id);
+    assert.strictEqual(result[1].id, a.id);
+    assert.strictEqual(result[0].narrative.technical, 'tech ws1b');
+    assert.strictEqual(result[1].narrative.technical, 'tech ws1');
+  });
 });
