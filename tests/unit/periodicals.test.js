@@ -1003,6 +1003,17 @@ describe('Onboarding & Cold-Start Review specifics (LIN-1689)', () => {
     assert.doesNotMatch(prompt, /subjective design-direction call/i);
   });
 
+  test('authorizes performing the journey itself as inspection, not the bare review-only default', () => {
+    // This periodical's evidence is a *performed* walk, including a from-scratch
+    // local/self-hosted setup path that writes files and runs commands — the
+    // bare reviewOnly() default ("changes no code, docs, config, or secrets")
+    // would read as forbidding exactly that. Pin the override so a regression
+    // to the bare default (which still renders valid, generic text) fails here.
+    assert.match(prompt, /performing the journey itself/i);
+    assert.match(prompt, /scratch checkout or throwaway environment/i);
+    assert.match(prompt, /is inspection, not a change to ship/i);
+  });
+
   test('stays project-agnostic: entry paths are framed as illustrative examples, not this project\'s baked-in journeys', () => {
     assert.match(prompt, /illustrative examples/i);
     assert.match(prompt, /hosted or signed-up visitor/i);
