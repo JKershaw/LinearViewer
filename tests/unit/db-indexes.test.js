@@ -128,6 +128,20 @@ describe('db-indexes', () => {
     }
   });
 
+  test('declares the producing-item wake-witness index on both dispatch collections (LIN-1698)', () => {
+    // Backs a future lookup of a minted wake row by its producing item — no
+    // reader in Phase 1 (declared ahead of the spun-out reconciliation-sweep
+    // ticket, its first consumer), but populated by this ticket's addItem/
+    // _archiveItem threading.
+    for (const collection of ['dispatch-history', 'dispatch-queue']) {
+      const hasIt = INDEX_SPECS.some(s =>
+        s.collection === collection &&
+        JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, producingItemId: 1, producingItemAttempt: -1 })
+      );
+      assert.ok(hasIt, `${collection} must have a {urlKey:1, producingItemId:1, producingItemAttempt:-1} index`);
+    }
+  });
+
   test('unique option is honoured for tokenHash indexes', async () => {
     const db = freshDb();
     await ensureIndexes(db);
