@@ -19,6 +19,11 @@
  * Also supports `{ $in: [...] }` (used by the Observation materializer's
  * followUpTo BFS batch lookups, LIN-1307).
  *
+ * `$set` supports dot-path keys (e.g. `"wakeWitnessMeta.<id>.mintedWakeId"`),
+ * writing/creating only the named leaf without clobbering sibling keys under
+ * the same parent object — mirrors Mongo/MangoDB's dot-notation `$set`, used
+ * by LIN-1698's durable wake witness.
+ *
  * This mock's single-body-per-call design means every op below is atomic BY
  * CONSTRUCTION — it cannot reproduce the interleavings a real engine can
  * (see LIN-1343: concurrency pins for `addFeedback` run against a real
@@ -53,6 +58,17 @@ export function createMockCollection() {
     return value === condition;
   };
 
+  // Immutable dot-path $set (e.g. "wakeWitnessMeta.<id>.mintedWakeId"), used
+  // by LIN-1698's durable wake witness. Mirrors Mongo/MangoDB's dot-notation
+  // $set: writes/creates only the named leaf, never clobbering sibling keys
+  // under the same parent object.
+  const setAtPath = (obj, path, value) => {
+    const [head, ...rest] = path.split('.');
+    if (rest.length === 0) return { ...obj, [head]: value };
+    const child = (obj && typeof obj[head] === 'object' && obj[head] !== null) ? obj[head] : {};
+    return { ...obj, [head]: setAtPath(child, rest.join('.'), value) };
+  };
+
   // Applies $set/$push/$addToSet update operators to a doc, returning a NEW
   // object (never mutates the input) so callers holding the pre-update doc
   // (e.g. a findOneAndUpdate caller reading the stored array reference) are
@@ -60,7 +76,12 @@ export function createMockCollection() {
   // behave identically regardless of which method applies them.
   const applyUpdate = (doc, update) => {
     let next = doc;
-    if (update.$set) next = { ...next, ...update.$set };
+    if (update.$set) {
+      next = { ...next };
+      for (const [key, value] of Object.entries(update.$set)) {
+        next = key.includes('.') ? setAtPath(next, key, value) : { ...next, [key]: value };
+      }
+    }
     if (update.$push) {
       next = { ...next };
       for (const [field, value] of Object.entries(update.$push)) {
