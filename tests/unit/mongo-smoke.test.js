@@ -509,7 +509,24 @@ describe(
       // `$set`, and the document it produced is asserted here.
       const witness = edge.wakeWitnessMeta?.[child._id];
       assert.ok(witness, 'real MongoDB seeded wakeWitnessMeta, keyed by the producing item id');
-      assert.strictEqual(witness.feedbackIndex, 0, 'indexes the terminal feedback entry that won the CAS');
+
+      // feedbackIndex is the CAS WINNER's own append position, and under N
+      // concurrent racers the winner is not necessarily the first appender —
+      // so this asserts the contract (a valid index pointing at a terminal
+      // entry), never a fixed number. An earlier revision of this test pinned
+      // it to 0; that passed locally and on the PR run and failed on main with
+      // actual 3, because which racer wins the CAS is genuinely nondeterministic.
+      assert.ok(
+        Number.isInteger(witness.feedbackIndex) &&
+          witness.feedbackIndex >= 0 &&
+          witness.feedbackIndex < edge.feedback.length,
+        `feedbackIndex ${witness.feedbackIndex} must index into the stored feedback array (length ${edge.feedback.length})`
+      );
+      assert.match(
+        edge.feedback[witness.feedbackIndex].message,
+        /^\[done\]/,
+        'it indexes the terminal feedback entry that won the CAS'
+      );
       assert.strictEqual(witness.attempt, 0, 'the implicit live-path slot');
       assert.strictEqual(
         witness.mintedWakeId,
