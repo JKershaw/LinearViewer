@@ -190,6 +190,52 @@ describe('LIN-1698 Phase 1 — producingItemId/producingItemAttempt survive queu
   });
 });
 
+describe('LIN-1698 Phase 1 — structural pin: the CAS and the witness seed are ONE write', () => {
+  // Review ledger item 2. Every other assertion in this file reads the mock's
+  // RESULT, and the mock applies an update atomically by construction — so a
+  // future refactor that split the seed into a second `updateOne` would leave
+  // all of them green while silently reopening this ticket's root cause (a
+  // witness that can exist without its CAS, or a CAS without its witness).
+  // Nothing behavioural can catch that; only the call shape can. Hence a spy.
+  test('the terminalWakeItems CAS call carries $addToSet AND the wakeWitnessMeta $set in the same update object', async (t) => {
+    const { store, historyCollection } = makeStore();
+    const parent = await store.addItem(URL_KEY, { prompt: 'parent work', kind: 'implementation' });
+    const child = await takenChild(store, { sessionId: parent._id });
+
+    const updateSpy = t.mock.method(historyCollection, 'updateOne');
+
+    const res = await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
+    assert.ok(res && res.success);
+
+    // The CAS is identified by its once-only filter, not by call order.
+    const casCalls = updateSpy.mock.calls.filter(
+      c => c.arguments[0]?.terminalWakeItems?.$ne !== undefined
+    );
+    assert.equal(casCalls.length, 1, 'exactly one CAS write per terminal mint');
+
+    const [filter, update] = casCalls[0].arguments;
+    assert.equal(filter.terminalWakeItems.$ne, child._id, 'keyed per producing item (LIN-1355/LIN-1357)');
+    assert.equal(update.$addToSet?.terminalWakeItems, child._id, 'the CAS half');
+    assert.deepEqual(
+      Object.keys(update.$set || {}),
+      [`wakeWitnessMeta.${child._id}`],
+      'the witness seed rides the SAME update object — one write, not two'
+    );
+
+    // And no OTHER write may seed a witness: the only other permitted
+    // wakeWitnessMeta write is the best-effort mintedWakeId/lastAttemptAt
+    // enrichment stamp, which touches leaves under an ALREADY-seeded entry.
+    const otherWitnessWrites = updateSpy.mock.calls
+      .filter(c => c !== casCalls[0])
+      .flatMap(c => Object.keys(c.arguments[1]?.$set || {}))
+      .filter(k => k.startsWith('wakeWitnessMeta.'));
+    assert.ok(
+      otherWitnessWrites.every(k => k.split('.').length > 2),
+      `only leaf enrichment may write the witness outside the CAS; saw ${JSON.stringify(otherWitnessWrites)}`
+    );
+  });
+});
+
 describe('mock-collection: dot-path $set support (LIN-1698)', () => {
   test('a dot-path $set creates nested structure without clobbering sibling keys', async () => {
     const collection = createMockCollection();

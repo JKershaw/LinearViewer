@@ -500,6 +500,28 @@ describe(
         'the witness set durably records the producing item on the edge'
       );
       assert.strictEqual(edge.terminalWakeItems.length, 1, 'one producing item, one slot — no duplicates from the N racers');
+
+      // LIN-1698 Phase 1 (review ledger item 1): the witness SHAPE, read back
+      // off real MongoDB. Every other shape assertion for wakeWitnessMeta runs
+      // against the mock whose dot-path `$set` support this same change
+      // authored — the mock proving itself. This is the one read-back that is
+      // not circular: real Mongo applied the combined `$addToSet` + dot-path
+      // `$set`, and the document it produced is asserted here.
+      const witness = edge.wakeWitnessMeta?.[child._id];
+      assert.ok(witness, 'real MongoDB seeded wakeWitnessMeta, keyed by the producing item id');
+      assert.strictEqual(witness.feedbackIndex, 0, 'indexes the terminal feedback entry that won the CAS');
+      assert.strictEqual(witness.attempt, 0, 'the implicit live-path slot');
+      assert.strictEqual(
+        witness.mintedWakeId,
+        queued[0]._id,
+        'stamped with the id of the wake row real MongoDB actually minted'
+      );
+      assert.ok(witness.lastAttemptAt instanceof Date, 'round-trips as a BSON date, not a string');
+
+      // The row fields the archive hop must carry, present pre-claim on the
+      // real engine (the mock covers the post-archive half).
+      assert.strictEqual(queued[0].producingItemId, child._id);
+      assert.strictEqual(queued[0].producingItemAttempt, 0);
     });
 
     // --- LIN-1470 (review ledger L2): the lineage `$in` query's real plan ---
@@ -695,6 +717,19 @@ describe(
       const edge = await store.historyCollection.findOne({ _id: beat1._id });
       assert.ok(edge.terminalWakeItems.includes(beat1._id) && edge.terminalWakeItems.includes(beat2._id));
       assert.strictEqual(edge.terminalWakeItems.length, 2, 'exactly the two distinct producing items');
+
+      // LIN-1698 Phase 1 (review ledger item 1): the dot-path `$set` keeps
+      // SIBLING witness entries on one shared edge doc — the specific way a
+      // whole-field `$set` would silently destroy the earlier beat's witness.
+      // Only a real engine can answer this; the mock's dot-path handling was
+      // written by this same change.
+      assert.deepStrictEqual(
+        Object.keys(edge.wakeWitnessMeta).sort(),
+        [beat1._id, beat2._id].sort(),
+        'both beats hold their own witness entry — no sibling clobber on real MongoDB'
+      );
+      assert.strictEqual(edge.wakeWitnessMeta[beat1._id].attempt, 0);
+      assert.strictEqual(edge.wakeWitnessMeta[beat2._id].attempt, 0);
     });
 
     // -----------------------------------------------------------------------
