@@ -479,6 +479,37 @@ test.describe('Live Console (experimental)', () => {
       expect(barWidth).toBeGreaterThanOrEqual(expectedFloorPx - 0.5);
     });
 
+    test('a fresh/still-running bar is actually painted at a desktop (1280px) viewport, not just present in the DOM', async ({ page }) => {
+      // Regression for the cycle-2 review's blocking finding: the full-bleed
+      // `.lc-timeline-breakout` (`width: 100vw; margin-inline: calc(50% - 50vw)`)
+      // overshot `body`'s own `max-width: 120ch; overflow-x: clip` box above
+      // ~1152px, so every fresh/still-running bar (clamped near the axis's
+      // right edge) and every clipped-start bar (pinned to the left edge) was
+      // laid out OUTSIDE body's clip box and never painted on an ordinary
+      // desktop viewport — invisible even though the bar existed in the DOM
+      // with the right data-kind/colour and a non-zero measured width.
+      // `toBeVisible()` and a `getBoundingClientRect().width` check (the prior
+      // test) both describe the bar's OWN box and are blind to an ancestor's
+      // overflow clip, so neither caught this. `elementFromPoint` at the bar's
+      // own centre is: it resolves to the bar itself when painted, and to some
+      // clipping ancestor (`HTML`/`BODY`) when not — the identity check the
+      // review asked for, at a viewport wide enough (>=1280) to reproduce the
+      // failure (it does not reproduce below body's ~1152px cap).
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-8023' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"][data-kind="working"]');
+      const paintedTestid = await page.evaluate(() => {
+        const bar = document.querySelector('[data-testid="live-console-timeline-bar"][data-kind="working"]');
+        const rect = bar.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const hit = document.elementFromPoint(cx, cy);
+        return hit ? hit.getAttribute('data-testid') : null;
+      });
+      expect(paintedTestid).toBe('live-console-timeline-bar');
+    });
+
     test('a done run renders data-kind="done" with the --green background', async ({ page }) => {
       await seedTerminalWorker(page, URL_KEY, { task: 'LIN-8025', message: '[done] shipped it' });
       await page.goto(PAGE_URL);

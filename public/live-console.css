@@ -146,10 +146,25 @@
  * overflow stays clean (scrollWidth <= clientWidth, desktop AND mobile) with
  * NO `.lc-page`-level guard at all. So no second, page-scoped guard is added
  * here — `html`'s existing one already covers it.
+ *
+ * `width: 100vw` was ALSO wrong on its own terms (cycle-2 review): `body`
+ * itself caps at `max-width: 120ch` (public/style.css) and clips overflow
+ * (`overflow-x: clip`), so a breakout to the *viewport* width overshoots
+ * `body`'s own box above ~1152px and is silently clipped there — invisible
+ * on every ordinary desktop viewport, not just the ones with a wide gutter.
+ * `.lc-page`'s max-width:900px guard would not have helped either (it clips
+ * to 900px, same failure shape). The breakout must never exceed `body`'s
+ * rendered content width. `--lc-body-content-width` below recomputes that
+ * exact value — same `min(100vw, 120ch)` expression `body` itself uses,
+ * minus `body`'s own left+right padding (`var(--space-5)` each side) — so it
+ * tracks `body`'s real box instead of the viewport's, and the width/margin
+ * pair generalizes the same `calc((100% - W) / 2)` centering the old 100vw
+ * trick used, just with `W` bounded by `body` instead of the viewport.
  */
 .lc-timeline-breakout {
-  width: 100vw;
-  margin-inline: calc(50% - 50vw);
+  --lc-body-content-width: calc(min(100vw, 120ch) - (var(--space-5) * 2));
+  width: var(--lc-body-content-width);
+  margin-inline: calc((100% - var(--lc-body-content-width)) / 2);
   padding-inline: 1rem;
 }
 .lc-timeline-presets {
