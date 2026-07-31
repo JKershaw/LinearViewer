@@ -480,21 +480,17 @@ test.describe('Live Console (experimental)', () => {
     });
 
     test('a fresh/still-running bar is actually painted at a desktop (1280px) viewport, not just present in the DOM', async ({ page }) => {
-      // Regression for the cycle-2 review's blocking finding: the full-bleed
-      // `.lc-timeline-breakout` (`width: 100vw; margin-inline: calc(50% - 50vw)`)
-      // overshot `body`'s own `max-width: 120ch; overflow-x: clip` box above
-      // ~1152px, so every fresh/still-running bar (clamped near the axis's
-      // right edge) and every clipped-start bar (pinned to the left edge) was
-      // laid out OUTSIDE body's clip box and never painted on an ordinary
-      // desktop viewport — invisible even though the bar existed in the DOM
-      // with the right data-kind/colour and a non-zero measured width.
+      // General paint-identity smoke test, not tied to any particular layout:
       // `toBeVisible()` and a `getBoundingClientRect().width` check (the prior
       // test) both describe the bar's OWN box and are blind to an ancestor's
-      // overflow clip, so neither caught this. `elementFromPoint` at the bar's
-      // own centre is: it resolves to the bar itself when painted, and to some
-      // clipping ancestor (`HTML`/`BODY`) when not — the identity check the
-      // review asked for, at a viewport wide enough (>=1280) to reproduce the
-      // failure (it does not reproduce below body's ~1152px cap).
+      // overflow clip. `elementFromPoint` at the bar's own centre resolves to
+      // the bar itself when painted, and to some clipping ancestor when not —
+      // this caught real bugs across review cycles 1-3 (a defeated min-width
+      // floor, then two generations of a full-bleed breakout overshooting its
+      // container; see the CSS comment on `.lc-timeline-section` in
+      // public/live-console.css). The breakout is gone now — the timeline
+      // lays out in `.lc-page`'s ordinary column — but this stays as a cheap,
+      // durable guarantee that a bar is genuinely rendered to the user.
       await page.setViewportSize({ width: 1280, height: 720 });
       await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-8023' });
       await page.goto(PAGE_URL);
@@ -508,6 +504,28 @@ test.describe('Live Console (experimental)', () => {
         return hit ? hit.getAttribute('data-testid') : null;
       });
       expect(paintedTestid).toBe('live-console-timeline-bar');
+    });
+
+    test('the bars viewport is exactly as wide as the page column (no breakout, no inset) at both mobile and desktop widths', async ({ page }) => {
+      // Cycle-3 review's suggested durable check, generalized: the existing
+      // mobile overflow test (`scrollWidth <= clientWidth`) is one-directional
+      // and passes on a box that is too NARROW, which is exactly the bug a
+      // prior full-bleed-breakout attempt introduced below 640px (measured
+      // 294px vs. the page column's 319px at 390px). Comparing the bars
+      // viewport's width directly against `.lc-lanes-section` — a sibling
+      // section that has never had a breakout — catches both an overshoot and
+      // an inset, at any viewport, and fails on either regression.
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-8024', message: '[done] shipped it' });
+      for (const size of [{ width: 390, height: 844 }, { width: 1280, height: 720 }]) {
+        await page.setViewportSize(size);
+        await page.goto(PAGE_URL);
+        await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+        const widths = await page.evaluate(() => ({
+          timeline: document.querySelector('[data-testid="live-console-timeline"]').getBoundingClientRect().width,
+          lanes: document.querySelector('[data-testid="live-console-lanes"]').getBoundingClientRect().width,
+        }));
+        expect(widths.timeline).toBeCloseTo(widths.lanes, 0);
+      }
     });
 
     test('a done run renders data-kind="done" with the --green background', async ({ page }) => {

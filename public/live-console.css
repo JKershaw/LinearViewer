@@ -126,47 +126,23 @@
   margin-bottom: 1.75rem;
 }
 /*
- * Only the axis+bars sub-wrapper breaks full-bleed — the label/presets above
- * stay in `.lc-page`'s normal centered column (matching every other section
- * label on this page).
- *
- * An earlier version put `width: 100vw; margin-inline: calc(50% - 50vw)` on
- * the WHOLE `.lc-timeline-section` and paired it with a guard on `.lc-page`
- * (`overflow-x: hidden`) to catch the breakout's scrollbar-gutter overshoot.
- * That guard was wrong: `.lc-page` is a NARROW, CENTERED box (max-width:900px
- * above) at any viewport wider than ~930px, not a full-viewport-width one — so
- * `overflow-x: hidden` there clips the breakout down to `.lc-page`'s own
- * ~900px box instead of merely trimming a few overshoot pixels, which made
- * the label/presets/axis/bars invisible on an ordinary desktop viewport
- * (confirmed live: 1280px viewport, `.lc-page` box measures x:182–1082).
- * It was also unnecessary: `html` already carries a global
- * `overflow-x: clip; scrollbar-gutter: stable` (public/style.css) for exactly
- * this failure mode, chosen there over `hidden` to avoid breaking the nav
- * bar's `position: sticky` (LIN-1068) — confirmed live that document-level
- * overflow stays clean (scrollWidth <= clientWidth, desktop AND mobile) with
- * NO `.lc-page`-level guard at all. So no second, page-scoped guard is added
- * here — `html`'s existing one already covers it.
- *
- * `width: 100vw` was ALSO wrong on its own terms (cycle-2 review): `body`
- * itself caps at `max-width: 120ch` (public/style.css) and clips overflow
- * (`overflow-x: clip`), so a breakout to the *viewport* width overshoots
- * `body`'s own box above ~1152px and is silently clipped there — invisible
- * on every ordinary desktop viewport, not just the ones with a wide gutter.
- * `.lc-page`'s max-width:900px guard would not have helped either (it clips
- * to 900px, same failure shape). The breakout must never exceed `body`'s
- * rendered content width. `--lc-body-content-width` below recomputes that
- * exact value — same `min(100vw, 120ch)` expression `body` itself uses,
- * minus `body`'s own left+right padding (`var(--space-5)` each side) — so it
- * tracks `body`'s real box instead of the viewport's, and the width/margin
- * pair generalizes the same `calc((100% - W) / 2)` centering the old 100vw
- * trick used, just with `W` bounded by `body` instead of the viewport.
+ * No full-bleed breakout. Three review cycles chased a `.lc-timeline-breakout`
+ * (`width: 100vw; margin-inline: calc(50% - 50vw)`, later re-derived from
+ * `body`'s own box) meant to widen just the axis+bars past `.lc-page`'s
+ * ~900px column, and each fix traded one viewport-conditional bug for
+ * another: a `.lc-page`-level clip guard that hid the whole section; a
+ * `100vw` overshoot silently clipped by `body`'s own
+ * `max-width: 120ch; overflow-x: clip`; then a fix that re-derived `body`'s
+ * box from hardcoded responsive-padding constants and inverted the breakout
+ * into an inset narrower than the page column below 640px. All three lived
+ * in the same ~20 lines of width arithmetic, and all three came from the
+ * same root — the panel trying to be wider than the container it lives in.
+ * The axis + bars now lay out in `.lc-page`'s ordinary column, exactly like
+ * every other section on this page: no `100vw`, no negative margins, no
+ * re-derivation of `body`'s responsive padding, and the bars automatically
+ * share the grid the label, chips and lanes rail already align to. Costs
+ * ~250px of desktop width; ships without a fourth viewport-conditional bug.
  */
-.lc-timeline-breakout {
-  --lc-body-content-width: calc(min(100vw, 120ch) - (var(--space-5) * 2));
-  width: var(--lc-body-content-width);
-  margin-inline: calc((100% - var(--lc-body-content-width)) / 2);
-  padding-inline: 1rem;
-}
 .lc-timeline-presets {
   display: flex;
   gap: 0.4rem;

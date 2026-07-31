@@ -100,29 +100,23 @@ test('mount order is pulse → chips → timeline → lanes → stream — no ex
   assert.ok(pulse < chips && chips < timeline && timeline < lanes && lanes < stream, 'mount points out of order');
 });
 
-test('only the axis+bars sub-wrapper breaks full-bleed — the label/presets are NOT inside it', () => {
-  // Regression guard for the bug found in manual verification: an earlier
-  // version put the 100vw breakout on the WHOLE `.lc-timeline-section`
-  // (label included), which a `.lc-page`-level clip guard then hid entirely
-  // on a normal desktop viewport (`.lc-page` is a narrow, centered 900px box,
-  // not full-viewport-width, at any width above ~930px). The fix scopes the
-  // breakout to a `.lc-timeline-breakout` child that wraps ONLY the axis and
-  // bars viewport, so the label/presets stay in `.lc-page`'s normal column.
+test('the timeline has no full-bleed breakout wrapper — axis/bars are ordinary children of the section', () => {
+  // Regression guard, inverted from what it used to pin: three review cycles
+  // found three distinct viewport-conditional clipping bugs chasing a
+  // `.lc-timeline-breakout` full-bleed wrapper (a `.lc-page`-level clip guard
+  // that hid the whole section; a `100vw` overshoot clipped by `body`'s own
+  // `max-width`/`overflow-x: clip`; a re-derivation of `body`'s box that
+  // inverted into an inset below 640px). The breakout was dropped entirely —
+  // this now asserts it stays gone, and that the axis + bars viewport are
+  // plain siblings of the label/presets in the same `.lc-page` column.
   const html = renderLiveConsolePage({ urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }], featureFlags: { liveConsole: true } });
+  assert.ok(!html.includes('lc-timeline-breakout'), '.lc-timeline-breakout must not exist');
   const sectionOpen = html.indexOf('class="lc-timeline-section"');
-  const breakoutOpen = html.indexOf('class="lc-timeline-breakout"');
   const labelOpen = html.indexOf('class="lc-section-label"', sectionOpen);
   const presetsOpen = html.indexOf('class="lc-timeline-presets"');
-  assert.ok(breakoutOpen > 0, '.lc-timeline-breakout must exist');
-  // Label + presets precede the breakout wrapper — they are siblings BEFORE
-  // it, not descendants of it.
-  assert.ok(labelOpen > sectionOpen && labelOpen < breakoutOpen);
-  assert.ok(presetsOpen > sectionOpen && presetsOpen < breakoutOpen);
-  // The axis + bars-viewport mount points ARE inside the breakout wrapper.
   const axisOpen = html.indexOf('id="live-console-timeline-axis"');
   const viewportOpen = html.indexOf('data-testid="live-console-timeline"');
-  assert.ok(axisOpen > breakoutOpen);
-  assert.ok(viewportOpen > breakoutOpen);
+  assert.ok(sectionOpen > 0 && labelOpen > sectionOpen && presetsOpen > labelOpen && axisOpen > presetsOpen && viewportOpen > axisOpen);
 });
 
 test('renderer puts aria-live on the banner status, NOT on the wholesale-replaced stream list', () => {

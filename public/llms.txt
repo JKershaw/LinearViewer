@@ -372,11 +372,9 @@ main.lc-page[data-url-key]                    - page container
   .lc-timeline-section                        - swimlane timeline: last 24h of dispatch runs as bars
                                                 (static/non-zoomable in this phase; LIN-1742)
     .lc-timeline-presets                      - 1h/24h range buttons (inert placeholders, wired in Phase 2)
-    .lc-timeline-breakout                     - full-viewport-width wrapper around JUST the axis + bars
-                                                (the label/presets above stay in the page's normal column)
-      #live-console-timeline-axis             - time axis mount (fixed 24h scale)
-      [data-testid="live-console-timeline"]   - bars viewport (internal vertical scroll, no row cap)
-        [data-testid="live-console-timeline-bar"][data-kind][data-ws]  - one bar per run;
+    #live-console-timeline-axis               - time axis mount (fixed 24h scale), same page column as the label above (no full-bleed breakout)
+    [data-testid="live-console-timeline"]     - bars viewport (internal vertical scroll, no row cap)
+      [data-testid="live-console-timeline-bar"][data-kind][data-ws]  - one bar per run;
                                                 data-kind vocabulary matches the stream's (below);
                                                 .lc-timeline-bar--clipped marks a run whose true start
                                                 predates the 24h window (clipped to the left edge, not dropped)
