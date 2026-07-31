@@ -521,6 +521,17 @@ process.on('uncaughtException', (err) => {
 // =============================================================================
 const app = express()
 
+// Deploy healthcheck (LIN-1691). Must stay registered here, above the
+// HTTPS-redirect middleware below: the deploy host's probe request may not
+// carry x-forwarded-proto, and a 301 instead of a 200 would fail every
+// deploy's healthcheck. Static and synchronous — no DB probe — because the
+// top-level `await dbClient.connect()` / `await ensureIndexes(db)` above
+// already gate this module from completing (and app.listen from opening)
+// until the DB is genuinely ready.
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' })
+})
+
 // Trust Heroku's proxy for X-Forwarded-* headers (required for secure cookies)
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1)
@@ -2788,12 +2799,15 @@ app.use((err, req, res, next) => {
 // Server Startup
 // =============================================================================
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => {
+// Handles captured for graceful shutdown (LIN-1691) — both were previously
+// discarded, leaving nothing for a SIGTERM handler to close.
+let cleanupTimer
+const server = app.listen(PORT, () => {
   console.log(`Harbour running at http://localhost:${PORT}`)
 
   // Start periodic cleanup of expired items (every hour)
   const CLEANUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
-  setInterval(async () => {
+  cleanupTimer = setInterval(async () => {
     try {
       const removedCount = await dispatchQueueStore.cleanup()
       if (removedCount > 0) {
@@ -2852,3 +2866,45 @@ app.listen(PORT, () => {
     }
   }, CLEANUP_INTERVAL_MS)
 })
+
+// Graceful shutdown (LIN-1691). Previously there was no SIGTERM/SIGINT
+// handling at all, so a deploy's draining window bought nothing — the
+// process was killed immediately, cutting off in-flight requests.
+//
+// The app deliberately holds some requests open far longer than a short
+// drain window: the dispatch long-poll caps at DISPATCH_WAIT_MAX_S (~50s,
+// routes/proxy.js) and SSE/keepalive streams (lib/http-keepalive.js) run
+// for the length of an AI call. server.close() waits for in-flight
+// connections to finish, so a hung stream could wedge shutdown — the
+// unref'd force-exit backstop below is the real safety valve for that case.
+// (Deployment-side draining/healthcheck config is a deferred follow-up —
+// see the LIN-1691 close-out ledger — but this backstop protects local/CI
+// shutdown regardless of what the host is configured with.)
+const FORCE_EXIT_TIMEOUT_MS = 65_000
+
+function gracefulShutdown(signal) {
+  console.log(`${signal} received, shutting down gracefully`)
+
+  // Idle keep-alive sockets would otherwise hold server.close() open until
+  // keepAliveTimeout; only supported on Node >= 18.2, so optionally chained.
+  server.closeIdleConnections?.()
+
+  server.close(async () => {
+    if (cleanupTimer) clearInterval(cleanupTimer)
+    try {
+      await dbClient.close()
+    } catch (err) {
+      console.error('Error closing DB client during shutdown:', err)
+    }
+    process.exit(0)
+  })
+
+  const forceExit = setTimeout(() => {
+    console.error(`Shutdown did not complete within ${FORCE_EXIT_TIMEOUT_MS}ms, forcing exit`)
+    process.exit(1)
+  }, FORCE_EXIT_TIMEOUT_MS)
+  forceExit.unref()
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
