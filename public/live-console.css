@@ -221,6 +221,26 @@
   border-bottom-left-radius: 0;
 }
 
+/* F1/F3 (LIN-1744): a stale-tail bar (data-still-running="unknown" — this
+   run's own last activity, freshness unconfirmed) and a genuinely
+   still-running bar (data-still-running="true") both land on
+   data-kind="working" (--amber) under outcome-based colouring, so colour can't
+   tell them apart — never assert work that isn't happening. The END treatment
+   carries the distinction instead, mirroring the clipped-START dashed-edge
+   idiom above rather than inventing a new visual language: a live bar
+   breathes (reusing the pulse-lane rail's own "alive" animation below,
+   `lc-bar` — same vocabulary, not a new one); a stale-tail bar gets a static
+   dashed right edge and never animates, since nothing here is confirmed
+   ongoing. */
+.lc-timeline-bar[data-still-running="true"] {
+  animation: lc-bar 1.8s ease-in-out infinite;
+}
+.lc-timeline-bar[data-still-running="unknown"] {
+  border-right: 2px dashed var(--card);
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 /* ── Pulse-lane rail ────────────────────────────────────────────────────── */
 .lc-lanes-section { margin-bottom: 1.75rem; }
 .lc-lanes { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
@@ -418,5 +438,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lc-status-dot--pulse, .lc-lane--pulse .lc-lane-bar, .lc-event--new, .lc-skel { animation: none; }
+  .lc-status-dot--pulse, .lc-lane--pulse .lc-lane-bar, .lc-event--new, .lc-skel,
+  .lc-timeline-bar[data-still-running="true"] { animation: none; }
 }

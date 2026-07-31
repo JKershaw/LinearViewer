@@ -209,6 +209,14 @@
     div.style.top = `${rowIndex * (TIMELINE_ROW_HEIGHT + TIMELINE_ROW_GAP)}px`;
     div.setAttribute('data-kind', run.outcomeKind || 'info');
     div.classList.toggle('lc-timeline-bar--clipped', !!run.clippedStart);
+    // F1/F3 (LIN-1744): a stale-tail bar (stillRunning: 'unknown') and a
+    // genuinely still-running bar (stillRunning: true) both render
+    // data-kind="working" under outcome-based colouring, so colour alone can't
+    // tell them apart — the end treatment (live-console.css) carries it
+    // instead, keyed off this attribute. Anything else (false, missing,
+    // malformed) falls back to 'false' — no special end treatment, never a
+    // thrown error on odd input.
+    div.setAttribute('data-still-running', run.stillRunning === true ? 'true' : run.stillRunning === 'unknown' ? 'unknown' : 'false');
     div.setAttribute('data-ws', run.workspaceUrlKey || '');
     // F1: a run lying entirely outside the CURRENT VIEW window (zoom introduced
     // sub-windows the server's own 24h-axis clamping doesn't cover) must
