@@ -901,6 +901,75 @@ test.describe('Live Console (experimental)', () => {
       await expect(page.locator('[data-testid="live-console-timeline-connector"]')).toHaveCount(0);
       expect(pageErrors).toEqual([]);
     });
+
+    // Review finding on PR #1043 (2026-07-31): `.lc-timeline-connectors` was
+    // `height: 100%` in CSS, which resolves against `.lc-timeline-viewport`'s
+    // CLAMPED `max-height: 320px`, not its scrollHeight. With `preserveAspectRatio
+    // ="none"` every y coordinate is scaled by `320 / rowsHeightPx`, so the two
+    // above tests (1-2 rows, well under the cap) could not fail on it — row
+    // pitch is 22px (18 bar + 4 gap), exact through 14 rows, wrong from 15 on.
+    // This seeds 20 rows (past the cap) and measures rendered pixels, not just
+    // presence, so a reintroduced `height: 100%` fails it again.
+    test('a connector stays pinned to its bar once the row count pushes the viewport past its 320px cap', async ({ page }) => {
+      const ROWS = 20;
+      let injected = false;
+      await page.route(`**${EVENTS_API}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!injected) {
+          injected = true;
+          const now = body.serverNow;
+          const rows = [];
+          for (let i = 0; i < ROWS; i++) {
+            rows.push([{
+              id: `f2i-run-${i}`,
+              issueIdentifier: `LIN-936${String(i).padStart(2, '0')}`,
+              kind: 'implementation',
+              promptName: null,
+              outcomeKind: 'done',
+              start: now - (ROWS - i) * 60000,
+              end: now - (ROWS - i - 1) * 60000,
+              stillRunning: false,
+              clippedStart: false,
+              groupKey: `f2i-session-${i}`,
+              followUpTo: null,
+              workspaceUrlKey: URL_KEY,
+            }]);
+          }
+          body.timeline = {
+            rows,
+            connectors: [{ fromId: 'f2i-run-0', toId: `f2i-run-${ROWS - 1}` }],
+            truncated: false,
+            totalInWindow: ROWS,
+          };
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      const connector = page.locator('[data-testid="live-console-timeline-connector"]');
+      await expect(connector).toHaveCount(1);
+
+      // Sanity check: this scenario must actually exceed the 320px cap, or the
+      // test would pass vacuously the same way the two smaller tests above do.
+      const viewport = page.locator('[data-testid="live-console-timeline"]');
+      const { scrollHeight, clientHeight } = await viewport.evaluate(el => ({
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+      }));
+      expect(scrollHeight).toBeGreaterThan(clientHeight);
+
+      const { barCenterY, connectorEndY } = await page.evaluate((rows) => {
+        const bar = document.querySelector(`[data-testid="live-console-timeline-bar"][aria-label*="LIN-936${String(rows - 1).padStart(2, '0')}"]`);
+        const path = document.querySelector('[data-testid="live-console-timeline-connector"]');
+        const barRect = bar.getBoundingClientRect();
+        const pathRect = path.getBoundingClientRect();
+        return { barCenterY: barRect.top + barRect.height / 2, connectorEndY: pathRect.bottom };
+      }, ROWS);
+      // Pre-fix this drifted 116px at 20 rows (measured in the review); a
+      // few px of tolerance covers stroke width / antialiasing only.
+      expect(Math.abs(connectorEndY - barCenterY)).toBeLessThan(3);
+    });
   });
 
   // Zoom/pan/gestures (LIN-1743, Phase 2 of LIN-1720): the 1h/24h presets,

@@ -278,7 +278,14 @@
     }
     const rowsHeightPx = Math.max(rows.length, 1) * (TIMELINE_ROW_HEIGHT + TIMELINE_ROW_GAP);
     els.timeline.style.height = `${rowsHeightPx}px`;
-    if (els.timelineConnectors) els.timelineConnectors.setAttribute('viewBox', `0 0 100 ${rowsHeightPx}`);
+    if (els.timelineConnectors) {
+      els.timelineConnectors.setAttribute('viewBox', `0 0 100 ${rowsHeightPx}`);
+      // CSS height:100% resolves against .lc-timeline-viewport's clamped
+      // max-height (320px), not its scrollHeight — past 14 rows that scales
+      // every connector y by 320/rowsHeightPx and detaches lines from their
+      // bars (review finding on PR #1043). Pin the real content height here.
+      els.timelineConnectors.style.height = `${rowsHeightPx}px`;
+    }
 
     updateTimelineEmptyState();
     paintTimelineConnectors();
