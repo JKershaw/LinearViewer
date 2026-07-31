@@ -33,6 +33,9 @@
   const HISTORY_PAGE = 40;
   const TICK_MS = 30000;       // relative-time refresh cadence
   const PULSE_WINDOW_MS = 3 * 60 * 1000; // time span the flowing strip covers (right=now)
+  const TIMELINE_WINDOW_MS = 24 * 60 * 60 * 1000; // fixed, non-zoomed 24h axis (Phase 1)
+  const TIMELINE_ROW_HEIGHT = 18;
+  const TIMELINE_ROW_GAP = 4;
   const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Kind → glyph (colour lives in live-console.css via [data-kind]).
@@ -50,6 +53,8 @@
     status: document.getElementById('live-console-status'),
     tempo: document.getElementById('live-console-tempo'),
     chips: document.getElementById('live-console-chips'),
+    timeline: document.getElementById('live-console-timeline'),
+    timelineEmpty: document.getElementById('live-console-timeline-empty'),
     lanes: document.getElementById('live-console-lanes'),
     lanesEmpty: document.getElementById('live-console-lanes-empty'),
     stream: document.getElementById('live-console-stream'),
@@ -64,6 +69,8 @@
   let seenEventIds = new Set();         // ids from the LAST poll (bounded; detects new arrivals)
   const laneNodes = new Map();          // `${ws}::${task}` → <li>
   const eventNodes = new Map();         // live event id → <li>
+  const timelineBarNodes = new Map();   // timeline run id → <div class="lc-timeline-bar">
+  let lastServerNow = 0;                // last poll's serverNow — the timeline's anchor for "now"
   const historyIds = new Set();         // ids paged into the history region
   let lastFeed = null;                  // last successful live feed (for in-place re-filter)
   let liveOldestTs = null;              // oldest ts in the live feed (first history cursor)
@@ -127,6 +134,67 @@
     if (els.stream) els.stream.innerHTML = '';
     laneNodes.clear();
     eventNodes.clear();
+  }
+
+  // ─── Timeline (LIN-1742, Phase 1: static, non-zoomable last-24h swimlane) ──
+  // Bars are laid out on a fixed 24h axis (`start`/`end` epoch ms → left/width
+  // percentages), stacked into the rows the SERVER already packed
+  // (lib/live-console.js's packTimelineRows) — this phase does no client-side
+  // repacking. Keyed reconcile by run id (same house rule as paintLanes/
+  // paintStream, above: nodes updated in place, never innerHTML-replaced, so a
+  // hidden bar's node reference survives a poll tick).
+  function timelineLabel(run) {
+    return (run && (run.kind || run.promptName)) || 'run';
+  }
+  function timelineBarNode(run) {
+    const div = document.createElement('div');
+    div.className = 'lc-timeline-bar';
+    div.setAttribute('data-testid', 'live-console-timeline-bar');
+    updateTimelineBarNode(div, run, 0);
+    return div;
+  }
+  function updateTimelineBarNode(div, run, rowIndex) {
+    const now = lastServerNow || Date.now();
+    const windowStart = now - TIMELINE_WINDOW_MS;
+    const clampedEnd = run.end != null ? run.end : now;
+    const pct = (t) => Math.max(0, Math.min(100, ((t - windowStart) / TIMELINE_WINDOW_MS) * 100));
+    const startPct = pct(run.start);
+    // A visible sliver for a near-zero-duration run, but never past the
+    // container's right edge — a run ending right at "now" (startPct ≈ 100)
+    // must not push left+width over 100% and force a horizontal scrollbar.
+    const widthPct = Math.min(Math.max(pct(clampedEnd) - startPct, 0.6), 100 - startPct);
+    div.style.left = `${startPct}%`;
+    div.style.width = `${widthPct}%`;
+    div.style.top = `${rowIndex * (TIMELINE_ROW_HEIGHT + TIMELINE_ROW_GAP)}px`;
+    div.setAttribute('data-kind', run.outcomeKind || 'info');
+    div.classList.toggle('lc-timeline-bar--clipped', !!run.clippedStart);
+    div.setAttribute('data-ws', run.workspaceUrlKey || '');
+    div.hidden = !isVisibleWs(run.workspaceUrlKey);
+    const label = `${run.issueIdentifier || '?'} — ${timelineLabel(run)}`;
+    div.title = label;
+    div.setAttribute('aria-label', label);
+  }
+  function paintTimeline(timeline) {
+    if (!els.timeline) return;
+    const rows = Array.isArray(timeline && timeline.rows) ? timeline.rows : [];
+    const flat = [];
+    rows.forEach((row, rowIndex) => {
+      (Array.isArray(row) ? row : []).forEach(run => { if (run) flat.push({ run, rowIndex }); });
+    });
+
+    const wanted = new Set(flat.map(f => f.run.id));
+    for (const [id, node] of timelineBarNodes) {
+      if (!wanted.has(id)) { node.remove(); timelineBarNodes.delete(id); }
+    }
+    for (const { run, rowIndex } of flat) {
+      let node = timelineBarNodes.get(run.id);
+      if (!node) { node = timelineBarNode(run); timelineBarNodes.set(run.id, node); els.timeline.appendChild(node); }
+      updateTimelineBarNode(node, run, rowIndex);
+    }
+    els.timeline.style.height = `${Math.max(rows.length, 1) * (TIMELINE_ROW_HEIGHT + TIMELINE_ROW_GAP)}px`;
+
+    const visibleCount = flat.filter(f => isVisibleWs(f.run.workspaceUrlKey)).length;
+    if (els.timelineEmpty) els.timelineEmpty.hidden = visibleCount > 0;
   }
 
   // ─── Chips (cross-workspace filter) ─────────────────────────────────────────
@@ -498,10 +566,14 @@
     seenEventIds = new Set(events.map(e => e.id));
     liveOldestTs = feed.oldestTs != null ? feed.oldestTs : liveOldestTs;
     liveHasMore = !!feed.hasMore;
+    lastServerNow = feed.serverNow || lastServerNow;
     paintBanner(feed.summary);
     updatePulse(feed);
     paintLanes(feed.lanes);
     paintStream(events, newIds);
+    // isVisibleWs parity with the chip filter, same as paintLanes/paintStream —
+    // wired AFTER paintStream so both share one chip-toggle re-filter path.
+    paintTimeline(feed.timeline);
     updateMoreButton();
   }
 

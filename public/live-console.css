@@ -121,6 +121,101 @@
 }
 .lc-section-mark { color: var(--brand); margin-right: 0.3rem; }
 
+/* ── Swimlane timeline (LIN-1742, Phase 1: static, non-zoomable) ──────────── */
+.lc-timeline-section {
+  margin-bottom: 1.75rem;
+}
+/*
+ * Only the axis+bars sub-wrapper breaks full-bleed — the label/presets above
+ * stay in `.lc-page`'s normal centered column (matching every other section
+ * label on this page).
+ *
+ * An earlier version put `width: 100vw; margin-inline: calc(50% - 50vw)` on
+ * the WHOLE `.lc-timeline-section` and paired it with a guard on `.lc-page`
+ * (`overflow-x: hidden`) to catch the breakout's scrollbar-gutter overshoot.
+ * That guard was wrong: `.lc-page` is a NARROW, CENTERED box (max-width:900px
+ * above) at any viewport wider than ~930px, not a full-viewport-width one — so
+ * `overflow-x: hidden` there clips the breakout down to `.lc-page`'s own
+ * ~900px box instead of merely trimming a few overshoot pixels, which made
+ * the label/presets/axis/bars invisible on an ordinary desktop viewport
+ * (confirmed live: 1280px viewport, `.lc-page` box measures x:182–1082).
+ * It was also unnecessary: `html` already carries a global
+ * `overflow-x: clip; scrollbar-gutter: stable` (public/style.css) for exactly
+ * this failure mode, chosen there over `hidden` to avoid breaking the nav
+ * bar's `position: sticky` (LIN-1068) — confirmed live that document-level
+ * overflow stays clean (scrollWidth <= clientWidth, desktop AND mobile) with
+ * NO `.lc-page`-level guard at all. So no second, page-scoped guard is added
+ * here — `html`'s existing one already covers it.
+ */
+.lc-timeline-breakout {
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  padding-inline: 1rem;
+}
+.lc-timeline-presets {
+  display: flex;
+  gap: 0.4rem;
+  margin: -0.25rem 0 0.6rem;
+}
+.lc-timeline-preset {
+  font-family: var(--font-structural);
+  font-size: 0.75rem;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  padding: 0.2rem 0.65rem;
+  cursor: pointer;
+}
+.lc-timeline-preset:hover { background: var(--card-h); }
+.lc-timeline-preset[aria-pressed="true"] {
+  border-color: var(--brand);
+  color: var(--brand-dim);
+}
+.lc-timeline-axis {
+  height: 1.1rem;
+  font-family: var(--font-structural);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+.lc-timeline-viewport {
+  position: relative;
+  /* Q4: internal vertical scroll, deliberately no row cap — the page container
+     keeps its own scroll (`.lc-page` carries no fixed height), this viewport
+     scrolls independently once a session's runs stack past its max-height. */
+  max-height: 320px;
+  overflow-y: auto;
+  overflow-x: hidden; /* bars never exceed the viewport at any zoom level (Phase 2+) */
+}
+.lc-timeline-bar {
+  position: absolute;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  background: var(--slate);
+}
+/*
+ * Colour source is `outcomeKind` (data-kind), NEVER dispatch `kind`/
+ * `promptName` — those stay label text only (title/aria-label). The existing
+ * `.lc-event[data-kind="…"]` rules above are scoped to `.lc-event .lc-event-glyph`
+ * (a descendant glyph), so they do not apply here — new bar-scoped rules on the
+ * same six tokens instead.
+ */
+.lc-timeline-bar[data-kind="done"]     { background: var(--green); }
+.lc-timeline-bar[data-kind="working"]  { background: var(--amber); }
+.lc-timeline-bar[data-kind="blocked"]  { background: var(--slate); }
+.lc-timeline-bar[data-kind="failed"]   { background: var(--red); }
+.lc-timeline-bar[data-kind="evidence"] { background: var(--brand); }
+.lc-timeline-bar[data-kind="info"]     { background: var(--slate); } /* skipped: deliberately neutral, not a 7th colour */
+
+/* M5: a clipped-start run's true dispatch predates the 24h window — a dashed
+   left edge (instead of the normal rounded corner) marks "this ran in from
+   before the visible window", distinct from an ordinary bar's start. */
+.lc-timeline-bar--clipped {
+  border-left: 2px dashed var(--card);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
 /* ── Pulse-lane rail ────────────────────────────────────────────────────── */
 .lc-lanes-section { margin-bottom: 1.75rem; }
 .lc-lanes { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
