@@ -83,6 +83,59 @@ async function resolveColorToken(page, token) {
   }, token);
 }
 
+// LIN-1743 (Phase 2) gesture helpers — real DOM events dispatched on the
+// timeline viewport, not reaching into module-private state. Touch/TouchEvent
+// constructors work in this project's bundled Chromium regardless of a
+// `hasTouch` context, so pinch/pan are exercised as genuine touch sequences.
+async function wheelZoom(page, selector, { deltaY, ctrlKey = true }) {
+  await page.locator(selector).evaluate((el, opts) => {
+    const rect = el.getBoundingClientRect();
+    el.dispatchEvent(new WheelEvent('wheel', {
+      deltaY: opts.deltaY, ctrlKey: opts.ctrlKey, bubbles: true, cancelable: true,
+      clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2,
+    }));
+  }, { deltaY, ctrlKey });
+}
+
+async function pinch(page, selector, { startSpread, endSpread }) {
+  await page.locator(selector).evaluate((el, opts) => {
+    const rect = el.getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    const midY = rect.top + rect.height / 2;
+    const touchesAt = (spread) => [
+      new Touch({ identifier: 1, target: el, clientX: midX - spread / 2, clientY: midY }),
+      new Touch({ identifier: 2, target: el, clientX: midX + spread / 2, clientY: midY }),
+    ];
+    el.dispatchEvent(new TouchEvent('touchstart', { touches: touchesAt(opts.startSpread), bubbles: true, cancelable: true }));
+    el.dispatchEvent(new TouchEvent('touchmove', { touches: touchesAt(opts.endSpread), bubbles: true, cancelable: true }));
+    el.dispatchEvent(new TouchEvent('touchend', { touches: [], bubbles: true, cancelable: true }));
+  }, { startSpread, endSpread });
+}
+
+async function dragPan(page, selector, { startX, dx }) {
+  await page.locator(selector).evaluate((el, opts) => {
+    const rect = el.getBoundingClientRect();
+    const y = rect.top + rect.height / 2;
+    const touchAt = (x) => new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+    el.dispatchEvent(new TouchEvent('touchstart', { touches: [touchAt(opts.startX)], bubbles: true, cancelable: true }));
+    el.dispatchEvent(new TouchEvent('touchmove', { touches: [touchAt(opts.startX + opts.dx)], bubbles: true, cancelable: true }));
+    el.dispatchEvent(new TouchEvent('touchend', { touches: [], bubbles: true, cancelable: true }));
+  }, { startX, dx });
+}
+
+// The viewport's own current { start, end } window (public/live-console.js's
+// syncTimelineWindowAttrs), in epoch ms. A seeded run in these specs is only
+// ever a second or two old, which sits under updateTimelineBarNode's MIN_W
+// visibility floor at EVERY span the presets/gestures can reach — its bar's
+// own rendered geometry is therefore useless for telling spans apart. The
+// window bounds are the real, floor-free signal these tests need.
+async function timelineWindow(page) {
+  return page.evaluate(() => {
+    const el = document.querySelector('[data-testid="live-console-timeline"]');
+    return { start: Number(el.dataset.windowStart), end: Number(el.dataset.windowEnd) };
+  });
+}
+
 // Seed the audit rows Beat 1's predicate folds into `credential_dead`: within
 // the window, a token needs BOTH an exactly-`token_ownerless` note AND a
 // success (<400). Anything less is not a death, by design.
@@ -570,6 +623,133 @@ test.describe('Live Console (experimental)', () => {
       await bar.evaluate(el => { el.dataset.probe = 'still-here'; });
       await page.waitForTimeout(5500); // one more 5s poll tick
       await expect(bar).toHaveAttribute('data-probe', 'still-here');
+    });
+  });
+
+  // Zoom/pan/gestures (LIN-1743, Phase 2 of LIN-1720): the 1h/24h presets,
+  // ctrl/meta+wheel desktop zoom, and touch pinch+drag on the timeline
+  // viewport built in Phase 1. `timelineWindow` reads the window bounds off
+  // the viewport element rather than a bar's rendered geometry, because a
+  // freshly-seeded run's actual duration (a second or two) sits under
+  // updateTimelineBarNode's MIN_W visibility floor at every span these tests
+  // reach, which would make its rendered width identical regardless of zoom.
+  test.describe('Zoom & pan gestures (LIN-1743)', () => {
+    const TIMELINE = '[data-testid="live-console-timeline"]';
+    const PRESET_1H = '[data-testid="live-console-timeline-preset-1h"]';
+    const PRESET_24H = '[data-testid="live-console-timeline-preset-24h"]';
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const HOUR_MS = 60 * 60 * 1000;
+
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+    });
+    test.afterEach(async ({ page }) => {
+      await clearFeed(page, URL_KEY);
+    });
+
+    test('the 1h preset narrows the window to exactly 1h and marks itself pressed', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9001', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      const before = await timelineWindow(page);
+      expect(before.end - before.start).toBe(DAY_MS); // Phase 1's unchanged default
+
+      await page.locator(PRESET_1H).click();
+      const after = await timelineWindow(page);
+
+      expect(after.end - after.start).toBe(HOUR_MS);
+      await expect(page.locator(PRESET_1H)).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator(PRESET_24H)).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    test('the 24h preset returns to the default live window after a 1h detour', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9002', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+
+      await page.locator(PRESET_1H).click();
+      await page.locator(PRESET_24H).click();
+      const restored = await timelineWindow(page);
+
+      expect(restored.end - restored.start).toBe(DAY_MS);
+      await expect(page.locator(PRESET_24H)).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator(PRESET_1H)).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    test('ctrl+wheel zooms in smoothly; a plain wheel (no ctrl/meta) leaves the window untouched', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9003', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      const baseline = await timelineWindow(page);
+
+      await wheelZoom(page, TIMELINE, { deltaY: -200, ctrlKey: false });
+      expect(await timelineWindow(page)).toEqual(baseline); // native page scroll instead
+
+      await wheelZoom(page, TIMELINE, { deltaY: -800, ctrlKey: true }); // negative deltaY: zoom in
+      const zoomed = await timelineWindow(page);
+      expect(zoomed.end - zoomed.start).toBeLessThan(baseline.end - baseline.start);
+      // Both presets go un-pressed once the span is a custom (non-preset) value.
+      await expect(page.locator(PRESET_1H)).toHaveAttribute('aria-pressed', 'false');
+      await expect(page.locator(PRESET_24H)).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    test('a poll tick mid-gesture does not reset a custom (non-preset) zoom level', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9004', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+
+      await wheelZoom(page, TIMELINE, { deltaY: -1200, ctrlKey: true });
+      const zoomed = await timelineWindow(page);
+      expect(zoomed.end - zoomed.start).toBeLessThan(DAY_MS);
+      await page.waitForTimeout(5500); // one more 5s poll tick
+      expect(await timelineWindow(page)).toEqual(zoomed);
+    });
+
+    test('pinch-zoom (touch-emulated) narrows the window as the fingers spread', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9005', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      const baseline = await timelineWindow(page);
+
+      await pinch(page, TIMELINE, { startSpread: 20, endSpread: 240 });
+      const zoomed = await timelineWindow(page);
+      expect(zoomed.end - zoomed.start).toBeLessThan(baseline.end - baseline.start);
+    });
+
+    test('single-finger drag pans the window (bounds shift) without changing its span', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9006', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      // At the default 24h span the window already covers the FULL allowed
+      // axis [now-24h, now] — there is nowhere to pan without immediately
+      // hitting both edge clamps, which would snap it right back to itself.
+      // Zoom in first (1h) so a pan has room to move.
+      await page.locator(PRESET_1H).click();
+      const before = await timelineWindow(page);
+
+      // Dragging right reveals EARLIER time — the window shifts back in time,
+      // preserving its span exactly (no clamp in play, well inside the axis).
+      await dragPan(page, TIMELINE, { startX: 300, dx: 150 });
+      const after = await timelineWindow(page);
+
+      expect(after.end - after.start).toBe(before.end - before.start);
+      expect(after.start).toBeLessThan(before.start);
+      expect(after.end).toBeLessThan(before.end);
+    });
+
+    test('a gesture that does not originate on the timeline leaves its window untouched (normal page scroll survives)', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9007', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      const baseline = await timelineWindow(page);
+
+      // Dispatched on a sibling section, never reaching the timeline's own
+      // listeners — the gesture handlers are scoped to els.timeline only.
+      await pinch(page, '[data-testid="live-console-lanes"]', { startSpread: 20, endSpread: 240 });
+      await dragPan(page, '[data-testid="live-console-lanes"]', { startX: 300, dx: 150 });
+
+      expect(await timelineWindow(page)).toEqual(baseline);
     });
   });
 });

@@ -53,6 +53,63 @@ window.computeFitZoom = function computeFitZoom(opts) {
   return Math.max(minZoom, Math.min(maxZoom, raw));
 };
 
+// Default window bounds for the Live Console timeline zoom/pan primitives —
+// mirrors lib/timeline-zoom.js's TIMELINE_MIN_SPAN_MS/TIMELINE_MAX_SPAN_MS.
+var TIMELINE_MIN_SPAN_MS = 60 * 60 * 1000; // 1h
+var TIMELINE_MAX_SPAN_MS = 24 * 60 * 60 * 1000; // 24h
+
+function clampTimelineWindow(startMs, endMs, nowMs, maxSpanMs) {
+  var span = endMs - startMs;
+  var boundEnd = nowMs;
+  var boundStart = nowMs - maxSpanMs;
+  var s = startMs, e = endMs;
+  if (e > boundEnd) { e = boundEnd; s = e - span; }
+  if (s < boundStart) { s = boundStart; e = s + span; }
+  return { startMs: s, endMs: e };
+}
+
+/**
+ * Live Console timeline zoom (LIN-1743). Mirror of lib/timeline-zoom.js
+ * computeTimelineZoom — zoom the window around a focal point, keeping the
+ * instant at `focalX` stationary. Keep in sync with the pure version.
+ * @global
+ */
+window.computeTimelineZoom = function computeTimelineZoom(opts) {
+  var startMs = opts.startMs, endMs = opts.endMs;
+  var focalX = opts.focalX, deltaZoom = opts.deltaZoom;
+  var viewportWidthPx = opts.viewportWidthPx, nowMs = opts.nowMs;
+  var minSpanMs = opts.minSpanMs === undefined ? TIMELINE_MIN_SPAN_MS : opts.minSpanMs;
+  var maxSpanMs = opts.maxSpanMs === undefined ? TIMELINE_MAX_SPAN_MS : opts.maxSpanMs;
+  if (!(viewportWidthPx > 0) || !(endMs > startMs)) return { startMs: startMs, endMs: endMs };
+  var span = endMs - startMs;
+  var factor = Math.exp(deltaZoom);
+  var newSpan = Math.max(minSpanMs, Math.min(maxSpanMs, span * factor));
+  var ratio = Math.max(0, Math.min(1, focalX / viewportWidthPx));
+  var focalMs = startMs + ratio * span;
+  var newStart = focalMs - ratio * newSpan;
+  var newEnd = newStart + newSpan;
+  return clampTimelineWindow(newStart, newEnd, nowMs, maxSpanMs);
+};
+
+/**
+ * Live Console timeline pan (LIN-1743). Mirror of lib/timeline-zoom.js
+ * computeTimelinePan — shift the window by deltaPx, preserving its span,
+ * clamped to the same axis bounds computeTimelineZoom uses. Keep in sync
+ * with the pure version.
+ * @global
+ */
+window.computeTimelinePan = function computeTimelinePan(opts) {
+  var startMs = opts.startMs, endMs = opts.endMs;
+  var deltaPx = opts.deltaPx, viewportWidthPx = opts.viewportWidthPx, nowMs = opts.nowMs;
+  var maxSpanMs = opts.maxSpanMs === undefined ? TIMELINE_MAX_SPAN_MS : opts.maxSpanMs;
+  if (!(viewportWidthPx > 0) || !(endMs > startMs)) return { startMs: startMs, endMs: endMs };
+  var span = endMs - startMs;
+  var deltaMs = (deltaPx / viewportWidthPx) * span;
+  var newStart = startMs - deltaMs;
+  var newEnd = endMs - deltaMs;
+  return clampTimelineWindow(newStart, newEnd, nowMs, maxSpanMs);
+};
+
 // =============================================================================
 // Theme Primitives (client-side replicas of lib/components/* — LIN-861)
 // =============================================================================

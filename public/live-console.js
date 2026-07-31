@@ -33,9 +33,11 @@
   const HISTORY_PAGE = 40;
   const TICK_MS = 30000;       // relative-time refresh cadence
   const PULSE_WINDOW_MS = 3 * 60 * 1000; // time span the flowing strip covers (right=now)
-  const TIMELINE_WINDOW_MS = 24 * 60 * 60 * 1000; // fixed, non-zoomed 24h axis (Phase 1)
+  const TIMELINE_WINDOW_MS = 24 * 60 * 60 * 1000; // full axis bound + default/live span
+  const TIMELINE_MIN_SPAN_MS = 60 * 60 * 1000;    // 1h preset / interactive zoom-in floor
   const TIMELINE_ROW_HEIGHT = 18;
   const TIMELINE_ROW_GAP = 4;
+  const TIMELINE_WHEEL_ZOOM_SPEED = 0.0025;
   const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Kind → glyph (colour lives in live-console.css via [data-kind]).
@@ -55,6 +57,7 @@
     chips: document.getElementById('live-console-chips'),
     timeline: document.getElementById('live-console-timeline'),
     timelineEmpty: document.getElementById('live-console-timeline-empty'),
+    timelinePresets: Array.from(document.querySelectorAll('.lc-timeline-preset[data-range]')),
     lanes: document.getElementById('live-console-lanes'),
     lanesEmpty: document.getElementById('live-console-lanes-empty'),
     stream: document.getElementById('live-console-stream'),
@@ -71,6 +74,14 @@
   const eventNodes = new Map();         // live event id → <li>
   const timelineBarNodes = new Map();   // timeline run id → <div class="lc-timeline-bar">
   let lastServerNow = 0;                // last poll's serverNow — the timeline's anchor for "now"
+  // LIN-1743 (Phase 2): the timeline's zoom/pan viewport, module-scope and
+  // untouched by paintTimeline's poll-driven reconcile — a poll tick mid-gesture
+  // must not reset it. `endMs: null` means "live" (tracks lastServerNow every
+  // poll, i.e. the Phase 1 default); a gesture or a preset sets a concrete
+  // spanMs, and re-pins to live only once panned/zoomed back to the right edge.
+  let timelineView = { spanMs: TIMELINE_WINDOW_MS, endMs: null };
+  let timelineFlat = [];                // last { run, rowIndex } list, for viewport-only repaints
+  let timelineGesture = null;           // active touch gesture: { mode: 'pinch'|'pan', ... }
   const historyIds = new Set();         // ids paged into the history region
   let lastFeed = null;                  // last successful live feed (for in-place re-filter)
   let liveOldestTs = null;              // oldest ts in the live feed (first history cursor)
@@ -136,15 +147,38 @@
     eventNodes.clear();
   }
 
-  // ─── Timeline (LIN-1742, Phase 1: static, non-zoomable last-24h swimlane) ──
-  // Bars are laid out on a fixed 24h axis (`start`/`end` epoch ms → left/width
-  // percentages), stacked into the rows the SERVER already packed
-  // (lib/live-console.js's packTimelineRows) — this phase does no client-side
-  // repacking. Keyed reconcile by run id (same house rule as paintLanes/
-  // paintStream, above: nodes updated in place, never innerHTML-replaced, so a
-  // hidden bar's node reference survives a poll tick).
+  // ─── Timeline (LIN-1742 Phase 1 static swimlane + LIN-1743 Phase 2 zoom/pan) ─
+  // Bars are laid out on the CURRENT VIEW WINDOW (`currentTimelineWindow()` →
+  // `start`/`end` epoch ms → left/width percentages), stacked into the rows the
+  // SERVER already packed (lib/live-console.js's packTimelineRows) — the client
+  // still does no repacking, only re-layout of the same rows against a
+  // zoomable/pannable window. Keyed reconcile by run id (same house rule as
+  // paintLanes/paintStream, above: nodes updated in place, never
+  // innerHTML-replaced, so a hidden bar's node reference — and any in-flight
+  // gesture — survives a poll tick).
   function timelineLabel(run) {
     return (run && (run.kind || run.promptName)) || 'run';
+  }
+  // The visible window: { start, end } epoch ms. `timelineView.endMs === null`
+  // means "live" — tracks lastServerNow every call, exactly Phase 1's fixed
+  // now-24h..now behaviour. A gesture or preset pins a concrete window instead;
+  // paintTimeline (poll-driven) reads this but never writes it, so a poll tick
+  // mid-gesture can't reset the viewport.
+  function currentTimelineWindow() {
+    const now = lastServerNow || Date.now();
+    const end = timelineView.endMs != null ? timelineView.endMs : now;
+    return { start: end - timelineView.spanMs, end };
+  }
+  // Exposes the visible window on the viewport element itself — cheap
+  // groundwork for LIN-1755's axis ticks (which need exactly these bounds to
+  // label the axis) and a stable hook for tests, which otherwise have no way
+  // to observe the window once a fresh/near-now bar's true share of it falls
+  // under updateTimelineBarNode's MIN_W visibility floor.
+  function syncTimelineWindowAttrs() {
+    if (!els.timeline) return;
+    const { start, end } = currentTimelineWindow();
+    els.timeline.dataset.windowStart = String(Math.round(start));
+    els.timeline.dataset.windowEnd = String(Math.round(end));
   }
   function timelineBarNode(run) {
     const div = document.createElement('div');
@@ -155,16 +189,18 @@
   }
   function updateTimelineBarNode(div, run, rowIndex) {
     const now = lastServerNow || Date.now();
-    const windowStart = now - TIMELINE_WINDOW_MS;
+    const { start: windowStart, end: windowEnd } = currentTimelineWindow();
+    const span = Math.max(1, windowEnd - windowStart);
     const clampedEnd = run.end != null ? run.end : now;
-    const pct = (t) => Math.max(0, Math.min(100, ((t - windowStart) / TIMELINE_WINDOW_MS) * 100));
+    const pct = (t) => Math.max(0, Math.min(100, ((t - windowStart) / span) * 100));
     // A visible sliver for a near-zero-duration run, but never past the
-    // container's right edge — a run ending right at "now" (pct(run.start) ≈ 100)
-    // must not push left+width over 100% and force a horizontal scrollbar.
-    // `startPct` itself is clamped to `100 - MIN_W` (not just `widthPct`'s upper
-    // bound) so the floor survives for a run starting at/after that point —
-    // otherwise `100 - startPct` degenerates to the run's own duration and the
-    // outer `min` always wins, defeating MIN_W for every fresh/still-running run.
+    // container's right edge — a run ending right at the window's edge
+    // (pct(run.start) ≈ 100) must not push left+width over 100% and force a
+    // horizontal scrollbar. `startPct` itself is clamped to `100 - MIN_W` (not
+    // just `widthPct`'s upper bound) so the floor survives for a run starting
+    // at/after that point — otherwise `100 - startPct` degenerates to the run's
+    // own duration and the outer `min` always wins, defeating MIN_W for every
+    // fresh/still-running run.
     const MIN_W = 0.6;
     const startPct = Math.min(pct(run.start), 100 - MIN_W);
     const widthPct = Math.min(Math.max(pct(clampedEnd) - startPct, MIN_W), 100 - startPct);
@@ -186,6 +222,8 @@
     rows.forEach((row, rowIndex) => {
       (Array.isArray(row) ? row : []).forEach(run => { if (run) flat.push({ run, rowIndex }); });
     });
+    timelineFlat = flat; // for gesture-driven repaints that touch no new data
+    syncTimelineWindowAttrs();
 
     const wanted = new Set(flat.map(f => f.run.id));
     for (const [id, node] of timelineBarNodes) {
@@ -200,6 +238,170 @@
 
     const visibleCount = flat.filter(f => isVisibleWs(f.run.workspaceUrlKey)).length;
     if (els.timelineEmpty) els.timelineEmpty.hidden = visibleCount > 0;
+  }
+
+  // Re-layout the existing bars against the current window WITHOUT touching
+  // which runs exist — the pure viewport-only half of a zoom/pan gesture. Data
+  // changes (new/removed runs) stay paintTimeline's job, driven by the poll.
+  function repaintTimelineViewport() {
+    syncTimelineWindowAttrs();
+    for (const { run, rowIndex } of timelineFlat) {
+      const node = timelineBarNodes.get(run.id);
+      if (node) updateTimelineBarNode(node, run, rowIndex);
+    }
+  }
+
+  function updateTimelinePresetPressed() {
+    els.timelinePresets.forEach(btn => {
+      const target = btn.getAttribute('data-range') === '1h' ? TIMELINE_MIN_SPAN_MS : TIMELINE_WINDOW_MS;
+      btn.setAttribute('aria-pressed', String(timelineView.spanMs === target));
+    });
+  }
+
+  // Adopt a { startMs, endMs } window computed by computeTimelineZoom/Pan.
+  // Re-pins to "live" (endMs: null) once panned/zoomed back to the current
+  // right edge, so the view keeps tracking new runs without another gesture —
+  // matching the 1h/24h presets, which are always live.
+  function applyTimelineWindow({ startMs, endMs }) {
+    const now = lastServerNow || Date.now();
+    timelineView = {
+      spanMs: endMs - startMs,
+      endMs: (now - endMs) < 1000 ? null : endMs,
+    };
+    updateTimelinePresetPressed();
+    repaintTimelineViewport();
+  }
+
+  function setTimelinePreset(spanMs) {
+    timelineView = { spanMs, endMs: null };
+    updateTimelinePresetPressed();
+    repaintTimelineViewport();
+  }
+
+  // ─── Timeline gestures (LIN-1743, Phase 2 of LIN-1720) ──────────────────────
+  // Desktop: wheel + ctrl/meta (mirrors public/ship.js:1548-1552's gating — a
+  // plain wheel keeps native page scroll). Mobile: two-finger pinch zooms
+  // (focal point = the pinch midpoint), one-finger drag pans; `touch-action:
+  // none` on `.lc-timeline-viewport` (public/live-console.css) hands the WHOLE
+  // gesture to this hand-rolled code — including the vertical axis, which the
+  // pan branch below passes straight through as a manual `scrollTop` nudge so
+  // the viewport's own internal scroll (many stacked session rows, Q4) isn't
+  // lost to the disabled native touch-scroll.
+  function timelineViewportRect() {
+    return els.timeline.getBoundingClientRect();
+  }
+  function onTimelineWheel(e) {
+    if (!e.ctrlKey && !e.metaKey) return; // plain wheel: let the page scroll natively
+    e.preventDefault();
+    const rect = timelineViewportRect();
+    const { start, end } = currentTimelineWindow();
+    const next = window.computeTimelineZoom({
+      startMs: start,
+      endMs: end,
+      focalX: e.clientX - rect.left,
+      deltaZoom: e.deltaY * TIMELINE_WHEEL_ZOOM_SPEED,
+      viewportWidthPx: rect.width || els.timeline.clientWidth,
+      nowMs: lastServerNow || Date.now(),
+    });
+    applyTimelineWindow(next);
+  }
+  function touchDistance(t0, t1) {
+    return Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+  }
+  function touchMidX(t0, t1, rect) {
+    return (t0.clientX + t1.clientX) / 2 - rect.left;
+  }
+  function onTimelineTouchStart(e) {
+    if (e.touches.length === 2) {
+      const rect = timelineViewportRect();
+      timelineGesture = {
+        mode: 'pinch',
+        startDist: touchDistance(e.touches[0], e.touches[1]),
+        focalX: touchMidX(e.touches[0], e.touches[1], rect),
+        rectWidth: rect.width || els.timeline.clientWidth,
+        window: currentTimelineWindow(),
+      };
+    } else if (e.touches.length === 1) {
+      const rect = timelineViewportRect();
+      timelineGesture = {
+        mode: 'pan',
+        lastX: e.touches[0].clientX,
+        lastY: e.touches[0].clientY,
+        rectWidth: rect.width || els.timeline.clientWidth,
+      };
+    } else {
+      timelineGesture = null;
+    }
+  }
+  function onTimelineTouchMove(e) {
+    if (!timelineGesture) return;
+    const now = lastServerNow || Date.now();
+    if (timelineGesture.mode === 'pinch' && e.touches.length === 2) {
+      e.preventDefault();
+      const dist = touchDistance(e.touches[0], e.touches[1]);
+      if (!(timelineGesture.startDist > 0) || !(dist > 0)) return;
+      // Fingers spreading (dist grows) → zoom IN (span shrinks); pinching
+      // together → zoom OUT — hence the negated log ratio.
+      const deltaZoom = -Math.log(dist / timelineGesture.startDist);
+      const next = window.computeTimelineZoom({
+        startMs: timelineGesture.window.start,
+        endMs: timelineGesture.window.end,
+        focalX: timelineGesture.focalX,
+        deltaZoom,
+        viewportWidthPx: timelineGesture.rectWidth,
+        nowMs: now,
+      });
+      applyTimelineWindow(next);
+    } else if (timelineGesture.mode === 'pan' && e.touches.length === 1) {
+      e.preventDefault();
+      const x = e.touches[0].clientX;
+      const y = e.touches[0].clientY;
+      const deltaX = x - timelineGesture.lastX;
+      const deltaY = y - timelineGesture.lastY;
+      timelineGesture.lastX = x;
+      timelineGesture.lastY = y;
+      // Vertical component: hand-rolled scroll passthrough — touch-action:none
+      // suppresses the browser's own scroll for this element, so nothing else
+      // moves the row-stack's overflow-y:auto viewport on touch.
+      if (deltaY && els.timeline) els.timeline.scrollTop -= deltaY;
+      if (!deltaX) return;
+      const { start, end } = currentTimelineWindow();
+      const next = window.computeTimelinePan({
+        startMs: start,
+        endMs: end,
+        deltaPx: deltaX,
+        viewportWidthPx: timelineGesture.rectWidth,
+        nowMs: now,
+      });
+      applyTimelineWindow(next);
+    }
+  }
+  function onTimelineTouchEnd(e) {
+    if (e.touches.length === 0) {
+      timelineGesture = null;
+    } else if (e.touches.length === 1 && timelineGesture && timelineGesture.mode === 'pinch') {
+      // Dropped from two fingers to one mid-pinch: keep the gesture alive as a pan.
+      const rect = timelineViewportRect();
+      timelineGesture = {
+        mode: 'pan',
+        lastX: e.touches[0].clientX,
+        lastY: e.touches[0].clientY,
+        rectWidth: rect.width || els.timeline.clientWidth,
+      };
+    }
+  }
+  function wireTimelineGestures() {
+    if (!els.timeline) return;
+    els.timeline.addEventListener('wheel', onTimelineWheel, { passive: false });
+    els.timeline.addEventListener('touchstart', onTimelineTouchStart, { passive: true });
+    els.timeline.addEventListener('touchmove', onTimelineTouchMove, { passive: false });
+    els.timeline.addEventListener('touchend', onTimelineTouchEnd, { passive: true });
+    els.timeline.addEventListener('touchcancel', onTimelineTouchEnd, { passive: true });
+    els.timelinePresets.forEach(btn => {
+      btn.addEventListener('click', () => {
+        setTimelinePreset(btn.getAttribute('data-range') === '1h' ? TIMELINE_MIN_SPAN_MS : TIMELINE_WINDOW_MS);
+      });
+    });
   }
 
   // ─── Chips (cross-workspace filter) ─────────────────────────────────────────
@@ -626,6 +828,7 @@
 
   if (els.moreBtn) els.moreBtn.addEventListener('click', loadMore);
   buildChips();
+  wireTimelineGestures();
   renderSkeleton();
   start();
 })();

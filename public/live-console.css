@@ -121,7 +121,7 @@
 }
 .lc-section-mark { color: var(--brand); margin-right: 0.3rem; }
 
-/* ── Swimlane timeline (LIN-1742, Phase 1: static, non-zoomable) ──────────── */
+/* ── Swimlane timeline (LIN-1742 Phase 1 + LIN-1743 Phase 2: zoom/pan) ────── */
 .lc-timeline-section {
   margin-bottom: 1.75rem;
 }
@@ -177,6 +177,12 @@
   max-height: 320px;
   overflow-y: auto;
   overflow-x: hidden; /* bars never exceed the viewport at any zoom level (Phase 2+) */
+  /* LIN-1743 (Phase 2): pinch-zoom + drag-pan are hand-rolled in JS, including
+     the vertical axis (public/live-console.js's touchmove pan branch nudges
+     scrollTop manually) — deliberately `none`, not `pan-y` (public/swipe.css):
+     `pan-y` would let the browser take over a vertical-dominant drag mid-pinch,
+     which a two-finger gesture can easily start as. */
+  touch-action: none;
 }
 .lc-timeline-bar {
   position: absolute;

@@ -18,6 +18,12 @@ import {
   buildConsoleFeed,
   TIMELINE_RUN_CAP,
 } from '../../lib/live-console.js';
+import {
+  computeTimelineZoom,
+  computeTimelinePan,
+  TIMELINE_MIN_SPAN_MS,
+  TIMELINE_MAX_SPAN_MS,
+} from '../../lib/timeline-zoom.js';
 
 const NOW = Date.parse('2026-07-31T12:00:00.000Z');
 const MIN = 60 * 1000;
@@ -313,4 +319,101 @@ test('the history-page branch (loops: []) yields an empty/absent timeline shape'
   // Mirrors routes/live-console.js's history-page call: loops:[] (status-only read).
   const { timeline } = buildConsoleFeed({ statusItems: [], loops: [] }, { now: NOW, before: NOW });
   assert.deepEqual(timeline, { rows: [], connectors: [], truncated: false, totalInWindow: 0 });
+});
+
+// ─── computeTimelineZoom / computeTimelinePan (LIN-1743, Phase 2) ────────────
+// Pure zoom/pan math shared by the wheel/pinch/preset call sites in
+// public/live-console.js (mirrored on window in public/common.js).
+
+const VIEWPORT_W = 900;
+
+test('computeTimelineZoom clamps the span to [minSpanMs, maxSpanMs]', () => {
+  // A large zoom-IN delta would shrink the span far below 1h — clamps to the floor.
+  const zoomedIn = computeTimelineZoom({
+    startMs: NOW - HOUR, endMs: NOW, focalX: VIEWPORT_W / 2,
+    deltaZoom: -10, viewportWidthPx: VIEWPORT_W, nowMs: NOW,
+  });
+  assert.equal(zoomedIn.endMs - zoomedIn.startMs, TIMELINE_MIN_SPAN_MS);
+
+  // A large zoom-OUT delta from a short span would grow it past 24h — clamps to the ceiling.
+  const zoomedOut = computeTimelineZoom({
+    startMs: NOW - HOUR, endMs: NOW, focalX: VIEWPORT_W / 2,
+    deltaZoom: 10, viewportWidthPx: VIEWPORT_W, nowMs: NOW,
+  });
+  assert.equal(zoomedOut.endMs - zoomedOut.startMs, TIMELINE_MAX_SPAN_MS);
+});
+
+test('computeTimelineZoom keeps the instant under the focal point stationary', () => {
+  // Window comfortably inside the axis bounds so clamping never engages —
+  // isolates the focal-point invariant from the edge-clamp behaviour below.
+  const startMs = NOW - 10 * HOUR;
+  const endMs = NOW - 2 * HOUR;
+  const focalX = 300; // arbitrary point inside the viewport, not dead centre
+  const span = endMs - startMs;
+  const focalMsBefore = startMs + (focalX / VIEWPORT_W) * span;
+
+  const next = computeTimelineZoom({
+    startMs, endMs, focalX, deltaZoom: -0.5, viewportWidthPx: VIEWPORT_W, nowMs: NOW,
+  });
+  const nextSpan = next.endMs - next.startMs;
+  const focalMsAfter = next.startMs + (focalX / VIEWPORT_W) * nextSpan;
+  assert.ok(Math.abs(focalMsAfter - focalMsBefore) < 1, 'focal instant drifted across the zoom');
+  assert.ok(nextSpan < span, 'a negative deltaZoom should zoom in (shrink the span)');
+});
+
+test('computeTimelineZoom clamps the window to the fixed [now - maxSpanMs, now] axis', () => {
+  // Zooming out from a window already at the live edge must never push endMs
+  // past "now" or startMs past the 24h floor.
+  const next = computeTimelineZoom({
+    startMs: NOW - 2 * HOUR, endMs: NOW, focalX: VIEWPORT_W, // focal pinned to the right edge
+    deltaZoom: 5, viewportWidthPx: VIEWPORT_W, nowMs: NOW,
+  });
+  assert.equal(next.endMs, NOW);
+  assert.ok(next.startMs >= NOW - TIMELINE_MAX_SPAN_MS);
+});
+
+test('computeTimelineZoom is a no-op on degenerate input (zero viewport, inverted window)', () => {
+  assert.deepEqual(
+    computeTimelineZoom({ startMs: NOW - HOUR, endMs: NOW, focalX: 10, deltaZoom: -1, viewportWidthPx: 0, nowMs: NOW }),
+    { startMs: NOW - HOUR, endMs: NOW }
+  );
+  assert.deepEqual(
+    computeTimelineZoom({ startMs: NOW, endMs: NOW - HOUR, focalX: 10, deltaZoom: -1, viewportWidthPx: VIEWPORT_W, nowMs: NOW }),
+    { startMs: NOW, endMs: NOW - HOUR }
+  );
+});
+
+test('computeTimelinePan preserves the span and shifts the window by deltaPx', () => {
+  const startMs = NOW - 10 * HOUR;
+  const endMs = NOW - 8 * HOUR; // 2h span, well inside the axis bounds
+  const span = endMs - startMs;
+  // Dragging right (positive deltaPx) reveals earlier time — window moves back.
+  const next = computeTimelinePan({ startMs, endMs, deltaPx: 90, viewportWidthPx: VIEWPORT_W, nowMs: NOW });
+  assert.equal(next.endMs - next.startMs, span);
+  assert.ok(next.startMs < startMs);
+  assert.ok(next.endMs < endMs);
+});
+
+test('computeTimelinePan clamps at the live edge (cannot pan past "now")', () => {
+  const next = computeTimelinePan({
+    startMs: NOW - 2 * HOUR, endMs: NOW, deltaPx: -500, // drag left: reveal LATER time
+    viewportWidthPx: VIEWPORT_W, nowMs: NOW,
+  });
+  assert.equal(next.endMs, NOW);
+});
+
+test('computeTimelinePan clamps at the history edge (cannot pan past now - 24h)', () => {
+  const next = computeTimelinePan({
+    startMs: NOW - TIMELINE_MAX_SPAN_MS, endMs: NOW - TIMELINE_MAX_SPAN_MS + 2 * HOUR,
+    deltaPx: 500, // drag right: reveal EARLIER time, past the axis floor
+    viewportWidthPx: VIEWPORT_W, nowMs: NOW,
+  });
+  assert.equal(next.startMs, NOW - TIMELINE_MAX_SPAN_MS);
+});
+
+test('computeTimelinePan is a no-op on degenerate input (zero viewport, inverted window)', () => {
+  assert.deepEqual(
+    computeTimelinePan({ startMs: NOW - HOUR, endMs: NOW, deltaPx: 50, viewportWidthPx: 0, nowMs: NOW }),
+    { startMs: NOW - HOUR, endMs: NOW }
+  );
 });
