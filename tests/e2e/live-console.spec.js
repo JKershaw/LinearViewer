@@ -139,6 +139,36 @@ test.describe('Live Console (experimental)', () => {
       const later = await canvas.evaluate(c => c.width);
       expect(later).toBe(first); // the old bug compounded width by devicePixelRatio each poll
     });
+
+    // Route-A regression assertion (LIN-1741, Phase 0 of LIN-1720). Pins the
+    // pre-panel geometry of the strip and its page container so a later phase's
+    // render/CSS change fails this test if it disturbs either — the recorded,
+    // non-image substitute for a pixel-diff gate this repo has no harness for.
+    // Values captured fresh against current markup, not assumed from prose:
+    // .lc-page's 1rem side padding plus the root's `scrollbar-gutter: stable`
+    // reservation narrow the mobile strip well below a naive viewport-minus-padding
+    // guess, so 319 (not 358) is the real pinned width at 390px.
+    test('route A: .lc-pulse geometry and .lc-page max-width stay pinned (LIN-1741)', async ({ page }) => {
+      const pulse = page.locator('.lc-pulse');
+
+      const desktop = await pulse.evaluate(el => {
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        return { width: r.width, height: r.height, display: cs.display, position: cs.position };
+      });
+      expect(desktop).toEqual({ width: 868, height: 46, display: 'block', position: 'static' });
+
+      const maxWidth = await page.locator('.lc-page').evaluate(el => getComputedStyle(el).maxWidth);
+      expect(maxWidth).toBe('900px');
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      const mobile = await pulse.evaluate(el => {
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        return { width: r.width, height: r.height, display: cs.display, position: cs.position };
+      });
+      expect(mobile).toEqual({ width: 319, height: 46, display: 'block', position: 'static' });
+    });
   });
 
   test.describe('Live data', () => {
