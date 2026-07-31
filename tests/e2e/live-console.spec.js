@@ -643,6 +643,144 @@ test.describe('Live Console (experimental)', () => {
     });
   });
 
+  // Final cross-surface polish (LIN-1744, Phase 3 of LIN-1720). F1/F3: a
+  // stale-tail bar (stillRunning: 'unknown' — its own last activity, freshness
+  // unconfirmed) and a genuinely still-running bar (stillRunning: true) both
+  // render data-kind="working" under outcome-based colouring, so colour alone
+  // can no longer distinguish them — these tests pin the end-treatment DOM
+  // signal (data-still-running) that carries the distinction instead, plus
+  // the label-fallback and malformed-data behaviours step 8 asks to confirm.
+  test.describe('Timeline polish (LIN-1744)', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+    });
+    test.afterEach(async ({ page }) => {
+      await clearFeed(page, URL_KEY);
+    });
+
+    test('a stale-tail bar and a genuinely still-running bar share data-kind="working" but carry distinct data-still-running values', async ({ page }) => {
+      let injected = false;
+      await page.route(`**${EVENTS_API}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!injected) {
+          injected = true;
+          const now = body.serverNow;
+          const live = {
+            id: 'f13-live-run', issueIdentifier: 'LIN-9200', kind: 'implementation', promptName: null,
+            outcomeKind: 'working', start: now - 5 * 60000, end: null,
+            stillRunning: true, clippedStart: false, groupKey: 'f13-live-run', followUpTo: null,
+            workspaceUrlKey: URL_KEY,
+          };
+          const staleTail = {
+            id: 'f13-stale-tail-run', issueIdentifier: 'LIN-9201', kind: 'implementation', promptName: null,
+            outcomeKind: 'working', start: now - 3 * 60 * 60000, end: now - 90 * 60000,
+            stillRunning: 'unknown', clippedStart: false, groupKey: 'f13-stale-tail-run', followUpTo: null,
+            workspaceUrlKey: URL_KEY,
+          };
+          body.timeline = { rows: [[live], [staleTail]], connectors: [], truncated: false, totalInWindow: 2 };
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      const liveBar = page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9200"]');
+      const staleBar = page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9201"]');
+      await expect(liveBar).toBeVisible();
+      await expect(staleBar).toBeVisible();
+
+      // Same colour-carrying attribute (both "working")...
+      await expect(liveBar).toHaveAttribute('data-kind', 'working');
+      await expect(staleBar).toHaveAttribute('data-kind', 'working');
+      // ...but the end treatment distinguishes them in the DOM.
+      await expect(liveBar).toHaveAttribute('data-still-running', 'true');
+      await expect(staleBar).toHaveAttribute('data-still-running', 'unknown');
+
+      // The live bar breathes (reusing the pulse-lane rail's own animation);
+      // the stale-tail bar never asserts work that isn't happening.
+      const [liveAnim, staleAnim] = await Promise.all([
+        liveBar.evaluate(el => getComputedStyle(el).animationName),
+        staleBar.evaluate(el => getComputedStyle(el).animationName),
+      ]);
+      expect(liveAnim).not.toBe('none');
+      expect(staleAnim).toBe('none');
+    });
+
+    test('the still-running bar animation is suppressed under prefers-reduced-motion', async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9210' });
+      await page.goto(PAGE_URL);
+      const bar = page.locator('[data-testid="live-console-timeline-bar"][data-still-running="true"]').first();
+      await expect(bar).toBeVisible();
+      const animation = await bar.evaluate(el => getComputedStyle(el).animationName);
+      expect(animation).toBe('none');
+    });
+
+    test('malformed/partial run data (missing end, missing groupKey) renders without error, falling back to a sane single bar', async ({ page }) => {
+      const pageErrors = [];
+      const consoleErrors = [];
+      let injected = false;
+      await page.route(`**${EVENTS_API}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!injected) {
+          injected = true;
+          const now = body.serverNow;
+          // Deliberately missing `end` and `groupKey` — a run shape the client
+          // must tolerate without throwing (success criterion 6).
+          const malformed = {
+            id: 'f13-malformed-run', issueIdentifier: 'LIN-9220', kind: null, promptName: null,
+            outcomeKind: 'working', start: now - 60000,
+            stillRunning: true, clippedStart: false, followUpTo: null,
+            workspaceUrlKey: URL_KEY,
+          };
+          body.timeline = { rows: [[malformed]], connectors: [], truncated: false, totalInWindow: 1 };
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+      page.on('pageerror', (err) => pageErrors.push(err));
+      page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
+
+      await page.goto(PAGE_URL);
+      const bar = page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9220"]');
+      await expect(bar).toBeVisible();
+      await expect(bar).toHaveAttribute('data-still-running', 'true');
+      await page.waitForTimeout(5500); // one more 5s poll tick — still no throw
+      expect(pageErrors).toEqual([]);
+      expect(consoleErrors).toEqual([]);
+    });
+
+    test('label fallback renders the literal kind/promptName defaults ("custom"/"Prompt") sanely, not as absent data', async ({ page }) => {
+      let injected = false;
+      await page.route(`**${EVENTS_API}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!injected) {
+          injected = true;
+          const now = body.serverNow;
+          // lib/dispatch-store.js's real literal defaults (kind: 'custom',
+          // promptName: 'Prompt') — not absent/undefined data.
+          const defaultLabelled = {
+            id: 'f13-default-label-run', issueIdentifier: 'LIN-9230', kind: 'custom', promptName: 'Prompt',
+            outcomeKind: 'working', start: now - 60000, end: null,
+            stillRunning: true, clippedStart: false, groupKey: 'f13-default-label-run', followUpTo: null,
+            workspaceUrlKey: URL_KEY,
+          };
+          body.timeline = { rows: [[defaultLabelled]], connectors: [], truncated: false, totalInWindow: 1 };
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      const bar = page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9230"]');
+      await expect(bar).toBeVisible();
+      // `kind` wins over `promptName` in the label fallback (timelineLabel),
+      // and the literal default reads as a real word, not blank/"undefined".
+      await expect(bar).toHaveAttribute('aria-label', 'LIN-9230 — custom');
+    });
+  });
+
   // Zoom/pan/gestures (LIN-1743, Phase 2 of LIN-1720): the 1h/24h presets,
   // ctrl/meta+wheel desktop zoom, and touch pinch+drag on the timeline
   // viewport built in Phase 1. `timelineWindow` reads the window bounds off
