@@ -913,10 +913,13 @@ Requires a `readWrite` scoped token. Builds the kickoff **and dispatches it** in
 | `target` | `cli` | Dispatch target (`cli`/`web`/`dash`; `local`/Harbour OS is not available to proxy consumers). |
 | `repo` | _(resolved)_ | Target repo. For a scoped run, defaults to the project's `repo=`; an explicit value wins. |
 | `appendProxyContext` | `true` | Append the Linear-access + token + reporting block so the run inherits proxy access. |
+| `maxTasks` | _(none)_ | Optional integer ≥ 1 — a **scope** bound, not a cost control: this run covers up to that many **distinct** tasks, enforced server-side (see below). Omit for an unbounded run (today's behavior, byte-identical). See LIN-1751. |
 
 Dispatched as `kind:"autopilot"`, so the server appends the session-id self-reference block to the prompt and the returned `id` is this run's session id. Pass that id as `sessionId` on every worker dispatch the run fans out (`POST /dispatch`, `POST /recommend-and-dispatch`) so all the work reconstructs as one session.
 
 An **issue-scoped** kickoff can be refused `409 DUPLICATE_DISPATCH` by the [duplicate guard](#enqueue-a-dispatch) — its kind is `autopilot`, so a second scoped run launched for the same task within 5 minutes hits it. Adopt the returned `id` and watch that run rather than starting a rival one. A **general** (stack-walk) kickoff carries no `issueIdentifier` and can never be refused.
+
+When `maxTasks` is set, every worker dispatch stamped with this run's `sessionId` is refused `409 BUDGET_EXHAUSTED` once it would be the run's `maxTasks + 1`th **distinct** task — a dispatch continuing a task already inside the budget (its review, its close-out, a corrective follow-up) is never refused, so nothing is stranded half-done. This is an orderly, expected finish, not a failure. Unlike the duplicate guard, `force: true` does **not** bypass it. The enforcement key is `sessionId` itself, which is optional, caller-supplied, and format-validated only (never tied to a real dispatch) — this bound holds only for a cooperating orchestrator that stamps its own `sessionId` on every worker dispatch, per the kickoff prose; a dispatch under a budgeted run carrying no `sessionId` is **admitted**, the same as an unresolvable run. As with the duplicate guard, there is no atomic reserve-then-insert, so the bound is "at most `maxTasks` distinct tasks, modulo in-flight concurrency," not a transactional cap. See LIN-1751.
 
 ```json
 {
@@ -1324,6 +1327,20 @@ A `Retry-After` header carries the same value as `retryAfter` (seconds until the
 
 **This is not a failure — it means someone else is already doing this exact step.** Adopt the `id` from the body and watch it with `GET /api/proxy/dispatch/{id}` exactly as if you had dispatched it yourself. Do not retry, do not re-word the prompt and resend, and do not count it as an error against the endpoint. Only if you genuinely need a second, independent run should you wait `retryAfter` seconds and dispatch again — the window is self-clearing, so nothing is ever permanently blocked.
 
+Returns `409` — **task budget exhausted** (LIN-1751). A dispatch stamped with a budgeted run's `sessionId` is refused once it would be that run's `maxTasks + 1`th **distinct** task:
+
+```json
+{
+  "error": "This run's task budget (50) has been reached",
+  "code": "BUDGET_EXHAUSTED",
+  "count": 50,
+  "maxTasks": 50,
+  "sessionId": "the-run's-own-dispatch-id"
+}
+```
+
+**This is also not a failure — it means the run reached its declared scope bound.** Wind down any other in-flight work and report where the run stands; do not retry, work around it, or treat it as an instrument breakage. A dispatch continuing a task already inside the budget (its review, its close-out, a corrective follow-up) is never refused, so nothing already underway is stranded half-done. There is no `retryAfter` — the budget doesn't clear on a timer, and `force: true` does not bypass it (unlike the duplicate guard above). A dispatch carrying no `sessionId`, or whose `sessionId` doesn't resolve to a budgeted run, is admitted, not refused — the bound only holds for a caller that follows the kickoff prose's instruction to stamp its own `sessionId` on every worker dispatch.
+
 Branch on `code`, not on the status: `409` is also used by the trashed-issue refusal.
 
 **Never refused:** a `followUpTo` beat (that *is* the intended second dispatch), an `abort`, a different `kind` on the same issue (the normal research → plan → implementation pipeline), the same issue+kind in a different workspace, and any dispatch carrying no `issueIdentifier`.
@@ -1524,6 +1541,7 @@ Note for aggregating consumers: `feedbackCount` is no longer additive across row
 | 404 | `Issue not found` / `Cycle not found` | Resource doesn't exist — or, on the task-automation context endpoints, the target is trashed |
 | 409 | `Issue is trashed; refusing to modify a deleted issue` | Write target is a trashed (soft-deleted) issue |
 | 409 | `A dispatch for this issue and kind was created moments ago` (`code: DUPLICATE_DISPATCH`) | A fresh dispatch for this `issueIdentifier` + `kind` already exists from the last 5 minutes (creation endpoints only: `/dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff`). **Retryable after `retryAfter` seconds**, but usually you should not: the body's `id` is the live dispatch — adopt and watch it instead. Branch on `code`, since 409 is shared with the trashed-issue refusal. Follow-ups, aborts, other kinds, and other workspaces are never refused. See LIN-1656. |
+| 409 | `This run's task budget (N) has been reached` (`code: BUDGET_EXHAUSTED`) | A dispatch stamped with a budgeted run's `sessionId` would be that run's `maxTasks + 1`th **distinct** task (creation endpoints only, same set as above). **Not retryable** — no `retryAfter`, the budget doesn't clear on a timer. Wind down in-flight work and report where the run stands. A dispatch continuing a task already inside the budget is never refused; unlike `DUPLICATE_DISPATCH`, `force: true` does not bypass it; a dispatch with no resolvable `sessionId` is admitted, not refused. See LIN-1751. |
 | 422 | `This workspace's provider does not support this` (`code: CAPABILITY_NOT_SUPPORTED`) | The workspace's backend cannot perform this operation. `capability` names the specific provider operation that is missing — sometimes the write itself (`createRelation`, `uploadFile`), sometimes an internal read the write depends on. **Never retryable, and never a 500** — branch on `code`, not on the `capability` value, and treat any value as "this backend can't do this". |
 | 422 | `Cannot resolve <kind> '<ref>'` | A symbolic reference (state / label / project / team) could not be resolved against this workspace's backend; `candidates` lists the accepted values when the ref was ambiguous or the vocabulary is small. **Never retryable** — fix the reference. |
 | 429 | `Too many proxy requests` | Rate limit exceeded (60/minute) |

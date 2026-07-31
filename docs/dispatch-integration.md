@@ -419,6 +419,13 @@ body and what to do with it — adopt the returned `id` and watch that dispatch)
 a `followUpTo`, so it is **never** refused by that guard: a follow-up *is* the intended second
 dispatch. The example above passes no `issueIdentifier` at all, so neither call can be refused.
 
+A fresh, issue-bearing dispatch stamped with a `sessionId` can additionally be refused `409
+BUDGET_EXHAUSTED` (LIN-1751) when that `sessionId` names an Autopilot run launched with
+`maxTasks` and this dispatch would be that run's `maxTasks + 1`th **distinct** task — see the
+[proxy API reference](proxy-integration.md#enqueue-a-dispatch) for the body and what to do with
+it. `followUpTo`/`abort` dispatches, and any dispatch with no resolvable `sessionId`, are never
+refused by it.
+
 ## Aborting a session
 
 An **abort** asks the consumer to cancel/close an existing session instead of running a

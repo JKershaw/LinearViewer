@@ -579,6 +579,13 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         res.set('Retry-After', String(err.duplicateDispatch.retryAfter));
         return jsonError(res, 409, err.message, err.duplicateDispatch);
       }
+      // Task-budget refusal (LIN-1751): same tagged-throw relay convention as
+      // the duplicate guard above, distinct `code` (BUDGET_EXHAUSTED) so a
+      // caller branching on 409 bodies can tell the two refusals apart. No
+      // `Retry-After` — the budget doesn't clear on a timer.
+      if (err && err.budgetExhausted) {
+        return jsonError(res, 409, err.message, err.budgetExhausted);
+      }
       // Proxy-context attach failure (LIN-1162): a requested `attachProxy:true`
       // could not mint/append its block. Surface it (503, transient — mirrors the
       // client's old token-rate-limit message) rather than the generic 500, and

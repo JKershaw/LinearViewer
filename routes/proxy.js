@@ -29,7 +29,7 @@ import {
   isValidPriority,
   validateIssueWriteFields,
 } from '../lib/issue-write-validation.js';
-import { createDispatchItem, DUPLICATE_DISPATCH_CODE } from '../lib/dispatch-factory.js';
+import { createDispatchItem, DUPLICATE_DISPATCH_CODE, BUDGET_EXHAUSTED_CODE } from '../lib/dispatch-factory.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
 // route owns no GraphQL. Provider SELECTION for the consumer read + write data
@@ -514,6 +514,10 @@ function formatDispatchWatch(item, meta = null) {
     abortTo: item.abortTo || null,
     cascade: item.cascade === true,
     sessionId: item.sessionId || null,
+    // Scope bound (LIN-1751): visible on the poll/watch response like every
+    // other stored field, so a caller inspecting its own run can see the
+    // declared budget without guessing. null ⇒ unbounded.
+    maxTasks: item.maxTasks ?? null,
     dispatchedAt: item.dispatchedAt,
     // resolvedAt is take/archive time (when the runner claimed the item), NOT
     // completion. completedAt is the real completion time, null until terminal.
@@ -767,6 +771,44 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     if (!res.headersSent) {
       res.set('Retry-After', String(refusal.retryAfter));
     }
+    if (keepalive) {
+      keepalive.send(409, { error: err.message, ...refusal });
+    } else {
+      jsonError(res, 409, err.message, refusal);
+    }
+    return true;
+  }
+
+  /**
+   * Shared refusal responder for the task-budget guard (LIN-1751), mirroring
+   * `refuseIfDuplicateDispatch` above in every respect: one construction site
+   * for the 409 so a route replies identically and doesn't have to remember the
+   * shape, the same keepalive caveat (a long handler may have already flushed
+   * `200` via whitespace keepalive before this guard fires), and the same
+   * `note` argument to `logEvent` so refusals are countable on the Proxy page.
+   *
+   * The BODY is built once, in `createDispatchItem`, and carried on
+   * `err.budgetExhausted` — `{ code, count, maxTasks, sessionId }`. `code` is
+   * the programmatic discriminator (`BUDGET_EXHAUSTED`), distinct from
+   * `DUPLICATE_DISPATCH` so a caller branching on 409 bodies can tell the two
+   * refusals apart.
+   *
+   * Wired at the same call sites `refuseIfDuplicateDispatch` is (LIN-1751
+   * deliberately matches that existing coverage rather than closing its gap —
+   * see the plan): every route that checks the duplicate guard on its
+   * `createDispatchItem` catch also checks this one.
+   *
+   * @param {*} err - the caught error (a non-budget error passes straight through)
+   * @param {import('express').Request} req
+   * @param {import('express').Response} res
+   * @param {string} endpoint - audit-log endpoint tag
+   * @param {{send: Function}} [keepalive] - pass when the handler armed one
+   * @returns {boolean} true if a refusal was sent (caller returns early)
+   */
+  function refuseIfBudgetExhausted(err, req, res, endpoint, keepalive = null) {
+    if (!err || !err.budgetExhausted) return false;
+    const refusal = err.budgetExhausted;
+    logEvent(req, endpoint, 409, `${BUDGET_EXHAUSTED_CODE} ${refusal.sessionId}`);
     if (keepalive) {
       keepalive.send(409, { error: err.message, ...refusal });
     } else {
@@ -1533,7 +1575,7 @@ POST ${baseUrl}/api/proxy/recommend-and-dispatch
   → The duplicate guard documented under POST /dispatch applies here too, keyed on the kind this verb RESOLVES (the recommendation's own action, or your "kind" override). Same 409 "DUPLICATE_DISPATCH" body, same response: adopt the returned "id" and watch it. See LIN-1656.
 
 POST ${baseUrl}/api/proxy/autopilot/kickoff
-  Body: { "goal": "...", "mode": "write|readonly", "variant": "standard|stepper", "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "sessionId": "...", "subscription": "terminal-only|everything" }
+  Body: { "goal": "...", "mode": "write|readonly", "variant": "standard|stepper", "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "sessionId": "...", "subscription": "terminal-only|everything", "maxTasks": 50 }
   → Fused launch verb: builds the Autopilot kickoff AND dispatches it in one call — the single verb that actually STARTS a run from a goal (no need to GET the kickoff text and POST it back). The receiving session becomes the Autopilot orchestrator. All fields optional.
   → Omit "issueIdentifier" for a GENERAL run ("goal" focuses the stack walk); pass it for a SCOPED run ("autopilot until THIS task is done") — the project "repo=" is then inherited unless you pass "repo". "mode" defaults to "write" ("readonly" = investigation only).
   → "variant" defaults to "standard" (the normal orchestrator). "stepper" swaps in the warm single-session, beat-stepping disposition: it decomposes the task's worker prompt into 3–6 ordered beats and drip-feeds them into ONE session over followUpTo+force, judging and challenging each beat before advancing. Orthogonal to "mode" — they compose.
@@ -1543,6 +1585,8 @@ POST ${baseUrl}/api/proxy/autopilot/kickoff
   → The prompt body NEVER returns to you — only the header. The GET twin (GET /api/proxy/autopilot/kickoff?goal=&mode=&variant=) stays a text-only preview/inspect form that does NOT enqueue anything.
   → { "id": "...", "sessionId": "...", "status": "queued", "kind": "autopilot", "promptName": "Autopilot (stack walk)", "mode": "write", "variant": "standard", "issueIdentifier": null, "target": "cli", "dispatchedAt": "..." }
   → An ISSUE-SCOPED kickoff can hit the duplicate guard documented under POST /dispatch (its kind is "autopilot"): a 409 "DUPLICATE_DISPATCH" means a run for this task is already underway — adopt the returned "id" and watch it rather than launching a second one. A GENERAL (stack-walk) kickoff carries no "issueIdentifier" and can never be refused. See LIN-1656.
+  → "maxTasks" (optional integer >= 1) is a SCOPE bound, not a cost control: this run covers up to that many DISTINCT tasks. Stored on the run and enforced at the dispatch seam — the run's own returned "id" is the "sessionId" every worker dispatch must carry (per the kickoff prose) for the bound to apply. Omit for an unbounded run (today's behavior, byte-identical). See LIN-1751.
+  → BUDGET GUARD — once a budgeted run's worker dispatches have touched "maxTasks" distinct tasks (by "issueIdentifier"), the first fresh worker dispatch for a NEW (would-be 51st) task is refused 409: { "error": "...", "code": "BUDGET_EXHAUSTED", "count": 50, "maxTasks": 50, "sessionId": "<the run's id>" }. This is an orderly, expected finish, not a failure or an instrument breakage — wind down any other in-flight work and report where the run stands. NEVER refused: a dispatch that continues a task already inside the budget (its review, its close-out, a corrective followUpTo beat), a "followUpTo" beat, an "abort", or a dispatch carrying no "issueIdentifier". Unlike the duplicate guard, "force": true does NOT bypass this — a budget any caller could wave through would be advisory, not a bound. Match on "code" — 409 alone is ambiguous, other refusals use it too. NOTE the enforcement key is "sessionId" itself: it is optional, caller-supplied, and format-validated only (not tied to any real dispatch), so this bound holds only for a cooperating orchestrator that follows the kickoff prose's instruction to stamp its own "sessionId" on every worker dispatch — a dispatch under a budgeted run with no "sessionId" is admitted, not refused, the same as an unresolvable run. Also note the concurrency caveat: there is no atomic reserve-then-insert, so the bound is "at most maxTasks distinct tasks, modulo in-flight concurrency," not a transactional cap. See LIN-1751.
 
 GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
   → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
@@ -4298,7 +4342,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness, presetId } = req.body || {};
+      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness, presetId, maxTasks } = req.body || {};
 
       // Validate caller-supplied inputs. (The composed body is server-generated
       // and trusted, so only these raw inputs are checked — same split as the
@@ -4376,6 +4420,17 @@ One convention across every endpoint, so you can branch on the same fields every
           }
         }
       }
+      // Task budget (LIN-1751): a SCOPE bound on the run — up to this many
+      // distinct tasks — enforced deterministically at the dispatch-factory seam
+      // (never a cost control; see the kickoff prose). Optional; validated here,
+      // up front, following the presetId precedent just above. Absent/null ⇒ no
+      // budget, byte-identical to today.
+      if (maxTasks !== undefined && maxTasks !== null) {
+        if (!Number.isInteger(maxTasks) || maxTasks < 1) {
+          logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+          return badRequest.json(res, 'maxTasks must be an integer >= 1');
+        }
+      }
 
       // Subscription is DECLARED on the edge (LIN-900 §6), never reconstructed from
       // incidental fields: an undeclared edge is `terminal-only`, full stop. (This
@@ -4420,7 +4475,8 @@ One convention across every endpoint, so you can branch on the same fields every
         issue,
         goal: typeof goal === 'string' ? goal : '',
         mode: resolvedMode,
-        variant: resolvedVariant
+        variant: resolvedVariant,
+        maxTasks: maxTasks ?? null
       });
 
       // Create the dispatch item through the shared factory (LIN-1139): it
@@ -4482,7 +4538,11 @@ One convention across every endpoint, so you can branch on the same fields every
           // own `_id` is what addItem stamps into its prompt for its own sub-workers,
           // so the two ids stay distinct by construction.
           sessionId: sessionId || null,
-          subscription: subscriptionResolved
+          subscription: subscriptionResolved,
+          // Scope bound (LIN-1751): stored on the run row so the dispatch-factory
+          // seam can enforce it on every later worker dispatch under this run's
+          // own id. null ⇒ unbounded, byte-identical to today.
+          maxTasks: maxTasks ?? null
         }
       });
 
@@ -4500,7 +4560,8 @@ One convention across every endpoint, so you can branch on the same fields every
         variant: resolvedVariant,
         issueIdentifier: item.issueIdentifier,
         target: item.target,
-        dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
+        dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
+        maxTasks: item.maxTasks
       });
     } catch (err) {
       // An issue-scoped kickoff (kind 'autopilot') can duplicate like any other
@@ -4508,6 +4569,11 @@ One convention across every endpoint, so you can branch on the same fields every
       // and can never be refused. Ahead of the generic 500: a 500 here is worse
       // than no guard, since a caller cannot tell it from a real fault.
       if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/autopilot/kickoff')) return;
+      // Task budget reached (LIN-1751) — a kickoff itself is never budget-refused
+      // (this route's own dispatch is the run's OWNER row, not a worker dispatch
+      // under a budgeted sessionId), but a child-autopilot kickoff dispatched
+      // with `sessionId` set to a coordinator's budgeted run can be.
+      if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/autopilot/kickoff')) return;
       // Fail closed (LIN-1175): a claude-code dispatch whose out-of-band bootstrap
       // token could not be minted must be REFUSED, never launched credential-less.
       // attachProxyContext flags this as proxyAttachFailed (same convention as the
@@ -4789,6 +4855,8 @@ One convention across every endpoint, so you can branch on the same fields every
       // Duplicate-dispatch refusal (LIN-1656) — see the responder. Ahead of the
       // generic 500 so an orchestrator can branch on `code` and adopt the `id`.
       if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/dispatch')) return;
+      // Task-budget refusal (LIN-1751) — see the responder.
+      if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/dispatch')) return;
       // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
       if (err && err.proxyAttachFailed) {
         logEvent(req, '/api/proxy/dispatch', 503);
@@ -5043,6 +5111,8 @@ One convention across every endpoint, so you can branch on the same fields every
           // plain `res` — no keepalive to thread. (The LLM arm below is armed and
           // must pass one.)
           if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch')) return;
+          // Task-budget refusal (LIN-1751) — same plain-`res` arm as above.
+          if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/recommend-and-dispatch')) return;
           // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
           if (err && err.proxyAttachFailed) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
@@ -5223,6 +5293,8 @@ One convention across every endpoint, so you can branch on the same fields every
         // (same contract as the 503 below). The responder also skips the
         // `Retry-After` header once headers are sent.
         if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
+        // Task-budget refusal (LIN-1751) — same keepalive-armed arm as above.
+        if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
         // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
         if (err && err.proxyAttachFailed) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
