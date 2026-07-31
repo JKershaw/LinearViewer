@@ -18,6 +18,13 @@ import {
   buildConsoleFeed,
   TIMELINE_RUN_CAP,
 } from '../../lib/live-console.js';
+import {
+  computeTimelineZoom,
+  computeTimelinePan,
+  timelineRunOverlapsWindow,
+  TIMELINE_MIN_SPAN_MS,
+  TIMELINE_MAX_SPAN_MS,
+} from '../../lib/timeline-zoom.js';
 
 const NOW = Date.parse('2026-07-31T12:00:00.000Z');
 const MIN = 60 * 1000;
@@ -313,4 +320,158 @@ test('the history-page branch (loops: []) yields an empty/absent timeline shape'
   // Mirrors routes/live-console.js's history-page call: loops:[] (status-only read).
   const { timeline } = buildConsoleFeed({ statusItems: [], loops: [] }, { now: NOW, before: NOW });
   assert.deepEqual(timeline, { rows: [], connectors: [], truncated: false, totalInWindow: 0 });
+});
+
+// ─── computeTimelineZoom / computeTimelinePan (LIN-1743, Phase 2) ────────────
+// Pure zoom/pan math shared by the wheel/pinch/preset call sites in
+// public/live-console.js (mirrored on window in public/common.js).
+
+const VIEWPORT_W = 900;
+
+test('computeTimelineZoom clamps the span to [minSpanMs, maxSpanMs]', () => {
+  // A large zoom-IN delta would shrink the span far below 1h — clamps to the floor.
+  const zoomedIn = computeTimelineZoom({
+    startMs: NOW - HOUR, endMs: NOW, focalX: VIEWPORT_W / 2,
+    deltaZoom: -10, viewportWidthPx: VIEWPORT_W, nowMs: NOW,
+  });
+  assert.equal(zoomedIn.endMs - zoomedIn.startMs, TIMELINE_MIN_SPAN_MS);
+
+  // A large zoom-OUT delta from a short span would grow it past 24h — clamps to the ceiling.
+  const zoomedOut = computeTimelineZoom({
+    startMs: NOW - HOUR, endMs: NOW, focalX: VIEWPORT_W / 2,
+    deltaZoom: 10, viewportWidthPx: VIEWPORT_W, nowMs: NOW,
+  });
+  assert.equal(zoomedOut.endMs - zoomedOut.startMs, TIMELINE_MAX_SPAN_MS);
+});
+
+test('computeTimelineZoom keeps the instant under the focal point stationary', () => {
+  // Window comfortably inside the axis bounds so clamping never engages —
+  // isolates the focal-point invariant from the edge-clamp behaviour below.
+  const startMs = NOW - 10 * HOUR;
+  const endMs = NOW - 2 * HOUR;
+  const focalX = 300; // arbitrary point inside the viewport, not dead centre
+  const span = endMs - startMs;
+  const focalMsBefore = startMs + (focalX / VIEWPORT_W) * span;
+
+  const next = computeTimelineZoom({
+    startMs, endMs, focalX, deltaZoom: -0.5, viewportWidthPx: VIEWPORT_W, nowMs: NOW,
+  });
+  const nextSpan = next.endMs - next.startMs;
+  const focalMsAfter = next.startMs + (focalX / VIEWPORT_W) * nextSpan;
+  assert.ok(Math.abs(focalMsAfter - focalMsBefore) < 1, 'focal instant drifted across the zoom');
+  assert.ok(nextSpan < span, 'a negative deltaZoom should zoom in (shrink the span)');
+});
+
+test('computeTimelineZoom clamps the window to the fixed [now - maxSpanMs, now] axis', () => {
+  // Zooming out from a window already at the live edge must never push endMs
+  // past "now" or startMs past the 24h floor.
+  const next = computeTimelineZoom({
+    startMs: NOW - 2 * HOUR, endMs: NOW, focalX: VIEWPORT_W, // focal pinned to the right edge
+    deltaZoom: 5, viewportWidthPx: VIEWPORT_W, nowMs: NOW,
+  });
+  assert.equal(next.endMs, NOW);
+  assert.ok(next.startMs >= NOW - TIMELINE_MAX_SPAN_MS);
+});
+
+test('computeTimelineZoom is a no-op on degenerate input (zero viewport, inverted window)', () => {
+  assert.deepEqual(
+    computeTimelineZoom({ startMs: NOW - HOUR, endMs: NOW, focalX: 10, deltaZoom: -1, viewportWidthPx: 0, nowMs: NOW }),
+    { startMs: NOW - HOUR, endMs: NOW }
+  );
+  assert.deepEqual(
+    computeTimelineZoom({ startMs: NOW, endMs: NOW - HOUR, focalX: 10, deltaZoom: -1, viewportWidthPx: VIEWPORT_W, nowMs: NOW }),
+    { startMs: NOW, endMs: NOW - HOUR }
+  );
+});
+
+test('computeTimelinePan preserves the span and shifts the window by deltaPx', () => {
+  const startMs = NOW - 10 * HOUR;
+  const endMs = NOW - 8 * HOUR; // 2h span, well inside the axis bounds
+  const span = endMs - startMs;
+  // Dragging right (positive deltaPx) reveals earlier time — window moves back.
+  const next = computeTimelinePan({ startMs, endMs, deltaPx: 90, viewportWidthPx: VIEWPORT_W, nowMs: NOW });
+  assert.equal(next.endMs - next.startMs, span);
+  assert.ok(next.startMs < startMs);
+  assert.ok(next.endMs < endMs);
+});
+
+test('computeTimelinePan clamps at the live edge (cannot pan past "now")', () => {
+  const next = computeTimelinePan({
+    startMs: NOW - 2 * HOUR, endMs: NOW, deltaPx: -500, // drag left: reveal LATER time
+    viewportWidthPx: VIEWPORT_W, nowMs: NOW,
+  });
+  assert.equal(next.endMs, NOW);
+});
+
+test('computeTimelinePan clamps at the history edge (cannot pan past now - 24h)', () => {
+  const next = computeTimelinePan({
+    startMs: NOW - TIMELINE_MAX_SPAN_MS, endMs: NOW - TIMELINE_MAX_SPAN_MS + 2 * HOUR,
+    deltaPx: 500, // drag right: reveal EARLIER time, past the axis floor
+    viewportWidthPx: VIEWPORT_W, nowMs: NOW,
+  });
+  assert.equal(next.startMs, NOW - TIMELINE_MAX_SPAN_MS);
+});
+
+test('computeTimelinePan is a no-op on degenerate input (zero viewport, inverted window)', () => {
+  assert.deepEqual(
+    computeTimelinePan({ startMs: NOW - HOUR, endMs: NOW, deltaPx: 50, viewportWidthPx: 0, nowMs: NOW }),
+    { startMs: NOW - HOUR, endMs: NOW }
+  );
+});
+
+// timelineRunOverlapsWindow (LIN-1743 review F1) — the client-side culling
+// predicate the reviewer found missing: a run wholly outside the current
+// zoomed view window rendered as a phantom edge sliver instead of
+// disappearing, and the empty-state check counted it as present. Covered here
+// (rather than only via E2E) because the E2E seed seam always dispatches at
+// "now" (see tests/e2e/live-console.spec.js's seedTerminalWorker comment) —
+// arbitrary timestamps are cheap with `now` injected.
+test('timelineRunOverlapsWindow: a run entirely BEFORE the window does not overlap', () => {
+  assert.equal(
+    timelineRunOverlapsWindow({ start: NOW - 5 * HOUR, end: NOW - 4 * HOUR }, NOW - HOUR, NOW, NOW),
+    false
+  );
+});
+
+test('timelineRunOverlapsWindow: a run entirely AFTER the window does not overlap', () => {
+  // Window bounds needn't end at "now" — a panned-back-in-time window has
+  // both edges in the past, and a run starting after windowEnd is future
+  // relative to that window even though it's already happened relative to now.
+  assert.equal(
+    timelineRunOverlapsWindow({ start: NOW - HOUR, end: NOW - HOUR + MIN }, NOW - 5 * HOUR, NOW - 3 * HOUR, NOW),
+    false
+  );
+});
+
+test('timelineRunOverlapsWindow: a run spanning the whole window overlaps', () => {
+  assert.equal(
+    timelineRunOverlapsWindow({ start: NOW - 5 * HOUR, end: NOW - 4 * HOUR }, NOW - 4.5 * HOUR, NOW - 4.2 * HOUR, NOW),
+    true
+  );
+});
+
+test('timelineRunOverlapsWindow: a run partially clipped at the window edge overlaps', () => {
+  assert.equal(
+    timelineRunOverlapsWindow({ start: NOW - 90 * MIN, end: NOW - 30 * MIN }, NOW - HOUR, NOW, NOW),
+    true
+  );
+});
+
+test('timelineRunOverlapsWindow: an open-ended (still-running, end: null) run overlaps whenever it started before the window closes', () => {
+  assert.equal(
+    timelineRunOverlapsWindow({ start: NOW - 10 * HOUR, end: null }, NOW - HOUR, NOW, NOW),
+    true
+  );
+  assert.equal(
+    // Panned window entirely before the run's own start: not overlapping even
+    // though it's still running (an open end doesn't retroactively overlap
+    // a window that closes before the run began).
+    timelineRunOverlapsWindow({ start: NOW - HOUR, end: null }, NOW - 5 * HOUR, NOW - 2 * HOUR, NOW),
+    false
+  );
+});
+
+test('timelineRunOverlapsWindow: tolerant of a missing/malformed run', () => {
+  assert.equal(timelineRunOverlapsWindow(null, NOW - HOUR, NOW, NOW), false);
+  assert.equal(timelineRunOverlapsWindow({}, NOW - HOUR, NOW, NOW), false);
 });
