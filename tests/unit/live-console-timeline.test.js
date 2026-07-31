@@ -247,6 +247,19 @@ test('different groups always land in different rows, even with no time overlap'
   assert.equal(rows.length, 2);
 });
 
+// LIN-1744 (Phase 3): a run missing groupKey entirely must never throw, and
+// must fall back to a sane display — non-overlapping runs sharing the same
+// (absent) key still pack as an ungrouped single row, same as if each had its
+// own unique key and simply didn't overlap in time.
+test('packTimelineRows tolerates a missing groupKey, falling back to a sane ungrouped display', () => {
+  const a = run({ id: 'a', groupKey: undefined, start: NOW - 3 * HOUR, end: NOW - 2 * HOUR });
+  const b = run({ id: 'b', groupKey: undefined, start: NOW - HOUR, end: NOW - 30 * MIN });
+  assert.doesNotThrow(() => packTimelineRows([a, b]));
+  const { rows } = packTimelineRows([a, b]);
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0].map(r => r.id), ['a', 'b']);
+});
+
 test('groups are emitted most-recently-active first', () => {
   const older = run({ id: 'old', groupKey: 'g1', start: NOW - 5 * HOUR, end: NOW - 4 * HOUR });
   const newer = run({ id: 'new', groupKey: 'g2', start: NOW - HOUR, end: NOW - 30 * MIN });
