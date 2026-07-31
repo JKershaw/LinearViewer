@@ -367,11 +367,13 @@ LIN-875 and LIN-876. Until they land, each child surfaces as its own top-level s
 conversation is the single up-chain report. Reaching past that isn't initiative — it's building an
 unbuilt feature freehand, which is exactly the drop this seat is here to avoid.
 
-**A child autopilot counts as one task against your own budget, and your budget does not travel to
-it.** If your run was launched with a task budget (`maxTasks`), dispatching a child counts as one task
-toward that bound — it's a task you took on, the same as any other. The bound itself stays at your
-altitude: it does **not** auto-inherit onto the child's own kickoff, so a child you dispatch is
-unbudgeted unless you deliberately declare its own `maxTasks`.
+**An issue-bearing child autopilot counts as one task against your own budget, and your budget does not
+travel to it.** If your run was launched with a task budget (`maxTasks`), dispatching a child **with an
+`issueIdentifier`** — the shape described above — counts as one task toward that bound: it's a task you
+took on, the same as any other. A child dispatched with no `issueIdentifier` holds no task of its own,
+so it doesn't consume the bound. The bound itself stays at your altitude: it does **not** auto-inherit
+onto the child's own kickoff, so a child you dispatch is unbudgeted unless you deliberately declare its
+own `maxTasks`.
 
 ## The human's edge, and how to hand back
 
