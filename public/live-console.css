@@ -200,10 +200,11 @@
 }
 /*
  * Colour source is `outcomeKind` (data-kind), NEVER dispatch `kind`/
- * `promptName` — those stay label text only (title/aria-label). The existing
- * `.lc-event[data-kind="…"]` rules above are scoped to `.lc-event .lc-event-glyph`
- * (a descendant glyph), so they do not apply here — new bar-scoped rules on the
- * same six tokens instead.
+ * `promptName` — those are label TEXT (the `.lc-timeline-bar-label` child,
+ * below), never a colour source. The existing `.lc-event[data-kind="…"]`
+ * rules above are scoped to `.lc-event .lc-event-glyph` (a descendant glyph),
+ * so they do not apply here — new bar-scoped rules on the same six tokens
+ * instead.
  */
 .lc-timeline-bar[data-kind="done"]     { background: var(--green); }
 .lc-timeline-bar[data-kind="working"]  { background: var(--amber); }
@@ -211,6 +212,73 @@
 .lc-timeline-bar[data-kind="failed"]   { background: var(--red); }
 .lc-timeline-bar[data-kind="evidence"] { background: var(--brand); }
 .lc-timeline-bar[data-kind="info"]     { background: var(--slate); } /* skipped: deliberately neutral, not a 7th colour */
+
+/* Visible label (D3/success-criteria: "labelled with ticket ID and prompt
+   type") — title/aria-label alone left the identifier invisible until hover,
+   which fails the mobile-first requirement (A5) outright. `inset:0` sizes the
+   label to the bar's own box so a narrow/zoomed-out bar clips its own text
+   (ellipsis) rather than spilling into neighbouring rows. White text reads on
+   five of the six outcome fills (green/red/slate/brand — all mid-to-dark);
+   `--amber` is the one bright fill (it already needs `--amber-dim` for
+   AA-safe TEXT elsewhere, see public/style.css) so `[data-kind="working"]`
+   gets a dark-on-amber override just below instead.
+   Deliberately no horizontal `padding` and no `display: flex`. `inset: 0`
+   solves this element's width as EXACTLY the bar's own (possibly sub-1%-wide,
+   MIN_W-floor) width — with `box-sizing: border-box`, any horizontal padding
+   sets a floor equal to the padding sum, and the moment a bar is narrower
+   than that floor (routine at 24h zoom-out) the label's OWN box is forced
+   WIDER than its bar, inflating the BARS VIEWPORT's `scrollWidth` past
+   `clientWidth` (breaks the route-A invariant, LIN-1741/1742 review F2) even
+   though nothing paints visibly wrong. `text-indent` gives the same "text
+   starts a little in from the left" look without adding to the box model —
+   the box still clips at exactly the bar's edge. (The same
+   padding-as-a-width-floor trap rules out `display: flex` + `align-items`
+   too: a flex item generated from raw nowrap text gets an automatic
+   `min-width: auto` equal to its full content width, which wins over this
+   element's own `overflow: hidden` the same way.) */
+.lc-timeline-bar-label {
+  position: absolute;
+  inset: 0;
+  line-height: 18px;
+  text-indent: 0.4rem;
+  font-family: var(--font-structural);
+  font-size: 0.65rem;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none; /* decoration only — title/aria-label live on the bar itself */
+}
+.lc-timeline-bar[data-kind="working"] .lc-timeline-bar-label {
+  color: rgba(0, 0, 0, 0.82);
+  text-shadow: none;
+}
+
+/* Run-to-run connectors (D3: "swim lines shown where one leads on from the
+   other… some lines connecting them") — one SVG overlay per LIN-1720's
+   Research recommendation (DOM bars + SVG connector overlay), sized to match
+   the bars viewport's own content box (public/live-console.js sets its
+   `viewBox` to `0 0 100 <rowsHeightPx>` — x in percent-of-width to match a
+   bar's own `left`/`width`, y in real px to match its `top`, both read
+   straight off the bar's rendered style rather than re-derived). Sits BEFORE
+   the bar nodes in DOM order (lib/render-live-console.js) so bars paint on
+   top; `pointer-events: none` keeps it out of the drag/pinch gesture's hit
+   testing entirely. */
+.lc-timeline-connectors {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.lc-timeline-connector {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
 
 /* M5: a clipped-start run's true dispatch predates the 24h window — a dashed
    left edge (instead of the normal rounded corner) marks "this ran in from
