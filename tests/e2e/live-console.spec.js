@@ -781,6 +781,128 @@ test.describe('Live Console (experimental)', () => {
     });
   });
 
+  // LIN-1720 close-out: the two scope items D3/the success criteria named
+  // ("labelled with ticket ID and prompt type", "swim lines… some lines
+  // connecting them") that title/aria-label and the server-computed
+  // `timeline.connectors` edges alone did not satisfy — a label is only
+  // in-scope once it is VISIBLE, not merely accessible-on-hover/to a screen
+  // reader, and a connector edge computed server-side (packTimelineRows) but
+  // never painted client-side does not answer "where did a fan-out happen".
+  test.describe('Timeline labels + connectors (LIN-1720 close-out)', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+    });
+    test.afterEach(async ({ page }) => {
+      await clearFeed(page, URL_KEY);
+    });
+
+    test('a bar carries a VISIBLE label (ticket identifier + prompt type), not just title/aria-label', async ({ page }) => {
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9300' });
+      await page.goto(PAGE_URL);
+      const bar = page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9300"]');
+      await expect(bar).toBeVisible();
+      const label = bar.locator('.lc-timeline-bar-label');
+      await expect(label).toBeAttached();
+      await expect(label).toHaveText('LIN-9300 — implementation');
+      // Visible means rendered pixels, not display:none/visibility:hidden —
+      // the same bar-box a hover-only title attribute would NOT provide.
+      const box = await label.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.width).toBeGreaterThan(0);
+      expect(box.height).toBeGreaterThan(0);
+    });
+
+    test('a still-running (amber) bar\'s label uses dark text for contrast, unlike every other outcome colour', async ({ page }) => {
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9301' });
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9302', message: '[done] shipped it' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"][data-kind="working"] .lc-timeline-bar-label');
+      const amberLabel = page.locator('[data-testid="live-console-timeline-bar"][data-kind="working"] .lc-timeline-bar-label').first();
+      const doneLabel = page.locator('[data-testid="live-console-timeline-bar"][data-kind="done"] .lc-timeline-bar-label').first();
+      const [amberColor, doneColor] = await Promise.all([
+        amberLabel.evaluate(el => getComputedStyle(el).color),
+        doneLabel.evaluate(el => getComputedStyle(el).color),
+      ]);
+      expect(amberColor).not.toBe(doneColor);
+      expect(doneColor).toBe('rgb(255, 255, 255)');
+    });
+
+    test('a followUpTo edge renders a connector path from the predecessor bar to the successor bar', async ({ page }) => {
+      let injected = false;
+      await page.route(`**${EVENTS_API}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!injected) {
+          injected = true;
+          const now = body.serverNow;
+          const parent = {
+            id: 'f20-parent', issueIdentifier: 'LIN-9310', kind: 'research', promptName: null,
+            outcomeKind: 'done', start: now - 20 * 60000, end: now - 15 * 60000,
+            stillRunning: false, clippedStart: false, groupKey: 'f20-session', followUpTo: null,
+            workspaceUrlKey: URL_KEY,
+          };
+          const child = {
+            id: 'f20-child', issueIdentifier: 'LIN-9310', kind: 'implementation', promptName: null,
+            outcomeKind: 'working', start: now - 10 * 60000, end: null,
+            stillRunning: true, clippedStart: false, groupKey: 'f20-session', followUpTo: 'f20-parent',
+            workspaceUrlKey: URL_KEY,
+          };
+          body.timeline = {
+            rows: [[parent, child]],
+            connectors: [{ fromId: 'f20-parent', toId: 'f20-child' }],
+            truncated: false,
+            totalInWindow: 2,
+          };
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      await expect(page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9310"]')).toHaveCount(2);
+      const connector = page.locator('[data-testid="live-console-timeline-connector"]');
+      await expect(connector).toHaveCount(1);
+      const d = await connector.getAttribute('d');
+      expect(d).toMatch(/^M[\d.]+,[\d.]+ C/);
+    });
+
+    test('a connector whose predecessor aged out of the run list (unknown fromId) renders no path and throws no error', async ({ page }) => {
+      const pageErrors = [];
+      page.on('pageerror', (err) => pageErrors.push(err));
+      let injected = false;
+      await page.route(`**${EVENTS_API}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!injected) {
+          injected = true;
+          const now = body.serverNow;
+          const child = {
+            id: 'f20-orphan-child', issueIdentifier: 'LIN-9320', kind: 'implementation', promptName: null,
+            outcomeKind: 'working', start: now - 60000, end: null,
+            stillRunning: true, clippedStart: false, groupKey: 'f20-orphan-session', followUpTo: 'aged-out-of-window',
+            workspaceUrlKey: URL_KEY,
+          };
+          // Server sets connectorTruncated (no matching connector edge) rather
+          // than a dangling {fromId,toId} whose from-node cannot resolve — but
+          // the client must still tolerate a malformed edge referencing a
+          // non-existent id gracefully (success criterion 6).
+          body.timeline = {
+            rows: [[child]],
+            connectors: [{ fromId: 'aged-out-of-window', toId: 'f20-orphan-child' }],
+            truncated: false,
+            totalInWindow: 1,
+          };
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      await expect(page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9320"]')).toBeVisible();
+      await expect(page.locator('[data-testid="live-console-timeline-connector"]')).toHaveCount(0);
+      expect(pageErrors).toEqual([]);
+    });
+  });
+
   // Zoom/pan/gestures (LIN-1743, Phase 2 of LIN-1720): the 1h/24h presets,
   // ctrl/meta+wheel desktop zoom, and touch pinch+drag on the timeline
   // viewport built in Phase 1. `timelineWindow` reads the window bounds off

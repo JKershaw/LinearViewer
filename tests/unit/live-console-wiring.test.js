@@ -89,6 +89,19 @@ test('renderer emits the timeline section mount points', () => {
   assert.match(html, /data-testid="live-console-timeline-preset-24h"/);
 });
 
+// LIN-1720 close-out: the connector overlay is a static, empty mount point
+// (public/live-console.js paints into it; no business logic in the renderer),
+// and it must precede any bar node in DOM order so bars — appended later via
+// appendChild — paint on top of the connector lines.
+test('the connector overlay <svg> is a mount point inside the bars viewport, before any bar node', () => {
+  const html = renderLiveConsolePage({ urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }], featureFlags: { liveConsole: true } });
+  assert.match(html, /id="live-console-timeline-connectors"/);
+  assert.match(html, /data-testid="live-console-timeline-connectors"/);
+  const viewportOpen = html.indexOf('data-testid="live-console-timeline"');
+  const connectorsOpen = html.indexOf('id="live-console-timeline-connectors"');
+  assert.ok(viewportOpen > 0 && connectorsOpen > viewportOpen, 'connector overlay must be inside, and come after the opening tag of, the bars viewport');
+});
+
 test('mount order is pulse → chips → timeline → lanes → stream — no existing element moves', () => {
   const html = renderLiveConsolePage({ urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }], featureFlags: { liveConsole: true } });
   const idx = (needle) => html.indexOf(needle);

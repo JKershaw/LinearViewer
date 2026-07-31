@@ -56,6 +56,7 @@
     tempo: document.getElementById('live-console-tempo'),
     chips: document.getElementById('live-console-chips'),
     timeline: document.getElementById('live-console-timeline'),
+    timelineConnectors: document.getElementById('live-console-timeline-connectors'),
     timelineEmpty: document.getElementById('live-console-timeline-empty'),
     timelinePresets: Array.from(document.querySelectorAll('.lc-timeline-preset[data-range]')),
     lanes: document.getElementById('live-console-lanes'),
@@ -81,6 +82,7 @@
   // spanMs, and re-pins to live only once panned/zoomed back to the right edge.
   let timelineView = { spanMs: TIMELINE_WINDOW_MS, endMs: null };
   let timelineFlat = [];                // last { run, rowIndex } list, for viewport-only repaints
+  let timelineConnectorEdges = [];      // last { fromId, toId } list (server-packed, LIN-1720)
   let timelineGesture = null;           // active touch gesture: { mode: 'pinch'|'pan', ... }
   const historyIds = new Set();         // ids paged into the history region
   let lastFeed = null;                  // last successful live feed (for in-place re-filter)
@@ -184,6 +186,15 @@
     const div = document.createElement('div');
     div.className = 'lc-timeline-bar';
     div.setAttribute('data-testid', 'live-console-timeline-bar');
+    // Visible label (ticket identifier + prompt type) — a child span, not just
+    // title/aria-label, so the identifier reads at a glance without hovering
+    // or a screen reader (in scope per the D3/success-criteria: "labelled with
+    // ticket ID and prompt type", not merely accessible-but-invisible).
+    // Absolutely positioned to fill the bar and clip its own overflow, so a
+    // narrow/zoomed-out bar truncates gracefully instead of spilling text.
+    const labelNode = document.createElement('span');
+    labelNode.className = 'lc-timeline-bar-label';
+    div.appendChild(labelNode);
     updateTimelineBarNode(div, run, 0);
     return div;
   }
@@ -227,6 +238,7 @@
     const label = `${run.issueIdentifier || '?'} — ${timelineLabel(run)}`;
     div.title = label;
     div.setAttribute('aria-label', label);
+    if (div.firstElementChild) div.firstElementChild.textContent = label;
   }
   // F1: "is there anything to show" must agree with "is this bar visible" —
   // both the chip filter AND the current view window, computed once here so
@@ -252,6 +264,7 @@
       (Array.isArray(row) ? row : []).forEach(run => { if (run) flat.push({ run, rowIndex }); });
     });
     timelineFlat = flat; // for gesture-driven repaints that touch no new data
+    timelineConnectorEdges = Array.isArray(timeline && timeline.connectors) ? timeline.connectors : [];
     syncTimelineWindowAttrs();
 
     const wanted = new Set(flat.map(f => f.run.id));
@@ -263,9 +276,43 @@
       if (!node) { node = timelineBarNode(run); timelineBarNodes.set(run.id, node); els.timeline.appendChild(node); }
       updateTimelineBarNode(node, run, rowIndex);
     }
-    els.timeline.style.height = `${Math.max(rows.length, 1) * (TIMELINE_ROW_HEIGHT + TIMELINE_ROW_GAP)}px`;
+    const rowsHeightPx = Math.max(rows.length, 1) * (TIMELINE_ROW_HEIGHT + TIMELINE_ROW_GAP);
+    els.timeline.style.height = `${rowsHeightPx}px`;
+    if (els.timelineConnectors) els.timelineConnectors.setAttribute('viewBox', `0 0 100 ${rowsHeightPx}`);
 
     updateTimelineEmptyState();
+    paintTimelineConnectors();
+  }
+
+  // Run-to-run connector overlay (D3/success-criteria: "swim lines shown
+  // where one leads on from the other… some lines connecting them"). Edges
+  // are server-packed ({fromId,toId}, lib/live-console.js's packTimelineRows)
+  // — the client draws, never recomputes, which runs follow on from which.
+  // Reads each endpoint bar's OWN rendered left/width/top (not a re-derived
+  // copy of updateTimelineBarNode's pct/MIN_W math) so a connector always
+  // touches exactly where its bar was actually drawn, including the MIN_W
+  // visibility floor and any window-driven clamping. A full innerHTML rebuild
+  // (rather than a keyed reconcile like the bars) is deliberate here: the
+  // overlay is aria-hidden, non-interactive, and holds no focus/gesture state
+  // an innerHTML replace could destroy — unlike the bars, cheap to rebuild
+  // wholesale on every poll and every gesture-driven repaint.
+  function paintTimelineConnectors() {
+    if (!els.timelineConnectors) return;
+    const parts = [];
+    for (const edge of timelineConnectorEdges) {
+      if (!edge) continue;
+      const fromNode = timelineBarNodes.get(edge.fromId);
+      const toNode = timelineBarNodes.get(edge.toId);
+      if (!fromNode || !toNode || fromNode.hidden || toNode.hidden) continue;
+      const x1 = parseFloat(fromNode.style.left) + parseFloat(fromNode.style.width);
+      const y1 = parseFloat(fromNode.style.top) + TIMELINE_ROW_HEIGHT / 2;
+      const x2 = parseFloat(toNode.style.left);
+      const y2 = parseFloat(toNode.style.top) + TIMELINE_ROW_HEIGHT / 2;
+      if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+      const midX = (x1 + x2) / 2;
+      parts.push(`<path class="lc-timeline-connector" data-testid="live-console-timeline-connector" d="M${x1},${y1} C${midX},${y1} ${midX},${y2} ${x2},${y2}"/>`);
+    }
+    els.timelineConnectors.innerHTML = parts.join('');
   }
 
   // Re-layout the existing bars against the current window WITHOUT touching
@@ -278,6 +325,7 @@
       if (node) updateTimelineBarNode(node, run, rowIndex);
     }
     updateTimelineEmptyState();
+    paintTimelineConnectors();
   }
 
   function updateTimelinePresetPressed() {
