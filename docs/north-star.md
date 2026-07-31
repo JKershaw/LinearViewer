@@ -1,49 +1,19 @@
-# Harbour — North Star
+# North star — v2, the self-funding loop
 
-*The workspace north star: prose, singular, normative. Native to Harbour (not a Linear
-primitive). This file is the version-controlled canonical copy; paste it into the Roadmap page's
-north-star input (`PUT /workspace/:urlKey/api/roadmap/north-star`) to make it live. The layer-3b
-reader (`lib/prompts/roadmap-north-star-template.js`) scores work against it; the same
-classification eventually orients the Ship view's FORWARD sector.*
+*(a waypoint: revised by the human only, versioned, and never edited by any agent — this document is the normative layer)*
 
----
+**Harbour completes verified backlog work at a cost and cadence a solo operator can sustain, funds itself doing it — and proves every word.**
 
-Harbour exists to keep human intent in command of AI-accelerated execution.
+**Verified beats claimed.** Work counts only when its evidence chain closes: CI green, merged, ledger discharged. done is a claim; the artifact is the fact.
 
-As agents make producing work cheap, the scarce act is no longer doing the work — it is deciding
-what is worth doing, and noticing when the body of work has drifted from it. The product's job is
-to make two things legible faster than the work can drift: **where the work is**, and **whether it
-is pointed somewhere worth going**.
+**Cost per verified task, visible and falling — in the money actually spent.** Every session attributes its spend to the lane that billed it; cash the operator feels is the headline, API-equivalent keeps it honest. Every cycle forecasts the next and scores the last against actuals. Routing, plan-review, and re-grounding economy are judged by this number alone — and pricing is policy, never judgement: no agent reasons about price; defaults are config, changed only behind an eval, reverted in one line.
 
-**Forward** work builds or sharpens instruments that surface drift at every altitude — commit,
-plan, and backlog — before it compounds, and keeps direction and execution coupled so a human can
-continuously and cheaply see whether today's work served the intent.
+**Operator minutes and sessions are the scarce resources.** Silent failures and detection gaps outrank feature work — a halt the system didn't report costs more than the halt. Follow-on tasks and wakes per verified task are tracked taxes; work that shrinks them ranks high. No autonomous run starts without a declared task budget, enforced at the seam — a run that cannot finish inside its bound hands back; it does not sprawl.
 
-**Necessary maintenance** is work that keeps the workbench running — auth, storage, sessions,
-deploys, bug fixes, refactors — without itself advancing intent-legibility.
+**Gates buy evidence, never delay.** Every phase gate is a measured artifact, not a declared intention — and not a calendar habit: shorten a gate by densifying evidence, never by waiving it. Time to any milestone is a policy choice and cost is a scope choice; neither excuses the other.
 
-**Drift** is capability added without serving intent-legibility: a feature that makes the tool do
-more but does not help a human keep execution pointed at intent.
+**Finish transitions before starting capabilities.** A substrate 90% migrated is a liability, not progress. The longest blocked chain and the oldest open compat lane are standing priorities.
 
----
+**A stranger can trust it in one sitting — and the free tier is a published line item.** Login → connected → first evidence-verified merge, without talking to the operator. Secure defaults assume hostile input; payments land only behind the hardening gate; what the free tier costs is ring-fenced and visible from day one.
 
-## How to read this against the work
-
-The layer-3b reader classifies each project/issue as `aligned` / `necessary maintenance` /
-`drift` / `archive candidate` against the phrases above. A correct reading should land, for
-example:
-
-- **aligned** — the drift-defense subsystem (LIN-289 and children), the direction layer
-  (LIN-273), the model benchmark (LIN-263), the state/direction views.
-- **necessary maintenance** — OAuth/PAT, session store, privacy/ToS, refresh-token fixes,
-  client-JS refactors.
-- **drift** — net-new capability with no intent-legibility purpose.
-
-## Calibration note
-
-This is a v1. It is deliberately specific enough to discriminate (the maintenance-vs-forward split
-and the "capability without intent-legibility" test are the discriminators), but some phrases will
-still be vague to score against. That is expected: the Roadmap "feedback on the north star" button
-exists to surface specificity gaps and sharpen this text over time. The north star is **fixed
-until a human deliberately revises it** — the analyzer must never rewrite it to match observed
-behaviour (drift-as-rationalization).
+**Every claim reachable from its evidence; every contract legible in one screen.** Reports cite dispatches, KPIs cite outcomes, relaxations name their adversarial follow-up. Complexity that breaks legibility is a defect even when locally justified.
