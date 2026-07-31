@@ -110,6 +110,18 @@ window.computeTimelinePan = function computeTimelinePan(opts) {
   return clampTimelineWindow(newStart, newEnd, nowMs, maxSpanMs);
 };
 
+/**
+ * Live Console timeline run/window overlap test (LIN-1743 F1). Mirror of
+ * lib/timeline-zoom.js timelineRunOverlapsWindow — keep in sync with the pure
+ * version.
+ * @global
+ */
+window.timelineRunOverlapsWindow = function timelineRunOverlapsWindow(run, windowStart, windowEnd, nowMs) {
+  if (!run || run.start == null) return false;
+  var end = run.end != null ? run.end : nowMs;
+  return run.start < windowEnd && end > windowStart;
+};
+
 // =============================================================================
 // Theme Primitives (client-side replicas of lib/components/* — LIN-861)
 // =============================================================================

@@ -210,11 +210,32 @@
     div.setAttribute('data-kind', run.outcomeKind || 'info');
     div.classList.toggle('lc-timeline-bar--clipped', !!run.clippedStart);
     div.setAttribute('data-ws', run.workspaceUrlKey || '');
-    div.hidden = !isVisibleWs(run.workspaceUrlKey);
+    // F1: a run lying entirely outside the CURRENT VIEW window (zoom introduced
+    // sub-windows the server's own 24h-axis clamping doesn't cover) must
+    // disappear, not clamp to a phantom sliver at the nearest edge —
+    // window-overlap is a real cull, not just the MIN_W visual floor above.
+    const inWindow = window.timelineRunOverlapsWindow(run, windowStart, windowEnd, now);
+    div.hidden = !isVisibleWs(run.workspaceUrlKey) || !inWindow;
     const label = `${run.issueIdentifier || '?'} — ${timelineLabel(run)}`;
     div.title = label;
     div.setAttribute('aria-label', label);
   }
+  // F1: "is there anything to show" must agree with "is this bar visible" —
+  // both the chip filter AND the current view window, computed once here so
+  // paintTimeline (new data) and repaintTimelineViewport (viewport-only, e.g.
+  // a preset click with no poll in between) can't disagree about the empty
+  // state. Zooming into a span with genuinely nothing in it must show the
+  // empty state even between polls, not just on the next poll tick.
+  function updateTimelineEmptyState() {
+    if (!els.timelineEmpty) return;
+    const now = lastServerNow || Date.now();
+    const { start: windowStart, end: windowEnd } = currentTimelineWindow();
+    const visibleCount = timelineFlat.filter(({ run }) =>
+      isVisibleWs(run.workspaceUrlKey) && window.timelineRunOverlapsWindow(run, windowStart, windowEnd, now)
+    ).length;
+    els.timelineEmpty.hidden = visibleCount > 0;
+  }
+
   function paintTimeline(timeline) {
     if (!els.timeline) return;
     const rows = Array.isArray(timeline && timeline.rows) ? timeline.rows : [];
@@ -236,8 +257,7 @@
     }
     els.timeline.style.height = `${Math.max(rows.length, 1) * (TIMELINE_ROW_HEIGHT + TIMELINE_ROW_GAP)}px`;
 
-    const visibleCount = flat.filter(f => isVisibleWs(f.run.workspaceUrlKey)).length;
-    if (els.timelineEmpty) els.timelineEmpty.hidden = visibleCount > 0;
+    updateTimelineEmptyState();
   }
 
   // Re-layout the existing bars against the current window WITHOUT touching
@@ -249,6 +269,7 @@
       const node = timelineBarNodes.get(run.id);
       if (node) updateTimelineBarNode(node, run, rowIndex);
     }
+    updateTimelineEmptyState();
   }
 
   function updateTimelinePresetPressed() {
@@ -279,14 +300,21 @@
   }
 
   // ─── Timeline gestures (LIN-1743, Phase 2 of LIN-1720) ──────────────────────
-  // Desktop: wheel + ctrl/meta (mirrors public/ship.js:1548-1552's gating — a
-  // plain wheel keeps native page scroll). Mobile: two-finger pinch zooms
-  // (focal point = the pinch midpoint), one-finger drag pans; `touch-action:
-  // none` on `.lc-timeline-viewport` (public/live-console.css) hands the WHOLE
-  // gesture to this hand-rolled code — including the vertical axis, which the
-  // pan branch below passes straight through as a manual `scrollTop` nudge so
-  // the viewport's own internal scroll (many stacked session rows, Q4) isn't
-  // lost to the disabled native touch-scroll.
+  // Desktop: wheel + ctrl/meta zooms (mirrors public/ship.js:1548-1552's gating
+  // — a plain wheel keeps native page scroll), plain mouse drag pans (F2).
+  // Mobile: two-finger pinch zooms (focal point = the pinch midpoint),
+  // one-finger drag pans; `touch-action: none` on `.lc-timeline-viewport`
+  // (public/live-console.css) hands the WHOLE gesture to this hand-rolled
+  // code for its entire duration — including the vertical axis, decided once
+  // by the browser at touch-start, so no per-move `preventDefault()` choice
+  // can hand it back. A one-finger drag therefore locks to its dominant axis
+  // (F3) on the first move past a small jitter threshold: horizontal-dominant
+  // pans the time window; vertical-dominant hand-rolls a scroll passthrough —
+  // first the viewport's own internal `overflow-y:auto` (many stacked session
+  // rows, Q4), and only the leftover delta the page itself, so a vertical
+  // swipe over the timeline still scrolls the page instead of hitting a dead
+  // zone when the viewport has little or no internal overflow to give.
+  const TIMELINE_AXIS_LOCK_PX = 6;
   function timelineViewportRect() {
     return els.timeline.getBoundingClientRect();
   }
@@ -305,6 +333,40 @@
     });
     applyTimelineWindow(next);
   }
+
+  // F2: desktop mouse drag-pan — the in-scope requirement Step 7 named but
+  // never wired. `mousemove`/`mouseup` listen on `window`, not the viewport,
+  // so a drag started inside the timeline keeps panning even if the pointer
+  // leaves it mid-drag (same reach as public/ship.js's `wirePan`).
+  let timelineMouseDrag = null; // { lastX, rectWidth } while a left-button drag is down
+  function onTimelineMouseDown(e) {
+    if (e.button !== 0) return;
+    const rect = timelineViewportRect();
+    timelineMouseDrag = { lastX: e.clientX, rectWidth: rect.width || els.timeline.clientWidth };
+    els.timeline.classList.add('lc-timeline-viewport--panning');
+  }
+  function onTimelineMouseMove(e) {
+    if (!timelineMouseDrag) return;
+    const x = e.clientX;
+    const deltaX = x - timelineMouseDrag.lastX;
+    timelineMouseDrag.lastX = x;
+    if (!deltaX) return;
+    const { start, end } = currentTimelineWindow();
+    const next = window.computeTimelinePan({
+      startMs: start,
+      endMs: end,
+      deltaPx: deltaX,
+      viewportWidthPx: timelineMouseDrag.rectWidth,
+      nowMs: lastServerNow || Date.now(),
+    });
+    applyTimelineWindow(next);
+  }
+  function onTimelineMouseUp() {
+    if (!timelineMouseDrag) return;
+    timelineMouseDrag = null;
+    els.timeline.classList.remove('lc-timeline-viewport--panning');
+  }
+
   function touchDistance(t0, t1) {
     return Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
   }
@@ -325,9 +387,12 @@
       const rect = timelineViewportRect();
       timelineGesture = {
         mode: 'pan',
+        startX: e.touches[0].clientX,
+        startY: e.touches[0].clientY,
         lastX: e.touches[0].clientX,
         lastY: e.touches[0].clientY,
         rectWidth: rect.width || els.timeline.clientWidth,
+        axis: null, // 'x' | 'y' — locked on the first move past the jitter threshold
       };
     } else {
       timelineGesture = null;
@@ -353,46 +418,81 @@
       });
       applyTimelineWindow(next);
     } else if (timelineGesture.mode === 'pan' && e.touches.length === 1) {
-      e.preventDefault();
       const x = e.touches[0].clientX;
       const y = e.touches[0].clientY;
       const deltaX = x - timelineGesture.lastX;
       const deltaY = y - timelineGesture.lastY;
       timelineGesture.lastX = x;
       timelineGesture.lastY = y;
-      // Vertical component: hand-rolled scroll passthrough — touch-action:none
-      // suppresses the browser's own scroll for this element, so nothing else
-      // moves the row-stack's overflow-y:auto viewport on touch.
-      if (deltaY && els.timeline) els.timeline.scrollTop -= deltaY;
-      if (!deltaX) return;
-      const { start, end } = currentTimelineWindow();
-      const next = window.computeTimelinePan({
-        startMs: start,
-        endMs: end,
-        deltaPx: deltaX,
-        viewportWidthPx: timelineGesture.rectWidth,
-        nowMs: now,
-      });
-      applyTimelineWindow(next);
+
+      if (!timelineGesture.axis) {
+        const totalX = x - timelineGesture.startX;
+        const totalY = y - timelineGesture.startY;
+        // Below the threshold, direction is noise — wait for more movement
+        // before committing to an axis (an early pick would flip randomly).
+        if (Math.abs(totalX) < TIMELINE_AXIS_LOCK_PX && Math.abs(totalY) < TIMELINE_AXIS_LOCK_PX) return;
+        timelineGesture.axis = Math.abs(totalX) > Math.abs(totalY) ? 'x' : 'y';
+      }
+
+      e.preventDefault();
+      if (timelineGesture.axis === 'x') {
+        if (!deltaX) return;
+        const { start, end } = currentTimelineWindow();
+        const next = window.computeTimelinePan({
+          startMs: start,
+          endMs: end,
+          deltaPx: deltaX,
+          viewportWidthPx: timelineGesture.rectWidth,
+          nowMs: now,
+        });
+        applyTimelineWindow(next);
+      } else {
+        // Vertical-dominant: touch-action:none already told the browser, at
+        // touch-start, not to scroll this element for the WHOLE gesture — a
+        // later preventDefault() can't hand that back — so native scroll is
+        // never coming and this code must replicate it by hand. Prefer the
+        // viewport's own internal scroll; only the delta it can't absorb
+        // (scrollTop pinned at an end, or no overflow at all — the common
+        // case at under ~15 rows) falls through to the page itself, so a
+        // vertical swipe over the timeline never goes dead.
+        if (!deltaY) return;
+        // Desired change in scroll POSITION (not finger delta): matches the
+        // `scrollTop -= deltaY` convention, so the page falls through in the
+        // SAME direction the inner viewport would have scrolled had it had
+        // room — a swipe must feel identical regardless of which one absorbs it.
+        const desired = -deltaY;
+        const before = els.timeline.scrollTop;
+        els.timeline.scrollTop = before + desired; // browser clamps to [0, scrollHeight - clientHeight]
+        const consumed = els.timeline.scrollTop - before;
+        const remainder = desired - consumed;
+        if (remainder) window.scrollBy(0, remainder);
+      }
     }
   }
   function onTimelineTouchEnd(e) {
     if (e.touches.length === 0) {
       timelineGesture = null;
     } else if (e.touches.length === 1 && timelineGesture && timelineGesture.mode === 'pinch') {
-      // Dropped from two fingers to one mid-pinch: keep the gesture alive as a pan.
+      // Dropped from two fingers to one mid-pinch: keep the gesture alive as a
+      // pan, re-armed with its own fresh axis lock from this point.
       const rect = timelineViewportRect();
       timelineGesture = {
         mode: 'pan',
+        startX: e.touches[0].clientX,
+        startY: e.touches[0].clientY,
         lastX: e.touches[0].clientX,
         lastY: e.touches[0].clientY,
         rectWidth: rect.width || els.timeline.clientWidth,
+        axis: null,
       };
     }
   }
   function wireTimelineGestures() {
     if (!els.timeline) return;
     els.timeline.addEventListener('wheel', onTimelineWheel, { passive: false });
+    els.timeline.addEventListener('mousedown', onTimelineMouseDown);
+    window.addEventListener('mousemove', onTimelineMouseMove);
+    window.addEventListener('mouseup', onTimelineMouseUp);
     els.timeline.addEventListener('touchstart', onTimelineTouchStart, { passive: true });
     els.timeline.addEventListener('touchmove', onTimelineTouchMove, { passive: false });
     els.timeline.addEventListener('touchend', onTimelineTouchEnd, { passive: true });

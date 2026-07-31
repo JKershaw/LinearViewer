@@ -183,6 +183,14 @@
      `pan-y` would let the browser take over a vertical-dominant drag mid-pinch,
      which a two-finger gesture can easily start as. */
   touch-action: none;
+  cursor: grab;
+}
+/* F2: desktop mouse drag-pan (LIN-1743 review) — held for the duration of a
+   drag, mirroring public/ship.css's `.ship-panning`; suppresses text
+   selection so the drag reads as a pan, not a selection. */
+.lc-timeline-viewport--panning {
+  cursor: grabbing;
+  user-select: none;
 }
 .lc-timeline-bar {
   position: absolute;

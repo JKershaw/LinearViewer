@@ -21,6 +21,7 @@ import {
 import {
   computeTimelineZoom,
   computeTimelinePan,
+  timelineRunOverlapsWindow,
   TIMELINE_MIN_SPAN_MS,
   TIMELINE_MAX_SPAN_MS,
 } from '../../lib/timeline-zoom.js';
@@ -416,4 +417,61 @@ test('computeTimelinePan is a no-op on degenerate input (zero viewport, inverted
     computeTimelinePan({ startMs: NOW - HOUR, endMs: NOW, deltaPx: 50, viewportWidthPx: 0, nowMs: NOW }),
     { startMs: NOW - HOUR, endMs: NOW }
   );
+});
+
+// timelineRunOverlapsWindow (LIN-1743 review F1) — the client-side culling
+// predicate the reviewer found missing: a run wholly outside the current
+// zoomed view window rendered as a phantom edge sliver instead of
+// disappearing, and the empty-state check counted it as present. Covered here
+// (rather than only via E2E) because the E2E seed seam always dispatches at
+// "now" (see tests/e2e/live-console.spec.js's seedTerminalWorker comment) —
+// arbitrary timestamps are cheap with `now` injected.
+test('timelineRunOverlapsWindow: a run entirely BEFORE the window does not overlap', () => {
+  assert.equal(
+    timelineRunOverlapsWindow({ start: NOW - 5 * HOUR, end: NOW - 4 * HOUR }, NOW - HOUR, NOW, NOW),
+    false
+  );
+});
+
+test('timelineRunOverlapsWindow: a run entirely AFTER the window does not overlap', () => {
+  // Window bounds needn't end at "now" — a panned-back-in-time window has
+  // both edges in the past, and a run starting after windowEnd is future
+  // relative to that window even though it's already happened relative to now.
+  assert.equal(
+    timelineRunOverlapsWindow({ start: NOW - HOUR, end: NOW - HOUR + MIN }, NOW - 5 * HOUR, NOW - 3 * HOUR, NOW),
+    false
+  );
+});
+
+test('timelineRunOverlapsWindow: a run spanning the whole window overlaps', () => {
+  assert.equal(
+    timelineRunOverlapsWindow({ start: NOW - 5 * HOUR, end: NOW - 4 * HOUR }, NOW - 4.5 * HOUR, NOW - 4.2 * HOUR, NOW),
+    true
+  );
+});
+
+test('timelineRunOverlapsWindow: a run partially clipped at the window edge overlaps', () => {
+  assert.equal(
+    timelineRunOverlapsWindow({ start: NOW - 90 * MIN, end: NOW - 30 * MIN }, NOW - HOUR, NOW, NOW),
+    true
+  );
+});
+
+test('timelineRunOverlapsWindow: an open-ended (still-running, end: null) run overlaps whenever it started before the window closes', () => {
+  assert.equal(
+    timelineRunOverlapsWindow({ start: NOW - 10 * HOUR, end: null }, NOW - HOUR, NOW, NOW),
+    true
+  );
+  assert.equal(
+    // Panned window entirely before the run's own start: not overlapping even
+    // though it's still running (an open end doesn't retroactively overlap
+    // a window that closes before the run began).
+    timelineRunOverlapsWindow({ start: NOW - HOUR, end: null }, NOW - 5 * HOUR, NOW - 2 * HOUR, NOW),
+    false
+  );
+});
+
+test('timelineRunOverlapsWindow: tolerant of a missing/malformed run', () => {
+  assert.equal(timelineRunOverlapsWindow(null, NOW - HOUR, NOW, NOW), false);
+  assert.equal(timelineRunOverlapsWindow({}, NOW - HOUR, NOW, NOW), false);
 });

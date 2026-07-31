@@ -123,6 +123,23 @@ async function dragPan(page, selector, { startX, dx }) {
   }, { startX, dx });
 }
 
+// A vertical-dominant one-finger drag (F3): unlike native touch input, a
+// synthetic TouchEvent never drives the browser's own scrolling regardless of
+// `touch-action` — but that's exactly why it still proves this fix. F3's fix
+// is plain JS (`els.timeline.scrollTop` / `window.scrollBy`) reacting to the
+// touchmove handler's OWN axis-lock + delta math, not native touch-scroll, so
+// a synthetic event exercises the real code path end to end.
+async function dragPanVertical(page, selector, { startY, dy }) {
+  await page.locator(selector).evaluate((el, opts) => {
+    const rect = el.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const touchAt = (y) => new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+    el.dispatchEvent(new TouchEvent('touchstart', { touches: [touchAt(opts.startY)], bubbles: true, cancelable: true }));
+    el.dispatchEvent(new TouchEvent('touchmove', { touches: [touchAt(opts.startY + opts.dy)], bubbles: true, cancelable: true }));
+    el.dispatchEvent(new TouchEvent('touchend', { touches: [], bubbles: true, cancelable: true }));
+  }, { startY, dy });
+}
+
 // The viewport's own current { start, end } window (public/live-console.js's
 // syncTimelineWindowAttrs), in epoch ms. A seeded run in these specs is only
 // ever a second or two old, which sits under updateTimelineBarNode's MIN_W
@@ -748,6 +765,135 @@ test.describe('Live Console (experimental)', () => {
       // listeners — the gesture handlers are scoped to els.timeline only.
       await pinch(page, '[data-testid="live-console-lanes"]', { startSpread: 20, endSpread: 240 });
       await dragPan(page, '[data-testid="live-console-lanes"]', { startX: 300, dx: 150 });
+
+      expect(await timelineWindow(page)).toEqual(baseline);
+    });
+
+    test('a run entirely outside the zoomed window is culled, not shown as a phantom edge sliver (F1)', async ({ page }) => {
+      // seedTerminalWorker always dispatches "now" (see its own comment above),
+      // so a genuinely stale run needs a route-intercept — the same technique
+      // the LIN-1743 review used to surface this in the first place.
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9010', message: '[done] ok' });
+      let injected = false;
+      await page.route(`**${EVENTS_API}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!injected) {
+          injected = true;
+          const now = body.serverNow;
+          const staleRun = {
+            id: 'f1-stale-run', issueIdentifier: 'LIN-9099', kind: 'implementation', promptName: null,
+            outcomeKind: 'done', start: now - 22 * HOUR_MS, end: now - 22 * HOUR_MS + 60000,
+            stillRunning: false, clippedStart: false, groupKey: 'f1-stale-run', followUpTo: null,
+            workspaceUrlKey: URL_KEY,
+          };
+          body.timeline = body.timeline || { rows: [] };
+          body.timeline.rows = [...(body.timeline.rows || []), [staleRun]];
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      const staleBar = page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9099"]');
+      // At the default 24h span both the fresh and the 22h-old run overlap the window.
+      await expect(staleBar).toBeVisible();
+
+      // Zoom to 1h: the 22h-old run no longer overlaps the window at all, so it
+      // must disappear — not clamp to a 0.6%-wide sliver pinned to the left edge.
+      await page.locator(PRESET_1H).click();
+      await expect(staleBar).toBeHidden();
+    });
+
+    test('zooming into a span with nothing in it shows the empty state, even without a poll in between (F1)', async ({ page }) => {
+      let injected = false;
+      await page.route(`**${EVENTS_API}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!injected) {
+          injected = true;
+          const now = body.serverNow;
+          const staleRun = {
+            id: 'f1-empty-state-run', issueIdentifier: 'LIN-9098', kind: 'implementation', promptName: null,
+            outcomeKind: 'done', start: now - 20 * HOUR_MS, end: now - 20 * HOUR_MS + 60000,
+            stillRunning: false, clippedStart: false, groupKey: 'f1-empty-state-run', followUpTo: null,
+            workspaceUrlKey: URL_KEY,
+          };
+          body.timeline = { rows: [[staleRun]], connectors: [], truncated: false, totalInWindow: 1 };
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      await expect(page.locator('#live-console-timeline-empty')).toBeHidden();
+
+      // Zoom to 1h — the run's 20h-old activity is fully outside this window,
+      // so the panel has nothing to show and must say so immediately (F1's
+      // second finding: visibleCount previously counted every run regardless
+      // of window overlap, so this empty state was unreachable at any zoom).
+      await page.locator(PRESET_1H).click();
+      await expect(page.locator('#live-console-timeline-empty')).toBeVisible();
+    });
+
+    test('a plain mouse drag pans the window on desktop (F2)', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9011', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      // Zoom in first (1h) so a pan has room to move, same reasoning as the
+      // touch drag-pan test above.
+      await page.locator(PRESET_1H).click();
+      const before = await timelineWindow(page);
+
+      const box = await page.locator(TIMELINE).boundingBox();
+      const y = box.y + box.height / 2;
+      await page.mouse.move(box.x + box.width * 0.3, y);
+      await page.mouse.down();
+      // Drag right: reveals EARLIER time, mirroring the touch drag-pan test's
+      // direction convention exactly.
+      await page.mouse.move(box.x + box.width * 0.7, y, { steps: 5 });
+      await page.mouse.up();
+
+      const after = await timelineWindow(page);
+      expect(after.end - after.start).toBe(before.end - before.start);
+      expect(after.start).toBeLessThan(before.start);
+      expect(after.end).toBeLessThan(before.end);
+    });
+
+    test('a vertical-dominant one-finger swipe over the timeline scrolls the page instead of hitting a dead zone (F3)', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9012', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      // A single seeded run packs into one row — well under Q4's ~15-row
+      // internal-scroll threshold, so the viewport itself has no overflow to
+      // absorb the swipe and the whole delta must fall through to the page.
+      const before = await page.evaluate(() => window.scrollY);
+
+      await dragPanVertical(page, TIMELINE, { startY: 200, dy: -220 });
+
+      const after = await page.evaluate(() => window.scrollY);
+      expect(after).toBeGreaterThan(before);
+    });
+
+    test('a mostly-vertical swipe with a small horizontal wobble locks to the vertical axis and does not pan the window (F3)', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9013', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      await page.locator(PRESET_1H).click(); // give a pan somewhere to go, if it wrongly fires
+      const baseline = await timelineWindow(page);
+
+      await page.locator(TIMELINE).evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        const touchAt = (dx, dy) => new Touch({ identifier: 1, target: el, clientX: x + dx, clientY: y + dy });
+        // Small horizontal wobble (2px), large vertical travel (60px) — the
+        // axis should lock to vertical on the first move past the jitter
+        // threshold and stay there for the rest of the gesture.
+        el.dispatchEvent(new TouchEvent('touchstart', { touches: [touchAt(0, 0)], bubbles: true, cancelable: true }));
+        el.dispatchEvent(new TouchEvent('touchmove', { touches: [touchAt(2, 60)], bubbles: true, cancelable: true }));
+        el.dispatchEvent(new TouchEvent('touchend', { touches: [], bubbles: true, cancelable: true }));
+      });
 
       expect(await timelineWindow(page)).toEqual(baseline);
     });
