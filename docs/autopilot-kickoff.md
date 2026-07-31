@@ -183,6 +183,12 @@ finish lines are the two human-meaningful ones: **the feature/task is complete**
 or **it's reached a point that wants human review**. An open-ended "just keep the stack
 moving" run has no finish line — it runs until it needs you.
 
+If the run was launched with a declared task budget (`maxTasks`), that budget is a **scope
+bound**, not a substitute for either finish line above — it says how far the run reaches, not
+when it's actually done. If the run reaches the bound first, Harbour enforces it server-side
+(see `BUDGET_EXHAUSTED` below); that refusal is itself a clean, expected stop, not a broken
+instrument.
+
 ## Your instruments — and when to halt
 
 You drive a small set of verbs. Knowing how each behaves up front is what keeps a hiccup from
@@ -208,6 +214,12 @@ becoming a halt you didn't need — recognise these known quirks, don't debug th
   `$?` and the assignment aborts. Use `dispatch_status`, or run the loop under `bash`.
 - **`/recommend` can run past 25s** behind whitespace keepalives that `JSON.parse` ignores —
   don't set a short client timeout on it.
+- **A `409 BUDGET_EXHAUSTED` means a budgeted run reached its task limit — it is not a failure
+  and not a broken instrument.** A run launched with `maxTasks` refuses a fresh worker dispatch
+  for a NEW task once that many distinct tasks are underway; a dispatch that continues a task
+  already inside the budget (its review, its close-out, a corrective follow-up) is never
+  refused. Wind down any other in-flight work, post the run summary, and stop — that is the
+  run's clean, expected finish, not something to retry, work around, or count as a strike.
 - **Rate limit: 60 requests/minute.** Space your polls.
 
 A broken signal in *your own* calls is a halt, not a puzzle: a network error, timeout, or 5xx

@@ -319,6 +319,79 @@ describe('buildAutopilotKickoff (originNote seam, LIN-918)', () => {
   });
 });
 
+describe('buildAutopilotKickoff (maxTasks budget, LIN-1751)', () => {
+  const issue = { identifier: 'LIN-1751', title: 'Bounded autonomous runs' };
+
+  test('omitting maxTasks is byte-identical to the default (no drift)', () => {
+    assert.strictEqual(
+      buildAutopilotKickoff({ baseUrl: BASE_URL }),
+      buildAutopilotKickoff({ baseUrl: BASE_URL, maxTasks: null })
+    );
+    assert.strictEqual(
+      buildAutopilotKickoff({ baseUrl: BASE_URL, issue }),
+      buildAutopilotKickoff({ baseUrl: BASE_URL, issue, maxTasks: undefined })
+    );
+    assert.strictEqual(
+      buildAutopilotKickoff({ baseUrl: BASE_URL, goal: 'ship it', variant: 'stepper' }),
+      buildAutopilotKickoff({ baseUrl: BASE_URL, goal: 'ship it', variant: 'stepper', maxTasks: null })
+    );
+  });
+
+  test('an invalid maxTasks (0, negative, non-integer) is treated the same as absent — byte-identical', () => {
+    const base = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    for (const bad of [0, -1, 1.5, NaN]) {
+      assert.strictEqual(buildAutopilotKickoff({ baseUrl: BASE_URL, maxTasks: bad }), base,
+        `maxTasks: ${bad} must not be treated as a declared budget`);
+    }
+  });
+
+  test('a declared budget states the scope bound up front, beside mode', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, maxTasks: 50 });
+    assert.ok(text.includes('Task budget: up to 50 distinct tasks this run'));
+    // Stated near the mode block, before the goal block.
+    assert.ok(text.indexOf('Task budget') < text.indexOf('**Goal from the human:**'));
+  });
+
+  test('a budget of exactly 1 uses the singular "task"', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, maxTasks: 1 });
+    assert.ok(text.includes('Task budget: up to 1 distinct task this run.'));
+    assert.ok(!text.includes('1 distinct tasks'));
+  });
+
+  test('the finish-line sentence becomes budget-aware when maxTasks is set', () => {
+    const unbudgeted = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(unbudgeted.includes('has no finish line — it runs until it needs you.'));
+
+    const budgeted = buildAutopilotKickoff({ baseUrl: BASE_URL, maxTasks: 50 });
+    assert.ok(!budgeted.includes('has no finish line — it runs until it needs you.'));
+    assert.ok(budgeted.includes('This run covers **up to 50 distinct tasks**'));
+    assert.ok(budgeted.includes('BUDGET_EXHAUSTED'));
+  });
+
+  test('the BUDGET_EXHAUSTED quirk-list bullet appears only when a budget is declared', () => {
+    // The inlined manual (docs/autopilot-operating-manual.md) mentions
+    // BUDGET_EXHAUSTED generically regardless of whether THIS run is budgeted
+    // (it has no per-run templating), so assert on the kickoff's own quirk
+    // bullet text specifically, not the bare code string.
+    const QUIRK_BULLET = 'means this run reached its task budget';
+    const unbudgeted = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(!unbudgeted.includes(QUIRK_BULLET));
+
+    const budgeted = buildAutopilotKickoff({ baseUrl: BASE_URL, maxTasks: 50 });
+    assert.ok(budgeted.includes('A `409 BUDGET_EXHAUSTED` means this run reached its task budget'));
+    assert.ok(budgeted.includes('it is not a failure and not a\n  broken instrument'),
+      'must be framed as an orderly finish, matching the DUPLICATE_DISPATCH quirk\'s framing');
+    // Sits in the same quirks list as the existing DUPLICATE_DISPATCH entry.
+    assert.ok(budgeted.indexOf('DUPLICATE_DISPATCH') < budgeted.indexOf(QUIRK_BULLET));
+  });
+
+  test('a budgeted scoped run still pins the goal and names the task, unaffected by the budget block', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, maxTasks: 10 });
+    assert.ok(text.includes('run on autopilot until **LIN-1751**'));
+    assert.ok(text.includes('Task budget: up to 10 distinct tasks this run.'));
+  });
+});
+
 describe('buildAutopilotKickoff (read-only mode)', () => {
   test('restricts the worker to findings-only and names the boundary', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, mode: 'readonly' });
