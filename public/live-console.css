@@ -121,6 +121,92 @@
 }
 .lc-section-mark { color: var(--brand); margin-right: 0.3rem; }
 
+/* ── Swimlane timeline (LIN-1742, Phase 1: static, non-zoomable) ──────────── */
+.lc-timeline-section {
+  margin-bottom: 1.75rem;
+}
+/*
+ * No full-bleed breakout. Three review cycles chased a `.lc-timeline-breakout`
+ * (`width: 100vw; margin-inline: calc(50% - 50vw)`, later re-derived from
+ * `body`'s own box) meant to widen just the axis+bars past `.lc-page`'s
+ * ~900px column, and each fix traded one viewport-conditional bug for
+ * another: a `.lc-page`-level clip guard that hid the whole section; a
+ * `100vw` overshoot silently clipped by `body`'s own
+ * `max-width: 120ch; overflow-x: clip`; then a fix that re-derived `body`'s
+ * box from hardcoded responsive-padding constants and inverted the breakout
+ * into an inset narrower than the page column below 640px. All three lived
+ * in the same ~20 lines of width arithmetic, and all three came from the
+ * same root — the panel trying to be wider than the container it lives in.
+ * The axis + bars now lay out in `.lc-page`'s ordinary column, exactly like
+ * every other section on this page: no `100vw`, no negative margins, no
+ * re-derivation of `body`'s responsive padding, and the bars automatically
+ * share the grid the label, chips and lanes rail already align to. Costs
+ * ~250px of desktop width; ships without a fourth viewport-conditional bug.
+ */
+.lc-timeline-presets {
+  display: flex;
+  gap: 0.4rem;
+  margin: -0.25rem 0 0.6rem;
+}
+.lc-timeline-preset {
+  font-family: var(--font-structural);
+  font-size: 0.75rem;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  padding: 0.2rem 0.65rem;
+  cursor: pointer;
+}
+.lc-timeline-preset:hover { background: var(--card-h); }
+.lc-timeline-preset[aria-pressed="true"] {
+  border-color: var(--brand);
+  color: var(--brand-dim);
+}
+.lc-timeline-axis {
+  height: 1.1rem;
+  font-family: var(--font-structural);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+.lc-timeline-viewport {
+  position: relative;
+  /* Q4: internal vertical scroll, deliberately no row cap — the page container
+     keeps its own scroll (`.lc-page` carries no fixed height), this viewport
+     scrolls independently once a session's runs stack past its max-height. */
+  max-height: 320px;
+  overflow-y: auto;
+  overflow-x: hidden; /* bars never exceed the viewport at any zoom level (Phase 2+) */
+}
+.lc-timeline-bar {
+  position: absolute;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  background: var(--slate);
+}
+/*
+ * Colour source is `outcomeKind` (data-kind), NEVER dispatch `kind`/
+ * `promptName` — those stay label text only (title/aria-label). The existing
+ * `.lc-event[data-kind="…"]` rules above are scoped to `.lc-event .lc-event-glyph`
+ * (a descendant glyph), so they do not apply here — new bar-scoped rules on the
+ * same six tokens instead.
+ */
+.lc-timeline-bar[data-kind="done"]     { background: var(--green); }
+.lc-timeline-bar[data-kind="working"]  { background: var(--amber); }
+.lc-timeline-bar[data-kind="blocked"]  { background: var(--slate); }
+.lc-timeline-bar[data-kind="failed"]   { background: var(--red); }
+.lc-timeline-bar[data-kind="evidence"] { background: var(--brand); }
+.lc-timeline-bar[data-kind="info"]     { background: var(--slate); } /* skipped: deliberately neutral, not a 7th colour */
+
+/* M5: a clipped-start run's true dispatch predates the 24h window — a dashed
+   left edge (instead of the normal rounded corner) marks "this ran in from
+   before the visible window", distinct from an ordinary bar's start. */
+.lc-timeline-bar--clipped {
+  border-left: 2px dashed var(--card);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
 /* ── Pulse-lane rail ────────────────────────────────────────────────────── */
 .lc-lanes-section { margin-bottom: 1.75rem; }
 .lc-lanes { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }

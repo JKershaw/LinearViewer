@@ -46,6 +46,43 @@ async function seedRunningLoopWithToken(page, key, { task, tokenId = null, token
   return workerId;
 }
 
+// Dispatch a worker, claim it, then post a terminal feedback marker so the
+// loop reconstructs with a `terminalStatus`/`terminalCompletedAt` — a DONE or
+// FAILED timeline run. `dispatchedAt` is always "now" (no test seam backdates
+// it), so this can only produce runs well inside the live 24h window; the
+// clipped-start (dispatch predates the window) and truncation-cap paths are
+// unit-tested instead (tests/unit/live-console-timeline.test.js), where `now`
+// is injected and arbitrary timestamps are cheap.
+async function seedTerminalWorker(page, key, { task, message }) {
+  const worker = await page.request.post(`/workspace/${key}/api/dispatch`, {
+    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: task, issueTitle: `${task} worker`, target: 'cli' },
+  });
+  expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+  const workerId = (await worker.json()).item.id;
+  const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner-${task}&urlKey=${key}`)).json();
+  await page.request.post(`/api/dispatch/take/${workerId}`, { headers: { Authorization: `Bearer ${token}` } });
+  await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    data: { message },
+  });
+  return workerId;
+}
+
+// A CSS color token (e.g. `--red`) resolved to the browser's computed rgb()
+// form, so it can be compared against an element's computed background-color
+// without hardcoding either side's exact string format.
+async function resolveColorToken(page, token) {
+  return page.evaluate((varName) => {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    const probe = document.createElement('div');
+    probe.style.color = value;
+    document.body.appendChild(probe);
+    const rgb = getComputedStyle(probe).color;
+    probe.remove();
+    return rgb;
+  }, token);
+}
+
 // Seed the audit rows Beat 1's predicate folds into `credential_dead`: within
 // the window, a token needs BOTH an exactly-`token_ownerless` note AND a
 // success (<400). Anything less is not a death, by design.
@@ -354,6 +391,185 @@ test.describe('Live Console (experimental)', () => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       const res = await page.request.get(EVENTS_API);
       expect(res.status()).toBe(403);
+    });
+  });
+
+  // Timeline (LIN-1742, Phase 1 of LIN-1720): static, non-zoomable last-24h
+  // swimlane panel between the filter chips and the "working now" lanes rail.
+  test.describe('Timeline (LIN-1742)', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+    });
+    test.afterEach(async ({ page }) => {
+      await clearFeed(page, URL_KEY);
+    });
+
+    test('one bar renders per seeded run, and the bars viewport never overflows horizontally', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-8001', message: '[done] shipped it' });
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-8002', message: '[failed] broke on step 3' });
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-8003' });
+
+      await page.goto(PAGE_URL);
+      await page.waitForFunction(() => document.querySelectorAll('[data-testid="live-console-timeline-bar"]').length >= 3);
+      await expect(page.locator('[data-testid="live-console-timeline-bar"]')).toHaveCount(3);
+
+      // Route-A-style invariant (LIN-1741 honesty note extended to this new
+      // element): the bars viewport is never meant to natively overflow —
+      // re-layout, not zoom-via-CSS-transform, is the design for Phase 2+.
+      const viewport = page.locator('[data-testid="live-console-timeline"]');
+      const overflow = await viewport.evaluate(el => ({ scrollWidth: el.scrollWidth, clientWidth: el.clientWidth }));
+      expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+    });
+
+    test('the bars viewport never overflows horizontally at a 390×844 mobile viewport either', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-8005', message: '[done] shipped it' });
+      await page.goto(PAGE_URL);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      const viewport = page.locator('[data-testid="live-console-timeline"]');
+      const overflow = await viewport.evaluate(el => ({ scrollWidth: el.scrollWidth, clientWidth: el.clientWidth }));
+      expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+    });
+
+    test('a terminal-failed run renders data-kind="failed" with the --red background', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-8010', message: '[failed] broke on step 3' });
+      await page.goto(PAGE_URL);
+      // waitForSelector first (generous default timeout) — the poll+paint cycle
+      // can occasionally still be in flight right after goto, and expect()'s
+      // own default timeout (5s) is tighter than that first-paint race allows.
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"][data-kind="failed"]');
+      const bar = page.locator('[data-testid="live-console-timeline-bar"][data-kind="failed"]').first();
+      await expect(bar).toBeVisible();
+      // The attribute alone would also pass on an uncoloured bar — the computed
+      // background-color read is the assertion that actually exercises the fix.
+      const bg = await bar.evaluate(el => getComputedStyle(el).backgroundColor);
+      expect(bg).toBe(await resolveColorToken(page, '--red'));
+    });
+
+    test('a still-running run renders data-kind="working" with the --amber background', async ({ page }) => {
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-8020' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"][data-kind="working"]');
+      const bar = page.locator('[data-testid="live-console-timeline-bar"][data-kind="working"]').first();
+      await expect(bar).toBeVisible();
+      const bg = await bar.evaluate(el => getComputedStyle(el).backgroundColor);
+      expect(bg).toBe(await resolveColorToken(page, '--amber'));
+    });
+
+    test('a just-seeded, still-running run renders with a measurable width (min-width sliver survives for a fresh/near-now run)', async ({ page }) => {
+      // Regression for the review's blocking finding: `100 - startPct` degenerates
+      // to the run's own duration-percentage for anything ending at/near "now", so
+      // the 0.6% MIN_W floor was silently defeated for exactly the newest work —
+      // the bar landed in the DOM with the right data-kind but at sub-pixel width
+      // (measured ~0.28px on the review's own repro), so the panel read as visually
+      // empty even with live runs seeded. `toBeVisible()` alone can't catch this —
+      // it passes on a 0.0025px-wide box — so this asserts a measured px width.
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-8022' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"][data-kind="working"]');
+      const { barWidth, viewportWidth } = await page.evaluate(() => {
+        const viewport = document.querySelector('[data-testid="live-console-timeline"]');
+        const bar = document.querySelector('[data-testid="live-console-timeline-bar"][data-kind="working"]');
+        return { barWidth: bar.getBoundingClientRect().width, viewportWidth: viewport.clientWidth };
+      });
+      // The 0.6% MIN_W floor in px for this viewport, with a small tolerance for
+      // sub-pixel rounding — well above the sub-1px width a defeated floor renders.
+      const expectedFloorPx = viewportWidth * 0.006;
+      expect(barWidth).toBeGreaterThanOrEqual(expectedFloorPx - 0.5);
+    });
+
+    test('a fresh/still-running bar is actually painted at a desktop (1280px) viewport, not just present in the DOM', async ({ page }) => {
+      // General paint-identity smoke test, not tied to any particular layout:
+      // `toBeVisible()` and a `getBoundingClientRect().width` check (the prior
+      // test) both describe the bar's OWN box and are blind to an ancestor's
+      // overflow clip. `elementFromPoint` at the bar's own centre resolves to
+      // the bar itself when painted, and to some clipping ancestor when not —
+      // this caught real bugs across review cycles 1-3 (a defeated min-width
+      // floor, then two generations of a full-bleed breakout overshooting its
+      // container; see the CSS comment on `.lc-timeline-section` in
+      // public/live-console.css). The breakout is gone now — the timeline
+      // lays out in `.lc-page`'s ordinary column — but this stays as a cheap,
+      // durable guarantee that a bar is genuinely rendered to the user.
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-8023' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"][data-kind="working"]');
+      const paintedTestid = await page.evaluate(() => {
+        const bar = document.querySelector('[data-testid="live-console-timeline-bar"][data-kind="working"]');
+        const rect = bar.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const hit = document.elementFromPoint(cx, cy);
+        return hit ? hit.getAttribute('data-testid') : null;
+      });
+      expect(paintedTestid).toBe('live-console-timeline-bar');
+    });
+
+    test('the bars viewport is exactly as wide as the page column (no breakout, no inset) at both mobile and desktop widths', async ({ page }) => {
+      // Cycle-3 review's suggested durable check, generalized: the existing
+      // mobile overflow test (`scrollWidth <= clientWidth`) is one-directional
+      // and passes on a box that is too NARROW, which is exactly the bug a
+      // prior full-bleed-breakout attempt introduced below 640px (measured
+      // 294px vs. the page column's 319px at 390px). Comparing the bars
+      // viewport's width directly against `.lc-lanes-section` — a sibling
+      // section that has never had a breakout — catches both an overshoot and
+      // an inset, at any viewport, and fails on either regression.
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-8024', message: '[done] shipped it' });
+      for (const size of [{ width: 390, height: 844 }, { width: 1280, height: 720 }]) {
+        await page.setViewportSize(size);
+        await page.goto(PAGE_URL);
+        await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+        const widths = await page.evaluate(() => ({
+          timeline: document.querySelector('[data-testid="live-console-timeline"]').getBoundingClientRect().width,
+          lanes: document.querySelector('[data-testid="live-console-lanes"]').getBoundingClientRect().width,
+        }));
+        expect(widths.timeline).toBeCloseTo(widths.lanes, 0);
+      }
+    });
+
+    test('a done run renders data-kind="done" with the --green background', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-8025', message: '[done] shipped it' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"][data-kind="done"]');
+      const bar = page.locator('[data-testid="live-console-timeline-bar"][data-kind="done"]').first();
+      await expect(bar).toBeVisible();
+      const bg = await bar.evaluate(el => getComputedStyle(el).backgroundColor);
+      expect(bg).toBe(await resolveColorToken(page, '--green'));
+    });
+
+    test('chip-filter parity: a bar carries the seeding workspace on data-ws', async ({ page }) => {
+      // A single-workspace test session keeps the chip row itself hidden
+      // (LIN-1436 house rule), but `isVisibleWs` filtering is wired from the
+      // SAME `data-ws` attribute a multi-workspace session's chips toggle —
+      // this pins that the bar carries the right key for that filter to act on.
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-8030', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      const bar = page.locator('[data-testid="live-console-timeline-bar"]').first();
+      await expect(bar).toHaveAttribute('data-ws', URL_KEY);
+    });
+
+    test('empty state shows with no runs in the window, and hides once one is seeded', async ({ page }) => {
+      await page.goto(PAGE_URL);
+      await expect(page.locator('#live-console-timeline-empty')).toBeVisible();
+
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-8040', message: '[done] ok' });
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      await expect(page.locator('#live-console-timeline-empty')).toBeHidden();
+    });
+
+    test('a bar keeps the SAME DOM node across a poll tick (keyed reconcile, never innerHTML-replaced)', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-8050', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      const bar = page.locator('[data-testid="live-console-timeline-bar"]').first();
+      await expect(bar).toBeVisible();
+      // Tag the live node directly; if the next poll rebuilt it via innerHTML
+      // instead of updating in place, this custom attribute would be gone.
+      await bar.evaluate(el => { el.dataset.probe = 'still-here'; });
+      await page.waitForTimeout(5500); // one more 5s poll tick
+      await expect(bar).toHaveAttribute('data-probe', 'still-here');
     });
   });
 });

@@ -369,6 +369,15 @@ main.lc-page[data-url-key]                    - page container
                                                 aware (static snapshot instead of scrolling)
   [data-testid="live-console-chips"]          - workspace filter chips (hidden when <2 workspaces)
     .lc-chip[data-ws][aria-pressed]           - one toggle per workspace (.lc-chip--off when filtered out)
+  .lc-timeline-section                        - swimlane timeline: last 24h of dispatch runs as bars
+                                                (static/non-zoomable in this phase; LIN-1742)
+    .lc-timeline-presets                      - 1h/24h range buttons (inert placeholders, wired in Phase 2)
+    #live-console-timeline-axis               - time axis mount (fixed 24h scale), same page column as the label above (no full-bleed breakout)
+    [data-testid="live-console-timeline"]     - bars viewport (internal vertical scroll, no row cap)
+      [data-testid="live-console-timeline-bar"][data-kind][data-ws]  - one bar per run;
+                                                data-kind vocabulary matches the stream's (below);
+                                                .lc-timeline-bar--clipped marks a run whose true start
+                                                predates the 24h window (clipped to the left edge, not dropped)
   [data-testid="live-console-lanes"]          - "working now" rail (<ul>)
     [data-testid="live-console-lane"]         - one breathing lane per working agent
       a.lc-lane-task[href]                     - links to that workspace's /observation
@@ -384,7 +393,7 @@ main.lc-page[data-url-key]                    - page container
 - New events on later polls get a transient `.lc-event--new` class; lane pulses + heartbeat ticks persist across polls via a keyed reconcile (nodes are updated in place, not rebuilt).
 
 ### Live Console Endpoint
-- `GET /workspace/{urlKey}/api/live-console/events` — merged, normalized live feed (session-auth; 403 when the flag is off). Returns `{ events:[{id,kind,ts,iso,workspaceUrlKey,workspaceName,task,action,status,summary,url}], lanes:[{workspaceUrlKey,workspaceName,task,action,summary,sinceMs,lastActivityMs,heartbeat:{toolCount,elapsedSeconds,breakdown,total}}], tempo:[n,...], pulse:{bucketMs,endTs,buckets:[n,...]}, serverNow, summary:{active,done,failed,blocked,total}, hasMore, oldestTs }`. `pulse` is heartbeat-only fine-grained density (the strip's hum); `serverNow` anchors the strip's time axis. Generation-free.
+- `GET /workspace/{urlKey}/api/live-console/events` — merged, normalized live feed (session-auth; 403 when the flag is off). Returns `{ events:[{id,kind,ts,iso,workspaceUrlKey,workspaceName,task,action,status,summary,url}], lanes:[{workspaceUrlKey,workspaceName,task,action,summary,sinceMs,lastActivityMs,heartbeat:{toolCount,elapsedSeconds,breakdown,total}}], tempo:[n,...], pulse:{bucketMs,endTs,buckets:[n,...]}, timeline:{rows:[[{id,issueIdentifier,kind,promptName,outcomeKind,start,end,stillRunning,clippedStart,groupKey,followUpTo,workspaceUrlKey,connectorTruncated},...],...], connectors:[{fromId,toId},...], truncated, totalInWindow}, serverNow, summary:{active,done,failed,blocked,total}, hasMore, oldestTs }`. `pulse` is heartbeat-only fine-grained density (the strip's hum); `serverNow` anchors the strip's time axis (also the timeline's fixed 24h window right edge). `timeline.rows` is pre-packed into non-overlapping display rows (`lib/live-console.js`'s `packTimelineRows`) — each row is an array of runs never overlapping in time; `outcomeKind` (not dispatch `kind`) is the colour source; `end:null` + `stillRunning:true` is an open-ended (still-running) bar; `stillRunning:'unknown'` is a stale-but-not-yet-terminal run; `truncated`/`totalInWindow` disclose when the 500-run cap dropped older rows (LIN-1494 pattern). Generation-free.
 - `GET …/events?before=<epochMs>&limit=<n>` — a HISTORY page: older status events strictly before the cursor. Returns `{ events:[…], hasMore, oldestTs }`.
 
 ## Common Workflows
