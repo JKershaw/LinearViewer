@@ -158,11 +158,16 @@
     const windowStart = now - TIMELINE_WINDOW_MS;
     const clampedEnd = run.end != null ? run.end : now;
     const pct = (t) => Math.max(0, Math.min(100, ((t - windowStart) / TIMELINE_WINDOW_MS) * 100));
-    const startPct = pct(run.start);
     // A visible sliver for a near-zero-duration run, but never past the
-    // container's right edge — a run ending right at "now" (startPct ≈ 100)
+    // container's right edge — a run ending right at "now" (pct(run.start) ≈ 100)
     // must not push left+width over 100% and force a horizontal scrollbar.
-    const widthPct = Math.min(Math.max(pct(clampedEnd) - startPct, 0.6), 100 - startPct);
+    // `startPct` itself is clamped to `100 - MIN_W` (not just `widthPct`'s upper
+    // bound) so the floor survives for a run starting at/after that point —
+    // otherwise `100 - startPct` degenerates to the run's own duration and the
+    // outer `min` always wins, defeating MIN_W for every fresh/still-running run.
+    const MIN_W = 0.6;
+    const startPct = Math.min(pct(run.start), 100 - MIN_W);
+    const widthPct = Math.min(Math.max(pct(clampedEnd) - startPct, MIN_W), 100 - startPct);
     div.style.left = `${startPct}%`;
     div.style.width = `${widthPct}%`;
     div.style.top = `${rowIndex * (TIMELINE_ROW_HEIGHT + TIMELINE_ROW_GAP)}px`;

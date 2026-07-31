@@ -457,6 +457,28 @@ test.describe('Live Console (experimental)', () => {
       expect(bg).toBe(await resolveColorToken(page, '--amber'));
     });
 
+    test('a just-seeded, still-running run renders with a measurable width (min-width sliver survives for a fresh/near-now run)', async ({ page }) => {
+      // Regression for the review's blocking finding: `100 - startPct` degenerates
+      // to the run's own duration-percentage for anything ending at/near "now", so
+      // the 0.6% MIN_W floor was silently defeated for exactly the newest work —
+      // the bar landed in the DOM with the right data-kind but at sub-pixel width
+      // (measured ~0.28px on the review's own repro), so the panel read as visually
+      // empty even with live runs seeded. `toBeVisible()` alone can't catch this —
+      // it passes on a 0.0025px-wide box — so this asserts a measured px width.
+      await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-8022' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"][data-kind="working"]');
+      const { barWidth, viewportWidth } = await page.evaluate(() => {
+        const viewport = document.querySelector('[data-testid="live-console-timeline"]');
+        const bar = document.querySelector('[data-testid="live-console-timeline-bar"][data-kind="working"]');
+        return { barWidth: bar.getBoundingClientRect().width, viewportWidth: viewport.clientWidth };
+      });
+      // The 0.6% MIN_W floor in px for this viewport, with a small tolerance for
+      // sub-pixel rounding — well above the sub-1px width a defeated floor renders.
+      const expectedFloorPx = viewportWidth * 0.006;
+      expect(barWidth).toBeGreaterThanOrEqual(expectedFloorPx - 0.5);
+    });
+
     test('a done run renders data-kind="done" with the --green background', async ({ page }) => {
       await seedTerminalWorker(page, URL_KEY, { task: 'LIN-8025', message: '[done] shipped it' });
       await page.goto(PAGE_URL);
