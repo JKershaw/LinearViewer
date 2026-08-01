@@ -261,7 +261,12 @@ describe('LIN-1118 seam: a relaxed sessionId survives dispatch storage and stays
       agentStatus: [agentStatusDone('w-ok', 'LIN-1118')]
     });
     assert.equal(page.statusCode, 200, 'the session page rendered');
-    assert.equal(titleOf(page.sentBody), `Session · ${COMPOSITE}`,
+    // LIN-1801: this session has no seedIssue, so the anchor-loop fallback
+    // (session.loops[0], per routes/dashboard.js) is the worker carrying
+    // issueTitle 'Title LIN-1118' — distinct from the composite id, so it now
+    // renders as a title suffix. The escape-fidelity claim this test exists for
+    // still holds: the composite id itself reaches the title unescaped-but-intact.
+    assert.equal(titleOf(page.sentBody), `Session · ${COMPOSITE} — Title LIN-1118`,
       'a benign composite id reaches the title unchanged — the escape must not over-escape');
   });
 });

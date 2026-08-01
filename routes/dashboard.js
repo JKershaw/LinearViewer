@@ -1005,6 +1005,7 @@ export function createDashboardRoutes({
       const anchorLoop = findAnchorLoop(session) || (session.loops && session.loops[0]) || null;
       const anchorTarget = (anchorLoop && anchorLoop.target) || null;
       const canReply = anchorTarget !== 'dash' && anchorTarget !== 'local';
+      const anchorIssueTitle = (anchorLoop && anchorLoop.issueTitle) || null;
 
       // Per-session credential state (LIN-1588, Beat 2). One bounded, single-
       // workspace Mongo read on a PAGE-LOAD path — never the feed poll, whose
@@ -1015,7 +1016,7 @@ export function createDashboardRoutes({
       const credentialByToken = await readSessionCredentials(workspace.urlKey, session);
 
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken },
+        { session, sessionId, issueContext, waiting, waitingMessage, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle },
         pageOptions
       );
       res.send(html);
