@@ -1402,7 +1402,7 @@ export function createDashboardRoutes({
   // The summary routes are async handlers invoked as `(req, res) => handleX(...)`.
   // Express does not await the returned promise, so any rejection (e.g. a store
   // read inside liveStatusLine/gatherChildOutcomes, or a cache get/put outside the
-  // inner try) would escape as an unhandled rejection and could crash the dyno
+  // inner try) would escape as an unhandled rejection and could crash the process
   // (LIN-608). `.catch(next)` routes it to the global error middleware → a visible
   // 500 instead of a crash.
   router.get('/workspace/:urlKey/api/dashboard/run-summary/:loopId', workspaceFromUrl, (req, res, next) =>
