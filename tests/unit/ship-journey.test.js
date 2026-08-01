@@ -376,4 +376,131 @@ describe('deriveJourney', () => {
       'only non-archived entries should produce waypoints');
   });
 
+  // ── scenario 11: newest-first input (the real listFull() order) ────────────
+
+  // `ReportHistoryStore.listFull()` returns reports NEWEST-FIRST — the exact
+  // opposite of every fixture above, and the order the sole intended caller
+  // (P3/LIN-1685) will hand in. `sortReportsChronological` is the one line that
+  // reconciles the two, and it is load-bearing twice over: `walkReportHistory`
+  // selects the newest bearing by last-write-wins over an ASCENDING pass, and
+  // `starChanges` reads its from/to direction off that same pass. Every fixture
+  // above arrives pre-sorted, so deleting the sort leaves them all green while
+  // the trail silently inverts. These two tests are what make that mutation fail.
+
+  test('selects the newest bearing and star direction from newest-first input', () => {
+    // The order listFull() actually returns.
+    const newestFirst = [
+      createReport({
+        generatedAt: '2026-01-02T00:00:00Z',
+        northStar: 'star-B',
+        orientation: [{ identifier: 'T-X', bearing: 'E', reason: '', archived: false }]
+      }),
+      createReport({
+        generatedAt: '2026-01-01T00:00:00Z',
+        northStar: 'star-A',
+        orientation: [{ identifier: 'T-X', bearing: 'N', reason: '', archived: false }]
+      })
+    ];
+
+    const issues = [
+      createIssue({
+        identifier: 'T-X',
+        state: { name: 'Done', type: 'completed' },
+        completedAt: '2026-01-03T00:00:00Z'
+      })
+    ];
+
+    const result = deriveJourney({ reports: newestFirst, issues });
+
+    assert.strictEqual(result.waypoints.length, 1);
+    assert.strictEqual(result.waypoints[0].bearing, 'E',
+      'must select the NEWEST bearing (E), not the first-seen entry of an unsorted array (N)');
+    assert.deepStrictEqual(result.starChanges, [
+      { from: 'star-A', to: 'star-B', at: '2026-01-02T00:00:00Z' }
+    ], 'starChanges must read oldest → newest regardless of the order reports arrive in');
+    assert.deepStrictEqual(result.coverage.span, {
+      oldest: '2026-01-01T00:00:00Z',
+      newest: '2026-01-02T00:00:00Z'
+    });
+  });
+
+  test('derives an identical result whatever order the same reports arrive in', () => {
+    // Generalises the case above: the output is a function of the report SET,
+    // never of its arrival order. Pins the delete-the-sort mutation AND the
+    // reverse-the-comparator one, neither of which the ascending fixtures catch.
+    const oldestFirst = [
+      createReport({
+        generatedAt: '2026-01-01T00:00:00Z',
+        northStar: 'star-A',
+        orientation: [
+          { identifier: 'T-X', bearing: 'N', reason: '', archived: false },
+          { identifier: 'T-Y', bearing: 'S', reason: '', archived: false }
+        ]
+      }),
+      createReport({
+        generatedAt: '2026-01-02T00:00:00Z',
+        northStar: 'star-A',
+        orientation: [{ identifier: 'T-X', bearing: 'E', reason: '', archived: false }]
+      }),
+      createReport({
+        generatedAt: '2026-01-03T00:00:00Z',
+        northStar: 'star-B',
+        orientation: [
+          { identifier: 'T-Y', bearing: 'W', reason: '', archived: false },
+          { identifier: 'T-Z', bearing: 'NE', reason: '', archived: true }
+        ]
+      }),
+      createReport({
+        generatedAt: '2026-01-04T00:00:00Z',
+        northStar: 'star-C',
+        orientation: [{ identifier: 'T-X', bearing: 'SE', reason: '', archived: false }]
+      })
+    ];
+
+    const issues = [
+      createIssue({
+        identifier: 'T-X',
+        state: { name: 'Done', type: 'completed' },
+        completedAt: '2026-01-05T00:00:00Z'
+      }),
+      createIssue({
+        identifier: 'T-Y',
+        state: { name: 'Done', type: 'completed' },
+        completedAt: '2026-01-02T00:00:00Z'
+      }),
+      createIssue({
+        identifier: 'T-Z',
+        state: { name: 'Done', type: 'completed' },
+        completedAt: '2026-01-03T00:00:00Z'
+      })
+    ];
+
+    const expected = deriveJourney({ reports: oldestFirst, issues });
+
+    // Anchor the expectation on the real semantics, so a bug that corrupts both
+    // orderings identically cannot pass this test by mere self-consistency.
+    assert.deepStrictEqual(
+      expected.waypoints.map(w => [w.identifier, w.bearing]),
+      [['T-Y', 'W'], ['T-X', 'SE']],
+      'newest bearing per identifier, ascending by completedAt, archived-only T-Z excluded'
+    );
+    assert.deepStrictEqual(expected.starChanges, [
+      { from: 'star-A', to: 'star-B', at: '2026-01-03T00:00:00Z' },
+      { from: 'star-B', to: 'star-C', at: '2026-01-04T00:00:00Z' }
+    ]);
+
+    const orderings = [
+      ['newest-first', [...oldestFirst].reverse()],
+      ['shuffled', [oldestFirst[2], oldestFirst[0], oldestFirst[3], oldestFirst[1]]]
+    ];
+
+    for (const [label, reports] of orderings) {
+      assert.deepStrictEqual(
+        deriveJourney({ reports, issues }),
+        expected,
+        `${label} input must derive the same journey as oldest-first input`
+      );
+    }
+  });
+
 });
