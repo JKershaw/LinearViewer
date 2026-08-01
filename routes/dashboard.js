@@ -613,7 +613,8 @@ export function createDashboardRoutes({
         // with run length (LIN-608 memory follow-up).
         metrics: metrics.slice(-6),
         toolPeak: peakToolCount(metrics),
-        producedArtifacts: Array.isArray(l.telemetry?.producedArtifacts) ? l.telemetry.producedArtifacts : []
+        producedArtifacts: Array.isArray(l.telemetry?.producedArtifacts) ? l.telemetry.producedArtifacts : [],
+        resources: l.telemetry?.resources || null
       };
     });
 
@@ -644,6 +645,7 @@ export function createDashboardRoutes({
       lastActivity: lastActivityMs ? new Date(lastActivityMs).toISOString() : null,
       runtime: telemetry.runtime || null,
       model: telemetry.model || null,
+      resources: telemetry.resources || null,
       // Live status line served on the feed (deterministic, cache-free) so the
       // client never issues a per-poll /session-summary scan for a running
       // session. Null for terminal sessions — they render their cached AI summary.

@@ -17,6 +17,7 @@ import {
   parseEvidenceArtifacts,
   parseModel,
   parseUsage,
+  parseResources,
   deriveRuntime,
   buildRunTelemetry,
   buildSessionTelemetry,
@@ -412,6 +413,113 @@ describe('parseUsage (LIN-1425)', () => {
     const usage = parseUsage(feedback);
     assert.strictEqual(usage.lane, 'subscription');
     assert.strictEqual(usage.costUsd, DEFAULT_PAYLOAD_COST);
+  });
+});
+
+describe('parseResources (LIN-1789)', () => {
+  const resourcesMessage = (overrides = {}) =>
+    `[resources] ${JSON.stringify({
+      peakRssBytes: 536870912,
+      hostMemAvailableBytes: 2147483648,
+      hostMemTotalBytes: 8589934592,
+      hostSwapUsedBytes: 0,
+      oomKillDelta: 0,
+      loadAvg1: 1.5,
+      cpuCount: 4,
+      activeSessionCount: 2,
+      cloneDiskBytes: 1073741824,
+      cloneCount: 3,
+      ...overrides,
+    })}`;
+
+  test('omitted (null) when no kind:"resources" entry exists', () => {
+    const feedback = [
+      { message: '[started] session abc · tty 3' },
+      { message: '[working] 6 tools/32s · alive', kind: 'heartbeat' },
+    ];
+    assert.equal(parseResources(feedback), null);
+  });
+
+  test('parses a well-formed kind:"resources" entry, whitelisting exactly the ten numeric fields', () => {
+    const feedback = [{ message: resourcesMessage(), kind: 'resources' }];
+    const resources = parseResources(feedback);
+    assert.deepEqual(resources, {
+      peakRssBytes: 536870912,
+      hostMemAvailableBytes: 2147483648,
+      hostMemTotalBytes: 8589934592,
+      hostSwapUsedBytes: 0,
+      oomKillDelta: 0,
+      loadAvg1: 1.5,
+      cpuCount: 4,
+      activeSessionCount: 2,
+      cloneDiskBytes: 1073741824,
+      cloneCount: 3,
+    });
+  });
+
+  test('malformed JSON payload is tolerated, never throws', () => {
+    const feedback = [{ message: '[resources] {"peakRssBytes":1, not-json', kind: 'resources' }];
+    assert.doesNotThrow(() => parseResources(feedback));
+    assert.equal(parseResources(feedback), null);
+  });
+
+  test('truncated JSON payload (e.g. cut at the message-length cap) is tolerated, never throws', () => {
+    const feedback = [{ message: '[resources] {"peakRssBytes":536870912,"hostMemAvailableBytes":21', kind: 'resources' }];
+    assert.doesNotThrow(() => parseResources(feedback));
+    assert.equal(parseResources(feedback), null);
+  });
+
+  test('empty object payload is tolerated and yields null (no fields to attach)', () => {
+    const feedback = [{ message: '[resources] {}', kind: 'resources' }];
+    assert.equal(parseResources(feedback), null);
+  });
+
+  test('absent message on a kind:"resources" entry is tolerated', () => {
+    const feedback = [{ kind: 'resources' }];
+    assert.doesNotThrow(() => parseResources(feedback));
+    assert.equal(parseResources(feedback), null);
+  });
+
+  test('unrecognized fields on the payload are dropped, not copied through', () => {
+    const feedback = [{
+      message: `[resources] ${JSON.stringify({
+        peakRssBytes: 536870912,
+        vmHwmRaw: '524288 kB',
+        hostname: 'worker-7',
+        arch: 'x86_64',
+      })}`,
+      kind: 'resources',
+    }];
+    const resources = parseResources(feedback);
+    assert.deepEqual(Object.keys(resources), ['peakRssBytes']);
+  });
+
+  test('non-array feedback input returns null', () => {
+    assert.equal(parseResources(undefined), null);
+  });
+
+  test('top-level-array JSON payload is tolerated, never throws — the Array.isArray(payload) guard', () => {
+    const feedback = [{ message: '[resources] [1,2,3]', kind: 'resources' }];
+    assert.doesNotThrow(() => parseResources(feedback));
+    assert.equal(parseResources(feedback), null);
+  });
+
+  test('last-entry-wins semantics: the LAST kind:"resources" entry wins, never merged', () => {
+    const feedback = [
+      { message: resourcesMessage({ peakRssBytes: 100 }), kind: 'resources' },
+      { message: resourcesMessage({ peakRssBytes: 536870912 }), kind: 'resources' },
+    ];
+    assert.equal(parseResources(feedback).peakRssBytes, 536870912);
+  });
+
+  test('ignores an entry whose kind is not "resources" even if the message looks like a resources payload', () => {
+    const feedback = [{ message: resourcesMessage(), kind: 'assistant-text' }];
+    assert.equal(parseResources(feedback), null);
+  });
+
+  test('an entry with no kind at all is tolerated, never matched', () => {
+    const feedback = [{ message: resourcesMessage() }];
+    assert.equal(parseResources(feedback), null);
   });
 });
 
