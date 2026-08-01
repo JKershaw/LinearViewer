@@ -2013,6 +2013,98 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const step3 = buildMetaPromptTemplate({ ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0, isTerminal: false, hasOpenChildren: false });
     assert.ok(/Recommend `close-out` — the ledger-gated finish/i.test(step3), 'Step 3 landed-guard offers close-out after approval');
   });
+
+  // ===========================================================================
+  // Archive + prune superseded stage artifacts on successful close-out (LIN-1770)
+  // ===========================================================================
+
+  test('(g1) archive+prune is sited as item 4 of the irreversible set, after summary and before follow-ups', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    const irreversible = prompt.slice(prompt.indexOf('### On All-Clear — Perform the Irreversible Set'));
+    const summaryAt = irreversible.search(/\d\. Post the summary comment/);
+    const archiveAt = irreversible.search(/\d\. Archive a pre-prune snapshot of the description, then prune/);
+    const followUpsAt = irreversible.search(/\d\. File any remaining review or task follow-ups/);
+    assert.ok(summaryAt > -1 && archiveAt > -1 && followUpsAt > -1, 'all three list items are present');
+    assert.ok(summaryAt < archiveAt && archiveAt < followUpsAt,
+      'archive+prune sits strictly between the summary post and follow-up filing');
+  });
+
+  test('(g2) the workflow list also carries an explicit archive+prune step before filing follow-ups', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    const workflow = prompt.slice(prompt.indexOf('## Workflow'), prompt.indexOf('## Context'));
+    const archiveAt = workflow.search(/\*\*Archive & prune\*\*/);
+    const followUpsAt = workflow.search(/\*\*File follow-ups\*\*/);
+    assert.ok(archiveAt > -1 && followUpsAt > -1 && archiveAt < followUpsAt,
+      'the workflow list sequences archive & prune before filing follow-ups');
+  });
+
+  test('(g3) archive-first uses the zero-spend brief flag, then verifies the snapshot landed before pruning', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(/brief\?noRefresh=1/.test(prompt), 'archive step calls the brief endpoint with noRefresh=1 (zero LLM spend)');
+    assert.ok(/GET \/api\/proxy\/issues\/LIN-901\/snapshots/.test(prompt) || /\/snapshots\b/.test(prompt),
+      'verify step reads the snapshot listing before editing');
+    assert.ok(/fire-and-forget server-side and swallows its own errors/i.test(prompt),
+      'a 200 from the archive call is explicitly NOT treated as proof it captured anything');
+  });
+
+  test('(g4) prune uses a full PATCH rewrite, and the never-prune list explicitly carries scope', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(/PATCH \/api\/proxy\/issues\/:id/.test(prompt), 'prune uses the full-body PATCH rewrite');
+    assert.ok(/\*\*Never prune\*\*/.test(prompt), 'a never-prune carve-out is named');
+    assert.ok(/original problem statement, acceptance criteria, reproduction steps, scope/i.test(prompt),
+      'never-prune explicitly lists scope alongside problem statement/acceptance criteria/repro steps');
+    assert.ok(/single source of truth.*stands/i.test(prompt),
+      'never-prune cross-references the scoping template\'s single-source-of-truth wording rather than contradicting it');
+  });
+
+  test('(g5) the stub must preserve the session-fit phrase or Implementation Plan heading verbatim', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(/retain, word for word, the committed session-fit phrase/i.test(prompt),
+      'the marker-preservation mandate is explicit and verbatim');
+    assert.ok(/fits one session.*needs multiple sessions/.test(prompt), 'both session-fit phrases are named');
+    assert.ok(/`Implementation Plan` heading/.test(prompt), 'the Implementation Plan heading alternative is named');
+    assert.ok(/Two other deterministic readers key on exactly these literals/i.test(prompt),
+      'the prompt explains WHY the literals matter, so an implementer does not "clean up" the wording');
+  });
+
+  test('(g6) archive+prune runs only on the all-clear path, never on the cannot-close branch', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(/This step runs only here, after the merge and the Done transition, on the successful all-clear path/i.test(prompt),
+      'the prune step is explicitly scoped to the all-clear path');
+    assert.ok(/never on a cannot-close branch, and never on a task that stays open with Request Changes/i.test(prompt),
+      'the prune step explicitly excludes the cannot-close / stays-open branches');
+  });
+
+  test('(g7) comments stay untouched — the prune is a description-only edit using an existing surface', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(/Comments are untouched — there is no comment-edit endpoint/i.test(prompt),
+      'comments are explicitly out of scope for the prune');
+    assert.ok(/adds no new capability/i.test(prompt), 'the prune uses only existing write surfaces');
+  });
+
+  test('(g8) close-out still emits no literal "Linear" with the archive+prune section included (LIN-177 parity)', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(/Archive & Prune/.test(prompt), 'sanity: the new section is actually present in this render');
+    assert.ok(!prompt.includes('Linear'), 'the archive+prune addition introduces no literal "Linear"');
+  });
+
+  test('(meta g9) the Close-out quality rule also carries the archive+prune step and its never-prune/marker guardrails', () => {
+    const meta = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-901', hasSubtasks: false, subtaskCount: 0,
+      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
+      aiHints: 'H', actionVocabulary: 'review, close-out, implementation', completionSignals: 'S'
+    });
+    const rule = meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Close-out prompts**'));
+    assert.ok(rule, 'the Close-out prompts quality rule exists');
+    assert.ok(/archive a pre-prune snapshot/i.test(rule), 'meta rule requires archiving before pruning');
+    assert.ok(/verify the archive landed/i.test(rule), 'meta rule requires verifying the archive before editing');
+    assert.ok(/NEVER prune the original problem statement, acceptance criteria, reproduction steps, or scope/i.test(rule),
+      'meta rule carries the same never-prune carve-out');
+    assert.ok(/"fits one session" \/ "needs multiple sessions"\) and\/or an "Implementation Plan" heading/i.test(rule),
+      'meta rule carries the same marker-preservation mandate');
+    assert.ok(/runs only on the all-clear path, never on a cannot-close branch/i.test(rule),
+      'meta rule scopes the step to the all-clear path only');
+  });
 });
 
 // =============================================================================
@@ -2246,6 +2338,59 @@ describe('plan-review gate + revision half in the plan template (LIN-1603)', () 
       'plan-review must head its verdict comment with the disambiguator');
     assert.ok(/an Approve here must never be mistaken for authorization to close the task out/.test(prompt),
       'the template must say why the header exists — the close-out confusion it prevents');
+  });
+
+  // ===========================================================================
+  // Plan revisions REPLACE the prior plan section instead of appending (LIN-1770)
+  // ===========================================================================
+
+  test('(h1) the revision half instructs replace, not append, and states the one-current-plan invariant', () => {
+    const p = plan();
+    const replaceAt = p.indexOf('**Replace, don\'t append**');
+    const recordAt = p.indexOf('**Record what changed**');
+    assert.ok(replaceAt > -1, 'the "Replace, don\'t append" instruction is present');
+    assert.ok(recordAt > -1 && replaceAt < recordAt,
+      'replace-semantics is stated before the record-what-changed instruction, in write order');
+    assert.ok(/REPLACES the plan section already in the description/.test(p),
+      'states explicitly that the revision replaces the prior plan section');
+    assert.ok(/rather than leaving the superseded plan in place beside it/.test(p),
+      'explicitly forbids leaving the old plan text in place alongside the new one');
+    assert.ok(/description\/replace/.test(p), 'names the targeted description/replace write surface');
+    assert.ok(/carries exactly one current plan, never a stack of them/.test(p),
+      'states the one-current-plan invariant');
+  });
+
+  test('(h2) the changelog is a short line, not the superseded plan\'s full text', () => {
+    const p = plan();
+    assert.ok(/a short changelog line/.test(p), 'the record-what-changed instruction names it as a short line');
+    assert.ok(/not the superseded plan's full text/.test(p),
+      'explicitly distinguishes the changelog from retaining the old plan verbatim');
+  });
+
+  test('(h3) the revision half still sits before Strategy Framing with the new replace instruction included', () => {
+    const p = plan();
+    const revise = p.indexOf('### Revising After a Plan Review');
+    const replaceAt = p.indexOf('**Replace, don\'t append**');
+    const framing = p.indexOf('### Strategy Framing');
+    assert.ok(revise > -1 && replaceAt > -1 && framing > -1, 'all three landmarks are present');
+    assert.ok(revise < replaceAt && replaceAt < framing,
+      'the replace instruction sits inside the revision section, before Strategy Framing');
+  });
+
+  test('(meta h4) the Plan-prompts quality rule also carries replace-not-append revision semantics', () => {
+    const meta = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-904', hasSubtasks: false, subtaskCount: 0,
+      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
+      aiHints: 'H', actionVocabulary: 'plan, plan-review, implementation', completionSignals: 'S'
+    });
+    const rule = meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Plan prompts**'));
+    assert.ok(rule, 'the Plan prompts quality rule exists');
+    assert.ok(/The revision REPLACES the plan section already in the description/.test(rule),
+      'meta rule states the replace-not-append contract');
+    assert.ok(/rather than leaving the superseded plan in place beside it/.test(rule),
+      'meta rule forbids leaving the superseded plan in place');
+    assert.ok(/retaining only a short changelog line/.test(rule),
+      'meta rule mirrors the short-changelog instruction');
   });
 
   test('the gate did not disturb the pre-existing plan apparatus', () => {
