@@ -136,7 +136,7 @@
 /* LIN-1801: the anchor task's human-readable title, shown beside the bare
    seed identifier — sans face (human label) vs. the row's mono default. */
 .sess-seed-title {
-  display: block;
+  grid-column: 2;
   font-family: var(--font-content);
   color: var(--muted);
 }

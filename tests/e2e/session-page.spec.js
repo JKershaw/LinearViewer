@@ -248,6 +248,42 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
       .toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);
   });
 
+  // LIN-1801 review fix: the Overview seed-title span is a THIRD child of the
+  // `.sess-kv` grid row (label + value already fill it), so a `display: block`
+  // declaration left it in grid auto-placement's label column instead of the
+  // value column (row 2, col 1 rather than col 2) — invisible to the HTML
+  // substring assertions above, only visible in a real computed layout. This
+  // asserts actual rendered bounding boxes so a regression back to `display:
+  // block` (or any other declaration that drops `grid-column: 2`) fails here.
+  test('the Overview seed title left-aligns with the identifier value, not the label (LIN-1801)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedSessionWithTranscript(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const label = page.locator('[data-testid="session-seed"]')
+      .locator('xpath=preceding-sibling::span[1]');
+    const value = page.locator('[data-testid="session-seed"]');
+    const title = page.locator('[data-testid="session-seed-title"]');
+    await expect(title).toBeVisible();
+    await expect(title).toContainText('Session-page seed');
+
+    for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport);
+      const [labelBox, valueBox, titleBox] = await Promise.all([
+        label.boundingBox(),
+        value.boundingBox(),
+        title.boundingBox(),
+      ]);
+      // The title shares the value column's left edge, not the label's.
+      expect(Math.abs(titleBox.x - valueBox.x)).toBeLessThan(2);
+      expect(Math.abs(titleBox.x - labelBox.x)).toBeGreaterThan(20);
+    }
+  });
+
   test('shows the "waiting on you" banner for a [blocked] (paused) session (LIN-1005)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
