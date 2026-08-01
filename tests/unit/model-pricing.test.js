@@ -180,6 +180,18 @@ describe('rate table shape (LIN-1495)', () => {
     }
   });
 
+  test('gpt-5.6-sol carries the cache tiers the live catalog exposes for it (LIN-1763 review finding)', () => {
+    // The catalog exposes input_cache_read/input_cache_write for this id; the
+    // row originally omitted them, which the LIN-1763 review flagged as an
+    // undercount for any worker session that actually uses this model.
+    assert.deepStrictEqual(MODEL_PRICING['openai/gpt-5.6-sol'], {
+      prompt: 5.00,
+      completion: 30.00,
+      cacheRead: 0.50,
+      cacheWrite: 6.25,
+    });
+  });
+
   test('the table and its rows are frozen — a rate card a caller can mutate is not one representation', () => {
     assert.ok(Object.isFrozen(MODEL_PRICING));
     for (const [id, rate] of Object.entries(MODEL_PRICING)) {
@@ -200,23 +212,30 @@ describe('rate table shape (LIN-1495)', () => {
 });
 
 describe('AVAILABLE_MODELS derives its pricing from this table (LIN-993 charter preserved)', () => {
-  // The literals that lived inline in lib/openrouter.js before the extraction.
-  const PRE_EXTRACTION_PRICING = {
+  // Known-good pricing for every currently curated entry (LIN-1763 widened this
+  // past the original 5-id extraction snapshot; see the superset invariant test
+  // below for what actually must hold going forward).
+  const CURRENT_PRICING = {
     'openai/gpt-5.4-mini': { prompt: 0.75, completion: 4.50 },
     'anthropic/claude-sonnet-4.6': { prompt: 3.00, completion: 15.00 },
     'anthropic/claude-opus-4.8': { prompt: 5.00, completion: 25.00 },
     'openai/gpt-5.5': { prompt: 5.00, completion: 30.00 },
     'openai/gpt-5.5-pro': { prompt: 30.00, completion: 180.00 },
+    'anthropic/claude-sonnet-5': { prompt: 2.00, completion: 10.00 },
+    'anthropic/claude-opus-5': { prompt: 5.00, completion: 25.00 },
+    'anthropic/claude-fable-5': { prompt: 10.00, completion: 50.00 },
+    'anthropic/claude-haiku-4.5': { prompt: 1.00, completion: 5.00 },
+    'openai/gpt-5.6-sol': { prompt: 5.00, completion: 30.00 },
   };
 
-  test('every curated entry deep-equals the literal it replaced', () => {
+  test('every curated entry deep-equals its known-good pricing', () => {
     assert.deepStrictEqual(
       AVAILABLE_MODELS.map(m => m.id).sort(),
-      Object.keys(PRE_EXTRACTION_PRICING).sort(),
-      'the curated allowlist itself must not have changed'
+      Object.keys(CURRENT_PRICING).sort(),
+      'the curated allowlist must match the known-good pricing snapshot exactly — update both together'
     );
     for (const m of AVAILABLE_MODELS) {
-      assert.deepStrictEqual(m.pricing, PRE_EXTRACTION_PRICING[m.id], `${m.id} pricing is unchanged`);
+      assert.deepStrictEqual(m.pricing, CURRENT_PRICING[m.id], `${m.id} pricing is unchanged`);
     }
   });
 
@@ -233,17 +252,20 @@ describe('AVAILABLE_MODELS derives its pricing from this table (LIN-993 charter 
       'anthropic/claude-opus-4.8': '$5.00 in / $25.00 out per 1M tokens',
       'openai/gpt-5.5': '$5.00 in / $30.00 out per 1M tokens',
       'openai/gpt-5.5-pro': '$30.00 in / $180.00 out per 1M tokens',
+      'anthropic/claude-sonnet-5': '$2.00 in / $10.00 out per 1M tokens',
+      'anthropic/claude-opus-5': '$5.00 in / $25.00 out per 1M tokens',
+      'anthropic/claude-fable-5': '$10.00 in / $50.00 out per 1M tokens',
+      'anthropic/claude-haiku-4.5': '$1.00 in / $5.00 out per 1M tokens',
+      'openai/gpt-5.6-sol': '$5.00 in / $30.00 out per 1M tokens',
     };
     for (const m of AVAILABLE_MODELS) {
       assert.strictEqual(formatModelPricing(m), expected[m.id], `${m.id} hint is byte-identical`);
     }
   });
 
-  test('worker rows are priceable but stay OUT of the user-facing allowlist', () => {
-    const curated = new Set(AVAILABLE_MODELS.map(m => m.id));
-    for (const id of ['anthropic/claude-opus-5', 'anthropic/claude-sonnet-5', 'anthropic/claude-haiku-4.5']) {
-      assert.ok(getModelRate(id), `${id} must be priceable`);
-      assert.ok(!curated.has(id), `${id} must NOT be user-selectable — the allowlist gates billing`);
+  test('MODEL_PRICING is a superset of AVAILABLE_MODELS — every curated id is priceable (membership flows one way)', () => {
+    for (const m of AVAILABLE_MODELS) {
+      assert.ok(getModelRate(m.id), `${m.id} must be priceable — a curated entry with no rate row is a charter violation`);
     }
   });
 

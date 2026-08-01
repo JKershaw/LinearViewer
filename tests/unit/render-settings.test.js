@@ -378,7 +378,7 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       assert.match(html, /<datalist id="dispatch-model-suggestions-claude">/);
     });
 
-    test('LIN-1282: the Claude Code datalist offers exactly the three presets (haiku/sonnet/opus), no catalog', () => {
+    test('LIN-1282/LIN-1763: the Claude Code datalist offers exactly the four presets (haiku/sonnet/opus/fable), no catalog', () => {
       const html = renderSettingsPage('Acme', {
         ...BASE,
         dispatchModelCatalog: [{ id: 'mock-provider/catalog-model-one', name: 'Catalog Model One' }]
@@ -386,10 +386,11 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       const start = html.indexOf('<datalist id="dispatch-model-suggestions-claude">');
       const end = html.indexOf('</datalist>', start);
       const datalist = html.slice(start, end);
-      assert.equal((datalist.match(/<option/g) || []).length, 3);
+      assert.equal((datalist.match(/<option/g) || []).length, 4);
       assert.match(datalist, /<option value="haiku">/);
       assert.match(datalist, /<option value="sonnet">/);
       assert.match(datalist, /<option value="opus">/);
+      assert.match(datalist, /<option value="fable">/);
       // The live catalog is never merged into the Claude list.
       assert.doesNotMatch(datalist, /catalog-model-one/);
     });
@@ -429,7 +430,7 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       const start = html.indexOf('<datalist id="dispatch-model-suggestions">');
       const end = html.indexOf('</datalist>', start);
       const datalist = html.slice(start, end);
-      assert.equal((datalist.match(/<option/g) || []).length, 5);
+      assert.equal((datalist.match(/<option/g) || []).length, 10);
     });
 
     test('LIN-1111 Session 2: merges the live OpenRouter catalog into the shared model datalist', () => {
