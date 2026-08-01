@@ -1921,6 +1921,21 @@ describe('GET /observation/session/:sessionId — brief/recap join (LIN-1003)', 
     assert.ok(html.includes('session-recap-generate'), 'cache miss shows the recap generate affordance');
     assert.ok(!html.includes('sess-ctx-panel--present'), 'no present panel when both caches miss');
   });
+
+  test('LIN-1801: the anchor loop\'s issueTitle is threaded into renderSessionPage and rendered on the page', async () => {
+    const briefCacheStore = { async get() { return null; } };
+    const recapCacheStore = { async get() { return null; } };
+    const router = makeRouterWithCaches({ briefCacheStore, recapCacheStore });
+    const res = await driveSessionPage(router);
+
+    assert.equal(res.statusCode, 200);
+    const html = res.sentBody;
+    // The anchor loop is the kind:'autopilot' loop whose loopId === sessionId
+    // (autopilotHistoryItem('sess-ctx', 'LIN-900') here), carrying issueTitle
+    // 'Title LIN-900' — distinct from the session's bare seedIssue 'LIN-900'.
+    assert.match(html, /data-testid="session-seed-title"[^>]*>Title LIN-900</);
+    assert.match(html, /<h1>Session · LIN-900 — Title LIN-900<\/h1>/);
+  });
 });
 
 describe('GET /observation/session/:sessionId — waiting banner clears after a reply (LIN-1341 RC2)', () => {

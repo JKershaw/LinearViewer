@@ -100,6 +100,53 @@ describe('render-session: tasks + overview', () => {
   });
 });
 
+describe('render-session: anchor issue title (LIN-1801)', () => {
+  test('a distinct anchorIssueTitle renders on the header, browser title, and a new seed-title span; session-seed stays identifier-only', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], anchorIssueTitle: 'Seed task' },
+      {}
+    );
+    assert.match(html, /data-testid="session-seed"[^>]*>LIN-900</, 'session-seed keeps its identifier-only content');
+    assert.match(html, /data-testid="session-seed-title"[^>]*>Seed task</);
+    assert.match(html, /<h1>Session · LIN-900 — Seed task<\/h1>/);
+    assert.match(html, /<title>Session · LIN-900 — Seed task<\/title>/);
+  });
+
+  test('an absent anchorIssueTitle renders byte-identical to today (no new span, no suffix)', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] }, {});
+    assert.ok(!html.includes('data-testid="session-seed-title"'));
+    assert.match(html, /<h1>Session · LIN-900<\/h1>/);
+    assert.match(html, /<title>Session · LIN-900<\/title>/);
+  });
+
+  test('anchorIssueTitle equal to session.seedIssue is treated as no title (LIN-783-style regression guard)', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], anchorIssueTitle: 'LIN-900' },
+      {}
+    );
+    assert.ok(!html.includes('data-testid="session-seed-title"'));
+    assert.match(html, /<h1>Session · LIN-900<\/h1>/);
+    assert.match(html, /<title>Session · LIN-900<\/title>/);
+  });
+
+  test('a hostile anchorIssueTitle is escaped, single-escaped, and cannot break out of the header or <title>', () => {
+    const HOSTILE_TITLE = '"><script>alert(1)</script> & co';
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], anchorIssueTitle: HOSTILE_TITLE },
+      {}
+    );
+    assert.ok(!html.includes('<script>alert(1)</script>'), 'raw script must not reach the document');
+    assert.match(
+      html,
+      /data-testid="session-seed-title"[^>]*>&quot;&gt;&lt;script&gt;alert\(1\)&lt;\/script&gt; &amp; co</
+    );
+    assert.match(
+      html,
+      /<title>Session · LIN-900 — &quot;&gt;&lt;script&gt;alert\(1\)&lt;\/script&gt; &amp; co<\/title>/
+    );
+  });
+});
+
 describe('render-session: waiting banner (LIN-1005)', () => {
   test('renders the "waiting on you" alert banner with the message + follow-up CTA when waiting', () => {
     const html = renderSessionPage(
