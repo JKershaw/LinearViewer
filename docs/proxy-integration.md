@@ -185,7 +185,7 @@ The workspace-unavailable `code`s and how to act on each:
 
 | `code` | `category` | `retryable` | What it means → what to do |
 | --- | --- | --- | --- |
-| `WORKSPACE_STORE_UNAVAILABLE` | `upstream` | `true` | Session store is unreachable (e.g. a dyno is booting right after a deploy). **Back off and retry** — it is expected to self-heal. |
+| `WORKSPACE_STORE_UNAVAILABLE` | `upstream` | `true` | Session store is unreachable (e.g. the instance is booting right after a deploy). **Back off and retry** — it is expected to self-heal. |
 | `WORKSPACE_SESSION_EXPIRED` | `auth` | `false` | A session for this workspace exists but its token expired. **A human must re-authenticate** — this works when the token's own owner account still holds the workspace; retrying won't help. |
 | `WORKSPACE_NOT_CONNECTED` | `config` | `false` | No session references this workspace. **It is not connected** — connect it first; retrying won't help. |
 | `WORKSPACE_OWNER_MISMATCH` | `config` | `false` | A **different** account holds a live session for this workspace while this token's own account does not. This can mean the token's account no longer holds the workspace, **or** simply that its own session lapsed while another legitimate account on the same workspace happens to be live — the two are indistinguishable from this signal alone. **Try re-authenticating first**; if that does not restore access, a new token must be issued from the account that currently holds the workspace. Note this moves only the token — other account-keyed state (OpenRouter key, preferences, saved chats) stays on the old account. |
