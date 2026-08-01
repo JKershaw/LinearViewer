@@ -23,6 +23,7 @@ function createMockCollection() {
     find(query) {
       const results = docs.filter(doc => {
         if (query.urlKey && doc.urlKey !== query.urlKey) return false;
+        if (query.issueIdentifier && doc.issueIdentifier !== query.issueIdentifier) return false;
         if (query.expiresAt?.$gt && !(doc.expiresAt > query.expiresAt.$gt)) return false;
         return true;
       });
@@ -178,5 +179,57 @@ describe('LlmCallLogStore.summarize', () => {
     assert.deepStrictEqual(await store.summarize('nope'), empty);
     assert.deepStrictEqual(await store.summarize(), empty);
     assert.deepStrictEqual(await new LlmCallLogStore({}).summarize('acme'), empty);
+  });
+});
+
+describe('LlmCallLogStore.summarizeByIssue', () => {
+  let store;
+  let collection;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new LlmCallLogStore({ collection });
+  });
+
+  test('filters by both urlKey and issueIdentifier', async () => {
+    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recommend', cost: 0.01 });
+    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-2', feature: 'recommend', cost: 0.02 }); // other issue
+    await store.record({ urlKey: 'other', issueIdentifier: 'LIN-1', feature: 'recommend', cost: 0.03 }); // other workspace
+
+    const s = await store.summarizeByIssue('acme', 'LIN-1');
+    assert.strictEqual(s.calls, 1);
+    assert.ok(Math.abs(s.costUsd - 0.01) < 1e-9);
+  });
+
+  test('groups by feature (busiest first)', async () => {
+    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recommend', cost: 0.01 });
+    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recommend', cost: 0.02 });
+    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'brief', cost: 0.005 });
+
+    const s = await store.summarizeByIssue('acme', 'LIN-1');
+    assert.strictEqual(s.calls, 3);
+    assert.strictEqual(s.byFeature[0].feature, 'recommend');
+    assert.strictEqual(s.byFeature[0].calls, 2);
+    assert.ok(Math.abs(s.byFeature[0].costUsd - 0.03) < 1e-9);
+    assert.strictEqual(s.byFeature[1].feature, 'brief');
+  });
+
+  test('a null cost is counted in unpricedCalls, never folded to 0', async () => {
+    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recap', cost: 0.01 });
+    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recap' }); // no cost reported
+
+    const s = await store.summarizeByIssue('acme', 'LIN-1');
+    assert.strictEqual(s.calls, 2);
+    assert.strictEqual(s.unpricedCalls, 1);
+    assert.ok(Math.abs(s.costUsd - 0.01) < 1e-9); // the unpriced call contributes nothing, not 0-as-priced
+  });
+
+  test('empty for unknown issue, missing args, or no collection', async () => {
+    const empty = { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] };
+    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recommend', cost: 0.01 });
+    assert.deepStrictEqual(await store.summarizeByIssue('acme', 'LIN-999'), empty);
+    assert.deepStrictEqual(await store.summarizeByIssue('acme'), empty);
+    assert.deepStrictEqual(await store.summarizeByIssue(undefined, 'LIN-1'), empty);
+    assert.deepStrictEqual(await new LlmCallLogStore({}).summarizeByIssue('acme', 'LIN-1'), empty);
   });
 });

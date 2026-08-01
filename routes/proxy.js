@@ -16,6 +16,7 @@ import { Router, json } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
 import { deriveTerminalStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
+import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload } from '../lib/dispatch-validation.js';
 // LIN-1552: the issue-write validation rules (length caps, control-char guard,
@@ -589,7 +590,7 @@ function dispatchWatchChanged(baseline, item) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null }) {
   const router = Router();
 
   /**
@@ -1452,6 +1453,35 @@ GET ${baseUrl}/api/proxy/issues/{identifier}/brief
 
 POST ${baseUrl}/api/proxy/brief/{identifier}
   → Force-regenerate the brief and return the fresh result (same shape as GET above).
+
+GET ${baseUrl}/api/proxy/issues/{identifier}/cost   (alias: /api/proxy/cost/{identifier})
+  → API-equivalent USD cost for one task: joins worker dispatch usage telemetry with
+    app-side (OpenRouter) LLM call-log spend attributed to this issue. Pure read, no
+    LLM call, no Linear fetch.
+  → {identifier} MUST be the issue identifier (e.g. "LIN-1770"), NOT a UUID — this
+    route never resolves through the provider, and a UUID matches zero rows. A
+    UUID-shaped {identifier} is rejected with 400.
+  → { "identifier": "LIN-1770", "pricedUsd": 22.78, "totalUsd": 22.83,
+      "workerSessions": [{ "rootItemId": "...", "kind": "implementation",
+        "dispatchedAt": "...", "model": "claude-sonnet-5", "costUsd": 4.90 }],
+      "appCalls": { "calls": 9, "costUsd": 0.05, "unpricedCalls": 0,
+        "byFeature": [{ "feature": "recommend", "calls": 6, "costUsd": 0.04 }] },
+      "unpriced": [], "noTelemetryCount": 0,
+      "window": { "days": 30, "appCallsSince": "..." } }
+  → "pricedUsd" is the worker-side sum of whatever IS priceable. "totalUsd" restates
+    "pricedUsd" plus "appCalls.costUsd" ONLY when "unpriced" is empty AND
+    "noTelemetryCount" is 0 AND "appCalls.unpricedCalls" is 0 — otherwise "totalUsd"
+    is null. Never a silent partial: an unpriced model, a "taken" dispatch with no
+    usage telemetry, or an unpriced app call each independently null the total while
+    "pricedUsd"/"appCalls.costUsd" stay populated with whatever is known.
+  → A dispatch LINEAGE (a follow-up chain sharing one root session) is counted once,
+    not once per row — cumulative worker usage snapshots would otherwise be
+    multiply-counted by the lineage's dispatch count.
+  → App-call figures cover only the "window" (default 30-day retention) — older
+    OpenRouter calls have already aged out of the log and are invisible here.
+  → KNOWN LIMITATION: a lineage that spans two issues (a follow-up filed under a
+    different issue than its parent) is reported under BOTH issues' /cost endpoints
+    — the same documented behavior as the /dispatch list route's lineage join.
 
 GET ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — deprecated)
   → Recent agent status entries
@@ -3618,6 +3648,103 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       logEvent(req, '/api/proxy/snapshots/diff', 500);
       jsonError(res, 500, 'Failed to diff task snapshots');
+    }
+  });
+
+  /**
+   * GET /api/proxy/issues/:identifier/cost  (canonical — nested issue-scoped)
+   * GET /api/proxy/cost/:identifier          (forgiving alias, flat form)
+   * (LIN-1775)
+   *
+   * Per-task API-equivalent USD cost: joins worker dispatch usage telemetry
+   * (cumulative `[usage]` feedback, LIN-1425/LIN-1495) with app-side
+   * OpenRouter llm-call-log spend attributed to this issue. Pure read — no
+   * Linear fetch, no LLM call.
+   *
+   * `:identifier` MUST be the human issue identifier (e.g. `LIN-1770`), not
+   * a UUID: unlike /recap and /brief, this route never resolves through the
+   * provider, and dispatch/call-log rows are keyed by identifier. A
+   * UUID-shaped param is rejected with 400 rather than silently matching
+   * zero rows and returning an authoritative-looking $0.00 (LIN-1775 R1).
+   *
+   * Own rows come from BOTH the live queue and history, scoped by
+   * `issueIdentifier` at the store (indexed). Lineage siblings — other rows
+   * sharing a `rootItemId` anchor with one of the own rows — are
+   * batch-fetched from history UNSCOPED by issueIdentifier, mirroring the
+   * `/dispatch` list route: a cross-issue follow-up's usage must still merge
+   * into the anchor's single cumulative total, or that lineage would be
+   * undercounted here. `buildTaskCost` (lib/task-cost.js) does the actual
+   * lineage-group/merge/sum join; this route only fetches its inputs.
+   */
+  router.get(['/api/proxy/issues/:identifier/cost', '/api/proxy/cost/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      if (!dispatchQueueStore) {
+        logEvent(req, '/api/proxy/cost', 503);
+        return jsonError(res, 503, 'Dispatch is not available');
+      }
+      const { identifier } = req.params;
+      if (!isValidIssueId(identifier)) {
+        logEvent(req, '/api/proxy/cost', 400);
+        return badRequest.json(res, 'Invalid identifier format');
+      }
+      // Dispatch rows and call-log rows are joined on the human issue
+      // identifier (e.g. "LIN-1770"), never the issue UUID — unlike
+      // /recap and /brief, this route does no provider lookup to resolve
+      // one to the other. A UUID passes isValidIssueId's shape check but
+      // matches no row, so it must be rejected loudly here rather than
+      // silently returning an authoritative-looking $0.00 (LIN-1775 R1).
+      if (UUID_REGEX.test(identifier)) {
+        logEvent(req, '/api/proxy/cost', 400);
+        return badRequest.json(res, 'This endpoint requires the issue identifier (e.g. LIN-123), not a UUID — dispatch and call-log rows are keyed by identifier, so a UUID would silently match zero rows');
+      }
+
+      const [queued, history] = await Promise.all([
+        dispatchQueueStore.listItems(req.proxyUrlKey, { issueIdentifier: identifier, projection: { prompt: 0 } }),
+        dispatchQueueStore.listHistory(req.proxyUrlKey, { issueIdentifier: identifier, projection: { prompt: 0 } })
+      ]);
+      const ownRows = [
+        ...queued.map(i => ({ ...i, status: 'queued', feedback: [] })),
+        ...history.items
+      ];
+
+      const anchors = [...new Set(
+        ownRows.filter(i => i.status === 'taken').map(taskCostAnchorFor).filter(Boolean)
+      )];
+
+      const siblingRowsByAnchor = new Map();
+      if (anchors.length) {
+        const { items: lineageSiblings, total: lineageTotal } = await dispatchQueueStore.listHistory(req.proxyUrlKey, {
+          rootItemId: { $in: anchors },
+          limit: LINEAGE_QUERY_LIMIT,
+          projection: { prompt: 0 }
+        });
+        if (lineageTotal > LINEAGE_QUERY_LIMIT) {
+          console.warn(`Lineage query exceeded LINEAGE_QUERY_LIMIT (${LINEAGE_QUERY_LIMIT}) for urlKey=${req.proxyUrlKey}, identifier=${identifier}, anchors=${anchors.length}, total=${lineageTotal} — result truncated to the newest ${LINEAGE_QUERY_LIMIT}`);
+        }
+        for (const sib of lineageSiblings) {
+          const bucket = siblingRowsByAnchor.get(sib.rootItemId);
+          if (bucket) bucket.push(sib);
+          else siblingRowsByAnchor.set(sib.rootItemId, [sib]);
+        }
+      }
+
+      const appSummary = llmCallLogStore
+        ? await llmCallLogStore.summarizeByIssue(req.proxyUrlKey, identifier)
+        : { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] };
+
+      const result = buildTaskCost({ ownRows, siblingRowsByAnchor, appSummary });
+
+      const ttlSeconds = llmCallLogStore?.ttl || 30 * 24 * 60 * 60;
+      const window = {
+        days: Math.round(ttlSeconds / 86400),
+        appCallsSince: new Date(Date.now() - ttlSeconds * 1000).toISOString()
+      };
+
+      logEvent(req, '/api/proxy/cost', 200);
+      res.json({ identifier, ...result, window });
+    } catch (err) {
+      logEvent(req, '/api/proxy/cost', 500);
+      jsonError(res, 500, 'Failed to compute task cost');
     }
   });
 

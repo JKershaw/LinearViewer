@@ -677,6 +677,68 @@ Response:
 With fewer than two snapshots there is nothing to compare: `changed` is `false` and
 `fields` is empty.
 
+#### Get Task Cost
+
+```
+GET /api/proxy/issues/{identifier}/cost
+GET /api/proxy/cost/{identifier}          (alias)
+```
+
+Returns a task's total cost in **API-equivalent USD** (LIN-1775), joining two sources:
+
+- **Worker dispatch usage** — the cumulative `[usage]` telemetry the runner posts per
+  session (LIN-1425), priced via the static rate card (LIN-1495) when the harness
+  reports no native cost (`claude-code`).
+- **App-side LLM calls** — OpenRouter calls this app itself makes on the task's behalf
+  (e.g. `recommend`), from the llm-call-log.
+
+Pure read: no Linear fetch, no LLM call. Read scope is sufficient. `{identifier}` must be
+the issue **identifier** (e.g. `ENG-1770`), not a UUID — unlike `/recap` and `/brief`,
+this endpoint never resolves through the provider, and dispatch/call-log rows are keyed
+by identifier. A UUID-shaped `{identifier}` is rejected with `400` rather than silently
+matching zero rows and returning an authoritative-looking `$0.00`.
+
+```json
+{
+  "identifier": "ENG-1770",
+  "pricedUsd": 22.78,
+  "totalUsd": 22.83,
+  "workerSessions": [
+    { "rootItemId": "…", "kind": "implementation", "dispatchedAt": "2026-08-01T10:00:00Z",
+      "model": "claude-sonnet-5", "costUsd": 4.90 }
+  ],
+  "appCalls": {
+    "calls": 9, "costUsd": 0.05, "unpricedCalls": 0,
+    "byFeature": [{ "feature": "recommend", "calls": 6, "costUsd": 0.04 }]
+  },
+  "unpriced": [],
+  "noTelemetryCount": 0,
+  "window": { "days": 30, "appCallsSince": "2026-07-02T12:00:00Z" }
+}
+```
+
+- **`pricedUsd`** is the worker-side sum of whatever *is* priceable. **`totalUsd`**
+  restates `pricedUsd` plus `appCalls.costUsd` **only** when `unpriced` is empty, AND
+  `noTelemetryCount` is `0`, AND `appCalls.unpricedCalls` is `0` — otherwise `totalUsd`
+  is `null`. This is deliberate: a partial figure must never look complete. `unpriced`
+  lists worker models with no rate-card entry; `noTelemetryCount` counts `taken`
+  dispatches with no usage telemetry at all; `appCalls.unpricedCalls` counts app calls
+  with no recorded cost. All three are surfaced independently so a caller can tell
+  *which* half of the join is uncertain.
+- **Lineage de-duplication**: a follow-up dispatch resumes the same worker transcript
+  and reports a *cumulative* usage snapshot on every Stop, so a task with a follow-up
+  chain is counted **once per lineage**, never once per dispatch row — summing rows
+  directly would multiply-count that lineage by its dispatch count. `workerSessions`
+  reports one entry per lineage (keyed by `rootItemId`), not per dispatch row.
+- **Retention window**: `window.days` (default 30) is how far back app-call figures
+  reach — both the llm-call-log's TTL and the dispatch history's retention default to
+  30 days, so `appCalls`/`workerSessions` are silently blind to anything older, which
+  this field makes machine-readable instead of doc-only.
+- **Known limitation**: a lineage spanning two issues (a follow-up filed under a
+  different issue than its parent — already an accepted, documented behavior for the
+  `/dispatch` list route's status/completedAt join) is reported under **both** issues'
+  `/cost` endpoints, not split between them.
+
 ### Task Automation Endpoints
 
 These endpoints back the task-automation workflow: pick the next task, generate a prompt for it, and record agent progress. The **recap** and **brief** endpoints above are part of this group too. All are read-scope except `POST /api/proxy/agent/status` (deprecated alias: `POST /api/proxy/foreman/status`), which requires `readWrite`.
