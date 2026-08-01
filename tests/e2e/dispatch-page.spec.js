@@ -492,20 +492,21 @@ test.describe('Dispatch Page', () => {
       await expect(controls.locator('.dispatch-exec-harness-custom')).toHaveCount(0);
     });
 
-    test('the model datalist is harness-aware: Claude Code offers only the three presets, OpenCode the full list (LIN-1282)', async ({ page }) => {
+    test('the model datalist is harness-aware: Claude Code offers only the four presets, OpenCode the full list (LIN-1282/LIN-1763)', async ({ page }) => {
       const controls = page.locator('.dispatch-exec-controls');
       const modelInput = controls.locator('.dispatch-exec-model');
 
       // Default harness is claude-code (pre-selected) → the model input points at
-      // the Claude datalist, which holds exactly haiku/sonnet/opus.
+      // the Claude datalist, which holds exactly haiku/sonnet/opus/fable.
       const claudeListId = await modelInput.getAttribute('data-model-list-claude');
       const opencodeListId = await modelInput.getAttribute('data-model-list-opencode');
       await expect(modelInput).toHaveAttribute('list', claudeListId);
       const claudeList = page.locator(`#${claudeListId}`);
-      await expect(claudeList.locator('option')).toHaveCount(3);
+      await expect(claudeList.locator('option')).toHaveCount(4);
       await expect(claudeList.locator('option[value="haiku"]')).toHaveCount(1);
       await expect(claudeList.locator('option[value="sonnet"]')).toHaveCount(1);
       await expect(claudeList.locator('option[value="opus"]')).toHaveCount(1);
+      await expect(claudeList.locator('option[value="fable"]')).toHaveCount(1);
       // The full OpenRouter list is never merged into the Claude datalist.
       await expect(claudeList.locator('option[value="openai/gpt-5.4-mini"]')).toHaveCount(0);
 

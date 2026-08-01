@@ -88,7 +88,7 @@ test.describe('Dispatch defaults settings', () => {
     await page.selectOption('select[name="defaultHarnessSelect"]', 'opencode');
     await expect(modelInput).toHaveAttribute('list', 'dispatch-model-suggestions');
 
-    // Back to Claude Code → back to the three-preset datalist.
+    // Back to Claude Code → back to the Claude preset datalist.
     await page.selectOption('select[name="defaultHarnessSelect"]', 'claude-code');
     await expect(modelInput).toHaveAttribute('list', 'dispatch-model-suggestions-claude');
   });
