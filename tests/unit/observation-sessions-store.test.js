@@ -91,9 +91,9 @@ test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it reb
   const store = new ObservationSessionsStore({ collection });
   await store.upsertSession(URL_KEY, makeSession('S1'));
 
-  // The pin tracks the CURRENT version (LIN-1495 moved it 4 → 5); a lingering v3
+  // The pin tracks the CURRENT version (LIN-1766 moved it 5 → 6); a lingering v3
   // archive doc from before LIN-1487 must still miss on both reads.
-  assert.equal(BUILDER_VERSION, 5, 'this bump-specific pin tracks the current version');
+  assert.equal(BUILDER_VERSION, 6, 'this bump-specific pin tracks the current version');
   const doc = collection._docs.find(d => d.type === 'session');
   doc.builderVersion = 3;
 
@@ -117,6 +117,23 @@ test('a v4 doc (pre-LIN-1495) read-misses on both list and point reads so it reb
 
   assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v4 doc');
   assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v4 doc → route reconstructs');
+});
+
+// LIN-1766: the v5 → v6 bump exists because `telemetry.usage.lane` is now parsed
+// onto usage. Unlike v4 → v5, this genuinely ADDS A KEY rather than changing a
+// value inside an existing field, so a v5 doc no longer matches the shape — a
+// real shape change, not another efficacy lever. Pinning the v5 doc as the
+// target set is what makes this bump load-bearing rather than cosmetic.
+test('a v5 doc (pre-LIN-1766) read-misses on both list and point reads so it rebuilds with lane', async () => {
+  const collection = createMockCollection();
+  const store = new ObservationSessionsStore({ collection });
+  await store.upsertSession(URL_KEY, makeSession('S1'));
+
+  const doc = collection._docs.find(d => d.type === 'session');
+  doc.builderVersion = 5;
+
+  assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v5 doc');
+  assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v5 doc → route reconstructs');
 });
 
 test('removeSession deletes a single derived doc (idempotent)', async () => {
