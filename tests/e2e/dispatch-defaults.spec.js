@@ -68,10 +68,11 @@ test.describe('Dispatch defaults settings', () => {
     const claudeList = page.locator('#dispatch-model-suggestions-claude');
     await expect(opencodeList).toHaveCount(1);
     await expect(opencodeList.locator('option')).not.toHaveCount(0);
-    // The Claude Code datalist holds exactly the three presets.
+    // The Claude Code datalist holds exactly the four presets (LIN-1763 added fable).
     await expect(claudeList).toHaveCount(1);
-    await expect(claudeList.locator('option')).toHaveCount(3);
+    await expect(claudeList.locator('option')).toHaveCount(4);
     await expect(claudeList.locator('option[value="sonnet"]')).toHaveCount(1);
+    await expect(claudeList.locator('option[value="fable"]')).toHaveCount(1);
   });
 
   test('the model input is harness-aware: it swaps datalists when the harness changes (LIN-1282)', async ({ page, localWorkerUrlKey }) => {

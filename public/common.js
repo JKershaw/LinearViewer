@@ -646,18 +646,23 @@ const DISPATCH_MODEL_SUGGESTIONS = [
   'anthropic/claude-opus-4.8',
   'openai/gpt-5.4-mini',
   'openai/gpt-5.5',
-  'openai/gpt-5.5-pro'
+  'openai/gpt-5.5-pro',
+  'anthropic/claude-sonnet-5',
+  'anthropic/claude-opus-5',
+  'anthropic/claude-fable-5',
+  'anthropic/claude-haiku-4.5',
+  'openai/gpt-5.6-sol'
 ];
 
-// Claude Code's three model presets (LIN-1282). Unlike OpenCode — which reaches
-// the full OpenRouter-derived DISPATCH_MODEL_SUGGESTIONS list above plus the live
-// catalog — Claude Code only offers Haiku / Sonnet / Opus. These are the Claude
-// Code `--model` aliases, so they stay stable across model generations (the
+// Claude Code's model presets (LIN-1282, `fable` added LIN-1763). Unlike OpenCode —
+// which reaches the full OpenRouter-derived DISPATCH_MODEL_SUGGESTIONS list above
+// plus the live catalog — Claude Code only offers Haiku / Sonnet / Opus / Fable.
+// These are the Claude Code `--model` aliases, so they stay stable across model generations (the
 // Simple Dispatcher launch-with-model wiring is a separate follow-up). The model
 // input's datalist swaps between this list and the OpenCode one based on the
 // selected harness (syncHarnessModelList, below); the live catalog is merged only
 // into the OpenCode datalist.
-const DISPATCH_CLAUDE_MODEL_SUGGESTIONS = ['haiku', 'sonnet', 'opus'];
+const DISPATCH_CLAUDE_MODEL_SUGGESTIONS = ['haiku', 'sonnet', 'opus', 'fable'];
 
 // =============================================================================
 // Live OpenRouter model catalog (LIN-1111 Session 2)
@@ -711,7 +716,7 @@ function applyDispatchModelCatalogToPage(models) {
   const optionsHtml = buildCatalogModelOptionsHtml(models);
   if (!optionsHtml) return;
   // Only the OpenCode datalists take the catalog (LIN-1282) — the Claude Code
-  // datalist stays fixed at its three presets.
+  // datalist stays fixed at its presets.
   document.querySelectorAll('.dispatch-exec-model-datalist-opencode').forEach(dl => {
     dl.insertAdjacentHTML('beforeend', optionsHtml);
   });
@@ -752,7 +757,7 @@ window.fetchDispatchModelCatalog = function fetchDispatchModelCatalog(urlKey) {
  *
  * The free-text "custom harness" input was removed in LIN-1282 — there are only
  * two real harnesses. The model input carries two datalists: the OpenCode one
- * (full OpenRouter list + live catalog) and the Claude Code one (three presets).
+ * (full OpenRouter list + live catalog) and the Claude Code one (fixed presets).
  * It starts on the datalist matching the pre-selected harness; the shared
  * document-level `change` handler (`syncHarnessModelList`) swaps `list` between
  * them when the harness select changes.
@@ -827,7 +832,7 @@ window.readDispatchExecControls = function readDispatchExecControls(scopeEl) {
 /**
  * Harness-aware model datalist sync (LIN-1282). Swaps a model input's `list`
  * between its Claude Code and OpenCode datalists based on the sibling harness
- * select's value: Claude Code exposes only its three presets, OpenCode the full
+ * select's value: Claude Code exposes only its presets, OpenCode the full
  * OpenRouter list. Surface-agnostic — it works for both the Dispatch-page exec
  * controls (`.dispatch-exec-*`, datalists inside the control) and the Settings
  * dispatch-defaults rows (`.harness-select`/`.dispatch-model-input`, shared
