@@ -180,6 +180,18 @@ describe('rate table shape (LIN-1495)', () => {
     }
   });
 
+  test('gpt-5.6-sol carries the cache tiers the live catalog exposes for it (LIN-1763 review finding)', () => {
+    // The catalog exposes input_cache_read/input_cache_write for this id; the
+    // row originally omitted them, which the LIN-1763 review flagged as an
+    // undercount for any worker session that actually uses this model.
+    assert.deepStrictEqual(MODEL_PRICING['openai/gpt-5.6-sol'], {
+      prompt: 5.00,
+      completion: 30.00,
+      cacheRead: 0.50,
+      cacheWrite: 6.25,
+    });
+  });
+
   test('the table and its rows are frozen — a rate card a caller can mutate is not one representation', () => {
     assert.ok(Object.isFrozen(MODEL_PRICING));
     for (const [id, rate] of Object.entries(MODEL_PRICING)) {
