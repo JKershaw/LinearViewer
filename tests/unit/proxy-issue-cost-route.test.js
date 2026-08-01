@@ -140,6 +140,31 @@ describe('GET /api/proxy/issues/:identifier/cost — validation', () => {
     const { status } = await get(app, '/api/proxy/issues/LIN-42/cost');
     assert.equal(status, 200);
   });
+
+  test('400 (not a silent zeroed result) on a UUID-shaped identifier — LIN-1775 R1', async () => {
+    // A UUID passes isValidIssueId's shape check, but dispatch/call-log rows
+    // are keyed by the human identifier, so it would otherwise silently
+    // match zero rows and return an authoritative-looking $0.00.
+    const ownRow = row({ id: 'row-uuid', issueIdentifier: '01882c20-bc5e-4307-8a33-4f9857e65f7e' });
+    const { app, historyCalls } = buildApp({ history: [ownRow] });
+    const { status, body } = await get(app, '/api/proxy/issues/01882c20-bc5e-4307-8a33-4f9857e65f7e/cost');
+    assert.equal(status, 400);
+    assert.ok(body.error);
+    // No store read should be attempted once the identifier is rejected.
+    assert.equal(historyCalls.length, 0);
+  });
+
+  test('the alias also rejects a UUID-shaped identifier with 400', async () => {
+    const { app } = buildApp({ history: [] });
+    const { status } = await get(app, '/api/proxy/cost/01882c20-bc5e-4307-8a33-4f9857e65f7e');
+    assert.equal(status, 400);
+  });
+
+  test('a non-UUID identifier that merely contains hyphens/digits (e.g. LIN-1770) is unaffected', async () => {
+    const { app } = buildApp({ history: [row()] });
+    const { status } = await get(app, '/api/proxy/issues/LIN-42/cost');
+    assert.equal(status, 200);
+  });
 });
 
 describe('GET /api/proxy/issues/:identifier/cost — route aliases', () => {

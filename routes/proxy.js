@@ -1458,6 +1458,9 @@ GET ${baseUrl}/api/proxy/issues/{identifier}/cost   (alias: /api/proxy/cost/{ide
   → API-equivalent USD cost for one task: joins worker dispatch usage telemetry with
     app-side (OpenRouter) LLM call-log spend attributed to this issue. Pure read, no
     LLM call, no Linear fetch.
+  → {identifier} MUST be the issue identifier (e.g. "LIN-1770"), NOT a UUID — this
+    route never resolves through the provider, and a UUID matches zero rows. A
+    UUID-shaped {identifier} is rejected with 400.
   → { "identifier": "LIN-1770", "pricedUsd": 22.78, "totalUsd": 22.83,
       "workerSessions": [{ "rootItemId": "...", "kind": "implementation",
         "dispatchedAt": "...", "model": "claude-sonnet-5", "costUsd": 4.90 }],
@@ -3658,6 +3661,12 @@ One convention across every endpoint, so you can branch on the same fields every
    * OpenRouter llm-call-log spend attributed to this issue. Pure read — no
    * Linear fetch, no LLM call.
    *
+   * `:identifier` MUST be the human issue identifier (e.g. `LIN-1770`), not
+   * a UUID: unlike /recap and /brief, this route never resolves through the
+   * provider, and dispatch/call-log rows are keyed by identifier. A
+   * UUID-shaped param is rejected with 400 rather than silently matching
+   * zero rows and returning an authoritative-looking $0.00 (LIN-1775 R1).
+   *
    * Own rows come from BOTH the live queue and history, scoped by
    * `issueIdentifier` at the store (indexed). Lineage siblings — other rows
    * sharing a `rootItemId` anchor with one of the own rows — are
@@ -3677,6 +3686,16 @@ One convention across every endpoint, so you can branch on the same fields every
       if (!isValidIssueId(identifier)) {
         logEvent(req, '/api/proxy/cost', 400);
         return badRequest.json(res, 'Invalid identifier format');
+      }
+      // Dispatch rows and call-log rows are joined on the human issue
+      // identifier (e.g. "LIN-1770"), never the issue UUID — unlike
+      // /recap and /brief, this route does no provider lookup to resolve
+      // one to the other. A UUID passes isValidIssueId's shape check but
+      // matches no row, so it must be rejected loudly here rather than
+      // silently returning an authoritative-looking $0.00 (LIN-1775 R1).
+      if (UUID_REGEX.test(identifier)) {
+        logEvent(req, '/api/proxy/cost', 400);
+        return badRequest.json(res, 'This endpoint requires the issue identifier (e.g. LIN-123), not a UUID — dispatch and call-log rows are keyed by identifier, so a UUID would silently match zero rows');
       }
 
       const [queued, history] = await Promise.all([

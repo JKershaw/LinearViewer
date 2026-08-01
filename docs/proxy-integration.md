@@ -692,8 +692,11 @@ Returns a task's total cost in **API-equivalent USD** (LIN-1775), joining two so
 - **App-side LLM calls** — OpenRouter calls this app itself makes on the task's behalf
   (e.g. `recommend`), from the llm-call-log.
 
-Pure read: no Linear fetch, no LLM call. Read scope is sufficient; accepts a UUID or an
-identifier.
+Pure read: no Linear fetch, no LLM call. Read scope is sufficient. `{identifier}` must be
+the issue **identifier** (e.g. `ENG-1770`), not a UUID — unlike `/recap` and `/brief`,
+this endpoint never resolves through the provider, and dispatch/call-log rows are keyed
+by identifier. A UUID-shaped `{identifier}` is rejected with `400` rather than silently
+matching zero rows and returning an authoritative-looking `$0.00`.
 
 ```json
 {
