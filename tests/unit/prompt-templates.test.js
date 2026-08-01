@@ -1828,6 +1828,30 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
       'Step 3 carries the cannot-close exception');
     assert.ok(/route the next action to that blocker/i.test(p), 'it routes the next action to the blocker');
   });
+
+  test('Step 0 and Step 3 stuck-review-signal bullets name archive+prune in the same order as the Close-out quality rule (LIN-1773)', () => {
+    const step0 = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
+    const step3 = buildMetaPromptTemplate({
+      ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0,
+      isTerminal: false, hasOpenChildren: false
+    });
+    const keywords = ['merge', 'done', 'summary', 'archive', 'prune', 'follow-up'];
+    const assertOrdered = (text, label) => {
+      const lower = text.toLowerCase();
+      const positions = keywords.map(k => lower.indexOf(k));
+      assert.ok(positions.every(p => p > -1), `${label} mentions every keyword (${keywords.join(', ')})`);
+      for (let i = 1; i < positions.length; i++) {
+        assert.ok(positions[i] > positions[i - 1],
+          `${label}: "${keywords[i]}" must appear after "${keywords[i - 1]}"`);
+      }
+    };
+    const step0Bullet = step0.split('\n').find(l => /inverted stuck-review signal/i.test(l));
+    const step3Bullet = step3.split('\n').find(l => /the next step is the close, not another review pass/i.test(l));
+    assert.ok(step0Bullet, 'Step 0 stuck-review-signal bullet is present');
+    assert.ok(step3Bullet, 'Step 3 stuck-review-signal bullet is present');
+    assertOrdered(step0Bullet, 'Step 0 stuck-review-signal bullet');
+    assertOrdered(step3Bullet, 'Step 3 stuck-review-signal bullet');
+  });
 });
 
 describe('meta-prompt design shape-fork routing + aiHint discriminators (LIN-878)', () => {
@@ -2159,6 +2183,39 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'the question-mark invariant is preserved (locked separately in tests/unit/completion-signals.test.js:86)');
     assert.ok(sig.signals.some(s => /where the archive could not be verified, the prune skipped and that recorded in the summary/i.test(s)),
       'signals[] carries the same contract for consistency, even though it reaches no prompt path');
+  });
+
+  // ===========================================================================
+  // Catalog/aiHint text pinned to the template body's step ordering (LIN-1773)
+  // ===========================================================================
+
+  test('(h1) sanity: the On All-Clear body itself states merge→done→summary→archive→prune→follow-up in order', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    const body = prompt.slice(prompt.indexOf('### On All-Clear — Perform the Irreversible Set')).toLowerCase();
+    const keywords = ['merge', 'done', 'summary', 'archive', 'prune', 'follow-up'];
+    const positions = keywords.map(k => body.indexOf(k));
+    assert.ok(positions.every(p => p > -1), 'every keyword is present in the On All-Clear body');
+    for (let i = 1; i < positions.length; i++) {
+      assert.ok(positions[i] > positions[i - 1],
+        `"${keywords[i]}" must appear after "${keywords[i - 1]}" in the On All-Clear body`);
+    }
+  });
+
+  test('(h2) description, aiHint.goal, and aiHint.workflow name every irreversible-set step in the body\'s order', () => {
+    const keywords = ['merge', 'done', 'summary', 'archive', 'prune', 'follow-up'];
+    const assertOrdered = (text, label) => {
+      const lower = text.toLowerCase();
+      const positions = keywords.map(k => lower.indexOf(k));
+      assert.ok(positions.every(p => p > -1), `${label} mentions every keyword (${keywords.join(', ')})`);
+      for (let i = 1; i < positions.length; i++) {
+        assert.ok(positions[i] > positions[i - 1],
+          `${label}: "${keywords[i]}" must appear after "${keywords[i - 1]}"`);
+      }
+    };
+    const t = PROMPT_TEMPLATES['close-out'];
+    assertOrdered(t.description, 'close-out.description');
+    assertOrdered(t.aiHint.goal, 'close-out.aiHint.goal');
+    assertOrdered(t.aiHint.workflow, 'close-out.aiHint.workflow');
   });
 });
 
