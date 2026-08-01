@@ -1040,6 +1040,24 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       'the rule must scope the step to the all-clear path only, mirroring the handwritten template');
   });
 
+  // LIN-1772: LIN-1770's review (finding F1) named no fallback for a snapshot
+  // verification that fails after the merge and Done have already landed. This
+  // pins the meta-path half of the fix — mirrors (g9) in prompt-templates.test.js.
+  test('S4 parity — the Close-out prompts quality rule carries the archive-verification skip-and-close failure branch', () => {
+    const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Close-out prompts**'));
+    assert.ok(rule, 'the meta-prompt must carry a Close-out prompts quality rule');
+    const verifyAt = rule.search(/verify the archive landed/i);
+    const failureAt = rule.search(/if that verification fails, do not prune/i);
+    assert.ok(verifyAt > -1 && failureAt > -1 && verifyAt < failureAt,
+      'the failure branch is sited immediately after the archive-verification clause');
+    assert.ok(/record in the summary that the archive could not be confirmed and the prune was skipped/i.test(rule),
+      'the rule must require recording the skip in the summary');
+    assert.ok(/close the task anyway, since the merge and Done transition have already landed/i.test(rule),
+      'the rule must name the post-merge/Done discriminator that authorizes closing anyway');
+    assert.ok(/never holding open, re-routing, or reopening a task whose merge and Done have landed/i.test(rule),
+      'the rule must prohibit holding open, re-routing, or reopening');
+  });
+
   test('the emitted action is dispatchable — `→ **plan-review**` round-trips to a valid kind', () => {
     // The routing branch is only real if what the recommender emits survives the
     // wire: parseRecommendedAction reads the `→ **name**` line, and the dispatch

@@ -2041,7 +2041,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
   test('(g3) archive-first uses the zero-spend brief flag, then verifies the snapshot landed before pruning', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
     assert.ok(/brief\?noRefresh=1/.test(prompt), 'archive step calls the brief endpoint with noRefresh=1 (zero LLM spend)');
-    assert.ok(/GET \/api\/proxy\/issues\/LIN-901\/snapshots/.test(prompt) || /\/snapshots\b/.test(prompt),
+    assert.ok(/GET \/api\/proxy\/issues\/LIN-901\/snapshots/.test(prompt),
       'verify step reads the snapshot listing before editing');
     assert.ok(/fire-and-forget server-side and swallows its own errors/i.test(prompt),
       'a 200 from the archive call is explicitly NOT treated as proof it captured anything');
@@ -2088,7 +2088,26 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.ok(!prompt.includes('Linear'), 'the archive+prune addition introduces no literal "Linear"');
   });
 
-  test('(meta g9) the Close-out quality rule also carries the archive+prune step and its never-prune/marker guardrails', () => {
+  test('(g9) archive-verification failure branch: skip-and-close is sited between verify and prune, and names the post-merge discriminator', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    const section = prompt.slice(prompt.indexOf('### Archive & Prune Superseded Stage Artifacts'));
+    const verifyAt = section.search(/\d\. \*\*Verify the archive landed\*\*/);
+    const failureAt = section.search(/\d\. \*\*If the snapshot cannot be verified\*\*/);
+    const pruneAt = section.search(/\d\. \*\*Prune\*\*/);
+    assert.ok(verifyAt > -1 && failureAt > -1 && pruneAt > -1, 'all three steps are present');
+    assert.ok(verifyAt < failureAt && failureAt < pruneAt,
+      'the failure branch sits strictly between verification and pruning');
+    assert.ok(/do not prune/i.test(section) && /close the task anyway/i.test(section),
+      'the branch states do-not-prune and close-anyway');
+    assert.ok(/record in the close-out summary that the archive could not be confirmed and the prune was skipped/i.test(section),
+      'the branch requires recording the skip in the summary');
+    assert.ok(/never hold open, re-route, or reopen a task whose merge and Done transition have landed/i.test(section),
+      'the branch prohibits holding open, re-routing, or reopening');
+    assert.ok(/merge and Done transition are already irreversible/i.test(section) || /merge and Done transition have landed/i.test(section),
+      'the branch names the post-merge/Done discriminator — this is what distinguishes it from the pre-merge gate');
+  });
+
+  test('(meta g10) the Close-out quality rule also carries the archive+prune step and its never-prune/marker guardrails', () => {
     const meta = buildMetaPromptTemplate({
       issueContext: 'CTX', identifier: 'LIN-901', hasSubtasks: false, subtaskCount: 0,
       completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
@@ -2104,6 +2123,42 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'meta rule carries the same marker-preservation mandate');
     assert.ok(/runs only on the all-clear path, never on a cannot-close branch/i.test(rule),
       'meta rule scopes the step to the all-clear path only');
+  });
+
+  test('(meta g11) the Close-out quality rule also carries the skip-and-close failure branch, sited at the archive-verification clause', () => {
+    const meta = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-901', hasSubtasks: false, subtaskCount: 0,
+      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
+      aiHints: 'H', actionVocabulary: 'review, close-out, implementation', completionSignals: 'S'
+    });
+    const rule = meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Close-out prompts**'));
+    assert.ok(rule, 'the Close-out prompts quality rule exists');
+    const verifyAt = rule.search(/verify the archive landed/i);
+    const failureAt = rule.search(/if that verification fails, do not prune/i);
+    const pruneAt = rule.search(/otherwise rewrite the description removing embedded stage-artifact sections/i);
+    assert.ok(verifyAt > -1 && failureAt > -1 && pruneAt > -1, 'all three clauses are present');
+    assert.ok(verifyAt < failureAt && failureAt < pruneAt,
+      'the failure branch sits between verification and the prune rewrite, mirroring the handwritten siting');
+    assert.ok(/record in the summary that the archive could not be confirmed and the prune was skipped/i.test(rule),
+      'meta rule requires recording the skip in the summary');
+    assert.ok(/close the task anyway, since the merge and Done transition have already landed/i.test(rule),
+      'meta rule names the post-merge/Done discriminator and closes anyway');
+    assert.ok(/never holding open, re-routing, or reopening a task whose merge and Done have landed/i.test(rule),
+      'meta rule carries the same hold-open/re-route/reopen prohibition');
+    assert.ok(rule.split('\n').length === 1 || !rule.includes('\n'),
+      'the Close-out prompts rule stays a single line, since tests extract it by its line prefix');
+  });
+
+  test('(g12) coreOutcome and readinessCheck carry the "(or the skip recorded)" wording together — never readinessCheck alone', () => {
+    const sig = COMPLETION_SIGNALS['close-out'];
+    assert.ok(/archived and pruned of superseded stage artifacts \(or the skipped prune recorded\)/i.test(sig.coreOutcome),
+      'coreOutcome carries the skipped-prune parenthetical');
+    assert.ok(/archived-and-pruned \(or the skip recorded\)/i.test(sig.readinessCheck),
+      'readinessCheck carries the matching parenthetical, so the two fields state one contract, not two');
+    assert.ok(sig.readinessCheck.trim().endsWith('?'),
+      'the question-mark invariant is preserved (locked separately in tests/unit/completion-signals.test.js:86)');
+    assert.ok(sig.signals.some(s => /where the archive could not be verified, the prune skipped and that recorded in the summary/i.test(s)),
+      'signals[] carries the same contract for consistency, even though it reaches no prompt path');
   });
 });
 
