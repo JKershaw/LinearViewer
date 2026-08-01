@@ -220,7 +220,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -311,6 +311,18 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           if (!preset) {
             return badRequest.json(res, 'Invalid or unknown presetId');
           }
+        }
+      }
+
+      // Task budget (LIN-1751/LIN-1737): a SCOPE bound on the run — up to this many
+      // distinct tasks — enforced deterministically at the dispatch-factory seam.
+      // Validated here inline, matching routes/proxy.js's kickoff-seam rule and
+      // error text exactly (LIN-1737 D3), so a run kicked off through either seam
+      // rejects an invalid budget identically. Optional; absent/null ⇒ no budget,
+      // byte-identical to today.
+      if (maxTasks !== undefined && maxTasks !== null) {
+        if (!Number.isInteger(maxTasks) || maxTasks < 1) {
+          return badRequest.json(res, 'maxTasks must be an integer >= 1');
         }
       }
 
@@ -493,7 +505,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           sessionId: sessionId || null,
           waitForFollowUps: waitForFollowUps === true,
           queueIfBusy: queueIfBusy === true,
-          subscription: subscription ?? DEFAULT_SUBSCRIPTION
+          subscription: subscription ?? DEFAULT_SUBSCRIPTION,
+          maxTasks: maxTasks ?? null
         }
       });
 

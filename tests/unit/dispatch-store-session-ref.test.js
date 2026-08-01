@@ -51,6 +51,24 @@ test('the appended id is the actual minted UUID, available to forward', async ()
   assert.ok(idsInPrompt.includes(doc._id));
 });
 
+test('the appended block explicitly overrides any earlier-mentioned session id (LIN-1737 B1)', async () => {
+  const store = makeStore();
+  const standalonePlaceholder = '11111111-1111-1111-1111-111111111111';
+
+  const doc = await store.addItem('acme', {
+    prompt: `You are Autopilot. Your session id is \`${standalonePlaceholder}\`, unless dispatched through the queue.`,
+    kind: 'autopilot'
+  });
+
+  // Both ids are present (the earlier placeholder in the original body, the real
+  // minted id in the appended block)...
+  assert.ok(doc.prompt.includes(standalonePlaceholder));
+  assert.ok(doc.prompt.includes(doc._id));
+  // ...and the appended block says, in terms an orchestrator reads, that its id
+  // overrides whatever was named earlier — not merely restating a second id.
+  assert.match(doc.prompt, /overrides any other session id mentioned earlier/i);
+});
+
 test('non-autopilot kinds are left byte-identical', async () => {
   const store = makeStore();
   const prompt = 'Implement the feature. Open a PR.';
