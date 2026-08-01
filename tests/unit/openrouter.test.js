@@ -1015,6 +1015,29 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       'the rule must carry the revision half (item 2.2 parity)');
     assert.ok(/never a required format to key on/i.test(rule),
       'the header must stay a disambiguator in the meta path too (LIN-810)');
+    // LIN-1770: a revision replaces the prior plan section instead of appending.
+    assert.ok(/The revision REPLACES the plan section already in the description/.test(rule),
+      'the rule must carry the replace-not-append semantics for a plan revision');
+    assert.ok(/retaining only a short changelog line/i.test(rule),
+      'the rule must state the changelog stays short — the superseded plan\'s full text is not retained');
+  });
+
+  // LIN-1770: close-out's irreversible set now includes an archive+prune step. This
+  // is the same shape as the S2 parity test above, one template over — the quality
+  // rule that generates a `close-out` recommendation prompt must carry the same
+  // guardrails the handwritten close-out template hardcodes (see the (g*) tests in
+  // tests/unit/prompt-templates.test.js), or the two prompt paths diverge silently.
+  test('S3 parity — the Close-out prompts quality rule carries archive+prune with its guardrails', () => {
+    const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Close-out prompts**'));
+    assert.ok(rule, 'the meta-prompt must carry a Close-out prompts quality rule');
+    assert.ok(/archive a pre-prune snapshot of the description and then prune/i.test(rule),
+      'the rule must require archiving before pruning');
+    assert.ok(/NEVER prune the original problem statement, acceptance criteria, reproduction steps, or scope/i.test(rule),
+      'the rule must carry the never-prune carve-out, including scope');
+    assert.ok(/"fits one session" \/ "needs multiple sessions"\) and\/or an "Implementation Plan" heading/i.test(rule),
+      'the rule must carry the verbatim marker-preservation mandate');
+    assert.ok(/this step runs only on the all-clear path, never on a cannot-close branch/i.test(rule),
+      'the rule must scope the step to the all-clear path only, mirroring the handwritten template');
   });
 
   test('the emitted action is dispatchable — `→ **plan-review**` round-trips to a valid kind', () => {

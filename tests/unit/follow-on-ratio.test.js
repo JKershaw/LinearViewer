@@ -697,3 +697,68 @@ describe('F. clock-freedom, loudness and __internal', () => {
     assert.deepEqual(countFollowOns(null, idx), { peers: [], unresolvedPeers: 0, relationsSeen: 0 });
   });
 });
+
+// ─── LIN-1770: close-out's archive+prune stub must not blind PLAN_MARKER ──────
+//
+// The close-out template now prunes stage artifacts from the description on
+// successful close, including any `## Implementation Plan` heading and the
+// `fits one session` / `needs multiple sessions` phrasing the plan step wrote.
+// hasPlanMarker (this module) reads exactly those literals from the
+// description, and it is LIN-1600's denominator instrument — pruning them
+// away on every successfully-closed ticket would silently zero out the
+// population the metric measures. The mitigation is wording, not code: the
+// close-out template mandates the stub retain one of the two markers
+// verbatim. This test locks that contract from the follow-on-ratio side —
+// if a future edit to the close-out template's stub instructions drops the
+// mandate, this fails, rather than the regression surfacing only as a
+// silently-corrupted metric weeks later.
+describe('LIN-1770: close-out prune must preserve a PLAN_MARKER-matching stub', () => {
+  test('the close-out template instructs the stub to retain the plan marker verbatim', async () => {
+    const { generatePrompt } = await import('../../lib/prompt-templates.js');
+    const issue = {
+      id: 'co-lin1770', identifier: 'LIN-1770-CO', title: 'Land the thing',
+      description: 'work', url: 'https://linear.app/test/issue/LIN-1770-CO',
+      labels: [], createdAt: '2026-01-01T00:00:00.000Z',
+    };
+    const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+    const { prompt } = generatePrompt('close-out', issue, context);
+
+    assert.ok(/Archive & Prune/i.test(prompt), 'close-out documents the archive+prune step');
+    assert.ok(/never prune/i.test(prompt), 'close-out names a never-prune carve-out');
+    // The instruction must cite the SAME literals PLAN_MARKER matches, not a
+    // paraphrase — a paraphrase would pass a human read but not the regex.
+    assert.ok(/fits one session.*needs multiple sessions|needs multiple sessions.*fits one session/is.test(prompt),
+      'the stub mandate names both committed session-fit phrases verbatim');
+    assert.ok(/`Implementation Plan` heading/.test(prompt),
+      'the stub mandate names the Implementation Plan heading verbatim, matching PLAN_MARKER\'s heading branch');
+  });
+
+  test('a stub written per the close-out mandate still satisfies hasPlanMarker; one that drops the marker does not', () => {
+    const { hasPlanMarker } = __internal;
+    // What close-out's stub looks like when it follows the mandate: the
+    // stage-artifact sections are gone, but the session-fit phrase survives.
+    const compliantStub = [
+      '## Problem',
+      'Original problem statement, untouched by the prune.',
+      '',
+      '## Shipped',
+      'Implemented as approved. Session fit: fits one session.',
+      'See PR #123. Full history in task snapshots and comments.',
+    ].join('\n');
+    assert.equal(hasPlanMarker({ description: compliantStub }), true,
+      'a stub that keeps the session-fit phrase still registers as having a plan');
+
+    // What it would look like if a future edit dropped the mandate — this is
+    // the corruption the mandate exists to prevent, reproduced so the test
+    // fails loudly if the mandate above is ever removed without a replacement.
+    const noncompliantStub = [
+      '## Problem',
+      'Original problem statement, untouched by the prune.',
+      '',
+      '## Shipped',
+      'Implemented as approved. See PR #123. Full history in task snapshots and comments.',
+    ].join('\n');
+    assert.equal(hasPlanMarker({ description: noncompliantStub }), false,
+      'without the mandated phrase, the pruned description is indistinguishable from "no plan ever ran"');
+  });
+});
