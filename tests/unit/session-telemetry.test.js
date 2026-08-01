@@ -228,7 +228,7 @@ describe('parseUsage (LIN-1425)', () => {
     + 4588835 * 0.50
   ) / 1e6;
 
-  test('parses a well-formed kind:"usage" entry, whitelisting exactly the four token fields + model + costUsd', () => {
+  test('parses a well-formed kind:"usage" entry, whitelisting exactly the four token fields + model + lane + costUsd', () => {
     const feedback = [{ message: usageMessage(), kind: 'usage' }];
     const usage = parseUsage(feedback);
     assert.deepEqual(usage, {
@@ -238,6 +238,8 @@ describe('parseUsage (LIN-1425)', () => {
       outputTokens: 25811,
       cacheCreationInputTokens: 145449,
       cacheReadInputTokens: 4588835,
+      // LIN-1766: absent from the payload, so null (closed enum, no default lane).
+      lane: null,
       // LIN-1495: claude-code posts costUsd: null (it has no native cost), so the
       // figure is derived here from the four token counts + the static rate card.
       costUsd: DEFAULT_PAYLOAD_COST,
@@ -291,10 +293,13 @@ describe('parseUsage (LIN-1425)', () => {
   });
 
   test('LIN-1495: derivation adds no key to the usage object', () => {
+    // lane is a parse-time key (assigned before costUsd's derivation branch runs),
+    // so its presence here does not weaken this test's intent: the derivation
+    // step itself still contributes nothing beyond costUsd.
     const usage = parseUsage([{ message: usageMessage(), kind: 'usage' }]);
     assert.deepEqual(
       Object.keys(usage).sort(),
-      ['cacheCreationInputTokens', 'cacheReadInputTokens', 'costUsd', 'harness', 'inputTokens', 'model', 'outputTokens'].sort()
+      ['cacheCreationInputTokens', 'cacheReadInputTokens', 'costUsd', 'harness', 'inputTokens', 'lane', 'model', 'outputTokens'].sort()
     );
   });
 
@@ -355,11 +360,58 @@ describe('parseUsage (LIN-1425)', () => {
       kind: 'usage',
     }];
     const usage = parseUsage(feedback);
-    assert.deepEqual(Object.keys(usage).sort(), ['costUsd', 'inputTokens', 'outputTokens'].sort());
+    assert.deepEqual(Object.keys(usage).sort(), ['costUsd', 'inputTokens', 'lane', 'outputTokens'].sort());
   });
 
   test('non-array input returns null', () => {
     assert.equal(parseUsage(undefined), null);
+  });
+
+  test('LIN-1766: each closed-enum lane literal passes through unchanged', () => {
+    for (const lane of ['subscription', 'api', 'openrouter']) {
+      const feedback = [{ message: usageMessage({ lane }), kind: 'usage' }];
+      assert.equal(parseUsage(feedback).lane, lane);
+    }
+  });
+
+  test('LIN-1766: an unrecognized lane string is squashed to null, never passed through raw', () => {
+    const feedback = [{ message: usageMessage({ lane: 'aws-bedrock' }), kind: 'usage' }];
+    const usage = parseUsage(feedback);
+    assert.strictEqual(usage.lane, null);
+    assert.ok(!JSON.stringify(usage).includes('aws-bedrock'), 'the unrecognized lane value must not leak anywhere on the returned object');
+  });
+
+  test('LIN-1766: non-string lane values (number, object, array, boolean) all squash to null', () => {
+    for (const lane of [42, { subscription: true }, ['subscription'], true]) {
+      const feedback = [{ message: usageMessage({ lane }), kind: 'usage' }];
+      assert.strictEqual(parseUsage(feedback).lane, null);
+    }
+  });
+
+  test('LIN-1766: an absent lane key parses to null, present as a key rather than missing', () => {
+    const feedback = [{ message: usageMessage(), kind: 'usage' }];
+    const usage = parseUsage(feedback);
+    assert.ok('lane' in usage);
+    assert.strictEqual(usage.lane, null);
+  });
+
+  test('LIN-1766: [usage] {} still parses to null — lane must never be assigned before the empty-usage guard', () => {
+    const feedback = [{ message: '[usage] {}', kind: 'usage' }];
+    assert.strictEqual(parseUsage(feedback), null);
+  });
+
+  test('LIN-1766: lane coexists with a native (non-derived) costUsd', () => {
+    const feedback = [{ message: usageMessage({ harness: 'opencode', lane: 'openrouter', costUsd: 0.0421 }), kind: 'usage' }];
+    const usage = parseUsage(feedback);
+    assert.strictEqual(usage.lane, 'openrouter');
+    assert.strictEqual(usage.costUsd, 0.0421);
+  });
+
+  test('LIN-1766: lane coexists with a derived costUsd', () => {
+    const feedback = [{ message: usageMessage({ lane: 'subscription' }), kind: 'usage' }];
+    const usage = parseUsage(feedback);
+    assert.strictEqual(usage.lane, 'subscription');
+    assert.strictEqual(usage.costUsd, DEFAULT_PAYLOAD_COST);
   });
 });
 
@@ -437,6 +489,7 @@ describe('buildRunTelemetry', () => {
       outputTokens: 2,
       cacheCreationInputTokens: 3,
       cacheReadInputTokens: 4,
+      lane: null,
       // LIN-1495: derived, since claude-code reports no native cost —
       // (1×5.00 + 2×25.00 + 3×6.25 + 4×0.50) / 1e6
       costUsd: 0.00007575,
