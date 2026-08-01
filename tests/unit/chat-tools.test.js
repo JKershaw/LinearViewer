@@ -862,6 +862,32 @@ describe('pass-3 session reads — list_task_sessions / get_session (LIN-1073)',
     });
   });
 
+  test('LIN-1789: get_session forwards telemetry.resources unchanged — a wholesale object passthrough needs no field-specific code', async () => {
+    const history = twoSessionHistory();
+    const workerLoop = history.find(h => h.id === 'w-done');
+    workerLoop.feedback = [
+      ...workerLoop.feedback,
+      { message: '[resources] {"peakRssBytes":536870912,"cpuCount":4}', kind: 'resources', timestamp: T_DONE },
+    ];
+    const executeTool = makeCatalog(history);
+    const result = await executeTool({ name: 'get_session', arguments: { sessionId: 'sess-done' } });
+    assert.deepStrictEqual(result.telemetry.resources, { peakRssBytes: 536870912, cpuCount: 4 });
+    const workerRun = result.runs.find(r => r.kind !== 'autopilot' && r.terminalStatus === 'done');
+    assert.deepStrictEqual(workerRun.telemetry.resources, { peakRssBytes: 536870912, cpuCount: 4 });
+  });
+
+  test('list_task_sessions does NOT forward resources — it only ever picks runtime, matching its narrower :735 field-by-field projection', async () => {
+    const history = twoSessionHistory();
+    const workerLoop = history.find(h => h.id === 'w-done');
+    workerLoop.feedback = [
+      ...workerLoop.feedback,
+      { message: '[resources] {"peakRssBytes":536870912}', kind: 'resources', timestamp: T_DONE },
+    ];
+    const executeTool = makeCatalog(history);
+    const result = await executeTool({ name: 'list_task_sessions', arguments: { issueId: 'LIN-500' } });
+    assert.deepStrictEqual(Object.keys(result.sessions[0]).sort(), ['completedAt', 'dispatchedAt', 'runCount', 'sessionId', 'seedIssue', 'terminal', 'runtime'].sort());
+  });
+
   test('get_session rejects a missing sessionId and an unknown session', async () => {
     const executeTool = makeCatalog(twoSessionHistory());
     await assert.rejects(
