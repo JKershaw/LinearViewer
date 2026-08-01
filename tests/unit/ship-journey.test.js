@@ -240,21 +240,29 @@ describe('deriveJourney', () => {
 
   // ── scenario 7: newest-vs-oldest bearing selection ─────────────────────────
 
+  // Fixture is newest-first — the order ReportHistoryStore.listFull() actually
+  // returns (`_docsSorted()` sorts descending by generatedAt) and therefore the
+  // order the sole intended caller (P3/LIN-1685) will hand in. Every other
+  // fixture in this file happens to arrive pre-sorted ascending, which leaves
+  // `sortReportsChronological` completely unexercised — deleting that line
+  // left the suite green. This scenario is what pins it (LIN-1684 review).
   test('selects the newest pre-completion bearing for each identifier', () => {
     const reports = [
       createReport({
-        generatedAt: '2026-01-01T00:00:00Z',
-        orientation: [
-          { identifier: 'T-X', bearing: 'N', reason: '', archived: false }
-        ]
-      }),
-      createReport({
         generatedAt: '2026-01-02T00:00:00Z',
+        northStar: 'star-B',
         orientation: [
           { identifier: 'T-X', bearing: 'E', reason: '', archived: false }
         ]
+      }),
+      createReport({
+        generatedAt: '2026-01-01T00:00:00Z',
+        northStar: 'star-A',
+        orientation: [
+          { identifier: 'T-X', bearing: 'N', reason: '', archived: false }
+        ]
       })
-    ];
+    ]; // newest-first — the order listFull() actually returns
 
     const issues = [
       createIssue({
@@ -268,7 +276,10 @@ describe('deriveJourney', () => {
 
     assert.strictEqual(result.waypoints.length, 1);
     assert.strictEqual(result.waypoints[0].bearing, 'E',
-      'waypoint must carry the NEWEST bearing (E), not the oldest (N)');
+      'waypoint must carry the NEWEST bearing (E), not the first-seen entry of an unsorted array (N)');
+    assert.deepStrictEqual(result.starChanges, [
+      { from: 'star-A', to: 'star-B', at: '2026-01-02T00:00:00Z' }
+    ], 'starChanges must read chronologically oldest -> newest regardless of input order');
   });
 
   // ── scenario 8: a run at the cap ───────────────────────────────────────────
