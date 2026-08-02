@@ -65,7 +65,7 @@
   function currentMaxTasks() {
     if (!budgetInput || !budgetInput.value || !budgetInput.value.trim()) return undefined;
     var parsed = parseInt(budgetInput.value.trim(), 10);
-    if (!isFinite(parsed) || parsed < 1) return undefined;
+    if (!isFinite(parsed)) return undefined;
     return parsed;
   }
 
