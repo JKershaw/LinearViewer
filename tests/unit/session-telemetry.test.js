@@ -512,6 +512,51 @@ describe('parseResources (LIN-1789)', () => {
     assert.equal(parseResources(feedback).peakRssBytes, 536870912);
   });
 
+  // Verified by hand during review (cases E and H) but unpinned — a future
+  // refactor of the `Number.isFinite` gate or the `if (parsed)` guard would
+  // regress either silently. LIN-1789 close-out ledger items 7.
+  test('non-numeric values are dropped field-by-field, never coerced', () => {
+    const feedback = [{
+      message: `[resources] ${JSON.stringify({
+        peakRssBytes: '536870912', // numeric-looking STRING — not coerced
+        hostMemAvailableBytes: null,
+        hostMemTotalBytes: true,
+        hostSwapUsedBytes: { bytes: 0 },
+        oomKillDelta: [0],
+        loadAvg1: 1.5, // the one genuinely numeric field
+      })}`,
+      kind: 'resources',
+    }];
+    const resources = parseResources(feedback);
+    assert.deepEqual(resources, { loadAvg1: 1.5 });
+  });
+
+  test('non-finite numeric values (NaN/Infinity, arriving as JSON null) are dropped', () => {
+    // JSON.stringify turns NaN/Infinity into null, so this is the shape that
+    // actually reaches the wire — Number.isFinite rejects it either way.
+    const feedback = [{
+      message: `[resources] ${JSON.stringify({ peakRssBytes: NaN, cpuCount: Infinity, cloneCount: 3 })}`,
+      kind: 'resources',
+    }];
+    assert.deepEqual(parseResources(feedback), { cloneCount: 3 });
+  });
+
+  test('a malformed entry AFTER a valid one does not clobber it — last PARSEABLE entry wins', () => {
+    const feedback = [
+      { message: resourcesMessage({ peakRssBytes: 536870912 }), kind: 'resources' },
+      { message: '[resources] {"peakRssBytes":1, not-json', kind: 'resources' },
+    ];
+    assert.equal(parseResources(feedback).peakRssBytes, 536870912);
+  });
+
+  test('an unrecognized-fields-only entry AFTER a valid one does not clobber it either', () => {
+    const feedback = [
+      { message: resourcesMessage({ peakRssBytes: 536870912 }), kind: 'resources' },
+      { message: '[resources] {"vmHwmRaw":"524288 kB"}', kind: 'resources' },
+    ];
+    assert.equal(parseResources(feedback).peakRssBytes, 536870912);
+  });
+
   test('ignores an entry whose kind is not "resources" even if the message looks like a resources payload', () => {
     const feedback = [{ message: resourcesMessage(), kind: 'assistant-text' }];
     assert.equal(parseResources(feedback), null);
