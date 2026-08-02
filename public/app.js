@@ -1224,6 +1224,9 @@ function initPrompts() {
     // its fetch handler; absent for ordinary prompts, where the server derives
     // kind from promptName.
     const kind = promptContainer.dataset.kind || undefined
+    // Periodical-template join key (LIN-1825): set on the container by
+    // renderPeriodicalNode's data-periodical-id, absent for ordinary prompts.
+    const periodicalId = promptContainer.dataset.periodicalId || undefined
 
     // LIN-1279: surfaces whose prompt REQUIRES workspace-API proxy context (the
     // Mint + Autopilot periodical variant, whose tail calls the kickoff endpoint)
@@ -1257,6 +1260,7 @@ function initPrompts() {
         target,
         repo: repo || undefined,
         kind,
+        periodicalId,
         model,
         harness,
         proxyForce

@@ -24,6 +24,7 @@ import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { isValidDispatchKind, DISPATCH_KINDS, DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
+import { getPeriodicals } from '../lib/periodicals.js';
 import { FEEDBACK_ENTRY_KINDS } from '../lib/dispatch-store.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
@@ -220,7 +221,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -276,6 +277,15 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // Validate kind if provided; when omitted it is derived from promptName below.
       if (kind !== undefined && !isValidDispatchKind(kind)) {
         return badRequest.json(res, `kind must be one of: ${DISPATCH_KINDS.join(', ')}`);
+      }
+
+      // Periodical-template join key (LIN-1825): registry-membership check, not
+      // format validation, so it stays route-local rather than routing through
+      // validateDispatchPayload (deliberately format-only, never against a
+      // model registry). Optional; absent/undefined means a non-periodical
+      // dispatch and is left untouched.
+      if (periodicalId !== undefined && !getPeriodicals().map(p => p.id).includes(periodicalId)) {
+        return badRequest.json(res, 'periodicalId must be one of the known periodical template ids');
       }
 
       // Opt-in completion hold (LIN-797): boolean, default false. Stored +
@@ -503,6 +513,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           abortTo: isAbort ? abortTo : null,
           cascade: cascade === true,
           sessionId: sessionId || null,
+          periodicalId: periodicalId || null,
           waitForFollowUps: waitForFollowUps === true,
           queueIfBusy: queueIfBusy === true,
           subscription: subscription ?? DEFAULT_SUBSCRIPTION,
