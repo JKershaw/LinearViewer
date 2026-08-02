@@ -58,6 +58,7 @@ import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
+import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS } from '../lib/next-run.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
@@ -579,6 +580,10 @@ function dispatchWatchChanged(baseline, item) {
  * @param {Function} options.getWorkspaceAccessToken - Function to get workspace access token by urlKey (token-only)
  * @param {Function} options.resolveWorkspaceAccess - Function returning { token, reason } for actionable error envelopes (LIN-417)
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
+ * @param {Function} [options.getWorkspaceNorthStar] - Function(urlKey, accountId) resolving the proxy
+ *   token creator's durable north-star intent (LIN-1810). Absent → GET /api/proxy/north-star 503s.
+ * @param {Object} [options.reportHistoryStore] - Durable per-workspace roadmap report history store
+ *   (LIN-1810). Absent → GET /api/proxy/north-star 503s.
  * @param {Object} [options.dispatchPresetsStore] - Dispatch presets store (LIN-1390), used by the
  *   autopilot kickoff route to validate an incoming `presetId` and resolve its config's routing
  *   precedence over workspace dispatchDefaults. Absent → `presetId` is accepted but has no effect.
@@ -590,7 +595,7 @@ function dispatchWatchChanged(baseline, item) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null }) {
   const router = Router();
 
   /**
@@ -1482,6 +1487,30 @@ GET ${baseUrl}/api/proxy/issues/{identifier}/cost   (alias: /api/proxy/cost/{ide
   → KNOWN LIMITATION: a lineage that spans two issues (a follow-up filed under a
     different issue than its parent) is reported under BOTH issues' /cost endpoints
     — the same documented behavior as the /dispatch list route's lineage join.
+
+GET ${baseUrl}/api/proxy/north-star
+  → The token creator's durable north-star intent for this workspace, plus a
+    freshness-gated alignment reading and the latest roadmap digest. Pure read,
+    no LLM call. Identity is the token creator (req.proxyCreatedBy) — a
+    creator-less/ownerless token gets no north star, ever.
+  → { "northStar": "…" | null,
+      "reading": { "state": "fresh" | "stale" | "absent" | "unscored",
+                    "text": "…", "gap": "…", "ageDays": 2 | null },
+      "roadmap": { "state": "fresh" | "stale" | "absent",
+                    "narrative": "…" | null, "ageDays": 2 | null },
+      "reportGeneratedAt": "2026-08-01T10:00:00Z" | null,
+      "maxAgeDays": 14 }
+  → "northStar" is the LIVE durable intent (never a report-time snapshot); null
+    when the creator has none set. "reading" folds in the latest report's
+    north-star alignment classification + gap ONLY when that report is fresh
+    (within "maxAgeDays") — "state" tells you WHY it's empty when it is:
+    "absent" (no north star, or no report at all), "stale" (report too old or
+    future-dated), "unscored" (report is fresh but never scored alignment), or
+    "fresh" (populated). "roadmap" is the separate delivery-trajectory digest
+    (falls back to trajectory prose when no digest exists) from the SAME report
+    fetch, so the two sections can never disagree about which report is latest.
+    "reportGeneratedAt" is the report's own timestamp regardless of freshness
+    state; "maxAgeDays" is the freshness window so callers don't hardcode it.
 
 GET ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — deprecated)
   → Recent agent status entries
@@ -3745,6 +3774,93 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       logEvent(req, '/api/proxy/cost', 500);
       jsonError(res, 500, 'Failed to compute task cost');
+    }
+  });
+
+  /**
+   * GET /api/proxy/north-star  (LIN-1810)
+   *
+   * Read-only: the token creator's durable north-star intent for this
+   * workspace, plus a freshness-gated alignment reading and the latest
+   * roadmap digest — composed off ONE reportHistoryStore.getLatest() fetch so
+   * the two readings cannot drift relative to each other (mirrors
+   * generateGoalSuggestions, lib/next-run.js:900-910).
+   *
+   * Harbour-local-only: no resolveWorkspaceAccess, no provider fetch — the
+   * north star and report history are both Harbour-local stores, not
+   * Linear-backed. Identity comes from req.proxyCreatedBy, never a session;
+   * a creator-less/ownerless token resolves no intent (fails closed), the
+   * same invariant getWorkspaceOpenRouterKey enforces (LIN-1352).
+   *
+   * Reads durable ACCOUNT-owned user preferences (lib/north-star-resolver.js),
+   * never workspace preferences and never a session: northStarByWorkspace is
+   * account-owned as-built (lib/user-preferences.js:44-46) — an open product
+   * question this endpoint must not silently answer. The durable copy can
+   * trail an unsaved in-session edit (the best-effort write-through in
+   * routes/workspace-api.js); that provenance gap is accepted, not papered
+   * over with a session read.
+   *
+   * Never falls back to ReportRecord.northStar — that is a report-time
+   * SNAPSHOT, not the live intent this endpoint returns
+   * (lib/report-history-store.js:10-12, :24).
+   *
+   * No write path, no feature-flag gate (see LIN-1810 research §6): the
+   * workspace-scoped, creator-bound, audit-logged token is the
+   * authorization, same as every other read verb on this router.
+   */
+  router.get('/api/proxy/north-star', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      if (!reportHistoryStore || !getWorkspaceNorthStar) {
+        logEvent(req, '/api/proxy/north-star', 503);
+        return jsonError(res, 503, 'Roadmap report history is not configured');
+      }
+
+      const [northStar, report] = await Promise.all([
+        getWorkspaceNorthStar(req.proxyUrlKey, req.proxyCreatedBy),
+        reportHistoryStore.getLatest(req.proxyUrlKey)
+      ]);
+
+      // One report fetch feeds both resolvers, exactly as lib/next-run.js:905-910
+      // composes them for generateGoalSuggestions — the two readings cannot
+      // disagree about which report is "latest".
+      const signal = resolveNorthStarSignal(northStar, report);
+      const narrative = resolveRoadmapNarrative(report);
+      const roadmapState = classifyReportFreshness(report);
+
+      // ageDays is null for more than one cause inside resolveNorthStarSignal
+      // (no report / stale / future-dated / fresh-but-unscored — LIN-1810
+      // research §4a). classifyReportFreshness disambiguates report-level
+      // freshness; "unscored" is the one remaining case it can't distinguish
+      // on its own (a fresh report whose narrative never scored alignment).
+      let readingState;
+      if (!signal) {
+        readingState = 'absent'; // no live north star at all — nothing to fold in
+      } else if (roadmapState !== 'fresh') {
+        readingState = roadmapState; // 'absent' | 'stale'
+      } else {
+        readingState = (signal.reading || signal.gap) ? 'fresh' : 'unscored';
+      }
+
+      logEvent(req, '/api/proxy/north-star', 200);
+      res.json({
+        northStar: signal ? signal.northStar : null,
+        reading: {
+          state: readingState,
+          text: signal ? signal.reading : '',
+          gap: signal ? signal.gap : '',
+          ageDays: signal ? signal.ageDays : null
+        },
+        roadmap: {
+          state: roadmapState,
+          narrative: narrative ? narrative.text : null,
+          ageDays: narrative ? narrative.ageDays : null
+        },
+        reportGeneratedAt: report?.generatedAt || null,
+        maxAgeDays: ROADMAP_REPORT_MAX_AGE_DAYS
+      });
+    } catch (err) {
+      logEvent(req, '/api/proxy/north-star', 500);
+      jsonError(res, 500, 'Failed to resolve north star');
     }
   });
 
