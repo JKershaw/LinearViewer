@@ -380,6 +380,89 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(run.producedArtifacts[0].url, 'https://github.com/x/y/pull/1');
   });
 
+  // ─── resources reaches BOTH projections (LIN-1789, close-out ledger item 3) ──
+  // The two projection widenings (routes/dashboard.js per-run + session-level)
+  // were the one link in the dispatch → telemetry → projection → render chain
+  // with no test. Pins that `telemetry.resources` survives to the feed at both
+  // levels, and that it degrades to null rather than undefined when absent.
+  test('a kind:"resources" feedback entry reaches the runs[] projection; the session-level one stays inert under lean', async () => {
+    const resourcesPayload = {
+      peakRssBytes: 536870912,
+      hostMemAvailableBytes: 2147483648,
+      hostMemTotalBytes: 8589934592,
+      loadAvg1: 1.5,
+      cpuCount: 4,
+    };
+    const resourcefulWorker = {
+      id: 'w-res', sessionId: 'sess-res', issueIdentifier: 'LIN-1789', issueTitle: 'Resources worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [
+        // `model=` makes the session-level assertion below meaningful: model is a
+        // feedback-derived session field that predates this ticket.
+        { message: '[started] session abc · model=claude-opus-5', timestamp: NOW_ISO },
+        { message: '[working] 6 tools/32s · alive', timestamp: NOW_ISO },
+        { message: `[resources] ${JSON.stringify(resourcesPayload)}`, kind: 'resources', timestamp: NOW_ISO },
+        { message: '[done] shipped it', timestamp: NOW_ISO }
+      ]
+    };
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-res', 'LIN-1788'), resourcefulWorker],
+        agentStatus: [agentStatusDone('sess-res', 'LIN-1788'), agentStatusDone('w-res', 'LIN-1789')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const sess = findSession(res.jsonBody, 'sess-res');
+    assert.ok(sess, 'session is present');
+
+    // Per-run widening (routes/dashboard.js runs[] projection). This is the one
+    // that carries data: per-loop telemetry is built from the raw feedback
+    // BEFORE the lean drop (lib/pipeline-loops.js), so it survives the feed.
+    const run = sess.runs.find(r => r.loopId === 'w-res');
+    assert.ok(run, 'worker run is present');
+    assert.deepEqual(run.resources, resourcesPayload, 'run projects telemetry.resources');
+
+    // Session-level widening (routes/dashboard.js session projection) is a NO-OP
+    // on this feed, and not because of anything LIN-1789 did. `_assembleSession`
+    // builds session telemetry by re-flattening `loop.feedback`, which the lean
+    // feed has already emptied (LIN-622) — so every feedback-DERIVED session
+    // field is null here. `model` is null for the identical reason (pinned
+    // below); only `runtime`, derived from dispatchedAt/completedAt rather than
+    // from feedback, survives. Pinned so a future fix to that seam flips a test
+    // instead of silently changing the per-poll payload.
+    assert.equal(sess.resources, null, 'session-level resources is inert on the lean feed');
+    assert.equal(sess.model, null, 'session-level model is inert for the same pre-existing reason');
+    assert.ok(sess.runtime && typeof sess.runtime === 'object', 'session runtime survives (not feedback-derived)');
+  });
+
+  test('sessions and runs with no kind:"resources" entry project resources as null', async () => {
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-nores', 'LIN-840'), workerHistoryItem('w-nores', 'LIN-841', 'sess-nores')],
+        agentStatus: [agentStatusDone('sess-nores', 'LIN-840'), agentStatusDone('w-nores', 'LIN-841')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const sess = findSession(res.jsonBody, 'sess-nores');
+    assert.ok(sess, 'session is present');
+    assert.equal(sess.resources, null, 'session resources is null, not undefined');
+    const run = sess.runs.find(r => r.loopId === 'w-nores');
+    assert.ok(run, 'worker run is present');
+    assert.equal(run.resources, null, 'run resources is null, not undefined');
+  });
+
   test('a live session carries a deterministic statusLine from its latest child (no per-poll summary fetch needed)', async () => {
     // A running worker decorated with an agent-status summary, under a live
     // (queued) autopilot anchor — i.e. a non-terminal session. The feed must

@@ -220,6 +220,35 @@ describe('render-session: telemetry + model omission', () => {
 
     assert.equal(withUsage, withoutUsage, 'renderRunChips/renderSessionPage must not render or be affected by telemetry.usage (display is LIN-1426)');
   });
+
+  test('LIN-1789: peakRssBytes chip renders on the run that carries it', () => {
+    const session = fixtureSession();
+    session.loops[0].telemetry.resources = { peakRssBytes: 536870912, hostMemTotalBytes: 8589934592 };
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-testid="session-run-resources"[^>]*>▤ 512 MB peak</);
+    // Only one chip renders — the other nine resources fields stay unrendered.
+    const chips = html.match(/data-testid="session-run-resources"/g) || [];
+    assert.equal(chips.length, 1);
+  });
+
+  test('LIN-1789: the other nine resources fields are inert — output is byte-identical whether present or absent', () => {
+    const withoutResources = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+
+    // Host/session-wide fields present at BOTH session- and loop-level telemetry,
+    // deliberately excluding peakRssBytes — must not leak into any run's chip row
+    // (they'd misrepresent host-wide data as run-scoped).
+    const NON_CHIP_FIELDS = {
+      hostMemAvailableBytes: 2147483648, hostMemTotalBytes: 8589934592, hostSwapUsedBytes: 0,
+      oomKillDelta: 0, loadAvg1: 1.5, cpuCount: 4, activeSessionCount: 2,
+      cloneDiskBytes: 1073741824, cloneCount: 3,
+    };
+    const session = fixtureSession();
+    session.telemetry.resources = { ...NON_CHIP_FIELDS };
+    session.loops[0].telemetry.resources = { ...NON_CHIP_FIELDS };
+    const withResources = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+
+    assert.equal(withResources, withoutResources, 'renderRunChips/renderSessionPage must not render or be affected by resources fields other than peakRssBytes');
+  });
 });
 
 describe('render-session: brief/recap context branches', () => {
