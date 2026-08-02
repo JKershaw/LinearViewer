@@ -52,8 +52,31 @@
   var contextSection = document.getElementById('next-run-context-section');
   var contextToggle = document.getElementById('next-run-context-toggle');
   var contextBody = document.getElementById('next-run-context-body');
+  var budgetInput = document.getElementById('next-run-budget-input');
+  var budgetPresetButtons = document.querySelectorAll('.next-run-budget-preset');
 
   if (!generateBtn || !optionsEl) return;
+
+  // Task-budget dial (LIN-1737 Beat 1): a scope bound threaded into whichever
+  // run is next dispatched (window.dispatchGoal below), read fresh at dispatch
+  // time — no persistence (D4). A preset chip just fills the free-entry input;
+  // there's no separate "selected" state to track, so the input is the one
+  // source of truth for both entry paths. Blank/whitespace ⇒ unbounded.
+  function currentMaxTasks() {
+    if (!budgetInput || !budgetInput.value || !budgetInput.value.trim()) return undefined;
+    var parsed = Number(budgetInput.value.trim());
+    if (!isFinite(parsed)) return undefined;
+    return parsed;
+  }
+
+  if (budgetPresetButtons.length) {
+    budgetPresetButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.disabled || !budgetInput) return;
+        budgetInput.value = btn.getAttribute('data-value') || '';
+      });
+    });
+  }
 
   function setFeedback(text, isError) {
     if (!feedbackEl) return;
@@ -145,9 +168,13 @@
     var goal = btn.getAttribute('data-goal') || '';
     var original = btn.textContent;
     var exec = window.readDispatchExecControls(btn.closest('.prompt-options'));
+    // Read the dial fresh at dispatch time (LIN-1737 Beat 1) — a scope bound on
+    // whichever run this button launches, threaded to BOTH the kickoff (so its
+    // prose states the bound) and the dispatch row (so it's actually enforced).
+    var maxTasks = currentMaxTasks();
     btn.disabled = true;
     btn.textContent = 'sending…';
-    window.fetchAutopilotKickoff({ urlKey: urlKey, goal: goal || undefined, on401: false })
+    window.fetchAutopilotKickoff({ urlKey: urlKey, goal: goal || undefined, maxTasks: maxTasks, on401: false })
       .then(function (kickoff) {
         return dispatchPrompt({
           urlKey: urlKey,
@@ -158,7 +185,8 @@
           target: target,
           model: exec.model,
           harness: exec.harness,
-          proxyForce: true
+          proxyForce: true,
+          maxTasks: maxTasks
         });
       })
       .then(function () {

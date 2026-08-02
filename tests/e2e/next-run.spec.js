@@ -547,6 +547,8 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       // body any more...
       expect(body.attachProxy).toBe(true);
       expect(body.prompt).not.toContain('Workspace API access');
+      // LIN-1737 Beat 1: no budget was set on this run, so no bound is threaded.
+      expect(body.maxTasks == null).toBe(true);
 
       await expect(cli).toHaveText('dispatched!', { timeout: 5000 });
 
@@ -559,6 +561,110 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       expect(item).toBeDefined();
       expect(item.prompt).toContain('Workspace API access');
       expect(item.prompt).toContain('/api/proxy/instructions');
+    });
+
+    // LIN-1737 Beat 1 (review F2): the task-budget dial is only user-visible
+    // through this client path (chip click → currentMaxTasks() → the kickoff GET
+    // query param → the dispatch POST body) — nothing else drives a browser, so
+    // this is the one place that proves the value actually leaves the page.
+    test('the task-budget dial threads maxTasks into both the kickoff GET and the dispatch POST', async ({ page }) => {
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+
+      // A preset chip fills the adjacent numeric input (D3) rather than posting itself.
+      await page.locator('.next-run-budget-preset[data-value="25"]').click();
+      await expect(page.locator('#next-run-budget-input')).toHaveValue('25');
+
+      await card.locator('.next-run-option-head').click();
+      await card.locator('.next-run-dispatch-toggle').click();
+
+      const kickoffReq = page.waitForRequest(req =>
+        req.url().includes('/api/autopilot-prompt') && req.method() === 'GET');
+      const dispatchReq = page.waitForRequest(req =>
+        req.url().includes('/api/dispatch') && req.method() === 'POST');
+      await card.locator('.next-run-dispatch[data-target="cli"]').click();
+
+      const kickoff = await kickoffReq;
+      expect(new URL(kickoff.url()).searchParams.get('maxTasks')).toBe('25');
+
+      const req = await dispatchReq;
+      const body = JSON.parse(req.postData() || '{}');
+      expect(body.maxTasks).toBe(25);
+
+      await expect(card.locator('.next-run-dispatch[data-target="cli"]'))
+        .toHaveText('dispatched!', { timeout: 5000 });
+    });
+
+    // LIN-1737 review F1: out-of-range dial input must reach the server's
+    // validation (and surface its error) rather than silently collapsing to "no
+    // budget" and launching an unbounded run.
+    test('an out-of-range dial value is sent through, not silently dropped (F1)', async ({ page }) => {
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+
+      await page.locator('#next-run-budget-input').fill('0');
+
+      await card.locator('.next-run-option-head').click();
+      await card.locator('.next-run-dispatch-toggle').click();
+
+      const kickoffReq = page.waitForRequest(req =>
+        req.url().includes('/api/autopilot-prompt') && req.method() === 'GET');
+      // The dial's own value is dispatched, not discarded — a fresh dispatch never
+      // fires for an invalid budget, since the kickoff step 400s first.
+      const dispatchReq = page.waitForRequest(req =>
+        req.url().includes('/api/dispatch') && req.method() === 'POST', { timeout: 2000 })
+        .catch(() => null);
+      const cli = card.locator('.next-run-dispatch[data-target="cli"]');
+      await cli.click();
+
+      const kickoff = await kickoffReq;
+      // The value reached the request — this is the exact regression F1 flagged:
+      // an invalid value must not be swallowed into an absent/omitted param.
+      expect(new URL(kickoff.url()).searchParams.get('maxTasks')).toBe('0');
+
+      expect(await dispatchReq).toBeNull();
+
+      // The server's real 400 ("maxTasks must be an integer >= 1") surfaces to
+      // the operator via the shared feedback element, not a silent success.
+      // (The button itself also flashes "failed" before resetting, but that
+      // reset is on a 1.5s timer racing this assertion's own waits — the
+      // feedback element is the stable signal.)
+      await expect(page.locator('#next-run-feedback')).toHaveText(/maxTasks must be an integer/, { timeout: 5000 });
+      await expect(page.locator('#next-run-feedback')).toHaveClass(/error/);
+    });
+
+    // LIN-1737 review F5: a non-integer dial value must not be silently
+    // truncated to a different, valid integer on the client (parseInt('2.5')
+    // === 2) — it must reach the server's real integer check and surface the
+    // same error path as the out-of-range case above, not dispatch a run
+    // under a bound the operator never asked for.
+    test('a decimal dial value is not silently truncated to a different bound (F5)', async ({ page }) => {
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+
+      await page.locator('#next-run-budget-input').fill('2.5');
+
+      await card.locator('.next-run-option-head').click();
+      await card.locator('.next-run-dispatch-toggle').click();
+
+      const kickoffReq = page.waitForRequest(req =>
+        req.url().includes('/api/autopilot-prompt') && req.method() === 'GET');
+      const dispatchReq = page.waitForRequest(req =>
+        req.url().includes('/api/dispatch') && req.method() === 'POST', { timeout: 2000 })
+        .catch(() => null);
+      const cli = card.locator('.next-run-dispatch[data-target="cli"]');
+      await cli.click();
+
+      const kickoff = await kickoffReq;
+      // The typed value reaches the request verbatim — not pre-truncated to
+      // "2" by a client-side parseInt, which would silently launch a 2-task
+      // run instead of surfacing the invalid input.
+      expect(new URL(kickoff.url()).searchParams.get('maxTasks')).toBe('2.5');
+
+      expect(await dispatchReq).toBeNull();
+
+      await expect(page.locator('#next-run-feedback')).toHaveText(/maxTasks must be an integer/, { timeout: 5000 });
+      await expect(page.locator('#next-run-feedback')).toHaveClass(/error/);
     });
 
     // LIN-1096: the shared model/harness exec controls live inside the same

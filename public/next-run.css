@@ -141,6 +141,69 @@
   display: none;
 }
 
+/* Task-budget dial (LIN-1737 Beat 1, D3): preset chips mirror .next-run-direction's
+   look (same border/radius/hover vocabulary) so the two chip rows on this page
+   read as one family, but this one is never a toggled/pressed selection — it just
+   fills the adjacent number input. */
+.next-run-budget {
+  margin: var(--space-2) 0 0;
+}
+
+.next-run-budget-label {
+  display: block;
+  margin: 0 0 var(--space-1);
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-content);
+}
+
+.next-run-budget-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.next-run-budget-preset {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border, var(--fg-vdim));
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg-dim);
+  font-family: var(--font-structural);
+  font-size: 0.75em;
+  cursor: pointer;
+}
+
+.next-run-budget-preset:hover:not(:disabled) {
+  background: var(--bg-muted, var(--bg));
+  color: var(--fg);
+}
+
+.next-run-budget-preset:disabled,
+.next-run-budget-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.next-run-budget-input {
+  width: 6rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border, var(--fg-vdim));
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+}
+
+.next-run-budget-hint {
+  margin: var(--space-1) 0 0;
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
 .next-run-options {
   list-style: none;
   margin: 0;

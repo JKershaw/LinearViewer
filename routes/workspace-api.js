@@ -632,8 +632,24 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const goal = typeof req.query.goal === 'string' ? req.query.goal.slice(0, 1000) : ''
     const baseUrl = `${req.protocol}://${req.get('host')}`
 
+    // Task budget (LIN-1737 D3/Beat 1 seam #3): an optional scope bound threaded
+    // into the kickoff so its prose states it, then forwarded by the client to
+    // POST /api/dispatch where it is actually enforced (LIN-1751). Query params
+    // are always strings, so blank/whitespace-only is treated as ABSENT, not an
+    // error — distinct from the JSON-body validation at the dispatch route,
+    // which has no such "blank" case to account for. A non-blank value follows
+    // the same integer->=1 rule and error text as every other maxTasks entry point.
+    let maxTasks = null
+    if (typeof req.query.maxTasks === 'string' && req.query.maxTasks.trim() !== '') {
+      const parsedMaxTasks = Number(req.query.maxTasks.trim())
+      if (!Number.isInteger(parsedMaxTasks) || parsedMaxTasks < 1) {
+        return badRequest.json(res, 'maxTasks must be an integer >= 1')
+      }
+      maxTasks = parsedMaxTasks
+    }
+
     try {
-      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true })
+      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true, maxTasks })
       sendPromptResult(req, res, {
         identifier: '',
         downloadName: stepper ? 'autopilot-stepper' : 'autopilot',

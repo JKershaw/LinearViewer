@@ -547,12 +547,13 @@ window.api = async function api(url, opts = {}) {
  * @param {string} [opts.followUpTo]                Resume a prior session (cli/web only); forwarded to the server as an opaque id
  * @param {boolean} [opts.force]                    Whether to force-follow-up even into a terminal session
  * @param {string} [opts.presetId]                  Selected dispatch preset id (LIN-1391); blank/omitted sends no presetId, so the consumer's own default resolution applies unchanged (LIN-1094/1390)
+ * @param {number} [opts.maxTasks]                  Task-budget scope bound (LIN-1737/LIN-1751); blank/omitted sends no maxTasks, so the run stays unbounded exactly as before this field existed
  * @returns {Promise<Object>} Parsed JSON response body
  * @throws {Error} on missing required args or a non-ok response. The thrown
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -593,6 +594,7 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   if (followUpTo) payload.followUpTo = followUpTo;
   if (force !== undefined) payload.force = force;
   if (presetId) payload.presetId = presetId;
+  if (maxTasks !== undefined && maxTasks !== null) payload.maxTasks = maxTasks;
 
   // on401:false — dispatch surfaces (swipe etc.) branch on err.status rather
   // than redirecting, so the 401 is thrown like any other error.
@@ -923,11 +925,14 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
  * @param {string} [opts.issueId]               Issue-scoped kickoff: appends `/${issueId}` to the URL
  * @param {string} [opts.goal]                  Goal-scoped kickoff: appends `?goal=<goal>` to the URL
  * @param {string} [opts.variant]               Optional `?variant=<variant>` query param
+ * @param {number} [opts.maxTasks]              Optional task-budget scope bound (LIN-1737/LIN-1751):
+ *   `?maxTasks=<n>` query param on the general (goal-scoped) kickoff only — the
+ *   issue-scoped kickoff has no budget concept, so this is a no-op there.
  * @param {AbortSignal} [opts.signal]           Passed through to the fetch
  * @param {boolean} [opts.on401=false]          Passed through to window.api
  * @returns {Promise<{prompt: string, promptName: string, kind: string, repo?: string}>}
  */
-window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, signal, on401 = false } = {}) {
+window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, maxTasks, signal, on401 = false } = {}) {
   if (!urlKey) throw new Error('fetchAutopilotKickoff: urlKey is required');
 
   let url;
@@ -939,6 +944,7 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
     const params = new URLSearchParams();
     if (goal) params.set('goal', goal);
     if (variant) params.set('variant', variant);
+    if (maxTasks !== undefined && maxTasks !== null) params.set('maxTasks', String(maxTasks));
     const query = params.toString() ? `?${params.toString()}` : '';
     url = `/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt${query}`;
   }
