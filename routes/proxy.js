@@ -66,6 +66,7 @@ import { snapshotFromContext } from '../lib/task-snapshot-store.js';
 import { isTerminalState, isBlocked } from '../lib/tree.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
+import { getPeriodicals } from '../lib/periodicals.js';
 import { parseRepoFromDescription, resolveDispatchRepo, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext, shouldUseMcpTokenField, provisionBootstrapToken } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS, WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
@@ -4887,7 +4888,7 @@ One convention across every endpoint, so you can branch on the same fields every
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -4940,6 +4941,16 @@ One convention across every endpoint, so you can branch on the same fields every
       if (kind !== undefined && !isValidDispatchKind(kind)) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, `kind must be one of: ${DISPATCH_KINDS.join(', ')}`);
+      }
+      // Periodical-template join key (LIN-1825): registry-membership check, not
+      // format validation, so it stays route-local rather than routing through
+      // validateDispatchPayload (deliberately format-only, never against a
+      // model registry). This is the entry point that makes "works from any
+      // entry point, including a bare-token agent POST" true — the id must be
+      // validated here too, not just at the session route.
+      if (periodicalId !== undefined && !getPeriodicals().map(p => p.id).includes(periodicalId)) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, 'periodicalId must be one of the known periodical template ids');
       }
       // Opt-in completion hold (LIN-797): boolean, default false. Stored +
       // forwarded blindly — the runner owns the behaviour (see LIN-795).
@@ -5097,6 +5108,7 @@ One convention across every endpoint, so you can branch on the same fields every
           abortTo: isAbort ? abortTo : null,
           cascade: cascade === true,
           sessionId: sessionId || null,
+          periodicalId: periodicalId || null,
           waitForFollowUps: waitForFollowUps === true,
           queueIfBusy: queueIfBusy === true,
           subscription: subscriptionResolved
