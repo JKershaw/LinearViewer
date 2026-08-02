@@ -173,6 +173,51 @@ describe('GET /api/proxy/north-star', () => {
     assert.equal(body.roadmap.narrative, 'Digest only, no alignment scored.');
   });
 
+  test('roadmap is "unscored" when the latest report is fresh but carried no digest and no trajectory', async () => {
+    // The symmetric half of the case above, and the branch the LIN-1810 review
+    // found unreachable as originally shipped (roadmap.state was a bare
+    // three-way report classification, so an empty narrative reported "fresh"
+    // next to `narrative: null`). Both blocks now carry the same four states.
+    const { app } = buildApp({
+      latestReport: report({ narrative: { northStarReading: 'On course.', gap: 'Auth lags.' } })
+    });
+    const { body } = await get(app, '/api/proxy/north-star');
+    assert.equal(body.roadmap.state, 'unscored');
+    assert.equal(body.roadmap.narrative, null);
+    assert.equal(body.roadmap.ageDays, null);
+    // The alignment reading is unaffected — it has its own scored prose.
+    assert.equal(body.reading.state, 'fresh');
+    assert.equal(body.reading.text, 'On course.');
+  });
+
+  test('both blocks are "unscored" when a fresh report has a completely empty narrative', async () => {
+    const { app } = buildApp({ latestReport: report({ narrative: {} }) });
+    const { body } = await get(app, '/api/proxy/north-star');
+    assert.equal(body.reading.state, 'unscored');
+    assert.equal(body.roadmap.state, 'unscored');
+    assert.equal(body.roadmap.narrative, null);
+    // A fresh report still exists — "unscored" is precisely NOT "absent".
+    assert.equal(body.reportGeneratedAt, report().generatedAt);
+  });
+
+  test('an unparseable generatedAt reads "absent" on both blocks while reportGeneratedAt echoes the stored value', async () => {
+    // Pins the composed response for a corrupt timestamp (LIN-1810 close-out,
+    // review finding 2 / ledger item 4). classifyReportFreshness is unit-tested
+    // for this in next-run.test.js; this is the route-level contract, and it is
+    // the one documented case where reportGeneratedAt is non-null next to
+    // "absent" — there is no age the gate can trust, which is a different
+    // signal from "stale" (a usable timestamp that fails the gate).
+    const { app } = buildApp({ latestReport: report({ generatedAt: 'not-a-date' }) });
+    const { status, body } = await get(app, '/api/proxy/north-star');
+    assert.equal(status, 200);
+    assert.equal(body.reading.state, 'absent');
+    assert.equal(body.roadmap.state, 'absent');
+    assert.equal(body.roadmap.narrative, null);
+    assert.equal(body.reportGeneratedAt, 'not-a-date');
+    // The live durable intent is unaffected by a corrupt report timestamp.
+    assert.equal(body.northStar, 'Ship a self-serve onboarding flow by Q3.');
+  });
+
   test('a creator-less token resolves no north star (fails closed)', async () => {
     const { app } = buildApp({ creatorId: null });
     const { body } = await get(app, '/api/proxy/north-star');

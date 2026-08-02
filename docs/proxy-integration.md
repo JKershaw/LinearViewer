@@ -783,19 +783,27 @@ endpoint's copy is the best-effort cross-device mirror of it.
 - **`reading`** folds in the latest roadmap report's north-star alignment classification
   (`northStarReading`) and `gap` — but only when that report is fresh (within
   `maxAgeDays`). `state` disambiguates *why* `text`/`gap` are empty, which a bare
-  `ageDays: null` cannot: `"absent"` (no north star set, or no report exists at all),
-  `"stale"` (the latest report is older than `maxAgeDays`, or future-dated — clock
-  skew), `"unscored"` (the latest report **is** fresh but its narrative never scored
-  alignment — e.g. it predates north-star scoring, or ran with no north star set at the
-  time), or `"fresh"` (populated). Do not infer state from `ageDays` alone.
+  `ageDays: null` cannot: `"absent"` (no north star set, no report exists at all, or the
+  latest report's `generatedAt` is missing/unparseable — see below), `"stale"` (the
+  latest report is older than `maxAgeDays`, or future-dated — clock skew), `"unscored"`
+  (the latest report **is** fresh but its narrative never scored alignment — e.g. it
+  predates north-star scoring, or ran with no north star set at the time), or `"fresh"`
+  (populated). Do not infer state from `ageDays` alone.
 - **`roadmap`** is the separate delivery-trajectory digest (prefers the report's
   `digest` layer, falls back to `trajectory` when no digest exists) — composed from the
   **same** report fetch as `reading`, so the two sections can never disagree about which
-  report is "latest". Its own `state` uses the same three values, independent of whether
-  `narrative` happens to be populated.
-- **`reportGeneratedAt`** is the latest report's own timestamp, always present when a
-  report exists, **regardless** of freshness state — useful for a caller that wants the
-  raw age even when `reading`/`roadmap` read `"stale"`.
+  report is "latest". Its `state` carries the **same four values**, resolved against its
+  own narrative layers: `"fresh"` always means `narrative` is populated, and `"unscored"`
+  means the report is fresh but carried neither a `digest` nor `trajectory` layer. You
+  never have to null-check a `narrative` whose own `state` said `"fresh"`.
+- **`reportGeneratedAt`** is the latest report's stored timestamp **verbatim**,
+  **regardless** of freshness state — useful for a caller that wants the raw age even
+  when `reading`/`roadmap` read `"stale"`. It is echoed as stored and is not validated,
+  so it can be non-null while both states read `"absent"`: a report whose `generatedAt`
+  is corrupt/unparseable has no timestamp the freshness gate can trust, and
+  `"absent"` — not `"stale"` — is the state for "no age is knowable here". Treat a
+  non-null `reportGeneratedAt` alongside `"absent"` as exactly that signal; parse it
+  defensively if you display it.
 - **`maxAgeDays`** is the freshness window (currently 14 days) so callers don't hardcode
   it.
 - **503** when roadmap report history isn't configured on this deployment.

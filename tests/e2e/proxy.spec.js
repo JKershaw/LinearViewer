@@ -2588,3 +2588,119 @@ test.describe('Proxy credential-fault visibility (LIN-1586)', () => {
     });
   });
 });
+
+// LIN-1810 close-out — ledger items 1, 2, 5 and 7.
+//
+// Every other test for GET /api/proxy/north-star calls createProxyRoutes()
+// directly with injected fakes, so nothing exercised server.js's wiring: the
+// `getWorkspaceNorthStar` wrapper, its (urlKey, accountId) argument order, or
+// the `reportHistoryStore` key in the createProxyRoutes({...}) object. A
+// misnamed key would have shipped as a permanent silent 503, and a swapped
+// argument as a permanent empty read, with every unit test still green.
+//
+// This drives the real server end to end instead: a real session establishes
+// the canonical test account, the session-auth Roadmap route writes the north
+// star through to DURABLE user preferences, a proxy token is minted for that
+// same account, and the token then reads it back over the real
+// proxyLimiter + authenticateProxyToken chain.
+//
+// Note the workspace key: this suite runs on the per-worker `test-workspace-w<N>`
+// (tests/fixtures/test-base.js), NOT the bare `test-workspace`, so server.js's
+// `NODE_ENV === 'test' && urlKey === 'test-workspace'` short-circuit does not
+// fire — the durable read really happens.
+test.describe('Proxy API - North Star (real-server wiring, LIN-1810)', () => {
+  const NORTH_STAR = 'Ship a self-serve onboarding flow by Q3.';
+
+  // Every key the endpoint documents in docs/proxy-integration.md and
+  // /api/proxy/instructions. Asserted as an exact set so a silently added or
+  // dropped field fails here rather than surprising a token-only consumer.
+  const DOCUMENTED_KEYS = ['northStar', 'reading', 'roadmap', 'reportGeneratedAt', 'maxAgeDays'];
+
+  let token;
+
+  test.beforeEach(async ({ request }) => {
+    await request.get(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    await request.get(`/test/clear-report-history?urlKey=${URL_KEY}`);
+
+    // Establish the session (and, through the production seam, the canonical
+    // test accountId) BEFORE minting, so the token's createdBy is that same
+    // account rather than the mint route's identity fallback.
+    const features = encodeURIComponent(JSON.stringify({ roadmap: true, proxy: true }));
+    await request.get(`/test/set-session?features=${features}&urlKey=${URL_KEY}`);
+
+    const minted = await request.get(`/test/create-proxy-token?scope=read&label=north-star-e2e&urlKey=${URL_KEY}`);
+    token = (await minted.json()).token;
+  });
+
+  test.afterEach(async ({ request }) => {
+    // The north star is written to DURABLE per-account preferences, which
+    // outlive the session this spec created — put it back so nothing leaks
+    // into another spec sharing this worker's account.
+    await request.put(`/workspace/${URL_KEY}/api/roadmap/north-star`, { data: { northStar: '' } });
+  });
+
+  test('a minted token reads the creator\'s durable north star through the real server', async ({ request }) => {
+    const put = await request.put(`/workspace/${URL_KEY}/api/roadmap/north-star`, {
+      data: { northStar: NORTH_STAR }
+    });
+    expect(put.status()).toBe(200);
+
+    const resp = await request.get('/api/proxy/north-star', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    // Not 503: proves reportHistoryStore really reached createProxyRoutes.
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+
+    // Not '' / null: proves the server.js wrapper is wired under the exact key
+    // the route destructures AND that it passes (urlKey, accountId) in that
+    // order — swapping them resolves no preferences at all.
+    expect(body.northStar).toBe(NORTH_STAR);
+
+    expect(Object.keys(body).sort()).toEqual([...DOCUMENTED_KEYS].sort());
+    expect(body.maxAgeDays).toBe(14);
+    // No report was saved for this workspace, so both blocks report "absent"
+    // — the documented no-report state, distinct from "stale"/"unscored".
+    expect(body.reading.state).toBe('absent');
+    expect(body.roadmap.state).toBe('absent');
+    expect(body.roadmap.narrative).toBeNull();
+    expect(body.reportGeneratedAt).toBeNull();
+  });
+
+  test('the route is admitted by the real auth chain as a read verb', async ({ request }) => {
+    // Only the stubbed validateToken path ran in the unit tests; these pin the
+    // real authenticateProxyToken behaviour for this specific route.
+    const noToken = await request.get('/api/proxy/north-star');
+    expect(noToken.status()).toBe(401);
+
+    const badToken = await request.get('/api/proxy/north-star', {
+      headers: { Authorization: 'Bearer invalid-token-here' }
+    });
+    expect(badToken.status()).toBe(401);
+
+    // A read-scope token is sufficient — no write scope, no feature-flag gate.
+    const ok = await request.get('/api/proxy/north-star', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    expect(ok.status()).toBe(200);
+  });
+
+  test('/instructions documents the north-star verb and its four-state contract', async ({ request }) => {
+    const resp = await request.get('/api/proxy/instructions', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    expect(resp.status()).toBe(200);
+    const text = await resp.text();
+
+    expect(text).toContain('/api/proxy/north-star');
+    // The catalog must carry the response contract, not just the path.
+    for (const key of DOCUMENTED_KEYS) {
+      expect(text).toContain(`"${key}"`);
+    }
+    // Both blocks carry the same four states (close-out finding 1) — this
+    // assertion is what fails if the enum and the catalog drift apart again.
+    expect(text).toContain('"state": "fresh" | "stale" | "absent" | "unscored"');
+    expect(text.match(/"state": "fresh" \| "stale" \| "absent" \| "unscored"/g)).toHaveLength(2);
+  });
+});

@@ -214,6 +214,18 @@ describe('resolveNorthStarSignal (LIN-779)', () => {
     assert.equal(out.reading, '');
   });
 
+  test('ignores an unparseable generatedAt for the reading/gap but keeps the live text', () => {
+    // The computeAgeDays sibling of the future-dated case above. Pinned for
+    // resolveRoadmapNarrative since LIN-742 but never for this resolver — a
+    // pre-existing characterization gap the LIN-1810 refactor made worth
+    // closing, since both now share one age helper (close-out, ledger item 6).
+    const out = resolveNorthStarSignal('Intent.', report({ generatedAt: 'not-a-date' }), { now: NOW });
+    assert.equal(out.northStar, 'Intent.');
+    assert.equal(out.ageDays, null);
+    assert.equal(out.reading, '');
+    assert.equal(out.gap, '');
+  });
+
   test('returns null for an empty / whitespace / non-string north star (path unchanged)', () => {
     assert.equal(resolveNorthStarSignal('', report(), { now: NOW }), null);
     assert.equal(resolveNorthStarSignal('   ', report(), { now: NOW }), null);

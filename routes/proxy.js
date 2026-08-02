@@ -1496,7 +1496,7 @@ GET ${baseUrl}/api/proxy/north-star
   → { "northStar": "…" | null,
       "reading": { "state": "fresh" | "stale" | "absent" | "unscored",
                     "text": "…", "gap": "…", "ageDays": 2 | null },
-      "roadmap": { "state": "fresh" | "stale" | "absent",
+      "roadmap": { "state": "fresh" | "stale" | "absent" | "unscored",
                     "narrative": "…" | null, "ageDays": 2 | null },
       "reportGeneratedAt": "2026-08-01T10:00:00Z" | null,
       "maxAgeDays": 14 }
@@ -1504,13 +1504,20 @@ GET ${baseUrl}/api/proxy/north-star
     when the creator has none set. "reading" folds in the latest report's
     north-star alignment classification + gap ONLY when that report is fresh
     (within "maxAgeDays") — "state" tells you WHY it's empty when it is:
-    "absent" (no north star, or no report at all), "stale" (report too old or
-    future-dated), "unscored" (report is fresh but never scored alignment), or
-    "fresh" (populated). "roadmap" is the separate delivery-trajectory digest
-    (falls back to trajectory prose when no digest exists) from the SAME report
-    fetch, so the two sections can never disagree about which report is latest.
-    "reportGeneratedAt" is the report's own timestamp regardless of freshness
-    state; "maxAgeDays" is the freshness window so callers don't hardcode it.
+    "absent" (no north star, no report at all, or a report whose "generatedAt"
+    is missing/unparseable — no trustworthy timestamp to judge), "stale"
+    (report too old or future-dated), "unscored" (report is fresh but never
+    scored alignment), or "fresh" (populated). "roadmap" is the separate
+    delivery-trajectory digest (falls back to trajectory prose when no digest
+    exists) from the SAME report fetch, so the two sections can never disagree
+    about which report is latest. It carries the SAME four states, so
+    "roadmap.state" == "fresh" always means "narrative" is populated and
+    "unscored" means the fresh report carried neither digest nor trajectory —
+    never null-check a payload your own state called fresh.
+    "reportGeneratedAt" is the report's stored timestamp verbatim regardless of
+    freshness state — which means it can be non-null while both states read
+    "absent", if that stored value is itself unparseable; "maxAgeDays" is the
+    freshness window so callers don't hardcode it.
 
 GET ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — deprecated)
   → Recent agent status entries
@@ -3825,21 +3832,38 @@ One convention across every endpoint, so you can branch on the same fields every
       // disagree about which report is "latest".
       const signal = resolveNorthStarSignal(northStar, report);
       const narrative = resolveRoadmapNarrative(report);
-      const roadmapState = classifyReportFreshness(report);
+      const reportState = classifyReportFreshness(report);
 
       // ageDays is null for more than one cause inside resolveNorthStarSignal
       // (no report / stale / future-dated / fresh-but-unscored — LIN-1810
       // research §4a). classifyReportFreshness disambiguates report-level
       // freshness; "unscored" is the one remaining case it can't distinguish
-      // on its own (a fresh report whose narrative never scored alignment).
+      // on its own (a fresh report whose narrative never carried the layer
+      // that block reports).
+      //
+      // BOTH blocks carry the same four-way discriminator off that one
+      // report-level classification, differing only in which narrative layer
+      // decides fresh-vs-unscored: the alignment layers (northStarReading/gap)
+      // for `reading`, the digest/trajectory layers for `roadmap`. Keeping them
+      // symmetric is the point of the endpoint — a consumer must never have to
+      // null-check a payload that its own `state` just called "fresh"
+      // (LIN-1810 close-out, review finding 1).
       let readingState;
       if (!signal) {
         readingState = 'absent'; // no live north star at all — nothing to fold in
-      } else if (roadmapState !== 'fresh') {
-        readingState = roadmapState; // 'absent' | 'stale'
+      } else if (reportState !== 'fresh') {
+        readingState = reportState; // 'absent' | 'stale'
       } else {
         readingState = (signal.reading || signal.gap) ? 'fresh' : 'unscored';
       }
+
+      // resolveRoadmapNarrative applies the same gate off the same report, so a
+      // non-null narrative here implies reportState === 'fresh'; the only case
+      // the report-level classification can't call on its own is a fresh report
+      // with no digest AND no trajectory prose.
+      const roadmapState = reportState !== 'fresh'
+        ? reportState // 'absent' | 'stale'
+        : (narrative ? 'fresh' : 'unscored');
 
       logEvent(req, '/api/proxy/north-star', 200);
       res.json({
