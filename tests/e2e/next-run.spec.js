@@ -633,6 +633,40 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await expect(page.locator('#next-run-feedback')).toHaveClass(/error/);
     });
 
+    // LIN-1737 review F5: a non-integer dial value must not be silently
+    // truncated to a different, valid integer on the client (parseInt('2.5')
+    // === 2) — it must reach the server's real integer check and surface the
+    // same error path as the out-of-range case above, not dispatch a run
+    // under a bound the operator never asked for.
+    test('a decimal dial value is not silently truncated to a different bound (F5)', async ({ page }) => {
+      const card = page.locator('.next-run-option:not(.next-run-option-open)').first();
+      await expect(card).toBeVisible({ timeout: 5000 });
+
+      await page.locator('#next-run-budget-input').fill('2.5');
+
+      await card.locator('.next-run-option-head').click();
+      await card.locator('.next-run-dispatch-toggle').click();
+
+      const kickoffReq = page.waitForRequest(req =>
+        req.url().includes('/api/autopilot-prompt') && req.method() === 'GET');
+      const dispatchReq = page.waitForRequest(req =>
+        req.url().includes('/api/dispatch') && req.method() === 'POST', { timeout: 2000 })
+        .catch(() => null);
+      const cli = card.locator('.next-run-dispatch[data-target="cli"]');
+      await cli.click();
+
+      const kickoff = await kickoffReq;
+      // The typed value reaches the request verbatim — not pre-truncated to
+      // "2" by a client-side parseInt, which would silently launch a 2-task
+      // run instead of surfacing the invalid input.
+      expect(new URL(kickoff.url()).searchParams.get('maxTasks')).toBe('2.5');
+
+      expect(await dispatchReq).toBeNull();
+
+      await expect(page.locator('#next-run-feedback')).toHaveText(/maxTasks must be an integer/, { timeout: 5000 });
+      await expect(page.locator('#next-run-feedback')).toHaveClass(/error/);
+    });
+
     // LIN-1096: the shared model/harness exec controls live inside the same
     // dispatch options panel as the per-target buttons.
     test('exec controls appear in the dispatch panel and flow through to the dispatched item', async ({ page }) => {

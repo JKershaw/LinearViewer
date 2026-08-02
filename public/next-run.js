@@ -64,7 +64,7 @@
   // source of truth for both entry paths. Blank/whitespace ⇒ unbounded.
   function currentMaxTasks() {
     if (!budgetInput || !budgetInput.value || !budgetInput.value.trim()) return undefined;
-    var parsed = parseInt(budgetInput.value.trim(), 10);
+    var parsed = Number(budgetInput.value.trim());
     if (!isFinite(parsed)) return undefined;
     return parsed;
   }

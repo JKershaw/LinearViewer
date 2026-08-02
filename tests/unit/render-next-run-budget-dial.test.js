@@ -28,3 +28,20 @@ test('proxy off ⇒ the dial is disabled, not hidden, with an inline explanation
   assert.match(html, /next-run-budget-preset[^>]*disabled/, 'presets are disabled');
   assert.ok(html.includes('id="next-run-budget-hint"'), 'inline explanation is shown');
 });
+
+// LIN-1737 review F6: the disabled input has an explanation on the page, but
+// nothing told assistive tech the two are related — a screen-reader user met
+// a disabled control with no announced reason.
+test('proxy off ⇒ the disabled input is programmatically associated with the hint (F6)', () => {
+  const html = renderNextRunPage({}, { urlKey: 'acme', featureFlags: { proxy: false } });
+  assert.match(
+    html,
+    /id="next-run-budget-input"[^>]*aria-describedby="next-run-budget-hint"/,
+    'disabled input references the hint via aria-describedby'
+  );
+});
+
+test('proxy on ⇒ no aria-describedby is added (nothing to explain)', () => {
+  const html = renderNextRunPage({}, { urlKey: 'acme', featureFlags: { proxy: true } });
+  assert.ok(!html.includes('aria-describedby'), 'no aria-describedby when the dial is enabled');
+});
