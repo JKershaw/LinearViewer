@@ -25,6 +25,7 @@ import {
   generateGoalSuggestions,
   resolveRoadmapNarrative,
   resolveNorthStarSignal,
+  classifyReportFreshness,
   ROADMAP_REPORT_MAX_AGE_DAYS,
   CONTINUE_UNTIL_STOPPED_OPTION,
   REQUIRED_SIZES,
@@ -213,6 +214,18 @@ describe('resolveNorthStarSignal (LIN-779)', () => {
     assert.equal(out.reading, '');
   });
 
+  test('ignores an unparseable generatedAt for the reading/gap but keeps the live text', () => {
+    // The computeAgeDays sibling of the future-dated case above. Pinned for
+    // resolveRoadmapNarrative since LIN-742 but never for this resolver — a
+    // pre-existing characterization gap the LIN-1810 refactor made worth
+    // closing, since both now share one age helper (close-out, ledger item 6).
+    const out = resolveNorthStarSignal('Intent.', report({ generatedAt: 'not-a-date' }), { now: NOW });
+    assert.equal(out.northStar, 'Intent.');
+    assert.equal(out.ageDays, null);
+    assert.equal(out.reading, '');
+    assert.equal(out.gap, '');
+  });
+
   test('returns null for an empty / whitespace / non-string north star (path unchanged)', () => {
     assert.equal(resolveNorthStarSignal('', report(), { now: NOW }), null);
     assert.equal(resolveNorthStarSignal('   ', report(), { now: NOW }), null);
@@ -231,6 +244,40 @@ describe('resolveNorthStarSignal (LIN-779)', () => {
   test('respects a custom maxAgeDays override', () => {
     assert.equal(resolveNorthStarSignal('Intent.', report({ generatedAt: iso(5) }), { now: NOW, maxAgeDays: 3 }).reading, '');
     assert.ok(resolveNorthStarSignal('Intent.', report({ generatedAt: iso(5) }), { now: NOW, maxAgeDays: 7 }).reading);
+  });
+});
+
+describe('classifyReportFreshness (LIN-1810)', () => {
+  const NOW = Date.UTC(2026, 5, 27);
+  const iso = daysAgo => new Date(NOW - daysAgo * 86400000).toISOString();
+  const report = (overrides = {}) => ({ generatedAt: iso(2), narrative: {}, ...overrides });
+
+  test('returns "absent" for no report, no generatedAt, or an invalid date', () => {
+    assert.equal(classifyReportFreshness(null, { now: NOW }), 'absent');
+    assert.equal(classifyReportFreshness({}, { now: NOW }), 'absent');
+    assert.equal(classifyReportFreshness(report({ generatedAt: 'not-a-date' }), { now: NOW }), 'absent');
+  });
+
+  test('returns "stale" for a report older than maxAgeDays', () => {
+    assert.equal(classifyReportFreshness(report({ generatedAt: iso(ROADMAP_REPORT_MAX_AGE_DAYS + 1) }), { now: NOW }), 'stale');
+  });
+
+  test('returns "stale" for a future-dated report (clock skew), not "fresh"', () => {
+    assert.equal(classifyReportFreshness(report({ generatedAt: iso(-1) }), { now: NOW }), 'stale');
+  });
+
+  test('returns "fresh" for a report exactly at the freshness boundary', () => {
+    assert.equal(classifyReportFreshness(report({ generatedAt: iso(ROADMAP_REPORT_MAX_AGE_DAYS) }), { now: NOW }), 'fresh');
+  });
+
+  test('returns "fresh" regardless of narrative content — freshness is report-level only', () => {
+    assert.equal(classifyReportFreshness(report({ narrative: null }), { now: NOW }), 'fresh');
+    assert.equal(classifyReportFreshness(report({ narrative: {} }), { now: NOW }), 'fresh');
+  });
+
+  test('respects a custom maxAgeDays override', () => {
+    assert.equal(classifyReportFreshness(report({ generatedAt: iso(5) }), { now: NOW, maxAgeDays: 3 }), 'stale');
+    assert.equal(classifyReportFreshness(report({ generatedAt: iso(5) }), { now: NOW, maxAgeDays: 7 }), 'fresh');
   });
 });
 

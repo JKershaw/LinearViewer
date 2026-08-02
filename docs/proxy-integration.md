@@ -739,6 +739,75 @@ matching zero rows and returning an authoritative-looking `$0.00`.
   `/dispatch` list route's status/completedAt join) is reported under **both** issues'
   `/cost` endpoints, not split between them.
 
+#### Get North Star
+
+```
+GET /api/proxy/north-star
+```
+
+Returns the token **creator's** durable north-star intent for this workspace (LIN-1810),
+plus a freshness-gated alignment reading and the latest roadmap digest — the workspace
+"current intent" signal a proxy-token agent otherwise has no way to read. Pure read: no
+Linear fetch, no LLM call. Read scope is sufficient.
+
+Identity is `req.proxyCreatedBy` (the token creator's account), never a session — a
+creator-less/ownerless token resolves **no** north star, ever (fails closed, same
+invariant as [Get Task Recap](#get-task-recap)'s OpenRouter key resolution). The north
+star is read from the creator's **durable** preferences, which can trail an unsaved
+in-session edit on the Roadmap page — the session copy is authoritative in-app, this
+endpoint's copy is the best-effort cross-device mirror of it.
+
+```json
+{
+  "northStar": "Ship a self-serve onboarding flow by Q3." ,
+  "reading": {
+    "state": "fresh",
+    "text": "On course — WIP aligns with intent.",
+    "gap": "Auth flow lags the intent.",
+    "ageDays": 2
+  },
+  "roadmap": {
+    "state": "fresh",
+    "narrative": "Velocity is steady; three tasks landed this week…",
+    "ageDays": 2
+  },
+  "reportGeneratedAt": "2026-08-01T10:00:00Z",
+  "maxAgeDays": 14
+}
+```
+
+- **`northStar`** is the LIVE durable intent text, `null` when the creator has none set
+  for this workspace. It is never a report-time snapshot — a saved roadmap report's own
+  `northStar` field is a **different** thing (what was true when that report ran), and
+  this endpoint never falls back to it, even when the live value is empty.
+- **`reading`** folds in the latest roadmap report's north-star alignment classification
+  (`northStarReading`) and `gap` — but only when that report is fresh (within
+  `maxAgeDays`). `state` disambiguates *why* `text`/`gap` are empty, which a bare
+  `ageDays: null` cannot: `"absent"` (no north star set, no report exists at all, or the
+  latest report's `generatedAt` is missing/unparseable — see below), `"stale"` (the
+  latest report is older than `maxAgeDays`, or future-dated — clock skew), `"unscored"`
+  (the latest report **is** fresh but its narrative never scored alignment — e.g. it
+  predates north-star scoring, or ran with no north star set at the time), or `"fresh"`
+  (populated). Do not infer state from `ageDays` alone.
+- **`roadmap`** is the separate delivery-trajectory digest (prefers the report's
+  `digest` layer, falls back to `trajectory` when no digest exists) — composed from the
+  **same** report fetch as `reading`, so the two sections can never disagree about which
+  report is "latest". Its `state` carries the **same four values**, resolved against its
+  own narrative layers: `"fresh"` always means `narrative` is populated, and `"unscored"`
+  means the report is fresh but carried neither a `digest` nor `trajectory` layer. You
+  never have to null-check a `narrative` whose own `state` said `"fresh"`.
+- **`reportGeneratedAt`** is the latest report's stored timestamp **verbatim**,
+  **regardless** of freshness state — useful for a caller that wants the raw age even
+  when `reading`/`roadmap` read `"stale"`. It is echoed as stored and is not validated,
+  so it can be non-null while both states read `"absent"`: a report whose `generatedAt`
+  is corrupt/unparseable has no timestamp the freshness gate can trust, and
+  `"absent"` — not `"stale"` — is the state for "no age is knowable here". Treat a
+  non-null `reportGeneratedAt` alongside `"absent"` as exactly that signal; parse it
+  defensively if you display it.
+- **`maxAgeDays`** is the freshness window (currently 14 days) so callers don't hardcode
+  it.
+- **503** when roadmap report history isn't configured on this deployment.
+
 ### Task Automation Endpoints
 
 These endpoints back the task-automation workflow: pick the next task, generate a prompt for it, and record agent progress. The **recap** and **brief** endpoints above are part of this group too. All are read-scope except `POST /api/proxy/agent/status` (deprecated alias: `POST /api/proxy/foreman/status`), which requires `readWrite`.
