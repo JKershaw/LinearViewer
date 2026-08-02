@@ -64,14 +64,13 @@ describe('periodicals registry', () => {
     assert.ok(!ids.has('prompt-injection-review'), 'prompt-injection-review folded into security-review');
   });
 
-  test('every template carries the full shape, incl. mode/cadence/lastRunAt', () => {
+  test('every template carries the full shape, incl. mode/cadence', () => {
     for (const t of PERIODICALS) {
       assert.ok(typeof t.id === 'string' && t.id.length > 0);
       assert.ok(typeof t.title === 'string' && t.title.length > 0);
       assert.ok(['corrective', 'advisory'].includes(t.mode));
-      // Carried even though nothing consumes them yet.
+      // Carried even though nothing consumes it yet.
       assert.ok('cadence' in t);
-      assert.ok('lastRunAt' in t);
       assert.strictEqual(typeof t.generatePrompt, 'function');
     }
   });
