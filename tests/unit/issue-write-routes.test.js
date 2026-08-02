@@ -28,7 +28,10 @@ const ISSUE_ID = 'LIN-900';
 // matches. Per-test overrides tune capabilities, the write result, and the
 // write-guard (trashed) read.
 function makeFakeProvider(overrides = {}) {
-  const calls = { createIssue: [], updateIssue: [], issueWriteGuard: [] };
+  const calls = {
+    createIssue: [], updateIssue: [], issueWriteGuard: [],
+    fetchTeams: [], fetchProjectsList: [], states: [],
+  };
   const caps = overrides.caps || { createIssue: true, updateIssue: true };
   const provider = {
     name: PROVIDER_NAME,
@@ -47,6 +50,27 @@ function makeFakeProvider(overrides = {}) {
       calls.issueWriteGuard.push(issueId);
       if (overrides.issueWriteGuard) return overrides.issueWriteGuard(issueId);
       return { id: 'iss-1', trashed: false, team: { id: 'team-x' } };
+    },
+    // Scoped list reads the symbolic-ref wrappers (resolveIssueTeamRef/
+    // resolveIssueProjectRef/resolveIssueStateRef) call before resolving a
+    // non-UUID ref (LIN-1556). Recorded so tests can assert the wrapper wired
+    // the scoped fetch to the RESOLVED id, not the symbolic string — the
+    // `states` call records its `teamId` argument, mirroring the twin's
+    // `calls.statesTeamId` idiom (tests/unit/proxy-ref-resolution-routes.test.js).
+    async fetchTeams(token) {
+      calls.fetchTeams.push(token);
+      if (overrides.fetchTeams) return overrides.fetchTeams();
+      return [];
+    },
+    async fetchProjectsList(token) {
+      calls.fetchProjectsList.push(token);
+      if (overrides.fetchProjectsList) return overrides.fetchProjectsList();
+      return [];
+    },
+    async states(token, teamId) {
+      calls.states.push({ token, teamId });
+      if (overrides.states) return overrides.states(teamId);
+      return [];
     },
   };
   return { provider, calls };
@@ -275,5 +299,144 @@ describe('PATCH /workspace/:urlKey/api/issues/:issueId (update)', () => {
     assert.strictEqual(provider.supports('issueWriteGuard'), false);
     const { status } = await patchIssue(buildApp({ provider }), ISSUE_ID, { title: 'x' });
     assert.strictEqual(status, 200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Symbolic reference resolution (LIN-1556 — LIN-1552 ledger follow-up)
+//
+// Proves the wrapper wiring (resolveIssueTeamRef/resolveIssueProjectRef/
+// resolveIssueStateRef in routes/workspace-api.js) end-to-end: a scoped list
+// fetch (fetchTeams/fetchProjectsList/states) happens for a non-UUID ref, and
+// the RESOLVED native id — not the symbolic string — reaches the provider
+// write. A bare 201/200 status proves nothing here (a wrapper that silently
+// forwarded the raw string would also pass), so every case additionally
+// asserts the recorded write input and/or the recorded `states(token, teamId)`
+// scoping argument.
+// ---------------------------------------------------------------------------
+describe('symbolic reference resolution (LIN-1556)', () => {
+  const RESOLVED_TEAM_UUID = '00000000-0000-0000-0000-0000000000bb';
+  const PROJECT_UUID = '00000000-0000-0000-0000-0000000000cc';
+  const STATE_UUID = '00000000-0000-0000-0000-0000000000dd';
+  const GUARD_TEAM_UUID = '00000000-0000-0000-0000-0000000000ee';
+
+  test('POST create-happy: symbolic team/project/state resolve to native ids; states scoped to the RESOLVED team', async () => {
+    const { provider, calls } = makeFakeProvider({
+      fetchTeams: () => [{ id: RESOLVED_TEAM_UUID, name: 'Linear Team', key: 'LIN' }],
+      fetchProjectsList: () => [{ id: PROJECT_UUID, name: 'Product' }],
+      states: () => [{ id: STATE_UUID, name: 'In Progress', type: 'started' }],
+    });
+
+    const { status, body } = await postIssue(buildApp({ provider }), {
+      teamId: 'LIN', title: 'Add a widget', projectId: 'Product', stateId: 'in-progress',
+    });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(calls.createIssue.length, 1);
+    const input = calls.createIssue[0];
+    assert.strictEqual(input.teamId, RESOLVED_TEAM_UUID);
+    assert.strictEqual(input.projectId, PROJECT_UUID);
+    assert.strictEqual(input.stateId, STATE_UUID);
+    assert.strictEqual(calls.fetchTeams.length, 1);
+    assert.strictEqual(calls.fetchProjectsList.length, 1);
+    assert.strictEqual(calls.states.length, 1);
+    // The proving assertion: states was scoped to the RESOLVED team id, not
+    // the symbolic 'LIN' the request sent.
+    assert.strictEqual(calls.states[0].teamId, RESOLVED_TEAM_UUID);
+  });
+
+  test('POST create-unmatched: unresolvable stateId → 422, never 500, no write', async () => {
+    const { provider, calls } = makeFakeProvider({ states: () => [] });
+
+    const { status, body } = await postIssue(buildApp({ provider }), {
+      teamId: TEAM_UUID, title: 'ok', stateId: 'nonsense',
+    });
+
+    assert.strictEqual(status, 422);
+    assert.notStrictEqual(status, 500);
+    assert.match(body.error, /no state matches reference 'nonsense'/i);
+    assert.strictEqual(body.candidates, undefined);
+    assert.strictEqual(calls.createIssue.length, 0);
+  });
+
+  test('POST create-ambiguous-project: two distinct-id matches → 422 with candidates, no write', async () => {
+    const AMBIG_1 = '00000000-0000-0000-0000-0000000000f1';
+    const AMBIG_2 = '00000000-0000-0000-0000-0000000000f2';
+    const { provider, calls } = makeFakeProvider({
+      fetchProjectsList: () => [{ id: AMBIG_1, name: 'Product' }, { id: AMBIG_2, name: 'product' }],
+    });
+
+    const { status, body } = await postIssue(buildApp({ provider }), {
+      teamId: TEAM_UUID, title: 'ok', projectId: 'Product',
+    });
+
+    assert.strictEqual(status, 422);
+    assert.notStrictEqual(status, 500);
+    assert.match(body.error, /ambiguous project reference 'Product'/i);
+    assert.deepEqual(body.candidates, [{ id: AMBIG_1, name: 'Product' }, { id: AMBIG_2, name: 'product' }]);
+    assert.strictEqual(calls.createIssue.length, 0);
+  });
+
+  test('POST UUID control: bare-UUID refs never touch fetchTeams/fetchProjectsList/states', async () => {
+    const { provider, calls } = makeFakeProvider();
+
+    const { status } = await postIssue(buildApp({ provider }), {
+      teamId: TEAM_UUID, title: 'ok', projectId: '00000000-0000-0000-0000-0000000000f9', stateId: STATE_UUID,
+    });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(calls.fetchTeams.length, 0);
+    assert.strictEqual(calls.fetchProjectsList.length, 0);
+    assert.strictEqual(calls.states.length, 0);
+  });
+
+  test('PATCH happy: symbolic stateId resolves against the GUARD team, not create-style team resolution', async () => {
+    const { provider, calls } = makeFakeProvider({
+      issueWriteGuard: () => ({ id: 'iss-1', trashed: false, team: { id: GUARD_TEAM_UUID } }),
+      states: () => [{ id: STATE_UUID, name: 'In Progress', type: 'started' }],
+    });
+
+    const { status, body } = await patchIssue(buildApp({ provider }), ISSUE_ID, { stateId: 'in-progress' });
+
+    assert.strictEqual(status, 200);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(calls.updateIssue.length, 1);
+    assert.strictEqual(calls.updateIssue[0].input.stateId, STATE_UUID);
+    assert.strictEqual(calls.states.length, 1);
+    assert.strictEqual(calls.states[0].teamId, GUARD_TEAM_UUID);
+  });
+
+  test('PATCH ambiguous state: two distinct-id matches → 422 with candidates, no write', async () => {
+    const AMBIG_1 = '00000000-0000-0000-0000-0000000000a1';
+    const AMBIG_2 = '00000000-0000-0000-0000-0000000000a2';
+    const { provider, calls } = makeFakeProvider({
+      issueWriteGuard: () => ({ id: 'iss-1', trashed: false, team: { id: GUARD_TEAM_UUID } }),
+      states: () => [{ id: AMBIG_1, name: 'In Progress', type: 'started' }, { id: AMBIG_2, name: 'Doing', type: 'started' }],
+    });
+
+    const { status, body } = await patchIssue(buildApp({ provider }), ISSUE_ID, { stateId: 'in-progress' });
+
+    assert.strictEqual(status, 422);
+    assert.notStrictEqual(status, 500);
+    assert.match(body.error, /ambiguous state reference 'in-progress'/i);
+    assert.deepEqual(body.candidates, [{ id: AMBIG_1, name: 'In Progress' }, { id: AMBIG_2, name: 'Doing' }]);
+    assert.strictEqual(calls.updateIssue.length, 0);
+  });
+
+  test('PATCH teamless guard: symbolic stateId with no guard.team → 422 BEFORE any states read (ledger item 3)', async () => {
+    const { provider, calls } = makeFakeProvider({
+      issueWriteGuard: () => ({ id: 'iss-1', trashed: false }), // no `team`
+    });
+
+    const { status, body } = await patchIssue(buildApp({ provider }), ISSUE_ID, { stateId: 'in-progress' });
+
+    assert.strictEqual(status, 422);
+    assert.notStrictEqual(status, 500);
+    assert.match(body.error, /the issue's team could not be determined/i);
+    // The proving assertion: the guard rejects before any scoped read is
+    // attempted, not merely that the write never happened.
+    assert.strictEqual(calls.states.length, 0);
+    assert.strictEqual(calls.updateIssue.length, 0);
   });
 });
