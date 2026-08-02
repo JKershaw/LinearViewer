@@ -112,6 +112,11 @@ test.describe('Periodicals group', () => {
     expect(periodicalItem).toBeDefined();
     expect(periodicalItem.promptName).toBe('Documentation Review');
     expect(periodicalItem.issueIdentifier ?? null).toBeNull();
+    // LIN-1825: the periodical-template join key rode the container's
+    // data-periodical-id all the way through render -> app.js -> common.js ->
+    // route -> addItem -> _formatItem, proven here through the exact read path
+    // (GET .../api/dispatch returns listItems() verbatim).
+    expect(periodicalItem.periodicalId).toBe('documentation-review');
   });
 
   // LIN-1279: the "Mint + Autopilot" action is a SECOND dispatch container on each
@@ -186,5 +191,9 @@ test.describe('Periodicals group', () => {
     expect(item.issueIdentifier ?? null).toBeNull();
     expect(item.prompt).toContain('/api/proxy/autopilot/kickoff');
     expect(item.prompt).toContain('issueIdentifier');
+    // LIN-1825: same join key as the plain-Mint variant — both mint from the
+    // SAME template, and the id must not drift with the "+ Autopilot" title
+    // suffix (that promptName drift is exactly what this id replaces).
+    expect(item.periodicalId).toBe('documentation-review');
   });
 });

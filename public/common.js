@@ -553,7 +553,7 @@ window.api = async function api(url, opts = {}) {
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -579,6 +579,10 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   // `kind` is normally derived server-side from promptName; pass it explicitly
   // only for meta-loops that don't map to a prompt template (e.g. 'autopilot').
   if (kind) payload.kind = kind;
+  // Periodical-template join key (LIN-1825): truthy gate, like `kind` — unlike
+  // `maxTasks` it has no legitimate falsy value, so there's no need for the
+  // nullish gate maxTasks uses below.
+  if (periodicalId) payload.periodicalId = periodicalId;
   if (issue) {
     if (issue.id) payload.issueId = issue.id;
     if (issue.identifier) payload.issueIdentifier = issue.identifier;
