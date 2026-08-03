@@ -2220,17 +2220,18 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 });
 
 // =============================================================================
-// plan-review template: registration + the six checks in BOTH paths (LIN-1602)
+// plan-review template: registration + the seven checks in BOTH paths
+// (LIN-1602; 7th check — source-of-truth re-grounding — added by LIN-1859)
 //
-// The acceptance criterion is that the six checks are present AND ORDERED in
+// The acceptance criterion is that the seven checks are present AND ORDERED in
 // both prompt paths, so the assertions below anchor on CONTENT, never on list
 // numbering. Two traps make numbering useless here:
 //   1. The rendered body opens with formatReadOnlyWorkflow's own `1./2./3.`
 //      list, ABOVE the checks — a bare `^\d\. \*\*` scan anchors on that and
 //      proves nothing. Every ordering assertion is therefore scoped to the
-//      `### The Six Checks` section.
-//   2. The two paths number differently — the template emits `1.`…`6.` as
-//      separate lines, the meta-prompt rule numbers `(1)`…`(6)` inline inside a
+//      `### The Seven Checks` section.
+//   2. The two paths number differently — the template emits `1.`…`7.` as
+//      separate lines, the meta-prompt rule numbers `(1)`…`(7)` inline inside a
 //      single bullet — so no shared numbering regex can span both. Each path is
 //      sliced to its own region and checked separately against shared anchors.
 // The anchors are case- and hyphen-tolerant because the two paths legitimately
@@ -2239,7 +2240,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
 import { formatReadOnlyWorkflow, formatDiscussionReference } from '../../lib/prompt-formatters.js';
 
-describe('plan-review template + the six checks in both paths (LIN-1602)', () => {
+describe('plan-review template + the seven checks in both paths (LIN-1602 / LIN-1859)', () => {
   const issue = {
     id: 'pr-1', identifier: 'LIN-903', title: 'Verify the plan',
     description: 'a plan', url: 'https://linear.app/test/issue/LIN-903',
@@ -2247,20 +2248,21 @@ describe('plan-review template + the six checks in both paths (LIN-1602)', () =>
   };
   const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
 
-  // The six checks, in their committed order. Content anchors only.
-  const SIX_CHECKS = [
+  // The seven checks, in their committed order. Content anchors only.
+  const PLAN_REVIEW_CHECKS = [
     { label: 'completeness check', re: /completeness check/i },
     { label: 'Strategy Framing', re: /strategy framing/i },
     { label: 'history signal', re: /history signal/i },
     { label: 'session-fit', re: /session-fit/i },
     { label: 'relaxation guard', re: /relaxation guard/i },
-    { label: 'prerequisite-refactor necessity', re: /prerequisite[- ]refactor/i }
+    { label: 'prerequisite-refactor necessity', re: /prerequisite[- ]refactor/i },
+    { label: 'source-of-truth re-grounding', re: /source-of-truth|re-grounding|authoritative/i }
   ];
 
-  /** Assert the six anchors are present and strictly increasing WITHIN one path's region. */
-  const assertSixChecksOrdered = (region, pathName) => {
+  /** Assert the seven anchors are present and strictly increasing WITHIN one path's region. */
+  const assertSevenChecksOrdered = (region, pathName) => {
     let prev = -1;
-    for (const { label, re } of SIX_CHECKS) {
+    for (const { label, re } of PLAN_REVIEW_CHECKS) {
       const at = region.search(re);
       assert.ok(at > -1, `${pathName}: missing the "${label}" check`);
       assert.ok(at > prev, `${pathName}: "${label}" is out of order (index ${at} follows ${prev})`);
@@ -2280,20 +2282,20 @@ describe('plan-review template + the six checks in both paths (LIN-1602)', () =>
     assert.strictEqual(t.completionSignals, COMPLETION_SIGNALS['plan-review'], 'template wires its completion signal');
   });
 
-  test('(a) handwritten path: the six checks are present and ordered inside "### The Six Checks"', () => {
+  test('(a) handwritten path: the seven checks are present and ordered inside "### The Seven Checks"', () => {
     const { prompt } = generatePrompt('plan-review', issue, context);
-    const start = prompt.indexOf('### The Six Checks');
+    const start = prompt.indexOf('### The Seven Checks');
     const end = prompt.indexOf('### Verdict');
-    assert.ok(start > -1, 'the body has a "### The Six Checks" section');
+    assert.ok(start > -1, 'the body has a "### The Seven Checks" section');
     assert.ok(end > start, 'the checks section is closed by "### Verdict"');
     const section = prompt.slice(start, end);
     // Trap 1: the decoy list from formatReadOnlyWorkflow sits ABOVE the section.
     assert.ok(!section.includes('**Fetch details**'),
       'the checks section excludes formatReadOnlyWorkflow\'s own numbered list');
-    assertSixChecksOrdered(section, 'handwritten');
+    assertSevenChecksOrdered(section, 'handwritten');
   });
 
-  test('(b) meta path: the Plan-review quality rule carries the same six checks in the same order', () => {
+  test('(b) meta path: the Plan-review quality rule carries the same seven checks in the same order', () => {
     const meta = buildMetaPromptTemplate({
       issueContext: 'CTX', identifier: 'LIN-903', hasSubtasks: false, subtaskCount: 0,
       completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
@@ -2306,7 +2308,7 @@ describe('plan-review template + the six checks in both paths (LIN-1602)', () =>
     const planIdx = rules.findIndex(r => r.startsWith('- **Plan prompts**'));
     assert.strictEqual(ruleIdx, planIdx + 1, 'the Plan-review rule sits adjacent to the Plan-prompts rule');
     // Trap 2: scoped to the single bullet, so the template's line numbering is irrelevant.
-    assertSixChecksOrdered(rules[ruleIdx], 'meta');
+    assertSevenChecksOrdered(rules[ruleIdx], 'meta');
   });
 
   test('(c) both paths carry the verdict vocabulary and the verify-don\'t-redesign, write-only stance', () => {
