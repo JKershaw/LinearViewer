@@ -16,12 +16,14 @@
 
 process.env.NODE_ENV = 'test';
 
-import { test, describe, afterEach } from 'node:test';
+import { test, describe, afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { encodeAttachmentHandle } from '../../lib/proxy-wire.js';
 import { ProviderInterface } from '../../lib/providers/interface.js';
+import { setProxyFetchImpl } from '../../lib/proxy-fetch.js';
+import { guardNetwork } from '../fixtures/network-guard.js';
 
 // A minimal injectable provider for the `att:` tests (LIN-890): `fetchAttachment`
 // is set as an instance property only when a resolver is supplied, so
@@ -123,14 +125,53 @@ const realFetch = globalThis.fetch;
 
 // Install a URL-discriminating fetch: only the Linear asset host is intercepted;
 // everything else (the loopback call to the test server) hits the real fetch.
+//
+// LIN-1848: routes/proxy.js's relay egress is `(await createProxyFetch()) ||
+// fetch` — under a configured proxy, createProxyFetch() returns a real
+// proxy-aware transport that bypasses a plain globalThis.fetch mock entirely
+// (the actual escape: 15/39 proxy-set failures were this relay reaching
+// uploads.linear.app for real). Installing the SAME handler as BOTH
+// globalThis.fetch (the no-proxy path) and the proxy-fetch override (the
+// proxy path, via setProxyFetchImpl) closes that regardless of which branch
+// `createProxyFetch()` takes.
 function stubUpstream(handler) {
-  globalThis.fetch = async (url, opts) => {
+  const fn = async (url, opts) => {
     if (typeof url === 'string' && url.startsWith(LINEAR_HOST)) return handler(url, opts);
     return realFetch(url, opts);
   };
+  globalThis.fetch = fn;
+  setProxyFetchImpl(fn);
 }
 
-afterEach(() => { globalThis.fetch = realFetch; });
+// LIN-1848 acceptance witness: every test in this file runs with HTTPS_PROXY
+// set to an unreachable value and must make zero real outbound requests
+// (network-guard), proving the relay's egress never bypasses whatever
+// stub/mock is installed above — the tests that never reach the egress path
+// (SSRF-guard rejections, capability declines, etc.) trivially satisfy this too.
+let networkGuard;
+let savedProxyEnv;
+beforeEach(() => {
+  // LIN-1848 close-out F2: save/restore all four proxy env vars (mirroring
+  // openrouter.test.js) rather than deleting HTTPS_PROXY outright — a bare
+  // delete discards whatever the whole-suite acceptance run (HTTPS_PROXY
+  // exported for `npm run test:unit`) had ambiently set.
+  savedProxyEnv = {
+    HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+    https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy,
+  };
+  process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+  delete process.env.HTTP_PROXY; delete process.env.https_proxy; delete process.env.http_proxy;
+  networkGuard = guardNetwork();
+});
+afterEach(() => {
+  globalThis.fetch = realFetch;
+  setProxyFetchImpl(null);
+  networkGuard.restore();
+  for (const [k, v] of Object.entries(savedProxyEnv)) {
+    if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+  assert.equal(networkGuard.attempts.length, 0, `unexpected http(s).request transport attempts: ${JSON.stringify(networkGuard.attempts)}`);
+});
 
 const md = (url) => encodeAttachmentHandle('md', url);
 
@@ -200,6 +241,26 @@ describe('GET /api/proxy/attachments/:id — relay (md: path)', () => {
     const res = await getAttachment(buildApp(), md(`${LINEAR_HOST}/redir.png`));
     assert.equal(res.status, 400);
     assert.match(res.bodyText, /redirect/i);
+  });
+
+  // LIN-1848 pinning test: under a real (if unreachable) HTTPS_PROXY,
+  // routes/proxy.js's egress is `(await createProxyFetch()) || fetch` — before
+  // the fix, createProxyFetch() returned a live proxy-aware transport that
+  // ignored any globalThis.fetch stub and reached uploads.linear.app for real.
+  // stubUpstream now installs the same handler as the setProxyFetchImpl
+  // override too, so this must resolve entirely from the stub with zero
+  // outbound requests (asserted in the file's afterEach via network-guard).
+  test('with HTTPS_PROXY set, the relay still resolves via the injected transport override, never live egress', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    let stubHit = false;
+    stubUpstream(() => {
+      stubHit = true;
+      return fakeResponse({ contentType: 'image/png', bytes: png });
+    });
+    const res = await getAttachment(buildApp(), md(`${LINEAR_HOST}/abc/screenshot.png`));
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.bodyBuf, png);
+    assert.ok(stubHit, 'the stub — not a live proxy transport — must have served the request');
   });
 });
 
@@ -298,10 +359,12 @@ describe('GET /api/proxy/attachments/:id — handle routing', () => {
 // leak), while Linear asset hosts keep their authenticated fetch (covered above).
 const GH_HOST = 'https://user-images.githubusercontent.com';
 function stubUpstreamHost(hostPrefix, handler) {
-  globalThis.fetch = async (url, opts) => {
+  const fn = async (url, opts) => {
     if (typeof url === 'string' && url.startsWith(hostPrefix)) return handler(url, opts);
     return realFetch(url, opts);
   };
+  globalThis.fetch = fn;
+  setProxyFetchImpl(fn);
 }
 
 describe('GET /api/proxy/attachments/:id — provider/host-aware auth (LIN-771)', () => {

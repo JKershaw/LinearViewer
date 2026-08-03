@@ -11,7 +11,7 @@
  *     coercion, empty-goal drop, cap
  *   - generateGoalSuggestions always appends the continue-until-stopped option
  */
-import { test, describe, mock, afterEach } from 'node:test';
+import { test, describe, mock, afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import {
   formatNextRunContext,
@@ -38,7 +38,39 @@ import {
   NEXT_RUN_PROSE_MAX_TOKENS,
 } from '../../lib/next-run.js';
 import { buildRoadmapModel } from '../../lib/roadmap.js';
-import { DEFAULT_MODEL } from '../../lib/openrouter.js';
+import { DEFAULT_MODEL, setFetchImpl } from '../../lib/openrouter.js';
+import { guardNetwork } from '../fixtures/network-guard.js';
+
+// LIN-1848: generateGoalSuggestions calls streamChat, which under a configured
+// egress proxy swaps to a substitute transport that a plain `global.fetch` mock
+// cannot see (the original escape). Every mock below installs the SAME function
+// as both `global.fetch` (for the non-proxy path) and the openrouter.js override
+// (for the proxy path), so the describe blocks below can additionally run with
+// HTTPS_PROXY set to an unreachable value and prove zero outbound requests
+// either way.
+function mockOpenRouterFetch(impl) {
+  const fn = mock.fn(impl);
+  global.fetch = fn;
+  setFetchImpl(fn);
+  return fn;
+}
+
+// LIN-1848 close-out F2: save/restore all four proxy env vars (mirroring
+// openrouter.test.js) rather than deleting HTTPS_PROXY outright — a bare
+// delete discards whatever the whole-suite acceptance run (HTTPS_PROXY
+// exported for `npm run test:unit`) had ambiently set, weakening "the whole
+// suite ran under a proxy" for any later describe in this same file/process.
+function saveProxyEnv() {
+  return {
+    HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+    https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy,
+  };
+}
+function restoreProxyEnv(saved) {
+  for (const [k, v] of Object.entries(saved)) {
+    if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+}
 
 const MODEL = {
   velocity: { tasksPerWeek: 3.5, pointsPerWeek: 8, trend: 'increasing' },
@@ -836,7 +868,23 @@ describe('CONTINUE_UNTIL_STOPPED_OPTION', () => {
 
 describe('generateGoalSuggestions return shape (LIN-633)', () => {
   const realFetch = global.fetch;
-  afterEach(() => { global.fetch = realFetch; });
+  let networkGuard;
+  let savedProxyEnv;
+  // LIN-1848 acceptance witness: a configured-but-unreachable proxy must not
+  // change the outcome OR leak a live request via the substitute transport.
+  beforeEach(() => {
+    savedProxyEnv = saveProxyEnv();
+    process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+    delete process.env.HTTP_PROXY; delete process.env.https_proxy; delete process.env.http_proxy;
+    networkGuard = guardNetwork();
+  });
+  afterEach(() => {
+    global.fetch = realFetch;
+    setFetchImpl(null);
+    networkGuard.restore();
+    restoreProxyEnv(savedProxyEnv);
+    assert.equal(networkGuard.attempts.length, 0, `unexpected http(s).request transport attempts: ${JSON.stringify(networkGuard.attempts)}`);
+  });
 
   function mockStreamResponse(text) {
     const enc = new TextEncoder();
@@ -845,12 +893,20 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
       `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 10 } })}\n\n`,
       'data: [DONE]\n\n',
     ];
-    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+    // Also usable as the NON-streaming shape (json()): under HTTPS_PROXY the
+    // streamChat/getRecommendationStream `useStreaming` branch flips to the
+    // non-streaming request, which reads `response.json()` instead of `.body`
+    // (LIN-1848) — one canned response must satisfy either branch.
+    return {
+      ok: true,
+      body: (async function* () { for (const b of blocks) yield enc.encode(b); })(),
+      json: () => Promise.resolve({ choices: [{ message: { content: text }, finish_reason: 'stop' }], usage: { completion_tokens: 10 } })
+    };
   }
 
   test('returns the grounding context verbatim plus the XL open-ended option', async () => {
     const raw = JSON.stringify({ analysis: 'WIP first.', options: [{ goal: 'Finish the in-flight work.', reasoning: 'WIP first.', size: 'M', title: 'Finish the in-flight work' }] });
-    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+    mockOpenRouterFetch(async () => mockStreamResponse(raw));
 
     const result = await generateGoalSuggestions(
       { projects: [], issues: [], organizationName: 'Acme' },
@@ -880,7 +936,7 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
   test('guarantees ≥1 option per size S/M/L even when the LLM returns only one (LIN-642)', async () => {
     // The model returns a single M option; the deterministic backstop must fill S and L.
     const raw = JSON.stringify({ analysis: '', options: [{ goal: 'Just one direction.', reasoning: 'r', size: 'M', title: 'One' }] });
-    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+    mockOpenRouterFetch(async () => mockStreamResponse(raw));
 
     const result = await generateGoalSuggestions(
       { projects: [], issues: [], organizationName: 'Acme' },
@@ -899,7 +955,7 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
     const raw = JSON.stringify({ options: [
       { goal: 'Act on real + fake.', reasoning: 'r', size: 'M', title: 'T', referencedTaskIds: ['LIN-1', 'LIN-999'] },
     ] });
-    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+    mockOpenRouterFetch(async () => mockStreamResponse(raw));
 
     const result = await generateGoalSuggestions(
       { projects: [], issues, organizationName: 'Acme' },
@@ -913,7 +969,7 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
 
   test('folds a fresh roadmap report digest into the returned context (LIN-742)', async () => {
     const raw = JSON.stringify({ options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
-    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+    mockOpenRouterFetch(async () => mockStreamResponse(raw));
 
     const report = { generatedAt: new Date().toISOString(), narrative: { digest: 'The roadmap digest line.' } };
     const result = await generateGoalSuggestions(
@@ -926,7 +982,7 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
 
   test('omits a stale roadmap report from the context (LIN-742)', async () => {
     const raw = JSON.stringify({ options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
-    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+    mockOpenRouterFetch(async () => mockStreamResponse(raw));
 
     const stale = new Date(Date.now() - 60 * 86400000).toISOString();
     const report = { generatedAt: stale, narrative: { digest: 'Stale digest line.' } };
@@ -939,7 +995,7 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
 
   test('omits silently when no roadmap report is provided (LIN-742)', async () => {
     const raw = JSON.stringify({ options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
-    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+    mockOpenRouterFetch(async () => mockStreamResponse(raw));
 
     const result = await generateGoalSuggestions(
       { projects: [], issues: [], organizationName: 'Acme' },
@@ -951,7 +1007,7 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
   test('threads a live north star into the returned context, kept byte-equal to the user message (LIN-779)', async () => {
     const raw = JSON.stringify({ options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
     let sentUserMessage = null;
-    global.fetch = mock.fn(async (_url, opts) => {
+    mockOpenRouterFetch(async (_url, opts) => {
       sentUserMessage = JSON.parse(opts.body).messages.find(m => m.role === 'user').content;
       return mockStreamResponse(raw);
     });
@@ -969,7 +1025,7 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
 
   test('folds a fresh report reading/gap under the north-star section (LIN-779)', async () => {
     const raw = JSON.stringify({ options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
-    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+    mockOpenRouterFetch(async () => mockStreamResponse(raw));
 
     const report = {
       generatedAt: new Date().toISOString(),
@@ -986,7 +1042,7 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
 
   test('the no-north-star path stays byte-identical and preserves size coverage + continue-until-stopped (LIN-779)', async () => {
     const raw = JSON.stringify({ options: [{ goal: 'Only M.', reasoning: 'r', size: 'M', title: 'One' }] });
-    global.fetch = mock.fn(async () => mockStreamResponse(raw));
+    mockOpenRouterFetch(async () => mockStreamResponse(raw));
 
     const withoutNs = await generateGoalSuggestions(
       { projects: [], issues: [], organizationName: 'Acme' },
@@ -1018,7 +1074,21 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
 
 describe('generateGoalSuggestions directions (LIN-1566)', () => {
   const realFetch = global.fetch;
-  afterEach(() => { global.fetch = realFetch; });
+  let networkGuard;
+  let savedProxyEnv;
+  beforeEach(() => {
+    savedProxyEnv = saveProxyEnv();
+    process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+    delete process.env.HTTP_PROXY; delete process.env.https_proxy; delete process.env.http_proxy;
+    networkGuard = guardNetwork();
+  });
+  afterEach(() => {
+    global.fetch = realFetch;
+    setFetchImpl(null);
+    networkGuard.restore();
+    restoreProxyEnv(savedProxyEnv);
+    assert.equal(networkGuard.attempts.length, 0, `unexpected http(s).request transport attempts: ${JSON.stringify(networkGuard.attempts)}`);
+  });
 
   function mockStreamResponse(text) {
     const enc = new TextEncoder();
@@ -1027,7 +1097,15 @@ describe('generateGoalSuggestions directions (LIN-1566)', () => {
       `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 10 } })}\n\n`,
       'data: [DONE]\n\n',
     ];
-    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+    // Also usable as the NON-streaming shape (json()): under HTTPS_PROXY the
+    // streamChat/getRecommendationStream `useStreaming` branch flips to the
+    // non-streaming request, which reads `response.json()` instead of `.body`
+    // (LIN-1848) — one canned response must satisfy either branch.
+    return {
+      ok: true,
+      body: (async function* () { for (const b of blocks) yield enc.encode(b); })(),
+      json: () => Promise.resolve({ choices: [{ message: { content: text }, finish_reason: 'stop' }], usage: { completion_tokens: 10 } })
+    };
   }
 
   const ISSUES = [
@@ -1050,7 +1128,7 @@ describe('generateGoalSuggestions directions (LIN-1566)', () => {
   });
 
   test('returns the resolved grouping alongside the flat options', async () => {
-    global.fetch = mock.fn(async () => mockStreamResponse(GROUPED_REPLY));
+    mockOpenRouterFetch(async () => mockStreamResponse(GROUPED_REPLY));
     const result = await generateGoalSuggestions(
       { projects: [], issues: ISSUES, organizationName: 'Acme' },
       { apiKey: 'test-key' }
@@ -1065,7 +1143,7 @@ describe('generateGoalSuggestions directions (LIN-1566)', () => {
   test('the grouping covers the deterministic size fills — proof the resolver runs LAST', async () => {
     // ensureSizeCoverage pushes the missing-L fill after parsing, so a fill carries
     // no direction of its own. Resolving before that point would silently orphan it.
-    global.fetch = mock.fn(async () => mockStreamResponse(GROUPED_REPLY));
+    mockOpenRouterFetch(async () => mockStreamResponse(GROUPED_REPLY));
     const result = await generateGoalSuggestions(
       { projects: [], issues: ISSUES, organizationName: 'Acme' },
       { apiKey: 'test-key' }
@@ -1078,7 +1156,7 @@ describe('generateGoalSuggestions directions (LIN-1566)', () => {
   });
 
   test('every concrete option is grouped exactly once and the open option never is', async () => {
-    global.fetch = mock.fn(async () => mockStreamResponse(GROUPED_REPLY));
+    mockOpenRouterFetch(async () => mockStreamResponse(GROUPED_REPLY));
     const result = await generateGoalSuggestions(
       { projects: [], issues: ISSUES, organizationName: 'Acme' },
       { apiKey: 'test-key' }
@@ -1097,7 +1175,7 @@ describe('generateGoalSuggestions directions (LIN-1566)', () => {
       analysis: 'a',
       options: [{ goal: 'Finish LIN-1.', reasoning: 'r', size: 'M', title: 'Finish LIN-1', referencedTaskIds: ['LIN-1'] }],
     });
-    global.fetch = mock.fn(async () => mockStreamResponse(flatReply));
+    mockOpenRouterFetch(async () => mockStreamResponse(flatReply));
     const result = await generateGoalSuggestions(
       { projects: [], issues: ISSUES, organizationName: 'Acme' },
       { apiKey: 'test-key' }
@@ -1113,7 +1191,7 @@ describe('generateGoalSuggestions directions (LIN-1566)', () => {
   });
 
   test('an LLM failure still yields the size-guaranteed set with no grouping', async () => {
-    global.fetch = mock.fn(async () => { throw new Error('upstream down'); });
+    mockOpenRouterFetch(async () => { throw new Error('upstream down'); });
     const result = await generateGoalSuggestions(
       { projects: [], issues: ISSUES, organizationName: 'Acme' },
       { apiKey: 'test-key' }
@@ -1129,7 +1207,7 @@ describe('generateGoalSuggestions directions (LIN-1566)', () => {
   test('the per-option direction tag survives the whole post-parse pipeline', async () => {
     // Grouping only works because every stage after the parser copies options by
     // spread. If a stage is ever "tidied" into an explicit field list this fails.
-    global.fetch = mock.fn(async () => mockStreamResponse(GROUPED_REPLY));
+    mockOpenRouterFetch(async () => mockStreamResponse(GROUPED_REPLY));
     const result = await generateGoalSuggestions(
       { projects: [], issues: ISSUES, organizationName: 'Acme' },
       { apiKey: 'test-key' }
@@ -1155,7 +1233,21 @@ describe('generateGoalSuggestions directions (LIN-1566)', () => {
 
 describe('generateGoalSuggestions request budget (LIN-1665)', () => {
   const realFetch = global.fetch;
-  afterEach(() => { global.fetch = realFetch; });
+  let networkGuard;
+  let savedProxyEnv;
+  beforeEach(() => {
+    savedProxyEnv = saveProxyEnv();
+    process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+    delete process.env.HTTP_PROXY; delete process.env.https_proxy; delete process.env.http_proxy;
+    networkGuard = guardNetwork();
+  });
+  afterEach(() => {
+    global.fetch = realFetch;
+    setFetchImpl(null);
+    networkGuard.restore();
+    restoreProxyEnv(savedProxyEnv);
+    assert.equal(networkGuard.attempts.length, 0, `unexpected http(s).request transport attempts: ${JSON.stringify(networkGuard.attempts)}`);
+  });
 
   function mockStreamResponse(text) {
     const enc = new TextEncoder();
@@ -1164,14 +1256,22 @@ describe('generateGoalSuggestions request budget (LIN-1665)', () => {
       `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 10 } })}\n\n`,
       'data: [DONE]\n\n',
     ];
-    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+    // Also usable as the NON-streaming shape (json()): under HTTPS_PROXY the
+    // streamChat/getRecommendationStream `useStreaming` branch flips to the
+    // non-streaming request, which reads `response.json()` instead of `.body`
+    // (LIN-1848) — one canned response must satisfy either branch.
+    return {
+      ok: true,
+      body: (async function* () { for (const b of blocks) yield enc.encode(b); })(),
+      json: () => Promise.resolve({ choices: [{ message: { content: text }, finish_reason: 'stop' }], usage: { completion_tokens: 10 } })
+    };
   }
 
   const REPLY = JSON.stringify({ analysis: 'a', options: [{ goal: 'g', reasoning: 'r', size: 'M', title: 'T' }] });
 
   async function capturedBody(model) {
     let sent = null;
-    global.fetch = mock.fn(async (_url, init) => {
+    mockOpenRouterFetch(async (_url, init) => {
       sent = JSON.parse(init.body);
       return mockStreamResponse(REPLY);
     });
@@ -1207,7 +1307,7 @@ describe('generateGoalSuggestions request budget (LIN-1665)', () => {
 
   test('an explicit maxTokens is honoured as the cap', async () => {
     let sent = null;
-    global.fetch = mock.fn(async (_url, init) => { sent = JSON.parse(init.body); return mockStreamResponse(REPLY); });
+    mockOpenRouterFetch(async (_url, init) => { sent = JSON.parse(init.body); return mockStreamResponse(REPLY); });
     await generateGoalSuggestions(
       { projects: [], issues: [], organizationName: 'Acme' },
       { apiKey: 'test-key', model: 'anthropic/claude-opus-4.8', maxTokens: 900 }
@@ -1242,7 +1342,22 @@ describe('assessNextRunOutcome (LIN-1665)', () => {
 describe('generateGoalSuggestions degraded signal (LIN-1665)', () => {
   const realFetch = global.fetch;
   const realError = console.error;
-  afterEach(() => { global.fetch = realFetch; console.error = realError; });
+  let networkGuard;
+  let savedProxyEnv;
+  beforeEach(() => {
+    savedProxyEnv = saveProxyEnv();
+    process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+    delete process.env.HTTP_PROXY; delete process.env.https_proxy; delete process.env.http_proxy;
+    networkGuard = guardNetwork();
+  });
+  afterEach(() => {
+    global.fetch = realFetch;
+    console.error = realError;
+    setFetchImpl(null);
+    networkGuard.restore();
+    restoreProxyEnv(savedProxyEnv);
+    assert.equal(networkGuard.attempts.length, 0, `unexpected http(s).request transport attempts: ${JSON.stringify(networkGuard.attempts)}`);
+  });
 
   // finish_reason is a parameter here, unlike the always-'stop' helper above: the
   // truncation case is the whole point.
@@ -1253,7 +1368,12 @@ describe('generateGoalSuggestions degraded signal (LIN-1665)', () => {
       `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: finishReason }], usage: { completion_tokens: 3600 } })}\n\n`,
       'data: [DONE]\n\n',
     ];
-    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+    // Also usable as the NON-streaming shape — see the sibling helper above (LIN-1848).
+    return {
+      ok: true,
+      body: (async function* () { for (const b of blocks) yield enc.encode(b); })(),
+      json: () => Promise.resolve({ choices: [{ message: { content: text }, finish_reason: finishReason }], usage: { completion_tokens: 3600 } })
+    };
   }
 
   const ISSUES = [
@@ -1275,7 +1395,7 @@ describe('generateGoalSuggestions degraded signal (LIN-1665)', () => {
 
   async function generateFrom(raw, finishReason) {
     console.error = () => {}; // the generator logs the collapse; keep test output clean
-    global.fetch = mock.fn(async () => mockStreamResponse(raw, finishReason));
+    mockOpenRouterFetch(async () => mockStreamResponse(raw, finishReason));
     return generateGoalSuggestions(
       { projects: [], issues: ISSUES, organizationName: 'Acme' },
       { apiKey: 'test-key', urlKey: 'acme' }
@@ -1354,5 +1474,61 @@ describe('generateGoalSuggestions degraded signal (LIN-1665)', () => {
     assert.equal(result.analysis, 'WIP first.');
     assert.equal(result.summary, buildNextRunSummary(buildRoadmapModel([], ISSUES), 'Acme'));
     assert.equal(result.context, formatNextRunContext(buildRoadmapModel([], ISSUES), 'Acme'));
+  });
+});
+
+// LIN-1848 close-out F3 (branch-coverage tidy): the four describes above force
+// HTTPS_PROXY, so generateGoalSuggestions always takes streamChat's
+// non-streaming `response.json()` branch — the SSE `body` generator in every
+// mockStreamResponse above is dead weight there. This describe runs with no
+// proxy configured (regardless of whatever the whole-suite acceptance run has
+// ambiently set) so the SSE streaming branch is still exercised by at least
+// one passing test. The mock deliberately omits `json()` — if a future change
+// silently routed this test through the non-streaming branch it would throw
+// rather than pass, so this is a real pin, not just a label.
+describe('generateGoalSuggestions streaming branch coverage, no proxy (LIN-1848 close-out F3)', () => {
+  const realFetch = global.fetch;
+  let savedProxyEnv;
+  beforeEach(() => {
+    savedProxyEnv = saveProxyEnv();
+    delete process.env.HTTPS_PROXY; delete process.env.HTTP_PROXY;
+    delete process.env.https_proxy; delete process.env.http_proxy;
+  });
+  afterEach(() => {
+    global.fetch = realFetch;
+    setFetchImpl(null);
+    restoreProxyEnv(savedProxyEnv);
+  });
+
+  function mockSseOnlyResponse(text) {
+    const enc = new TextEncoder();
+    const blocks = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 10 } })}\n\n`,
+      'data: [DONE]\n\n',
+    ];
+    return {
+      ok: true,
+      body: (async function* () { for (const b of blocks) yield enc.encode(b); })(),
+    };
+  }
+
+  test('a healthy generation over the real SSE streaming path still returns the guaranteed option set', async () => {
+    const raw = JSON.stringify({ analysis: 'WIP first.', options: [{ goal: 'Finish the in-flight work.', reasoning: 'WIP first.', size: 'M', title: 'Finish the in-flight work' }] });
+    let sawStreamedRequest = false;
+    mockOpenRouterFetch(async () => {
+      sawStreamedRequest = true;
+      return mockSseOnlyResponse(raw);
+    });
+
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    );
+
+    assert.ok(sawStreamedRequest, 'expected the mocked transport to be invoked');
+    const last = result.options[result.options.length - 1];
+    assert.equal(last.continueUntilStopped, true);
+    assert.ok(result.options.some(o => o.goal === 'Finish the in-flight work.' && o.size === 'M'));
   });
 });
