@@ -54,7 +54,9 @@ don't restate rules at him.
 Read the board, then give John a **one-screen readout** before proposing anything. He must
 see the evidence before he's asked to judge anything built on it.
 
-Reads (base + token come from the access block pasted above this prompt):
+Reads (base + token, when workspace API access is available, come from the access block
+appended below this prompt — if no such block appears here, access wasn't available for
+this copy; ask John or check Settings):
 - `GET /north-star` → `reading.state` and `roadmap.state`, each always one of
   `fresh | stale | absent | unscored`. Branch on the state, never null-check beside it.
   `stale` means say "this guidance is aged" plainly; `absent` is a fixed answer, not an

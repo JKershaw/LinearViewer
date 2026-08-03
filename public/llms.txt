@@ -353,6 +353,19 @@ main.flight-companion-page[data-url-key]  - page container
   #flight-companion-copy-feedback         - copy status text
 ```
 
+## Passage Planner (experimental)
+
+The Passage Planner page (`/workspace/{urlKey}/passage-planner`) is Flight Companion parity (LIN-1849) for the Passage Planner prompt. It surfaces the validated live passage-planning session kickoff prompt (`lib/prompts/passage-planner-kickoff.js`, which reads `docs/passage-planner-prompt.md` at HEAD with its design-artifact preamble stripped) that you paste into a fresh Claude Code session with a `readWrite` proxy token to orient off the real state of the workspace and negotiate a small ratified passage of work together. Requires the per-user `passagePlanner` feature flag; reached only via a link in Settings. Unlike Flight Companion, there is no user-facing `+proxy` toggle — the prompt requires the access block, so copy always attempts a FORCED append (`ProxyToggle.maybeAppend(text, urlKey, {force:true})`) when the per-user `proxy` feature flag is also on. When `proxy` is off, the page renders a degradation notice (with a Settings link) and copy skips the mint attempt entirely, copying the bare prompt instead of attempting a mint that would 403.
+
+### Passage Planner DOM Structure
+```
+main.passage-planner-page[data-url-key]   - page container
+  body[data-proxy-available]              - "true"/"false", read by the copy handler
+  #passage-planner-prompt                 - the kickoff prompt (pre, copyable)
+  #passage-planner-copy                   - copy-to-clipboard button
+  #passage-planner-copy-feedback          - copy status text
+```
+
 ## Live Console (experimental)
 
 The Live Console page (`/workspace/{urlKey}/live-console`) is an ambient, "lean-back" realtime feed of agent activity merged across ALL connected workspaces. It has TWO sources, shaped by `lib/live-console.js`: the agent-status log (research/implementation/review/close-out steps → the event STREAM) and lean dispatch loops (running loops → currently-working LANES carrying their latest HEARTBEAT — tool count / elapsed / per-tool breakdown — plus `[evidence]` artifacts as linked stream events; heartbeat beats also feed the tempo sparkline so it keeps moving between discrete steps). Reads Mongo only — no Linear calls and no LLM per poll. Requires the per-user `liveConsole` feature flag; reached via a Settings link and the nav `⋯ more` overflow when on (route redirects to `/settings` when off). Polls every 5s (chained, in-flight-guarded, exponential backoff on failure; pauses while the tab is hidden). A "view earlier activity" control pages OLDER status events (before page load) into a history region below the live feed. Purely presentational — no writes.

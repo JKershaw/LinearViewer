@@ -54,7 +54,7 @@ test('getViewNavLinks surfaces experimental views ONLY when their flag is on (ga
   // Policy reversal: experimental views used to be Settings-only and NEVER here.
   // They are now gated-included — absent when off, present (as their kebab route
   // key) when on, so they can land in the `⋯ more` overflow.
-  const experimentalPaths = ['collective', 'task-chat', 'ship', 'next-run', 'flight-companion', 'ship-biscuit'];
+  const experimentalPaths = ['collective', 'task-chat', 'ship', 'next-run', 'flight-companion', 'passage-planner', 'ship-biscuit'];
 
   // Off / absent → none of the experimental views appear.
   const off = getViewNavLinks('acme', {}).map(l => l.text);
@@ -64,13 +64,13 @@ test('getViewNavLinks surfaces experimental views ONLY when their flag is on (ga
 
   // Every flag on → each appears, emitted as its KEBAB route text.
   const on = getViewNavLinks('acme', {
-    collective: true, taskChat: true, ship: true, nextRun: true, flightCompanion: true, shipBiscuit: true
+    collective: true, taskChat: true, ship: true, nextRun: true, flightCompanion: true, passagePlanner: true, shipBiscuit: true
   }).map(l => l.text);
   for (const path of experimentalPaths) {
     assert.ok(on.includes(path), `${path} must appear when its flag is on`);
   }
   // The camelCase gating flag must NOT leak into the nav text (active-match key).
-  for (const flag of ['taskChat', 'nextRun', 'flightCompanion', 'shipBiscuit']) {
+  for (const flag of ['taskChat', 'nextRun', 'flightCompanion', 'passagePlanner', 'shipBiscuit']) {
     assert.ok(!on.includes(flag), `${flag} camelCase flag must not be used as nav text`);
   }
 

@@ -50,7 +50,7 @@ test.describe('Header view switcher (LIN-978)', () => {
   test('experimental views appear in the header ONLY when their flag is on (gated, LIN-1247)', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Policy reversal (LIN-1247): experimental views used to be Settings-only and
     // never in the switcher. They are now gated-included in the `⋯ more` overflow.
-    const experimentalViews = ['collective', 'task-chat', 'ship', 'next-run', 'flight-companion', 'ship-biscuit'];
+    const experimentalViews = ['collective', 'task-chat', 'ship', 'next-run', 'flight-companion', 'passage-planner', 'ship-biscuit'];
 
     // Flags off → none of the experimental views are in the switcher.
     await seedLocal(swimLocalSeed, { features: {} });
@@ -63,7 +63,7 @@ test.describe('Header view switcher (LIN-978)', () => {
     // Every experimental flag on → each view is surfaced (emitted as its kebab
     // route key, whether inline or collapsed in the overflow group).
     await seedLocal(swimLocalSeed, {
-      features: { collective: true, taskChat: true, ship: true, nextRun: true, flightCompanion: true, shipBiscuit: true }
+      features: { collective: true, taskChat: true, ship: true, nextRun: true, flightCompanion: true, passagePlanner: true, shipBiscuit: true }
     });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
@@ -71,7 +71,7 @@ test.describe('Header view switcher (LIN-978)', () => {
       await expect(nav(page).getView(view)).toHaveCount(1);
     }
     // The camelCase gating flags must NOT leak in as nav keys.
-    for (const flag of ['taskChat', 'nextRun', 'flightCompanion', 'shipBiscuit']) {
+    for (const flag of ['taskChat', 'nextRun', 'flightCompanion', 'passagePlanner', 'shipBiscuit']) {
       await expect(nav(page).getView(flag)).toHaveCount(0);
     }
   });
