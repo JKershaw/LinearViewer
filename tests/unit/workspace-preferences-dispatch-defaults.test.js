@@ -97,7 +97,13 @@ describe('resolveDispatchDefaults — precedence', () => {
     assert.deepEqual(resolved, { model: 'anthropic/claude-opus-4.8', harness: 'opencode' });
   });
 
-  test('model and harness resolve independently across per-kind and workspace-wide levels', async () => {
+  // Re-titled (LIN-1694, non-blocking per plan-review): this specific case has
+  // no cross-row conflict (the workspace-wide model row carries no harness of
+  // its own), so it is unaffected by the row-atomic eligibility guard added to
+  // `resolveRoutingFromConfig` — it is no longer asserting unconditional
+  // field independence. See resolve-routing-from-config.test.js's dedicated
+  // "row-atomic harnessInForce guard" suite for the guard itself.
+  test('a per-kind harness override with no per-kind model still falls through to the workspace-wide model (no cross-row conflict)', async () => {
     await store.saveWorkspacePreferences('ws-1', {
       dispatchDefaults: {
         model: 'anthropic/claude-opus-4.8',
@@ -109,6 +115,18 @@ describe('resolveDispatchDefaults — precedence', () => {
     });
     const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', kind: 'implementation', store });
     assert.deepEqual(resolved, { model: 'anthropic/claude-opus-4.8', harness: 'claude-code' });
+  });
+
+  // LIN-1694: `harnessInForce` threaded straight through to the pure resolver.
+  test('harnessInForce closes the crossed pair: a workspace-wide model scoped to a different harness does not cross', async () => {
+    await store.saveWorkspacePreferences('ws-1', {
+      dispatchDefaults: {
+        model: 'deepseek/deepseek-v4-pro',
+        harness: 'opencode'
+      }
+    });
+    const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', kind: 'implementation', store, harnessInForce: 'claude-code' });
+    assert.deepEqual(resolved, { model: null, harness: 'opencode' });
   });
 
   test('autopilot per-kind override is honored (LIN-1278) — autopilot is a configurable dispatch-default type', async () => {
