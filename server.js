@@ -1100,8 +1100,13 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
       // and never remove a genuinely revoked installation. Unconditional
       // removal is the correct, already-established precedent
       // (ensureValidToken's own catch takes the same action on remint failure).
+      // deleteDurable is `false`, NOT parity with ensureValidToken's catch on
+      // this axis: the durable owner-credential record is keyed per workspace
+      // identity (accountId, urlKey), not per binding, so a workspace with a
+      // co-resident Linear durable credential must not have it deleted just
+      // because its GitHub-family binding failed to re-mint (LIN-1503 review).
       console.error('GitHub credential re-mint failed after 401:', remintError);
-      return handleWorkspaceRemoval(session, workspace.id, res, true);
+      return handleWorkspaceRemoval(session, workspace.id, res, false);
     }
     try {
       // Explicitly awaited so a render rejection reaches THIS catch, not the

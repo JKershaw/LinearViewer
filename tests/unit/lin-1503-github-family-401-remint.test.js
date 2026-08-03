@@ -52,8 +52,8 @@ describe('LIN-1503: handleUnauthorizedError GitHub-family branch (source-text pi
     const remintCatchIdx = body.indexOf('catch (remintError)', remintCallIdx);
     assert.notEqual(remintCatchIdx, -1, 'expected a catch (remintError) clause after the remint call');
 
-    const remintCatchRemovalIdx = body.indexOf('return handleWorkspaceRemoval(session, workspace.id, res, true);', remintCatchIdx);
-    assert.notEqual(remintCatchRemovalIdx, -1, 'expected catch (remintError) to call handleWorkspaceRemoval(..., true) unconditionally');
+    const remintCatchRemovalIdx = body.indexOf('return handleWorkspaceRemoval(session, workspace.id, res, false);', remintCatchIdx);
+    assert.notEqual(remintCatchRemovalIdx, -1, 'expected catch (remintError) to call handleWorkspaceRemoval(..., false) unconditionally — false because the durable owner-credential record is keyed per workspace identity, not per binding, so a re-mint failure must not delete a co-resident Linear durable credential');
 
     // F1's regression guard: the slice from the guard through catch
     // (remintError)'s own body must not contain the render or the live fetch it
