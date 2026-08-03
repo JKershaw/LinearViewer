@@ -1016,7 +1016,17 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
   applyAccessTokenToWorkspace(workspace, refreshed.token, refreshed.expiresAt);
   await saveSession(session);
   console.log('Token refreshed after 401, retrying request');
+  return renderDashboardAfterRefresh(workspace, session, teamId, openRouterSource, res);
+}
 
+/**
+ * Renders the dashboard after a successful post-401 credential refresh/re-mint.
+ * Provider-agnostic — extracted from handleTokenRefreshAndRetry (LIN-1503) so the
+ * GitHub-family branch in handleUnauthorizedError can reuse the same render tail
+ * without duplicating it, and without widening handleTokenRefreshAndRetry's own
+ * Linear-specific refresh scope.
+ */
+async function renderDashboardAfterRefresh(workspace, session, teamId, openRouterSource, res) {
   // Load custom prompts (non-blocking, fallback to empty)
   let customPrompts = [];
   try {
@@ -1067,16 +1077,71 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
     return;
   }
 
+  // LIN-1503: GitHub-family credentials are RE-MINTED from installationId + the
+  // App JWT, never refreshed from a stored refresh token — so they must never
+  // fall through to the Linear durableRecord check below (which would always
+  // read false for them and remove a recoverable workspace). Mirrors
+  // ensureValidToken's own provider branch (`server.js:647-648`), reusing the
+  // same remintActiveCredential seam. Two INDEPENDENTLY-scoped try/catches, not
+  // one: a successful re-mint followed by a failed render (e.g. a GitHub 403
+  // rate-limit — isAuthError matches 403 as well as 401) must NOT be treated as
+  // a remint failure and destroy the workspace.
+  if (workspace.provider === 'github' || workspace.provider === 'github-projects') {
+    try {
+      // Bounded to ONLY the re-mint + session-save, matching ensureValidToken's
+      // own try scope exactly (server.js:631-689) — it never wraps a render.
+      // Consequence, accepted deliberately (LIN-1503 close-out, ledger row 5): a
+      // saveSession failure AFTER a successful re-mint lands in the catch below
+      // and removes the workspace, even though the credential itself is healthy.
+      // That is the same outcome ensureValidToken's identically-scoped try
+      // produces for the same failure, so the two paths stay consistent; the
+      // session is unusable either way. Covered by
+      // tests/unit/lin-1503-github-family-401-remint-behaviour.test.js.
+      await remintActiveCredential(workspace, getProviderForWorkspace(workspace));
+      await saveSession(session);
+    } catch (remintError) {
+      // GitHub-family errors are plain Error, never TokenRefreshError, so
+      // isDefinitiveRevocation/isTransientRefreshFailure (both
+      // `instanceof TokenRefreshError` checks) would always read false here —
+      // reusing Linear's split would misclassify every failure as transient
+      // and never remove a genuinely revoked installation. Unconditional
+      // removal is the correct, already-established precedent
+      // (ensureValidToken's own catch takes the same action on remint failure).
+      // deleteDurable is `false`, which RESTORES parity with ensureValidToken's
+      // catch rather than departing from it (LIN-1503 close-out, O1): that catch
+      // gates its own durable delete on isDefinitiveRevocation(), which is
+      // `instanceof TokenRefreshError && code === 'EXPIRED'` and therefore ALWAYS
+      // false for a plain-Error GitHub re-mint failure — so it never deletes the
+      // durable record on this failure either. lib/token-refresh.js:30-33 states
+      // that contract ("both human refresh paths gate their durable delete on
+      // this predicate so they can never diverge"); `false` is what upholds it.
+      // The independent reason it is correct regardless of parity: the durable
+      // owner-credential record is keyed per workspace identity (accountId,
+      // urlKey), not per binding, so a workspace with a co-resident Linear
+      // durable credential must not have it deleted just because its
+      // GitHub-family binding failed to re-mint (LIN-1503 implementation review).
+      console.error('GitHub credential re-mint failed after 401:', remintError);
+      return handleWorkspaceRemoval(session, workspace.id, res, false);
+    }
+    try {
+      // Explicitly awaited so a render rejection reaches THIS catch, not the
+      // one above — the re-mint already succeeded, so a render failure (e.g.
+      // the same rate limit hitting again) must preserve the workspace and
+      // fail only this request, retryably.
+      return await renderDashboardAfterRefresh(workspace, session, teamId, openRouterSource, res);
+    } catch (renderError) {
+      console.error('Post-remint dashboard render failed (workspace preserved):', renderError);
+      return serviceUnavailable.html(res);
+    }
+  }
+
   // LIN-1524 (folding in LIN-1503's mandatory predicate half): re-point at the
   // durable record instead of the session-side `workspace.refreshToken`,
   // which Linear no longer carries — that gate would now be permanently
   // false for Linear too, and every 401 would delete the workspace instead of
   // refreshing it (the same LIN-1499 destructive-mode defect class, this time
-  // for Linear). Provider-blindness itself is UNCHANGED and stays exactly as
-  // broken as before for GitHub-family (no durable record ever exists for it,
-  // so this still evaluates false and falls through to removal) — LIN-1503
-  // remains filed separately for that broader fix; this is only the one
-  // re-point this cutover makes mandatory.
+  // for Linear). GitHub-family is now branched above, so this remains the
+  // Linear-only path — byte-identical to before this ticket otherwise.
   const durableRecord = await ownerCredentialStore.get(session.accountId, workspace.urlKey);
   if (durableRecord?.refreshToken) {
     try {
