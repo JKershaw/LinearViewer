@@ -1995,6 +1995,45 @@ test.describe('Consumer Feedback API', () => {
     expect(body.success).toBe(true);
     expect(body.feedbackCount).toBe(1);
   });
+
+  test('LIN-1427: feedback accepts kind:"refusal" and it survives to the history read', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+
+    const response = await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: '[blocked] refused: task required bypassing a safety control', kind: 'refusal' }
+    });
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(body.feedbackCount).toBe(1);
+
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
+    const historyResponse = await request.get(`${API_PREFIX}/api/dispatch/history`);
+    const { items } = await historyResponse.json();
+
+    expect(items[0].feedback.length).toBe(1);
+    expect(items[0].feedback[0].kind).toBe('refusal');
+    expect(items[0].feedback[0].message).toBe('[blocked] refused: task required bypassing a safety control');
+  });
+
+  test('LIN-1427: a normal completion feedback entry (no kind) does not acquire a refusal tag', async ({ request }) => {
+    const { token, itemId } = await setupTakenItem(request);
+
+    const response = await request.post(`/api/dispatch/feedback/${itemId}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { message: '[done] all finished' }
+    });
+    expect(response.status()).toBe(200);
+
+    await request.get(`/test/set-session?urlKey=${URL_KEY}`);
+    const historyResponse = await request.get(`${API_PREFIX}/api/dispatch/history`);
+    const { items } = await historyResponse.json();
+
+    expect(items[0].feedback.length).toBe(1);
+    expect(items[0].feedback[0].message).toBe('[done] all finished');
+    expect('kind' in items[0].feedback[0]).toBe(false);
+  });
 });
 
 test.describe('Dispatch History UI', () => {

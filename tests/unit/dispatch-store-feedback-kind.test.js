@@ -104,4 +104,28 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
     assert.equal(doc.feedback[0].rootItemId, rootItemId);
     assert.equal(doc.feedback[0].message, message);
   });
+
+  test('LIN-1427: "refusal" is a recognized FEEDBACK_ENTRY_KINDS member', () => {
+    assert.ok(FEEDBACK_ENTRY_KINDS.includes('refusal'));
+  });
+
+  test('LIN-1427: a kind:"refusal" feedback entry posted at a [blocked] finalize boundary persists as given', async () => {
+    const store = makeStore();
+    const item = await takenItem(store);
+    const rootItemId = '11111111-2222-3333-4444-555555555555';
+    const message = '[blocked] refused to proceed: task required bypassing a safety control';
+
+    const res = await store.addFeedback(
+      item._id,
+      URL_KEY,
+      { message, kind: 'refusal', rootItemId },
+      'token-a'
+    );
+
+    assert.ok(res && res.success);
+    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    assert.equal(doc.feedback[0].kind, 'refusal');
+    assert.equal(doc.feedback[0].rootItemId, rootItemId);
+    assert.equal(doc.feedback[0].message, message);
+  });
 });

@@ -99,4 +99,26 @@ describe('LIN-1475 — watch endpoint kind exposure', () => {
     assert.equal(entry.rootItemId, rootItemId);
     assert.equal(entry.message, usageMessage);
   });
+
+  test('LIN-1427: kind:"refusal" survives the watch endpoint\'s formatter unchanged', async () => {
+    const dispatchQueueStore = new DispatchQueueStore({
+      collection: createMockCollection(),
+      historyCollection: createMockCollection()
+    });
+    const app = buildApp({ dispatchQueueStore });
+
+    const created = await dispatchQueueStore.addItem('acme', { prompt: 'do the thing' });
+    await dispatchQueueStore.takeItem(created._id, 'acme');
+    const rootItemId = '11111111-2222-3333-4444-555555555555';
+    const refusalMessage = '[blocked] refused to proceed: task required bypassing a safety control';
+    await dispatchQueueStore.addFeedback(created._id, 'acme', { message: refusalMessage, kind: 'refusal', rootItemId }, null);
+
+    const watchRes = await call(app, 'get', `/api/proxy/dispatch/${created._id}`);
+    assert.equal(watchRes.status, 200, JSON.stringify(watchRes.body));
+
+    const [entry] = watchRes.body.feedback;
+    assert.equal(entry.kind, 'refusal');
+    assert.equal(entry.rootItemId, rootItemId);
+    assert.equal(entry.message, refusalMessage);
+  });
 });
