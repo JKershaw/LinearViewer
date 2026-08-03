@@ -204,6 +204,21 @@ describe('GET /api/proxy/periodicals', () => {
     assert.equal(historyCalls[0].limit, undefined);
   });
 
+  // Caught by the e2e suite (LIN-1829 beat 5), not this file originally: the
+  // route once passed `since` as a raw epoch-ms NUMBER. `dispatchedAt` is
+  // stored as a real Date, and the file-backed MangoDB store's cross-type
+  // `$gte` comparator returns NaN (no match) for a Date-vs-Number comparison
+  // — so on that backend the belt-and-suspenders `since` trim silently
+  // excluded EVERY history row, making every template read `never`
+  // regardless of real dispatch history. This fake store's `since` was never
+  // type-checked, so this class of bug was invisible here until the e2e
+  // mint-take-read-back test caught it against the real store.
+  test('`since` is passed as a real Date instance, not a raw epoch-ms number', async () => {
+    const { app, historyCalls } = buildApp();
+    await get(app);
+    assert.ok(historyCalls[0].since instanceof Date, `expected a Date, got ${typeof historyCalls[0].since}`);
+  });
+
   test('both reads are scoped to req.proxyUrlKey', async () => {
     const { app, itemsCalls, historyCalls } = buildApp({ tokenUrlKey: 'acme' });
     await get(app);

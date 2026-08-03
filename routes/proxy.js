@@ -3980,7 +3980,14 @@ One convention across every endpoint, so you can branch on the same fields every
       const [queueRows, history] = await Promise.all([
         dispatchQueueStore.listItems(req.proxyUrlKey, { projection: PERIODICAL_PROJECTION }),
         dispatchQueueStore.listHistory(req.proxyUrlKey, {
-          since: now - effectiveHorizonMs,
+          // A Date, not a raw number: `dispatchedAt` is stored as a real Date
+          // and listHistory's `since` is compared against it via `$gte`. The
+          // file-backed MangoDB store's cross-type comparator returns NaN
+          // (no match) for a Date-vs-Number `$gte`, so a raw epoch-ms number
+          // here would silently exclude every history row on that backend —
+          // this belt-and-suspenders `since` is supposed to trim the read,
+          // never break it.
+          since: new Date(now - effectiveHorizonMs),
           projection: PERIODICAL_PROJECTION
         })
       ]);

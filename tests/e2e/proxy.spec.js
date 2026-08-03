@@ -2704,3 +2704,170 @@ test.describe('Proxy API - North Star (real-server wiring, LIN-1810)', () => {
     expect(text.match(/"state": "fresh" \| "stale" \| "absent" \| "unscored"/g)).toHaveLength(2);
   });
 });
+
+// LIN-1829 (sub-ticket of LIN-373 Approach C) — real-server wiring for
+// GET /api/proxy/periodicals, mirroring the North Star e2e block above.
+//
+// tests/unit/proxy-periodicals-route.test.js mocks authenticateProxyToken and
+// the dispatchQueueStore entirely, so it can never prove: the guards are
+// actually mounted on the real router (proxyLimiter + authenticateProxyToken,
+// read scope sufficient); PERIODICAL_PROJECTION reads survive a real
+// Mongo/Mango round-trip; or that two workspaces' stores are genuinely
+// partitioned rather than merely passed different `urlKey` strings to the same
+// fake. This drives the real server end to end for exactly those properties.
+//
+// KNOWN LIMIT, not papered over: the seconds-vs-ms `historyTtl` conversion
+// (the beat-3 trap) is NOT covered here. It is structurally unreachable by
+// e2e — the real take-path archives `dispatchedAt = now`, which reads
+// `recent` under BOTH the correct and the broken conversion, so an assertion
+// here would pass unconditionally and prove nothing about the conversion.
+// That trap stays pinned at the unit layer with a fake store whose
+// `historyTtl` is deliberately expressed in seconds.
+test.describe('Proxy API - Periodicals (real-server wiring, LIN-1829)', () => {
+  // A real, live registry id (lib/periodicals.js) — the route's
+  // foldPeriodicalRuns() call is fed the real getPeriodicals() registry, not
+  // an injectable fixture, so the id used here must actually exist in it.
+  const PERIODICAL_ID = 'documentation-review';
+
+  let readToken;
+  let writeToken;
+  let consumerToken;
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
+
+    const readResp = await page.goto(`/test/create-proxy-token?scope=read&label=periodicals-read&urlKey=${URL_KEY}`);
+    readToken = (await readResp.json()).token;
+
+    const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=periodicals-write&urlKey=${URL_KEY}`);
+    writeToken = (await writeResp.json()).token;
+
+    // A consumer dispatch token lets the test play the runner (take), the
+    // same substrate that archives a queue row into history as 'taken'.
+    const consumerResp = await page.goto(`/test/create-dispatch-token?label=periodicals-runner&urlKey=${URL_KEY}`);
+    consumerToken = (await consumerResp.json()).token;
+  });
+
+  test('the route is admitted by the real auth chain as a read verb', async ({ request }) => {
+    // Only the stubbed validateToken path ran in the unit tests; this pins the
+    // real authenticateProxyToken behaviour for this specific route.
+    const noToken = await request.get('/api/proxy/periodicals');
+    expect(noToken.status()).toBe(401);
+
+    const badToken = await request.get('/api/proxy/periodicals', {
+      headers: { Authorization: 'Bearer invalid-token-here' }
+    });
+    expect(badToken.status()).toBe(401);
+
+    // A read-scope token is sufficient — no write scope, no feature-flag gate.
+    const ok = await request.get('/api/proxy/periodicals', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(ok.status()).toBe(200);
+  });
+
+  test('a fresh workspace with no dispatch activity reads every template as `never`', async ({ request }) => {
+    const resp = await request.get('/api/proxy/periodicals', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    expect(Array.isArray(body.periodicals)).toBe(true);
+    expect(body.periodicals.length).toBeGreaterThan(0);
+    const item = body.periodicals.find(p => p.id === PERIODICAL_ID);
+    expect(item).toBeTruthy();
+    expect(item.state).toBe('never');
+    expect(item.lastDispatchedAt).toBeNull();
+  });
+
+  test('mint -> take -> read-back: a real periodical dispatch reads `recent`, not `never`', async ({ request }) => {
+    // Mint with kind + periodicalId set explicitly — exactly how the real
+    // Periodicals group dispatch works (never derived from promptName).
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: {
+        prompt: 'review the docs',
+        promptName: 'Documentation Review',
+        kind: 'periodical',
+        periodicalId: PERIODICAL_ID,
+        target: 'cli'
+      }
+    });
+    expect(enqueue.status()).toBe(201);
+    const { id } = await enqueue.json();
+
+    // Take: the real consumer path this endpoint must read back through.
+    // takeItem() archives the row into HISTORY with status 'taken'
+    // immediately (lib/dispatch-store.js) — the shape foldPeriodicalRuns
+    // treats as real run evidence. (A live, un-taken QUEUE row would ALSO
+    // read `recent` under fold rule 1 — taking it is what actually proves
+    // the history read-back path this route depends on, not just the
+    // live-queue one.)
+    const take = await request.post(`/api/dispatch/take/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}` }
+    });
+    expect(take.status()).toBe(200);
+
+    const resp = await request.get('/api/proxy/periodicals', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    const item = body.periodicals.find(p => p.id === PERIODICAL_ID);
+    expect(item).toBeTruthy();
+    // The ceiling of what e2e can prove: dispatchedAt is `now` on the real
+    // take-path, so it can never age far enough to read `due` here — that
+    // state transition is pinned at the unit layer (beat 3) with a fake
+    // clock/store instead.
+    expect(item.state).toBe('recent');
+    expect(item.lastDispatchedAt).not.toBeNull();
+    // Carried through from the matched registry template, never re-joined.
+    expect(item.mode).toBe('corrective');
+    expect(item.cadence).toBe('weekly');
+  });
+
+  test('workspace isolation: workspace A never reflects workspace B\'s periodical dispatch', async ({ page, request, secondWorkerUrlKey }) => {
+    // A second, fully independent workspace — its own tokens, its own queue.
+    // The /test/* mint routes take urlKey as a plain query param (no prior
+    // session needed for it), so this needs no multiWorkspace session dance.
+    await page.goto(`/test/clear-proxy-tokens?urlKey=${secondWorkerUrlKey}`);
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${secondWorkerUrlKey}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${secondWorkerUrlKey}`);
+
+    const otherWrite = await (await page.goto(`/test/create-proxy-token?scope=readWrite&label=periodicals-write-b&urlKey=${secondWorkerUrlKey}`)).json();
+    const otherConsumer = await (await page.goto(`/test/create-dispatch-token?label=periodicals-runner-b&urlKey=${secondWorkerUrlKey}`)).json();
+    const otherRead = await (await page.goto(`/test/create-proxy-token?scope=read&label=periodicals-read-b&urlKey=${secondWorkerUrlKey}`)).json();
+
+    // Mint + take a real periodical dispatch in workspace B ONLY.
+    const enqueue = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${otherWrite.token}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'review the docs', kind: 'periodical', periodicalId: PERIODICAL_ID, target: 'cli' }
+    });
+    expect(enqueue.status()).toBe(201);
+    const { id } = await enqueue.json();
+    const take = await request.post(`/api/dispatch/take/${id}`, {
+      headers: { Authorization: `Bearer ${otherConsumer.token}` }
+    });
+    expect(take.status()).toBe(200);
+
+    // Workspace B's own read: `recent`.
+    const bResp = await request.get('/api/proxy/periodicals', {
+      headers: { Authorization: `Bearer ${otherRead.token}` }
+    });
+    expect(bResp.status()).toBe(200);
+    const bBody = await bResp.json();
+    expect(bBody.periodicals.find(p => p.id === PERIODICAL_ID).state).toBe('recent');
+
+    // Workspace A's own token, same template id: must still be `never` —
+    // workspace A's queue/history reads never saw workspace B's row. This is
+    // the one property a mocked unit test structurally cannot prove (beat 5).
+    const aResp = await request.get('/api/proxy/periodicals', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(aResp.status()).toBe(200);
+    const aBody = await aResp.json();
+    expect(aBody.periodicals.find(p => p.id === PERIODICAL_ID).state).toBe('never');
+  });
+});
