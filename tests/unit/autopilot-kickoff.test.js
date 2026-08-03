@@ -346,12 +346,14 @@ describe('buildAutopilotKickoff (periodicals pointer — scoped byte-identity, L
     assert.ok(!text.includes('overdue periodical'));
   });
 
-  test('the whole scoped build is unaffected, not just the snapshot section — every other kickoff snapshot test outside the general-only branch passes untouched (structural: full scoped text is byte-identical too, since sections before `snapshot` never vary by scope)', () => {
-    // The pre-edit scoped output = intro + manual + guide + snapshot, joined by
-    // SEP (buildAutopilotKickoff's own `sections.join(SEP)`). Only `snapshot`
-    // (via `firstAct`'s scoped arm — untouched) can differ for a scoped run, so
-    // reconstituting the full text from the golden's snapshot plus the OTHER
-    // (untouched) sections of a fresh build must equal the fresh build exactly.
+  // NOTE: this reconstitutes `text` from its own sections plus the golden, so it
+  // can only fail when `golden !== sections.at(-1)` — exactly what the preceding
+  // test already asserts. It is a structural sanity check on the reconstitution
+  // itself (that `SEP`-joining the untouched sections back together is lossless),
+  // not independent full-text coverage: only the `snapshot` section is golden-
+  // pinned here; `intro`/`manual`/`guide` are covered separately by the
+  // `guide`-verbatim test below, not by this one.
+  test('reconstituting scoped output from its own sections plus the golden snapshot is lossless (structural, not independent full-text coverage)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
     const sections = text.split(SEP);
     const golden = readFileSync(join(__dirname, '../fixtures/autopilot-kickoff/scoped-snapshot-golden.txt'), 'utf8');

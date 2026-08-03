@@ -1533,11 +1533,13 @@ GET ${baseUrl}/api/proxy/periodicals
   → "state": "recent" means a live queue row OR a history run inside its cadence
     window; "due" means the cadence has elapsed since the last run; "never" means
     NO EVIDENCE IN THE FULL RETAINED HISTORY WINDOW — not "ever ran". The window
-    is bounded by the store's own retention (30 days by default); a workspace
-    whose retention is configured narrower could in principle see "unknown"
-    instead (not produced by any deployment today). "mode"/"cadence" are carried
-    through from the matched template, never re-joined, so they can never
-    disagree with the value the "due"/"recent" boundary itself used.
+    is min(this route's fixed 30-day horizon, the store's retention).
+    "unknown" — absence not conclusive — appears only when the horizon is
+    narrower than retention, i.e. if an operator configures "historyTtl" longer
+    than 30 days; a shorter retention still yields a conclusive "never". Not
+    produced by any deployment today (both default to 30 days). "mode"/"cadence"
+    are carried through from the matched template, never re-joined, so they can
+    never disagree with the value the "due"/"recent" boundary itself used.
 
 GET ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — deprecated)
   → Recent agent status entries
@@ -3955,8 +3957,9 @@ One convention across every endpoint, so you can branch on the same fields every
    * templates at once.
    *
    * `now` is route-supplied (`Date.now()`), never a request parameter — no
-   * `?days=`, which keeps the fold's `unknown` state unreachable through this
-   * endpoint by construction (not by a fold-side guard). `runs` is
+   * `?days=`, which keeps the fold's `unknown` state unreachable via any
+   * request parameter (not unreachable by construction: an operator raising
+   * `historyTtl` above 30 days makes it live with no code change). `runs` is
    * deliberately not published: no live consumer exists yet (LIN-1629 is
    * unbuilt) and reshaping a published field later is costlier than adding
    * one. No registry re-join: `mode`/`cadence` are fold output, carried
