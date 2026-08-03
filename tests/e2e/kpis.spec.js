@@ -7,7 +7,27 @@
  */
 import { test, expect } from '@playwright/test';
 
+// LIN-1846: /kpis is the only spec that ever requests /kpis, and the route
+// caches its instance-wide stats process-wide for 60s (server.js KPI_CACHE_MS)
+// with no test-only bypass. Seeding proxy events in beforeAll — before ANY
+// test in this file issues the first page.goto('/kpis') — guarantees that
+// first request lands on a cold cache, which awaits the fresh DB read
+// synchronously, so the seeded events are already in the snapshot every
+// later test (warm or stale-refreshed) reads. Seeding per-test instead would
+// often land after the cache is already warm, leaving the toggle-dependent
+// charts empty for the rest of the run regardless of the fixture.
+const SEED_URL_KEY = 'kpis-e2e-seed';
+
 test.describe('KPIs page', () => {
+  test.beforeAll(async ({ request }) => {
+    await request.get(`/test/seed-proxy-event?urlKey=${SEED_URL_KEY}&status=200&endpoint=/api/proxy/issues`);
+    await request.get(`/test/seed-proxy-event?urlKey=${SEED_URL_KEY}&status=404&endpoint=/api/proxy/me`);
+  });
+
+  test.afterAll(async ({ request }) => {
+    await request.get(`/test/clear-proxy-events?urlKey=${SEED_URL_KEY}`);
+  });
+
   test('renders without authentication', async ({ page }) => {
     await page.goto('/kpis');
 
@@ -109,11 +129,12 @@ test.describe('KPIs page', () => {
       // The toggle markup renders unconditionally, server-side, regardless of
       // data — but its click handler is only wired client-side inside the
       // `!emptyUnless(...)` branch (public/kpis.js), which replaces the
-      // canvas with a "no data yet" note on an empty chart. So the presence
-      // check that actually predicts whether the handler is wired is the
-      // CANVAS's survival, not the toggle's — on a fresh/low-traffic instance
-      // this chart can legitimately have no data yet.
-      if (await page.locator(`#${chartId}`).count() === 0) return;
+      // canvas with a "no data yet" note on an empty chart. So the assertion
+      // that actually predicts whether the handler is wired is the CANVAS's
+      // survival, not the toggle's. The beforeAll seed above guarantees this
+      // chart has data, so the canvas existing is a real assertion here, not
+      // a guard that silently skips the rest of the test.
+      await expect(page.locator(`#${chartId}`)).toBeVisible();
 
       const toggle = page.locator(`.kpi-range-toggle[data-chart="${chartId}"]`);
       await expect(toggle).toBeVisible();

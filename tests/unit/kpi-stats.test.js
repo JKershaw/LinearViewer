@@ -510,15 +510,15 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
   });
 
   test('funnel counts a windowed dispatch as reported/completed even when its report timestamp falls outside a naive 30-day cutoff', async () => {
-    // The dispatch is inside the window; its report lands a little later, at
-    // a timestamp a naive report-timestamp filter would exclude. The funnel
-    // must join on the DISPATCH's own window via dispatchId, not filter the
-    // report by its own timestamp (see the funnel comment in kpi-stats.js) —
-    // otherwise a report that lands just after a window boundary silently
-    // vanishes from `reported`/`completed`.
+    // The dispatch is unambiguously inside the window; its report lands
+    // outside it, at a timestamp a naive report-timestamp filter would
+    // exclude. The funnel must join on the DISPATCH's own window via
+    // dispatchId, not filter the report by its own timestamp (see the funnel
+    // comment in kpi-stats.js) — otherwise a report that lands outside its
+    // dispatch's window silently vanishes from `reported`/`completed`.
     const collections = buildCollections({
       dispatchHistory: createMockCollection([
-        { _id: 'late-report', status: 'taken', dispatchedAt: daysAgo(30) }
+        { _id: 'late-report', status: 'taken', dispatchedAt: daysAgo(20) }
       ]),
       agentStatus: createMockCollection([
         { dispatchId: 'late-report', status: 'completed', timestamp: daysAgo(31) }
@@ -557,6 +557,39 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
     assert.strictEqual(stats.hourOfDay[3], 1);
     assert.strictEqual(stats.hourOfDay[11], 1);
     assert.strictEqual(stats.hourOfDay.reduce((a, b) => a + b, 0), 2);
+  });
+
+  // LIN-1846 close-out: before this fix, `windowedDispatchDocs` used a rolling
+  // `now − 30×24h` instant while the daily chart (`dispatchByDay`) separately
+  // required the doc's calendar day to be one of the 30 keys in `activityDays`
+  // (anchored at midnight of `activityDays[0]`). A dispatch landing in the gap
+  // between those two cutoffs — up to just under a day — passed the rolling
+  // filter (counted in totals/kinds/funnel) while its calendar day fell one
+  // day before `activityDays[0]` (dropped from the chart): cards and chart
+  // silently disagreed on what "· 30d" meant. Both cutoffs are now anchored
+  // at the same UTC-calendar-day boundary, so a dispatch in that former gap
+  // is excluded from cards, kinds, funnel, AND the chart alike.
+  test('cards, kinds, funnel, and the daily chart agree at the 30-day boundary', async () => {
+    // NOW = 2026-06-10T12:00:00Z, so activityDays[0] = '2026-05-12'
+    // (midnight 2026-05-12T00:00:00Z). The old rolling cutoff was
+    // 2026-05-11T12:00:00Z — this timestamp sits inside that former gap.
+    const gapDispatch = new Date('2026-05-11T18:00:00.000Z');
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([
+        { _id: 'gap', kind: 'research', status: 'taken', dispatchedAt: gapDispatch, resolvedAt: gapDispatch }
+      ]),
+      agentStatus: createMockCollection([
+        { dispatchId: 'gap', action: 'research', status: 'completed', timestamp: gapDispatch }
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.totals.dispatches, 0);
+    assert.deepStrictEqual(stats.dispatchKinds, []);
+    assert.deepStrictEqual(stats.funnel, { dispatched: 0, taken: 0, reported: 0, completed: 0 });
+    const chartTotal = stats.dispatchByDay.kinds
+      .reduce((sum, series) => sum + series.counts.reduce((a, b) => a + b, 0), 0);
+    assert.strictEqual(chartTotal, 0);
   });
 });
 
@@ -897,6 +930,30 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     assert.deepStrictEqual(stats.topEndpoints[0], { label: '/api/proxy/issues/:id', count: 2 });
     assert.deepStrictEqual(stats.topEndpoints[1], { label: '/api/proxy/me', count: 2 });
     assert.deepStrictEqual(stats.topEndpoints[2], { label: '/api/proxy/recommend', count: 1 });
+  });
+
+  // LIN-1846 close-out: proxyStatusHourly/topEndpointsHourly were only pinned
+  // on the find path (see the mirrored fixture in the "hourly proxy siblings"
+  // describe block above) — the aggregate() branch (loadProxyBins) never had
+  // its own hourly assertion, so a regression there could ship unnoticed.
+  test('proxy status/endpoint hourly siblings match the find path, excluding events older than 24h', async () => {
+    const hoursAgo = (n) => new Date(NOW.getTime() - n * 60 * 60 * 1000);
+    const event = (endpoint, status, hours) => ({ endpoint, method: 'GET', status, timestamp: hoursAgo(hours) });
+    const collections = await realCollections({
+      proxyEvents: [
+        event('/api/proxy/me', 200, 0),
+        event('/api/proxy/me', 200, 5),
+        event('/api/proxy/issues/:id', 500, 1),
+        event('/api/proxy/me', 200, 30) // outside the 24h window: lands in the 30d field only
+      ]
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.deepStrictEqual(stats.proxyStatusHourly, { ok: 2, clientError: 0, serverError: 1 });
+    assert.deepStrictEqual(stats.topEndpointsHourly[0], { label: '/api/proxy/me', count: 2 });
+    // The 30h-old event still lands in the 30d fields, not the hourly ones
+    assert.strictEqual(stats.proxyStatus.ok, 3);
+    assert.strictEqual(stats.topEndpoints[0].count, 3);
   });
 
   test('hour-of-day histogram and workspace union match the find path', async () => {
