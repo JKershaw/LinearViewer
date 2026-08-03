@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Seeded-plan eval for the `plan-review` VERDICT (LIN-1603 acceptance criterion 2).
+ * Seeded-plan eval for the `plan-review` VERDICT (LIN-1603 acceptance criterion 2;
+ * DEFECT 3 added by LIN-1859 for the 7th check, source-of-truth re-grounding).
  *
  * Sibling to scripts/eval-plan-review.mjs, which measures ROUTING — whether the
  * recommender reaches `plan-review` at all. This measures the thing the step exists
@@ -9,10 +10,13 @@
  *
  *   "A seeded plan with a known missing sibling and a known unnamed relaxation
  *    receives Request Changes naming both."  — LIN-1603, Acceptance
+ *   "... and a known table-token value inherited from a cached summary doc without
+ *    re-checking the primary stylesheet, receives Request Changes naming all three."
+ *    — LIN-1859, extending the acceptance criterion to the 7th check
  *
  * The seeded plan is realistic for THIS codebase (the four hand-rolled Markdown
  * typography subsets are real — see CLAUDE.md on `.desc-full-content` /
- * `.comment-body` / `.swipe-accordion-body` / `.task-edit-preview`), and both
+ * `.comment-body` / `.swipe-accordion-body` / `.task-edit-preview`), and all three
  * defects are detectable from the plan's own text, which matters because this
  * harness makes a single tool-less call:
  *
@@ -25,10 +29,17 @@
  *     allowlist (a sanitiser guard) and never declares it as a relaxation nor names
  *     the adversarial follow-up that re-tightens or bounds it. The template's rule:
  *     an unnamed loosening is Request Changes.
+ *   DEFECT 3 (check 7, source-of-truth re-grounding) — the plan takes the new table
+ *     rules' border-colour/cell-padding tokens as-is from a cached summary doc
+ *     (docs/design-notes/table-styling-summary.md) instead of re-reading the primary,
+ *     directly-readable source (public/style.css, already named in the plan's own
+ *     Background). The template's rule: a lossy/derived/cached source carrying
+ *     load-bearing data while the primary source is directly readable is a finding,
+ *     citing the primary source to use instead.
  *
  * HONEST SCOPE — this is a LOWER bound, and a tighter one than the routing harness:
  * production runs plan-review as a dispatched agent WITH tools, so check 1's
- * "re-run the search yourself" is a real grep there and impossible here. Both
+ * "re-run the search yourself" is a real grep there and impossible here. All three
  * defects were therefore planted so the plan's own text is sufficient evidence
  * ("where the plan makes no such claim, that absence is itself the finding"). A
  * miss here is a genuine finding; a catch here is a floor, not a ceiling.
@@ -79,6 +90,9 @@ grid that is hard to read.
 - Widen the DOMPurify configuration in \`public/common.js\` to keep the \`style\`
   attribute on \`td\` and \`th\`, so the column alignment marked emits
   (\`style="text-align:right"\`) survives sanitisation.
+- Border colour and cell-padding tokens for the new table rules are taken as-is from
+  docs/design-notes/table-styling-summary.md (already documented there as the current
+  .desc-full-content token set), rather than re-reading public/style.css directly.
 - Tests: a unit test asserting \`renderMarkdown\` preserves the alignment attribute, and
   a Playwright visual check of a table in a description.
 
@@ -110,6 +124,15 @@ const SEEDED_CONTEXT = {
 // What each planted defect looks like when NAMED. Keyword detection is deliberately
 // generous — it answers "did the reviewer raise this subject at all", and the
 // verbatim transcript is what decides whether it raised it correctly.
+//
+// INVARIANT (LIN-1859, F1): a DEFECT regex must not match vocabulary the rendered
+// prompt already supplies. A run that reaches a check, names it by the template's own
+// wording, and reports it clean would otherwise trip the detector whether or not the
+// planted defect was actually found — the original DEFECT 3 draft keyed on `distilled`,
+// `stale`, `re-?ground`, and `primary source`, all four of which check 7's own landed
+// wording (or the universal staleness post-pass heading) hands the reviewer for free.
+// Every alternative below is planted-content-specific instead: the cached doc's
+// filename/path, or a re-check-verb paired with the specific primary source's filename.
 const DEFECTS = [
   {
     key: 'missing-sibling',
@@ -120,6 +143,11 @@ const DEFECTS = [
     key: 'unnamed-relaxation',
     label: 'DEFECT 2 — undeclared DOMPurify allowlist relaxation (check 5, relaxation guard)',
     re: /(dompurify|sanitis|sanitiz|allowlist|allow-list|style attribute|xss)/i
+  },
+  {
+    key: 'unre-grounded-inherited-source',
+    label: 'DEFECT 3 — table-token values inherited from a cached summary doc without re-checking the primary stylesheet (check 7, source-of-truth re-grounding)',
+    re: /table-styling-summary|design-notes[\\/]table-styling|re-?(check|read|verify)[^.\n]{0,60}style\.css|not authoritative/i
   }
 ];
 
@@ -191,10 +219,11 @@ const prompt = rendered + FETCHED;
 
 console.log(`model=${GEN_MODEL}  K=${K}  temp=${TEMP}`);
 console.log(`prompt: generatePrompt('plan-review', …) — ${rendered.length} chars, unmodified — plus a ${FETCHED.length}-char fetched-description block\n`);
-console.log('Planted defects (both detectable from the plan text alone — this harness has no tools):');
+console.log('Planted defects (all detectable from the plan text alone — this harness has no tools):');
 for (const d of DEFECTS) console.log(`  ${d.label}`);
-console.log('\nAcceptance criterion under test: "a seeded plan with a known missing sibling and a');
-console.log('known unnamed relaxation receives Request Changes naming both".\n');
+console.log('\nAcceptance criterion under test: "a seeded plan with a known missing sibling, a');
+console.log('known unnamed relaxation, and a known table-token value inherited from a cached summary');
+console.log('doc without re-checking the primary stylesheet, receives Request Changes naming all three".\n');
 
 const runs = await Promise.all(Array.from({ length: K }, () => call(prompt)));
 
@@ -203,7 +232,7 @@ const rows = runs.map((out, i) => {
   const hits = Object.fromEntries(DEFECTS.map(d => [d.key, d.re.test(out)]));
   const framed = relaxationFramed(out);
   if (!QUIET) {
-    console.log(`\n${'='.repeat(78)}\nRUN ${i + 1} — verdict: ${verdict} | defect1 named: ${hits['missing-sibling']} | defect2 named: ${hits['unnamed-relaxation']} (framed as a relaxation: ${framed})\n${'='.repeat(78)}\n${out}\n`);
+    console.log(`\n${'='.repeat(78)}\nRUN ${i + 1} — verdict: ${verdict} | defect1 named: ${hits['missing-sibling']} | defect2 named: ${hits['unnamed-relaxation']} (framed as a relaxation: ${framed}) | defect3 named: ${hits['unre-grounded-inherited-source']}\n${'='.repeat(78)}\n${out}\n`);
   }
   return { verdict, ...hits, framed };
 });
@@ -216,6 +245,7 @@ console.log(`  verdict = Approve                : ${count(r => r.verdict === 'ap
 console.log(`  verdict CUT OFF by the token cap : ${count(r => r.verdict === '(truncated)')}/${K}   (harness failure, not an abstention)`);
 console.log(`  named DEFECT 1 (missing sibling) : ${count(r => r['missing-sibling'])}/${K}`);
 console.log(`  named DEFECT 2 (relaxation)      : ${count(r => r['unnamed-relaxation'])}/${K}   [framed AS a relaxation: ${count(r => r.framed)}/${K}]`);
-console.log(`  BOTH named + Request Changes     : ${count(r => r.verdict === 'request changes' && r['missing-sibling'] && r['unnamed-relaxation'])}/${K}   ← the acceptance criterion`);
+console.log(`  named DEFECT 3 (inherited source): ${count(r => r['unre-grounded-inherited-source'])}/${K}`);
+console.log(`  ALL THREE named + Request Changes: ${count(r => r.verdict === 'request changes' && r['missing-sibling'] && r['unnamed-relaxation'] && r['unre-grounded-inherited-source'])}/${K}   ← the acceptance criterion`);
 console.log(`\nThe counters index the transcripts; the transcripts are the evidence. A keyword hit`);
 console.log(`is not proof the reviewer made the right argument — read the runs before believing a rate.`);
