@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import {
   collectKpiStats, categorizeProxyEvent, PROXY_PHASES,
-  ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS, WEEKLY_WINDOW_WEEKS,
+  ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS,
   OUTCOME_WINDOW_WEEKS, OUTCOME_WINDOW_DAYS
 } from '../../lib/kpi-stats.js';
 
@@ -109,8 +109,8 @@ describe('collectKpiStats', () => {
       assert.ok(stats.proxyCategories[phase].every(count => count === 0), `${phase} not all zero`);
       assert.ok(stats.proxyCategoriesHourly[phase].every(count => count === 0), `hourly ${phase} not all zero`);
     }
-    assert.strictEqual(stats.dispatchByWeek.weeks.length, WEEKLY_WINDOW_WEEKS);
-    assert.deepStrictEqual(stats.dispatchByWeek.kinds, []);
+    assert.strictEqual(stats.dispatchByDay.days.length, ACTIVITY_WINDOW_DAYS);
+    assert.deepStrictEqual(stats.dispatchByDay.kinds, []);
     assert.deepStrictEqual(stats.funnel, { dispatched: 0, taken: 0, reported: 0, completed: 0 });
     assert.deepStrictEqual(stats.stepOutcomes, { completed: 0, failed: 0, blocked: 0, other: 0 });
     assert.deepStrictEqual(stats.dispatchKinds, []);
@@ -159,7 +159,7 @@ describe('collectKpiStats', () => {
         event('GET', '/api/proxy/dispatch/:id', 0),
         event('POST', '/api/proxy/foreman/status', 3),
         event('PATCH', '/api/proxy/issues/:id', 3),
-        event('GET', '/api/proxy/me', 45) // outside window: counts toward totals, not buckets
+        event('GET', '/api/proxy/me', 45) // outside the 30-day window: excluded from totals and buckets
       ])
     });
 
@@ -171,7 +171,7 @@ describe('collectKpiStats', () => {
     assert.strictEqual(stats.proxyCategories.watching[last], 1);
     assert.strictEqual(stats.proxyCategories.reporting[last - 3], 1);
     assert.strictEqual(stats.proxyCategories.acting[last - 3], 1);
-    assert.strictEqual(stats.totals.agentActions, 7);
+    assert.strictEqual(stats.totals.agentActions, 6);
     // 4 GET reads vs 3 writes → 1.3 reads per write
     assert.strictEqual(stats.vanity.readsPerWrite, 1.3);
     // Busiest day is today: 4 events vs 2 on day -3
@@ -227,30 +227,31 @@ describe('collectKpiStats', () => {
     assert.strictEqual(stats.dispatchKinds.length, 4);
   });
 
-  test('buckets dispatched work by kind into weekly windows', async () => {
+  test('buckets dispatched work by kind into daily windows', async () => {
     const collections = buildCollections({
       dispatchHistory: createMockCollection([
-        { _id: 'h1', kind: 'autopilot', status: 'taken', dispatchedAt: daysAgo(1) },   // newest week
-        { _id: 'h2', kind: 'research', status: 'taken', dispatchedAt: daysAgo(2) },    // newest week
-        { _id: 'h3', kind: 'research', status: 'taken', dispatchedAt: daysAgo(10) },   // 2 weeks back
-        { _id: 'h4', kind: 'research', status: 'taken', dispatchedAt: daysAgo(40) }    // outside windows
+        { _id: 'h1', kind: 'autopilot', status: 'taken', dispatchedAt: daysAgo(1) },
+        { _id: 'h2', kind: 'research', status: 'taken', dispatchedAt: daysAgo(1) },
+        { _id: 'h3', kind: 'research', status: 'taken', dispatchedAt: daysAgo(10) },
+        { _id: 'h4', kind: 'research', status: 'taken', dispatchedAt: daysAgo(40) }   // outside the 30-day window
       ])
     });
 
     const stats = await collectKpiStats(collections, { now: NOW });
-    assert.strictEqual(stats.dispatchByWeek.weeks.length, WEEKLY_WINDOW_WEEKS);
+    assert.strictEqual(stats.dispatchByDay.days.length, ACTIVITY_WINDOW_DAYS);
 
-    const research = stats.dispatchByWeek.kinds.find(k => k.label === 'research');
-    const autopilot = stats.dispatchByWeek.kinds.find(k => k.label === 'autopilot');
-    const lastWeek = WEEKLY_WINDOW_WEEKS - 1;
-    assert.strictEqual(research.counts[lastWeek], 1);
-    assert.strictEqual(research.counts[lastWeek - 1], 1);
-    assert.strictEqual(autopilot.counts[lastWeek], 1);
-    // Out-of-window doc contributes to no week
+    const research = stats.dispatchByDay.kinds.find(k => k.label === 'research');
+    const autopilot = stats.dispatchByDay.kinds.find(k => k.label === 'autopilot');
+    const last = ACTIVITY_WINDOW_DAYS - 1;
+    assert.strictEqual(research.counts[last - 1], 1);
+    assert.strictEqual(research.counts[last - 10], 1);
+    assert.strictEqual(autopilot.counts[last - 1], 1);
+    // Out-of-window doc (35 days exceeded the old weekly span; 40 days here
+    // exceeds even the 30-day retention) contributes to no day
     assert.strictEqual(research.counts.reduce((a, b) => a + b, 0), 2);
   });
 
-  test('folds long-tail kinds into other in the weekly view', async () => {
+  test('folds long-tail kinds into other in the daily view', async () => {
     const docs = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((kind, i) => (
       { _id: `h${i}`, kind, status: 'taken', dispatchedAt: daysAgo(1) }
     ));
@@ -260,11 +261,11 @@ describe('collectKpiStats', () => {
     const collections = buildCollections({ dispatchHistory: createMockCollection(docs) });
     const stats = await collectKpiStats(collections, { now: NOW });
 
-    const labels = stats.dispatchByWeek.kinds.map(k => k.label);
+    const labels = stats.dispatchByDay.kinds.map(k => k.label);
     assert.strictEqual(labels.length, 6); // top 5 + other
     assert.ok(labels.includes('other'));
-    const other = stats.dispatchByWeek.kinds.find(k => k.label === 'other');
-    assert.strictEqual(other.counts[WEEKLY_WINDOW_WEEKS - 1], 2); // f, g
+    const other = stats.dispatchByDay.kinds.find(k => k.label === 'other');
+    assert.strictEqual(other.counts[ACTIVITY_WINDOW_DAYS - 2], 2); // f, g, at daysAgo(1)
   });
 
   test('builds the work funnel from dispatch status, feedback, and linked steps', async () => {
@@ -441,6 +442,182 @@ describe('collectKpiStats', () => {
     assert.ok(!serialized.includes('CONFIDENTIAL-SUMMARY-CONTENT'), 'agent summary leaked');
     assert.ok(!serialized.includes('LIN-999'), 'issue identifier leaked');
     assert.ok(!serialized.includes('SECRET_TOKEN'), 'session token leaked');
+  });
+});
+
+// LIN-1846: several metrics were labelled "· 30d" but applied no window in
+// code at all, silently aggregating whatever the retention sweep hadn't yet
+// deleted. These tests seed one in-window and one out-of-window (daysAgo(31))
+// doc per metric and assert the stale doc is excluded — proving the window is
+// real rather than an artefact of source retention.
+describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
+  test('excludes an out-of-window dispatch from dispatch totals, autopilot runs, and dispatch kinds', async () => {
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([
+        { _id: 'in', kind: 'research', status: 'taken', dispatchedAt: daysAgo(5) },
+        { _id: 'out', kind: 'autopilot', status: 'taken', dispatchedAt: daysAgo(31) }
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.totals.dispatches, 1);
+    assert.strictEqual(stats.totals.autopilotRuns, 0);
+    assert.deepStrictEqual(stats.dispatchKinds, [{ label: 'research', count: 1 }]);
+  });
+
+  test('excludes out-of-window feedback from totals.feedbackNotes', async () => {
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([
+        { _id: 'in', status: 'taken', dispatchedAt: daysAgo(5), feedback: [{}, {}] },
+        { _id: 'out', status: 'taken', dispatchedAt: daysAgo(31), feedback: [{}, {}, {}] }
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.totals.feedbackNotes, 2);
+  });
+
+  test('excludes out-of-window proxy events and agent-status reports from totals.agentActions', async () => {
+    const collections = buildCollections({
+      proxyEvents: createMockCollection([
+        { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: daysAgo(5) },
+        { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: daysAgo(31) }
+      ]),
+      agentStatus: createMockCollection([
+        { action: 'review', status: 'completed', timestamp: daysAgo(5) },
+        { action: 'review', status: 'completed', timestamp: daysAgo(31) }
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.totals.agentActions, 2); // 1 proxy event + 1 agent-status report
+  });
+
+  test('excludes an out-of-window dispatch from every funnel stage', async () => {
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([
+        { _id: 'in', status: 'taken', dispatchedAt: daysAgo(5), resolvedAt: daysAgo(4), feedback: [{}] },
+        { _id: 'out', status: 'taken', dispatchedAt: daysAgo(31), resolvedAt: daysAgo(30), feedback: [{}] }
+      ]),
+      agentStatus: createMockCollection([
+        { dispatchId: 'in', status: 'completed', timestamp: daysAgo(4) },
+        { dispatchId: 'out', status: 'completed', timestamp: daysAgo(30) }
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.deepStrictEqual(stats.funnel, { dispatched: 1, taken: 1, reported: 1, completed: 1 });
+  });
+
+  test('funnel counts a windowed dispatch as reported/completed even when its report timestamp falls outside a naive 30-day cutoff', async () => {
+    // The dispatch is unambiguously inside the window; its report lands
+    // outside it, at a timestamp a naive report-timestamp filter would
+    // exclude. The funnel must join on the DISPATCH's own window via
+    // dispatchId, not filter the report by its own timestamp (see the funnel
+    // comment in kpi-stats.js) — otherwise a report that lands outside its
+    // dispatch's window silently vanishes from `reported`/`completed`.
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([
+        { _id: 'late-report', status: 'taken', dispatchedAt: daysAgo(20) }
+      ]),
+      agentStatus: createMockCollection([
+        { dispatchId: 'late-report', status: 'completed', timestamp: daysAgo(31) }
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.deepStrictEqual(stats.funnel, { dispatched: 1, taken: 1, reported: 1, completed: 1 });
+  });
+
+  test('excludes out-of-window agent-status reports from stepOutcomes', async () => {
+    const collections = buildCollections({
+      agentStatus: createMockCollection([
+        { action: 'research', status: 'completed', timestamp: daysAgo(5) },
+        { action: 'research', status: 'failed', timestamp: daysAgo(31) }
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.deepStrictEqual(stats.stepOutcomes, { completed: 1, failed: 0, blocked: 0, other: 0 });
+  });
+
+  test('excludes out-of-window activity from hourOfDay', async () => {
+    const collections = buildCollections({
+      proxyEvents: createMockCollection([
+        { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: new Date('2026-06-05T03:00:00Z') },
+        { method: 'GET', endpoint: '/api/proxy/me', status: 200, timestamp: new Date('2026-04-01T03:00:00Z') } // outside window
+      ]),
+      agentStatus: createMockCollection([
+        { action: 'review', status: 'completed', timestamp: new Date('2026-06-05T11:00:00Z') },
+        { action: 'review', status: 'completed', timestamp: new Date('2026-04-01T11:00:00Z') } // outside window
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.hourOfDay[3], 1);
+    assert.strictEqual(stats.hourOfDay[11], 1);
+    assert.strictEqual(stats.hourOfDay.reduce((a, b) => a + b, 0), 2);
+  });
+
+  // LIN-1846 close-out: before this fix, `windowedDispatchDocs` used a rolling
+  // `now − 30×24h` instant while the daily chart (`dispatchByDay`) separately
+  // required the doc's calendar day to be one of the 30 keys in `activityDays`
+  // (anchored at midnight of `activityDays[0]`). A dispatch landing in the gap
+  // between those two cutoffs — up to just under a day — passed the rolling
+  // filter (counted in totals/kinds/funnel) while its calendar day fell one
+  // day before `activityDays[0]` (dropped from the chart): cards and chart
+  // silently disagreed on what "· 30d" meant. Both cutoffs are now anchored
+  // at the same UTC-calendar-day boundary, so a dispatch in that former gap
+  // is excluded from cards, kinds, funnel, AND the chart alike.
+  test('cards, kinds, funnel, and the daily chart agree at the 30-day boundary', async () => {
+    // NOW = 2026-06-10T12:00:00Z, so activityDays[0] = '2026-05-12'
+    // (midnight 2026-05-12T00:00:00Z). The old rolling cutoff was
+    // 2026-05-11T12:00:00Z — this timestamp sits inside that former gap.
+    const gapDispatch = new Date('2026-05-11T18:00:00.000Z');
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([
+        { _id: 'gap', kind: 'research', status: 'taken', dispatchedAt: gapDispatch, resolvedAt: gapDispatch }
+      ]),
+      agentStatus: createMockCollection([
+        { dispatchId: 'gap', action: 'research', status: 'completed', timestamp: gapDispatch }
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.totals.dispatches, 0);
+    assert.deepStrictEqual(stats.dispatchKinds, []);
+    assert.deepStrictEqual(stats.funnel, { dispatched: 0, taken: 0, reported: 0, completed: 0 });
+    const chartTotal = stats.dispatchByDay.kinds
+      .reduce((sum, series) => sum + series.counts.reduce((a, b) => a + b, 0), 0);
+    assert.strictEqual(chartTotal, 0);
+  });
+});
+
+// The hourly siblings backing the 24h toggle on the two newly-toggled charts
+// (proxy responses, top proxy endpoints). Free to compute — loadProxyBins
+// already groups on the UTC hour for the hero chart — so these mirror the
+// existing hourly-phases test pattern: a recent event lands in both the 30d
+// and 24h fields; an event older than 24h (but still inside 30d) lands in the
+// 30d field only.
+describe('collectKpiStats — hourly proxy siblings for the 24h toggle (LIN-1846)', () => {
+  test('buckets proxy response classes and top endpoints hourly, excluding events older than 24h', async () => {
+    const hoursAgo = (n) => new Date(NOW.getTime() - n * 60 * 60 * 1000);
+    const event = (endpoint, status, hours) => ({ endpoint, method: 'GET', status, timestamp: hoursAgo(hours) });
+    const collections = buildCollections({
+      proxyEvents: createMockCollection([
+        event('/api/proxy/me', 200, 0),
+        event('/api/proxy/me', 200, 5),
+        event('/api/proxy/issues/:id', 500, 1),
+        event('/api/proxy/me', 200, 30) // outside the 24h window: lands in the 30d field only
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.deepStrictEqual(stats.proxyStatusHourly, { ok: 2, clientError: 0, serverError: 1 });
+    assert.deepStrictEqual(stats.topEndpointsHourly[0], { label: '/api/proxy/me', count: 2 });
+    // The 30h-old event still lands in the 30d fields, not the hourly ones
+    assert.strictEqual(stats.proxyStatus.ok, 3);
+    assert.strictEqual(stats.topEndpoints[0].count, 3);
   });
 });
 
@@ -711,7 +888,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     assert.strictEqual(stats.proxyCategories.watching[last], 1);
     assert.strictEqual(stats.proxyCategories.reporting[last - 3], 1);
     assert.strictEqual(stats.proxyCategories.acting[last - 3], 1);
-    assert.strictEqual(stats.totals.agentActions, 7); // includes the out-of-window event
+    assert.strictEqual(stats.totals.agentActions, 6); // excludes the out-of-window event
     assert.strictEqual(stats.vanity.readsPerWrite, 1.3);
     assert.strictEqual(stats.vanity.busiestDay.count, 4);
   });
@@ -753,6 +930,30 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     assert.deepStrictEqual(stats.topEndpoints[0], { label: '/api/proxy/issues/:id', count: 2 });
     assert.deepStrictEqual(stats.topEndpoints[1], { label: '/api/proxy/me', count: 2 });
     assert.deepStrictEqual(stats.topEndpoints[2], { label: '/api/proxy/recommend', count: 1 });
+  });
+
+  // LIN-1846 close-out: proxyStatusHourly/topEndpointsHourly were only pinned
+  // on the find path (see the mirrored fixture in the "hourly proxy siblings"
+  // describe block above) — the aggregate() branch (loadProxyBins) never had
+  // its own hourly assertion, so a regression there could ship unnoticed.
+  test('proxy status/endpoint hourly siblings match the find path, excluding events older than 24h', async () => {
+    const hoursAgo = (n) => new Date(NOW.getTime() - n * 60 * 60 * 1000);
+    const event = (endpoint, status, hours) => ({ endpoint, method: 'GET', status, timestamp: hoursAgo(hours) });
+    const collections = await realCollections({
+      proxyEvents: [
+        event('/api/proxy/me', 200, 0),
+        event('/api/proxy/me', 200, 5),
+        event('/api/proxy/issues/:id', 500, 1),
+        event('/api/proxy/me', 200, 30) // outside the 24h window: lands in the 30d field only
+      ]
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.deepStrictEqual(stats.proxyStatusHourly, { ok: 2, clientError: 0, serverError: 1 });
+    assert.deepStrictEqual(stats.topEndpointsHourly[0], { label: '/api/proxy/me', count: 2 });
+    // The 30h-old event still lands in the 30d fields, not the hourly ones
+    assert.strictEqual(stats.proxyStatus.ok, 3);
+    assert.strictEqual(stats.topEndpoints[0].count, 3);
   });
 
   test('hour-of-day histogram and workspace union match the find path', async () => {

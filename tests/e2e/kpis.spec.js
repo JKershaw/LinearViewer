@@ -7,7 +7,27 @@
  */
 import { test, expect } from '@playwright/test';
 
+// LIN-1846: /kpis is the only spec that ever requests /kpis, and the route
+// caches its instance-wide stats process-wide for 60s (server.js KPI_CACHE_MS)
+// with no test-only bypass. Seeding proxy events in beforeAll — before ANY
+// test in this file issues the first page.goto('/kpis') — guarantees that
+// first request lands on a cold cache, which awaits the fresh DB read
+// synchronously, so the seeded events are already in the snapshot every
+// later test (warm or stale-refreshed) reads. Seeding per-test instead would
+// often land after the cache is already warm, leaving the toggle-dependent
+// charts empty for the rest of the run regardless of the fixture.
+const SEED_URL_KEY = 'kpis-e2e-seed';
+
 test.describe('KPIs page', () => {
+  test.beforeAll(async ({ request }) => {
+    await request.get(`/test/seed-proxy-event?urlKey=${SEED_URL_KEY}&status=200&endpoint=/api/proxy/issues`);
+    await request.get(`/test/seed-proxy-event?urlKey=${SEED_URL_KEY}&status=404&endpoint=/api/proxy/me`);
+  });
+
+  test.afterAll(async ({ request }) => {
+    await request.get(`/test/clear-proxy-events?urlKey=${SEED_URL_KEY}`);
+  });
+
   test('renders without authentication', async ({ page }) => {
     await page.goto('/kpis');
 
@@ -61,9 +81,11 @@ test.describe('KPIs page', () => {
     expect(Array.isArray(data.proxyCategories.days)).toBe(true);
     expect(data.proxyCategories.days.length).toBe(30);
     expect(data.proxyCategoriesHourly.hours.length).toBe(24);
-    expect(data.dispatchByWeek.weeks.length).toBe(5);
-    // The outcome trend uses 4 weekly buckets, NOT the 5-week span above: the
-    // history TTL is 30 days, so a 35-day span under-fills its oldest bucket.
+    // Dispatched work by kind is now a genuine 30-day daily window (LIN-1846),
+    // not the old 5×7-day = 35-day span that exceeded the 30-day history TTL.
+    expect(data.dispatchByDay.days.length).toBe(30);
+    // The outcome trend uses 4 weekly buckets: the history TTL is 30 days, so
+    // a full 30-day span split into whole weeks would under-fill its oldest.
     expect(data.dispatchOutcomes.weeks.length).toBe(4);
     expect(data.dispatchOutcomes.weeklyRate.length).toBe(4);
     expect(data.dispatchOutcomes.weeklyResolved.length).toBe(4);
@@ -96,6 +118,34 @@ test.describe('KPIs page', () => {
     await expect(toggle.locator('.kpi-range-btn.is-active')).toHaveText('30d');
     await expect(toggle.locator('[data-range="24h"]')).toBeVisible();
   });
+
+  // LIN-1846: the volume-led scope decision gives 24h toggles to the two
+  // remaining proxy-derived charts, alongside the hero chart above. Low-volume
+  // dispatch/agent-status charts get the honest 30-day window but no toggle.
+  for (const chartId of ['chart-proxy-status', 'chart-top-endpoints']) {
+    test(`${chartId} has a 30d/24h range toggle that switches the active button on click (LIN-1846)`, async ({ page }) => {
+      await page.goto('/kpis');
+
+      // The toggle markup renders unconditionally, server-side, regardless of
+      // data — but its click handler is only wired client-side inside the
+      // `!emptyUnless(...)` branch (public/kpis.js), which replaces the
+      // canvas with a "no data yet" note on an empty chart. So the assertion
+      // that actually predicts whether the handler is wired is the CANVAS's
+      // survival, not the toggle's. The beforeAll seed above guarantees this
+      // chart has data, so the canvas existing is a real assertion here, not
+      // a guard that silently skips the rest of the test.
+      await expect(page.locator(`#${chartId}`)).toBeVisible();
+
+      const toggle = page.locator(`.kpi-range-toggle[data-chart="${chartId}"]`);
+      await expect(toggle).toBeVisible();
+      await expect(toggle.locator('.kpi-range-btn')).toHaveCount(2);
+      await expect(toggle.locator('.kpi-range-btn.is-active')).toHaveText('30d');
+
+      await toggle.locator('[data-range="24h"]').click();
+      await expect(toggle.locator('.kpi-range-btn.is-active')).toHaveText('24h');
+      await expect(toggle.locator('[data-range="30d"]')).not.toHaveClass(/is-active/);
+    });
+  }
 
   test('renders without horizontal overflow on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
