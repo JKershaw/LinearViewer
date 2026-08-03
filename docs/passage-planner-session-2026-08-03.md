@@ -4,11 +4,14 @@ A chronicle of the first live human-ratified run of the experimental Passage
 Planner prompt (LIN-1811), in the tradition of
 `collective-session-2026-06-12.md` and `flight-companion-session-2026-08-02.md`.
 Every code and contract claim below was re-verified against this repository
-at the time of writing (`git log --since=2026-08-03T07:22:03Z` shows exactly
-two commits on `main`: `cfaee25c`, which landed the v0 prompt text this
-session ran, and a later, unrelated KPI-windowing fix that touches none of
-the files this chronicle cites — the v0 text is unchanged since `cfaee25c`).
-All timestamps are UTC. **No transcript of either planning session was
+at the time of writing. Three commits have landed on `main` since this
+chronicle's task was filed: `cfaee25c` (the v0 prompt text session #1 ran),
+an unrelated KPI-windowing fix, and `31fcf36b` — the v0.1 revision, merged
+at 09:57:58Z, which **rewrote the very prompt document this chronicle
+cites**, from 294 lines to 162. Line references are therefore pinned
+explicitly: defect anchors cite v0 **at `cfaee25c`**, where those defects
+lived and where they can still be read; surviving text is cited at current
+HEAD. All timestamps are UTC. **No transcript of either planning session was
 retained** — both were hand-run `claude` CLI sessions (a proxy-page bootstrap
 token plus the pasted prompt doc), which is why neither appears in the
 dispatch history. This chronicle rests on the flight companion's
@@ -22,9 +25,9 @@ as it goes.
   exercise the challenge loop.
 - **Planning session #1** — a `claude` CLI session running prompt v0
   (`docs/passage-planner-prompt.md` at `cfaee25c`).
-- **Planning session #2** — a `claude` CLI session running the unmerged v0.1
-  draft (the text attached to LIN-1850's first comment; not yet in this
-  repository — see "What this session changed").
+- **Planning session #2** — a `claude` CLI session running the v0.1 draft
+  (the text attached to LIN-1850's first comment; unmerged at the time it
+  ran, landed since as `31fcf36b` — see "What this session changed").
 - **The flight companion** — observer, feedback scribe, and the source of
   every session-interior detail in this chronicle. Supervised from outside
   both sessions; John pasted key artifacts into their shared channel as the
@@ -75,10 +78,10 @@ Session #1 surfaced seven human-interface defects, distilled and posted as
 comment `4f3d5cce` on LIN-1842 at 09:19:22Z:
 
 1. **Serial ratification produced rubber-stamping.** One-leg-at-a-time
-   approval (`docs/passage-planner-prompt.md:94`, "Human dialogue and
-   ratification, one leg at a time") gave John no whole-plan context; per the
-   flight companion's notes he was click-approving without reading
-   ("honestly I'm just clicking approve without reading").
+   approval (`docs/passage-planner-prompt.md:94` at `cfaee25c`, "Human
+   dialogue and ratification, one leg at a time") gave John no whole-plan
+   context; per the flight companion's notes he was click-approving without
+   reading ("honestly I'm just clicking approve without reading").
 2. **Contract-formal tone throughout**, with no register guidance in the doc.
 3. **A timid, unexplained 4-task budget default**, with no sizing
    conversation in the prompt.
@@ -90,12 +93,16 @@ comment `4f3d5cce` on LIN-1842 at 09:19:22Z:
    four legs are ratified" off the hollow per-leg clicks, with no way to
    distinguish a genuine yes from a fatigued one.
 7. **Machine-legible, human-illegible output** —
-   `docs/passage-planner-prompt.md:237` ("Write every leg so it survives
-   runner handoff") engineers every leg to survive brief-distillation but
-   says nothing about human legibility. Per the flight companion's notes,
-   John read session #1's 30-task overview attentively and concluded the
-   periodicals leg was missing; it was present as Leg 4 — the wall of text
-   simply didn't show it.
+   `docs/passage-planner-prompt.md:237` at `cfaee25c` ("Write every leg so it
+   survives runner handoff") engineers every leg to survive
+   brief-distillation but says nothing about human legibility. Per the flight
+   companion's notes, John read session #1's 30-task overview attentively and
+   concluded the periodicals leg was missing; it was present as Leg 4 — the
+   wall of text simply didn't show it.
+
+Neither of those two section headings survives at HEAD: both were the
+defects v0.1 removed. They are cited at `cfaee25c` because that is where the
+defects are readable, not because they describe the current prompt.
 
 John's decision, per the flight companion's notes: iterate the prompt text
 directly rather than route a fix through the normal pipeline. The companion
@@ -127,10 +134,12 @@ John ratified the whole proposal in one motion — a single yes to the full
 voyage-log comment (`dc7660d5`, 09:37:51Z). Per the flight companion's notes,
 this was an explicit choice: John was validating the planning experience,
 not flying a passage, and said he lacked run-budget for the passage that
-day — so the v0.1 draft's step 4 challenge/negotiate loop was never
-exercised. The central fix session #1 lacked is therefore validated only in
+day — so the challenge/negotiate loop was never exercised (Step 4,
+"Negotiate the whole, ratify once", at `docs/passage-planner-prompt.md:103`
+at HEAD). The central fix session #1 lacked is therefore validated only in
 its propose-and-ratify half; whether a real challenge round works as
-intended is untested by this session.
+intended is untested by this session — and that untested half has since
+shipped, which is worth knowing.
 
 ## Writeout
 
@@ -149,20 +158,27 @@ Append-discipline for future edits ("post-creation edits to this description
 go through description/append or description/replace, never whole-body
 PATCH") is recorded in-description.
 
-The writeout deviates from the strict block prescribed at
-`docs/passage-planner-prompt.md:253` (`### Leg: <name>` with `**Anchors:**` /
-`**Intent:**` / `**Budget:**` / `**Making port:**` / `**Wind down if:**`
-lines): LIN-1851's description instead uses `## Leg N — <name>` headings with
-bolded bullets. This is left uncorrected deliberately — LIN-1844, the
+The writeout deviates from the strict block prescribed by the prompt
+(`### Leg: <name>` with `**Anchors:**` / `**Intent:**` / `**Budget:**` /
+`**Making port:**` / `**Wind down if:**` lines): LIN-1851's description
+instead uses `## Leg N — <name>` headings with bolded bullets. That block is
+one of the pieces v0.1 carried over untouched — it is byte-identical between
+v0 (`:253` at `cfaee25c`) and the current HEAD text
+(`docs/passage-planner-prompt.md:122`), so the deviation stands against the
+shipping prompt, not just against the version session #2 ran. This is left uncorrected deliberately — LIN-1844, the
 cold-read witness, is the task that measures the format actually written,
 not this chronicle.
 
 ## Gate
 
-`docs/passage-planner-prompt.md:265` (section 9, "The acceptance bar") makes
-the ordering load-bearing: chronicle, then a cold-read witness (a fresh
-context-free session reading only `GET /brief/LIN-1851` and stating each leg
-back), and only then may any runner be dispatched against a ratified leg. A
+The prompt makes the ordering load-bearing: chronicle, then a cold-read
+witness (a fresh context-free session reading only `GET /brief/LIN-1851` and
+stating each leg back), and only then may any runner be dispatched against a
+ratified leg. This survived the revision — it was section 9 ("The acceptance
+bar") at `docs/passage-planner-prompt.md:265` in v0, and is Step 6 ("Stop at
+the gate") at `:140` at current HEAD, which states it as "witness before
+runner, no exceptions, because runner activity would contaminate the
+context-free read." A
 live check of `GET /dispatch?issueIdentifier=LIN-1851` and
 `GET /dispatch?issueIdentifier=LIN-1812` today both return zero items — no
 runner dispatch exists against the passage task or its gated build-order
@@ -174,15 +190,26 @@ to LIN-1811.
 
 ## What this session changed
 
-The v0.1 revision is in flight as **PR #1065** (commit `7bffcbe`,
-`lin-1850-passage-planner-v0-1`), tracked as LIN-1850, currently **open and
-unmerged** — the repository's prompt at HEAD is still v0
-(`docs/passage-planner-prompt.md` unchanged since `cfaee25c`). Every
-statement above about v0.1's content describes the unmerged draft, not the
-prompt this repository currently ships. LIN-1849 (a one-click kickoff page
-for the planner, mirroring the Flight Companion pattern) is filed and
-sequenced to land after LIN-1850, so it serves the revised text rather than
-v0. The session's overall finding: the planner's evidence and writeout
+**The v0.1 revision landed.** PR #1065 (LIN-1850) merged at 09:57:58Z as
+`31fcf36b`, and LIN-1850 is `Done` — so within roughly forty minutes of the
+session that exposed them, all seven defects were fixed in the shipping
+prompt. `docs/passage-planner-prompt.md` at HEAD is v0.1: 162 lines against
+v0's 294, restructured from numbered sections into six conversational steps
+("Orient, and SHOW your orientation" → "Size it together" → "Propose the
+WHOLE passage at once" → "Negotiate the whole, ratify once" → "Write it" →
+"Stop at the gate"), with a "How to talk" register section added. The merged
+text carries the validated draft's body unchanged, plus the header-notes
+block (design-artifact status, the LIN-1380 graduation path, the
+both-paths sync discipline, and the vocabulary note) that LIN-1850 required
+be preserved — the draft in comment `44f45b69` omitted those notes, so the
+merged file is the draft plus that block, not a byte-identical copy of it.
+
+LIN-1849 (a one-click kickoff page for the planner, mirroring the Flight
+Companion pattern) was filed at 09:00:13Z and deliberately sequenced behind
+LIN-1850 so it would serve the revised text rather than v0; with v0.1 landed,
+that dependency is discharged.
+
+The session's overall finding: the planner's evidence and writeout
 machinery worked as designed on the first real run: correct anchors, correct
 budgets, correct quoted evidence, an honored write gate. What failed was
 entirely in the human-interface layer — ratification mechanics, tone,
@@ -210,9 +237,11 @@ sizing, and legibility — and that is the layer v0.1 targets.
   survive only as the seven distilled findings in comment `4f3d5cce`; the
   overview artifact itself was not retained.
 - **The ratification was honest but narrow.** One genuine yes to a full
-  proposal John had actually read — but the v0.1 draft's challenge/negotiate
-  loop was never exercised, so that half of the central fix remains
-  unvalidated by this session.
+  proposal John had actually read — but the challenge/negotiate loop was
+  never exercised, so that half of the central fix remains unvalidated by
+  this session. It shipped anyway, in `31fcf36b`, roughly twenty minutes
+  after the session that half-validated it: v0.1 is the live prompt with one
+  of its two central mechanics never having been run.
 - **Ten of fifteen periodicals read `never`** at planning time, which is a
   bounded claim (no run inside the retained 30-day window), not evidence
   that they have never run at all; LIN-1851's own Notes section states this
@@ -220,4 +249,11 @@ sizing, and legibility — and that is the layer v0.1 targets.
   stronger, incorrect one.
 - **The writeout format deviated** from the strict `### Leg:` block (see
   "Writeout" above) — recorded here as a fact for LIN-1844 to measure, not
-  smoothed into "close enough."
+  smoothed into "close enough." The block survived v0.1 byte-identical, so
+  the deviation did not get revised away with the rest of the prompt.
+- **This chronicle was overtaken by its own subject mid-writing.** v0.1
+  merged after the first draft was written and before it landed, rewriting
+  the document this chronicle cites and invalidating every line reference in
+  it. The citations above are pinned to explicit commits for that reason.
+  A chronicle of a still-moving experiment is a snapshot, not a settled
+  record — LIN-1844 and LIN-1845 should re-verify rather than inherit.
