@@ -118,10 +118,14 @@ export function resolveProxyLLM(sessionApiKey) {
 // Distinct from OWNERLESS_NOTE (lib/proxy-events.js) and from the LIN-961
 // free-tier prose note — exact-equality strings so a future consumer can
 // classify by note without substring matching (lib/proxy-events.js's "never
-// includes" rule). Deliberately NOT exported from lib/proxy-events.js: they are
-// not consumed by credentialVerdict/foldCredentialHealth, which answers "is
-// this dispatch/proxy token dying", a different question from "which
-// OpenRouter credential source served this request".
+// includes" rule). Kept local rather than exported from lib/proxy-events.js
+// because they answer a different question than credentialVerdict does ("which
+// OpenRouter credential source served this request", not "is this dispatch/proxy
+// token dying") — but their audit rows DO reach credentialVerdict/foldCredentialHealth
+// like any other row for the token: exact-equality matching means they never
+// increment ownerlessCount, while their status:200 does feed okCount, the same
+// shape as the pre-existing LIN-961 free-tier row, and is accepted deliberately.
+// See tests/unit/credential-health-predicate.test.js's LIN-1458 case for the pin.
 const OPENROUTER_FALLBACK_PAID_NOTE = 'openrouter_key_fallback_paid_env';
 const OPENROUTER_FALLBACK_FREE_NOTE = 'openrouter_key_fallback_free_tier';
 
