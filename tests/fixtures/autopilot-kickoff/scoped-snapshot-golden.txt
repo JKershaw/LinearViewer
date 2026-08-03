@@ -1,0 +1,21 @@
+## Where things stand right now  (snapshot)
+
+**Mode: WRITE, merge-gated.** Implementation, review, and close-out kinds are allowed. You may
+drive a task all the way through its close: once `review` approves, dispatch the `close-out` step (it
+runs the ledger-gated merge + Done), then verify the close landed — you don't merge inline yourself.
+Pause for the human at a review that raises a direction question, or before anything large or risky
+lands.
+
+**Goal from the human:** run on autopilot until **LIN-42** (Fix the thing)
+is done. This run is scoped to that one task — the precedence policy is moot. Orient by reading the
+task, then trigger `POST /recommend-and-dispatch` with `{ issueIdentifier: "LIN-42", sessionId }`;
+loop until it's complete (verified) or you hit a point that wants the human, then stop.
+Do not pull other tasks off the stack.
+
+**Proxy:** base https://example.com/api/proxy · Bearer token supplied alongside this prompt (the +proxy block) · full
+verb catalog at `GET https://example.com/api/proxy/instructions`.
+
+**Your first act:** read **LIN-42** (`GET /brief/LIN-42` — distilled current state, folds in comments and supersedes stale wording; `GET /issues/LIN-42` for full raw detail), then trigger
+`POST /recommend-and-dispatch` (`{ issueIdentifier: "LIN-42", sessionId }`) for the next step.
+Announce your choice in a line and go — the prompt is dispatched server-side; you never hold it. The
+human is watching asynchronously, not live; being dispatched into this run was already their go-ahead.
