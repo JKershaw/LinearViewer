@@ -61,9 +61,11 @@ test.describe('KPIs page', () => {
     expect(Array.isArray(data.proxyCategories.days)).toBe(true);
     expect(data.proxyCategories.days.length).toBe(30);
     expect(data.proxyCategoriesHourly.hours.length).toBe(24);
-    expect(data.dispatchByWeek.weeks.length).toBe(5);
-    // The outcome trend uses 4 weekly buckets, NOT the 5-week span above: the
-    // history TTL is 30 days, so a 35-day span under-fills its oldest bucket.
+    // Dispatched work by kind is now a genuine 30-day daily window (LIN-1846),
+    // not the old 5×7-day = 35-day span that exceeded the 30-day history TTL.
+    expect(data.dispatchByDay.days.length).toBe(30);
+    // The outcome trend uses 4 weekly buckets: the history TTL is 30 days, so
+    // a full 30-day span split into whole weeks would under-fill its oldest.
     expect(data.dispatchOutcomes.weeks.length).toBe(4);
     expect(data.dispatchOutcomes.weeklyRate.length).toBe(4);
     expect(data.dispatchOutcomes.weeklyResolved.length).toBe(4);
@@ -96,6 +98,28 @@ test.describe('KPIs page', () => {
     await expect(toggle.locator('.kpi-range-btn.is-active')).toHaveText('30d');
     await expect(toggle.locator('[data-range="24h"]')).toBeVisible();
   });
+
+  // LIN-1846: the volume-led scope decision gives 24h toggles to the two
+  // remaining proxy-derived charts, alongside the hero chart above. Low-volume
+  // dispatch/agent-status charts get the honest 30-day window but no toggle.
+  for (const chartId of ['chart-proxy-status', 'chart-top-endpoints']) {
+    test(`${chartId} has a 30d/24h range toggle that switches the active button on click (LIN-1846)`, async ({ page }) => {
+      await page.goto('/kpis');
+
+      const toggle = page.locator(`.kpi-range-toggle[data-chart="${chartId}"]`);
+      // A chart whose canvas was replaced by emptyUnless() carries no toggle
+      // at all — only assert the click behavior when the toggle is present.
+      if (await toggle.count() === 0) return;
+
+      await expect(toggle).toBeVisible();
+      await expect(toggle.locator('.kpi-range-btn')).toHaveCount(2);
+      await expect(toggle.locator('.kpi-range-btn.is-active')).toHaveText('30d');
+
+      await toggle.locator('[data-range="24h"]').click();
+      await expect(toggle.locator('.kpi-range-btn.is-active')).toHaveText('24h');
+      await expect(toggle.locator('[data-range="30d"]')).not.toHaveClass(/is-active/);
+    });
+  }
 
   test('renders without horizontal overflow on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });

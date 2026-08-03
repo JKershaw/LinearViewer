@@ -41,11 +41,11 @@ function buildStats(overrides = {}) {
       watching: [2, 2],
       reporting: [1, 0]
     },
-    dispatchByWeek: {
-      weeks: ['2026-05-06', '2026-05-13', '2026-05-20', '2026-05-27', '2026-06-03'],
+    dispatchByDay: {
+      days: ['2026-06-09', '2026-06-10'],
       kinds: [
-        { label: 'autopilot', counts: [0, 1, 1, 2, 3] },
-        { label: 'research', counts: [1, 0, 2, 1, 1] }
+        { label: 'autopilot', counts: [1, 2] },
+        { label: 'research', counts: [0, 1] }
       ]
     },
     dispatchOutcomes: {
@@ -64,7 +64,9 @@ function buildStats(overrides = {}) {
     dispatchKinds: [{ label: 'autopilot', count: 4 }, { label: 'research', count: 3 }],
     stepOutcomes: { completed: 5, failed: 1, blocked: 0, other: 2 },
     proxyStatus: { ok: 30, clientError: 2, serverError: 1 },
+    proxyStatusHourly: { ok: 5, clientError: 0, serverError: 1 },
     topEndpoints: [{ label: '/api/proxy/me', count: 9 }],
+    topEndpointsHourly: [{ label: '/api/proxy/me', count: 2 }],
     hourOfDay: Array.from({ length: 24 }, (_, h) => h),
     freeTier: { days: ['2026-06-09', '2026-06-10'], counts: [4, 6] },
     vanity: {
@@ -137,8 +139,27 @@ describe('renderKpisPage', () => {
     assert.ok(html.includes('class="kpi-range-toggle" data-chart="chart-proxy-phases"'));
     assert.ok(html.includes('class="kpi-range-btn is-active" data-range="30d"'));
     assert.ok(html.includes('class="kpi-range-btn" data-range="24h"'));
-    // Only the hero chart gets a toggle
-    assert.strictEqual(html.match(/kpi-range-toggle/g).length, 1);
+  });
+
+  test('renders a 30d/24h range toggle on proxy responses and top proxy endpoints too (LIN-1846)', () => {
+    const html = renderKpisPage(buildStats());
+
+    assert.ok(html.includes('class="kpi-range-toggle" data-chart="chart-proxy-status"'));
+    assert.ok(html.includes('class="kpi-range-toggle" data-chart="chart-top-endpoints"'));
+    // Hero chart + proxy responses + top endpoints: exactly these three, and
+    // no other chart (the volume-led scope decision — LIN-1846).
+    assert.strictEqual(html.match(/kpi-range-toggle/g).length, 3);
+  });
+
+  test('titles the newly-windowed charts honestly (LIN-1846)', () => {
+    const html = renderKpisPage(buildStats());
+
+    // The 35-day weekly span exceeded 30-day retention; it is now a genuine
+    // 30-day daily-bucketed window, so the title drops "weekly".
+    assert.ok(html.includes('dispatched work by kind · 30d'));
+    assert.ok(!html.includes('dispatched work by kind · weekly'));
+    // proxy responses previously carried no window label at all
+    assert.ok(html.includes('proxy responses · 30d'));
   });
 
   test('renders the headline outcome number with its slices and coverage label', () => {

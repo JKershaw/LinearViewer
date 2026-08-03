@@ -55,6 +55,27 @@
     return dayKey.slice(5); // 'YYYY-MM-DD' → 'MM-DD'
   }
 
+  // Wire a chart's 30d/24h range toggle. `views` is a map of range name →
+  // arbitrary view data; `applyView(chart, view)` mutates the chart's data to
+  // match. Shared by every toggled chart so there is exactly one toggle
+  // system, not one per chart. Must only be called for a chart whose canvas
+  // still exists — emptyUnless() may have already replaced it with a
+  // "no data yet" note, which would leave the toggle's query target gone.
+  function wireRangeToggle(chartId, chart, views, applyView) {
+    const toggle = document.querySelector('.kpi-range-toggle[data-chart="' + chartId + '"]');
+    if (!toggle) return;
+    toggle.addEventListener('click', function (event) {
+      const button = event.target.closest('button[data-range]');
+      const view = button && views[button.dataset.range];
+      if (!view || button.classList.contains('is-active')) return;
+      toggle.querySelectorAll('.kpi-range-btn').forEach(function (b) {
+        b.classList.toggle('is-active', b === button);
+      });
+      applyView(chart, view);
+      chart.update();
+    });
+  }
+
   // --- Proxy calls by phase (hero): stacked bars per day or per hour ---
   // Composition over volume: what agents do, not how much. Phases are the
   // agent loop — orient, decide, act, watch, report. A 30d/24h toggle
@@ -102,22 +123,12 @@
       }
     });
 
-    const phasesToggle = document.querySelector('.kpi-range-toggle[data-chart="chart-proxy-phases"]');
-    if (phasesToggle) {
-      phasesToggle.addEventListener('click', function (event) {
-        const button = event.target.closest('button[data-range]');
-        const view = button && phaseViews[button.dataset.range];
-        if (!view || button.classList.contains('is-active')) return;
-        phasesToggle.querySelectorAll('.kpi-range-btn').forEach(function (b) {
-          b.classList.toggle('is-active', b === button);
-        });
-        phasesChart.data.labels = view.labels;
-        phasesChart.data.datasets.forEach(function (dataset, i) {
-          dataset.data = view.source[PHASE_STYLES[i][0]];
-        });
-        phasesChart.update();
+    wireRangeToggle('chart-proxy-phases', phasesChart, phaseViews, function (chart, view) {
+      chart.data.labels = view.labels;
+      chart.data.datasets.forEach(function (dataset, i) {
+        dataset.data = view.source[PHASE_STYLES[i][0]];
       });
-    }
+    });
   }
 
   // --- Work landed, weekly (the headline number's evidence) ---
@@ -164,17 +175,17 @@
     });
   }
 
-  // --- Dispatched work by kind, weekly stacked bars ---
-  const weekly = data.dispatchByWeek;
+  // --- Dispatched work by kind, daily stacked bars ---
+  const daily = data.dispatchByDay;
   const kindPalette = [COLORS.blue, COLORS.green, COLORS.yellow, COLORS.red, COLORS.dim];
   let paletteIndex = 0;
-  const weeklyTotal = sum(weekly.kinds.map(function (k) { return sum(k.counts); }));
-  if (!emptyUnless('chart-dispatch-weekly', weeklyTotal)) {
+  const dailyTotal = sum(daily.kinds.map(function (k) { return sum(k.counts); }));
+  if (!emptyUnless('chart-dispatch-weekly', dailyTotal)) {
     new Chart(document.getElementById('chart-dispatch-weekly'), {
       type: 'bar',
       data: {
-        labels: weekly.weeks.map(function (w) { return 'wk ' + shortDay(w); }),
-        datasets: weekly.kinds.map(function (k) {
+        labels: daily.days.map(shortDay),
+        datasets: daily.kinds.map(function (k) {
           const color = k.label === 'autopilot'
             ? COLORS.purple
             : kindPalette[paletteIndex++ % kindPalette.length];
@@ -226,36 +237,51 @@
 
   // --- Proxy response classes doughnut ---
   const proxyStatus = data.proxyStatus;
-  const statusEntries = [
-    ['2xx ok', proxyStatus.ok, COLORS.green],
-    ['4xx client error', proxyStatus.clientError, COLORS.yellow],
-    ['5xx server error', proxyStatus.serverError, COLORS.red]
-  ];
-  if (!emptyUnless('chart-proxy-status', sum(statusEntries.map(function (e) { return e[1]; })))) {
-    new Chart(document.getElementById('chart-proxy-status'), {
+  const statusLabels = ['2xx ok', '4xx client error', '5xx server error'];
+  const statusColors = [COLORS.green, COLORS.yellow, COLORS.red];
+  const statusViews = {
+    '30d': { data: [proxyStatus.ok, proxyStatus.clientError, proxyStatus.serverError] }
+  };
+  if (data.proxyStatusHourly) {
+    const hourly = data.proxyStatusHourly;
+    statusViews['24h'] = { data: [hourly.ok, hourly.clientError, hourly.serverError] };
+  }
+  if (!emptyUnless('chart-proxy-status', sum(statusViews['30d'].data))) {
+    const proxyStatusChart = new Chart(document.getElementById('chart-proxy-status'), {
       type: 'doughnut',
       data: {
-        labels: statusEntries.map(function (e) { return e[0]; }),
+        labels: statusLabels,
         datasets: [{
-          data: statusEntries.map(function (e) { return e[1]; }),
-          backgroundColor: statusEntries.map(function (e) { return e[2]; }),
+          data: statusViews['30d'].data,
+          backgroundColor: statusColors,
           borderWidth: 0
         }]
       },
       options: { cutout: '60%' }
     });
+    wireRangeToggle('chart-proxy-status', proxyStatusChart, statusViews, function (chart, view) {
+      chart.data.datasets[0].data = view.data;
+    });
   }
 
   // --- Top proxy endpoints horizontal bar ---
+  // Endpoint labels are parameterized route templates; trim the common prefix
+  // so labels fit ('/api/proxy/issues/:id' → 'issues/:id').
+  function endpointView(entries) {
+    return {
+      labels: entries.map(function (e) { return e.label.replace(/^\/api\/proxy\//, ''); }),
+      data: entries.map(function (e) { return e.count; })
+    };
+  }
   const endpoints = data.topEndpoints || [];
+  const endpointViews = { '30d': endpointView(endpoints) };
+  if (data.topEndpointsHourly) endpointViews['24h'] = endpointView(data.topEndpointsHourly);
   if (!emptyUnless('chart-top-endpoints', endpoints.length)) {
-    new Chart(document.getElementById('chart-top-endpoints'), {
+    const topEndpointsChart = new Chart(document.getElementById('chart-top-endpoints'), {
       type: 'bar',
       data: {
-        // Endpoint labels are parameterized route templates; trim the common
-        // prefix so labels fit ('/api/proxy/issues/:id' → 'issues/:id').
-        labels: endpoints.map(function (e) { return e.label.replace(/^\/api\/proxy\//, ''); }),
-        datasets: [{ data: endpoints.map(function (e) { return e.count; }), backgroundColor: COLORS.blue }]
+        labels: endpointViews['30d'].labels,
+        datasets: [{ data: endpointViews['30d'].data, backgroundColor: COLORS.blue }]
       },
       options: {
         indexAxis: 'y',
@@ -265,6 +291,10 @@
           y: { grid: { display: false } }
         }
       }
+    });
+    wireRangeToggle('chart-top-endpoints', topEndpointsChart, endpointViews, function (chart, view) {
+      chart.data.labels = view.labels;
+      chart.data.datasets[0].data = view.data;
     });
   }
 
