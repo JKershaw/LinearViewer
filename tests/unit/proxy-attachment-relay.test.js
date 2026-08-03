@@ -149,16 +149,28 @@ function stubUpstream(handler) {
 // stub/mock is installed above — the tests that never reach the egress path
 // (SSRF-guard rejections, capability declines, etc.) trivially satisfy this too.
 let networkGuard;
+let savedProxyEnv;
 beforeEach(() => {
+  // LIN-1848 close-out F2: save/restore all four proxy env vars (mirroring
+  // openrouter.test.js) rather than deleting HTTPS_PROXY outright — a bare
+  // delete discards whatever the whole-suite acceptance run (HTTPS_PROXY
+  // exported for `npm run test:unit`) had ambiently set.
+  savedProxyEnv = {
+    HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+    https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy,
+  };
   process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+  delete process.env.HTTP_PROXY; delete process.env.https_proxy; delete process.env.http_proxy;
   networkGuard = guardNetwork();
 });
 afterEach(() => {
   globalThis.fetch = realFetch;
   setProxyFetchImpl(null);
   networkGuard.restore();
-  delete process.env.HTTPS_PROXY;
-  assert.equal(networkGuard.attempts.length, 0, `unexpected outbound requests: ${JSON.stringify(networkGuard.attempts)}`);
+  for (const [k, v] of Object.entries(savedProxyEnv)) {
+    if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+  assert.equal(networkGuard.attempts.length, 0, `unexpected http(s).request transport attempts: ${JSON.stringify(networkGuard.attempts)}`);
 });
 
 const md = (url) => encodeAttachmentHandle('md', url);

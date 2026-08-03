@@ -143,64 +143,86 @@ async function streamRecommend(app, urlKey, issueId) {
   }
 }
 
-describe('LIN-777 — LLM streaming recommendation surfaces ## Attachments in the meta-prompt', () => {
-  let originalFetch;
-  let networkGuard;
+// LIN-1848 close-out F3: this suite is parameterized over BOTH proxy states
+// rather than pinned to proxy-set only. Forcing HTTPS_PROXY unconditionally
+// (the original LIN-1848 fix) flips getRecommendationStream's `useStreaming`
+// flag false, falling the request through to getRecommendation() — whose
+// OWN meta-prompt build (openrouter.js's getRecommendation, ~:1774) served
+// the captured request body instead of getRecommendationStream's streaming
+// meta-prompt build (~:959), the actual LIN-777 site this test is named for
+// and was written to guard. Running both conditions keeps that LIN-777
+// regression coverage on the real streaming code path AND retains the
+// LIN-1848 proxy-hermeticity proof on the non-streaming fallback path — a
+// regression in either meta-prompt build now fails a test again.
+for (const proxyOn of [false, true]) {
+  const label = proxyOn
+    ? 'with HTTPS_PROXY set (getRecommendation fallback path, LIN-1848 hermeticity)'
+    : 'with no proxy configured (getRecommendationStream streaming path, LIN-777 original coverage)';
 
-  // LIN-1848 acceptance witness: getRecommendationStream's useStreaming flag
-  // flips false under a configured proxy, falling through to getRecommendation()
-  // — which used the import-bound customFetch, invisible to a plain
-  // global.fetch mock (the actual escape: this file was one of the three
-  // deterministically-failing suites). Setting HTTPS_PROXY to an unreachable
-  // value here, alongside setFetchImpl (in addition to the existing
-  // global.fetch mock), proves the fix regardless of which branch is taken.
-  beforeEach(() => {
-    process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
-    networkGuard = guardNetwork();
-  });
+  describe(`LIN-777 — LLM streaming recommendation surfaces ## Attachments in the meta-prompt — ${label}`, () => {
+    let originalFetch;
+    let networkGuard;
+    let savedProxyEnv;
 
-  afterEach(() => {
-    if (originalFetch) global.fetch = originalFetch;
-    originalFetch = undefined;
-    setFetchImpl(null);
-    networkGuard.restore();
-    delete process.env.HTTPS_PROXY;
-    assert.equal(networkGuard.attempts.length, 0, `unexpected outbound requests: ${JSON.stringify(networkGuard.attempts)}`);
-  });
-
-  test('GET /api/recommend/:id/stream sends a meta-prompt containing the Attachments section', async () => {
-    originalFetch = global.fetch;
-
-    let capturedMetaPrompt = null;
-    // getRecommendationStream posts to OpenRouter via native global.fetch (or,
-    // under a proxy, getRecommendation's resolved transport — see above);
-    // capture the meta-prompt from the request body either way, then return a
-    // valid response. The test client also drives the express server through
-    // fetch, so delegate every non-OpenRouter request to the real fetch.
-    const openRouterMock = async (url, opts = {}) => {
-      if (typeof url === 'string' && url.includes('openrouter.ai')) {
-        capturedMetaPrompt = JSON.parse(opts.body).messages[0].content;
-        return mockStreamResponse(['## Reasoning\n→ **research**\nLook into it.\n## Prompt\nDo the thing.']);
+    beforeEach(() => {
+      savedProxyEnv = {
+        HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+        https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy,
+      };
+      if (proxyOn) {
+        process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+      } else {
+        delete process.env.HTTPS_PROXY;
       }
-      return originalFetch(url, opts);
-    };
-    global.fetch = openRouterMock;
-    setFetchImpl(openRouterMock);
+      delete process.env.HTTP_PROXY; delete process.env.https_proxy; delete process.env.http_proxy;
+      networkGuard = guardNetwork();
+    });
 
-    const app = buildApp(buildContext());
-    const res = await streamRecommend(app, 'acme', 'iss-748');
+    afterEach(() => {
+      if (originalFetch) global.fetch = originalFetch;
+      originalFetch = undefined;
+      setFetchImpl(null);
+      networkGuard.restore();
+      for (const [k, v] of Object.entries(savedProxyEnv)) {
+        if (v === undefined) delete process.env[k]; else process.env[k] = v;
+      }
+      assert.equal(networkGuard.attempts.length, 0, `unexpected http(s).request transport attempts: ${JSON.stringify(networkGuard.attempts)}`);
+    });
 
-    assert.equal(res.status, 200, `expected 200, got ${res.status}: ${res.text}`);
-    assert.ok(capturedMetaPrompt, 'the route must have issued an OpenRouter request carrying a meta-prompt');
-    assert.ok(
-      capturedMetaPrompt.includes('## Attachments'),
-      'the LLM streaming recommendation meta-prompt must render the ## Attachments section when the context has attachments'
-    );
-    // Anchor on the fixture attachment so the assertion proves the real collector
-    // output flowed through the route wiring, not an empty header.
-    assert.ok(
-      capturedMetaPrompt.includes('Screenshot') && capturedMetaPrompt.includes('att-abc123'),
-      'the rendered Attachments section must list the fixture attachment (title + opaque handle)'
-    );
+    test('GET /api/recommend/:id/stream sends a meta-prompt containing the Attachments section', async () => {
+      originalFetch = global.fetch;
+
+      let capturedMetaPrompt = null;
+      // getRecommendationStream posts to OpenRouter via native global.fetch (or,
+      // under a proxy, getRecommendation's resolved transport — see above);
+      // capture the meta-prompt from the request body either way, then return a
+      // valid response. The test client also drives the express server through
+      // fetch, so delegate every non-OpenRouter request to the real fetch.
+      const openRouterMock = async (url, opts = {}) => {
+        if (typeof url === 'string' && url.includes('openrouter.ai')) {
+          capturedMetaPrompt = JSON.parse(opts.body).messages[0].content;
+          return mockStreamResponse(['## Reasoning\n→ **research**\nLook into it.\n## Prompt\nDo the thing.']);
+        }
+        return originalFetch(url, opts);
+      };
+      global.fetch = openRouterMock;
+      setFetchImpl(openRouterMock);
+
+      const app = buildApp(buildContext());
+      const res = await streamRecommend(app, 'acme', 'iss-748');
+
+      assert.equal(res.status, 200, `expected 200, got ${res.status}: ${res.text}`);
+      assert.ok(capturedMetaPrompt, 'the route must have issued an OpenRouter request carrying a meta-prompt');
+      assert.ok(
+        capturedMetaPrompt.includes('## Attachments'),
+        'the LLM streaming recommendation meta-prompt must render the ## Attachments section when the context has attachments'
+      );
+      // Anchor on the fixture attachment so the assertion proves the real collector
+      // output flowed through the route wiring, not an empty header.
+      assert.ok(
+        capturedMetaPrompt.includes('Screenshot') && capturedMetaPrompt.includes('att-abc123'),
+        'the rendered Attachments section must list the fixture attachment (title + opaque handle)'
+      );
+    });
   });
-});
+}

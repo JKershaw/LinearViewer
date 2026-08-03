@@ -55,6 +55,23 @@ function mockOpenRouterFetch(impl) {
   return fn;
 }
 
+// LIN-1848 close-out F2: save/restore all four proxy env vars (mirroring
+// openrouter.test.js) rather than deleting HTTPS_PROXY outright — a bare
+// delete discards whatever the whole-suite acceptance run (HTTPS_PROXY
+// exported for `npm run test:unit`) had ambiently set, weakening "the whole
+// suite ran under a proxy" for any later describe in this same file/process.
+function saveProxyEnv() {
+  return {
+    HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+    https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy,
+  };
+}
+function restoreProxyEnv(saved) {
+  for (const [k, v] of Object.entries(saved)) {
+    if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+}
+
 const MODEL = {
   velocity: { tasksPerWeek: 3.5, pointsPerWeek: 8, trend: 'increasing' },
   executionQueue: [
@@ -852,18 +869,21 @@ describe('CONTINUE_UNTIL_STOPPED_OPTION', () => {
 describe('generateGoalSuggestions return shape (LIN-633)', () => {
   const realFetch = global.fetch;
   let networkGuard;
+  let savedProxyEnv;
   // LIN-1848 acceptance witness: a configured-but-unreachable proxy must not
   // change the outcome OR leak a live request via the substitute transport.
   beforeEach(() => {
+    savedProxyEnv = saveProxyEnv();
     process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+    delete process.env.HTTP_PROXY; delete process.env.https_proxy; delete process.env.http_proxy;
     networkGuard = guardNetwork();
   });
   afterEach(() => {
     global.fetch = realFetch;
     setFetchImpl(null);
     networkGuard.restore();
-    delete process.env.HTTPS_PROXY;
-    assert.equal(networkGuard.attempts.length, 0, `unexpected outbound requests: ${JSON.stringify(networkGuard.attempts)}`);
+    restoreProxyEnv(savedProxyEnv);
+    assert.equal(networkGuard.attempts.length, 0, `unexpected http(s).request transport attempts: ${JSON.stringify(networkGuard.attempts)}`);
   });
 
   function mockStreamResponse(text) {
@@ -1055,16 +1075,19 @@ describe('generateGoalSuggestions return shape (LIN-633)', () => {
 describe('generateGoalSuggestions directions (LIN-1566)', () => {
   const realFetch = global.fetch;
   let networkGuard;
+  let savedProxyEnv;
   beforeEach(() => {
+    savedProxyEnv = saveProxyEnv();
     process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+    delete process.env.HTTP_PROXY; delete process.env.https_proxy; delete process.env.http_proxy;
     networkGuard = guardNetwork();
   });
   afterEach(() => {
     global.fetch = realFetch;
     setFetchImpl(null);
     networkGuard.restore();
-    delete process.env.HTTPS_PROXY;
-    assert.equal(networkGuard.attempts.length, 0, `unexpected outbound requests: ${JSON.stringify(networkGuard.attempts)}`);
+    restoreProxyEnv(savedProxyEnv);
+    assert.equal(networkGuard.attempts.length, 0, `unexpected http(s).request transport attempts: ${JSON.stringify(networkGuard.attempts)}`);
   });
 
   function mockStreamResponse(text) {
@@ -1211,16 +1234,19 @@ describe('generateGoalSuggestions directions (LIN-1566)', () => {
 describe('generateGoalSuggestions request budget (LIN-1665)', () => {
   const realFetch = global.fetch;
   let networkGuard;
+  let savedProxyEnv;
   beforeEach(() => {
+    savedProxyEnv = saveProxyEnv();
     process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+    delete process.env.HTTP_PROXY; delete process.env.https_proxy; delete process.env.http_proxy;
     networkGuard = guardNetwork();
   });
   afterEach(() => {
     global.fetch = realFetch;
     setFetchImpl(null);
     networkGuard.restore();
-    delete process.env.HTTPS_PROXY;
-    assert.equal(networkGuard.attempts.length, 0, `unexpected outbound requests: ${JSON.stringify(networkGuard.attempts)}`);
+    restoreProxyEnv(savedProxyEnv);
+    assert.equal(networkGuard.attempts.length, 0, `unexpected http(s).request transport attempts: ${JSON.stringify(networkGuard.attempts)}`);
   });
 
   function mockStreamResponse(text) {
@@ -1317,8 +1343,11 @@ describe('generateGoalSuggestions degraded signal (LIN-1665)', () => {
   const realFetch = global.fetch;
   const realError = console.error;
   let networkGuard;
+  let savedProxyEnv;
   beforeEach(() => {
+    savedProxyEnv = saveProxyEnv();
     process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+    delete process.env.HTTP_PROXY; delete process.env.https_proxy; delete process.env.http_proxy;
     networkGuard = guardNetwork();
   });
   afterEach(() => {
@@ -1326,8 +1355,8 @@ describe('generateGoalSuggestions degraded signal (LIN-1665)', () => {
     console.error = realError;
     setFetchImpl(null);
     networkGuard.restore();
-    delete process.env.HTTPS_PROXY;
-    assert.equal(networkGuard.attempts.length, 0, `unexpected outbound requests: ${JSON.stringify(networkGuard.attempts)}`);
+    restoreProxyEnv(savedProxyEnv);
+    assert.equal(networkGuard.attempts.length, 0, `unexpected http(s).request transport attempts: ${JSON.stringify(networkGuard.attempts)}`);
   });
 
   // finish_reason is a parameter here, unlike the always-'stop' helper above: the
@@ -1445,5 +1474,61 @@ describe('generateGoalSuggestions degraded signal (LIN-1665)', () => {
     assert.equal(result.analysis, 'WIP first.');
     assert.equal(result.summary, buildNextRunSummary(buildRoadmapModel([], ISSUES), 'Acme'));
     assert.equal(result.context, formatNextRunContext(buildRoadmapModel([], ISSUES), 'Acme'));
+  });
+});
+
+// LIN-1848 close-out F3 (branch-coverage tidy): the four describes above force
+// HTTPS_PROXY, so generateGoalSuggestions always takes streamChat's
+// non-streaming `response.json()` branch — the SSE `body` generator in every
+// mockStreamResponse above is dead weight there. This describe runs with no
+// proxy configured (regardless of whatever the whole-suite acceptance run has
+// ambiently set) so the SSE streaming branch is still exercised by at least
+// one passing test. The mock deliberately omits `json()` — if a future change
+// silently routed this test through the non-streaming branch it would throw
+// rather than pass, so this is a real pin, not just a label.
+describe('generateGoalSuggestions streaming branch coverage, no proxy (LIN-1848 close-out F3)', () => {
+  const realFetch = global.fetch;
+  let savedProxyEnv;
+  beforeEach(() => {
+    savedProxyEnv = saveProxyEnv();
+    delete process.env.HTTPS_PROXY; delete process.env.HTTP_PROXY;
+    delete process.env.https_proxy; delete process.env.http_proxy;
+  });
+  afterEach(() => {
+    global.fetch = realFetch;
+    setFetchImpl(null);
+    restoreProxyEnv(savedProxyEnv);
+  });
+
+  function mockSseOnlyResponse(text) {
+    const enc = new TextEncoder();
+    const blocks = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 10 } })}\n\n`,
+      'data: [DONE]\n\n',
+    ];
+    return {
+      ok: true,
+      body: (async function* () { for (const b of blocks) yield enc.encode(b); })(),
+    };
+  }
+
+  test('a healthy generation over the real SSE streaming path still returns the guaranteed option set', async () => {
+    const raw = JSON.stringify({ analysis: 'WIP first.', options: [{ goal: 'Finish the in-flight work.', reasoning: 'WIP first.', size: 'M', title: 'Finish the in-flight work' }] });
+    let sawStreamedRequest = false;
+    mockOpenRouterFetch(async () => {
+      sawStreamedRequest = true;
+      return mockSseOnlyResponse(raw);
+    });
+
+    const result = await generateGoalSuggestions(
+      { projects: [], issues: [], organizationName: 'Acme' },
+      { apiKey: 'test-key' }
+    );
+
+    assert.ok(sawStreamedRequest, 'expected the mocked transport to be invoked');
+    const last = result.options[result.options.length - 1];
+    assert.equal(last.continueUntilStopped, true);
+    assert.ok(result.options.some(o => o.goal === 'Finish the in-flight work.' && o.size === 'M'));
   });
 });

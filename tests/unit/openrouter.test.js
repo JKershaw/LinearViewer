@@ -2165,7 +2165,7 @@ describe('getRecommendation transport seam under a configured proxy (LIN-1848)',
     for (const [k, v] of Object.entries(savedProxyEnv)) {
       if (v === undefined) delete process.env[k]; else process.env[k] = v;
     }
-    assert.equal(networkGuard.attempts.length, 0, `unexpected outbound requests: ${JSON.stringify(networkGuard.attempts)}`);
+    assert.equal(networkGuard.attempts.length, 0, `unexpected http(s).request transport attempts: ${JSON.stringify(networkGuard.attempts)}`);
   });
 
   test('an injected override serves the call with zero outbound requests, even under a proxy', async () => {
