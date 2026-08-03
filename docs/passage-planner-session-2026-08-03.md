@@ -67,10 +67,10 @@ resurface, quoted, in session #2's writeout and reproduce today:
   LIN-1558 carry `[]` (the digest gave no ranking reason for either); the
   seven stack-digest anchors that became Leg 2 (LIN-1694, LIN-1731, LIN-1594,
   LIN-1821, LIN-1458, LIN-1848, LIN-1389) all carry `["bug"]`. A live re-read
-  today reproduces every one of these values, though it also surfaces two
-  tasks (LIN-1503, LIN-1455) that were never anchors — the digest is a live
-  ranked read, not a replayable snapshot, so this corroborates the quoted
-  values without reproducing the session's exact membership.
+  today reproduces every one of these values, though it also surfaces tasks
+  that were never anchors — the digest is a live ranked read, not a
+  replayable snapshot, so this corroborates the quoted values without
+  reproducing the session's exact membership.
 
 ## Dialogue
 
@@ -145,8 +145,8 @@ shipped, which is worth knowing.
 
 LIN-1851 ("Passage — Cost chain, reliability bugs, Product close-out,
 maintenance (26 tasks)") was created 09:37:16Z: 4 legs plus 3 tasks of
-unallocated slack, budgets of 7 + 8 + 4 + 4 (summing to 26, matching the
-stated pool). A live check of `GET /relations/LIN-1851` today confirms
+unallocated slack, budgets of 7 + 8 + 4 + 4 + 3 slack (summing to 26, matching
+the stated pool). A live check of `GET /relations/LIN-1851` today confirms
 exactly 12 `related`-type relations, no `blocks`/`blocked-by` anchors,
 matching the description's inline leg↔anchor mapping exactly: Leg 1 →
 LIN-1625 (1); Leg 2 → LIN-1694, LIN-1731, LIN-1594, LIN-1821, LIN-1458,
@@ -165,9 +165,9 @@ instead uses `## Leg N — <name>` headings with bolded bullets. That block is
 one of the pieces v0.1 carried over untouched — it is byte-identical between
 v0 (`:253` at `cfaee25c`) and the current HEAD text
 (`docs/passage-planner-prompt.md:122`), so the deviation stands against the
-shipping prompt, not just against the version session #2 ran. This is left uncorrected deliberately — LIN-1844, the
-cold-read witness, is the task that measures the format actually written,
-not this chronicle.
+shipping prompt, not just against the version session #2 ran. This is left
+uncorrected deliberately — LIN-1844, the cold-read witness, is the task that
+measures the format actually written, not this chronicle.
 
 ## Gate
 
@@ -208,6 +208,20 @@ LIN-1849 (a one-click kickoff page for the planner, mirroring the Flight
 Companion pattern) was filed at 09:00:13Z and deliberately sequenced behind
 LIN-1850 so it would serve the revised text rather than v0; with v0.1 landed,
 that dependency is discharged.
+
+**The compression was not free, and one thread from it is still open.**
+Shrinking section 9 by 45% traded out two witness-facing specifics that
+existed nowhere else in the repository. LIN-1850's independent
+review caught the loss and made preserving them — not necessarily restoring
+them to the prompt text itself — the single condition on its approval; they
+were re-homed rather than restored, and now live in LIN-1844's description
+under its own "Carried forward from planner-prompt v0 §9" heading. Separately,
+the same revision dropped the single word "alongside" from the maintenance-leg
+reservation clause (v0 `:76`/`:116` at `cfaee25c` → HEAD `:41`/`:97`), leaving
+it undetermined whether the now-mandatory maintenance leg counts against the
+passage's 2–4 leg cap. That was raised as a non-blocking finding on the same
+review and left unfixed rather than slipped into an approval that hadn't seen
+it — it is tracked open as LIN-1853.
 
 The session's overall finding: the planner's evidence and writeout
 machinery worked as designed on the first real run: correct anchors, correct
