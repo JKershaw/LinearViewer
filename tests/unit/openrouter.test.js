@@ -18,6 +18,7 @@ import {
   getRecommendation,
   setLlmCallRecorder,
   setPromptTraceRecorder,
+  setFetchImpl,
   getModelDisplayName,
   formatModelPricing,
   getModelPricingHint,
@@ -39,6 +40,7 @@ import {
 import { appendGroundingSections } from '../../lib/prompt-formatters.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 import { getAIRecommendationActionNames, deriveDispatchKind, isValidDispatchKind, DISPATCH_KIND_DEFAULT } from '../../lib/prompt-templates.js';
+import { guardNetwork } from '../fixtures/network-guard.js';
 
 // =============================================================================
 // stripCodeBlockMarkers Tests
@@ -2085,12 +2087,24 @@ describe('getRecommendation abort (LIN-346 gap #2)', () => {
   test('rejects when options.signal fires mid-flight', async () => {
     const ac = new AbortController();
     // A fetch that hangs until its signal aborts, then throws AbortError like real fetch.
+    //
+    // LIN-1848: prior to the injectable transport seam, getRecommendation called
+    // the module-scoped `customFetch` directly, which was bound to native fetch
+    // at import time — so this mock was never actually invoked, and the test only
+    // passed because a REAL fetch call also honours an aborted signal. Now that
+    // getRecommendation resolves its transport live (via resolveOpenRouterFetch),
+    // this mock genuinely receives the call and must handle the case where the
+    // signal is ALREADY aborted by the time it's invoked (a real, once-only DOM
+    // 'abort' event fired before this listener existed would never be redelivered),
+    // exactly as a real fetch implementation would.
     global.fetch = mock.fn((url, opts) => new Promise((_, reject) => {
-      opts.signal.addEventListener('abort', () => {
+      const rejectAborted = () => {
         const err = new Error('The operation was aborted');
         err.name = 'AbortError';
         reject(err);
-      });
+      };
+      if (opts.signal.aborted) return rejectAborted();
+      opts.signal.addEventListener('abort', rejectAborted);
     }));
 
     const pending = getRecommendation(ISSUE, CONTEXT, { apiKey: 'test-key', signal: ac.signal });
@@ -2115,6 +2129,57 @@ describe('getRecommendation abort (LIN-346 gap #2)', () => {
       getRecommendation(ISSUE, CONTEXT, { apiKey: 'test-key', signal: ac.signal }),
       /OpenRouter request timed out/
     );
+  });
+});
+
+// =============================================================================
+// Injectable transport seam (LIN-1848)
+// =============================================================================
+// getRecommendation's transport is `customFetch` under a configured proxy — a
+// module-level binding captured before any mock exists (see lib/openrouter.js's
+// resolveOpenRouterFetch). setFetchImpl overrides it regardless of proxy state.
+// This is the pinning test for that surface: with HTTPS_PROXY set to an
+// unreachable value and NO global.fetch mock at all, the override alone must
+// carry the whole call and the process must make zero real outbound requests.
+describe('getRecommendation transport seam under a configured proxy (LIN-1848)', () => {
+  const ISSUE = {
+    identifier: 'LIN-1', title: 'A leaf task', description: 'Do the thing.',
+    url: 'https://linear.app/test/issue/LIN-1', state: { name: 'In Progress', type: 'started' }
+  };
+  const CONTEXT = { parent: null, siblings: [], project: { description: '' }, children: [], comments: [], focusedChild: null };
+
+  let networkGuard;
+  let savedProxyEnv;
+  beforeEach(() => {
+    savedProxyEnv = {
+      HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+      https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy
+    };
+    process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+    delete process.env.HTTP_PROXY; delete process.env.https_proxy; delete process.env.http_proxy;
+    networkGuard = guardNetwork();
+  });
+  afterEach(() => {
+    setFetchImpl(null);
+    networkGuard.restore();
+    for (const [k, v] of Object.entries(savedProxyEnv)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+    assert.equal(networkGuard.attempts.length, 0, `unexpected outbound requests: ${JSON.stringify(networkGuard.attempts)}`);
+  });
+
+  test('an injected override serves the call with zero outbound requests, even under a proxy', async () => {
+    let overrideCalls = 0;
+    setFetchImpl(async (url) => {
+      overrideCalls++;
+      assert.match(url, /openrouter\.ai/);
+      return { ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **research**\nLook into it.\n## Prompt\nDo the thing.' } }] }) };
+    });
+
+    const result = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'test-key' });
+
+    assert.equal(overrideCalls, 1, 'the override, not a live proxy transport, must have served the request');
+    assert.equal(result.recommendedAction, 'research');
   });
 });
 

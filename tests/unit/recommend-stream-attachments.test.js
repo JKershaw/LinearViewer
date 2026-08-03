@@ -26,11 +26,13 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe, afterEach } from 'node:test';
+import { test, describe, afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
+import { setFetchImpl } from '../../lib/openrouter.js';
+import { guardNetwork } from '../fixtures/network-guard.js';
 
 const PROVIDER_NAME = 'recommend-stream-fake';
 
@@ -76,8 +78,15 @@ function makeFakeProvider(context) {
 
 // Minimal OpenRouter streaming response, modelled on openrouter.test.js's
 // mockStreamResponse: an async-iterable body of SSE chunks the stream parser reads.
+//
+// LIN-1848: also usable as the NON-streaming shape (json()) — under HTTPS_PROXY
+// getRecommendationStream's useStreaming flips false and it falls through to
+// getRecommendation(), which reads response.json() instead of .body. One canned
+// response must satisfy either branch so this test proves the fix regardless
+// of which branch a proxy env selects.
 function mockStreamResponse(pieces) {
   const enc = new TextEncoder();
+  const fullText = pieces.join('');
   const blocks = pieces.map(p =>
     `data: ${JSON.stringify({ choices: [{ delta: { content: p }, finish_reason: null }] })}\n\n`
   );
@@ -85,7 +94,8 @@ function mockStreamResponse(pieces) {
   blocks.push('data: [DONE]\n\n');
   return {
     ok: true,
-    body: (async function* () { for (const b of blocks) yield enc.encode(b); })()
+    body: (async function* () { for (const b of blocks) yield enc.encode(b); })(),
+    json: () => Promise.resolve({ choices: [{ message: { content: fullText }, finish_reason: 'stop' }], usage: { completion_tokens: 12 } })
   };
 }
 
@@ -135,27 +145,47 @@ async function streamRecommend(app, urlKey, issueId) {
 
 describe('LIN-777 — LLM streaming recommendation surfaces ## Attachments in the meta-prompt', () => {
   let originalFetch;
+  let networkGuard;
+
+  // LIN-1848 acceptance witness: getRecommendationStream's useStreaming flag
+  // flips false under a configured proxy, falling through to getRecommendation()
+  // — which used the import-bound customFetch, invisible to a plain
+  // global.fetch mock (the actual escape: this file was one of the three
+  // deterministically-failing suites). Setting HTTPS_PROXY to an unreachable
+  // value here, alongside setFetchImpl (in addition to the existing
+  // global.fetch mock), proves the fix regardless of which branch is taken.
+  beforeEach(() => {
+    process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+    networkGuard = guardNetwork();
+  });
 
   afterEach(() => {
     if (originalFetch) global.fetch = originalFetch;
     originalFetch = undefined;
+    setFetchImpl(null);
+    networkGuard.restore();
+    delete process.env.HTTPS_PROXY;
+    assert.equal(networkGuard.attempts.length, 0, `unexpected outbound requests: ${JSON.stringify(networkGuard.attempts)}`);
   });
 
   test('GET /api/recommend/:id/stream sends a meta-prompt containing the Attachments section', async () => {
     originalFetch = global.fetch;
 
     let capturedMetaPrompt = null;
-    // getRecommendationStream posts to OpenRouter via native global.fetch; capture
-    // the meta-prompt from the request body, then return a valid streaming response.
-    // The test client also drives the express server through fetch, so delegate
-    // every non-OpenRouter request to the real fetch.
-    global.fetch = async (url, opts = {}) => {
+    // getRecommendationStream posts to OpenRouter via native global.fetch (or,
+    // under a proxy, getRecommendation's resolved transport — see above);
+    // capture the meta-prompt from the request body either way, then return a
+    // valid response. The test client also drives the express server through
+    // fetch, so delegate every non-OpenRouter request to the real fetch.
+    const openRouterMock = async (url, opts = {}) => {
       if (typeof url === 'string' && url.includes('openrouter.ai')) {
         capturedMetaPrompt = JSON.parse(opts.body).messages[0].content;
         return mockStreamResponse(['## Reasoning\n→ **research**\nLook into it.\n## Prompt\nDo the thing.']);
       }
       return originalFetch(url, opts);
     };
+    global.fetch = openRouterMock;
+    setFetchImpl(openRouterMock);
 
     const app = buildApp(buildContext());
     const res = await streamRecommend(app, 'acme', 'iss-748');
