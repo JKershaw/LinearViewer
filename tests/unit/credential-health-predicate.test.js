@@ -117,6 +117,23 @@ describe('credential-health predicate (LIN-1586)', () => {
     assert.strictEqual(verdictFor(rows), 'ok');
   });
 
+  test('LIN-1458: an OpenRouter fallback-credential-source note (200) pairs with an ownerless 503 into credential_dead', () => {
+    // routes/proxy.js's logOpenRouterCredentialSource writes a 200 row whose note
+    // is 'openrouter_key_fallback_paid_env' / '...free_tier' — distinct from
+    // OWNERLESS_NOTE (never matches ownerlessCount) but, like the pre-existing
+    // LIN-961 free-tier row above, its status:200 DOES feed okCount. Nothing
+    // before this pinned that cross-note interaction: the LIN-961 case above only
+    // ever pairs its note with another plain 200, never with an ownerless 503.
+    const rows = [
+      row({ status: 200, note: 'openrouter_key_fallback_paid_env', at: 2 }),
+      row({ status: 503, note: OWNERLESS_NOTE, at: 3 })
+    ];
+    const [entry] = fold(rows);
+    assert.strictEqual(entry.verdict, 'credential_dead');
+    assert.strictEqual(entry.ownerlessCount, 1, 'the fallback note must never increment ownerlessCount');
+    assert.strictEqual(entry.okCount, 1, 'its 200 status feeds okCount, same shape as the LIN-961 row');
+  });
+
   test('a 201 counts as the success half — not just 200', () => {
     // POST /agent/status and POST /dispatch log 201 and resolve no workspace:
     // for a dispatched worker they are the most common surviving call. Keying
