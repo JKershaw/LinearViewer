@@ -113,6 +113,18 @@ export function resolveProxyLLM(sessionApiKey) {
   return { apiKey, isFreeTier };
 }
 
+// LIN-1458: which OpenRouter credential source served a request whose token
+// creator's OWN account-keyed read (getWorkspaceOpenRouterKey) came back empty.
+// Distinct from OWNERLESS_NOTE (lib/proxy-events.js) and from the LIN-961
+// free-tier prose note — exact-equality strings so a future consumer can
+// classify by note without substring matching (lib/proxy-events.js's "never
+// includes" rule). Deliberately NOT exported from lib/proxy-events.js: they are
+// not consumed by credentialVerdict/foldCredentialHealth, which answers "is
+// this dispatch/proxy token dying", a different question from "which
+// OpenRouter credential source served this request".
+const OPENROUTER_FALLBACK_PAID_NOTE = 'openrouter_key_fallback_paid_env';
+const OPENROUTER_FALLBACK_FREE_NOTE = 'openrouter_key_fallback_free_tier';
+
 // Lazy-load test fixtures only in test mode to avoid production dependency on test files
 let testMockData = null;
 async function getTestMockData() {
@@ -875,6 +887,25 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       status,
       note
     }).catch(err => console.error('Failed to log proxy event:', err));
+  }
+
+  /**
+   * LIN-1458: records, once per request (never per descent hop —
+   * computeRecommendation's internal read never re-fires this because both
+   * production callers already pass a pre-resolved sessionApiKey), which
+   * OpenRouter credential source served this request when the token creator's
+   * OWN account-keyed read came back empty (null). Claims only what
+   * resolveProxyLLM's own return values prove: it does NOT claim a split
+   * account, and does NOT claim re-authenticating would help (LIN-1413's
+   * round-1 blocking defect — any copy written here inherits that
+   * constraint). No entry is written for the ordinary creator-key-present
+   * path — only the two previously-silent (or prose-only) fallback branches
+   * are witnessed here. Call only after the 503 "not configured" gate, so
+   * !sessionApiKey && !isFreeTier here always implies a paid env key exists.
+   */
+  function logOpenRouterCredentialSource(req, endpoint, { sessionApiKey, isFreeTier }) {
+    if (sessionApiKey) return;
+    logEvent(req, endpoint, 200, isFreeTier ? OPENROUTER_FALLBACK_FREE_NOTE : OPENROUTER_FALLBACK_PAID_NOTE);
   }
 
   /**
@@ -3518,6 +3549,13 @@ One convention across every endpoint, so you can branch on the same fields every
         return badRequest.json(res, `Invalid kind: ${kind}`);
       }
 
+      // LIN-1458: witness which credential source served this request when
+      // the creator's own key came back empty. Gated the same as the charge
+      // below (kind-override makes no LLM call, so nothing to witness there).
+      if (kind === undefined && !isTestMode) {
+        logOpenRouterCredentialSource(req, '/api/proxy/recommend', { sessionApiKey, isFreeTier });
+      }
+
       // Charge one free-tier unit ONCE per request (not per descent hop — that
       // would overbill a multi-hop container). resolveRecommendation does the
       // generation below; charge before it so an exhausted user gets a clean 429.
@@ -4113,6 +4151,11 @@ One convention across every endpoint, so you can branch on the same fields every
           return keepalive.send(503, { error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
         }
 
+        // LIN-1458: witness which credential source served this request.
+        if (!isTestMode) {
+          logOpenRouterCredentialSource(req, '/api/proxy/recap', { sessionApiKey, isFreeTier });
+        }
+
         // Charge one free-tier unit only now that generation is guaranteed.
         if (isFreeTier && !isTestMode) {
           const rejection = await chargeFreeTierOrReject(req, '/api/proxy/recap');
@@ -4210,6 +4253,11 @@ One convention across every endpoint, so you can branch on the same fields every
       if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
         logEvent(req, '/api/proxy/recap', 503);
         return jsonError(res, 503, 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
+      }
+
+      // LIN-1458: witness which credential source served this request.
+      if (!isTestMode) {
+        logOpenRouterCredentialSource(req, '/api/proxy/recap', { sessionApiKey, isFreeTier });
       }
 
       if (isFreeTier && !isTestMode) {
@@ -4385,6 +4433,11 @@ One convention across every endpoint, so you can branch on the same fields every
           return keepalive.send(503, { error: 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
         }
 
+        // LIN-1458: witness which credential source served this request.
+        if (!isTestMode) {
+          logOpenRouterCredentialSource(req, '/api/proxy/brief', { sessionApiKey, isFreeTier });
+        }
+
         // Charge one free-tier unit only now that generation is guaranteed.
         if (isFreeTier && !isTestMode) {
           const rejection = await chargeFreeTierOrReject(req, '/api/proxy/brief');
@@ -4481,6 +4534,11 @@ One convention across every endpoint, so you can branch on the same fields every
       if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
         logEvent(req, '/api/proxy/brief', 503);
         return jsonError(res, 503, 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
+      }
+
+      // LIN-1458: witness which credential source served this request.
+      if (!isTestMode) {
+        logOpenRouterCredentialSource(req, '/api/proxy/brief', { sessionApiKey, isFreeTier });
       }
 
       if (isFreeTier && !isTestMode) {
@@ -5552,6 +5610,11 @@ One convention across every endpoint, so you can branch on the same fields every
       if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
         return jsonError(res, 503, 'AI recommendations not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
+      }
+
+      // LIN-1458: witness which credential source served this request.
+      if (!isTestMode) {
+        logOpenRouterCredentialSource(req, '/api/proxy/recommend-and-dispatch', { sessionApiKey, isFreeTier });
       }
 
       // Charge one free-tier unit ONCE per request (not per descent hop). Charge
