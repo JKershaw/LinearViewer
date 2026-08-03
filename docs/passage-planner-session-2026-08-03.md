@@ -210,7 +210,7 @@ LIN-1850 so it would serve the revised text rather than v0; with v0.1 landed,
 that dependency is discharged.
 
 **The compression was not free, and one thread from it is still open.**
-Shrinking section 9 by 45% traded out two witness-facing specifics that
+Shrinking the prompt by 45% traded out two witness-facing specifics that
 existed nowhere else in the repository. LIN-1850's independent
 review caught the loss and made preserving them — not necessarily restoring
 them to the prompt text itself — the single condition on its approval; they
