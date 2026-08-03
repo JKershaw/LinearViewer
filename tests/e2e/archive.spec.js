@@ -2,8 +2,14 @@ import { test, expect } from '@playwright/test';
 
 // Archive pages: numbered standalone HTML documents under docs/archive/,
 // served verbatim at /archive/:n with no auth. Archives #1 and #2 are the
-// first and second editions of "The Harbour Archive" museum page; the
-// landing page's archive section links the latest edition.
+// first and second editions of "The Harbour Archive" museum page; #3 is a
+// different kind of document — the 2026-08-03 project brief, companion to
+// docs/reviews/recent-headwinds-review-2026-08-03.md. The numbering is a
+// sequence of standalone documents, not of Harbour Archive editions.
+//
+// The landing page's archive section links the Harbour Archive specifically
+// (hard-coded /archive/2), so adding a non-Archive document does NOT move it —
+// that is asserted below so the two cannot drift silently.
 
 test.describe('Archive Pages', () => {
 
@@ -17,6 +23,25 @@ test.describe('Archive Pages', () => {
     const response = await page.goto('/archive/2');
     expect(response.status()).toBe(200);
     await expect(page).toHaveTitle(/The Harbour Archive/);
+  });
+
+  test('serves archive #3 (the project brief) without authentication', async ({ page }) => {
+    const response = await page.goto('/archive/3');
+    expect(response.status()).toBe(200);
+    await expect(page).toHaveTitle(/Project Brief/);
+  });
+
+  test('archive #3 loads its self-hosted faces from public/fonts', async ({ page }) => {
+    // It links /fonts/*.woff2 rather than inlining them as base64 (same origin,
+    // unlike the published artifact). A moved or renamed face would silently
+    // degrade the page to system fallbacks, so assert the faces actually load.
+    await page.goto('/archive/3');
+    const loaded = await page.evaluate(async () => {
+      await document.fonts.ready;
+      return [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family);
+    });
+    expect(loaded).toContain('Inter');
+    expect(loaded).toContain('JetBrains Mono');
   });
 
   test('archive #1 is a standalone snapshot — no shared app chrome', async ({ page }) => {
