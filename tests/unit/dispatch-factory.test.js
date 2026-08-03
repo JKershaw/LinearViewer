@@ -166,7 +166,12 @@ describe('createDispatchItem — model/harness resolution', () => {
     assert.equal(store.captured.item.harness, 'explicit-harness');
   });
 
-  test('model and harness resolve independently', async () => {
+  // Re-titled (LIN-1694, non-blocking per plan-review): an explicit incoming
+  // model carries no harness field of its own to conflict with — there is no
+  // cross-row provenance mismatch here — so this case's resolved values are
+  // unchanged by the row-atomic eligibility guard. See the dedicated
+  // "row-atomic model eligibility" describe block below for the guard itself.
+  test('an explicit model with no explicit harness still falls through to the workspace-wide harness (no cross-row conflict)', async () => {
     const store = capturingStore();
     const prefs = await prefsWith({ model: 'ws-model', harness: 'ws-harness' });
     await createDispatchItem({
@@ -175,6 +180,120 @@ describe('createDispatchItem — model/harness resolution', () => {
     });
     assert.equal(store.captured.item.model, 'explicit-model');
     assert.equal(store.captured.item.harness, 'ws-harness');
+  });
+});
+
+// LIN-1694: the row-atomic model-eligibility guard — the Harbour-side half of
+// the fix (rule a). Reproduces the live incident (H1) plus the class's other
+// members (H2/H3), confirms H4 is explicitly NOT closed here (documented as
+// Simple Dispatcher's job instead), and closes the reverse cross (R) for a
+// kind outside DISPATCH_DEFAULT_KINDS. Mirrors the mechanical enumeration's
+// own labels (LIN-1871 comment on this ticket) so a reviewer can match each
+// case back to the class it covers.
+describe('createDispatchItem — row-atomic model eligibility (LIN-1694)', () => {
+  // H1 — the reported live incident, reproduced exactly: an explicit incoming
+  // harness with no model, against a workspace config whose ONLY configured
+  // row for this kind is scoped to a DIFFERENT harness.
+  test('H1: explicit harness + blank model — a byKind row scoped to a different harness must not cross', async () => {
+    const store = capturingStore();
+    const prefs = await prefsWith({
+      harness: 'claude-code',
+      byKind: { implementation: { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'implementation',
+      harness: 'claude-code', prompt: 'x'
+    });
+    assert.equal(store.captured.item.harness, 'claude-code');
+    assert.strictEqual(store.captured.item.model, null, 'the opencode-scoped model must not pair with claude-code');
+  });
+
+  // H1 control: with NO explicit harness, the byKind row's own harness governs
+  // resolution and its model IS eligible — proves the guard only fires on an
+  // actual provenance mismatch, not on every byKind lookup.
+  test('H1 control: no explicit harness — the byKind row supplies BOTH fields together, no conflict', async () => {
+    const store = capturingStore();
+    const prefs = await prefsWith({
+      byKind: { implementation: { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'implementation', prompt: 'x'
+    });
+    assert.equal(store.captured.item.harness, 'opencode');
+    assert.equal(store.captured.item.model, 'deepseek/deepseek-v4-pro');
+  });
+
+  // H2 — a follow-up inheriting the anchor's harness (LIN-1431, step 4.5),
+  // against the SAME crossed workspace config as H1.
+  test('H2: anchor harness inheritance — the inherited harness must gate the byKind model too', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { issueIdentifier: 'LIN-1', harness: 'claude-code' }
+    });
+    const prefs = await prefsWith({
+      byKind: { implementation: { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'implementation',
+      prompt: 'x', fields: { followUpTo: 'anchor-1' }
+    });
+    assert.equal(store.captured.item.harness, 'claude-code', 'inherited from the anchor');
+    assert.strictEqual(store.captured.item.model, null, 'the opencode-scoped model must not cross onto the inherited claude-code harness');
+  });
+
+  // H3 — a selected preset supplying harness only; the LOWER-precedence
+  // workspace byKind row (which the preset's own missing model falls through
+  // to) is scoped to a different harness than the preset just settled.
+  test('H3: preset supplies harness only — a lower-precedence row scoped elsewhere must not cross', async () => {
+    const store = capturingStore();
+    const presetsStore = presetsStoreWith({
+      p1: { id: 'p1', name: 'P', config: { harness: 'claude-code' } } // no model on the preset
+    });
+    const prefs = await prefsWith({
+      byKind: { implementation: { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'implementation', prompt: 'x',
+      dispatchPresetsStore: presetsStore, presetId: 'p1'
+    });
+    assert.equal(store.captured.item.harness, 'claude-code');
+    assert.strictEqual(store.captured.item.model, null);
+  });
+
+  // H4 — a byKind row carrying a model but a BLANK harness. Documented as
+  // explicitly OUT of scope for this Harbour-side rule (no conflicting
+  // provenance to detect: a blank-harness row is eligible under ANY harness
+  // in force, by the same "blank = inherit" contract every other row honours)
+  // — Simple Dispatcher's own unmappable-model refusal is the backstop for
+  // this cell, not this guard. Pinned here so a future change can't silently
+  // "fix" this case in a way that breaks blank = inherit.
+  test('H4 (documented non-closure): a byKind model with a BLANK harness stays eligible under ANY harness in force', async () => {
+    const store = capturingStore();
+    const prefs = await prefsWith({
+      byKind: { implementation: { model: 'deepseek/deepseek-v4-pro' } } // no harness on the row
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'implementation',
+      harness: 'claude-code', prompt: 'x'
+    });
+    assert.equal(store.captured.item.harness, 'claude-code');
+    assert.equal(store.captured.item.model, 'deepseek/deepseek-v4-pro', 'H4 is NOT closed here by design — see Simple Dispatcher\'s admission.js reject rule');
+  });
+
+  // R — the reverse cross: a `kind` OUTSIDE DISPATCH_DEFAULT_KINDS (so byKind
+  // is never consulted) whose anchor resolves onto opencode, against a
+  // workspace-WIDE (top-level) model row scoped to claude-code. The top-level
+  // row is subject to the SAME guard as byKind, so the model must not cross.
+  test('R: reverse cross — an opencode-resolving anchor must not inherit a claude-code-scoped workspace-wide model', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { issueIdentifier: 'LIN-1', harness: 'opencode' }
+    });
+    const prefs = await prefsWith({ model: 'opus', harness: 'claude-code' });
+    await createDispatchItem({
+      store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'custom',
+      prompt: 'x', fields: { followUpTo: 'anchor-1' }
+    });
+    assert.equal(store.captured.item.harness, 'opencode', 'inherited from the anchor');
+    assert.strictEqual(store.captured.item.model, null, 'the claude-code-scoped workspace model must not cross onto opencode');
   });
 });
 
