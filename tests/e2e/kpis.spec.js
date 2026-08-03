@@ -106,11 +106,16 @@ test.describe('KPIs page', () => {
     test(`${chartId} has a 30d/24h range toggle that switches the active button on click (LIN-1846)`, async ({ page }) => {
       await page.goto('/kpis');
 
-      const toggle = page.locator(`.kpi-range-toggle[data-chart="${chartId}"]`);
-      // A chart whose canvas was replaced by emptyUnless() carries no toggle
-      // at all — only assert the click behavior when the toggle is present.
-      if (await toggle.count() === 0) return;
+      // The toggle markup renders unconditionally, server-side, regardless of
+      // data — but its click handler is only wired client-side inside the
+      // `!emptyUnless(...)` branch (public/kpis.js), which replaces the
+      // canvas with a "no data yet" note on an empty chart. So the presence
+      // check that actually predicts whether the handler is wired is the
+      // CANVAS's survival, not the toggle's — on a fresh/low-traffic instance
+      // this chart can legitimately have no data yet.
+      if (await page.locator(`#${chartId}`).count() === 0) return;
 
+      const toggle = page.locator(`.kpi-range-toggle[data-chart="${chartId}"]`);
       await expect(toggle).toBeVisible();
       await expect(toggle.locator('.kpi-range-btn')).toHaveCount(2);
       await expect(toggle.locator('.kpi-range-btn.is-active')).toHaveText('30d');
