@@ -808,6 +808,59 @@ endpoint's copy is the best-effort cross-device mirror of it.
   it.
 - **503** when roadmap report history isn't configured on this deployment.
 
+#### Get Periodicals
+
+```
+GET /api/proxy/periodicals
+```
+
+Returns per-template **periodical run state** — what ran, when, and how recently — derived
+from the live dispatch queue plus history (LIN-1827/LIN-1829). Pure read: no Linear fetch,
+no LLM call, read scope is sufficient. This endpoint computes **no trigger and dispatches
+nothing** — it is evidence only, for a consumer that wants to decide for itself whether a
+periodical is due.
+
+```json
+{
+  "periodicals": [
+    {
+      "id": "documentation-review",
+      "title": "Documentation Review",
+      "mode": "corrective",
+      "cadence": "weekly",
+      "state": "due",
+      "lastDispatchedAt": "2026-07-24T10:00:00Z",
+      "daysSince": 10
+    }
+  ]
+}
+```
+
+- **`id`** is the template's stable registry id (the fold's own `periodicalId`, renamed at
+  the wire boundary).
+- **`mode`**/**`cadence`** are **carried through from the matched template** by the fold
+  itself, never re-joined against the registry here — so this endpoint can never publish a
+  `cadence` that disagrees with the one its own `due`/`recent` boundary actually used.
+- **`state`** is one of four values: `"recent"` — a live (queued, not yet resolved) dispatch
+  for this template, OR a `taken` history run inside its cadence window; `"due"` — the
+  cadence has elapsed since the last run; `"never"` — **no evidence in the full retained
+  history window**, which is a *bounded* claim, not "ever ran" — a workspace that only
+  recently started dispatching periodicals, or whose history retention is shorter than the
+  read horizon, reads `"never"` the same as one that has genuinely never run this template;
+  `"unknown"` — the read horizon is narrower than the store's retention window, so absence
+  isn't conclusive. `"unknown"` is **not produced by any deployment today** (both the read
+  horizon and the store's retention default to 30 days, so they're always equal) — it
+  becomes reachable only if a future caller narrows the horizon below the store's retention,
+  or an operator configures a longer retention than the fixed 30-day horizon this route uses.
+- **`lastDispatchedAt`** is the most recent matched **history** run's timestamp (ISO-8601),
+  `null` when there is none in the window. A live queued run does not update it — it only
+  drives `state: "recent"`.
+- **`daysSince`** is the floored day count since `lastDispatchedAt`, `null` when it is.
+- **`runs`** (a raw count of matched history runs) is **not published** by this endpoint —
+  it has no declared consumer today; add it if/when one needs it rather than reshaping a
+  field already in the wild.
+- **503** when dispatch is not configured on this deployment.
+
 ### Task Automation Endpoints
 
 These endpoints back the task-automation workflow: pick the next task, generate a prompt for it, and record agent progress. The **recap** and **brief** endpoints above are part of this group too. All are read-scope except `POST /api/proxy/agent/status` (deprecated alias: `POST /api/proxy/foreman/status`), which requires `readWrite`.

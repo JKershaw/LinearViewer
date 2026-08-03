@@ -174,6 +174,14 @@ announce what it will work on. A sensible default precedence:
 2. a periodical past its cadence threshold (maintenance debt), else
 3. the top of the stack (north-star-aligned first).
 
+**Shipped note (LIN-1827/LIN-1829, §8.C):** periodical cadence state ships as a **live
+pointer**, not text baked into the snapshot at generation time — the kickoff's general-mode
+first act tells Autopilot to fetch `GET /api/proxy/periodicals` itself, ahead of the stack
+digest, rather than embedding a computed cadence line in the prompt body. The three-level
+precedence above is exactly what shipped, stated explicitly in that same first-act text and
+declared to supersede the guide's own (unconditional, two-level) Orient-step wording for a
+general run.
+
 This sits right on invariant 1: "what's worth doing next" is normative-adjacent, so the
 precedence must be a **human-authored policy the autopilot executes**, not a judgment it
 improvises. Orientation = apply the policy to the snapshot, emit the choice, let the human
@@ -331,13 +339,20 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
   Autopilot's first orient action gets a sense of the whole stack without holding every task's
   full body in context. Baking that same projection into the kickoff at dispatch is the
   remaining (now-trivial) step. See [`autopilot-kickoff.md`](./autopilot-kickoff.md).
-- **C. Periodicals cadence.** The only stateful bit — the snapshot needs "code review last
-  ran 14d ago." v1 can likely **derive** this from existing signals (`foreman/status`
-  history, git log, periodical-tagged Linear search) rather than build a store; add a store
-  later if derivation proves flaky. *Deliberately deferred:* the shipped kickoff (B) drops
-  periodicals entirely — precedence is just (1) explicit goal, else (2) top of stack — and
-  the kickoff carries a maintainer note on how to slot the cadence rule back in cleanly when
-  the periodicals producer lands (**LIN-315**).
+- **C. Periodicals cadence.** ✅ **shipped (LIN-1827/LIN-1829, sub-tickets of LIN-373 Approach
+  C).** The snapshot needs "code review last ran 14d ago" — shipped as **derived, never
+  persisted**: `foldPeriodicalRuns()` (`lib/periodical-runs.js`) is a pure fold over the live
+  dispatch **queue + history**, joined to the registry on a mint-time `periodicalId`, producing
+  each template's `due`/`recent`/`never`/`unknown` state. No separate cadence store, and no
+  derivation from `foreman/status` history, git log, or a periodical-tagged Linear search —
+  those were the pre-implementation guess; the actual source is the dispatch queue/history rows
+  Harbour already persists for every dispatch. That fold is published two ways: a consumer-proxy
+  reader via `GET /api/proxy/periodicals`, and a pointer in the kickoff's general-mode first act
+  (`lib/prompts/autopilot-kickoff.js`) that Autopilot fetches live as its own first orient
+  action, ahead of the stack digest — full three-level precedence (goal → overdue periodical →
+  top of stack), not the two-level goal-or-stack order the kickoff shipped with initially. The
+  **ledger stays separate from the trigger**: this surfaces evidence only, never a dispatch
+  decision — turning it into one is **LIN-1629**'s still-unbuilt job.
 
 ### What is just guide text (no build)
 

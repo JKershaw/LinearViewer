@@ -67,6 +67,8 @@ import { isTerminalState, isBlocked } from '../lib/tree.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals } from '../lib/periodicals.js';
+import { foldPeriodicalRuns, DEFAULT_HORIZON_MS } from '../lib/periodical-runs.js';
+import { PERIODICAL_PROJECTION } from '../lib/dispatch-store.js';
 import { parseRepoFromDescription, resolveDispatchRepo, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext, shouldUseMcpTokenField, provisionBootstrapToken } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS, WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
@@ -1519,6 +1521,25 @@ GET ${baseUrl}/api/proxy/north-star
     freshness state — which means it can be non-null while both states read
     "absent", if that stored value is itself unparseable; "maxAgeDays" is the
     freshness window so callers don't hardcode it.
+
+GET ${baseUrl}/api/proxy/periodicals
+  → Per-template periodical run state, derived from the live dispatch queue +
+    history (LIN-1827/LIN-1829). Computes no trigger and dispatches nothing —
+    this is evidence only.
+  → { "periodicals": [{ "id": "documentation-review", "title": "Documentation Review",
+        "mode": "corrective" | "advisory", "cadence": "weekly",
+        "state": "due" | "recent" | "never" | "unknown",
+        "lastDispatchedAt": "2026-07-24T10:00:00Z" | null, "daysSince": 10 | null }] }
+  → "state": "recent" means a live queue row OR a history run inside its cadence
+    window; "due" means the cadence has elapsed since the last run; "never" means
+    NO EVIDENCE IN THE FULL RETAINED HISTORY WINDOW — not "ever ran". The window
+    is min(this route's fixed 30-day horizon, the store's retention).
+    "unknown" — absence not conclusive — appears only when the horizon is
+    narrower than retention, i.e. if an operator configures "historyTtl" longer
+    than 30 days; a shorter retention still yields a conclusive "never". Not
+    produced by any deployment today (both default to 30 days). "mode"/"cadence"
+    are carried through from the matched template, never re-joined, so they can
+    never disagree with the value the "due"/"recent" boundary itself used.
 
 GET ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — deprecated)
   → Recent agent status entries
@@ -3887,6 +3908,126 @@ One convention across every endpoint, so you can branch on the same fields every
     } catch (err) {
       logEvent(req, '/api/proxy/north-star', 500);
       jsonError(res, 500, 'Failed to resolve north star');
+    }
+  });
+
+  /**
+   * GET /api/proxy/periodicals  (LIN-1829, sub-ticket of LIN-373 Approach C)
+   *
+   * Read-only: per-template periodical run state (`due`/`recent`/`never`/
+   * `unknown`) derived from the live dispatch queue + history via
+   * foldPeriodicalRuns (LIN-1827, lib/periodical-runs.js). This route owns
+   * the async reads the fold is pure about — it computes no trigger and
+   * dispatches nothing (LIN-1629, not yet built, owns turning this evidence
+   * into a dispatch decision).
+   *
+   * Guards mirror GET /api/proxy/north-star (LIN-1810, :3820 above): proxyLimiter
+   * + authenticateProxyToken, `read` scope (no requireWriteScope — its absence
+   * is the existing read-scope convention on this router), workspace-scoped via
+   * req.proxyUrlKey, 503 when dispatchQueueStore is unavailable. No feature-flag
+   * gate — matches every other read verb here (isWorkspaceFeatureEnabled has
+   * exactly one app-wide consumer, server.js, and no proxy-token route is
+   * flag-gated).
+   *
+   * Read safety is TWO obligations, not one (LIN-1829 research, corrected
+   * 2026-08-03 — this ticket originally conflated them):
+   *
+   *  (a) PROJECTION. Both reads carry PERIODICAL_PROJECTION so the multi-KB-
+   *      to-10MB `prompt`/`feedback[]` fields never transfer — the documented
+   *      cause of the LIN-1030 H12/503 incidents. A projection is a column
+   *      filter, NOT a row cap (lib/dispatch-store.js:55-78).
+   *  (b) ROW BOUNDING. `limit` is ruled out permanently: listHistory's `limit`
+   *      path sorts on `resolvedAt`, not `dispatchedAt` (lib/dispatch-store.js
+   *      :918-940), so it can silently drop or wrongly retain a periodical's
+   *      only run. Bounding instead comes from the JS-side `kind === 'periodical'`
+   *      filter below (neither store method has a `kind` filter) — measured
+   *      safe today (~7,183 history rows workspace-wide for an O(15) answer).
+   *      REVISIT TRIGGER: workspace dispatch-history row count materially
+   *      exceeding ~25-30k, or this route's own latency approaching the 30s
+   *      router ceiling — whichever comes first — push `kind` into the store
+   *      query instead (deferred out of this ticket; not done here).
+   *
+   * historyTtl is stored in SECONDS (lib/dispatch-store.js:142); the fold
+   * wants milliseconds. This is a correctness gate, not a style point — a
+   * raw-seconds value is finite, so it passes the fold's Number.isFinite
+   * guard and silently collapses the horizon to ~30 minutes, reading every
+   * template as `never`. This endpoint must fail toward `recent`, never
+   * toward a false `never` — a false `never` would make the (unbuilt)
+   * LIN-1629 consumer read "nothing has ever run" and over-dispatch all 15
+   * templates at once.
+   *
+   * `now` is route-supplied (`Date.now()`), never a request parameter — no
+   * `?days=`, which keeps the fold's `unknown` state unreachable via any
+   * request parameter (not unreachable by construction: an operator raising
+   * `historyTtl` above 30 days makes it live with no code change). `runs` is
+   * deliberately not published: no live consumer exists yet (LIN-1629 is
+   * unbuilt) and reshaping a published field later is costlier than adding
+   * one. No registry re-join: `mode`/`cadence` are fold output, carried
+   * through from the matched template, so this route can never publish a
+   * value that disagrees with the one the `due`/`recent` boundary itself
+   * used.
+   */
+  router.get('/api/proxy/periodicals', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      if (!dispatchQueueStore) {
+        logEvent(req, '/api/proxy/periodicals', 503);
+        return jsonError(res, 503, 'Dispatch is not available');
+      }
+
+      const now = Date.now();
+      // Belt-and-suspenders only — the fold re-applies the horizon itself
+      // (lib/periodical-runs.js), so this `since` is not load-bearing for
+      // correctness, only for trimming the read.
+      const effectiveHorizonMs = Math.min(DEFAULT_HORIZON_MS, dispatchQueueStore.historyTtl * 1000);
+
+      const [queueRows, history] = await Promise.all([
+        dispatchQueueStore.listItems(req.proxyUrlKey, { projection: PERIODICAL_PROJECTION }),
+        dispatchQueueStore.listHistory(req.proxyUrlKey, {
+          // A Date, not a raw number: `dispatchedAt` is stored as a real Date
+          // and listHistory's `since` is compared against it via `$gte`. The
+          // file-backed MangoDB store's cross-type comparator returns NaN
+          // (no match) for a Date-vs-Number `$gte`, so a raw epoch-ms number
+          // here would silently exclude every history row on that backend —
+          // this belt-and-suspenders `since` is supposed to trim the read,
+          // never break it.
+          since: new Date(now - effectiveHorizonMs),
+          projection: PERIODICAL_PROJECTION
+        })
+      ]);
+
+      // JS-side kind filter — neither store method has one (see the read-
+      // safety note above). This is a CORRECTNESS guard (stops a human
+      // prompt titled like a template from counting as run evidence via the
+      // fold's title fallback), never a cost bound — see the revisit trigger
+      // above before adding a query-side `kind` predicate.
+      const filteredQueue = queueRows.filter(row => row.kind === 'periodical');
+      const filteredHistory = history.items.filter(row => row.kind === 'periodical');
+
+      const results = foldPeriodicalRuns(getPeriodicals(), {
+        queueRows: filteredQueue,
+        historyRows: filteredHistory
+      }, {
+        now,
+        // historyTtl is SECONDS (lib/dispatch-store.js:142) — mandatory
+        // conversion; see the correctness-gate note above.
+        historyTtlMs: dispatchQueueStore.historyTtl * 1000
+      });
+
+      logEvent(req, '/api/proxy/periodicals', 200);
+      res.json({
+        periodicals: results.map(r => ({
+          id: r.periodicalId,
+          title: r.title,
+          mode: r.mode,
+          cadence: r.cadence,
+          state: r.state,
+          lastDispatchedAt: r.lastDispatchedAt === null ? null : new Date(r.lastDispatchedAt).toISOString(),
+          daysSince: r.daysSince
+        }))
+      });
+    } catch (err) {
+      logEvent(req, '/api/proxy/periodicals', 500);
+      jsonError(res, 500, 'Failed to resolve periodicals');
     }
   });
 
