@@ -186,8 +186,8 @@ intended.
 starting, a human's challenge and the revision it produced, a leg winding down — as comments
 on the passage task, in the order it happened. If you ever need to retry posting a comment
 (a dropped response, an uncertain send), retry with the exact same body: a same-body retry
-within the retry window dedupes server-side and returns success rather than a duplicate
-entry, so a confirming retry is always safe.
+within the retry window dedupes server-side, returning HTTP 200 with `deduped: true` instead
+of a duplicate entry, so a confirming retry is always safe.
 
 ## 6. Task-count scope budgets, never cost
 
