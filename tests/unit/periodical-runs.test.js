@@ -52,6 +52,7 @@ import {
   DEFAULT_HORIZON_MS
 } from '../../lib/periodical-runs.js';
 import { PERIODICAL_PROJECTION, DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { PERIODICALS } from '../../lib/periodicals.js';
 
 const WEEK_MS = CADENCE_MS.weekly;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -259,6 +260,16 @@ describe('foldPeriodicalRuns — joins', () => {
     assert.equal(resultB.runs, 0);
   });
 
+  test('title fallback applies to queue rows too, not just history rows (AC3)', () => {
+    // Every other join test in this block runs on historyRows; _resolveTemplateForRow
+    // is shared code, but "uniformly across both reads" was an inference until
+    // pinned here (review F3).
+    const t = template({ title: 'Documentation Review' });
+    const rows = { queueRows: [queueRow({ periodicalId: null, promptName: 'Documentation Review' })] };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.state, 'recent');
+  });
+
   test('a stamped-but-unmatched periodicalId (a since-removed template) contributes to nothing and throws nothing', () => {
     const t = template({ id: 'documentation-review' });
     const rows = {
@@ -330,6 +341,28 @@ describe('foldPeriodicalRuns — evidence rules', () => {
     const [result] = foldPeriodicalRuns([t], rows, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
     assert.equal(result.state, 'never');
   });
+
+  test('cancelled/expired rows newer than the newest taken row do not win the max or inflate runs (AC4)', () => {
+    // The shape AC4 demands to the line: excluded rows placed NEWER than the
+    // taken row, with runs AND lastDispatchedAt (and the state it drives)
+    // both asserted — a mutant that filters `runs` by status but takes the
+    // max over every non-excluded row passes if either assertion is dropped
+    // (review F1: it reports `recent` when the truth is `due`).
+    const t = template({ cadence: 'weekly' });
+    const takenAt = new Date(NOW - 14 * DAY_MS).toISOString();
+    const rows = {
+      historyRows: [
+        historyRow({ periodicalId: t.id, status: 'taken', dispatchedAt: takenAt }),
+        historyRow({ periodicalId: t.id, status: 'cancelled', dispatchedAt: new Date(NOW - DAY_MS).toISOString() }),
+        historyRow({ periodicalId: t.id, status: 'expired', dispatchedAt: new Date(NOW - DAY_MS).toISOString() })
+      ]
+    };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.runs, 1);
+    assert.equal(result.lastDispatchedAt, new Date(takenAt).getTime());
+    assert.equal(result.daysSince, 14);
+    assert.equal(result.state, 'due');
+  });
 });
 
 // ── Queue precedence ─────────────────────────────────────────────────────────
@@ -372,6 +405,56 @@ describe('foldPeriodicalRuns — retention boundary', () => {
   test('effectiveHorizonMs < historyTtlMs (horizonMs narrower) with no matched row → unknown', () => {
     const t = template();
     const [result] = foldPeriodicalRuns([t], {}, { now: NOW, horizonMs: HISTORY_TTL_MS - 1, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.state, 'unknown');
+  });
+});
+
+// ── Effective horizon is re-applied to history rows (review F2) ────────────
+
+describe('foldPeriodicalRuns — effective horizon filters history rows, not just the never/unknown split', () => {
+  // Plan test 8: three points at the same injected `now` around the
+  // effective-horizon edge (`now - effectiveHorizonMs`), asserting
+  // included / included / excluded. Before this fix, no row was ever age-filtered
+  // by the fold at all — a caller's `since` was trusted blindly.
+  const edge = NOW - HISTORY_TTL_MS;
+
+  test('a history row exactly at the effective horizon boundary is included ($gte parity)', () => {
+    const t = template();
+    const rows = { historyRows: [historyRow({ periodicalId: t.id, dispatchedAt: new Date(edge).toISOString() })] };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, horizonMs: HISTORY_TTL_MS, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.runs, 1);
+  });
+
+  test('a history row 1ms inside (newer than) the effective horizon boundary is included', () => {
+    const t = template();
+    const rows = { historyRows: [historyRow({ periodicalId: t.id, dispatchedAt: new Date(edge + 1).toISOString() })] };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, horizonMs: HISTORY_TTL_MS, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.runs, 1);
+  });
+
+  test('a history row 1ms outside (older than) the effective horizon boundary is excluded', () => {
+    const t = template();
+    const rows = { historyRows: [historyRow({ periodicalId: t.id, dispatchedAt: new Date(edge - 1).toISOString() })] };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, horizonMs: HISTORY_TTL_MS, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.runs, 0);
+    assert.equal(result.state, 'never');
+  });
+
+  test('a taken row older than the store\'s own retention (40d, 30d TTL) is excluded, not read as due', () => {
+    const t = template();
+    const rows = { historyRows: [historyRow({ periodicalId: t.id, dispatchedAt: new Date(NOW - 40 * DAY_MS).toISOString() })] };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, horizonMs: HISTORY_TTL_MS, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.runs, 0);
+    assert.equal(result.state, 'never');
+  });
+
+  test('a caller-narrowed horizonMs (7d) excludes a 20d-old taken row even though historyTtlMs (30d) alone would not', () => {
+    // The exact probe from the review: without the fold re-applying
+    // effectiveHorizonMs, the caller's narrower horizon was silently ignored.
+    const t = template();
+    const rows = { historyRows: [historyRow({ periodicalId: t.id, dispatchedAt: new Date(NOW - 20 * DAY_MS).toISOString() })] };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, horizonMs: 7 * DAY_MS, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.runs, 0);
     assert.equal(result.state, 'unknown');
   });
 });
@@ -437,6 +520,37 @@ describe('foldPeriodicalRuns — daysSince', () => {
     const rows = { historyRows: [historyRow({ periodicalId: t.id, dispatchedAt: new Date(NOW + DAY_MS).toISOString() })] };
     const [result] = foldPeriodicalRuns([t], rows, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
     assert.equal(result.daysSince, null);
+  });
+});
+
+// ── historyTtlMs is a required contract, not tolerant row data (review F4) ──
+
+describe('foldPeriodicalRuns — historyTtlMs is required', () => {
+  test('an omitted historyTtlMs throws rather than silently degrading every template to unknown', () => {
+    const t = template();
+    assert.throws(() => foldPeriodicalRuns([t], {}, { now: NOW }), TypeError);
+  });
+
+  test('a non-finite historyTtlMs (NaN) throws', () => {
+    const t = template();
+    assert.throws(() => foldPeriodicalRuns([t], {}, { now: NOW, historyTtlMs: NaN }), TypeError);
+  });
+});
+
+// ── Registry cadence stays in sync with CADENCE_MS ──────────────────────────
+
+describe('foldPeriodicalRuns — registry cadence consistency', () => {
+  test('every PERIODICALS entry\'s cadence is a recognised key of CADENCE_MS', () => {
+    // A registry entry whose cadence isn't a CADENCE_MS key silently falls
+    // through resolveCadenceMs's fallback — this fails loudly instead so a
+    // future entry with an unrecognised cadence string is caught here rather
+    // than discovered as a due/recent misread in production.
+    for (const p of PERIODICALS) {
+      assert.ok(
+        Object.prototype.hasOwnProperty.call(CADENCE_MS, p.cadence),
+        `PERIODICALS entry '${p.id}' has cadence '${p.cadence}', not a recognised key of CADENCE_MS`
+      );
+    }
   });
 });
 
