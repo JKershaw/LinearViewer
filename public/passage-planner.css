@@ -1,0 +1,47 @@
+/**
+ * Passage Planner page (experimental, LIN-1849).
+ * Minimal styling for the prompt-surfacing stub; leans on style.css,
+ * common-actions.css, and observation.css (the .obs-session-body pre block).
+ */
+
+/* The page title + subtitle route through renderPageHeader (LIN-975); their
+   look is owned by the canonical `.page-header` / `.page-header__subtitle`. */
+
+.passage-planner-experimental {
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+
+.passage-planner-steps {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--text);
+}
+
+.passage-planner-steps li {
+  margin: 0.2rem 0;
+}
+
+.passage-planner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.passage-planner-feedback {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.passage-planner-degraded {
+  color: var(--muted);
+  margin: 0 0 0.75rem;
+}
+
+.passage-planner-prompt {
+  max-height: 60vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

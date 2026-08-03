@@ -19,6 +19,7 @@ import { renderCollectivePage } from '../../lib/render-collective.js';
 import { renderTaskChatPage } from '../../lib/render-task-chat.js';
 import { renderNextRunPage } from '../../lib/render-next-run.js';
 import { renderFlightCompanionPage } from '../../lib/render-flight-companion.js';
+import { renderPassagePlannerPage } from '../../lib/render-passage-planner.js';
 
 // The first <h1> that sits directly inside a `.page-header` header — i.e. the
 // title as emitted by renderPageHeader. A page that hand-rolls its own <h1>
@@ -76,6 +77,11 @@ const CASES = [
     title: 'Flight Companion',
     html: () => renderFlightCompanionPage({}, { urlKey: 'ws' }),
   },
+  {
+    name: 'passage-planner',
+    title: 'Passage Planner',
+    html: () => renderPassagePlannerPage({}, { urlKey: 'ws' }),
+  },
 ];
 
 describe('LIN-975: page titles route through renderPageHeader', () => {
@@ -103,6 +109,7 @@ describe('LIN-975: page titles route through renderPageHeader', () => {
       ['task-chat', renderTaskChatPage({}, { urlKey: 'ws' }), 'task-chat-header'],
       ['next-run', renderNextRunPage({}, { urlKey: 'ws' }), 'next-run-header'],
       ['flight-companion', renderFlightCompanionPage({}, { urlKey: 'ws' }), 'flight-companion-header'],
+      ['passage-planner', renderPassagePlannerPage({}, { urlKey: 'ws' }), 'passage-planner-header'],
       ['roadmap', renderRoadmapPage({ roadmapModel: {} }, { urlKey: 'ws' }), 'roadmap-page-title'],
     ];
     for (const [name, out, cls] of stale) {

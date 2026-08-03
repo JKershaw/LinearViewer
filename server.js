@@ -107,6 +107,7 @@ import { createTaskEditRoutes } from './routes/task-edit.js'
 import { createNextRunRoutes } from './routes/next-run.js'
 import { createLiveConsoleRoutes } from './routes/live-console.js'
 import { createFlightCompanionRoutes } from './routes/flight-companion.js'
+import { createPassagePlannerRoutes } from './routes/passage-planner.js'
 import { createShipBiscuitRoutes } from './routes/ship-biscuit.js'
 import { yapClientFromEnv } from './lib/yap-client.js'
 import { getLoopsForWorkspace } from './lib/pipeline-loops.js'
@@ -1637,6 +1638,9 @@ app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferen
 
 // Mount flight-companion routes (experimental prototype for LIN-751 realtime chat — LIN-922).
 app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
+
+// Mount passage-planner routes (experimental one-click kickoff prompt, Flight Companion parity — LIN-1849).
+app.use(createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
 
 // Mount live-console routes (experimental ambient "watch the swarm" feed — LIN-1436).
 app.use(createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, dispatchQueueStore, proxyEventStore, getOpenRouterSource, getDeployInfo }))
