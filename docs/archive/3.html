@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Harbour — Project Brief · 3 August 2026</title>
+<meta name="description" content="Why Harbour&#x27;s delivery fell by a third between June and July 2026 — measured from git history, agent-session telemetry and the workspace API, with the headline that an adversarial check refuted along the way.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%E2%9A%93</text></svg>">
+</head>
+<body>
+<style>
+@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/inter-400.woff2) format('woff2');}
+@font-face{font-family:'Inter';font-style:normal;font-weight:600;font-display:swap;src:url(/fonts/inter-600.woff2) format('woff2');}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/jetbrains-mono-400.woff2) format('woff2');}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:600;font-display:swap;src:url(/fonts/jetbrains-mono-600.woff2) format('woff2');}
+
+/* ============================================================
+   Harbour Project Brief
+   Tokens lifted verbatim from LinearViewer/public/style.css so this
+   page reads as native Harbour rather than a generic report skin.
+   Status hues (green/amber/red) are RESERVED: they appear only on
+   glyphs and chip borders, never on text — #d4a600 measures 2.15:1
+   on the light surface, so text always wears an ink token.
+   ============================================================ */
+:root{
+  --bg:#ffffff; --card:#f8f9fa; --inset:rgba(0,0,0,.03);
+  --text:#1a1a1a; --muted:#666666; --faint:#eeeeee;
+  --line:#dddddd; --line-soft:rgba(0,0,0,.08);
+  --brand:#0d9488; --brand-ink:#0b7c72; --brand-soft:#0d94881f;
+  --ok:#16a34a; --warn:#d4a600; --crit:#cc0000; --idle:#bbbbbb;
+  /* --warn at #d4a600 measures 2.15:1 on the card surface — too weak for a small
+     glyph, fine for a 1px chip border. Glyphs get the darkened step instead. */
+  --warn-ink:#9a7a00;
+  /* box-drawing sits on --card here, not on page white, so --faint (#eee) would
+     vanish; this is the recessive-but-present step */
+  --branch:#c3c8cd;
+  --mono:'JetBrains Mono','SF Mono','Fira Code',Consolas,monospace;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#16181d; --card:#1f222a; --inset:rgba(255,255,255,.05);
+    --text:#e6e6e6; --muted:#9aa0a6; --faint:#2c313a;
+    --line:#2c313a; --line-soft:rgba(255,255,255,.12);
+    --brand:#2dd4bf; --brand-ink:#2dd4bf; --brand-soft:#2dd4bf24;
+    --ok:#2ee65f; --warn:#e6c14a; --crit:#ff6b6b; --idle:#5c6370;
+    --warn-ink:#e6c14a; --branch:#3d4450;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16181d; --card:#1f222a; --inset:rgba(255,255,255,.05);
+  --text:#e6e6e6; --muted:#9aa0a6; --faint:#2c313a;
+  --line:#2c313a; --line-soft:rgba(255,255,255,.12);
+  --brand:#2dd4bf; --brand-ink:#2dd4bf; --brand-soft:#2dd4bf24;
+  --ok:#2ee65f; --warn:#e6c14a; --crit:#ff6b6b; --idle:#5c6370;
+  --warn-ink:#e6c14a; --branch:#3d4450;
+}
+:root[data-theme="light"]{
+  --bg:#ffffff; --card:#f8f9fa; --inset:rgba(0,0,0,.03);
+  --text:#1a1a1a; --muted:#666666; --faint:#eeeeee;
+  --line:#dddddd; --line-soft:rgba(0,0,0,.08);
+  --brand:#0d9488; --brand-ink:#0b7c72; --brand-soft:#0d94881f;
+  --ok:#16a34a; --warn:#d4a600; --crit:#cc0000; --idle:#bbbbbb;
+  --warn-ink:#9a7a00; --branch:#c3c8cd;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:var(--sans); font-size:15px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:54rem; margin:0 auto; padding:2.5rem 1.5rem 4rem}
+
+/* ---- shared primitives ---- */
+.eyebrow{
+  font-family:var(--mono); font-size:.6875rem; font-weight:600;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+}
+.num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+h1,h2,h3{text-wrap:balance; margin:0}
+h2{font-size:1.375rem; font-weight:600; letter-spacing:-.01em}
+h3{font-size:.9375rem; font-weight:600}
+p{margin:0}
+a{color:var(--brand-ink); text-decoration:none; border-bottom:1px solid var(--brand-soft)}
+a:hover{border-bottom-color:currentColor}
+a:focus-visible,button:focus-visible{outline:2px solid var(--brand); outline-offset:2px; border-radius:2px}
+
+section{
+  padding-top:2.25rem; margin-top:2.25rem; border-top:1px solid var(--line);
+}
+.sec-head{display:flex; align-items:baseline; gap:.75rem; flex-wrap:wrap; margin-bottom:1.25rem}
+.sec-head .spacer{flex:1}
+
+/* provenance chip — encodes how a section was sourced, the one thing
+   an agent-generated doc must make auditable */
+.prov{
+  font-family:var(--mono); font-size:.6875rem; letter-spacing:.04em;
+  color:var(--muted); border:1px solid var(--line); border-radius:999px;
+  padding:.15rem .55rem; white-space:nowrap;
+}
+.prov b{font-weight:600; color:var(--text)}
+
+/* ---- header ---- */
+header{padding-bottom:.5rem}
+.mark{display:flex; align-items:center; gap:.7rem; margin-bottom:1.5rem}
+.anchor{width:1.6rem; height:1.6rem; flex:none; color:var(--brand)}
+.wordmark{font-size:1.5rem; font-weight:600; letter-spacing:-.02em}
+.kicker{font-family:var(--mono); font-size:.75rem; color:var(--muted); margin-left:auto; text-align:right}
+h1{font-size:2.25rem; font-weight:600; letter-spacing:-.025em; line-height:1.15; margin-bottom:.6rem}
+.standfirst{color:var(--muted); font-size:1.0625rem; max-width:44ch}
+.meta{
+  display:flex; flex-wrap:wrap; gap:.4rem 1.5rem; margin-top:1.5rem;
+  font-family:var(--mono); font-size:.75rem; color:var(--muted);
+}
+.meta b{font-weight:500; color:var(--text)}
+
+/* ---- verdict ---- */
+.verdict{
+  margin-top:2rem; border:1px solid var(--line); border-left:3px solid var(--warn);
+  border-radius:0 8px 8px 0; background:var(--card); padding:1.25rem 1.4rem;
+}
+.verdict-top{display:flex; align-items:center; gap:.65rem; flex-wrap:wrap}
+.rag{
+  font-family:var(--mono); font-size:.75rem; font-weight:600; letter-spacing:.1em;
+  padding:.2rem .55rem; border-radius:4px; border:1px solid; background:var(--bg);
+}
+.rag[data-rag="amber"]{border-color:var(--warn)}
+.rag[data-rag="red"]{border-color:var(--crit)}
+.rag[data-rag="green"]{border-color:var(--ok)}
+.rag[data-rag="complete"]{border-color:var(--idle)}
+.verdict-line{font-size:1.125rem; font-weight:600}
+.basis{
+  font-family:var(--mono); font-size:.8125rem; line-height:1.65;
+  color:var(--muted); margin-top:.75rem; padding-top:.75rem;
+  border-top:1px dashed var(--line);
+}
+.basis::before{content:"basis  "; color:var(--brand-ink); font-weight:600}
+
+/* ---- prose ---- */
+.prose{display:flex; flex-direction:column; gap:1rem; max-width:68ch}
+.prose p{font-size:1rem}
+.pull{
+  border-left:2px solid var(--brand); padding-left:1rem; color:var(--muted);
+  font-size:.9375rem;
+}
+.quote{
+  background:var(--card); border:1px solid var(--line); border-radius:8px;
+  padding:1rem 1.15rem; font-size:.9375rem; color:var(--muted); max-width:68ch;
+}
+.quote .src{
+  display:block; margin-top:.6rem; font-family:var(--mono); font-size:.6875rem;
+  letter-spacing:.04em; color:var(--muted);
+}
+
+/* ---- chart ---- */
+/* clip (not hidden) so a wide hover tooltip cannot widen the document, while the
+   tooltip is still free to rise above the chart vertically */
+figure{margin:1.5rem 0 0; overflow-x:clip}
+.chart{
+  display:flex; align-items:flex-end; gap:2px; height:11rem;
+  padding:0 0 0 3rem; position:relative; border-bottom:1px solid var(--line);
+}
+.gridline{
+  position:absolute; left:3rem; right:0; border-top:1px dashed var(--line-soft);
+  font-family:var(--mono); font-size:.625rem; color:var(--muted);
+}
+.gridline span{position:absolute; left:-3rem; top:-.55em; width:2.5rem; text-align:right}
+.bar{
+  flex:1; position:relative; border-radius:4px 4px 0 0; min-height:2px;
+  background:var(--brand); opacity:.55; transition:opacity .12s;
+}
+.bar[data-emph="peak"]{opacity:1}
+.bar[data-emph="last"]{opacity:1}
+.bar:hover,.bar:focus-visible{opacity:1}
+.bar>.tip{
+  position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
+  background:var(--text); color:var(--bg); font-family:var(--mono); font-size:.6875rem;
+  padding:.25rem .5rem; border-radius:4px; white-space:nowrap; opacity:0;
+  pointer-events:none; transition:opacity .12s; z-index:5;
+}
+.bar:hover>.tip,.bar:focus-visible>.tip{opacity:1}
+/* edge bars anchor their tooltip inward — a centred tip on the last bar pushes
+   the document's scrollWidth past the viewport even while hidden */
+.bar:first-child>.tip{left:0; transform:none}
+.bar:last-child>.tip{left:auto; right:0; transform:none}
+.xaxis{
+  display:flex; gap:2px; padding-left:3rem; margin-top:.4rem;
+  font-family:var(--mono); font-size:.625rem; color:var(--muted);
+}
+/* min-width:0 is load-bearing — a flex:1 item defaults to min-width:auto and so
+   refuses to shrink below its label text, pushing the whole document wider */
+.xaxis span{flex:1; min-width:0; overflow:hidden; text-align:center}
+figcaption{
+  font-family:var(--mono); font-size:.75rem; color:var(--muted);
+  margin-top:.9rem; line-height:1.6; max-width:68ch;
+}
+
+/* ---- tree ---- */
+.tree{
+  font-family:var(--mono); font-size:.8125rem; overflow-x:auto;
+  background:var(--card); border:1px solid var(--line); border-radius:8px; padding:1.1rem 1.2rem;
+}
+.tree-root{color:var(--muted); padding-bottom:.55rem}
+.tree-root b{color:var(--text); font-weight:600}
+.trow{display:flex; align-items:center; gap:.55rem; padding:.22rem 0; white-space:nowrap}
+.branch{color:var(--branch); flex:none}
+.glyph{flex:none; width:1ch; font-weight:600}
+.glyph[data-rag="green"]{color:var(--ok)}
+.glyph[data-rag="amber"]{color:var(--warn-ink)}
+.glyph[data-rag="red"]{color:var(--crit)}
+.glyph[data-rag="complete"]{color:var(--idle)}
+.tname{flex:none; width:32ch; overflow:hidden; text-overflow:ellipsis}
+.tbar{flex:none; width:9rem; height:6px; border-radius:3px; background:var(--inset); overflow:hidden}
+.tbar i{display:block; height:100%; background:var(--brand); border-radius:3px}
+.tratio{flex:none; color:var(--muted); font-variant-numeric:tabular-nums}
+
+/* ---- causes ---- */
+.cause{
+  border-left:2px solid var(--line); padding:.15rem 0 .15rem 1.15rem;
+  display:flex; flex-direction:column; gap:.5rem;
+}
+.cause-head{display:flex; align-items:baseline; gap:.65rem; flex-wrap:wrap}
+.cause-when{
+  font-size:.6875rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); border:1px solid var(--line); border-radius:3px; padding:.1rem .4rem;
+  white-space:nowrap;
+}
+.cause h3{font-size:1rem; line-height:1.35}
+.cause p{font-size:.9375rem}
+.cause code{font-family:var(--mono); font-size:.8125rem}
+
+/* ---- method ---- */
+.method{display:flex; flex-direction:column; gap:.6rem}
+.step{
+  display:flex; gap:.9rem; align-items:baseline;
+  border-bottom:1px dashed var(--line); padding-bottom:.6rem;
+}
+.step:last-child{border-bottom:none}
+.step .who{
+  flex:none; width:11rem; font-family:var(--mono); font-size:.75rem; color:var(--text);
+}
+.step .what{flex:1; font-size:.9375rem; color:var(--muted)}
+@media (max-width:560px){.step{flex-direction:column; gap:.2rem} .step .who{width:auto}}
+
+/* ---- theme graph ---- */
+.tg-wrap{
+  background:var(--card); border:1px solid var(--line); border-radius:8px;
+  padding:1rem .75rem; overflow-x:auto;
+}
+.tg{display:block; min-width:44rem}
+.tg-edge{fill:none; stroke:var(--branch); stroke-width:1.5}
+.tg-arrow{fill:none; stroke:var(--branch); stroke-width:1.5}
+.tg-box{fill:var(--bg); stroke:var(--line); stroke-width:1}
+.tg-node:hover .tg-box,.tg-node:focus-visible .tg-box{stroke:var(--brand); stroke-width:1.5}
+.tg-node:focus-visible{outline:none}
+.tg-stripe{fill:var(--idle)}
+.tg-node[data-rag="green"] .tg-stripe{fill:var(--ok)}
+.tg-node[data-rag="amber"] .tg-stripe{fill:var(--warn-ink)}
+.tg-node[data-rag="red"] .tg-stripe{fill:var(--crit)}
+.tg-node[data-rag="complete"] .tg-stripe{fill:var(--idle)}
+.tg-label{font-family:var(--sans); font-size:12.5px; font-weight:600; fill:var(--text)}
+.tg-meta{font-family:var(--mono); font-size:11px; fill:var(--muted)}
+.tg-track{fill:var(--inset)}
+.tg-fill{fill:var(--brand)}
+.tg-legend{
+  display:flex; flex-wrap:wrap; gap:.35rem 1.1rem; margin-top:.8rem;
+  font-family:var(--mono); font-size:.75rem; color:var(--muted);
+}
+.tg-legend b{font-weight:600; color:var(--text)}
+
+/* ---- theme detail list under the graph ---- */
+.themes{display:flex; flex-direction:column; gap:.6rem; margin-top:1.25rem}
+.theme{
+  background:var(--card); border:1px solid var(--line); border-radius:8px;
+  padding:.9rem 1.05rem; display:flex; flex-direction:column; gap:.4rem;
+}
+.theme-top{display:flex; align-items:center; gap:.5rem; flex-wrap:wrap}
+.theme-top h3{flex:1; min-width:12rem}
+.theme p{font-size:.9375rem; color:var(--muted)}
+.theme .tk{font-family:var(--mono); font-size:.75rem; color:var(--muted)}
+
+/* ---- two-measure comparison ---- */
+.compare{
+  display:grid; grid-template-columns:1fr 1fr; gap:.85rem; margin:1.5rem 0 0;
+}
+.cmp{
+  background:var(--card); border:1px solid var(--line); border-radius:8px; padding:1rem 1.1rem;
+}
+.cmp .lbl{font-size:.8125rem; color:var(--text); font-weight:600}
+.cmp .big{
+  font-family:var(--mono); font-size:1.75rem; font-weight:600; letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums; display:block; margin:.3rem 0 .1rem;
+}
+.cmp .sub{font-family:var(--mono); font-size:.75rem; color:var(--muted); line-height:1.55}
+.cmp[data-tone="soft"] .big{color:var(--muted)}
+@media (max-width:560px){.compare{grid-template-columns:1fr}}
+
+/* ---- workstream cards ---- */
+.cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(17rem,1fr)); gap:.85rem}
+.card{
+  background:var(--card); border:1px solid var(--line); border-radius:8px;
+  padding:.95rem 1.05rem; display:flex; flex-direction:column; gap:.55rem;
+}
+.card-top{display:flex; align-items:center; gap:.45rem}
+.card h3{flex:1; line-height:1.35}
+.chip{
+  font-family:var(--mono); font-size:.625rem; font-weight:600; letter-spacing:.08em;
+  padding:.1rem .4rem; border-radius:3px; border:1px solid var(--line); color:var(--muted);
+  white-space:nowrap; flex:none;
+}
+.chip[data-rag="green"]{border-color:var(--ok)}
+.chip[data-rag="amber"]{border-color:var(--warn)}
+.chip[data-rag="red"]{border-color:var(--crit)}
+.chip[data-rag="complete"]{border-color:var(--idle)}
+.card-basis{font-family:var(--mono); font-size:.75rem; color:var(--muted); line-height:1.55}
+.card-stats{
+  display:flex; gap:1rem; font-family:var(--mono); font-size:.75rem;
+  color:var(--muted); border-top:1px dashed var(--line); padding-top:.55rem; margin-top:auto;
+}
+.card-stats b{color:var(--text); font-weight:600}
+
+/* ---- risks ---- */
+.risks{display:flex; flex-direction:column; gap:.7rem}
+.risk{
+  display:flex; gap:.9rem; background:var(--card); border:1px solid var(--line);
+  border-radius:8px; padding:.9rem 1.05rem;
+}
+.risk-sev{
+  font-family:var(--mono); font-size:.625rem; font-weight:600; letter-spacing:.08em;
+  padding:.1rem .4rem; border-radius:3px; border:1px solid var(--line);
+  height:fit-content; flex:none; color:var(--muted);
+}
+.risk-sev[data-sev="high"]{border-color:var(--crit)}
+.risk-sev[data-sev="med"]{border-color:var(--warn)}
+.risk-body{flex:1; display:flex; flex-direction:column; gap:.3rem}
+.risk-body strong{font-size:.9375rem; font-weight:600}
+.risk-body p{font-size:.875rem; color:var(--muted)}
+.risk-body .ev{font-family:var(--mono); font-size:.75rem; color:var(--muted)}
+
+/* ---- metrics ---- */
+.metrics{display:grid; grid-template-columns:repeat(3,1fr); gap:.85rem}
+@media (max-width:760px){.metrics{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:440px){.metrics{grid-template-columns:1fr}}
+.tile{
+  background:var(--card); border:1px solid var(--line); border-radius:8px; padding:1rem 1.1rem;
+  display:flex; flex-direction:column; gap:.15rem;
+}
+.tile .v{font-family:var(--mono); font-size:1.5rem; font-weight:600; letter-spacing:-.02em; font-variant-numeric:tabular-nums}
+.tile .k{font-size:.8125rem; color:var(--text)}
+.tile .s{font-family:var(--mono); font-size:.6875rem; color:var(--muted); line-height:1.5}
+
+/* ---- gaps (what this brief cannot say) ---- */
+.gaps{
+  border:1px dashed var(--line); border-radius:8px; padding:1.1rem 1.2rem;
+  display:flex; flex-direction:column; gap:.6rem;
+}
+.gaps li{font-size:.9375rem; color:var(--muted)}
+.gaps ul{margin:0; padding-left:1.1rem; display:flex; flex-direction:column; gap:.45rem}
+.gaps code{font-family:var(--mono); font-size:.8125rem; color:var(--text)}
+
+/* ---- footer ---- */
+footer{margin-top:2.25rem; padding-top:2.25rem; border-top:1px solid var(--line)}
+.srcs{
+  font-family:var(--mono); font-size:.75rem; color:var(--muted);
+  display:flex; flex-direction:column; gap:.4rem; margin-top:1rem;
+}
+.srcs div{display:flex; gap:.75rem; align-items:baseline}
+.srcs .lbl{flex:none; width:9rem; color:var(--text)}
+.srcs .val{flex:1; word-break:break-word}
+.colophon{margin-top:1.5rem; font-size:.8125rem; color:var(--muted); max-width:68ch}
+
+@media (max-width:640px){
+  .wrap{padding:1.75rem 1.1rem 3rem}
+  h1{font-size:1.75rem}
+  .kicker{margin-left:0; text-align:left; width:100%}
+  .mark{flex-wrap:wrap}
+  .tname{width:15ch}
+  .tbar{width:5rem}
+  /* 16 weekly labels can't sit legibly on a phone — show alternates; the exact
+     date stays available on each bar's own tooltip */
+  .xaxis span:nth-child(even){visibility:hidden}
+  .srcs .lbl{width:7rem}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="mark">
+    <svg class="anchor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="4.2" r="2.2"/><path d="M12 6.4V21"/><path d="M7.4 9.6h9.2"/>
+      <path d="M4 13.6a8 8 0 0 0 16 0"/>
+    </svg>
+    <span class="wordmark">Harbour</span>
+    <span class="kicker">project brief<br>generated 3 August 2026 by Claude</span>
+  </div>
+
+  <h1>The bottleneck moved.</h1>
+  <p class="standfirst">Harbour is generating work as fast as ever and converting
+  a third less of it into shipped code. That gap is the story.</p>
+
+  <div class="meta">
+    <span>period <b>trailing 30 days</b></span>
+    <span>scope <b>2 repositories · 1,810 tasks · 14 arcs</b></span>
+    <span>upstream report <b>0d old · fresh</b></span>
+  </div>
+
+  <div class="verdict">
+    <div class="verdict-top">
+      <span class="rag" data-rag="amber">◐ AMBER</span>
+      <span class="verdict-line">Delivery is down by a third. The effort went into verification — and the instrument that should have caught it stopped running.</span>
+    </div>
+    <p class="basis">Tickets reaching code fell 39% (115.2→69.8/wk) and mainline delivery units fell 37%, while ticket creation held flat at about 190/wk — so conversion, not capacity, is what changed. Work per ticket is flat (+4%). Production code fell 54% while test code held steady. 1 workstream stalled, 4 under pressure, 5 healthy. No schedule risk is measurable: 0 of 1,810 tasks carry a due date.</p>
+  </div>
+
+  <div class="compare">
+    <div class="cmp" data-tone="soft">
+      <span class="lbl">Tickets created</span>
+      <span class="big">193→190</span>
+      <span class="sub">per week · flat<br>capacity to generate work is unchanged</span>
+    </div>
+    <div class="cmp">
+      <span class="lbl">Reaching code</span>
+      <span class="big">60%→37%</span>
+      <span class="sub">share of tickets a commit ever cites<br>this is what fell</span>
+    </div>
+  </div>
+</header>
+
+<section id="what">
+  <div class="sec-head">
+    <h2>What this is</h2><span class="spacer"></span>
+    <span class="prov"><b>source</b> repo + CLAUDE.md</span>
+  </div>
+  <div class="prose">
+    <p><b>Harbour</b> is a provider-agnostic control plane for AI-augmented software
+    development. It reads an issue backend, generates a grounded prompt for a specific task,
+    dispatches that prompt to an AI agent, and verifies the result against real evidence.
+    It began as a read-only Linear project tree and grew into the cockpit for that loop.</p>
+
+    <p>The system is two repositories. <b>Harbour</b> is the web control plane —
+    provider adapters for Linear, GitHub Issues, GitHub Projects and a local store; a
+    dual-path prompt engine; a dispatch queue; and a source-neutral workspace API that
+    external agents authenticate against with single-use bootstrap tokens.
+    <b>simple-dispatcher</b> is the runtime that executes the work. Its design is the
+    unusual part: there is no in-process agent. A session is a detached terminal process
+    driven entirely from the outside at hook boundaries, coordinating through a single
+    JSON file as its IPC bus — which is what lets the same substrate run on a developer's
+    Mac or a headless Linux box under tmux.</p>
+
+    <p>One sentence governs the whole thing: <b>verified beats claimed</b>. Work counts only
+    when its evidence chain closes — CI green, merged, ledger discharged. The architecture
+    is largely downstream of that: a review step that may only issue a <i>conditional</i>
+    approval, a mandatory ledger of what CI did not prove, and a separate close-out step
+    that owns the irreversible finish. "Done" is a claim; the artifact is the fact.</p>
+  </div>
+</section>
+
+<section id="progress">
+  <div class="sec-head">
+    <h2>Progress</h2><span class="spacer"></span>
+    <span class="prov"><b>source</b> git history, both repos</span>
+  </div>
+
+  <figure>
+    <div class="chart" role="img" aria-label="Weekly tickets first landing in git. Peak 163 in the week of 2026-06-29, falling to 43 in the most recent full week.">
+      <div class="gridline" style="bottom:27.4%"><span>50</span></div><div class="gridline" style="bottom:54.8%"><span>100</span></div><div class="gridline" style="bottom:82.2%"><span>150</span></div><div class="bar" tabindex="0" data-emph="" style="height:1.1%"><span class="tip">13 Apr · 2</span></div><div class="bar" tabindex="0" data-emph="" style="height:0.5%"><span class="tip">20 Apr · 1</span></div><div class="bar" tabindex="0" data-emph="" style="height:0.0%;min-height:0"><span class="tip">27 Apr · 0</span></div><div class="bar" tabindex="0" data-emph="" style="height:0.0%;min-height:0"><span class="tip">4 May · 0</span></div><div class="bar" tabindex="0" data-emph="" style="height:0.0%;min-height:0"><span class="tip">11 May · 0</span></div><div class="bar" tabindex="0" data-emph="" style="height:1.1%"><span class="tip">18 May · 2</span></div><div class="bar" tabindex="0" data-emph="" style="height:6.6%"><span class="tip">25 May · 12</span></div><div class="bar" tabindex="0" data-emph="" style="height:12.1%"><span class="tip">1 Jun · 22</span></div><div class="bar" tabindex="0" data-emph="" style="height:53.1%"><span class="tip">8 Jun · 97</span></div><div class="bar" tabindex="0" data-emph="" style="height:40.0%"><span class="tip">15 Jun · 73</span></div><div class="bar" tabindex="0" data-emph="" style="height:70.1%"><span class="tip">22 Jun · 128</span></div><div class="bar" tabindex="0" data-emph="peak" style="height:89.3%"><span class="tip">29 Jun · 163</span></div><div class="bar" tabindex="0" data-emph="" style="height:55.3%"><span class="tip">6 Jul · 101</span></div><div class="bar" tabindex="0" data-emph="" style="height:36.2%"><span class="tip">13 Jul · 66</span></div><div class="bar" tabindex="0" data-emph="" style="height:37.8%"><span class="tip">20 Jul · 69</span></div><div class="bar" tabindex="0" data-emph="last" style="height:23.6%"><span class="tip">27 Jul · 43</span></div>
+    </div>
+    <div class="xaxis"><span>13/4</span><span>20/4</span><span>27/4</span><span>4/5</span><span>11/5</span><span>18/5</span><span>25/5</span><span>1/6</span><span>8/6</span><span>15/6</span><span>22/6</span><span>29/6</span><span>6/7</span><span>13/7</span><span>20/7</span><span>27/7</span></div>
+    <figcaption>Tickets first appearing in a commit message, by week, across both
+    repositories. Peak <b class="num">163</b> in the week of 29 June;
+    last four full weeks average <b class="num">69.8</b>/wk against
+    <b class="num">115.2</b>/wk the prior four — <b class="num">-39%</b>.
+    The current partial week is excluded.</figcaption>
+  </figure>
+
+  <div class="prose" style="margin-top:1.75rem">
+    <p>Delivery is down by about a third from its late-June peak, and the decline is
+    steady rather than a single bad week. Two independent measures agree:
+    tickets reaching code fell <b class="num">-39%</b>, and mainline delivery
+    units — one per merged pull request, immune to how commits are squashed — fell
+    <b class="num">-37%</b>.</p>
+
+    <p>What shipped is coherent. The runtime became more portable, more bounded and more
+    observable: a tmux driver took the substrate off macOS onto headless Linux, autonomous
+    runs gained an enforced task budget at the dispatch seam, per-task cost capture landed,
+    and a Live Console timeline made in-flight execution legible. Alongside those, a broad
+    run of incident fixes covered launch, wake, restart, transcript and completion recovery.</p>
+
+    <p class="pull"><b>What did not change is as important.</b> Work per ticket stayed flat —
+    <b class="num">1.18</b> to <b class="num">1.22</b> mainline units per
+    ticket, <b class="num">+4%</b>. Tickets did not get bigger or harder. Fewer of
+    them simply arrived at code.</p>
+
+    <p>One measurement gap is worth stating plainly. Of 1,112 tasks marked complete,
+    <b class="num">743</b> can be traced to a commit citing their identifier —
+    leaving <b class="num">369</b> that cannot. Some of that is legitimate: research
+    notes, documentation, decisions, and work predating the current history. But the
+    residue is unverifiable by the project's own standard, and the gap is not measured
+    anywhere.</p>
+  </div>
+</section>
+
+<section id="why">
+  <div class="sec-head">
+    <h2>Why</h2><span class="spacer"></span>
+    <span class="prov"><b>researched</b> · git, tickets, docs</span>
+  </div>
+
+  <div class="prose">
+    <p>The effort did not disappear. It changed what it was spent on, and the change
+    is visible in what the code actually <i>is</i>.</p>
+  </div>
+
+  <figure>
+    <div class="chart" role="img" aria-label="Test code as a share of all code written each week. Rises from 32% in early June to 66% by late July, crossing 50% in the week of 6 July.">
+      <div class="gridline" style="bottom:50.0%"><span>50%</span></div><div class="bar" tabindex="0" data-emph="" style="height:32.0%"><span class="tip">1 Jun · 32% test</span></div><div class="bar" tabindex="0" data-emph="" style="height:33.1%"><span class="tip">8 Jun · 33% test</span></div><div class="bar" tabindex="0" data-emph="" style="height:34.2%"><span class="tip">15 Jun · 34% test</span></div><div class="bar" tabindex="0" data-emph="" style="height:44.2%"><span class="tip">22 Jun · 44% test</span></div><div class="bar" tabindex="0" data-emph="" style="height:43.4%"><span class="tip">29 Jun · 43% test</span></div><div class="bar" tabindex="0" data-emph="last" style="height:51.5%"><span class="tip">6 Jul · 52% test</span></div><div class="bar" tabindex="0" data-emph="last" style="height:59.8%"><span class="tip">13 Jul · 60% test</span></div><div class="bar" tabindex="0" data-emph="last" style="height:62.7%"><span class="tip">20 Jul · 63% test</span></div><div class="bar" tabindex="0" data-emph="last" style="height:65.5%"><span class="tip">27 Jul · 66% test</span></div>
+    </div>
+    <div class="xaxis"><span>1/6</span><span>8/6</span><span>15/6</span><span>22/6</span><span>29/6</span><span>6/7</span><span>13/7</span><span>20/7</span><span>27/7</span></div>
+    <figcaption>Test and verification code as a share of all code written, by week,
+    both repositories. It crosses 50% in the week of 6 July and has not gone back.
+    In absolute terms production code more than halved —
+    <b class="num">26,072</b> → <b class="num">12,086</b> lines/week —
+    while test code held steady, within one per cent of where it started.</figcaption>
+  </figure>
+
+  <div class="prose" style="margin-top:1.75rem">
+    <p>The same shift shows up in what the agents spend their sessions doing. Across
+    <b class="num">68</b> tickets and <b class="num">500</b> worker
+    sessions sampled from the live API, fewer than one session in four writes code:</p>
+  </div>
+
+  <div class="metrics" style="margin-top:1rem"><div class="tile"><span class="v">23%</span><span class="k">Implementation</span><span class="s">117 of 500 sessions write code</span></div><div class="tile"><span class="v">54%</span><span class="k">Plan, review, close-out</span><span class="s">271 of 500 sessions · governance</span></div><div class="tile"><span class="v">12%</span><span class="k">Orchestration</span><span class="s">62 of 500 sessions · coordination</span></div><div class="tile"><span class="v">5.0 → 8.0</span><span class="k">Sessions per ticket</span><span class="s">median · week of 6 Jul → week of 27 Jul</span></div><div class="tile"><span class="v">44 → 63%</span><span class="k">Governance share</span><span class="s">same cohorts — the growth is all here</span></div><div class="tile"><span class="v">$26.01</span><span class="k">Median cost per task</span><span class="s">mean $35.26 · $8.97–$89.08 · n=13</span></div></div>
+
+  <div class="prose" style="margin-top:1.75rem">
+    <p>Four causes are visible in the record, and they are not equally weighted.</p>
+
+    <div class="cause">
+      <div class="cause-head"><span class="cause-when num">28–29 Jun</span>
+      <h3>Two process changes landed 48 hours apart, at the exact peak</h3></div>
+      <p>LIN-550 split close-out from review and introduced the "What CI Did Not Prove"
+      ledger. The next day LIN-791 instructed the orchestrator to "decompose it into
+      <b>3–6 ordered, self-contained beats</b>" and "label every send <code>beat N/M</code>".
+      The literal string <code>beat N</code> appears in <b>zero</b> commits before 1 July,
+      then 9, then 18 a week. Both were deliberate quality decisions.</p>
+    </div>
+
+    <div class="cause">
+      <div class="cause-head"><span class="cause-when num">7 Jul</span>
+      <h3>An external shock broke the dispatch mechanism</h3></div>
+      <p>Claude Code's own prompt-injection defence began refusing Harbour's bootstrap-token
+      handoff — the trust handshake the entire dispatch path depends on. Credential and broker
+      work consumed <b class="num">24%</b> of all commits in the week of 13 July. This one is
+      one-off and external, and roughly a fortnight of the window is attributable to it.</p>
+    </div>
+
+    <div class="cause">
+      <div class="cause-head"><span class="cause-when num">ongoing</span>
+      <h3>The review loop does not converge</h3></div>
+      <p>The project's own autopilot diagnosed this, unprompted, as a cross-task pattern —
+      and four high-value tickets are parked at exactly that gate today, each carrying the
+      same line: <i>"No code has been changed at any point — the ticket is still at plan
+      stage."</i> These tickets consume sessions and never reach code, so they are invisible
+      in every delivery measure above.</p>
+      <div class="quote">
+        "the plan enumerates a class of call sites by hand-listing files; the reviewer
+        verifies by running an independent behavior sweep and finds another member of the
+        class the plan did not name. The revision adds the named ones, and the next sweep
+        finds one more … the two-cycle bound is reached before the enumeration converges."
+        <span class="src">— LIN-1408, autopilot comment, 2 August 2026</span>
+      </div>
+    </div>
+
+    <div class="cause">
+      <div class="cause-head"><span class="cause-when num">9 Jul</span>
+      <h3>The instrument stopped</h3></div>
+      <p>Harbour runs a periodical whose stated job is "a severity-ranked read of what has
+      been dragging recent delivery". Its last run was 9 July. It reported
+      <i>"velocity hit a new all-time high … everything else is healthy and improving"</i> —
+      in the same week delivery began falling. Twelve lines earlier, the same document had
+      written down the trap it then walked into:</p>
+      <div class="quote">
+        "Git merge cadence tracks throughput, not forward delivery — so a rising commit
+        count is never read as rising forward progress."
+        <span class="src">— Recent Headwinds review, 9 July 2026 · the last one to run</span>
+      </div>
+      <p>Ten of fifteen periodicals currently read <code>never</code>. Nothing in the
+      project's own record observes the decline.</p>
+    </div>
+
+    <p class="pull"><b>The sharpest detail.</b> The plan-review gate shipped with a recorded
+    baseline and an explicit guard — "the step must not tax the throughput it exists to
+    protect" — plus a follow-up ticket, LIN-1661, to re-read the number one cycle later.
+    LIN-1661 is still <b>Todo</b>. The gate's own falsification test has never been run, and
+    the window it would have covered is exactly the window delivery fell in.</p>
+  </div>
+</section>
+
+<section id="shape">
+  <div class="sec-head">
+    <h2>The shape of the work</h2><span class="spacer"></span>
+    <span class="prov"><b>derived</b> · 97% of all tasks</span>
+  </div>
+  <div class="prose" style="margin-bottom:1.25rem">
+    <p>Harbour began in January 2026 as a read-only viewer for Linear projects, little more than a tree and a footer. Within weeks it started generating prompts, and the story becomes one of an app teaching itself to act: grounded prompts gave the work shape, a safe API gave it hands, and the autonomous run loop turned a person clicking dispatch into a fleet of agents dispatching each other. That autonomy exposed how much the system lied to itself, so the largest single investment became making the runner honest — watched by the observation surfaces and defended by the test suite. In parallel the foundations were generalised: the backend became swappable, then the agent engine, then the host, then the human. The remaining frontier is the north star itself — cost per verified task is only now becoming measurable, recurring self-review has stalled short of true cadence, and the steering layer is being rebuilt around planned voyages.</p>
+  </div>
+  <div class="tg-wrap"><svg class="tg" viewBox="0 0 980 618" width="100%" height="618" role="img" aria-label="Theme dependency graph"><defs><marker id="tgArrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L7,4 L0,7" class="tg-arrow"/></marker></defs><path class="tg-edge" d="M490.0,86.0 C490.0,101.0 365.0,101.0 365.0,116.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M490.0,86.0 C490.0,101.0 615.0,101.0 615.0,116.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M490.0,86.0 C490.0,153.0 490.0,153.0 490.0,220.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M615.0,190.0 C615.0,205.0 490.0,205.0 490.0,220.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M365.0,190.0 C365.0,205.0 740.0,205.0 740.0,220.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M615.0,190.0 C615.0,205.0 740.0,205.0 740.0,220.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M740.0,294.0 C740.0,309.0 868.0,309.0 868.0,324.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M740.0,294.0 C740.0,361.0 365.0,361.0 365.0,428.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M868.0,398.0 C868.0,413.0 365.0,413.0 365.0,428.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M868.0,398.0 C868.0,413.0 615.0,413.0 615.0,428.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M490.0,294.0 C490.0,309.0 118.0,309.0 118.0,324.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M868.0,398.0 C868.0,465.0 615.0,465.0 615.0,532.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M615.0,502.0 C615.0,517.0 615.0,517.0 615.0,532.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M490.0,294.0 C490.0,309.0 368.0,309.0 368.0,324.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M615.0,190.0 C615.0,257.0 368.0,257.0 368.0,324.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M490.0,86.0 C490.0,153.0 240.0,153.0 240.0,220.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M365.0,190.0 C365.0,205.0 240.0,205.0 240.0,220.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M740.0,294.0 C740.0,309.0 618.0,309.0 618.0,324.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M365.0,190.0 C365.0,257.0 618.0,257.0 618.0,324.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M365.0,502.0 C365.0,517.0 365.0,517.0 365.0,532.0" marker-end="url(#tgArrow)"/><path class="tg-edge" d="M615.0,502.0 C615.0,517.0 365.0,517.0 365.0,532.0" marker-end="url(#tgArrow)"/><g class="tg-node" data-rag="green" tabindex="0" transform="translate(384.0,12.0)">
+<title>The product surface — 178/222 done. From a bare read-only Linear tree to a designed, themed, mobile-aware product.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">The product surface</text>
+<text class="tg-meta" x="14" y="43">178/222 · 80%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="147.5" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="green" tabindex="0" transform="translate(259.0,116.0)">
+<title>Grounded prompts &amp; routing — 97/132 done. Turning a ticket into a prompt an agent can act on without hallucinating.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">Grounded prompts &amp; rou…</text>
+<text class="tg-meta" x="14" y="43">97/132 · 73%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="135.2" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="green" tabindex="0" transform="translate(509.0,116.0)">
+<title>A safe API for agents — 83/118 done. The workspace API agents talk to, and the fight to stop credentials leaking through prompts.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">A safe API for agents</text>
+<text class="tg-meta" x="14" y="43">83/118 · 70%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="129.4" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="green" tabindex="0" transform="translate(384.0,220.0)">
+<title>Beyond Linear — 82/114 done. Making the issue backend swappable behind a canonical model and capability flags.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">Beyond Linear</text>
+<text class="tg-meta" x="14" y="43">82/114 · 72%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="132.4" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="green" tabindex="0" transform="translate(634.0,220.0)">
+<title>The autonomous run loop — 95/144 done. The layer that picks work, dispatches it, follows up, wakes sessions and escalates.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">The autonomous run loop</text>
+<text class="tg-meta" x="14" y="43">95/144 · 66%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="121.4" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="green" tabindex="0" transform="translate(762.0,324.0)">
+<title>Making the runner honest — 93/139 done. The out-of-process state machine, and the campaign to stop it reporting done for unfinished work.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">Making the runner honest</text>
+<text class="tg-meta" x="14" y="43">93/139 · 67%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="123.1" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="green" tabindex="0" transform="translate(259.0,428.0)">
+<title>Watching the swarm work — 59/87 done. Surfaces showing what agents are doing right now — sessions, telemetry, transcripts, live console.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">Watching the swarm work</text>
+<text class="tg-meta" x="14" y="43">59/87 · 68%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="124.8" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="green" tabindex="0" transform="translate(509.0,428.0)">
+<title>More than one agent engine — 75/111 done. Breaking the assumption that &#x27;the agent&#x27; means Claude Code.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">More than one agent engine</text>
+<text class="tg-meta" x="14" y="43">75/111 · 68%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="124.3" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="green" tabindex="0" transform="translate(12.0,324.0)">
+<title>A test suite that gates — 75/130 done. Turning a flaky, mock-backed suite into something that can actually block a merge.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">A test suite that gates</text>
+<text class="tg-meta" x="14" y="43">75/130 · 58%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="106.2" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="green" tabindex="0" transform="translate(509.0,532.0)">
+<title>Getting off the Mac — 37/76 done. Escaping AppleScript/iTerm so the dispatcher can run headless on Linux.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">Getting off the Mac</text>
+<text class="tg-meta" x="14" y="43">37/76 · 49%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="89.6" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="green" tabindex="0" transform="translate(262.0,324.0)">
+<title>From one user to many — 52/83 done. Durable accounts and owner-scoped credentials — prerequisites for anyone but the author using this.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">From one user to many</text>
+<text class="tg-meta" x="14" y="43">52/83 · 63%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="115.3" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="green" tabindex="0" transform="translate(134.0,220.0)">
+<title>Knowing where we&#x27;re going — 78/114 done. Direction surfaces that decide what the autonomy points at.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">Knowing where we&#x27;re g…</text>
+<text class="tg-meta" x="14" y="43">78/114 · 68%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="125.9" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="red" tabindex="0" transform="translate(512.0,324.0)">
+<title>Recurring self-review — 64/94 done. Scheduled, grounded review tasks the system files against itself.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">Recurring self-review</text>
+<text class="tg-meta" x="14" y="43">64/94 · 68%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="125.3" height="5" rx="2.5"/>
+</g><g class="tg-node" data-rag="amber" tabindex="0" transform="translate(259.0,532.0)">
+<title>Cost per verified task — 14/47 done. The north-star metric: what a verified task actually costs — and making it fall.</title>
+<rect class="tg-box" width="212" height="74" rx="8"/>
+<rect class="tg-stripe" width="3.5" height="74" rx="2"/>
+<text class="tg-label" x="14" y="24">Cost per verified task</text>
+<text class="tg-meta" x="14" y="43">14/47 · 30%</text>
+<rect class="tg-track" x="14" y="53" width="184" height="5" rx="2.5"/>
+<rect class="tg-fill" x="14" y="53" width="54.8" height="5" rx="2.5"/>
+</g></svg></div>
+  <div class="tg-legend">
+    <span><b>↓</b> depends on / came first</span>
+    <span><b>bar</b> delivered ÷ in scope</span>
+    <span><b>◐</b> active</span>
+    <span><b>○</b> emerging</span>
+    <span><b>✗</b> stalled</span>
+  </div>
+  <div class="themes"><div class="theme"><div class="theme-top"><span class="glyph" data-rag="green">◐</span><h3>The product surface</h3><span class="chip" data-rag="green">ACTIVE</span><span class="tk">178/222 · 80%</span></div><p>Began in January as a project tree with features bolted on as hand-rolled HTML. From April the debt was paid deliberately: a shared page shell, a component library, a token/typography design system, a full UI audit and a page-level glow-up. What remains is polish and accessibility residue.</p><p class="tk">LIN-748 · LIN-953 · LIN-1042</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="green">◐</span><h3>Grounded prompts &amp; routing</h3><span class="chip" data-rag="green">ACTIVE</span><span class="tk">97/132 · 73%</span></div><p>An early audit found the hand-written templates contradicted each other, and the AI meta-prompt path immediately drifted from them. The fix was structural: one shared grounding post-pass so both paths execute the same rules once — plus staleness re-grounding, the class check, plan-fidelity, and the review/close-out split.</p><p class="tk">LIN-435 · LIN-313 · LIN-550 · LIN-698</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="green">◐</span><h3>A safe API for agents</h3><span class="chip" data-rag="green">ACTIVE</span><span class="tk">83/118 · 70%</span></div><p>The secure proxy landed in March — the moment the viewer stopped being read-only. Security drove the arc from standing tokens in prompt text, to single-use bootstrap tokens, to a localhost broker where the agent never sees a bearer at all.</p><p class="tk">LIN-193 · LIN-376 · LIN-1375</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="green">◐</span><h3>Beyond Linear</h3><span class="chip" data-rag="green">ACTIVE</span><span class="tk">82/114 · 72%</span></div><p>Everything initially spoke Linear GraphQL directly. A canonical model came first, then the consumer API itself was routed through providers, retiring the raw passthrough. A writable local provider was pulled ahead of GitHub to unblock testing. Jira was filed in February and never started.</p><p class="tk">LIN-174 · LIN-306 · LIN-356 · LIN-1504</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="green">◐</span><h3>The autonomous run loop</h3><span class="chip" data-rag="green">ACTIVE</span><span class="tk">95/144 · 66%</span></div><p>It started as Foreman Mode — one session driving a project — retired in June for the autopilot proper: a dispatch queue with feedback, follow-ups as a first-class capability, then push-based wake rails. Most 2026 defects lived here. The frontier is now governance: an operator decision queue and bounded runs.</p><p class="tk">LIN-209 · LIN-826 · LIN-1721 · LIN-1751</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="green">◐</span><h3>Making the runner honest</h3><span class="chip" data-rag="green">ACTIVE</span><span class="tk">93/139 · 67%</span></div><p>The runner drives detached terminals coordinated only through a JSON file, so almost every failure was a lie about state: lost-write races, terminal markers firing early or never, stale waits wedging sessions forever. July&#x27;s rebuild collapsed thirteen phases to eight. It remains the noisiest arc.</p><p class="tk">LIN-459 · LIN-549 · LIN-900 · LIN-1113</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="green">◐</span><h3>Watching the swarm work</h3><span class="chip" data-rag="green">ACTIVE</span><span class="tk">59/87 · 68%</span></div><p>The Pipeline page was the first attempt and was eventually deleted. The real answer was the Observation page, grouping dispatches into sessions, then a per-session page with a reply box so a human can answer an agent waiting on them. Remaining work is fidelity.</p><p class="tk">LIN-595 · LIN-1003 · LIN-1436</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="green">◐</span><h3>More than one agent engine</h3><span class="chip" data-rag="green">ACTIVE</span><span class="tk">75/111 · 68%</span></div><p>For most of the year the runner could only launch Claude Code. OpenCode arrived as a genuine second harness with its own per-session runner. The hard part was parity, not launching: OpenCode has no Stop hook, so heartbeats, sentinels and evidence mining were rebuilt. Cursor and Gemini are filed but unstarted.</p><p class="tk">LIN-393 · LIN-1077 · LIN-1404</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="green">◐</span><h3>A test suite that gates</h3><span class="chip" data-rag="green">ACTIVE</span><span class="tk">75/130 · 58%</span></div><p>Early specs asserted against mock branches inside production routes, so green meant very little. Every spec was migrated onto the real local provider, then a flakiness sweep, then a full-system hermetic suite that boots a real Harbour and drives the real dispatcher. CI still cannot be made a required check.</p><p class="tk">LIN-215 · LIN-798 · LIN-1490 · LIN-1580</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="green">◐</span><h3>Getting off the Mac</h3><span class="chip" data-rag="green">ACTIVE</span><span class="tk">37/76 · 49%</span></div><p>Execution was welded to macOS, with absurd failure modes — reapers closing terminals mid-conversation, terminology faults after a reboot. A driver port allowed Terminal.app, then kitty, finally tmux, which needs no display server. Cloud execution and a multi-box fleet are specified but entirely unstarted — the largest concentration of untouched work in the project.</p><p class="tk">LIN-767 · LIN-1782 · LIN-1301 · LIN-1792</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="green">◐</span><h3>From one user to many</h3><span class="chip" data-rag="green">ACTIVE</span><span class="tk">52/83 · 63%</span></div><p>The app originally equated a Linear user id with a human, which broke the moment a workspace could be GitHub-backed. Durable accounts came first, then preferences and tokens re-keyed onto them. The sharp edge was credentials: workers died whenever the owning human&#x27;s session expired. The hosted path is barely begun.</p><p class="tk">LIN-1326 · LIN-1539 · LIN-1414</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="green">◐</span><h3>Knowing where we&#x27;re going</h3><span class="chip" data-rag="green">ACTIVE</span><span class="tk">78/114 · 68%</span></div><p>It started as a deterministic roadmap with an LLM narrative on top, then a north-star layer and a radial view orienting tasks by compass bearing. The payoff came later: suggested next run, turning roadmap state into goal options a human can accept. The newest form is a human-ratified planning session that writes a multi-leg voyage.</p><p class="tk">LIN-222 · LIN-273 · LIN-603 · LIN-1811</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="red">✗</span><h3>Recurring self-review</h3><span class="chip" data-rag="red">STALLED</span><span class="tk">64/94 · 68%</span></div><p>A registry of periodicals whose dispatch generates a grounded task rather than a generic reminder, growing to eleven templates. June saw the peak — all eleven ran in one sweep. Since then the cadence has not recurred: two dated runs in July, eleven run-tickets cancelled. The trigger that would make it autonomous is still open.</p><p class="tk">LIN-315 · LIN-373 · LIN-1629</p></div><div class="theme"><div class="theme-top"><span class="glyph" data-rag="amber">○</span><h3>Cost per verified task</h3><span class="chip" data-rag="amber">EMERGING</span><span class="tk">14/47 · 30%</span></div><p>Cost was invisible for the first half of the year. Real capture arrived only in late July, when the runner began emitting per-session usage. The north-star derivation is in progress right now, blocked on a definition rather than on engineering. This is the youngest and thinnest arc, and almost everything that would make cost fall is still ahead.</p><p class="tk">LIN-418 · LIN-1425 · LIN-1625</p></div></div>
+</section>
+
+<section id="forecast">
+  <div class="sec-head">
+    <h2>Forecast</h2><span class="spacer"></span>
+    <span class="prov"><b>deterministic</b> · arrival rate unmeasured</span>
+  </div>
+  <div class="prose">
+    <p>At the current rate of <b class="num">69.8</b> tickets/week, the
+    <b class="num">549</b> open tasks represent <b class="num">7.9 weeks</b>
+    of work — reaching 27 September 2026. At the prior rate it would be
+    <b class="num">4.8 weeks</b>.</p>
+
+    <p class="pull"><b>But that figure is a floor, and a receding one.</b> Tickets are being
+    created at about <b class="num">190</b> a week against
+    <b class="num">69.8</b> reaching code — so the backlog grows by roughly
+    <b class="num">120</b> tasks every week at current rates. The burn-down above
+    answers "how long if creation stopped", which it will not. And nothing in this workspace
+    carries a due date — 0 of 1,810 tasks — so there is no schedule to be on or off.
+    Every colour in this brief is flow health, never schedule health.</p>
+
+    <p>The more useful forward statement is about sequencing, not dates. Harbour's own
+    north-star reading names the open question directly:</p>
+
+    <div class="quote">
+      "Should active Product interface work continue, or be paused behind reliability
+      incidents and the blocked cost-per-verified-task chain?"
+      <span class="src">— Harbour roadmap digest, generated 2 August 2026, LLM-authored, marked fresh</span>
+    </div>
+
+    <p>That question has force because of a specific inversion. The project's stated headline
+    metric is <i>cost per verified task, visible and falling</i> — and the task that would
+    derive it from existing capture (LIN-1625) is in progress, stale, and blocking eight
+    others. Meanwhile the raw data to compute it already exists and is queryable today: the
+    figures in the metrics below were derived from the live API in about fifteen seconds.</p>
+  </div>
+</section>
+
+<section id="tree">
+  <div class="sec-head">
+    <h2>Where the work sits</h2><span class="spacer"></span>
+    <span class="prov"><b>deterministic</b> · task states</span>
+  </div>
+  <div class="tree">
+    <div class="tree-root">Harbour · <b>1,423</b> tasks in scope · <b>68%</b> delivered<br>
+    <span style="color:var(--muted)">excludes 128 canceled &amp; duplicate and 259 unassigned to a workstream — 1,423 + 259 + 128 = 1,810</span></div>
+    <div class="trow"><span class="branch">├─</span><span class="glyph" data-rag="green" title="HEALTHY">◐</span><span class="tname" title="Product">Product</span><span class="tbar"><i style="width:79%"></i></span><span class="tratio">398/507 · 79%</span></div><div class="trow"><span class="branch">├─</span><span class="glyph" data-rag="green" title="HEALTHY">◐</span><span class="tname" title="Autopilot, Recommendation &amp; Prompt Engine">Autopilot, Recommendation &amp; Prompt Engine</span><span class="tbar"><i style="width:62%"></i></span><span class="tratio">136/218 · 62%</span></div><div class="trow"><span class="branch">├─</span><span class="glyph" data-rag="amber" title="AT RISK">○</span><span class="tname" title="Simple Dispatcher">Simple Dispatcher</span><span class="tbar"><i style="width:66%"></i></span><span class="tratio">134/203 · 66%</span></div><div class="trow"><span class="branch">├─</span><span class="glyph" data-rag="green" title="HEALTHY">◐</span><span class="tname" title="Dispatch &amp; Execution Runtime">Dispatch &amp; Execution Runtime</span><span class="tbar"><i style="width:55%"></i></span><span class="tratio">63/114 · 55%</span></div><div class="trow"><span class="branch">├─</span><span class="glyph" data-rag="amber" title="AT RISK">○</span><span class="tname" title="Quality, Periodicals &amp; Measurement">Quality, Periodicals &amp; Measurement</span><span class="tbar"><i style="width:46%"></i></span><span class="tratio">38/82 · 46%</span></div><div class="trow"><span class="branch">├─</span><span class="glyph" data-rag="red" title="STALLED">✗</span><span class="tname" title="DevOps &amp; Tooling">DevOps &amp; Tooling</span><span class="tbar"><i style="width:83%"></i></span><span class="tratio">55/66 · 83%</span></div><div class="trow"><span class="branch">├─</span><span class="glyph" data-rag="amber" title="AT RISK">○</span><span class="tname" title="Platform Security, Robustness, Observability">Platform Security, Robustness, Observability</span><span class="tbar"><i style="width:33%"></i></span><span class="tratio">22/66 · 33%</span></div><div class="trow"><span class="branch">├─</span><span class="glyph" data-rag="green" title="HEALTHY">◐</span><span class="tname" title="Providers &amp; API Unification">Providers &amp; API Unification</span><span class="tbar"><i style="width:80%"></i></span><span class="tratio">51/64 · 80%</span></div><div class="trow"><span class="branch">├─</span><span class="glyph" data-rag="green" title="HEALTHY">◐</span><span class="tname" title="UX, Theme">UX, Theme</span><span class="tbar"><i style="width:73%"></i></span><span class="tratio">45/62 · 73%</span></div><div class="trow"><span class="branch">├─</span><span class="glyph" data-rag="complete" title="COMPLETE">✓</span><span class="tname" title="Test Infrastructure: Local-Provider Migration">Test Infrastructure: Local-Provider Migration</span><span class="tbar"><i style="width:100%"></i></span><span class="tratio">28/28 · 100%</span></div><div class="trow"><span class="branch">└─</span><span class="glyph" data-rag="amber" title="AT RISK">○</span><span class="tname" title="The Ship&#x27;s Biscuit">The Ship&#x27;s Biscuit</span><span class="tbar"><i style="width:31%"></i></span><span class="tratio">4/13 · 31%</span></div>
+  </div>
+  <p style="font-family:var(--mono);font-size:.75rem;color:var(--muted);margin-top:.75rem">
+    ✓ complete &nbsp; ◐ healthy &nbsp; ○ at risk &nbsp; ✗ stalled &nbsp;— bar shows delivered ÷ in scope
+  </p>
+</section>
+
+<section id="workstreams">
+  <div class="sec-head">
+    <h2>Moving parts</h2><span class="spacer"></span>
+    <span class="prov"><b>deterministic</b> · rule printed per card</span>
+  </div>
+  <div class="cards"><div class="card"><div class="card-top"><span class="glyph" data-rag="red">✗</span><h3>DevOps &amp; Tooling</h3><span class="chip" data-rag="red">STALLED</span></div><p class="card-basis">11 open, 0 landings in 30d (last was 45d ago)</p><div class="card-stats"><span><b>55</b> done</span><span><b>11</b> open</span><span><b>1</b> bug</span><span>ship <b>45d ago</b></span></div></div><div class="card"><div class="card-top"><span class="glyph" data-rag="amber">○</span><h3>Simple Dispatcher</h3><span class="chip" data-rag="amber">AT RISK</span></div><p class="card-basis">5 open bugs (threshold 3); still shipping (17 landings/30d)</p><div class="card-stats"><span><b>134</b> done</span><span><b>69</b> open</span><span><b>5</b> bug</span><span>ship <b>9d ago</b></span></div></div><div class="card"><div class="card-top"><span class="glyph" data-rag="amber">○</span><h3>Quality, Periodicals &amp; Measurement</h3><span class="chip" data-rag="amber">AT RISK</span></div><p class="card-basis">3 open bugs (threshold 3); still shipping (12 landings/30d)</p><div class="card-stats"><span><b>38</b> done</span><span><b>44</b> open</span><span><b>3</b> bug</span><span>ship <b>today</b></span></div></div><div class="card"><div class="card-top"><span class="glyph" data-rag="amber">○</span><h3>Platform Security, Robustness, Observability</h3><span class="chip" data-rag="amber">AT RISK</span></div><p class="card-basis">open (44) exceeds delivered (22); still shipping (8 landings/30d)</p><div class="card-stats"><span><b>22</b> done</span><span><b>44</b> open</span><span><b>2</b> bug</span><span>ship <b>2d ago</b></span></div></div><div class="card"><div class="card-top"><span class="glyph" data-rag="amber">○</span><h3>The Ship&#x27;s Biscuit</h3><span class="chip" data-rag="amber">AT RISK</span></div><p class="card-basis">open (9) exceeds delivered (4); still shipping (4 landings/30d)</p><div class="card-stats"><span><b>4</b> done</span><span><b>9</b> open</span><span><b>0</b> bug</span><span>ship <b>22d ago</b></span></div></div><div class="card"><div class="card-top"><span class="glyph" data-rag="green">◐</span><h3>Product</h3><span class="chip" data-rag="green">HEALTHY</span></div><p class="card-basis">73 landings in 30d, last 0d ago; 2 open bugs</p><div class="card-stats"><span><b>398</b> done</span><span><b>109</b> open</span><span><b>2</b> bug</span><span>ship <b>today</b></span></div></div><div class="card"><div class="card-top"><span class="glyph" data-rag="green">◐</span><h3>Autopilot, Recommendation &amp; Prompt Engine</h3><span class="chip" data-rag="green">HEALTHY</span></div><p class="card-basis">57 landings in 30d, last 1d ago; 1 open bugs</p><div class="card-stats"><span><b>136</b> done</span><span><b>82</b> open</span><span><b>1</b> bug</span><span>ship <b>1d ago</b></span></div></div><div class="card"><div class="card-top"><span class="glyph" data-rag="green">◐</span><h3>Dispatch &amp; Execution Runtime</h3><span class="chip" data-rag="green">HEALTHY</span></div><p class="card-basis">17 landings in 30d, last 1d ago; 2 open bugs</p><div class="card-stats"><span><b>63</b> done</span><span><b>51</b> open</span><span><b>2</b> bug</span><span>ship <b>1d ago</b></span></div></div><div class="card"><div class="card-top"><span class="glyph" data-rag="green">◐</span><h3>Providers &amp; API Unification</h3><span class="chip" data-rag="green">HEALTHY</span></div><p class="card-basis">4 landings in 30d, last 10d ago; 0 open bugs</p><div class="card-stats"><span><b>51</b> done</span><span><b>13</b> open</span><span><b>0</b> bug</span><span>ship <b>10d ago</b></span></div></div><div class="card"><div class="card-top"><span class="glyph" data-rag="green">◐</span><h3>UX, Theme</h3><span class="chip" data-rag="green">HEALTHY</span></div><p class="card-basis">38 landings in 30d, last 5d ago; 0 open bugs</p><div class="card-stats"><span><b>45</b> done</span><span><b>17</b> open</span><span><b>0</b> bug</span><span>ship <b>5d ago</b></span></div></div><div class="card"><div class="card-top"><span class="glyph" data-rag="complete">✓</span><h3>Test Infrastructure: Local-Provider Migration</h3><span class="chip" data-rag="complete">COMPLETE</span></div><p class="card-basis">0 open tasks; 28 delivered</p><div class="card-stats"><span><b>28</b> done</span><span><b>0</b> open</span><span><b>0</b> bug</span><span>ship <b>40d ago</b></span></div></div></div>
+</section>
+
+<section id="risks">
+  <div class="sec-head">
+    <h2>Risks &amp; blockers</h2><span class="spacer"></span>
+    <span class="prov"><b>mixed</b> · measured + judged</span>
+  </div>
+  <div class="risks"><div class="risk"><span class="risk-sev" data-sev="high">HIGH</span><div class="risk-body"><strong>Delivery is down about a third, and it is not a measurement artifact</strong><p>Two independent measures agree: tickets reaching code, and mainline delivery units that are immune to merge policy. Work per ticket is flat, so this is fewer tickets converting — not bigger tickets.</p><p class="ev">tickets 115.2→69.8/wk (-39%) · mainline 135.5→85.2/wk (-37%) · per-ticket +4%</p></div></div><div class="risk"><span class="risk-sev" data-sev="high">HIGH</span><div class="risk-body"><strong>The project cannot see its own slowdown</strong><p>The periodical whose stated job is reading delivery drag last ran on 9 July, reporting an all-time high in the very week the decline began. Nothing in the project record observes what this brief measures.</p><p class="ev">last Recent Headwinds review 2026-07-09 · 24 days overdue · 10 of 15 periodicals read never</p></div></div><div class="risk"><span class="risk-sev" data-sev="high">HIGH</span><div class="risk-body"><strong>The gate that may have caused it has never been tested</strong><p>The plan-review gate shipped with a recorded baseline, an explicit guard that it must not tax the throughput it exists to protect, and a follow-up to re-read the number one cycle later. That follow-up has not run — and the unmeasured window is exactly the window delivery fell in.</p><p class="ev">LIN-1600 shipped 2026-07-26 · baseline follow-on ratio 0.2342 · LIN-1661 re-read still Todo</p></div></div><div class="risk"><span class="risk-sev" data-sev="high">HIGH</span><div class="risk-body"><strong>The headline metric is blocked on a definition, not on engineering</strong><p>Cost per verified task is the stated north star. The spend half is captured; the outcome half is not computable, because ledger discharge has no marker and no pull request is ever read. It waits on one human ruling.</p><p class="ev">LIN-1625 · in progress · unblocks 8 · 7 days stale · trial figures $17.83 vs $22.80 per task</p></div></div><div class="risk"><span class="risk-sev" data-sev="med">MED</span><div class="risk-body"><strong>Tickets that consume sessions and never reach code</strong><p>Four high-value tickets are parked at the plan-review bound, each carrying the line &quot;No code has been changed at any point&quot;. They burn agent sessions and appear in no delivery measure — here or in Harbour.</p><p class="ev">LIN-1694 · LIN-1731 · LIN-1717 · LIN-1408 — 4+ sessions each, zero commits</p></div></div><div class="risk"><span class="risk-sev" data-sev="med">MED</span><div class="risk-body"><strong>Coordination is now most of what the fleet does</strong><p>Fewer than one agent session in four writes code; planning, review and orchestration take the rest. The wake traffic carrying that coordination is itself unowned.</p><p class="ev">implementation 117/500 sampled sessions = 23% · LIN-1749 reports wakes at 46% of all sessions</p></div></div><div class="risk"><span class="risk-sev" data-sev="med">MED</span><div class="risk-body"><strong>Completed work that cannot be verified</strong><p>By the project&#x27;s own standard the artifact is the fact, yet a fifth of completed tasks have no commit citing them. Some are legitimately non-code; the residue is unmeasured.</p><p class="ev">743 of 1112 completed tasks traceable to a commit</p></div></div><div class="risk"><span class="risk-sev" data-sev="med">MED</span><div class="risk-body"><strong>No schedule accountability is possible</strong><p>Not a risk in the work but in the reporting. With no due dates anywhere, no stakeholder can be told whether anything is late, and no brief can honestly claim a project is on track.</p><p class="ev">0 of 1810 tasks carry a due date</p></div></div></div>
+</section>
+
+<section id="metrics">
+  <div class="sec-head">
+    <h2>Metrics</h2><span class="spacer"></span>
+    <span class="prov"><b>measured</b> 3 August 2026</span>
+  </div>
+  <div class="metrics"><div class="tile"><span class="v">1,112</span><span class="k">Tasks delivered</span><span class="s">of 1,810 · 61% · 149 canceled</span></div><div class="tile"><span class="v">69.8</span><span class="k">Tickets reaching code</span><span class="s">per week · -39% vs prior 4 weeks</span></div><div class="tile"><span class="v">190</span><span class="k">Tickets created</span><span class="s">per week · flat vs 193 prior</span></div><div class="tile"><span class="v">-54%</span><span class="k">Production code</span><span class="s">26,072 → 12,086 lines/wk · test -1%</span></div><div class="tile"><span class="v">549</span><span class="k">Open tasks</span><span class="s">across 11 workstreams · 18 flagged bug</span></div><div class="tile"><span class="v">743</span><span class="k">Traceable to a commit</span><span class="s">of 1,112 completed · 67%</span></div></div>
+  <p style="font-family:var(--mono);font-size:.75rem;color:var(--muted);margin-top:.9rem;max-width:68ch">
+    Cost figures are a sample of the 13 most recently landed tickets, each fully
+    priced — no unpriced models, no missing telemetry. The endpoint returns a null total
+    rather than a partial one, so these are complete or absent, never quietly understated.
+  </p>
+</section>
+
+<section id="method">
+  <div class="sec-head">
+    <h2>How this was made</h2><span class="spacer"></span>
+    <span class="prov"><b>method</b> · and one correction</span>
+  </div>
+  <div class="prose" style="margin-bottom:1.25rem">
+    <p>This brief was assembled by an AI agent from live data, then attacked by another
+    one. The attack succeeded, and the headline changed — so it is worth showing the work.</p>
+  </div>
+  <div class="method">
+    <div class="step"><span class="who">measure</span><span class="what">All 1,810 tasks paged from the workspace API; full git history of both repositories; 500 agent sessions sampled for composition and cost.</span></div>
+    <div class="step"><span class="who">explain</span><span class="what">Six independent agents on the slowdown: git forensics, a commit taxonomy, the theme graph, ticket bodies and comment threads, the project's own research docs, and one adversary.</span></div>
+    <div class="step"><span class="who">refute</span><span class="what">The adversary's only job was to break the headline. It was given the claim, the data, and seven specific attacks to attempt.</span></div>
+    <div class="step"><span class="who">correct</span><span class="what">It succeeded on three of them. The original claim — "output barely fell, tickets just got heavier" — was withdrawn.</span></div>
+  </div>
+
+  <div class="prose" style="margin-top:1.5rem">
+    <p class="pull"><b>What the adversary found.</b> The first draft claimed raw commits fell
+    only 18% against a 49% fall in tickets, and concluded the work per ticket had inflated by
+    ~77%. Three things were wrong with it. The two series were computed on <b>different
+    repository sets</b> — a missing directory change had silently made one of them a duplicate
+    of the other. The commit counts were <b>inflated by a merge-policy shift</b>: squashed pull
+    requests contribute one commit, merged ones contribute a whole branch, and the mix moved
+    from 92% squash to about 25%. And the four-week window was the <b>only</b> window length at
+    which the two measures diverged at all — at three weeks and five weeks they track each
+    other.</p>
+
+    <p>Re-measured on one consistent basis, using mainline units that are immune to merge
+    policy, work per ticket is <b>flat</b> (+4%). Delivery genuinely fell by about a
+    third. The composition shift and the session evidence — both independent of git — are what
+    survived, and they are what this brief now rests on.</p>
+
+    <p>That is not an aside. Harbour's own thesis is that an optimizer scored on a surface it
+    authored itself will drift, and that the fix is a check it cannot author. This page was
+    written by an agent, checked by an agent it did not control, and corrected against its own
+    first conclusion. The method is the subject.</p>
+  </div>
+</section>
+
+<section id="gaps">
+  <div class="sec-head">
+    <h2>What this brief cannot tell you</h2><span class="spacer"></span>
+    <span class="prov"><b>limits</b> of the sources</span>
+  </div>
+  <div class="gaps">
+    <ul>
+      <li><b>Whether anything is late.</b> No task or project carries a due date, so no
+      schedule verdict is possible. Every status here is flow health, not schedule health.</li>
+      <li><b>What changed since the last brief.</b> Report history stores narrative prose,
+      not structured snapshots, and only the latest report is reachable — there is nothing
+      to diff. "Progress" above means the trailing period, not the delta since last time.</li>
+      <li><b>Whether the review loop is worth its cost.</b> This is the central open
+      question and it is not answerable from here. The gates were added to stop defects
+      escaping; measuring whether they did needs the follow-on-task ratio re-read that
+      LIN-1661 owns and has never run. Reverts falling to near zero is suggestive, not proof.</li>
+      <li><b>Agent effort before 4 July.</b> Session and cost telemetry expires at 30 days,
+      so the session-composition evidence cannot be extended back into the June peak. The
+      June-vs-July comparison exists for code, not for effort.</li>
+      <li><b>Total spend.</b> Cost is per-task only, with no workspace aggregate. The
+      dispatch history caps at <code>100</code> items with no pagination, and its unfiltered
+      <code>total</code> of 7,129 does not reconcile with the per-status totals summing to
+      200 — so that number is deliberately not printed anywhere above.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="sec-head"><h2>Provenance</h2></div>
+  <p style="color:var(--muted);font-size:.9375rem;max-width:68ch">Every figure above traces
+  to one of these. Nothing was estimated, and where a source could not answer, the question
+  is listed as a gap rather than filled in.</p>
+  <div class="srcs">
+    <div><span class="lbl">workspace API</span><span class="val">1,810 tasks over 8 pages · <span class="num">GET /api/proxy/issues</span> · read 3 August 2026</span></div>
+    <div><span class="lbl">narrative</span><span class="val"><span class="num">GET /api/proxy/north-star</span> · LLM-authored, report generated 2026-08-02 19:44 UTC · age 0d of 14 permitted · state <b>fresh</b></span></div>
+    <div><span class="lbl">delivery</span><span class="val">git log, LinearViewer (2,167 commits from 2026-01-04) + simple-dispatcher (431 from 2026-02-26)</span></div>
+    <div><span class="lbl">cost</span><span class="val"><span class="num">GET /api/proxy/issues/{id}/cost</span> · 13 tickets sampled</span></div>
+    <div><span class="lbl">ranking</span><span class="val"><span class="num">GET /api/proxy/stack?view=digest</span> · 715 ranked tasks</span></div>
+    <div><span class="lbl">architecture</span><span class="val">CLAUDE.md, README.md, docs/north-star.md — both repositories at HEAD</span></div>
+    <div><span class="lbl">composition</span><span class="val">git numstat, both repos, non-merge commits, classified by path (test / docs / production)</span></div>
+    <div><span class="lbl">delivery unit</span><span class="val"><span class="num">git log --first-parent</span> — one unit per merged PR, invariant to squash-vs-merge policy</span></div>
+    <div><span class="lbl">sessions</span><span class="val">68 tickets / 500 worker sessions via <span class="num">/api/proxy/issues/{id}/cost</span> · window limited to 30d by telemetry TTL</span></div>
+    <div><span class="lbl">creation rate</span><span class="val">sequential-id interpolation against 47 sampled <span class="num">createdAt</span> values</span></div>
+    <div><span class="lbl">research</span><span class="val">six independent agents over git history, ticket bodies and comment threads, and <span class="num">docs/</span> in both repositories; every quoted line verified against its source</span></div>
+    <div><span class="lbl">not used</span><span class="val">no LLM call was made to compute any figure on this page; the two quoted narrative passages were generated by Harbour beforehand and are cited as such</span></div>
+  </div>
+  <p class="colophon">Prepared by Claude on 3 August 2026 from a read-write workspace token.
+  Colours follow a printed rule, never a judgement: each is stated beside the thing it
+  describes so a reader who distrusts a verdict can check the arithmetic instead of
+  taking it on faith.</p>
+</footer>
+
+</div>
+
+</body>
+</html>

@@ -213,7 +213,7 @@ tests/
   screenshots/         Reference images for visual specs
   visual/              Playwright visual-regression specs
 docs/
-  archive/                     Numbered standalone HTML documents served verbatim at /archive/:n, public; the landing page links the latest (archives #1–#2 = first and second editions of "The Harbour Archive" museum page, Jan–Jul 2026)
+  archive/                     Numbered standalone HTML documents served verbatim at /archive/:n, public. The numbering is a sequence of DOCUMENTS, not of Harbour Archive editions: #1–#2 are the first and second editions of "The Harbour Archive" museum page (Jan–Jul 2026), #3 is the 2026-08-03 project brief (companion to docs/reviews/recent-headwinds-review-2026-08-03.md). The landing page links the Harbour Archive specifically via a hard-coded /archive/2 (lib/render-landing.js), so adding a non-Archive document does not move it — tests/e2e/archive.spec.js pins that. #3 LINKS its faces from /fonts/*.woff2 (same origin) rather than inlining base64, which is why it is ~77KB rather than ~198KB
   dispatch-integration.md      Dispatch consumer integration guide
   proxy-integration.md         Linear API proxy consumer integration guide
   prompt-change-validation.md  Prompt-behavior change validation process
