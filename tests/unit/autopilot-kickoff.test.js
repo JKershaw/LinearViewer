@@ -5,10 +5,14 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../../lib/prompts/autopilot-manual.js';
 
 const BASE_URL = 'https://example.com';
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe('buildAutopilotKickoff (shared guide)', () => {
   test('starts with the Autopilot persona header', () => {
@@ -259,6 +263,32 @@ describe('buildAutopilotKickoff (general / stack-walk)', () => {
     assert.ok(text.includes('deliverable this task was meant to produce'));
     assert.ok(text.includes('not a fixed checklist'));
   });
+
+  // LIN-1829: the periodicals pointer, general-mode only.
+  test('first act points at the periodicals endpoint BEFORE the stack digest fetch — section order encodes precedence', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    const periodicalsIdx = text.indexOf(`${BASE_URL}/api/proxy/periodicals`);
+    const stackIdx = text.indexOf(`${BASE_URL}/api/proxy/stack?limit=5&view=digest`);
+    assert.notEqual(periodicalsIdx, -1, 'periodicals pointer must be present');
+    assert.notEqual(stackIdx, -1, 'stack digest fetch must still be present');
+    assert.ok(periodicalsIdx < stackIdx, 'periodicals pointer must precede the stack fetch');
+  });
+
+  test('states the three-level precedence order: goal -> overdue periodical -> stack', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(text.includes('an explicit goal from the human, else **(2)** a\nperiodical reading `due`, else **(3)** the top of the stack'));
+  });
+
+  test('states the explicit supersedes clause resolving G3, closing with the "not a judgment call" phrase', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(text.includes('This supersedes the Orient step\'s two-level order'));
+    assert.ok(text.includes('still a policy, not a judgment\ncall, so don\'t improvise it'));
+  });
+
+  test('glosses `never` as bounded ("no evidence in the full retained window"), not "ever ran"', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(text.includes('no evidence in the full\nretained history window, not "ever ran"'));
+  });
 });
 
 describe('buildAutopilotKickoff (scoped to an issue)', () => {
@@ -285,6 +315,56 @@ describe('buildAutopilotKickoff (scoped to an issue)', () => {
   test('does not pull other tasks off the stack', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
     assert.ok(text.includes('Do not pull other tasks off the stack'));
+  });
+});
+
+// LIN-1829, plan step 5f. The golden fixture (tests/fixtures/autopilot-kickoff/
+// scoped-snapshot-golden.txt) was captured from the PRE-CHANGE
+// lib/prompts/autopilot-kickoff.js (commit 8891b0b8, before the periodicals
+// pointer edit landed) — the whole point of that sequencing was to compare the
+// post-edit scoped output against a fixture that predates the edit, not one
+// captured after it (which would certify a regression instead of catching one).
+describe('buildAutopilotKickoff (periodicals pointer — scoped byte-identity, LIN-1829)', () => {
+  const SEP = '\n\n---\n\n';
+  // Must match the exact params the golden was generated with (beat 1).
+  const GOLDEN_ISSUE = { identifier: 'LIN-42', title: 'Fix the thing' };
+
+  function scopedSnapshotSection(params) {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE, ...params });
+    const sections = text.split(SEP);
+    return sections[sections.length - 1];
+  }
+
+  test('scoped snapshot section is byte-identical to the pre-change golden fixture', () => {
+    const golden = readFileSync(join(__dirname, '../fixtures/autopilot-kickoff/scoped-snapshot-golden.txt'), 'utf8');
+    assert.strictEqual(scopedSnapshotSection(), golden);
+  });
+
+  test('the periodicals pointer never appears in scoped output (general-only branch)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
+    assert.ok(!text.includes('/api/proxy/periodicals'));
+    assert.ok(!text.includes('overdue periodical'));
+  });
+
+  test('the whole scoped build is unaffected, not just the snapshot section — every other kickoff snapshot test outside the general-only branch passes untouched (structural: full scoped text is byte-identical too, since sections before `snapshot` never vary by scope)', () => {
+    // The pre-edit scoped output = intro + manual + guide + snapshot, joined by
+    // SEP (buildAutopilotKickoff's own `sections.join(SEP)`). Only `snapshot`
+    // (via `firstAct`'s scoped arm — untouched) can differ for a scoped run, so
+    // reconstituting the full text from the golden's snapshot plus the OTHER
+    // (untouched) sections of a fresh build must equal the fresh build exactly.
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
+    const sections = text.split(SEP);
+    const golden = readFileSync(join(__dirname, '../fixtures/autopilot-kickoff/scoped-snapshot-golden.txt'), 'utf8');
+    const reconstituted = [...sections.slice(0, -1), golden].join(SEP);
+    assert.strictEqual(reconstituted, text);
+  });
+
+  test('`guide`\'s original two-level Orient list still renders verbatim, unconditionally (guide was NOT edited)', () => {
+    const scopedText = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
+    const generalText = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    const TWO_LEVEL_ORIENT = '(1) an explicit goal from the human, else (2) the top of';
+    assert.ok(scopedText.includes(TWO_LEVEL_ORIENT), 'guide renders unconditionally — scoped output must still carry it');
+    assert.ok(generalText.includes(TWO_LEVEL_ORIENT), 'guide renders unconditionally — general output must still carry it');
   });
 });
 

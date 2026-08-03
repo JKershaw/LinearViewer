@@ -92,17 +92,21 @@ and a fresh session is dispatched into the same wall.
    the loop keeps your altitude fresh as the run gets long — cheap, and the first thing worth
    doing here.
 
-<!-- MAINTAINER NOTE — adding periodicals back as a precedence rule.
-     When the periodicals producer lands (LIN-315), it slots in as a new rule *between*
-     the two above: (1) explicit goal, else (2) a periodical past its cadence threshold
-     (maintenance debt), else (3) top of stack. To land it cleanly:
-       - Add the rule to the ordered list above (keep it human-authored policy, not a
-         judgment Autopilot improvises — that's invariant 1).
-       - Add a "Periodical cadence" line to the snapshot block listing each periodical and
-         when it last ran / whether it's due (e.g. "code review: 14d ago → due; security:
-         3d ago; docs: never"), sourced from the cadence store/derivation LIN-315 builds.
-       - Until then there is no cadence data source, so the rule would be inert — which is
-         why it is deliberately omitted here rather than left in as a dead branch. -->
+<!-- MAINTAINER NOTE — periodicals precedence has shipped, but NOT into this list.
+     LIN-1827/LIN-1829 (sub-tickets of LIN-373 Approach C) shipped the cadence data source
+     this note used to say did not exist: GET /api/proxy/periodicals derives each template's
+     due/recent/never/unknown state from the live dispatch queue + history (foldPeriodicalRuns,
+     lib/periodical-runs.js) — no separate store. The three-level precedence — (1) explicit
+     goal, else (2) a periodical reading `due`, else (3) top of stack — is real and live.
+
+     It was deliberately NOT added to the Orient list above. It lives instead as an explicit
+     supersedes clause in the kickoff's general-mode first-act text
+     (lib/prompts/autopilot-kickoff.js, the `firstAct` else-branch), fetched and applied before
+     this Orient step even runs. That was a deliberate choice (LIN-1829): this list renders
+     UNCONDITIONALLY in both scoped and general kickoffs, so editing it would silently break a
+     scoped run's byte-identical output; confining the change to the general-only `firstAct`
+     branch keeps scoped output untouched by construction, not by discipline. `never` is a
+     BOUNDED claim (no evidence in the store's retained history window) — never "ever ran". -->
 
 
 2. **Trigger the next step.** `POST /recommend-and-dispatch` with `{ issueIdentifier, target, sessionId }`
