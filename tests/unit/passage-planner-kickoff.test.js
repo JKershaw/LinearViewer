@@ -1,8 +1,8 @@
 /**
  * Unit tests for lib/prompts/passage-planner-kickoff.js (LIN-1849).
  *
- * Pins the preamble-cut contract: docs/passage-planner-prompt.md's lines 1-37
- * are a design-artifact preamble; line 38 is the file's only `^---$`; only the
+ * Pins the preamble-cut contract: docs/passage-planner-prompt.md's
+ * design-artifact preamble sits above the file's one `^---$` divider; only the
  * body after it is the pasteable live-session prompt. Mirrors
  * tests/unit/flight-companion-kickoff.test.js's pinning style.
  *
@@ -17,7 +17,14 @@ describe('buildPassagePlannerKickoff', () => {
     const text = buildPassagePlannerKickoff();
     assert.ok(!text.includes('What this is'));
     assert.ok(!text.includes('v0.1 revises v0'));
+    assert.ok(!text.includes('v0.2 amends v0.1'));
     assert.ok(!text.includes('Graduation-lift tracking'));
+  });
+
+  test('does not contain the retired witness-ceremony acceptance gate', () => {
+    const text = buildPassagePlannerKickoff();
+    assert.ok(!text.includes('cold-read witness'));
+    assert.ok(text.includes('chronicle'));
   });
 
   test('does not start with the doc H1 title', () => {
