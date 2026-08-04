@@ -1177,7 +1177,7 @@ Content-Type: application/json
 | `assigneeId` | UUID | No | Assign to user |
 | `parentId` | UUID | No | Set parent issue |
 | `cycleId` | UUID | No | Assign to cycle |
-| `priority` | int | No | Priority 0 (none) to 4 (urgent) |
+| `priority` | int | No | Priority — `1` urgent, `2` high, `3` medium, `4` low, `0` none. Note the scale runs highest-first; `0` sits outside it as "no priority", not as the lowest. |
 
 Returns `201`. The echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus the `children` / `comments` / `relations` collections, which a create cannot set) — self-verifying, so you do **not** need a follow-up `GET` to confirm the fields the request set:
 ```json
@@ -1227,7 +1227,7 @@ At least one field must be provided.
 | `assigneeId` | UUID | Assign to user |
 | `parentId` | UUID \| `null` | Set parent issue (UUID), or `null` to remove the parent and promote the issue to top-level |
 | `cycleId` | UUID | Assign to cycle |
-| `priority` | int | Priority 0 (none) to 4 (urgent) |
+| `priority` | int | Priority — `1` urgent, `2` high, `3` medium, `4` low, `0` none. Note the scale runs highest-first; `0` sits outside it as "no priority", not as the lowest. |
 
 Response. As with create, the echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus `children` / `comments` / `relations`) and is **self-verifying** — every mutable field (`priority`/`priorityLabel`, `labels`, `parent`, `project`, `assignee`, `state`, `cycle`, `estimate`, `team`/`teamId`) reflects the post-write state, so a round-trip write→read shows no field absent from the write response that the request set:
 ```json
