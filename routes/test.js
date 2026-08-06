@@ -21,6 +21,13 @@ import { defaultGitHubSeed, GITHUB_WORKSPACE_URL_KEY, GITHUB_REPO } from '../tes
 import '../lib/providers/github-projects/index.js';
 import { createFakeGitHubProjectsClient } from '../lib/providers/github-projects/fake-client.js';
 import { defaultGitHubProjectsSeed, GITHUB_PROJECTS_WORKSPACE_URL_KEY, GITHUB_PROJECTS_BOARD } from '../tests/fixtures/github-projects-harness.js';
+// Same self-registration for the Jira Cloud provider (LIN-1885, Phase 1 of
+// LIN-275): importing it registers 'jira' so the read seam can resolve a
+// Jira-backed workspace, and its fake REST client backs the E2E with no
+// network/auth (never live Jira).
+import '../lib/providers/jira/index.js';
+import { createFakeJiraClient } from '../lib/providers/jira/fake-client.js';
+import { defaultJiraSeed, JIRA_WORKSPACE_URL_KEY, JIRA_SITE } from '../tests/fixtures/jira-harness.js';
 import { establishAccount } from '../lib/account-session.js';
 
 /**
@@ -1097,6 +1104,82 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   };
   router.get('/test/set-github-projects-session', setGitHubProjectsSession);
   router.post('/test/set-github-projects-session', setGitHubProjectsSession);
+
+  // ---------------------------------------------------------------------------
+  // Jira Cloud provider harness (LIN-1885, Phase 1 of LIN-275) — a genuinely
+  // hostile third-party schema, mirrors the GitHub Projects harness above.
+  // Configures the registered `jira` singleton with an in-memory fake REST
+  // client (no network, no Basic auth) and establishes a `provider: 'jira'`
+  // session whose binding is scoped to a Jira site. The dashboard then renders
+  // the site through the real getProviderForWorkspace + getWorkspaceCallScope
+  // read seam — proving the statusCategory→canonical mapping offline.
+  // ---------------------------------------------------------------------------
+  const JIRA_WS_UUID = '66666666-6666-6666-6666-666666666666';
+  // Stand-in Basic-auth credential (mirrors the Projects harness's stand-in
+  // installation token): the binding credential is {email, apiToken}, NOT the
+  // site — the clientFactory seam ignores it (returns the fake) but it travels
+  // through the real read scope, and it is deliberately NOT 'test-token' so
+  // the mock short-circuit never fires.
+  const JIRA_EMAIL = 'test-jira-user@example.com';
+  const JIRA_API_TOKEN = 'fake_jira_api_token';
+
+  // POST → seeds a custom `{ seed }` body (the clean {projects,issues} shape,
+  //        falls back to defaultJiraSeed). GET → seeds the default.
+  const setJiraSession = async (req, res) => {
+    try {
+      const body = req.body || {};
+      const seed = (body.seed && typeof body.seed === 'object') ? body.seed : defaultJiraSeed;
+
+      if (body.features && typeof body.features === 'object') {
+        const validated = {}
+        for (const [key, value] of Object.entries(body.features)) {
+          if (isValidFeatureKey(key)) validated[key] = value
+        }
+        req.session.features = validated
+      }
+
+      // Wire the request-time path: the `clientFactory` test seam resolves the
+      // per-request REST client (`_clientForCredential`) to the SAME fake,
+      // proving the per-request read path offline. `client` backs any
+      // boot-configured call; `site` backs getCreateTaskUrl's fallback.
+      const provider = getProvider('jira');
+      if (!provider) throw new Error('jira provider not registered');
+      const fake = createFakeJiraClient(seed);
+      provider.configure({ client: fake, clientFactory: () => fake, site: JIRA_SITE });
+
+      // Jira Basic-auth binding shape (LIN-1885 beat 2): the credential is
+      // {email, apiToken} and the SITE is the binding SCOPE (not the token).
+      // The read seam threads {email, apiToken, site} so the provider builds a
+      // request-time client from the credential. tokenExpiresAt:MAX_SAFE_INTEGER
+      // mirrors what routes/jira-auth.js's real link handler writes.
+      req.session.workspaces = [{
+        id: JIRA_WS_UUID,
+        name: 'Jira Workspace',
+        urlKey: JIRA_WORKSPACE_URL_KEY,
+        provider: 'jira',
+        bindings: [{
+          provider: 'jira',
+          scope: JIRA_SITE,
+          credentials: { token: JIRA_API_TOKEN, email: JIRA_EMAIL, tokenExpiresAt: Number.MAX_SAFE_INTEGER },
+        }],
+        credentials: { token: JIRA_API_TOKEN, email: JIRA_EMAIL },
+        accessToken: JIRA_API_TOKEN,
+        tokenExpiresAt: Number.MAX_SAFE_INTEGER,
+        addedAt: Date.now(),
+      }];
+      req.session.activeWorkspaceId = JIRA_WS_UUID;
+
+      // LIN-1329 fixture re-point: `jira` identity scope is the human's Jira
+      // accountId (mirrors routes/jira-auth.js's real establishAccount call).
+      await establishAccount(req.session, accountStore, accountWorkspaceStore, 'jira', 'test-jira-account-id', {}, JIRA_WS_UUID);
+
+      req.session.save(() => res.json({ ok: true, urlKey: JIRA_WORKSPACE_URL_KEY, site: JIRA_SITE }));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  };
+  router.get('/test/set-jira-session', setJiraSession);
+  router.post('/test/set-jira-session', setJiraSession);
 
   return router;
 }
