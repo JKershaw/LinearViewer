@@ -91,6 +91,7 @@ import { renderAuditPage } from './lib/render-audit.js'
 import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js'
 import { renderStyleguide } from './lib/render-styleguide.js'
 import { renderKpisPage } from './lib/render-kpis.js'
+import { renderTemplatesPage } from './lib/render-templates.js'
 import { collectKpiStats } from './lib/kpi-stats.js'
 import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
@@ -752,7 +753,7 @@ async function ensureValidToken(req, res, next) {
 // Apply middleware to all routes except auth and logout
 // Note: workspace routes need token refresh too (they access Linear API)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path === '/privacy' || req.path === '/terms' || req.path === '/styleguide' || req.path === '/kpis') {
+  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path === '/privacy' || req.path === '/terms' || req.path === '/styleguide' || req.path === '/kpis' || req.path === '/templates') {
     return next();
   }
   ensureValidToken(req, res, next);
@@ -1332,6 +1333,13 @@ app.get('/archive/:n(\\d+)', (req, res) => {
 // Deliberately deterministic: no deployInfo, no live data.
 app.get('/styleguide', (req, res) => {
   res.send(renderStyleguide())
+})
+
+// Public templates catalog (LIN-1889): publishes the 16 non-meta prompt
+// templates for anyone to view/copy without auth. Indexable (no noindex) —
+// unlike /styleguide and /kpis above, discovery is the point.
+app.get('/templates', (req, res) => {
+  res.send(renderTemplatesPage({ deployInfo: getDeployInfo() }))
 })
 
 // =============================================================================

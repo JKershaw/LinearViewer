@@ -89,6 +89,10 @@ test.describe('Static pages', () => {
     // Chart.js draws to <canvas> after load — let the charts settle.
     await capture(page, '/kpis', 'kpis', { settleMs: 800 });
   });
+
+  test('templates', async ({ page }) => {
+    await capture(page, '/templates', 'templates');
+  });
 });
 
 // ---------------------------------------------------------------------------
