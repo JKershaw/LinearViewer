@@ -206,7 +206,7 @@ relationship between the tasks, not as a label.
 
 ### Public Templates Page
 
-All 16 templates above (never the meta-prompt) are also published, unauthenticated, at `/templates` — a public page with no session/workspace requirement, linked from every page's footer (`a.footer-legal[href="/templates"]`). Each template renders in a `.prompt-card` with a `.template-copy-btn` that copies its full text to the clipboard (client-only; no dispatch, no proxy token). Indexable (no `noindex`) — unlike `/kpis`/`/styleguide`, discoverability is the point.
+All 16 templates above (never the meta-prompt) are also published, unauthenticated, at `/templates` — a public page with no session/workspace requirement, linked from every other page's footer (`a.footer-legal[href="/templates"]`; on `/templates` itself the footer shows it as plain current-page `<strong>` text, not a link). Each template renders in a `.prompt-card`, with its full text inside that card's `<details class="prompt-details"><pre class="prompt-text">` — so fetching the HTML is enough to read every template, no JavaScript required. The `.template-copy-btn` copy control is **not** in the served HTML: `/templates.js` injects one per card on `DOMContentLoaded` (client-only; no dispatch, no proxy token), so with JS off the cards and their text remain, minus the copy buttons. Indexable (no `noindex`) — unlike `/kpis`/`/styleguide`, discoverability is the point.
 
 ### More Prompts Inline
 Access additional prompt templates from any issue, regardless of its labels or state.
