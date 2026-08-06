@@ -229,6 +229,26 @@
 }
 
 /* =============================================================================
+   Template Copy Button (public /templates page only — LIN-1889)
+   ============================================================================= */
+.template-copy-btn {
+  display: block;
+  margin-top: var(--space-2);
+  padding: 0.3rem 0.75rem;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--fg);
+  background: var(--bg-muted);
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.template-copy-btn:hover {
+  background: var(--bg-alt);
+}
+
+/* =============================================================================
    Meta-Prompt Section
    ============================================================================= */
 .meta-prompt-section {
