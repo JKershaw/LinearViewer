@@ -47,6 +47,14 @@ test.describe('Jira provider (no test-token mock)', () => {
     await expect(page.locator('.detail-link', { hasText: 'View in Linear' })).toHaveCount(0);
   });
 
+  test('the project "View in Jira" link is a browsable /browse/ URL, never the raw REST resource URL (LIN-1885 beat 2 review finding #4)', async ({ page }) => {
+    const projectLink = page.locator('.project-meta .detail-link', { hasText: 'View in Jira' }).first();
+    await expect(projectLink).toBeAttached();
+    const href = await projectLink.getAttribute('href');
+    expect(href).toBe('https://acme.atlassian.net/browse/ENG');
+    expect(href).not.toContain('/rest/api/');
+  });
+
   test('an issue description renders the ADF→Markdown conversion, not raw ADF JSON', async ({ page }) => {
     await page.locator('.line:has-text("Jira task to do")').first().click();
     // Description/comments are nested inside the collapsed "Details" section
@@ -72,7 +80,7 @@ test.describe('Jira provider (no test-token mock)', () => {
 test.describe('Jira provider — empty project', () => {
   test('a project with zero issues still renders its container', async ({ page }) => {
     await seedJiraWorkspace(page, {
-      projects: [{ id: '20001', key: 'EMPTY', name: 'Empty Project', self: 'https://acme.atlassian.net/rest/api/3/project/20001' }],
+      projects: [{ id: '20001', key: 'EMPTY', name: 'Empty Project' }],
       issues: [],
     });
     await page.goto(jiraDashboardUrl(JIRA_WORKSPACE_URL_KEY));

@@ -36,7 +36,7 @@ const SITE = 'https://acme.atlassian.net'
 function seededProvider() {
   const client = createFakeJiraClient({
     projects: [
-      { id: '10001', key: 'ENG', name: 'Engineering', self: `${SITE}/rest/api/3/project/10001` },
+      { id: '10001', key: 'ENG', name: 'Engineering' },
     ],
     issues: [
       {
@@ -279,6 +279,7 @@ describe('JiraProvider reads (fake client)', () => {
     assert.equal(result.organizationName, 'acme')
     assert.equal(result.projects.length, 1)
     assert.equal(result.projects[0].id, '10001')
+    assert.equal(result.projects[0].url, `${SITE}/browse/ENG`, 'project url is the browsable /browse/ link, never the raw REST resource URL (project.self)')
     assert.equal(result.issues.length, 2)
     for (const issue of result.issues) assert.equal(issue.source, SOURCE_JIRA)
 
@@ -412,10 +413,25 @@ describe('createJiraClient serial pagination', () => {
     assert.deepEqual(all.map(p => p.key), ['A', 'B', 'C'])
   })
 
-  test('searchAllIssues walks JQL search pages serially via startAt using the response total', async () => {
+  test('searchIssues posts to /search/jql (not the removed /search) with jql/maxResults/fields, no startAt', async () => {
+    const calls = []
+    const fetchImpl = async (url, opts) => {
+      calls.push({ url, body: JSON.parse(opts.body) })
+      return { status: 200, ok: true, headers: { get: () => null }, text: async () => JSON.stringify({ issues: [] }) }
+    }
+    const client = createJiraClient({ email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl })
+    await client.searchIssues('project = ENG ORDER BY key ASC', { fields: ['summary', 'status'] })
+    assert.equal(calls.length, 1)
+    assert.ok(calls[0].url.startsWith(`${SITE}/rest/api/3/search/jql`))
+    assert.equal(calls[0].body.jql, 'project = ENG ORDER BY key ASC')
+    assert.deepEqual(calls[0].body.fields, ['summary', 'status'])
+    assert.equal('startAt' in calls[0].body, false, 'startAt is not a /search/jql param — random page access is gone')
+  })
+
+  test('searchAllIssues walks JQL search pages serially via nextPageToken, stopping once the token is absent', async () => {
     const pages = [
-      { issues: [{ id: '1', key: 'ENG-1' }], startAt: 0, maxResults: 1, total: 2 },
-      { issues: [{ id: '2', key: 'ENG-2' }], startAt: 1, maxResults: 1, total: 2 },
+      { issues: [{ id: '1', key: 'ENG-1' }], nextPageToken: 'p2' },
+      { issues: [{ id: '2', key: 'ENG-2' }] }, // no nextPageToken → last page, no `total` field anywhere
     ]
     const calls = []
     const fetchImpl = async (url, opts) => {
@@ -424,10 +440,24 @@ describe('createJiraClient serial pagination', () => {
     }
     const client = createJiraClient({ email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl })
     const all = await client.searchAllIssues('project = ENG ORDER BY key ASC')
-    assert.equal(calls.length, 2)
-    assert.equal(calls[0].body.startAt, 0)
-    assert.equal(calls[1].body.startAt, 1)
+    assert.equal(calls.length, 2, 'stopped once nextPageToken was absent, not on a total count')
+    assert.equal(calls[0].body.nextPageToken, undefined, 'first page requests no cursor')
+    assert.equal(calls[1].body.nextPageToken, 'p2', 'second page carries the cursor the first page returned')
     assert.deepEqual(all.map(i => i.key), ['ENG-1', 'ENG-2'])
+  })
+
+  test('searchAllIssues stops at the issue cap even if more pages remain, never an unbounded walk', async () => {
+    let calls = 0
+    const fetchImpl = async (url, opts) => {
+      calls += 1
+      const body = JSON.parse(opts.body)
+      const issues = Array.from({ length: body.maxResults }, (_, i) => ({ id: String(calls * 100 + i), key: `ENG-${calls}-${i}` }))
+      return { status: 200, ok: true, headers: { get: () => null }, text: async () => JSON.stringify({ issues, nextPageToken: 'more' }) }
+    }
+    const client = createJiraClient({ email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl })
+    const all = await client.searchAllIssues('ORDER BY key ASC', { cap: 5, maxResults: 3 })
+    assert.ok(all.length <= 5, `capped at 5 issues, got ${all.length}`)
+    assert.equal(all.length, 5)
   })
 })
 
@@ -507,6 +537,72 @@ describe('createJiraClient 429 handling', () => {
     })
     // 1 initial attempt + 4 bounded retries = 5 total fetch calls, never unbounded.
     assert.equal(attempts, 5)
+  })
+
+  test('a quota-reason 429 (RateLimit-Reason: jira-quota-tenant-based) fails fast on first sight, never sleeps', async () => {
+    const sleeps = []
+    let attempts = 0
+    const fetchImpl = async () => {
+      attempts += 1
+      return {
+        status: 429, ok: false,
+        headers: { get: (name) => (name === 'RateLimit-Reason' ? 'jira-quota-tenant-based' : name === 'Retry-After' ? '2' : null) },
+        text: async () => '',
+      }
+    }
+    const client = createJiraClient({
+      email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl,
+      sleepImpl: async (ms) => { sleeps.push(ms) },
+    })
+    await assert.rejects(() => client.getIssue('ENG-1'), err => {
+      assert.equal(err.status, 429)
+      assert.equal(err.rateLimitReason, 'jira-quota-tenant-based')
+      return true
+    })
+    assert.equal(attempts, 1, 'failed on the first 429, never retried a quota-exhausted bucket')
+    assert.deepEqual(sleeps, [], 'never slept — an hour-scale quota wait is not worth parking the handler for')
+  })
+
+  test('a burst-reason 429 still retries normally (only quota reasons fail fast)', async () => {
+    let attempt = 0
+    const fetchImpl = async () => {
+      attempt += 1
+      if (attempt === 1) {
+        return {
+          status: 429, ok: false,
+          headers: { get: (name) => (name === 'RateLimit-Reason' ? 'jira-burst-based' : name === 'Retry-After' ? '2' : null) },
+          text: async () => '',
+        }
+      }
+      return { status: 200, ok: true, headers: { get: () => null }, text: async () => JSON.stringify({ id: '1', key: 'ENG-1' }) }
+    }
+    const client = createJiraClient({
+      email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl,
+      sleepImpl: async () => {},
+    })
+    const issue = await client.getIssue('ENG-1')
+    assert.equal(attempt, 2, 'a burst-based 429 was retried, not failed fast')
+    assert.equal(issue.key, 'ENG-1')
+  })
+
+  test('a Retry-After above the MAX_RETRY_AFTER_MS ceiling fails fast instead of sleeping through an hour-scale wait', async () => {
+    const sleeps = []
+    let attempts = 0
+    const fetchImpl = async () => {
+      attempts += 1
+      // 3600s (1h) — clearly quota-scale, well past any sane inline retry.
+      return { status: 429, ok: false, headers: { get: (name) => (name === 'Retry-After' ? '3600' : null) }, text: async () => '' }
+    }
+    const client = createJiraClient({
+      email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl,
+      sleepImpl: async (ms) => { sleeps.push(ms) },
+    })
+    await assert.rejects(() => client.getIssue('ENG-1'), err => {
+      assert.equal(err.status, 429)
+      return true
+    })
+    assert.equal(attempts, 1, 'failed on the first 429 — an over-ceiling Retry-After is never honoured')
+    assert.deepEqual(sleeps, [], 'never slept the full hour-scale delay')
   })
 
   test('a 429 never lands on classifyUpstreamError as an auth failure', async () => {

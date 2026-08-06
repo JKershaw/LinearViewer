@@ -34,7 +34,12 @@ export function jiraDashboardUrl(urlKey = JIRA_WORKSPACE_URL_KEY) {
  */
 export const defaultJiraSeed = {
   projects: [
-    { id: '10001', key: 'ENG', name: 'Engineering', self: `${JIRA_SITE}/rest/api/3/project/10001` },
+    // Deliberately no `self` field: the provider's canonical project `url`
+    // must come from `${site}/browse/${key}` (LIN-1885 beat 2 review finding
+    // #4 — the old `project.self` REST resource URL leaked into the
+    // user-facing "View in Jira →" link). A seed carrying `self` could let a
+    // regression back to `project.self` pass unnoticed.
+    { id: '10001', key: 'ENG', name: 'Engineering' },
   ],
   issues: [
     {
