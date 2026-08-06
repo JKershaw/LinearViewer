@@ -8,6 +8,12 @@ import assert from 'node:assert';
 import { renderSettingsPage } from '../../lib/render-settings.js';
 import { AVAILABLE_MODELS } from '../../lib/openrouter.js';
 import { PROMPT_TEMPLATES } from '../../lib/prompt-template-defs.js';
+import { getProvider } from '../../lib/providers/registry.js';
+// Side-effect import: registers the real Jira provider (LIN-1885), so the
+// displayName test below exercises the actual server.js:2173 derivation
+// (`getProvider(b.provider)?.ui?.displayName || b.provider`) against a real
+// singleton, not a hand-typed stand-in.
+import '../../lib/providers/jira/index.js';
 
 const BASE = { urlKey: 'acme', workspaces: [], currentModel: 'openai/gpt-5.4-mini', availableModels: [] };
 
@@ -173,6 +179,34 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.match(html, /data-testid="settings-provider-add-github-projects"/);
     assert.match(html, /GitHub Projects/);
     assert.doesNotMatch(html, /blocked on LIN-560/);
+  });
+
+  test('offers a working add affordance for Jira (unblocked, LIN-1885)', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.match(html, /data-testid="settings-provider-add-jira"/);
+    assert.match(html, /\+ Jira:/);
+  });
+
+  // LIN-1885 research: server.js:2173 resolves a bound row's displayName via
+  // `getProvider(b.provider)?.ui?.displayName || b.provider` — a DIFFERENT
+  // source than KNOWN_ADD_PROVIDERS' static displayName above. Without the
+  // JiraProvider.ui override (LIN-1885 beat 1), that expression falls back to
+  // the bare `b.provider` string and a bound Jira workspace renders lowercase
+  // `jira:` instead of `Jira:`. This exercises the REAL registered provider,
+  // not a hand-typed displayName, so it would catch the override being
+  // removed or the fallback silently kicking in again.
+  test('a bound Jira binding row renders "Jira", not lowercase "jira" (the displayName trap)', () => {
+    const jiraDisplayName = getProvider('jira')?.ui?.displayName || 'jira';
+    assert.equal(jiraDisplayName, 'Jira', 'sanity: the real provider must actually override ui.displayName');
+
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      providerBindings: [
+        { provider: 'jira', scope: 'https://acme.atlassian.net', displayName: jiraDisplayName, token: 'fake_jira_api_token1234', active: true },
+      ],
+    });
+    assert.match(html, /Jira:/);
+    assert.doesNotMatch(html, />jira:/, 'must never render the lowercase machine name as the visible label');
   });
 
   test('GitHub add affordances default to enabled when githubEnabled is omitted (LIN-761)', () => {

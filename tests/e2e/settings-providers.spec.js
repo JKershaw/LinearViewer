@@ -58,6 +58,31 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     await expect(linearAdd.locator('button')).toHaveCount(1)
   })
 
+  // LIN-1885 Phase 1: Jira's add flow needs no GITHUB_* config (it is its own
+  // API-token Basic-auth flow, unrelated to the GitHub App), so it is live
+  // regardless of the GitHub-unconfigured environment this suite runs under —
+  // unlike the two GitHub rows above.
+  test('offers a LIVE Jira add-source affordance (LIN-1885)', async ({ page }) => {
+    const jiraAdd = page.locator('[data-testid="settings-provider-add-jira"]')
+    await expect(jiraAdd).toBeVisible()
+    await expect(jiraAdd).toContainText('Jira')
+    await expect(jiraAdd).not.toHaveClass(/provider-add-blocked/)
+    await expect(jiraAdd.locator('button')).toHaveCount(1)
+  })
+
+  test('the Jira add form posts to the providers/add route, which redirects to the GET link form (LIN-1885)', async ({ page }) => {
+    // The add button POSTs .../settings/providers/add with provider=jira;
+    // server.js redirects that to GET /auth/jira?workspace=<urlKey> (the
+    // API-token link form), never an OAuth ?mode=add-source URL — Jira has no
+    // redirect round-trip to carry session `mode` intent across.
+    await page.locator('[data-testid="settings-provider-add-jira"] button').click()
+    await page.waitForLoadState('networkidle')
+    const url = new URL(page.url())
+    expect(url.pathname).toBe('/auth/jira')
+    expect(url.searchParams.get('workspace')).toBe(urlKey)
+    await expect(page.locator('[data-testid="jira-link-form"]')).toBeVisible()
+  })
+
   test('refresh / test validates the binding and reports success', async ({ page }) => {
     await page.locator('[data-testid="settings-provider-binding"][data-provider="local"] [data-testid="settings-provider-refresh"]').click()
     await page.waitForLoadState('networkidle')

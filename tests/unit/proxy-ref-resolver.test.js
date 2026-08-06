@@ -58,6 +58,33 @@ test('ACTIVE_SOURCES is Linear-only today', () => {
   assert.deepEqual(ACTIVE_SOURCES, ['linear']);
 });
 
+// LIN-1885: adding SOURCE_JIRA to KNOWN_SOURCES (registered) without adding it
+// to ACTIVE_SOURCES (live) has exactly one observable effect — `jira:` now
+// parses as a recognised namespace and is rejected with a clean 422 "not
+// active", the SAME treatment `github:`/`local:` already get above, rather
+// than being silently swallowed as part of a bare local ref. It does NOT turn
+// jira: refs on.
+test('parseSourceNamespace: jira: is a KNOWN but not ACTIVE namespace — 422, same as github/local', () => {
+  assert.throws(() => parseSourceNamespace('jira:ENG-1'), (err) => {
+    assert.ok(err instanceof RefResolutionError);
+    assert.equal(err.status, 422);
+    assert.match(err.message, /^Provider namespace 'jira:' is not active in this workspace$/);
+    return true;
+  });
+});
+
+test('parseSourceNamespace: jira becomes active once passed in activeSources, same mechanism as github', () => {
+  assert.deepEqual(
+    parseSourceNamespace('jira:ENG-1', ['linear', 'jira']),
+    { source: 'jira', localRef: 'ENG-1' },
+  );
+});
+
+test('ACTIVE_SOURCES does NOT include jira (this ticket does not activate it)', () => {
+  assert.deepEqual(ACTIVE_SOURCES, ['linear']);
+  assert.ok(!ACTIVE_SOURCES.includes('jira'));
+});
+
 // ---------------------------------------------------------------------------
 // State resolution (layer 2)
 // ---------------------------------------------------------------------------

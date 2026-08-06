@@ -788,9 +788,27 @@ describe('getBindingCallScope', () => {
     assert.deepStrictEqual(getBindingCallScope(binding), { token: 'ghs_install', repo: 'octocat/hello' });
   });
 
+  // LIN-1885: Basic auth needs {email, apiToken, site} — a bare token cannot
+  // carry it, so this is a third instance of the structured-credential
+  // category, not a bare-token seam.
+  test('returns {email, apiToken, site} for a Jira binding (Basic auth needs all three)', () => {
+    const binding = { provider: 'jira', scope: 'https://acme.atlassian.net', credentials: { token: 'tok-123', email: 'ada@acme.com' } };
+    assert.deepStrictEqual(getBindingCallScope(binding), { email: 'ada@acme.com', apiToken: 'tok-123', site: 'https://acme.atlassian.net' });
+  });
+
+  test('the github/github-projects branches are unchanged by the Jira branch (LIN-1885 research finding 2: no widened slice)', () => {
+    const gh = { provider: 'github', scope: 'octocat/hello', credentials: { token: 'ghs_install', installationId: '42' } };
+    assert.deepStrictEqual(getBindingCallScope(gh), { token: 'ghs_install', repo: 'octocat/hello' });
+    const proj = { provider: 'github-projects', scope: 'octocat/5', credentials: { token: 'ghs_install' } };
+    assert.deepStrictEqual(getBindingCallScope(proj), { token: 'ghs_install', scope: 'octocat/5' });
+    const lin = { provider: 'linear', scope: 'org-1', credentials: { token: 'lin-tok' } };
+    assert.strictEqual(getBindingCallScope(lin), 'lin-tok');
+  });
+
   test('tolerates a missing credential bag (undefined token)', () => {
     assert.strictEqual(getBindingCallScope({ provider: 'linear', scope: 'org' }), undefined);
     assert.deepStrictEqual(getBindingCallScope({ provider: 'github', scope: 'o/r' }), { token: undefined, repo: 'o/r' });
+    assert.deepStrictEqual(getBindingCallScope({ provider: 'jira', scope: 'https://acme.atlassian.net' }), { email: undefined, apiToken: undefined, site: 'https://acme.atlassian.net' });
   });
 
   test('returns undefined for a null/undefined binding', () => {
@@ -830,8 +848,127 @@ describe('getWorkspaceCallScope', () => {
     assert.deepStrictEqual(getWorkspaceCallScope(ws), { token: 'tok-one', repo: 'octocat/one' });
   });
 
+  // LIN-1885: the active-binding form of the same third structured-credential
+  // category (see getBindingCallScope above).
+  test('returns {email, apiToken, site} for a Jira workspace, resolved from the active binding', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'jira', 'https://acme.atlassian.net', { token: 'tok-123', email: 'ada@acme.com' });
+    assert.deepStrictEqual(getWorkspaceCallScope(ws), { email: 'ada@acme.com', apiToken: 'tok-123', site: 'https://acme.atlassian.net' });
+  });
+
+  test('Jira site resolves from the binding whose token matches the active scalar mirror (two Jira sites on one account)', () => {
+    const ws = {
+      id: 'jira:1', provider: 'jira', accessToken: 'tok-one',
+      bindings: [
+        { provider: 'jira', scope: 'https://one.atlassian.net', credentials: { token: 'tok-one', email: 'a@one.com' } },
+        { provider: 'jira', scope: 'https://two.atlassian.net', credentials: { token: 'tok-two', email: 'a@two.com' } },
+      ],
+    };
+    assert.deepStrictEqual(getWorkspaceCallScope(ws), { email: 'a@one.com', apiToken: 'tok-one', site: 'https://one.atlassian.net' });
+  });
+
+  test('the github/github-projects/linear/local branches are unchanged by the Jira branch (LIN-1885 research finding 2: no widened slice)', () => {
+    let gh = linkProvider({ id: 'gh:1' }, 'github', 'octocat/one', { token: 'tok-one', installationId: '1' });
+    gh = linkProvider(gh, 'github', 'octocat/two', { token: 'tok-two', installationId: '2' });
+    assert.deepStrictEqual(getWorkspaceCallScope(gh), { token: 'tok-two', repo: 'octocat/two' });
+
+    const proj = linkProvider({ id: 'proj:1' }, 'github-projects', 'octocat/5', { token: 'tok-proj' });
+    assert.deepStrictEqual(getWorkspaceCallScope(proj), { token: 'tok-proj', scope: 'octocat/5' });
+
+    const lin = { id: 'org-1', provider: 'linear', accessToken: 'lin-tok' };
+    assert.strictEqual(getWorkspaceCallScope(lin), 'lin-tok');
+
+    const local = { id: 'uuid', provider: 'local', urlKey: 'notes-abcd', accessToken: 'notes-abcd' };
+    assert.strictEqual(getWorkspaceCallScope(local), 'notes-abcd');
+  });
+
   test('undefined for a null workspace', () => {
     assert.strictEqual(getWorkspaceCallScope(null), undefined);
+  });
+});
+
+// =============================================================================
+// Jira credential persistence (LIN-1885, beat 2) — the MAX_SAFE_INTEGER stamp
+// =============================================================================
+//
+// Research established this stamp has a THIRD, previously-unwritten job beyond
+// "never expires": it keeps a Jira workspace out of BOTH the destructive-401
+// class's proactive entry point (server.js `ensureValidToken`'s inline
+// `needsTokenRefresh` check) and the headless refresh-on-resolve candidate set
+// (`selectExpiredOwnerRow`), because a Jira credential has no refresh
+// mechanism at all — the only recovery from a dead token is a human re-link.
+// It must be written into `binding.credentials`, not only the scalar mirror,
+// so a later `setActiveProvider` switch (mirrorActiveBinding) carries it
+// forward rather than reading `undefined` off the freshly-active binding.
+import { selectOwnerWorkspaceToken, selectExpiredOwnerRow } from '../../lib/workspace-token-resolver.js';
+
+// Mirrors server.js:174/628 exactly (TOKEN_REFRESH_BUFFER_MS, the inline
+// `needsTokenRefresh` expression in `ensureValidToken`) — not exported, so
+// re-derived here as a pinned characterization rather than imported.
+const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
+function needsTokenRefresh(tokenExpiresAt) {
+  return tokenExpiresAt - Date.now() < TOKEN_REFRESH_BUFFER_MS;
+}
+
+describe('Jira MAX_SAFE_INTEGER stamp (LIN-1885)', () => {
+  test('linkProvider writes the stamp into BOTH the binding credentials and the scalar mirror', () => {
+    const ws = linkProvider({ id: 'ws-1' }, 'jira', 'https://acme.atlassian.net', {
+      token: 'tok-123', email: 'ada@acme.com', tokenExpiresAt: Number.MAX_SAFE_INTEGER,
+    });
+    assert.equal(ws.tokenExpiresAt, Number.MAX_SAFE_INTEGER, 'scalar mirror');
+    assert.equal(ws.bindings[0].credentials.tokenExpiresAt, Number.MAX_SAFE_INTEGER, 'binding credentials');
+  });
+
+  test('the stamp survives switching the active provider away and back (mirrorActiveBinding reads binding.credentials)', () => {
+    // linkProvider's "active" semantics are first-link-wins across DIFFERENT
+    // providers (never auto-overwritten) — so Jira, linked first, stays active
+    // even after `local` is appended. Switching away needs an explicit
+    // setActiveProvider, exactly like a real Settings provider-switch would.
+    let ws = linkProvider({ id: 'ws-1' }, 'jira', 'https://acme.atlassian.net', {
+      token: 'tok-123', email: 'ada@acme.com', tokenExpiresAt: Number.MAX_SAFE_INTEGER,
+    });
+    ws = linkProvider(ws, 'local', 'notes-abcd', { token: 'notes-abcd', tokenExpiresAt: Number.MAX_SAFE_INTEGER });
+    assert.equal(ws.provider, 'jira', 'first link wins — appending local does not steal active status');
+
+    setActiveProvider(ws, 'local', 'notes-abcd');
+    assert.equal(ws.provider, 'local', 'now switched away from Jira');
+
+    setActiveProvider(ws, 'jira', 'https://acme.atlassian.net');
+
+    assert.equal(ws.provider, 'jira');
+    // This is the assertion that fails without the credentials copy: were the
+    // stamp written ONLY to the scalar mirror at link time, mirrorActiveBinding
+    // would read `binding.credentials?.tokenExpiresAt` -> undefined here.
+    assert.equal(ws.tokenExpiresAt, Number.MAX_SAFE_INTEGER);
+  });
+
+  test('headless token selection (selectOwnerWorkspaceToken) resolves "ok" for a Jira row, never session_expired', () => {
+    const sessions = [
+      { session: { accountId: 'account-A', workspaces: [
+        { urlKey: 'acme', provider: 'jira', accessToken: 'tok-123', tokenExpiresAt: Number.MAX_SAFE_INTEGER },
+      ] } },
+    ];
+    const result = selectOwnerWorkspaceToken(sessions, 'acme', 'account-A');
+    assert.equal(result.reason, 'ok');
+    assert.equal(result.token, 'tok-123');
+    assert.equal(result.provider, 'jira');
+  });
+
+  test('a Jira row is NEVER selected as an expired/refreshable candidate (selectExpiredOwnerRow), matching "no recovery but a human re-link"', () => {
+    const sessions = [
+      { session: { accountId: 'account-A', workspaces: [
+        { urlKey: 'acme', provider: 'jira', accessToken: 'tok-123', tokenExpiresAt: Number.MAX_SAFE_INTEGER },
+      ] } },
+    ];
+    // isLive stays true forever (MAX_SAFE_INTEGER), so the row never even reaches
+    // the refreshability check — unlike Linear/GitHub-family, which have one.
+    assert.strictEqual(selectExpiredOwnerRow(sessions, 'acme', 'account-A'), null);
+  });
+
+  test('needsTokenRefresh (server.js ensureValidToken\'s proactive guard) stays false for a Jira workspace', () => {
+    assert.equal(needsTokenRefresh(Number.MAX_SAFE_INTEGER), false);
+    // Contrast: a normal (non-Jira) finite expiry inside the buffer DOES need refresh —
+    // proves the characterization function itself is meaningful, not vacuously false.
+    assert.equal(needsTokenRefresh(Date.now() + 60_000), true);
   });
 });
 

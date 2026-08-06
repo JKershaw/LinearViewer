@@ -62,6 +62,7 @@ import './lib/providers/linear/index.js' // side effect: self-registers the Line
 import { localProvider } from './lib/providers/local/index.js' // side effect: self-registers the Local provider; store injected below
 import './lib/providers/github/index.js' // side effect: self-registers the GitHub provider so its OAuth router mounts (LIN-541)
 import './lib/providers/github-projects/index.js' // side effect: self-registers the GitHub Projects v2 provider (LIN-560)
+import './lib/providers/jira/index.js' // side effect: self-registers the Jira provider so its API-token auth router mounts (LIN-1885 Phase 1)
 import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID } from './lib/tree.js'
 import { isHiddenState } from './lib/providers/state-map.js'
@@ -1077,6 +1078,46 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
     return;
   }
 
+  // LIN-1885: a Jira API-token credential is a static, user-supplied secret
+  // with NO renewal mechanism — unlike GitHub-family's re-mintable
+  // installation token or Linear's refresh_token exchange, there is genuinely
+  // nothing to retry. Without this branch, a Jira workspace falls through to
+  // neither the isPAT nor the github-family arm, has no durable Linear-style
+  // credential record (so `durableRecord?.refreshToken` below is always
+  // falsy), and lands on the destructive fallthrough at the bottom of this
+  // function — the exact defect class LIN-1503 closed for GitHub-family
+  // workspaces, still open here until now.
+  //
+  // The right in-tree analogue is the isPAT branch just above: render an
+  // actionable "invalid, go re-link" page and stop — no
+  // handleTokenRefreshAndRetry (nothing to refresh), no
+  // handleWorkspaceRemoval / durable-credential delete (nothing revoked on
+  // Harbour's side; the workspace and its OTHER bindings are still real), and
+  // — UNLIKE isPAT — no evictAllWorkspaceTokens / session teardown. isPAT
+  // tears down the whole session because a PAT session is (near-)always
+  // single-workspace, so destroying it is PAT's closest approximation of
+  // "just this workspace" (LIN-1507's reasoning). A Jira binding is instead
+  // one binding on an otherwise-multi-provider workspace: destroying the
+  // whole session over one dead Jira token would strand every co-resident
+  // workspace's still-healthy cached token for no reason — a new,
+  // disproportionate defect, not a fix. The action link points straight at
+  // the re-link form (not a dead-end settings page) since the only recovery
+  // from a dead Jira token is a human re-link.
+  //
+  // Placed BEFORE the github-family guard (LIN-1885 research finding 2): the
+  // two guards are mutually exclusive on `workspace.provider`, so this has no
+  // effect on the github-family branch's own pinned test slices below, but
+  // keeps this branch from ever being silently swallowed by a future
+  // widening of that guard's boundary.
+  if (workspace.provider === 'jira') {
+    const html = renderErrorPage('Access Token Invalid',
+      'Your Jira API token is no longer valid. Reconnect Jira with a fresh API token to continue.', {
+        action: 'Reconnect Jira',
+        actionUrl: `/auth/jira?workspace=${encodeURIComponent(workspace.urlKey)}`
+      });
+    return res.status(401).send(html);
+  }
+
   // LIN-1503: GitHub-family credentials are RE-MINTED from installationId + the
   // App JWT, never refreshed from a stored refresh token — so they must never
   // fall through to the Linear durableRecord check below (which would always
@@ -1496,6 +1537,20 @@ function persistSessionRow(sid, session) {
   return sessionsCollection.updateOne({ _id: sid }, { $set: { session } });
 }
 
+// KNOWN GAP (LIN-1885 research): this resolver, and every one of its ~15
+// routes/proxy.js call sites that hand `{token}` straight to a `provider.*`
+// method, return a BARE token string regardless of provider — never the
+// structured `{email, apiToken, site}` shape a Jira Basic-auth binding needs
+// (see getWorkspaceCallScope in lib/workspace.js, which THIS function does not
+// call and never has). A Jira workspace therefore resolves 'ok' here — the
+// token itself is real and lookup succeeds — but a provider call made with it
+// alone cannot authenticate. This headless/proxy lane is a pre-existing gap
+// Phase 1 (LIN-1885) does not fix: `getWorkspaceCallScope`'s Jira branch only
+// reaches the SESSION lane (dashboard reads via getProviderForWorkspace).
+// Fixing this needs either a self-sufficient `credentials.token` encoding for
+// Jira or rewiring these call sites onto `getWorkspaceCallScope` — deliberately
+// left as a named, not-yet-scheduled follow-up rather than silently patched
+// or silently ignored.
 async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
     return { token: 'test-token', reason: 'ok', provider: 'linear' };
@@ -2820,6 +2875,16 @@ app.post('/workspace/:urlKey/settings/providers/add', workspaceFromUrl, async (r
   // workspace's urlKey so the post-link redirect returns to its settings page.
   if (provider === 'linear') {
     return res.redirect(`/auth/linear?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`);
+  }
+
+  // Jira add-source (LIN-1885 Phase 1): redirects to the GET page that renders
+  // the API-token Basic-auth link form (routes/jira-auth.js), NOT an
+  // OAuth-style `?mode=add-source` — Jira has no OAuth redirect round-trip to
+  // carry session `mode` intent across, so the target workspace rides as the
+  // same `?workspace=` query param convention instead (consumed directly by
+  // the GET route, no session-side intent to thread).
+  if (provider === 'jira') {
+    return res.redirect(`/auth/jira?workspace=${encodeURIComponent(workspace.urlKey)}`);
   }
 
   return res.redirect(`${settingsUrl}?provider_error=unsupported-add`);
