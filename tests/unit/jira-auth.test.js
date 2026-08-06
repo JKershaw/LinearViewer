@@ -16,7 +16,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MangoClient } from '@jkershaw/mangodb'
-import { createJiraAuthRoutes } from '../../routes/jira-auth.js'
+import { createJiraAuthRoutes, normalizeJiraSite } from '../../routes/jira-auth.js'
 import { JiraProvider } from '../../lib/providers/jira/index.js'
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js'
 import { AccountStore } from '../../lib/account-store.js'
@@ -124,6 +124,20 @@ describe('routes/jira-auth.js', () => {
       assert.equal(session.workspaces[0].provider, undefined, 'no binding written')
     })
 
+    test('rejects a non-atlassian.net site BEFORE ever probing it (SSRF guard, LIN-1885 re-review blocker)', async () => {
+      // provider.validateCredential throwing on any call proves the network
+      // probe never happens — the site is rejected purely by validation.
+      const spyProvider = { validateCredential: () => { throw new Error('must not be called for a rejected site') } }
+      const router = createJiraAuthRoutes({ provider: spyProvider, ...freshAccountStores() })
+      const handler = getHandler(router, 'post', '/auth/jira/link')
+      const res = makeRes()
+      const session = makeSession({ workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
+      await handler({ body: { workspace: 'acme', email: 'a@b.com', apiToken: 't', site: 'http://169.254.169.254' }, session }, res)
+      assert.equal(res.statusCode, 400)
+      assert.match(res.body, /Jira Cloud URL/)
+      assert.equal(session.workspaces[0].provider, undefined, 'no binding written')
+    })
+
     test('400s when the target workspace is not in this session', async () => {
       const router = createJiraAuthRoutes({ provider: workingProvider(), ...freshAccountStores() })
       const handler = getHandler(router, 'post', '/auth/jira/link')
@@ -197,5 +211,59 @@ describe('routes/jira-auth.js', () => {
       const workspaces = await accountWorkspaceStore.listWorkspacesForAccount(firstAccountId)
       assert.deepEqual(workspaces.sort(), ['ws-1', 'ws-2'])
     })
+  })
+})
+
+describe('normalizeJiraSite (SSRF guard, LIN-1885 re-review blocker)', () => {
+  test('accepts a bare Jira Cloud tenant URL', () => {
+    assert.equal(normalizeJiraSite('https://acme.atlassian.net'), 'https://acme.atlassian.net')
+  })
+
+  test('accepts (and strips) a trailing slash', () => {
+    assert.equal(normalizeJiraSite('https://acme.atlassian.net/'), 'https://acme.atlassian.net')
+  })
+
+  test('lower-cases the hostname', () => {
+    assert.equal(normalizeJiraSite('https://ACME.Atlassian.Net'), 'https://acme.atlassian.net')
+  })
+
+  test('rejects a non-https scheme', () => {
+    assert.equal(normalizeJiraSite('http://acme.atlassian.net'), null)
+  })
+
+  test('rejects an unrelated host', () => {
+    assert.equal(normalizeJiraSite('https://evil.com'), null)
+  })
+
+  test('rejects a suffix-confusion host that a naive includes() check would wrongly pass', () => {
+    assert.equal(normalizeJiraSite('https://acme.atlassian.net.evil.com'), null)
+  })
+
+  test('rejects an internal IP', () => {
+    assert.equal(normalizeJiraSite('http://169.254.169.254'), null)
+  })
+
+  test('rejects an embedded query string (would otherwise push the client\'s fixed API path into the query)', () => {
+    assert.equal(normalizeJiraSite('https://acme.atlassian.net?x='), null)
+  })
+
+  test('rejects embedded credentials', () => {
+    assert.equal(normalizeJiraSite('https://user:pass@acme.atlassian.net'), null)
+  })
+
+  test('rejects a non-default port', () => {
+    assert.equal(normalizeJiraSite('https://acme.atlassian.net:8443'), null)
+  })
+
+  test('rejects a path', () => {
+    assert.equal(normalizeJiraSite('https://acme.atlassian.net/some/path'), null)
+  })
+
+  test('rejects garbage input', () => {
+    assert.equal(normalizeJiraSite('not a url'), null)
+  })
+
+  test('rejects a bare tenant-less atlassian.net host', () => {
+    assert.equal(normalizeJiraSite('https://atlassian.net'), null)
   })
 })

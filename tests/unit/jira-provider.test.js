@@ -378,6 +378,24 @@ describe('createJiraClient — Basic auth wire shape', () => {
     assert.ok(calls[0].url.startsWith(`${SITE}/rest/api/3/project/search`))
   })
 
+  test('every request carries an abort signal, so a black-holing host cannot pin the handler forever (LIN-1885 re-review blocker, part 4)', async () => {
+    const calls = []
+    const fetchImpl = async (url, opts) => {
+      calls.push(opts)
+      return { status: 200, ok: true, headers: { get: () => null }, text: async () => JSON.stringify({ values: [], startAt: 0, maxResults: 50, total: 0, isLast: true }) }
+    }
+    const client = createJiraClient({ email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl })
+    await client.listProjects()
+    assert.ok(calls[0].signal instanceof AbortSignal, 'a real, timing-out AbortSignal is attached to every request')
+  })
+
+  test('refuses a non-https site at construction (belt-and-braces SSRF guard, LIN-1885 re-review blocker)', () => {
+    assert.throws(
+      () => createJiraClient({ email: 'a@b.com', apiToken: 'tok', site: 'http://169.254.169.254' }),
+      /https/
+    )
+  })
+
   test('a non-2xx, non-429 response throws with the status exposed on err.status', async () => {
     const fetchImpl = async () => ({
       status: 404, ok: false, statusText: 'Not Found', headers: { get: () => null },
@@ -411,6 +429,21 @@ describe('createJiraClient serial pagination', () => {
     assert.ok(calls[0].includes('startAt=0'))
     assert.ok(calls[1].includes('startAt=2'))
     assert.deepEqual(all.map(p => p.key), ['A', 'B', 'C'])
+    assert.equal(all.truncated, false, 'reached the natural end (isLast), not the cap')
+  })
+
+  test('listAllProjects stops at the project cap even if more pages remain, never an unbounded walk (LIN-1885 re-review finding #6)', async () => {
+    let calls = 0
+    const fetchImpl = async (url) => {
+      calls += 1
+      const maxResults = Number(new URL(url).searchParams.get('maxResults'))
+      const values = Array.from({ length: maxResults }, (_, i) => ({ id: String(calls * 100 + i), key: `P${calls}-${i}` }))
+      return { status: 200, ok: true, headers: { get: () => null }, text: async () => JSON.stringify({ values, startAt: 0, maxResults, total: 999, isLast: false }) }
+    }
+    const client = createJiraClient({ email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl })
+    const all = await client.listAllProjects({ cap: 5 })
+    assert.equal(all.length, 5, `capped at exactly 5 projects, got ${all.length}`)
+    assert.equal(all.truncated, true, 'stopping on the cap, not the natural end, must be signalled')
   })
 
   test('searchIssues posts to /search/jql (not the removed /search) with jql/maxResults/fields, no startAt', async () => {
@@ -444,6 +477,7 @@ describe('createJiraClient serial pagination', () => {
     assert.equal(calls[0].body.nextPageToken, undefined, 'first page requests no cursor')
     assert.equal(calls[1].body.nextPageToken, 'p2', 'second page carries the cursor the first page returned')
     assert.deepEqual(all.map(i => i.key), ['ENG-1', 'ENG-2'])
+    assert.equal(all.truncated, false, 'reached the natural end (no nextPageToken), not the cap')
   })
 
   test('searchAllIssues stops at the issue cap even if more pages remain, never an unbounded walk', async () => {
@@ -458,6 +492,7 @@ describe('createJiraClient serial pagination', () => {
     const all = await client.searchAllIssues('ORDER BY key ASC', { cap: 5, maxResults: 3 })
     assert.ok(all.length <= 5, `capped at 5 issues, got ${all.length}`)
     assert.equal(all.length, 5)
+    assert.equal(all.truncated, true, 'stopping on the cap, not the natural end (more pages remained), must be signalled')
   })
 })
 

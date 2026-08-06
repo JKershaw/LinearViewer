@@ -28,6 +28,39 @@ import { getWorkspaceByUrlKey, validateWorkspaceUrlKey, linkProvider, saveSessio
 import { establishAccount } from '../lib/account-session.js'
 
 const NO_WORKSPACE_MESSAGE = 'Jira can only be added as an additional source on an existing workspace — open Settings on the workspace you want to add it to, then try again.'
+const INVALID_SITE_MESSAGE = 'Site must be a Jira Cloud URL like https://yourteam.atlassian.net — no path, port, or credentials.'
+
+/**
+ * The SSRF guard: `site` reaches `createJiraClient` as a literal fetch base
+ * (`lib/providers/jira/client.js`), so an unvalidated value lets a caller make
+ * the server issue arbitrary requests to arbitrary hosts (LIN-1885 re-review
+ * blocker — confirmed reachable via this exact form, no auth bypass needed).
+ * Accepts ONLY a bare `https://<tenant>.atlassian.net` tenant base:
+ *   - `endsWith('.atlassian.net')`, never `includes` — `includes` would pass
+ *     a suffix-confusion host like `https://acme.atlassian.net.evil.com`.
+ *   - no embedded credentials, no non-default port, no path/query/fragment —
+ *     a trailing `?` in the raw input would otherwise land in `url.search`
+ *     and push the client's fixed `/rest/api/3/myself` suffix into the query
+ *     string, handing the caller control of the full request path.
+ * `URL` lower-cases `hostname` for us, so this is case-insensitive for free.
+ * @param {string} site
+ * @returns {string|null} the normalized `https://<tenant>.atlassian.net` base, or null if invalid.
+ */
+export function normalizeJiraSite(site) {
+  let url
+  try {
+    url = new URL(String(site))
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'https:') return null
+  if (url.username || url.password) return null
+  if (url.port) return null
+  if (url.pathname !== '/') return null
+  if (url.search || url.hash) return null
+  if (!url.hostname.endsWith('.atlassian.net')) return null
+  return `https://${url.hostname}`
+}
 
 /**
  * @param {Object} options
@@ -74,7 +107,13 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
         error: 'Email, API token, and site are all required.',
       }))
     }
-    const normalizedSite = String(site).replace(/\/+$/, '')
+    const normalizedSite = normalizeJiraSite(site)
+    if (!normalizedSite) {
+      return res.status(400).send(renderJiraLinkForm({
+        workspaceUrlKey,
+        error: INVALID_SITE_MESSAGE,
+      }))
+    }
 
     // Validate BEFORE linking — a lightweight read probe (GET /rest/api/3/myself)
     // rather than the settings refresh route's generic READ_PROBES list, which
