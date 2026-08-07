@@ -223,7 +223,12 @@ describe('markdownToAdf', () => {
     assert.deepEqual(markdownToAdf('   '), { type: 'doc', version: 1, content: [] })
   })
 
-  test('round-trips through adfToMarkdown for every modeled node type', () => {
+  // NOTE: this is the markdown → ADF → markdown direction — it proves REPEATED
+  // EDITS are idempotent, nothing more. It is deliberately NOT called a round
+  // trip over the modeled node types: it cannot see whether stored ADF survives
+  // a write (that is the ADF → markdown → ADF property suite below, added by
+  // LIN-1886 review Blocker 3 — this test was green through that whole bug).
+  test('markdown → ADF → markdown is idempotent for each hand-written block form', () => {
     const md = [
       '# Round trip',
       'plain **bold** and _em_ and `code` and ~~strike~~ and [a link](https://example.com)',
@@ -254,6 +259,142 @@ describe('markdownToAdf', () => {
     assert.doesNotThrow(() => markdownToAdf('| a | b |\n| - | - |\n| 1 | 2 |'))
     const adf = markdownToAdf('| a | b |')
     assert.equal(adf.content[0].type, 'paragraph')
+  })
+})
+
+// =============================================================================
+// THE write-direction property: ADF → markdown → ADF (LIN-1886 review Blocker 3)
+// =============================================================================
+//
+// The invariant the D1 write gate exists to buy, stated as a property over
+// fixtures:
+//
+//     adfHasUnrenderableContent(doc) === false
+//       ⟹  markdownToAdf(adfToMarkdown(doc)) deep-equals doc
+//
+// This is the direction that proves STORED CONTENT SURVIVES A WRITE. The
+// markdown → ADF → markdown test above only ever proved repeated edits are
+// idempotent, which is why CI stayed green while a 200-OK append was flattening
+// a mention/emoji/smart-link description into one anonymous text run.
+//
+// Every fixture is written in the canonical shape `markdownToAdf` itself emits
+// (`{type:'doc', version:1, content:[...]}`, no empty `marks: []`, no extra
+// attrs) so a deep-equal is a real claim rather than one defeated by incidental
+// field differences. A fixture that must be REFUSED asserts the gate is `true`
+// — the property's precondition is then false and no round-trip is claimed.
+
+const adfDoc = (...content) => ({ type: 'doc', version: 1, content })
+const adfText = (text, marks) => (marks ? { type: 'text', text, marks } : { type: 'text', text })
+const adfPara = (...content) => ({ type: 'paragraph', content })
+const adfItem = (...content) => ({ type: 'listItem', content })
+const HARD_BREAK = { type: 'hardBreak' }
+
+/** Docs the writer CAN rebuild — the gate must permit these AND they must deep-equal. */
+const WRITER_SAFE_ADF = {
+  'plain paragraph': adfDoc(adfPara(adfText('Hello world.'))),
+  'two paragraphs': adfDoc(adfPara(adfText('One.')), adfPara(adfText('Two.'))),
+  heading: adfDoc({ type: 'heading', attrs: { level: 3 }, content: [adfText('Deep')] }),
+  'heading carrying a mark': adfDoc({ type: 'heading', attrs: { level: 2 }, content: [adfText('B', [{ type: 'strong' }])] }),
+  'strong mark': adfDoc(adfPara(adfText('bold', [{ type: 'strong' }]))),
+  'em mark': adfDoc(adfPara(adfText('italic', [{ type: 'em' }]))),
+  'code mark': adfDoc(adfPara(adfText('x', [{ type: 'code' }]))),
+  'strike mark': adfDoc(adfPara(adfText('struck', [{ type: 'strike' }]))),
+  'link mark': adfDoc(adfPara(adfText('a link', [{ type: 'link', attrs: { href: 'https://example.com' } }]))),
+  'mixed inline runs': adfDoc(adfPara(adfText('plain '), adfText('bold', [{ type: 'strong' }]), adfText(' tail'))),
+  bulletList: adfDoc({ type: 'bulletList', content: [adfItem(adfPara(adfText('one'))), adfItem(adfPara(adfText('two')))] }),
+  orderedList: adfDoc({ type: 'orderedList', content: [adfItem(adfPara(adfText('first'))), adfItem(adfPara(adfText('second')))] }),
+  'list item carrying a mark': adfDoc({ type: 'orderedList', content: [adfItem(adfPara(adfText('b', [{ type: 'strong' }])))] }),
+  'codeBlock with a language': adfDoc({ type: 'codeBlock', attrs: { language: 'js' }, content: [adfText('console.log(1)')] }),
+  'codeBlock without a language': adfDoc({ type: 'codeBlock', content: [adfText('plain code')] }),
+  'multi-line codeBlock': adfDoc({ type: 'codeBlock', content: [adfText('a\nb\nc')] }),
+  'single-paragraph blockquote': adfDoc({ type: 'blockquote', content: [adfPara(adfText('quoted'))] }),
+  'blockquote with a hardBreak': adfDoc({ type: 'blockquote', content: [adfPara(adfText('l1'), HARD_BREAK, adfText('l2'))] }),
+  rule: adfDoc({ type: 'rule' }),
+  'rule followed by a paragraph': adfDoc({ type: 'rule' }, adfPara(adfText('after'))),
+  'hardBreak inside a paragraph': adfDoc(adfPara(adfText('line one'), HARD_BREAK, adfText('line two'))),
+  'a whole realistic document': adfDoc(
+    { type: 'heading', attrs: { level: 1 }, content: [adfText('Title')] },
+    adfPara(adfText('Body with '), adfText('bold', [{ type: 'strong' }]), adfText(' in it.')),
+    { type: 'bulletList', content: [adfItem(adfPara(adfText('one'))), adfItem(adfPara(adfText('two')))] },
+    { type: 'codeBlock', attrs: { language: 'js' }, content: [adfText('const x = 1')] },
+    { type: 'rule' },
+    { type: 'blockquote', content: [adfPara(adfText('closing thought'))] },
+  ),
+}
+
+/**
+ * Docs the writer CANNOT rebuild — the gate must refuse these. Each entry
+ * records what a write would have destroyed had the gate stayed derived from
+ * the READER's vocabulary (LIN-1886 review Blocker 3).
+ */
+const WRITER_UNSAFE_ADF = {
+  // No markdown → ADF inverse exists for these four ANYWHERE in the writer;
+  // they render for display and re-parse as anonymous text.
+  mention: adfDoc(adfPara(adfText('hi '), { type: 'mention', attrs: { id: '1', text: '@ada' } })),
+  inlineCard: adfDoc(adfPara(adfText('see '), { type: 'inlineCard', attrs: { url: 'https://example.com/x' } })),
+  blockCard: adfDoc({ type: 'blockCard', attrs: { url: 'https://example.com/y' } }),
+  emoji: adfDoc(adfPara({ type: 'emoji', attrs: { shortName: ':smile:', text: '🙂' } })),
+  'ordinary Jira prose mixing mention + inlineCard + emoji': adfDoc(adfPara(
+    adfText('hi '), { type: 'mention', attrs: { text: '@ada' } },
+    adfText(' see '), { type: 'inlineCard', attrs: { url: 'https://e.com' } },
+    adfText(' '), { type: 'emoji', attrs: { text: '🙂' } },
+  )),
+  // Structural: shapes markdownToAdf never emits.
+  'nested bulletList': adfDoc({
+    type: 'bulletList',
+    content: [{
+      type: 'listItem',
+      content: [adfPara(adfText('parent')), { type: 'bulletList', content: [adfItem(adfPara(adfText('child')))] }],
+    }],
+  }),
+  'listItem holding two paragraphs': adfDoc({ type: 'bulletList', content: [adfItem(adfPara(adfText('a')), adfPara(adfText('b')))] }),
+  'listItem holding nothing': adfDoc({ type: 'bulletList', content: [{ type: 'listItem', content: [] }] }),
+  'listItem whose paragraph has a hardBreak': adfDoc({ type: 'bulletList', content: [adfItem(adfPara(adfText('a'), HARD_BREAK, adfText('b')))] }),
+  'heading with a hardBreak': adfDoc({ type: 'heading', attrs: { level: 1 }, content: [adfText('a'), HARD_BREAK, adfText('b')] }),
+  'multi-paragraph blockquote': adfDoc({ type: 'blockquote', content: [adfPara(adfText('one')), adfPara(adfText('two'))] }),
+  'empty blockquote': adfDoc({ type: 'blockquote', content: [] }),
+  'blockquote holding a codeBlock': adfDoc({ type: 'blockquote', content: [{ type: 'codeBlock', content: [adfText('x')] }] }),
+  'blockquote holding a heading': adfDoc({ type: 'blockquote', content: [{ type: 'heading', attrs: { level: 1 }, content: [adfText('x')] }] }),
+  'codeBlock containing a blank line': adfDoc({ type: 'codeBlock', content: [adfText('a\n\nb')] }),
+  'codeBlock with a leading newline': adfDoc({ type: 'codeBlock', content: [adfText('\na')] }),
+  'codeBlock with a trailing newline': adfDoc({ type: 'codeBlock', content: [adfText('a\n')] }),
+  'empty codeBlock': adfDoc({ type: 'codeBlock', content: [] }),
+  // Marks: INLINE_PATTERN is a single non-nesting scan, so two marks on one run
+  // render as `_**x**_` and re-parse as ONE em run whose text is literally `**x**`.
+  'text carrying strong + em': adfDoc(adfPara(adfText('x', [{ type: 'strong' }, { type: 'em' }]))),
+  'text carrying link + strong': adfDoc(adfPara(adfText('x', [{ type: 'link', attrs: { href: 'https://e.com' } }, { type: 'strong' }]))),
+}
+
+describe('ADF → markdown → ADF property (LIN-1886 review Blocker 3)', () => {
+  for (const [name, doc] of Object.entries(WRITER_SAFE_ADF)) {
+    test(`permitted and survives the round trip: ${name}`, () => {
+      assert.equal(adfHasUnrenderableContent(doc), false, 'the write gate must permit this doc')
+      assert.deepEqual(
+        markdownToAdf(adfToMarkdown(doc)), doc,
+        `markdownToAdf(adfToMarkdown(doc)) lost content for: ${name}\nmarkdown was: ${JSON.stringify(adfToMarkdown(doc))}`,
+      )
+    })
+  }
+
+  for (const [name, doc] of Object.entries(WRITER_UNSAFE_ADF)) {
+    test(`refused, because the writer cannot rebuild it: ${name}`, () => {
+      // The gate must be true — so the property's precondition is false and no
+      // round trip is claimed. Asserting the round trip genuinely FAILS as well
+      // is what stops this fixture quietly becoming a needless over-refusal.
+      assert.equal(adfHasUnrenderableContent(doc), true, 'the write gate must refuse this doc')
+      assert.notDeepEqual(
+        markdownToAdf(adfToMarkdown(doc)), doc,
+        `${name} actually round-trips fine — refusing it is a needless capability cost`,
+      )
+    })
+  }
+
+  test('the read path is untouched: adfToMarkdown still renders refused content for display', () => {
+    // Only the WRITE tightened. Mentions, emoji and cards must still render.
+    assert.equal(adfToMarkdown(WRITER_UNSAFE_ADF.mention), 'hi @ada')
+    assert.equal(adfToMarkdown(WRITER_UNSAFE_ADF.inlineCard), 'see https://example.com/x')
+    assert.equal(adfToMarkdown(WRITER_UNSAFE_ADF.emoji), '🙂')
+    assert.equal(adfToMarkdown(WRITER_UNSAFE_ADF.blockCard), 'https://example.com/y')
   })
 })
 
