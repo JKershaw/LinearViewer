@@ -178,6 +178,87 @@ describe('createDispatchItem — model/harness resolution', () => {
   });
 });
 
+// LIN-1694 — the routed-model/harness mismatch class, at the factory seam that actually built the
+// crossed items observed live (5 dispatches, all kind:'implementation', followUpTo:null).
+describe('createDispatchItem — row-atomic routing (LIN-1694)', () => {
+  test('THE BUG: an explicit harness no longer imports a model from another harness row', async () => {
+    // Exactly the reported config: the workspace's `implementation` row is opencode/DeepSeek, and
+    // the orchestrator retries a failed opencode worker by pinning harness:'claude-code' with a
+    // blank model. Before the fix this resolved to claude-code + deepseek/deepseek-v4-pro, which SD
+    // launched as `claude --model deepseek-v4-pro`.
+    const store = capturingStore();
+    const prefs = await prefsWith({
+      byKind: { implementation: { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' } }
+    });
+
+    await createDispatchItem({
+      store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'implementation',
+      harness: 'claude-code', prompt: 'x'
+    });
+
+    assert.equal(store.captured.item.harness, 'claude-code', 'the explicit override still wins');
+    assert.strictEqual(store.captured.item.model, null, 'and no longer drags the opencode row model across');
+  });
+
+  test('leaving harness blank still resolves the row as a matched pair', async () => {
+    // The row is the harness source here, so it is self-consistent by construction and must keep
+    // working exactly as before — the fix must not make a plain configured row stop applying.
+    const store = capturingStore();
+    const prefs = await prefsWith({
+      byKind: { implementation: { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' } }
+    });
+
+    await createDispatchItem({ store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'implementation', prompt: 'x' });
+
+    assert.equal(store.captured.item.harness, 'opencode');
+    assert.equal(store.captured.item.model, 'deepseek/deepseek-v4-pro');
+  });
+
+  test('eligibility uses the PRE-interpose harness, so a blank harness still reads the opencode row', async () => {
+    // applyDefaultDispatchHarness (step 5) defaults a blank harness to claude-code. If eligibility
+    // ran on the POST-interpose value, this workspace-wide opencode row would be wrongly
+    // disqualified and the model dropped — the interpose is a default, not an explicit choice.
+    const store = capturingStore();
+    const prefs = await prefsWith({ model: 'deepseek/deepseek-v4-pro', harness: 'opencode' });
+
+    await createDispatchItem({ store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'implementation', prompt: 'x' });
+
+    assert.equal(store.captured.item.harness, 'opencode');
+    assert.equal(store.captured.item.model, 'deepseek/deepseek-v4-pro');
+  });
+
+  test('an ineligible per-kind row falls through to the unscoped workspace-wide model', async () => {
+    const store = capturingStore();
+    const prefs = await prefsWith({
+      model: 'anthropic/claude-opus-4.8', // unscoped — no top-level harness
+      byKind: { implementation: { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' } }
+    });
+
+    await createDispatchItem({
+      store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'implementation',
+      harness: 'claude-code', prompt: 'x'
+    });
+
+    assert.equal(store.captured.item.harness, 'claude-code');
+    assert.equal(store.captured.item.model, 'anthropic/claude-opus-4.8');
+  });
+
+  test('an explicit model paired with an explicit harness is untouched', async () => {
+    const store = capturingStore();
+    const prefs = await prefsWith({
+      byKind: { implementation: { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' } }
+    });
+
+    await createDispatchItem({
+      store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'implementation',
+      harness: 'claude-code', model: 'anthropic/claude-sonnet-5', prompt: 'x'
+    });
+
+    assert.equal(store.captured.item.harness, 'claude-code');
+    assert.equal(store.captured.item.model, 'anthropic/claude-sonnet-5');
+  });
+});
+
 describe('createDispatchItem — applyDefaultHarness opt-out', () => {
   test('applyDefaultHarness:false leaves a blank harness null', async () => {
     const store = capturingStore();
