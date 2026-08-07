@@ -1474,7 +1474,7 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 // Mount proxy routes
 // resolveWorkspaceAccess: looks up a workspace access token from active sessions
 // AND recovers WHY a lookup failed, so callers can surface an actionable signal
-// (LIN-417) instead of an opaque null. Returns { token, reason, provider }:
+// (LIN-417) instead of an opaque null. Returns { token, scope, reason, provider }:
 //   ok               → token present (success path)
 //   store_unreachable → session store find() threw (dyno booting post-deploy) — transient
 //   session_expired   → a session referenced this workspace but its token expired — re-auth
@@ -1502,6 +1502,22 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 //                       detectOwnerSignedOut and lib/errors.js's owner_signed_out detail
 //                       (LIN-1506). Unreachable whenever owner_mismatch also fires — that
 //                       reason wins the overlap; see classifyWorkspaceFailure's ordering.
+// `scope` (LIN-1891) is the matched workspace's PROVIDER-STRUCTURED call scope,
+// carried alongside — never instead of — the bare `token`. It is whatever
+// getWorkspaceCallScope (lib/workspace.js) returns for that provider: the bare
+// token verbatim for 'linear'/'local', `{token, repo}` for the github family,
+// `{email, apiToken, site}` for a Jira Basic-auth binding. It is populated by
+// the two lib/ modules that already hold the workspace row — the pure selector
+// (lib/workspace-token-resolver.js) and doRefresh's github-family arm
+// (lib/workspace-token-refresh.js) — and this function is a pure pass-through
+// of it: no derivation logic here, on any of the three token-bearing returns or
+// either cache write. `token` never changes meaning, so getWorkspaceAccessToken
+// and every consumer reading `.token` is untouched by construction. The one
+// substitution point is resolveProviderAccess (routes/proxy.js), which hands
+// `scope ?? token` to provider.* — that is what lets the headless proxy/dispatch
+// lane authenticate a github/github-projects/jira workspace at all. Absent on
+// the failure returns (they carry no token either).
+//
 // `provider` is the matched workspace's provider name (e.g. 'linear'), or null
 // when no session referenced the workspace. It lets the session-less consumer
 // proxy resolve the provider per workspace via getProviderForWorkspace (LIN-581),
@@ -1545,20 +1561,26 @@ function persistSessionRow(sid, session) {
   return sessionsCollection.updateOne({ _id: sid }, { $set: { session } });
 }
 
-// KNOWN GAP (LIN-1885 research): this resolver, and every one of its ~15
-// routes/proxy.js call sites that hand `{token}` straight to a `provider.*`
-// method, return a BARE token string regardless of provider — never the
-// structured `{email, apiToken, site}` shape a Jira Basic-auth binding needs
-// (see getWorkspaceCallScope in lib/workspace.js, which THIS function does not
-// call and never has). A Jira workspace therefore resolves 'ok' here — the
-// token itself is real and lookup succeeds — but a provider call made with it
-// alone cannot authenticate. This headless/proxy lane is a pre-existing gap
-// Phase 1 (LIN-1885) does not fix: `getWorkspaceCallScope`'s Jira branch only
-// reaches the SESSION lane (dashboard reads via getProviderForWorkspace).
-// Fixing this needs either a self-sufficient `credentials.token` encoding for
-// Jira or rewiring these call sites onto `getWorkspaceCallScope` — deliberately
-// left as a named, not-yet-scheduled follow-up rather than silently patched
-// or silently ignored.
+// CLOSED GAP (LIN-1885 research → fixed by LIN-1891). This resolver used to
+// return a BARE token string regardless of provider, so the headless proxy/
+// dispatch lane could not authenticate any provider whose credential is not a
+// bearer token: a Jira Basic-auth binding needs `{email, apiToken, site}`, and
+// the github family needs `{token, repo}`. A GitHub-backed proxy WRITE 500'd on
+// that account. It now carries `scope` (see the block above) alongside `token`,
+// sourced from getWorkspaceCallScope via the two lib/ modules that already hold
+// the workspace row, and resolveProviderAccess (routes/proxy.js) substitutes it
+// at the single provider-lane chokepoint.
+//
+// Two things this deliberately did NOT change, so a later reader does not
+// mistake them for oversights. (1) No Jira-visible consumer-API behaviour: the
+// capability gate fronts the credential on 21 of JiraProvider's 22 provider-lane
+// sites (denyIfUnsupported → 422, or NotImplementedError → 500), so every gated
+// route still returns exactly what it did before — the credential fix is
+// necessary but not sufficient, and Jira's read surface lands with LIN-1886 and
+// its successors. (2) The scalar `accessToken` mirror and the audit/image-proxy
+// paths that read it (lib/workspace.js's mirror writers, routes/workspace-api.js
+// → lib/audit.js) are untouched and out of this fix's remit — the cross-provider
+// credential disclosure there is LIN-1899's, not closed by anything here.
 async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
     return { token: 'test-token', reason: 'ok', provider: 'linear' };
