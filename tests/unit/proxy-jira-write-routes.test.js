@@ -304,6 +304,30 @@ describe('Jira-backed proxy POST /issues/:id/description/{append,replace} (LIN-1
   });
 });
 
+describe('Jira-backed proxy PATCH /issues/:id — refusals precede every write (LIN-1886 review N1)', () => {
+  test('title + an unresolvable stateId → 422 and the summary is NOT written', async () => {
+    const { status, body } = await call(buildApp(), 'PATCH', '/api/proxy/issues/ENG-10',
+      { title: 'CHANGED', stateId: '11111111-1111-1111-1111-111111111111' });
+    assert.equal(status, 422);
+    assert.match(body.error, /Cannot resolve state/);
+    assert.equal((await stored('ENG-10')).fields.summary, 'Original title', 'the title write never happened');
+  });
+
+  test('title + a target with no available transition → 422 and the summary is NOT written', async () => {
+    const { status } = await call(buildApp(), 'PATCH', '/api/proxy/issues/ENG-13', { title: 'CHANGED', stateId: 'todo' });
+    assert.equal(status, 422);
+    const issue = await stored('ENG-13');
+    assert.equal(issue.fields.summary, 'Already done, nothing else available', 'the title write never happened');
+    assert.equal(issue.fields.status.statusCategory.key, 'done');
+  });
+
+  test('title + a screen-required transition → 422 and the summary is NOT written', async () => {
+    const { status } = await call(buildApp(), 'PATCH', '/api/proxy/issues/ENG-14', { title: 'CHANGED', stateId: 'done' });
+    assert.equal(status, 422);
+    assert.equal((await stored('ENG-14')).fields.summary, 'Only transition requires a screen', 'the title write never happened');
+  });
+});
+
 describe('Jira-backed proxy PATCH /issues/:id — D3 priority is silently dropped end-to-end (LIN-1886, S1)', () => {
   test('a PATCH with priority OMITTED (the S1-fixed client behaviour) succeeds normally', async () => {
     // This is the shape public/task-edit.js now sends for Jira (priority key
