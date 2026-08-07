@@ -252,6 +252,58 @@ describe('Jira-backed proxy PATCH /issues/:id — D1 description-overwrite refus
   });
 });
 
+describe('Jira-backed proxy POST /issues/:id/description/{append,replace} (LIN-1886 review Blocker 1)', () => {
+  // The shared read-modify-write in routes/proxy.js (`applyDescriptionEdit`) is a
+  // MARKDOWN-STRING splice over whatever `provider.issueDescription` returns. When
+  // Jira returned the raw ADF object there, `String(<object>)` stringified it to
+  // "[object Object]" — append silently DESTROYED the stored body (200 + a
+  // description of `"[object Object]\n\n<block>"`) and replace could never match.
+  // These assert against the FAKE STORE's ADF, not just the response, so a
+  // regression to the object-shaped return cannot pass.
+
+  const paragraphTexts = (adf) => (adf?.content || [])
+    .filter(n => n.type === 'paragraph')
+    .map(p => (p.content || []).map(t => t.text).join(''));
+
+  test('append preserves the original body byte-for-byte and adds the block as a new paragraph', async () => {
+    const { status, body } = await call(buildApp(), 'POST', '/api/proxy/issues/ENG-10/description/append', { block: 'A new note.' });
+    assert.equal(status, 200);
+    assert.equal(body.success, true);
+    const adf = (await stored('ENG-10')).fields.description;
+    assert.deepEqual(paragraphTexts(adf), ['Original body.', 'A new note.'],
+      'the original paragraph survives and the block lands as its own paragraph');
+    assert.ok(!JSON.stringify(adf).includes('[object Object]'), 'no stringified ADF object reached the store');
+    assert.ok(!JSON.stringify(body).includes('[object Object]'), 'no stringified ADF object reached the response');
+    assert.equal(body.issue.description, 'Original body.\n\nA new note.');
+  });
+
+  test('replace rewrites a genuinely-occurring span and the stored ADF reflects it', async () => {
+    const { status, body } = await call(buildApp(), 'POST', '/api/proxy/issues/ENG-10/description/replace',
+      { oldString: 'Original body.', newString: 'Rewritten body.' });
+    assert.equal(status, 200);
+    assert.equal(body.success, true);
+    assert.deepEqual(paragraphTexts((await stored('ENG-10')).fields.description), ['Rewritten body.']);
+    assert.ok(!JSON.stringify(body).includes('[object Object]'));
+  });
+
+  test('D1 still protects append: an unrenderable current ADF refuses (422) and the stored ADF is byte-identical', async () => {
+    // ENG-11's description is an unmodeled NODE (table). The markdown view is
+    // empty, so a naive append would happily overwrite it — `updateIssue`'s D1
+    // guard is what stops the write, and it still runs on this path.
+    const before = JSON.stringify((await stored('ENG-11')).fields.description);
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/ENG-11/description/append', { block: 'A new note.' });
+    assert.equal(status, 422);
+    assert.equal(JSON.stringify((await stored('ENG-11')).fields.description), before, 'nothing was written');
+  });
+
+  test('D1 still protects append for an unmodeled MARK only (422, no write)', async () => {
+    const before = JSON.stringify((await stored('ENG-12')).fields.description);
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/ENG-12/description/append', { block: 'A new note.' });
+    assert.equal(status, 422);
+    assert.equal(JSON.stringify((await stored('ENG-12')).fields.description), before, 'nothing was written');
+  });
+});
+
 describe('Jira-backed proxy PATCH /issues/:id — D3 priority is silently dropped end-to-end (LIN-1886, S1)', () => {
   test('a PATCH with priority OMITTED (the S1-fixed client behaviour) succeeds normally', async () => {
     // This is the shape public/task-edit.js now sends for Jira (priority key
