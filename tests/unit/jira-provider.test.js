@@ -95,22 +95,33 @@ function seededProvider() {
 describe('jiraStatusCategoryToCanonical', () => {
   test('new → unstarted', () => {
     const state = jiraStatusCategoryToCanonical({ fields: { status: { name: 'To Do', statusCategory: { key: 'new' } } } })
-    assert.deepEqual(state, { name: 'To Do', type: 'unstarted' })
+    assert.deepEqual(state, { id: 'todo', name: 'To Do', type: 'unstarted' })
   })
 
   test('indeterminate → started', () => {
     const state = jiraStatusCategoryToCanonical({ fields: { status: { name: 'In Progress', statusCategory: { key: 'indeterminate' } } } })
-    assert.deepEqual(state, { name: 'In Progress', type: 'started' })
+    assert.deepEqual(state, { id: 'in-progress', name: 'In Progress', type: 'started' })
   })
 
   test('done → completed', () => {
     const state = jiraStatusCategoryToCanonical({ fields: { status: { name: 'Done', statusCategory: { key: 'done' } } } })
-    assert.deepEqual(state, { name: 'Done', type: 'completed' })
+    assert.deepEqual(state, { id: 'done', name: 'Done', type: 'completed' })
   })
 
   test('an unrecognized/missing category defaults to unstarted, never canceled/duplicate', () => {
     assert.equal(jiraStatusCategoryToCanonical({ fields: { status: { name: 'Weird', statusCategory: { key: 'something-else' } } } }).type, 'unstarted')
     assert.equal(jiraStatusCategoryToCanonical({}).type, 'unstarted')
+  })
+
+  test('stamps the states() id for the category — the id, NOT the free-text status name, is what the task-edit <select> preselects on (LIN-1886 D2)', async () => {
+    // A CUSTOM workflow status name: the exact case name-matching cannot serve.
+    const state = jiraStatusCategoryToCanonical({ fields: { status: { name: 'Ready for QA', statusCategory: { key: 'indeterminate' } } } })
+    assert.equal(state.id, 'in-progress')
+    assert.equal(state.name, 'Ready for QA')
+    // The stamped id is always one this provider's own states() vocabulary emits.
+    const ids = new Set((await new JiraProvider({ site: SITE }).states()).map(s => s.id))
+    assert.ok(ids.has(state.id), 'stamped id is a real states() id')
+    assert.ok(ids.has(jiraStatusCategoryToCanonical({}).id), 'even the fallback branch stamps a real states() id')
   })
 
   test('never maps from the free-text status name', () => {
