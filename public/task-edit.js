@@ -94,8 +94,20 @@
         title: val('title'),
         description: val('description'),
         stateId: val('stateId'),
-        priority: Number(val('priority')),
       };
+      // LIN-1886 (S1 fix): the priority control is conditionally rendered
+      // (lib/render-task-edit.js gates it on ui.priority !== false — hidden for
+      // Jira). When the control does not exist in the form DOM, `val('priority')`
+      // is `undefined` and `Number(undefined)` is `NaN`, which `JSON.stringify`
+      // turns into `"priority": null` — a PRESENT-but-invalid priority that
+      // `validateIssueWriteFields(..., {validatePriority: true})`
+      // (routes/workspace-api.js) rejects with a 400, before the server ever
+      // reaches its separate silent-drop-on-invalid logic. Only include the
+      // field when the control is actually present, so a Jira-backed save omits
+      // it entirely instead of sending a value that always 400s.
+      if (val('priority') !== undefined) {
+        body.priority = Number(val('priority'));
+      }
 
       await window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/issues/' + encodeURIComponent(issueId), {
         method: 'PATCH',

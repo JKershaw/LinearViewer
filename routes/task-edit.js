@@ -78,12 +78,17 @@ export function createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     const { issueId } = req.params;
     const dashboardHref = `/workspace/${encodeURIComponent(workspace.urlKey)}/`;
 
+    const provider = getProviderForWorkspace(workspace);
+
     const pageOptions = {
       deployInfo: getDeployInfo(),
       urlKey: workspace.urlKey,
       openRouterSource: getOpenRouterSource(req),
       workspaces: req.session.workspaces,
-      featureFlags: getFeatureFlags(req.session)
+      featureFlags: getFeatureFlags(req.session),
+      // LIN-1886: threads the provider's ui surface through so the renderer can
+      // hide the priority control for a provider that cannot honor it (Jira).
+      ui: provider?.ui || {}
     };
 
     if (!isValidIssueId(issueId)) {
@@ -93,8 +98,6 @@ export function createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         { action: 'Back to tasks', actionUrl: dashboardHref }
       ));
     }
-
-    const provider = getProviderForWorkspace(workspace);
 
     // Capability gate: `ui.inlineEdit` (derived from the provider's real
     // `updateIssue` support), read EXCLUSIVELY off `provider.ui` and never off

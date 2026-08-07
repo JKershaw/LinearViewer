@@ -35,6 +35,7 @@ describe('LocalProvider capability profile (LIN-356 step D)', () => {
       estimates: false,
       subtasks: true,
       attachments: true,  // markdown bodies can embed upload links (LIN-771)
+      priority: true,     // abstract default, not overridden (LIN-1886)
       displayName: 'Local',
     });
   });
