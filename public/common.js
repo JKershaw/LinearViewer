@@ -929,6 +929,10 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
  * @param {string} [opts.issueId]               Issue-scoped kickoff: appends `/${issueId}` to the URL
  * @param {string} [opts.goal]                  Goal-scoped kickoff: appends `?goal=<goal>` to the URL
  * @param {string} [opts.variant]               Optional `?variant=<variant>` query param
+ * @param {string} [opts.source]                Optional `?source=<source>` query param (LIN-1904):
+ *   the resolved provider's name, so the issue-scoped kickoff resolves THAT
+ *   issue's own binding instead of the workspace's active provider. No-op
+ *   (and unused) on the goal-scoped kickoff, which has no single issue to bind.
  * @param {number} [opts.maxTasks]              Optional task-budget scope bound (LIN-1737/LIN-1751):
  *   `?maxTasks=<n>` query param on the general (goal-scoped) kickoff only — the
  *   issue-scoped kickoff has no budget concept, so this is a no-op there.
@@ -936,14 +940,19 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
  * @param {boolean} [opts.on401=false]          Passed through to window.api
  * @returns {Promise<{prompt: string, promptName: string, kind: string, repo?: string}>}
  */
-window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, maxTasks, signal, on401 = false } = {}) {
+window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, source, maxTasks, signal, on401 = false } = {}) {
   if (!urlKey) throw new Error('fetchAutopilotKickoff: urlKey is required');
 
   let url;
 
   if (issueId) {
-    const variantQuery = variant ? `?variant=${encodeURIComponent(variant)}` : '';
-    url = `/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt/${encodeURIComponent(issueId)}${variantQuery}`;
+    // LIN-1904: built via URLSearchParams (not string concatenation) so a
+    // second param (`source`) alongside `variant` gets correct `?`/`&` joining.
+    const params = new URLSearchParams();
+    if (variant) params.set('variant', variant);
+    if (source) params.set('source', source);
+    const issueQuery = params.toString() ? `?${params.toString()}` : '';
+    url = `/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt/${encodeURIComponent(issueId)}${issueQuery}`;
   } else {
     const params = new URLSearchParams();
     if (goal) params.set('goal', goal);

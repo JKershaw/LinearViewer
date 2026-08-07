@@ -18,10 +18,12 @@ import {
   getBindingsForWorkspace,
   getBindingCallScope,
   getWorkspaceCallScope,
+  resolveIssueBinding,
   remintActiveCredential,
   saveSession,
   MAX_WORKSPACES
 } from '../../lib/workspace.js';
+import { registerProvider } from '../../lib/providers/registry.js';
 
 // LIN-1523: fake durable owner-credential store — records every `put` call so
 // tests can assert on write count/args without a real backing collection.
@@ -883,6 +885,147 @@ describe('getWorkspaceCallScope', () => {
 
   test('undefined for a null workspace', () => {
     assert.strictEqual(getWorkspaceCallScope(null), undefined);
+  });
+});
+
+// =============================================================================
+// resolveIssueBinding (LIN-1904) — the per-ISSUE sibling of getWorkspaceCallScope.
+// Returns { provider, callScope } as one pair, resolved from the `source`
+// provenance stamp (LIN-561) rather than always the workspace's active binding.
+// =============================================================================
+
+describe('resolveIssueBinding', () => {
+  let seq = 0;
+  /** Register a fake provider under a unique name so tests never contend over one registry slot. */
+  function fakeProvider() {
+    const name = `fake-resolve-${++seq}`;
+    return registerProvider({ name, ui: {}, supports: () => true });
+  }
+
+  test('no `source` → workspace-level resolution (active provider, active call scope)', () => {
+    const active = fakeProvider();
+    const secondary = fakeProvider();
+    const ws = {
+      id: 'ws-1', provider: active.name, accessToken: 'active-token',
+      bindings: [
+        { provider: active.name, scope: 'active-scope', credentials: { token: 'active-token' } },
+        { provider: secondary.name, scope: 'secondary-scope', credentials: { token: 'secondary-token' } },
+      ],
+    };
+    const { provider, callScope } = resolveIssueBinding(ws, undefined);
+    assert.strictEqual(provider, active);
+    assert.strictEqual(callScope, 'active-token');
+    // Byte-identical to the pre-existing workspace-level pair.
+    assert.strictEqual(callScope, getWorkspaceCallScope(ws));
+  });
+
+  test('an unmatched `source` falls back to workspace-level resolution unchanged', () => {
+    const active = fakeProvider();
+    fakeProvider(); // registered, but never bound to this workspace
+    const ws = {
+      id: 'ws-1', provider: active.name, accessToken: 'active-token',
+      bindings: [{ provider: active.name, scope: 'active-scope', credentials: { token: 'active-token' } }],
+    };
+    const { provider, callScope } = resolveIssueBinding(ws, 'some-unrelated-provider-name');
+    assert.strictEqual(provider, active);
+    assert.strictEqual(callScope, 'active-token');
+  });
+
+  test('`source` naming the sole binding for a provider resolves that binding, even when it is not the active one', () => {
+    const active = fakeProvider();
+    const secondary = fakeProvider();
+    const ws = {
+      id: 'ws-1', provider: active.name, accessToken: 'active-token',
+      bindings: [
+        { provider: active.name, scope: 'active-scope', credentials: { token: 'active-token' } },
+        { provider: secondary.name, scope: 'secondary-scope', credentials: { token: 'secondary-token' } },
+      ],
+    };
+    const { provider, callScope } = resolveIssueBinding(ws, secondary.name);
+    assert.strictEqual(provider, secondary);
+    // The security-critical assertion: the secondary binding's OWN scope, never
+    // the active binding's getWorkspaceCallScope credential.
+    assert.strictEqual(callScope, 'secondary-token');
+  });
+
+  test('`source` is bounded to this workspace\'s own bindings — a registered-but-unbound provider name never resolves', () => {
+    const active = fakeProvider();
+    const unbound = fakeProvider(); // registered globally, but not in this workspace's bindings
+    const ws = {
+      id: 'ws-1', provider: active.name, accessToken: 'active-token',
+      bindings: [{ provider: active.name, scope: 'active-scope', credentials: { token: 'active-token' } }],
+    };
+    const { provider, callScope } = resolveIssueBinding(ws, unbound.name);
+    // Falls back to the active binding, never resolves the unbound provider.
+    assert.strictEqual(provider, active);
+    assert.strictEqual(callScope, 'active-token');
+  });
+
+  // F1 (plan-review 91a7c209): same-provider multi-binding must prefer the
+  // ACTIVE binding (credentials.token matching the scalar mirror) over a bare
+  // first-match — mirroring getWorkspaceCallScope's own GitHub/Jira idiom.
+  // First-match-only would let a write route (PATCH /api/issues) silently
+  // target the wrong repo/site.
+  test('`source` naming a provider with TWO bindings prefers the ACTIVE one (matches the scalar-mirrored token)', () => {
+    // getBindingCallScope/getWorkspaceCallScope switch on the LITERAL provider
+    // string 'github' for the {token, repo} shape, so the registered name must
+    // match it (not an arbitrary fake name) to exercise that branch honestly.
+    const gh = registerProvider({ name: 'github', ui: {}, supports: () => true });
+    const ws = linkProvider({ id: 'ws-1' }, gh.name, 'octocat/one', { token: 'tok-one' });
+    linkProvider(ws, gh.name, 'octocat/two', { token: 'tok-two' });
+    // linkProvider mirrors the LAST same-provider link into the scalar fields.
+    assert.strictEqual(getWorkspaceToken(ws), 'tok-two');
+
+    const { provider, callScope } = resolveIssueBinding(ws, gh.name);
+    assert.strictEqual(provider, gh);
+    assert.deepStrictEqual(callScope, { token: 'tok-two', repo: 'octocat/two' });
+  });
+
+  test('`source` naming a provider with TWO bindings falls back to the first match when neither is the active mirror', () => {
+    // Constructed directly (not via linkProvider) so NEITHER binding's token
+    // matches the scalar mirror — the genuinely unresolvable residual the
+    // approved plan records (Scope exclusion 4): a foreign row from the
+    // non-active binding of a same-provider pair cannot be disambiguated by a
+    // provider-name `source` alone.
+    const gh = registerProvider({ name: 'github', ui: {}, supports: () => true });
+    const ws = {
+      id: 'ws-1', provider: gh.name, accessToken: 'active-elsewhere-token',
+      bindings: [
+        { provider: gh.name, scope: 'octocat/a', credentials: { token: 'tok-a' } },
+        { provider: gh.name, scope: 'octocat/b', credentials: { token: 'tok-b' } },
+      ],
+    };
+    const { provider, callScope } = resolveIssueBinding(ws, gh.name);
+    assert.strictEqual(provider, gh);
+    assert.deepStrictEqual(callScope, { token: 'tok-a', repo: 'octocat/a' });
+  });
+
+  test('a single-binding workspace resolves byte-identically whether or not `source` is sent', () => {
+    const sole = fakeProvider();
+    const ws = linkProvider({ id: 'ws-1' }, sole.name, 'sole-scope', { token: 'sole-token' });
+
+    const withoutSource = resolveIssueBinding(ws, undefined);
+    const withSource = resolveIssueBinding(ws, sole.name);
+    assert.strictEqual(withoutSource.provider, withSource.provider);
+    assert.strictEqual(withoutSource.callScope, withSource.callScope);
+    assert.strictEqual(withSource.callScope, 'sole-token');
+  });
+
+  test('resolves Jira\'s structured {email, apiToken, site} call scope from a matched binding, not the active mirror', () => {
+    // Same reason as the github test above: the {email, apiToken, site} shape
+    // is keyed on the literal provider string 'jira'.
+    const active = fakeProvider();
+    const jira = registerProvider({ name: 'jira', ui: {}, supports: () => true });
+    const ws = {
+      id: 'ws-1', provider: active.name, accessToken: 'active-token',
+      bindings: [
+        { provider: active.name, scope: 'active-scope', credentials: { token: 'active-token' } },
+        { provider: jira.name, scope: 'https://acme.atlassian.net', credentials: { token: 'jira-api-token', email: 'ada@acme.com' } },
+      ],
+    };
+    const { provider, callScope } = resolveIssueBinding(ws, jira.name);
+    assert.strictEqual(provider, jira);
+    assert.deepStrictEqual(callScope, { email: 'ada@acme.com', apiToken: 'jira-api-token', site: 'https://acme.atlassian.net' });
   });
 });
 
