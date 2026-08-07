@@ -10,7 +10,7 @@
  */
 import { Router, json } from 'express';
 import { badRequest, jsonError, notFound, unauthorized } from '../lib/errors.js';
-import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
+import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { buildRoadmapNarrativeMessages } from '../lib/prompts/roadmap-narrative-template.js';
@@ -52,7 +52,7 @@ import { hashContext } from '../lib/recap-cache.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, getBindingsForWorkspace, getBindingCallScope } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, resolveIssueBinding } from '../lib/workspace.js';
 // LIN-1552 Session A: the session-auth issue write routes reuse the SAME
 // symbolic-ref primitives the proxy write path uses, the shared trashed-signal
 // detector, and the shared issue-write validator — no rules re-inlined here.
@@ -455,8 +455,13 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         })
       }
 
-      // Fetch issue context from Linear
-      const { issue, parent, siblings, project, children, comments, attachments } = await getProviderForWorkspace(workspace).fetchIssueContext(getWorkspaceCallScope(workspace), issueId)
+      // LIN-1904: resolve the issue's OWN binding (per the `source` provenance
+      // stamp LIN-561 puts on every merged-tree row, LIN-544) rather than
+      // always the workspace's active provider — same fix as /api/detail
+      // (LIN-1903), same helper.
+      const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
+      const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource)
+      const { issue, parent, siblings, project, children, comments, attachments } = await issueProvider.fetchIssueContext(issueCallScope, issueId)
 
       // Generate the prompt
       let result;
@@ -577,7 +582,10 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         })
       }
 
-      const { issue, project } = await getProviderForWorkspace(workspace).fetchIssueContext(getWorkspaceCallScope(workspace), issueId)
+      // LIN-1904: resolve the issue's own binding via `source`, same as /api/prompt.
+      const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
+      const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource)
+      const { issue, project } = await issueProvider.fetchIssueContext(issueCallScope, issueId)
       const prompt = buildAutopilotKickoff({
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title },
@@ -1338,7 +1346,10 @@ ${goal}`
       // (interactions.spec) reads comments through the local provider and no
       // test-token spec reaches this endpoint, so the old `testMockData` data-mock
       // branch was orphaned and removed (LIN-413). Linear + local both serve here.
-      const comments = await getProviderForWorkspace(workspace).fetchIssueComments(getWorkspaceCallScope(workspace), issueId)
+      // LIN-1904: resolve the issue's own binding via `source`, same as /api/detail.
+      const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
+      const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource)
+      const comments = await issueProvider.fetchIssueComments(issueCallScope, issueId)
       res.json({ comments })
     } catch (error) {
       console.error('Comments fetch error:', error)
@@ -1386,19 +1397,11 @@ ${goal}`
       // WORKSPACE's active provider/scope — misrouting a foreign-source row's id
       // to the wrong provider/credential. The client-supplied `source` (the
       // issue's own provenance, LIN-561) lets us resolve that issue's own
-      // binding instead. It is bounded to this workspace's OWN bindings via the
-      // `.find()` below — never passed to `getProvider()` directly — so it can
-      // only select among credentials the caller already has access to.
+      // binding instead, via resolveIssueBinding — bounded to this workspace's
+      // OWN bindings, so it can only select among credentials the caller
+      // already has access to (LIN-1904).
       const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
-      const matchedBinding = requestedSource
-        ? getBindingsForWorkspace(workspace).find(b => b.provider === requestedSource)
-        : null
-      const provider = matchedBinding ? getProvider(matchedBinding.provider) : getProviderForWorkspace(workspace)
-      // Security-critical: the resolved branch must use getBindingCallScope on
-      // THAT binding, never getWorkspaceCallScope(workspace)'s active-binding
-      // scope — reusing it would hand the active binding's credential to a
-      // different provider's client.
-      const callScope = matchedBinding ? getBindingCallScope(matchedBinding) : getWorkspaceCallScope(workspace)
+      const { provider, callScope } = resolveIssueBinding(workspace, requestedSource)
 
       // Test mode (test-token + testMockData): the homepage renders from the mock
       // fixtures, not the provider API, so the lazy detail must too — fetching via
@@ -2632,8 +2635,13 @@ ${goal}`
    */
   router.patch('/workspace/:urlKey/api/issues/:issueId', workspaceFromUrl, json(), async (req, res) => {
     const workspace = req.workspace;
-    const provider = getProviderForWorkspace(workspace);
-    const token = getWorkspaceCallScope(workspace);
+    // LIN-1904: resolve the issue's own binding via `source` (thread from the
+    // edit-link → task-edit → PATCH provenance hop), same helper as the read
+    // routes. Guard-read and write both derive from this single pairing, so
+    // they cannot land on different bindings (the invariant LIN-1903's review
+    // mutation-tested).
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
+    const { provider, callScope: token } = resolveIssueBinding(workspace, requestedSource);
 
     if (!provider.supports('updateIssue')) {
       return jsonError(res, 422, "This workspace's provider does not support updating issues", {

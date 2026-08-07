@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { defaultJiraSeed, JIRA_SITE } from '../fixtures/jira-harness.js';
+import { defaultGitHubSeed, GITHUB_REPO } from '../fixtures/github-harness.js';
 
 // LIN-1903 — the acceptance witness the ticket's research called for: a
 // multi-binding workspace where the issue under test belongs to the
@@ -73,5 +74,130 @@ test.describe('Detail drill-down on a non-active binding (LIN-1903)', () => {
 
     await localRow.click();
     await expect(page.locator('body')).toContainText('Seeded parent');
+  });
+});
+
+// LIN-1904 — the sibling routes LIN-1903 deliberately left unfixed: the exact
+// same misroute affects /api/prompt, /api/comments, /api/autopilot-prompt and
+// PATCH /api/issues (via task-edit) whenever the id belongs to a NON-active
+// binding. Extends the multi-binding fixture above rather than replacing it —
+// same workspace shape (local active + Jira secondary), different routes.
+test.describe('Sibling id-scoped routes on a non-active (Jira) binding (LIN-1904)', () => {
+  test('prompt and comments resolve through the JIRA binding, not the active local one', async ({ page, seedLocal }) => {
+    await page.request.post('/test/set-jira-session', { data: { seed: defaultJiraSeed } });
+    const { dashboard } = await seedLocal(null, {
+      extraBindings: [
+        { provider: 'jira', scope: JIRA_SITE, credentials: { token: 'jira-api-token', email: 'ada@example.com', tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
+      ],
+    });
+
+    await page.goto(dashboard);
+    await page.waitForLoadState('networkidle');
+
+    // ENG-2 ("Jira task in progress") carries a comment in the fixture, unlike
+    // ENG-1 — a genuine discriminator for the comments assertion below.
+    const jiraNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task in progress")') }).first();
+    const jiraRow = jiraNode.locator('.line').first();
+    await expect(jiraRow).toBeAttached();
+
+    // Expand the row first — this is the lazy /api/detail fetch (LIN-1903)
+    // that populates the Details/Prompts toggles below; skipping it leaves
+    // the fragment empty and every nested locator times out.
+    await jiraRow.click();
+    await jiraNode.locator('[data-toggle="details"]').first().click();
+
+    // Prompt: click the always-visible "implementation" prompt button and
+    // assert the generated prompt embeds the JIRA issue's own title — pre-fix,
+    // this request carried no provenance and fetched the ACTIVE (local)
+    // provider's issue context for this id, either 404ing or embedding the
+    // wrong issue's title.
+    await jiraNode.locator('[data-toggle="prompts"]').first().click();
+    await jiraNode.locator('[data-label="implementation"]').first().click();
+    await expect(jiraNode.locator('.prompt-text').first()).toContainText('Jira task in progress');
+
+    // Comments: expand the nested Comments toggle and assert the JIRA
+    // comment body is present — proof the fetch reached the Jira binding's
+    // own fetchIssueComments, not local's (which has no knowledge of this id).
+    await jiraNode.locator('[data-toggle="comments"]').first().click();
+    await expect(jiraNode.locator('.comments-list')).toContainText('Investigating.');
+  });
+
+  test('no Edit link renders for the Jira row — Jira has no updateIssue, so ui.inlineEdit is false for its OWN binding', async ({ page, seedLocal }) => {
+    await page.request.post('/test/set-jira-session', { data: { seed: defaultJiraSeed } });
+    const { dashboard } = await seedLocal(null, {
+      extraBindings: [
+        { provider: 'jira', scope: JIRA_SITE, credentials: { token: 'jira-api-token', email: 'ada@example.com', tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
+      ],
+    });
+
+    await page.goto(dashboard);
+    await page.waitForLoadState('networkidle');
+
+    const jiraNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task to do")') }).first();
+    const jiraRow = jiraNode.locator('.line').first();
+    await expect(jiraRow).toBeAttached();
+    await jiraRow.click();
+    await jiraNode.locator('[data-toggle="details"]').first().click();
+
+    // The Details panel is populated (proves the fragment actually rendered,
+    // not just an empty/failed fetch), but carries no Edit affordance at all —
+    // the observable this ticket's plan-review (F3) flagged as previously only
+    // implied, never asserted directly.
+    await expect(jiraNode.locator('.detail-content[data-content="details"]')).toContainText('A todo Jira issue.');
+    await expect(jiraNode.locator('[data-testid="issue-edit-link"]')).toHaveCount(0);
+  });
+});
+
+// LIN-1904 — the write-path provenance chain (plan-review F3): a foreign row
+// whose OWN binding DOES support inline edit (unlike Jira above) must render
+// an Edit link carrying `?source=<provider>`, land on THAT binding's own
+// task-edit page, and PATCH THAT binding on save — never the active one.
+// GitHub is the secondary, write-capable binding here (local stays active).
+test.describe('Edit-link → task-edit → PATCH provenance chain, foreign write-capable binding (LIN-1904)', () => {
+  test('editing a GitHub-sourced row (non-active binding) writes to GitHub, not the active local workspace', async ({ page, seedLocal }) => {
+    await page.request.post('/test/set-github-session', { data: defaultGitHubSeed });
+    const { dashboard } = await seedLocal(null, {
+      extraBindings: [
+        { provider: 'github', scope: GITHUB_REPO, credentials: { token: 'github-install-token', installationId: '4242', tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
+      ],
+    });
+
+    await page.goto(dashboard);
+    await page.waitForLoadState('networkidle');
+
+    const githubNode = page.locator('.node').filter({ has: page.locator('.line:has-text("GitHub open task")') }).first();
+    const githubRow = githubNode.locator('.line').first();
+    await expect(githubRow).toBeAttached();
+    await expect(githubRow.locator('[data-testid="issue-source"]')).toHaveText('github');
+
+    // Expand the row first — the lazy /api/detail fetch that populates the
+    // Details toggle (and the Edit link inside it) below.
+    await githubRow.click();
+    await githubNode.locator('[data-toggle="details"]').first().click();
+
+    // The Edit link carries `?source=github` — the row's OWN provider, not the
+    // active local one — so the drill-down and its PATCH resolve the same
+    // binding this row came from.
+    const editLink = githubNode.locator('[data-testid="issue-edit-link"]');
+    await expect(editLink).toBeAttached();
+    await expect(editLink).toHaveAttribute('href', /\/edit\?source=github$/);
+
+    await editLink.click();
+
+    // Landed on the task-edit page rendering the GITHUB binding's OWN issue —
+    // pre-fix this would have resolved via the ACTIVE (local) provider with a
+    // GitHub-shaped id, 404ing (LocalStore has no record for GitHub's `1`).
+    const titleInput = page.locator('[data-testid="task-edit-title"]');
+    await expect(titleInput).toHaveValue('GitHub open task');
+
+    const newTitle = 'GitHub open task — edited via non-active binding (LIN-1904)';
+    await titleInput.fill(newTitle);
+    await page.locator('[data-testid="task-edit-submit"]').click();
+
+    // Save redirects back to the dashboard; the GitHub row now shows the
+    // edited title — proof the PATCH landed on the GitHub binding's own issue,
+    // not a wrong-target write against the active local workspace.
+    await page.waitForURL(dashboard);
+    await expect(page.locator(`.line:has-text("${newTitle}")`)).toBeAttached();
   });
 });

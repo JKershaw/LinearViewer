@@ -87,6 +87,10 @@ function downloadMarkdown(text, filename) {
 async function loadComments(toggle, content) {
   const issueId = toggle.dataset.issueId
   const urlKey = toggle.dataset.urlKey
+  // LIN-1904: forward the resolved provider (stamped server-side in
+  // lib/render.js) so the fetch resolves THIS issue's own binding instead of
+  // the workspace's active provider.
+  const source = toggle.dataset.source
 
   if (!issueId || !urlKey) {
     console.error('Missing issueId or urlKey for comments')
@@ -102,7 +106,8 @@ async function loadComments(toggle, content) {
   errorEl?.classList.add('hidden')
 
   try {
-    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/comments/${encodeURIComponent(issueId)}`)
+    const sourceQuery = source ? `?source=${encodeURIComponent(source)}` : ''
+    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/comments/${encodeURIComponent(issueId)}${sourceQuery}`)
     const comments = (data && data.comments) || []
 
     // Mark as loaded (don't re-fetch on toggle)
@@ -1061,8 +1066,12 @@ function initPrompts() {
       // Get workspace URL key from data attribute (workspace-prefixed URLs)
       const urlKey = promptContainer.dataset.urlKey
       const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
+      // LIN-1904: forward the resolved provider (stamped server-side in
+      // lib/render.js) so the fetch resolves THIS issue's own binding.
+      const source = promptContainer.dataset.source
+      const sourceQuery = source ? `?source=${encodeURIComponent(source)}` : ''
       const data = await window.api(
-        `${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(labelName)}`,
+        `${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(labelName)}${sourceQuery}`,
         { signal: abortController.signal }
       )
 
@@ -2285,10 +2294,14 @@ function initAutopilot() {
 
     try {
       const urlKey = container.dataset.urlKey
+      // LIN-1904: forward the resolved provider (stamped server-side in
+      // lib/render.js) so the kickoff fetch resolves THIS issue's own binding.
+      const source = container.dataset.source
       const data = await window.fetchAutopilotKickoff({
         urlKey,
         issueId,
         variant: variant || undefined,
+        source: source || undefined,
         signal: abortController.signal
       })
 
