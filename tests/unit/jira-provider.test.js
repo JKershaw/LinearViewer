@@ -412,6 +412,54 @@ describe('createJiraClient — Basic auth wire shape', () => {
   })
 })
 
+// =============================================================================
+// LIN-1891 acceptance item 3 — the headless/proxy lane's structured scope
+// reaches JiraProvider and produces the LITERAL Basic-auth header, driven
+// through the real per-request seam (_clientFor -> _clientForCredential ->
+// clientFactory) rather than calling createJiraClient directly (the block
+// above tests that boundary in isolation, credential-blind). This file's
+// `seededProvider()` helper (used everywhere above) is `clientFactory: () =>
+// client` — it ignores its credential argument entirely, so it would pass
+// even if the scope object lost a field between getWorkspaceCallScope and
+// the client. This describe block builds a SEPARATE, credential-KEYED
+// provider instead, mirroring tests/unit/github-app-integration.test.js's
+// `clientFactory: (token) => clientScopedTo(...)` template — never extending
+// seededProvider's blind factory into this evidence.
+// =============================================================================
+
+describe('JiraProvider — literal Basic-auth header through the real per-request scope seam (LIN-1891)', () => {
+  // Builds a JiraProvider with NO boot client (mirrors production: a
+  // headless-lane Jira workspace has no configure({client}) call) whose
+  // clientFactory is keyed on the credential it receives — a wrong or
+  // incomplete credential produces a wrong or missing header, rather than
+  // being silently ignored.
+  function providerWithCapturingFactory(calls) {
+    const fetchImpl = async (url, opts) => {
+      calls.push({ url, headers: opts.headers })
+      return { status: 200, ok: true, headers: { get: () => null }, text: async () => JSON.stringify({ values: [], startAt: 0, maxResults: 50, total: 0, isLast: true }) }
+    }
+    return new JiraProvider({ clientFactory: cred => createJiraClient({ ...cred, fetchImpl }) })
+  }
+
+  test('a getWorkspaceCallScope-shaped {email, apiToken, site} credential produces the literal Authorization: Basic header', async () => {
+    const calls = []
+    const provider = providerWithCapturingFactory(calls)
+    // Exactly the shape lib/workspace.js's getWorkspaceCallScope produces for
+    // a Jira workspace — the structured scope LIN-1891's edits 1-4 thread
+    // through the headless lane in place of a bare token string.
+    const scope = { email: 'ada@acme.com', apiToken: 'tok-123', site: SITE }
+
+    await provider.fetchProjects(scope)
+
+    assert.equal(calls.length, 1, 'fetchProjects makes exactly one request when the site has no projects')
+    const expected = `Basic ${Buffer.from('ada@acme.com:tok-123').toString('base64')}`
+    // The LITERAL header value, not merely "a header is present" or "no
+    // error was thrown" — see the module comment above for why that
+    // distinction is load-bearing here.
+    assert.equal(calls[0].headers.Authorization, expected);
+  });
+});
+
 describe('createJiraClient serial pagination', () => {
   test('listAllProjects walks pages serially via startAt until isLast', async () => {
     const pages = [

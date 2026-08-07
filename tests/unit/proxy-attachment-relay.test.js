@@ -29,16 +29,23 @@ import { guardNetwork } from '../fixtures/network-guard.js';
 // is set as an instance property only when a resolver is supplied, so
 // `provider.supports('fetchAttachment')` correctly reports false when omitted
 // (it then resolves to the base's throwing stub, exactly like a real provider
-// that hasn't implemented the capability).
+// that hasn't implemented the capability). Named `linear` (LIN-1891), not a
+// distinguishing fake label: in production `att:` only ever reaches this seam
+// through the real Linear provider (every other provider 422s or 500s at the
+// capability gate before a credential is touched — see routes/proxy.js's
+// `denyIfUnsupported`), so this stand-in must carry that same provider
+// identity for the relay's `linear`-only auth-header check to behave as it
+// would in production, rather than accidentally exercising the "unknown
+// non-linear provider" branch no real `att:` request can reach.
 class FakeAttachmentProvider extends ProviderInterface {
   constructor(fetchAttachmentImpl) {
     super();
-    this.name = 'fake';
+    this.name = 'linear';
     if (fetchAttachmentImpl) this.fetchAttachment = fetchAttachmentImpl;
   }
 }
 
-function buildApp({ token = 'ws-linear-token', reason = 'ok', provider } = {}) {
+function buildApp({ token = 'ws-linear-token', reason = 'ok', provider, providerName } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -48,7 +55,15 @@ function buildApp({ token = 'ws-linear-token', reason = 'ok', provider } = {}) {
       })
     },
     proxyEventStore: { recordEvent: async () => {} },
-    resolveWorkspaceAccess: async () => ({ token, reason }),
+    // LIN-1891: `providerName` threads the workspace's resolved `provider`
+    // field through the REAL resolveProviderAccess -> getProviderForWorkspace
+    // path (registry lookup, legacy-default fallback included) — the
+    // production route for a non-injected provider. This is a DIFFERENT seam
+    // from `provider` below, which bypasses the registry entirely via
+    // `injectedProvider`. Omitted (undefined) reproduces today's default
+    // stub shape exactly (no `provider` key), preserving the legacy-workspace
+    // no-provider-field byte-identity case already covered above.
+    resolveWorkspaceAccess: async () => ({ token, reason, provider: providerName }),
     getWorkspaceAccessToken: async () => token,
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
@@ -390,6 +405,54 @@ describe('GET /api/proxy/attachments/:id — provider/host-aware auth (LIN-771)'
   test('SSRF guard still rejects a GitHub look-alike host', async () => {
     const res = await getAttachment(buildApp(), md('https://user-images.githubusercontent.com.evil.com/x.png'));
     assert.equal(res.status, 400);
+  });
+});
+
+// LIN-1891 — the relay's Authorization header is now gated by TWO independent
+// booleans: the existing host check above (LIN-771) AND a provider-name check.
+// A Linear-hosted asset gets the bearer token ONLY when the resolved
+// workspace's own provider is `linear` — deliberately `linear`-only, never
+// `linear` OR `local`. Every other provider relaying a Linear-hosted asset
+// (local, jira, github, github-projects) gets NO Authorization header: today
+// those workspaces send their OWN credential to Linear's CDN on every such
+// relay, and stopping that cross-provider credential egress is why this check
+// exists. `local` is used below (rather than jira/github) because it is the
+// one non-linear provider already registered in this test file's module
+// graph (routes/proxy.js imports lib/providers/local/index.js directly),
+// and it is also the literal wrong-implementation case the plan review named
+// (`provider === 'linear' || provider === 'local'`) — see the mutation note
+// on the second test.
+describe('GET /api/proxy/attachments/:id — provider check on the relay auth header (LIN-1891)', () => {
+  test('a legacy workspace with no `provider` field falls back to `linear` and KEEPS its Authorization header', async () => {
+    let sawAuth = null;
+    stubUpstream((url, opts) => {
+      sawAuth = opts.headers.Authorization;
+      return fakeResponse({ contentType: 'image/png' });
+    });
+    // buildApp() with no providerName reproduces a legacy workspace exactly:
+    // resolveWorkspaceAccess returns `provider: undefined`, so
+    // getProviderForWorkspace falls through to LEGACY_DEFAULT_PROVIDER
+    // ('linear') — the real registry path, not an injected fake.
+    const res = await getAttachment(buildApp(), md(`${LINEAR_HOST}/abc/legacy.png`));
+    assert.equal(res.status, 200);
+    assert.equal(sawAuth, 'Bearer ws-linear-token', 'a legacy (providerless) workspace must keep its Linear auth header');
+  });
+
+  test('a non-linear (local) workspace relaying a Linear-hosted asset gets NO Authorization header', async () => {
+    let sawAuthHeader = 'UNSET';
+    stubUpstream((url, opts) => {
+      sawAuthHeader = 'Authorization' in (opts.headers || {});
+      return fakeResponse({ contentType: 'image/png' });
+    });
+    const res = await getAttachment(buildApp({ providerName: 'local' }), md(`${LINEAR_HOST}/abc/screenshot.png`));
+    assert.equal(res.status, 200, 'the relay still serves the asset — only the credential is withheld');
+    assert.equal(sawAuthHeader, false, 'a local-bound workspace must not send its own credential to Linear\'s CDN');
+    // Mutation check (verified by hand, per beat instructions — not
+    // executable here): writing routes/proxy.js's check as
+    // `providerName === 'linear' || providerName === 'local'` (the literal
+    // wrong implementation the plan review named) turns this assertion red,
+    // since `local` would then wrongly keep the header. See the beat 3
+    // report for the actual mutate-run-revert transcript.
   });
 });
 
