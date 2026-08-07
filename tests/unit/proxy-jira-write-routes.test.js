@@ -92,6 +92,52 @@ function seed() {
         },
       },
       {
+        // LIN-1886 review Blocker 3: ORDINARY Jira prose — a mention, a smart
+        // link and an emoji. Every one of these renders to markdown fine, so
+        // the old reader-derived gate PERMITTED the write and a 200-OK append
+        // flattened the whole body into one anonymous text run.
+        id: '30006', key: 'ENG-15',
+        fields: {
+          summary: 'Ordinary Jira prose the reader can render but the writer cannot rebuild',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'paragraph', content: [
+              { type: 'text', text: 'hi ' },
+              { type: 'mention', attrs: { id: 'acc-1', text: '@ada' } },
+              { type: 'text', text: ' see ' },
+              { type: 'inlineCard', attrs: { url: 'https://example.com/doc' } },
+              { type: 'text', text: ' ' },
+              { type: 'emoji', attrs: { shortName: ':smile:', text: '🙂' } },
+            ] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
+      {
+        // Same blocker, structural half: nesting the writer cannot rebuild at
+        // any depth (it would re-emit the child as a flat sibling list).
+        id: '30007', key: 'ENG-16',
+        fields: {
+          summary: 'Nested bullet list',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'bulletList', content: [
+              { type: 'listItem', content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'parent' }] },
+                { type: 'bulletList', content: [
+                  { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'child' }] }] },
+                ] },
+              ] },
+            ] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
+      {
         id: '30004', key: 'ENG-13', // done, no available transitions
         fields: {
           summary: 'Already done, nothing else available',
@@ -301,6 +347,47 @@ describe('Jira-backed proxy POST /issues/:id/description/{append,replace} (LIN-1
     const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/ENG-12/description/append', { block: 'A new note.' });
     assert.equal(status, 422);
     assert.equal(JSON.stringify((await stored('ENG-12')).fields.description), before, 'nothing was written');
+  });
+});
+
+describe('Jira-backed proxy writes — the gate is derived from the WRITER (LIN-1886 review Blocker 3)', () => {
+  // The exact regression: ordinary Jira content the READER renders happily but
+  // the WRITER has no inverse for. Before this fix, every case below returned
+  // 200 and destroyed the stored body. Asserted against the FAKE STORE so a
+  // regression cannot pass on the response shape alone.
+
+  test('append to a mention/inlineCard/emoji description refuses (422) and the stored ADF is byte-identical', async () => {
+    const before = JSON.stringify((await stored('ENG-15')).fields.description);
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/ENG-15/description/append', { block: 'A new note.' });
+    assert.equal(status, 422);
+    assert.equal(JSON.stringify((await stored('ENG-15')).fields.description), before, 'nothing was written');
+  });
+
+  test('a title-only PATCH that resends the description (the public/task-edit.js session-lane shape) refuses rather than flattening it', async () => {
+    // public/task-edit.js always resends the full description, so a title-only
+    // edit went through the description branch and destroyed the body too.
+    const before = JSON.stringify((await stored('ENG-15')).fields.description);
+    const { status } = await call(buildApp(), 'PATCH', '/api/proxy/issues/ENG-15',
+      { title: 'Renamed', description: 'hi @ada see https://example.com/doc 🙂' });
+    assert.equal(status, 422);
+    const issue = await stored('ENG-15');
+    assert.equal(JSON.stringify(issue.fields.description), before, 'the description was not flattened');
+    assert.equal(issue.fields.summary, 'Ordinary Jira prose the reader can render but the writer cannot rebuild',
+      'and the title write never happened either (N1 ordering holds)');
+  });
+
+  test('a nested bulletList description refuses (422) rather than being rewritten as two flat sibling lists', async () => {
+    const before = JSON.stringify((await stored('ENG-16')).fields.description);
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/ENG-16/description/append', { block: 'A new note.' });
+    assert.equal(status, 422);
+    assert.equal(JSON.stringify((await stored('ENG-16')).fields.description), before, 'the nesting survives');
+  });
+
+  test('the READ path is untouched — the same refused issue still renders its mention/card/emoji for display', async () => {
+    // `issueDescription` is the route-internal read the write lane itself calls
+    // before splicing. Only the WRITE gate tightened; this must be unchanged.
+    const read = await jiraProvider.issueDescription(SCOPE, 'ENG-15');
+    assert.equal(read.description, 'hi @ada see https://example.com/doc 🙂');
   });
 });
 
