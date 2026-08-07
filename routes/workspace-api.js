@@ -52,7 +52,7 @@ import { hashContext } from '../lib/recap-cache.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, resolveIssueBinding } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, resolveIssueBinding, isActiveProviderLinear } from '../lib/workspace.js';
 // LIN-1552 Session A: the session-auth issue write routes reuse the SAME
 // symbolic-ref primitives the proxy write path uses, the shared trashed-signal
 // detector, and the shared issue-write validator — no rules re-inlined here.
@@ -318,6 +318,33 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         };
         const report = computeAuditFromData(mockAuditData);
         return res.json(report);
+      }
+
+      // LIN-1899: the audit is a Linear-SPECIFIC capability — it reads the
+      // provider-agnostic scalar mirror `workspace.accessToken` and hands it to
+      // a statically Linear-bound GraphQL client (lib/audit.js:180). For a
+      // non-Linear active binding that mirror holds THAT provider's credential
+      // (a raw Jira API token, say), so the call below discloses it to
+      // api.linear.app — and returns a misleading 401 from the catch branch
+      // because Linear rejects it. Refuse instead: a capability endpoint with no
+      // meaningful non-Linear rendering declines with 422 CAPABILITY_NOT_SUPPORTED
+      // (the denyIfUnsupported envelope, routes/proxy.js:750-757), not the 503
+      // workspaceUnavailable envelope — a provider mismatch is not transient.
+      //
+      // Placed AFTER the test-mode mock branch above so the LIN-412 local
+      // carve-out keeps firing (tests/e2e/audit.spec.js runs on a genuine
+      // `provider: 'local'` seed). Consequence, recorded deliberately: a local
+      // workspace is mocked in test but REFUSED in production — today it sends
+      // its urlKey to Linear for a fake 401, and 422 is the honest answer.
+      // `linear`-only, never `linear` OR `local` (LIN-1891's settled rule); the
+      // sibling asset relay withholds the header instead of refusing, because
+      // capability endpoints refuse and asset relays degrade (see /api/image).
+      if (!isActiveProviderLinear(workspace)) {
+        return jsonError(res, 422, `This workspace's provider does not support this`, {
+          code: 'CAPABILITY_NOT_SUPPORTED',
+          capability: 'audit',
+          provider: workspace.provider,
+        });
       }
 
       const report = await runAudit(workspace.accessToken);
@@ -2041,10 +2068,27 @@ ${goal}`
     const MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
     try {
+      // LIN-1899: attach the workspace credential ONLY when the active binding
+      // is Linear. `workspace.accessToken` is the provider-agnostic scalar
+      // mirror, so for a Jira-active workspace this template would send a raw
+      // Jira API token to uploads.linear.app — the same cross-provider
+      // credential egress LIN-1891 closed on the attachment relay
+      // (routes/proxy.js:2477-2479), and this route is the same site class, so
+      // it takes that precedent's consequence verbatim: SERVE the asset, WITHHOLD
+      // the header. Deliberately degrade rather than refuse (unlike the audit
+      // capability above) — a mixed workspace's already-rendered <img> still
+      // resolves for genuinely public linear.app assets, and the security
+      // property is identical either way: the credential does not leave the
+      // system. `linear`-only, never `linear` OR `local` (LIN-1891's rule);
+      // legacy providerless workspaces keep their header.
+      //
+      // Placed at the fetch, AFTER the https-only / exact-host-allowlist /
+      // path-traversal checks above — none of which are reordered or relaxed.
+      const fetchHeaders = isActiveProviderLinear(workspace)
+        ? { Authorization: `Bearer ${workspace.accessToken}` }
+        : {}
       const response = await fetch(imageUrl, {
-        headers: {
-          Authorization: `Bearer ${workspace.accessToken}`
-        },
+        headers: fetchHeaders,
         // Prevent redirects that could bypass SSRF protection
         redirect: 'error'
       })
