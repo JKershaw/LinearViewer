@@ -23,8 +23,12 @@ import {
   JiraProvider,
   jiraProvider,
   jiraStatusCategoryToCanonical,
+  jiraStateIdToCanonicalType,
   adfToMarkdown,
+  markdownToAdf,
+  adfHasUnrenderableContent,
 } from '../../lib/providers/jira/index.js'
+import { RefResolutionError } from '../../lib/proxy-ref-resolver.js'
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js'
 import { createJiraClient } from '../../lib/providers/jira/client.js'
 import { getProvider } from '../../lib/providers/registry.js'
@@ -198,6 +202,111 @@ describe('adfToMarkdown', () => {
 })
 
 // =============================================================================
+// markdownToAdf — the write-direction inverse of adfToMarkdown (LIN-1886 Step 1)
+// =============================================================================
+
+describe('markdownToAdf', () => {
+  test('null/undefined/blank → an empty doc', () => {
+    assert.deepEqual(markdownToAdf(null), { type: 'doc', version: 1, content: [] })
+    assert.deepEqual(markdownToAdf(undefined), { type: 'doc', version: 1, content: [] })
+    assert.deepEqual(markdownToAdf('   '), { type: 'doc', version: 1, content: [] })
+  })
+
+  test('round-trips through adfToMarkdown for every modeled node type', () => {
+    const md = [
+      '# Round trip',
+      'plain **bold** and _em_ and `code` and ~~strike~~ and [a link](https://example.com)',
+      '- one\n- two',
+      '1. first\n2. second',
+      '```js\nconsole.log(1)\n```',
+      '> quoted',
+      '---',
+      'line one\nline two',
+    ]
+    for (const original of md) {
+      const roundTripped = adfToMarkdown(markdownToAdf(original))
+      assert.equal(roundTripped, original, `round trip failed for: ${JSON.stringify(original)}`)
+    }
+  })
+
+  test('a full multi-block document round-trips as a whole', () => {
+    const original = [
+      '# Title',
+      'A paragraph with **bold** text.',
+      '- item one\n- item two',
+      '```js\nconst x = 1\n```',
+    ].join('\n\n')
+    assert.equal(adfToMarkdown(markdownToAdf(original)), original)
+  })
+
+  test('never throws on unsupported Markdown — degrades to a plain paragraph', () => {
+    assert.doesNotThrow(() => markdownToAdf('| a | b |\n| - | - |\n| 1 | 2 |'))
+    const adf = markdownToAdf('| a | b |')
+    assert.equal(adf.content[0].type, 'paragraph')
+  })
+})
+
+// =============================================================================
+// adfHasUnrenderableContent — D1 policy detection (LIN-1886 Step 1)
+// =============================================================================
+
+describe('adfHasUnrenderableContent', () => {
+  test('false for a doc using only modeled nodes and modeled marks', () => {
+    const doc = {
+      type: 'doc', version: 1, content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'bold', marks: [{ type: 'strong' }] }] },
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Title' }] },
+        { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x' }] }] }] },
+      ],
+    }
+    assert.equal(adfHasUnrenderableContent(doc), false)
+  })
+
+  test('null/undefined/non-object doc → false', () => {
+    assert.equal(adfHasUnrenderableContent(null), false)
+    assert.equal(adfHasUnrenderableContent(undefined), false)
+  })
+
+  for (const nodeType of ['table', 'media', 'panel', 'taskList', 'status', 'date']) {
+    test(`true for a doc containing a bare '${nodeType}' node`, () => {
+      const doc = { type: 'doc', version: 1, content: [{ type: nodeType, content: [] }] }
+      assert.equal(adfHasUnrenderableContent(doc), true)
+    })
+  }
+
+  test('true when the unmodeled node is nested inside otherwise-modeled structure (proves recursion)', () => {
+    const doc = {
+      type: 'doc', version: 1, content: [
+        { type: 'bulletList', content: [
+          { type: 'listItem', content: [
+            { type: 'blockquote', content: [
+              { type: 'table', content: [] },
+            ] },
+          ] },
+        ] },
+      ],
+    }
+    assert.equal(adfHasUnrenderableContent(doc), true)
+  })
+
+  test('true for a paragraph carrying an unmodeled MARK only (no unmodeled node anywhere) — proves mark-walking, not just node-type walking', () => {
+    const underline = {
+      type: 'doc', version: 1, content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'underline' }] }] },
+      ],
+    }
+    assert.equal(adfHasUnrenderableContent(underline), true)
+
+    const textColor = {
+      type: 'doc', version: 1, content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'textColor', attrs: { color: '#ff0000' } }] }] },
+      ],
+    }
+    assert.equal(adfHasUnrenderableContent(textColor), true)
+  })
+})
+
+// =============================================================================
 // Capability profile + registration
 // =============================================================================
 
@@ -207,27 +316,40 @@ describe('JiraProvider capability profile', () => {
     assert.equal(jiraProvider.name, 'jira')
   })
 
-  test('implements exactly the Phase 1 read surface', () => {
+  test('implements the Phase 1 read + Phase 2 (LIN-1886) write surface', () => {
     const p = new JiraProvider()
     assert.equal(p.supports('fetchProjects'), true)
     assert.equal(p.supports('fetchTeams'), true)
     assert.equal(p.supports('fetchIssueContext'), true)
     assert.equal(p.supports('fetchIssueComments'), true)
     assert.equal(p.supports('fetchIssueFields'), true, 'backs the dashboard lazy per-issue detail load, LIN-442')
-    // Writes are declared-but-unimplemented this phase.
+    assert.equal(p.supports('fetchProjectsList'), true, 'LIN-1886 Step 2')
+    // createIssue stays deferred behind LIN-1557; everything else in the
+    // LIN-1886 write surface is now implemented.
     assert.equal(p.supports('createIssue'), false)
-    assert.equal(p.supports('updateIssue'), false)
-    assert.equal(p.supports('createComment'), false)
+    assert.equal(p.supports('updateIssue'), true)
+    assert.equal(p.supports('createComment'), true)
+    assert.equal(p.supports('addLabel'), true)
+    assert.equal(p.supports('removeLabel'), true)
   })
 
-  test('ui surface: write true (external create link) decoupled from inlineCreate false', () => {
+  test('the four route-internal reads exist but stay OFF the declared PROVIDER_SURFACE (LIN-1886, mirrors GitHub LIN-1559)', () => {
+    const p = new JiraProvider()
+    for (const m of ['issueWriteGuard', 'issueDescription', 'issueLabels', 'updateIssueLabels']) {
+      assert.equal(p.supports(m), false, `${m} must stay off the declared surface`)
+      assert.equal(typeof p[m], 'function', `${m} must still be implemented`)
+    }
+  })
+
+  test('ui surface: write true (external create link) decoupled from inlineCreate false; inlineEdit true (LIN-1886)', () => {
     const p = new JiraProvider({ site: SITE })
     assert.equal(p.ui.write, true, 'getCreateTaskUrl is overridden')
-    assert.equal(p.ui.inlineCreate, false, 'createIssue is not implemented this phase')
-    assert.equal(p.ui.inlineEdit, false, 'updateIssue is not implemented this phase')
+    assert.equal(p.ui.inlineCreate, false, 'createIssue is not implemented (deferred behind LIN-1557)')
+    assert.equal(p.ui.inlineEdit, true, 'updateIssue is implemented (LIN-1886)')
     assert.equal(p.ui.comments, true)
     assert.equal(p.ui.estimates, false)
     assert.equal(p.ui.subtasks, true)
+    assert.equal(p.ui.priority, false, 'priority is unmapped (D3) — the edit form must hide the control')
   })
 
   test('ui.displayName is "Jira", not the lowercase machine name (LIN-1885 research trap)', () => {
@@ -351,9 +473,360 @@ describe('JiraProvider reads (fake client)', () => {
     assert.equal(comments[0].body, 'First comment')
   })
 
-  test('unimplemented writes still throw NotImplementedError (capability-gated decline)', () => {
+  test('createIssue stays unimplemented (deferred behind LIN-1557) — still throws NotImplementedError', () => {
     assert.throws(() => provider.createIssue({}, {}), NotImplementedError)
-    assert.throws(() => provider.updateIssue({}, 'ENG-1', {}), NotImplementedError)
+  })
+
+  test('fetchProjectsList returns the same canonical projects fetchProjects emits (LIN-1886 Step 2)', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const projects = await provider.fetchProjectsList(scope)
+    assert.equal(projects.length, 1)
+    assert.equal(projects[0].id, '10001')
+    assert.equal(projects[0].url, `${SITE}/browse/ENG`)
+  })
+})
+
+// =============================================================================
+// jiraStateIdToCanonicalType — the reverse of jiraStatusCategoryToCanonical
+// (LIN-1886 Step 2, mirrors githubStateIdToCanonicalType)
+// =============================================================================
+
+describe('jiraStateIdToCanonicalType', () => {
+  test('maps the three synthetic states() ids to their canonical types', () => {
+    assert.equal(jiraStateIdToCanonicalType('todo'), 'unstarted')
+    assert.equal(jiraStateIdToCanonicalType('in-progress'), 'started')
+    assert.equal(jiraStateIdToCanonicalType('done'), 'completed')
+  })
+
+  test('an unknown id (e.g. a UUID that slipped the routes\' UUID fast-path) throws a 422-shaped RefResolutionError', () => {
+    assert.throws(() => jiraStateIdToCanonicalType('11111111-1111-1111-1111-111111111111'), err => {
+      assert.ok(err instanceof RefResolutionError)
+      assert.equal(err.status, 422)
+      return true
+    })
+  })
+
+  test('there is no id mapping to canceled/duplicate — those categories are unreachable from Jira\'s statusCategory vocabulary', () => {
+    for (const id of ['todo', 'in-progress', 'done']) {
+      const type = jiraStateIdToCanonicalType(id)
+      assert.notEqual(type, 'canceled')
+      assert.notEqual(type, 'duplicate')
+    }
+  })
+})
+
+// =============================================================================
+// Step 2 — states()/labels()/route-internal reads (LIN-1886)
+// =============================================================================
+
+describe('JiraProvider Step 2 reads (fake client)', () => {
+  let provider
+
+  beforeEach(() => {
+    ({ provider } = seededProvider())
+  })
+
+  test('states() returns the fixed synthetic todo/in-progress/done vocabulary, never real per-workflow status names', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const states = await provider.states(scope, null)
+    assert.deepEqual(states.map(s => s.id), ['todo', 'in-progress', 'done'])
+    assert.deepEqual(states.map(s => s.type), ['unstarted', 'started', 'completed'])
+    for (const s of states) {
+      assert.equal(typeof s.name, 'string')
+      assert.equal(typeof s.position, 'number')
+    }
+  })
+
+  test('labels() returns the site-wide label vocabulary as {id, name} pairs (id = name, mirrors GitHub)', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const labels = await provider.labels(scope)
+    assert.ok(labels.some(l => l.id === 'backend' && l.name === 'backend'))
+  })
+
+  test('issueWriteGuard returns a non-null, stable team.id (required by resolveStateInput) — null for a missing issue', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const guard = await provider.issueWriteGuard(scope, 'ENG-1')
+    assert.equal(guard.trashed, false)
+    assert.ok(guard.team?.id, 'team.id must be non-null')
+    assert.equal(await provider.issueWriteGuard(scope, 'ENG-999'), null)
+  })
+
+  test('issueDescription returns the RAW ADF (not markdown) — null for a missing issue', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const desc = await provider.issueDescription(scope, 'ENG-1')
+    assert.equal(desc.trashed, false)
+    assert.equal(typeof desc.description, 'object', 'must be the raw ADF object, not a markdown string')
+    assert.equal(desc.description.type, 'doc')
+    assert.equal(await provider.issueDescription(scope, 'ENG-999'), null)
+  })
+
+  test('issueLabels returns {id, trashed, labels:{nodes}} with id = name — null for a missing issue', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const labels = await provider.issueLabels(scope, 'ENG-1')
+    assert.equal(labels.trashed, false)
+    assert.deepEqual(labels.labels.nodes, [{ id: 'backend', name: 'backend' }])
+    assert.equal(await provider.issueLabels(scope, 'ENG-999'), null)
+  })
+
+  test('updateIssueLabels diffs current vs desired and emits ONE atomic write, re-reading the canonical issue', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const result = await provider.updateIssueLabels(scope, 'ENG-1', ['backend', 'urgent'])
+    assert.equal(result.success, true)
+    assert.deepEqual(result.issue.labels.nodes.map(n => n.name).sort(), ['backend', 'urgent'])
+
+    const removed = await provider.updateIssueLabels(scope, 'ENG-1', ['urgent'])
+    assert.equal(removed.success, true)
+    assert.deepEqual(removed.issue.labels.nodes.map(n => n.name), ['urgent'])
+  })
+
+  test('addLabel/removeLabel are thin wrappers over updateIssueLabels (capability-gate completeness)', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    assert.equal(await provider.addLabel(scope, 'ENG-1', 'urgent'), true)
+    const afterAdd = await provider.issueLabels(scope, 'ENG-1')
+    assert.deepEqual(afterAdd.labels.nodes.map(n => n.name).sort(), ['backend', 'urgent'])
+
+    assert.equal(await provider.removeLabel(scope, 'ENG-1', 'backend'), true)
+    const afterRemove = await provider.issueLabels(scope, 'ENG-1')
+    assert.deepEqual(afterRemove.labels.nodes.map(n => n.name), ['urgent'])
+  })
+})
+
+// =============================================================================
+// Step 3 — updateIssue() + status-transition write path (LIN-1886)
+// =============================================================================
+
+/** A seed purpose-built for updateIssue's write-path branches (transitions, unrenderable content). */
+function writableSeededProvider() {
+  const client = createFakeJiraClient({
+    projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+    issues: [
+      {
+        id: '30001', key: 'ENG-10',
+        fields: {
+          summary: 'Writable issue',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'paragraph', content: [{ type: 'text', text: 'Plain description.' }] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: ['bug'], assignee: null, parent: null,
+          _transitions: [
+            { id: '11', name: 'Start Progress', to: { name: 'In Progress', statusCategory: { key: 'indeterminate' } } },
+            { id: '21', name: 'Done', to: { name: 'Done', statusCategory: { key: 'done' } } },
+          ],
+        },
+      },
+      {
+        id: '30002', key: 'ENG-11', // unrenderable description: an unmodeled NODE (table)
+        fields: {
+          summary: 'Issue with a table in its description',
+          description: { type: 'doc', version: 1, content: [{ type: 'table', content: [] }] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
+      {
+        id: '30003', key: 'ENG-12', // unrenderable description: an unmodeled MARK only
+        fields: {
+          summary: 'Issue with an underline mark in its description',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'underline' }] }] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
+      {
+        id: '30004', key: 'ENG-13', // done, with NO available transitions at all
+        fields: {
+          summary: 'Done issue with nothing else available',
+          description: null,
+          status: { name: 'Done', statusCategory: { key: 'done' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
+      {
+        id: '30005', key: 'ENG-14', // its only forward transition requires a screen
+        fields: {
+          summary: 'Issue whose only transition to Done requires a screen',
+          description: null,
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+          _transitions: [
+            { id: '31', name: 'Resolve', to: { name: 'Done', statusCategory: { key: 'done' } }, fields: { resolution: { required: true } } },
+          ],
+        },
+      },
+    ],
+  })
+  const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+  return { provider, client }
+}
+
+const SCOPE = { email: 'a@b.com', apiToken: 't', site: SITE }
+
+describe('JiraProvider.updateIssue (LIN-1886 Step 3)', () => {
+  let provider, client
+
+  beforeEach(() => {
+    ({ provider, client } = writableSeededProvider())
+  })
+
+  test('title update: ALWAYS re-reads and returns the canonical issue, never trusting the 204 write response', async () => {
+    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { title: 'Renamed' })
+    assert.ok(issue, 'a truthy canonical issue, never a {success:false}/502-shaped miss')
+    assert.equal(issue.title, 'Renamed')
+    assert.equal(issue.source, SOURCE_JIRA)
+  })
+
+  test('description update: renderable current content is overwritten with the markdownToAdf conversion', async () => {
+    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { description: 'New **bold** body' })
+    assert.equal(issue.description, 'New **bold** body')
+  })
+
+  test('D1: description overwrite is refused (422) when the CURRENT ADF contains an unmodeled NODE (table)', async () => {
+    await assert.rejects(
+      () => provider.updateIssue(SCOPE, 'ENG-11', { description: 'replacement text' }),
+      err => {
+        assert.ok(err instanceof RefResolutionError)
+        assert.equal(err.status, 422)
+        return true
+      }
+    )
+  })
+
+  test('D1: description overwrite is refused (422) when the CURRENT ADF contains an unmodeled MARK only (no unmodeled node)', async () => {
+    await assert.rejects(
+      () => provider.updateIssue(SCOPE, 'ENG-12', { description: 'replacement text' }),
+      err => {
+        assert.ok(err instanceof RefResolutionError)
+        assert.equal(err.status, 422)
+        return true
+      }
+    )
+  })
+
+  test('D2: happy-path status transition (todo → in-progress) actually moves the issue', async () => {
+    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { stateId: 'in-progress' })
+    assert.equal(issue.state.type, 'started')
+  })
+
+  test('D2: happy-path status transition (todo → done)', async () => {
+    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { stateId: 'done' })
+    assert.equal(issue.state.type, 'completed')
+  })
+
+  test('D2: a same-category stateId is a SKIPPED no-op — no getTransitions/doTransition call at all', async () => {
+    let getTransitionsCalls = 0
+    const originalGetTransitions = client.getTransitions.bind(client)
+    client.getTransitions = async (...args) => { getTransitionsCalls += 1; return originalGetTransitions(...args) }
+
+    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { stateId: 'todo' })
+    assert.equal(issue.state.type, 'unstarted')
+    assert.equal(getTransitionsCalls, 0, 'the current type already matched — no transitions call should have been made')
+  })
+
+  test('a title-only patch leaves status untouched (no stateId in the patch at all)', async () => {
+    const before = await provider.fetchIssueFields(SCOPE, 'ENG-10')
+    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { title: 'Only the title changes' })
+    assert.equal(issue.state.type, before.state.type)
+  })
+
+  test('D2: no available transition to the target category → 422, never a silent no-op', async () => {
+    // ENG-13 is `done` with an EMPTY _transitions list; targeting `todo` finds nothing.
+    await assert.rejects(
+      () => provider.updateIssue(SCOPE, 'ENG-13', { stateId: 'todo' }),
+      err => {
+        assert.ok(err instanceof RefResolutionError)
+        assert.equal(err.status, 422)
+        return true
+      }
+    )
+  })
+
+  test('D2: a screen-required transition refuses (422) rather than attempting a screen-driven update', async () => {
+    await assert.rejects(
+      () => provider.updateIssue(SCOPE, 'ENG-14', { stateId: 'done' }),
+      err => {
+        assert.ok(err instanceof RefResolutionError)
+        assert.equal(err.status, 422)
+        return true
+      }
+    )
+  })
+
+  test('D2: a symbolic stateId of "canceled"/"duplicate" is refused (422) — Jira has no such statusCategory, never silently folds to done', async () => {
+    await assert.rejects(() => provider.updateIssue(SCOPE, 'ENG-10', { stateId: 'canceled' }), RefResolutionError)
+    await assert.rejects(() => provider.updateIssue(SCOPE, 'ENG-10', { stateId: 'duplicate' }), RefResolutionError)
+  })
+
+  test('D3: patch.priority is silently excluded — never mapped into the Jira PUT body, never causes a rejection', async () => {
+    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { title: 'Still renamed', priority: 2 })
+    assert.equal(issue.title, 'Still renamed')
+    // The fake client's updateIssue only ever applies `fields`/`update.labels`;
+    // nothing about priority is readable back because nothing was ever sent.
+  })
+
+  test('D4: a truthy projectId is refused (422) — Jira cannot move an issue between projects through this integration', async () => {
+    await assert.rejects(
+      () => provider.updateIssue(SCOPE, 'ENG-10', { projectId: '99999' }),
+      err => {
+        assert.ok(err instanceof RefResolutionError)
+        assert.equal(err.status, 422)
+        return true
+      }
+    )
+  })
+
+  test('D4: parentId === null is refused (422) — Jira cannot promote an issue to top-level through this integration', async () => {
+    await assert.rejects(
+      () => provider.updateIssue(SCOPE, 'ENG-10', { parentId: null }),
+      err => {
+        assert.ok(err instanceof RefResolutionError)
+        assert.equal(err.status, 422)
+        return true
+      }
+    )
+  })
+
+  test('a missing issue returns null (never throws, mirrors GitHub)', async () => {
+    assert.equal(await provider.updateIssue(SCOPE, 'ENG-999', { title: 'x' }), null)
+  })
+})
+
+// =============================================================================
+// Step 5 — createComment (LIN-1886)
+// =============================================================================
+
+describe('JiraProvider.createComment (LIN-1886 Step 5)', () => {
+  test('converts markdown to ADF on the way in, and returns the canonical comment shape matching fetchIssueComments', async () => {
+    const { provider } = seededProvider()
+    const comment = await provider.createComment(SCOPE, 'ENG-1', 'A **bold** reply')
+    assert.equal(typeof comment.id, 'string')
+    assert.equal(comment.body, 'A **bold** reply')
+    assert.equal(comment.user, 'Tester')
+    assert.ok(comment.createdAt)
+
+    // Round-trips through a real read too.
+    const comments = await provider.fetchIssueComments(SCOPE, 'ENG-1')
+    assert.ok(comments.some(c => c.body === 'A **bold** reply'))
+  })
+
+  test('a missing issue throws a clean, status-carrying error (404, propagated from the client)', async () => {
+    const { provider } = seededProvider()
+    await assert.rejects(() => provider.createComment(SCOPE, 'ENG-999', 'hello'), err => {
+      assert.equal(err.status, 404)
+      return true
+    })
   })
 })
 
