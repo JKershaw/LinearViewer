@@ -708,15 +708,29 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * `req.proxyCreatedBy`, including `null` for a legacy proxy token with no
    * recorded creator, which fails closed rather than falling back owner-blind).
    *
-   * @returns {Promise<{provider: Object, token: (string|null), reason: string}>}
+   * LIN-1891: `token` is the provider's structured call scope when the
+   * workspace's active binding needs one (a bare string for linear/local,
+   * unchanged; `{token, repo}` / `{token, scope}` / `{email, apiToken, site}`
+   * for github/github-projects/jira) — substituted in only when a scalar
+   * token was already present, so a missing credential still resolves `token:
+   * null` and 503s exactly as before.
+   *
+   * @returns {Promise<{provider: Object, token: (string|Object|null), reason: string}>}
    */
   async function resolveProviderAccess(urlKey, ownerAccountId) {
     if (process.env.NODE_ENV === 'test' && urlKey === TEST_LOCAL_URL_KEY) {
       return { provider: localProvider, token: urlKey, reason: 'ok' };
     }
-    const { token, reason, provider: providerName } = await resolveWorkspaceAccess(urlKey, ownerAccountId);
+    const { token, scope, reason, provider: providerName } = await resolveWorkspaceAccess(urlKey, ownerAccountId);
     const activeProvider = injectedProvider || getProviderForWorkspace({ provider: providerName });
-    return { provider: activeProvider, token, reason };
+    // LIN-1891: substitute the structured call scope for the bare token ONLY
+    // where a token was already present — the ternary is load-bearing. It
+    // preserves every `if (!token)` guard and the 503 envelope unchanged: a
+    // missing credential still 503s (token stays falsy) regardless of what
+    // `scope` contains, and `scope ?? token` falls back to the bare token for
+    // linear/local (whose scope IS the token, byte-identical) or for any
+    // provider-lane site that hasn't been given a structured scope yet.
+    return { provider: activeProvider, token: token ? (scope ?? token) : token, reason };
   }
 
   /**

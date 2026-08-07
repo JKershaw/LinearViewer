@@ -1571,7 +1571,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
   // check (business logic, not cache mechanics) stays here.
   const cached = workspaceTokenCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
-    return { token: cached.token, reason: 'ok', provider: cached.provider };
+    return { token: cached.token, reason: 'ok', provider: cached.provider, scope: cached.scope };
   }
 
   // Look up the access token from the sessions collection, scoped to
@@ -1581,8 +1581,8 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     const selected = selectOwnerWorkspaceToken(sessions, urlKey, ownerAccountId);
 
     if (selected.token) {
-      workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider });
-      return { token: selected.token, reason: 'ok', provider: selected.provider };
+      workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider, scope: selected.scope });
+      return { token: selected.token, reason: 'ok', provider: selected.provider, scope: selected.scope };
     }
 
     // LIN-1373 refresh-on-resolve, widened LIN-1524: the selector above only
@@ -1615,8 +1615,8 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
           store: ownerCredentialStore
         });
         if (refreshed) {
-          workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider });
-          return { token: refreshed.token, reason: 'ok', provider: refreshed.provider };
+          workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider, scope: refreshed.scope });
+          return { token: refreshed.token, reason: 'ok', provider: refreshed.provider, scope: refreshed.scope };
         }
       } catch (err) {
         console.error(`Token refresh-on-resolve failed for workspace ${urlKey}:`, err);
