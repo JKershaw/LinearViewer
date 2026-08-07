@@ -10,7 +10,7 @@
  */
 import { Router, json } from 'express';
 import { badRequest, jsonError, notFound, unauthorized } from '../lib/errors.js';
-import { getProviderForWorkspace } from '../lib/providers/registry.js';
+import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { buildRoadmapNarrativeMessages } from '../lib/prompts/roadmap-narrative-template.js';
@@ -52,7 +52,7 @@ import { hashContext } from '../lib/recap-cache.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, getBindingsForWorkspace, getBindingCallScope } from '../lib/workspace.js';
 // LIN-1552 Session A: the session-auth issue write routes reuse the SAME
 // symbolic-ref primitives the proxy write path uses, the shared trashed-signal
 // detector, and the shared issue-write validator — no rules re-inlined here.
@@ -1381,7 +1381,24 @@ ${goal}`
     }
 
     try {
-      const provider = getProviderForWorkspace(workspace)
+      // LIN-1903: the dashboard tree merges issues across ALL of a workspace's
+      // bindings (LIN-544), but a bare id-only drill-down defaulted to the
+      // WORKSPACE's active provider/scope — misrouting a foreign-source row's id
+      // to the wrong provider/credential. The client-supplied `source` (the
+      // issue's own provenance, LIN-561) lets us resolve that issue's own
+      // binding instead. It is bounded to this workspace's OWN bindings via the
+      // `.find()` below — never passed to `getProvider()` directly — so it can
+      // only select among credentials the caller already has access to.
+      const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
+      const matchedBinding = requestedSource
+        ? getBindingsForWorkspace(workspace).find(b => b.provider === requestedSource)
+        : null
+      const provider = matchedBinding ? getProvider(matchedBinding.provider) : getProviderForWorkspace(workspace)
+      // Security-critical: the resolved branch must use getBindingCallScope on
+      // THAT binding, never getWorkspaceCallScope(workspace)'s active-binding
+      // scope — reusing it would hand the active binding's credential to a
+      // different provider's client.
+      const callScope = matchedBinding ? getBindingCallScope(matchedBinding) : getWorkspaceCallScope(workspace)
 
       // Test mode (test-token + testMockData): the homepage renders from the mock
       // fixtures, not the provider API, so the lazy detail must too — fetching via
@@ -1394,7 +1411,7 @@ ${goal}`
           return notFound.json(res, 'Issue not found')
         }
       } else {
-        issue = await provider.fetchIssueFields(getWorkspaceCallScope(workspace), issueId)
+        issue = await provider.fetchIssueFields(callScope, issueId)
       }
 
       // Custom prompts (non-blocking, fallback to empty) — matches the homepage.

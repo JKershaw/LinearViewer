@@ -229,11 +229,19 @@ async function loadDetails(details) {
   // sections at once (In Progress + project tree); without this the second
   // appearance's "Dispatch ▾" resolves to the first's panel (LIN-732).
   const section = details.dataset.section || ''
-  const sectionQuery = section ? `?section=${encodeURIComponent(section)}` : ''
+  // Forward the issue's own provenance too (LIN-1903), so the server can
+  // resolve THIS issue's own binding in a merged multi-binding workspace
+  // instead of always resolving the workspace's active provider.
+  const source = details.dataset.source || ''
+  const params = new URLSearchParams()
+  if (section) params.set('section', section)
+  if (source) params.set('source', source)
+  const query = params.toString()
+  const detailQuery = query ? `?${query}` : ''
 
   details.dataset.loaded = 'loading'
   try {
-    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/detail/${encodeURIComponent(issueId)}${sectionQuery}`)
+    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/detail/${encodeURIComponent(issueId)}${detailQuery}`)
     details.innerHTML = (data && data.html) || ''
     details.dataset.loaded = 'true'
     // The fetched fragment's dispatch panels (prompt/recommend/autopilot) need
