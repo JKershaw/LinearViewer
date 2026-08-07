@@ -162,6 +162,39 @@ describe('selectOwnerWorkspaceToken (LIN-1366, Block A — pure selector)', () =
     assert.equal(expiredOnly.token, null);
     assert.equal(expiredOnly.provider, 'linear');
   });
+
+  test('A8 (LIN-1891): `scope` carries the winning row\'s structured provider call scope, additive alongside `token`', () => {
+    // Jira: a binding-carrying row (as linkProvider persists one) yields the
+    // structured {email, apiToken, site} Basic-auth credential the headless
+    // lane previously had no way to surface — resolveWorkspaceAccess handed
+    // Jira only the bare `token`, which cannot authenticate.
+    const jiraSessions = [{
+      session: {
+        accountId: 'account-A',
+        workspaces: [{
+          urlKey: 'acme-jira',
+          provider: 'jira',
+          accessToken: 'jira-token',
+          tokenExpiresAt: NOW + FAR_FUTURE_MS,
+          bindings: [{ provider: 'jira', scope: 'acme.atlassian.net', credentials: { email: 'ada@acme.com', token: 'jira-token' } }],
+        }],
+      },
+    }];
+    const jiraResult = selectOwnerWorkspaceToken(jiraSessions, 'acme-jira', 'account-A');
+    assert.equal(jiraResult.token, 'jira-token');
+    // deepStrictEqual (not deepEqual) so an accidental extra key — e.g. a
+    // resurrected `refreshToken` — fails this assertion rather than passing.
+    assert.deepStrictEqual(jiraResult.scope, { email: 'ada@acme.com', apiToken: 'jira-token', site: 'acme.atlassian.net' });
+
+    // Byte-identity: linear (and local) carry no structured scope, so `scope`
+    // is the bare token itself, not a second copy.
+    const linearResult = selectOwnerWorkspaceToken(
+      [sessionRow('account-A', 'acme', 'tokA', NOW + FAR_FUTURE_MS)],
+      'acme',
+      'account-A'
+    );
+    assert.equal(linearResult.scope, linearResult.token);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -500,6 +500,26 @@ describe('refreshOwnerWorkspaceToken (LIN-1499, Block D — GitHub-family routin
     assert.equal(persisted[0].sid, 'sid-1');
   });
 
+  test('D1b (LIN-1891): the refreshed GitHub-family return carries `scope` — the structured {token, repo} call scope, additive alongside `token`/`provider`', async () => {
+    // This is the half-fix detector: it fails if only edit 1 (the selector)
+    // lands and edit 2 (this refresh arm) does not — a GitHub-family
+    // credential that expires and refreshes off-session would otherwise drop
+    // back to a bare token with no repo scope for the headless lane.
+    const sessions = [
+      githubSessionRow('sid-1', 'account-A', 'acme-gh', { accessToken: 'stale-gh', expiresAt: NOW + PAST_MS, installationId: '987' }),
+    ];
+    const provider = fakeMintProvider({ token: 'ghs_fresh', tokenExpiresAt: NOW + FAR_FUTURE_MS, installationId: '987' }, []);
+    const resolveProvider = () => provider;
+    const refreshAccessToken = async () => ({});
+    const persistSession = async () => {};
+
+    const result = await refreshOwnerWorkspaceToken({
+      sessions, urlKey: 'acme-gh', ownerAccountId: 'account-A', refreshAccessToken, persistSession, resolveProvider
+    });
+
+    assert.deepStrictEqual(result.scope, { token: 'ghs_fresh', repo: 'octocat/repo' });
+  });
+
   test('D2 [D2 FIXED at the routing layer]: a github-projects row is refreshed via the provider seam and NEVER handed to refreshAccessToken', async () => {
     const sessions = [
       githubSessionRow('sid-1', 'account-A', 'acme-ghp', { accessToken: 'stale-ghp', expiresAt: NOW + PAST_MS, installationId: '555', provider: 'github-projects' }),
