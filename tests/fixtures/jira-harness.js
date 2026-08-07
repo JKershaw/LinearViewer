@@ -95,6 +95,38 @@ export const defaultJiraSeed = {
         labels: [], assignee: null, parent: { id: '20002', key: 'ENG-2' },
       },
     },
+    // LIN-1886 (Phase 2, write path): two issues whose description ADF carries
+    // content the write-side D1 policy (adfHasUnrenderableContent) must refuse
+    // to overwrite — one via an unmodeled NODE, one via an unmodeled MARK only
+    // (no unmodeled node anywhere), so both refusal branches have a live seed
+    // to drive an E2E "editing this issue's description is refused" spec
+    // against, not just the unit-level fake-client coverage.
+    {
+      id: '20005', key: 'ENG-5',
+      fields: {
+        summary: 'Issue with a table in its description',
+        description: { type: 'doc', version: 1, content: [
+          { type: 'table', content: [] },
+        ] },
+        status: { name: 'To Do', statusCategory: { key: 'new' } },
+        project: { id: '10001', key: 'ENG', name: 'Engineering' },
+        created: '2026-01-05T00:00:00.000Z', duedate: null, resolutiondate: null,
+        labels: [], assignee: null, parent: null,
+      },
+    },
+    {
+      id: '20006', key: 'ENG-6',
+      fields: {
+        summary: 'Issue with an underline mark in its description',
+        description: { type: 'doc', version: 1, content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'underlined', marks: [{ type: 'underline' }] }] },
+        ] },
+        status: { name: 'To Do', statusCategory: { key: 'new' } },
+        project: { id: '10001', key: 'ENG', name: 'Engineering' },
+        created: '2026-01-06T00:00:00.000Z', duedate: null, resolutiondate: null,
+        labels: [], assignee: null, parent: null,
+      },
+    },
   ],
 };
 
