@@ -2341,7 +2341,7 @@ One convention across every endpoint, so you can branch on the same fields every
       return badRequest.json(res, 'Invalid attachment handle');
     }
 
-    let fetchUrl, urlObj, nameHint, isGithubAssetHost, token;
+    let fetchUrl, urlObj, nameHint, isGithubAssetHost, token, providerName;
 
     if (decoded.type === 'att') {
       // `att:` needs an authenticated provider call just to DISCOVER the URL,
@@ -2393,6 +2393,7 @@ One convention across every endpoint, so you can branch on the same fields every
       urlObj = guard.urlObj;
       isGithubAssetHost = GITHUB_UPLOAD_HOSTS.includes(urlObj.hostname);
       token = resolved.token;
+      providerName = resolved.provider?.name;
       // The relay's file-type gate needs a filename hint; `att:` handles carry
       // none (unlike `md:`'s `#name=` fragment), so supply the attachment's own
       // title — otherwise every non-image formal attachment would 400 as
@@ -2437,6 +2438,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return workspaceUnavailable(req, res, endpoint, resolved.reason);
       }
       token = resolved.token;
+      providerName = resolved.provider?.name;
 
       // Non-image file relay (LIN-750): discovery encodes the filename in a
       // `#name=<filename>` fragment so we can type extension-less upload bytes.
@@ -2454,10 +2456,27 @@ One convention across every endpoint, so you can branch on the same fields every
       // Proxy-aware egress: route through the egress proxy when one is
       // configured, exactly like every other Linear call.
       const customFetch = (await createProxyFetch()) || fetch;
-      // Auth header by host: Linear asset hosts require the workspace bearer token
-      // (unchanged); GitHub user-content is public, so send no Authorization and
-      // never leak the workspace token cross-provider (LIN-771).
-      const fetchHeaders = isGithubAssetHost ? {} : { Authorization: `Bearer ${token}` };
+      // Auth header by host (LIN-771) AND by provider (LIN-1891) — two
+      // INDEPENDENT booleans, checked alongside each other, never collapsed
+      // into one condition:
+      //   - GitHub asset hosts are public user-content; never send Authorization
+      //     regardless of provider, so the workspace token is never leaked
+      //     cross-provider (unchanged).
+      //   - A Linear-hosted asset gets the bearer token ONLY when the resolved
+      //     workspace's own provider is `linear` — deliberately `linear`-only,
+      //     never `linear` OR `local`. Every other provider (local, jira,
+      //     github, github-projects) sends NO Authorization header when
+      //     relaying a Linear-hosted asset: today those workspaces send their
+      //     OWN credential to Linear's CDN on every such relay, and stopping
+      //     exactly that cross-provider credential egress is why this check
+      //     exists. It also sidesteps a `token ? (scope ?? token) : token`
+      //     structured scope object (edit 4) ever reaching this template —
+      //     `resolveProviderAccess` returns jira/github/github-projects'
+      //     {email,apiToken,site}/{token,repo} shape here, which would
+      //     otherwise serialize as `Bearer [object Object]`.
+      const fetchHeaders = (!isGithubAssetHost && providerName === 'linear')
+        ? { Authorization: `Bearer ${token}` }
+        : {};
       const response = await customFetch(fetchUrl, {
         method: 'GET',
         headers: fetchHeaders,
