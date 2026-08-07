@@ -33,7 +33,7 @@ const SECONDARY_ISSUE = { id: 'secondary-1', identifier: 'SEC-1', title: 'Second
 let providerSeq = 0;
 
 /** Register a fake provider under a unique name, so tests never contend over one shared registry slot. */
-function fakeProvider(issue, { seenScopes } = {}) {
+function fakeProvider(issue, { seenScopes, seenContextScopes } = {}) {
   const name = `fake-detail-${++providerSeq}`;
   registerProvider({
     name,
@@ -44,18 +44,27 @@ function fakeProvider(issue, { seenScopes } = {}) {
       if (issueId !== issue.id) throw new Error(`Issue not found: ${issueId}`);
       return issue;
     },
+    // LIN-1904: /api/autopilot-prompt resolves through fetchIssueContext, not
+    // fetchIssueFields — a separate method on the same fake provider so the
+    // route-level test below can assert the SAME binding-scoped-resolution
+    // contract on this consumer too.
+    fetchIssueContext: async (scope, issueId) => {
+      if (seenContextScopes) seenContextScopes.push(scope);
+      if (issueId !== issue.id) throw new Error(`Issue not found: ${issueId}`);
+      return { issue, project: null };
+    },
   });
   return name;
 }
 
 /** Mount the workspace-api router with an injected workspace carrying two bindings. */
-function buildApp(workspace) {
+function buildApp(workspace, { features = {} } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createWorkspaceApiRoutes({
     workspaceFromUrl: (req, _res, next) => {
       req.workspace = workspace;
-      req.session = { features: {} };
+      req.session = { features };
       next();
     },
     freeTierStore: {},
@@ -210,5 +219,56 @@ describe('GET /workspace/:urlKey/api/detail/:issueId — binding-scoped provider
     assert.equal(withSource.status, 200);
     assert.deepEqual(withoutSource.body, withSource.body);
     assert.deepEqual(scopes, ['sole-token', 'sole-token']);
+  });
+});
+
+// LIN-1904 close-out ledger row 3: `/api/autopilot-prompt` adopted
+// `resolveIssueBinding` alongside `/api/detail`, but shipped with no
+// assertion anywhere that it actually threads `source` through to a
+// binding-scoped `fetchIssueContext` call rather than the active workspace's.
+describe('GET /workspace/:urlKey/api/autopilot-prompt/:issueId — binding-scoped provider resolution', () => {
+  test('`source` matching the NON-active binding resolves that binding\'s provider + scope, not the active one', async () => {
+    const activeContextScopes = [];
+    const secondaryContextScopes = [];
+    const activeName = fakeProvider(ACTIVE_ISSUE, { seenContextScopes: activeContextScopes });
+    const secondaryName = fakeProvider(SECONDARY_ISSUE, { seenContextScopes: secondaryContextScopes });
+    const workspace = {
+      urlKey: 'test-workspace',
+      provider: activeName,
+      accessToken: 'active-token',
+      bindings: [
+        { provider: activeName, scope: 'active-scope', credentials: { token: 'active-token' } },
+        { provider: secondaryName, scope: 'secondary-scope', credentials: { token: 'secondary-token' } },
+      ],
+    };
+    const app = buildApp(workspace, { features: { proxy: true } });
+    const { status, body } = await withServer(app, get => get(`/workspace/test-workspace/api/autopilot-prompt/${SECONDARY_ISSUE.id}?source=${secondaryName}`));
+    assert.equal(status, 200);
+    assert.ok(body.prompt.includes(SECONDARY_ISSUE.identifier));
+    // The security-critical assertion: the ACTIVE provider was never called at
+    // all, and the secondary provider received ITS OWN binding's scope — never
+    // the active binding's already-computed getWorkspaceCallScope credential.
+    assert.deepEqual(activeContextScopes, []);
+    assert.deepEqual(secondaryContextScopes, ['secondary-token']);
+  });
+
+  test('no `source` param → unchanged workspace-level resolution (active provider, active scope)', async () => {
+    const activeContextScopes = [];
+    const activeName = fakeProvider(ACTIVE_ISSUE, { seenContextScopes: activeContextScopes });
+    const secondaryName = fakeProvider(SECONDARY_ISSUE);
+    const workspace = {
+      urlKey: 'test-workspace',
+      provider: activeName,
+      accessToken: 'active-token',
+      bindings: [
+        { provider: activeName, scope: 'active-scope', credentials: { token: 'active-token' } },
+        { provider: secondaryName, scope: 'secondary-scope', credentials: { token: 'secondary-token' } },
+      ],
+    };
+    const app = buildApp(workspace, { features: { proxy: true } });
+    const { status, body } = await withServer(app, get => get(`/workspace/test-workspace/api/autopilot-prompt/${ACTIVE_ISSUE.id}`));
+    assert.equal(status, 200);
+    assert.ok(body.prompt.includes(ACTIVE_ISSUE.identifier));
+    assert.deepEqual(activeContextScopes, ['active-token']);
   });
 });
