@@ -377,6 +377,58 @@ const WRITER_UNSAFE_ADF = {
   'text carrying link + strong': adfDoc(adfPara(adfText('x', [{ type: 'link', attrs: { href: 'https://e.com' } }, { type: 'strong' }]))),
 }
 
+/**
+ * Docs the gate PERMITS that do NOT deep-equal round-trip — the two enumerated
+ * exceptions in `adfHasUnrenderableContent`'s docstring, made executable
+ * (LIN-1886, John's Option C ruling `d38d3755`).
+ *
+ * The docstring used to assert the invariant unqualified and it was not true.
+ * Option C reworded it to what actually holds; these fixtures are what stop the
+ * reworded version drifting in EITHER direction. Each entry asserts three
+ * things at once:
+ *
+ *   1. the gate permits it (it is an exception, not a refusal);
+ *   2. the rendered Markdown is byte-identical across the round trip — the
+ *      whole reason each exception is tolerable is that nothing a reader sees
+ *      changes;
+ *   3. it does NOT deep-equal — which is the exception itself, and the part a
+ *      future change is most likely to close by accident.
+ *
+ * Assertion 3 failing is GOOD NEWS, not a regression: it means someone closed
+ * the gap. The message says so and says what to do about it. A test that
+ * silently kept passing after the gap closed would leave the docstring
+ * under-claiming, which is the same class of defect as over-claiming.
+ */
+const WRITER_PERMITTED_LOSSY_ADF = {
+  'orderedList identity attrs {order: 1} (ruling d38d3755)': {
+    doc: adfDoc({
+      type: 'orderedList',
+      attrs: { order: 1 },
+      content: [adfItem(adfPara(adfText('first'))), adfItem(adfPara(adfText('second')))],
+    }),
+    lost: 'the `attrs` key itself — `markdownToAdf` emits none for an orderedList, and `renderAdfNode` renumbers from 1 whatever is stored, so the list reads identically',
+    closedBy: 'the writer modelling `order`, which is explicitly out of scope — see the note on WRITER_EMITTED_ATTRS',
+  },
+  'orderedList bare empty attrs {} (ruling d38d3755)': {
+    doc: adfDoc({
+      type: 'orderedList',
+      attrs: {},
+      content: [adfItem(adfPara(adfText('first'))), adfItem(adfPara(adfText('second')))],
+    }),
+    lost: 'the empty `attrs` key itself; there is nothing in it to preserve, but its PRESENCE is not reproducible',
+    closedBy: 'the writer emitting an empty `attrs` on every orderedList, which would break the far commoner no-attrs list instead',
+  },
+  // Pre-existing and orthogonal: unchanged by LIN-1886, deliberately not fixed
+  // here, tracked as its own ticket per the ruling's scope rule. Pinned so the
+  // docstring's claim about it is executable rather than prose — and so whoever
+  // fixes LIN-1939 is told, by a failing test, to update the docstring with it.
+  'empty unmarked text run between marked runs (LIN-1939)': {
+    doc: adfDoc(adfPara(adfText(''), adfText('x', [{ type: 'em' }]))),
+    lost: 'the empty run — it slips the empty-run rule (which needs a mark) and the adjacent-unmarked-pair rule (which needs both neighbours unmarked). Nothing visible: the run is empty',
+    closedBy: 'LIN-1939 — teaching one of those two rules about an empty unmarked run whose neighbours are marked',
+  },
+}
+
 describe('ADF → markdown → ADF property (LIN-1886 review Blocker 3)', () => {
   for (const [name, doc] of Object.entries(WRITER_SAFE_ADF)) {
     test(`permitted and survives the round trip: ${name}`, () => {
@@ -408,6 +460,64 @@ describe('ADF → markdown → ADF property (LIN-1886 review Blocker 3)', () => 
     assert.equal(adfToMarkdown(WRITER_UNSAFE_ADF.emoji), '🙂')
     assert.equal(adfToMarkdown(WRITER_UNSAFE_ADF.blockCard), 'https://example.com/y')
   })
+})
+
+describe('LIN-1886 ruling d38d3755 — the invariant\'s two enumerated exceptions', () => {
+  for (const [name, { doc, lost, closedBy }] of Object.entries(WRITER_PERMITTED_LOSSY_ADF)) {
+    test(`permitted, renders identically, but does NOT deep-equal: ${name}`, () => {
+      assert.equal(
+        adfHasUnrenderableContent(doc), false,
+        'the gate must PERMIT this — it is a documented exception to the invariant, not a refusal',
+      )
+
+      const back = markdownToAdf(adfToMarkdown(doc))
+
+      // What makes the exception tolerable: a write changes no rendered character.
+      assert.equal(
+        adfToMarkdown(back), adfToMarkdown(doc),
+        `a write must not change what a reader sees here. Only structure is lost: ${lost}`,
+      )
+
+      // The exception itself. If this starts failing, the gap has been CLOSED.
+      assert.notDeepEqual(
+        back, doc,
+        `This now round-trips exactly, so the exception is closed (${closedBy}). `
+        + 'Move it to WRITER_SAFE_ADF and delete the matching clause from '
+        + "adfHasUnrenderableContent's docstring — an invariant that under-claims is "
+        + 'as wrong as one that over-claims.',
+      )
+    })
+  }
+
+  // The boundary of the relaxation. `{order: 1}` is permitted because dropping
+  // it renumbers nothing; every one of these renumbers something or loses a
+  // key, so the exception must not swallow them. `{order: 0}` and `{order: 2}`
+  // are the pointed cases: the ruling's words were "relax to `order > 1`", but
+  // a non-positive order is not an identity value either and is refused too.
+  for (const [label, attrs] of Object.entries({
+    '{order: 5} — the review\'s original counterexample': { order: 5 },
+    '{order: 2}': { order: 2 },
+    '{order: 0} — renumbers a 0-based list to 1-based': { order: 0 },
+    '{order: -3}': { order: -3 },
+    '{order: "1"} — a string is not the integer identity': { order: '1' },
+    '{order: 1, start: 4} — an extra key the writer cannot re-emit': { order: 1, start: 4 },
+  })) {
+    test(`a non-identity orderedList attrs ${label} is still refused`, () => {
+      const doc = adfDoc({
+        type: 'orderedList',
+        attrs,
+        content: [adfItem(adfPara(adfText('first'))), adfItem(adfPara(adfText('second')))],
+      })
+      assert.equal(
+        adfHasUnrenderableContent(doc), true,
+        'only the exact identity `{order: 1}` (or a bare `{}`) is harmless — this one is not',
+      )
+      assert.notDeepEqual(
+        markdownToAdf(adfToMarkdown(doc)), doc,
+        'this round-trips fine, so refusing it is a needless capability cost',
+      )
+    })
+  }
 })
 
 // =============================================================================
