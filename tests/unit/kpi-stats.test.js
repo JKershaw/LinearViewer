@@ -16,7 +16,8 @@ import { MangoClient } from '@jkershaw/mangodb';
 import {
   collectKpiStats, categorizeProxyEvent, PROXY_PHASES,
   ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS,
-  OUTCOME_WINDOW_WEEKS, OUTCOME_WINDOW_DAYS
+  OUTCOME_WINDOW_WEEKS, OUTCOME_WINDOW_DAYS,
+  harnessOf, usageOf, evidenceCountOf, loadDispatchHistory
 } from '../../lib/kpi-stats.js';
 
 // Minimal in-memory mock of the collection surface kpi-stats uses:
@@ -666,6 +667,74 @@ describe('PROXY_FIELDS keeps the free-text note out of the unauthenticated read 
   });
 });
 
+// The LIN-1957 dual-shape readers for the terminal-marked-task-cost numerator
+// (Session 1 of LIN-1625) — exact siblings of feedbackLen/terminalFeedbackOf
+// above, exported (like categorizeProxyEvent) for direct coverage ahead of
+// their beat 3/4 consumer, which doesn't exist yet.
+describe('harnessOf/usageOf/evidenceCountOf (LIN-1957)', () => {
+  test('harnessOf reads the raw field on either shape, null when absent/non-string', () => {
+    assert.strictEqual(harnessOf({ harness: 'claude-code' }), 'claude-code');
+    assert.strictEqual(harnessOf({ harness: 'opencode', feedback: [] }), 'opencode');
+    assert.strictEqual(harnessOf({}), null);
+    assert.strictEqual(harnessOf({ harness: null }), null);
+  });
+
+  test('usageOf takes the LAST kind:usage entry on the find-path feedback[] shape', () => {
+    const doc = {
+      feedback: [
+        { kind: 'usage', message: '[usage] {"costUsd":1}' },
+        { kind: 'heartbeat', message: 'still going' },
+        { kind: 'usage', message: '[usage] {"costUsd":2}' }
+      ]
+    };
+    assert.deepStrictEqual(usageOf(doc), { kind: 'usage', message: '[usage] {"costUsd":2}' });
+  });
+
+  test('usageOf returns null when no feedback entry carries kind:usage', () => {
+    assert.strictEqual(usageOf({ feedback: [{ kind: 'heartbeat', message: 'still going' }] }), null);
+    assert.strictEqual(usageOf({ feedback: [] }), null);
+  });
+
+  test('usageOf reads the pre-derived usageEntry on the aggregation-path shape', () => {
+    const entry = { message: '[usage] {}', timestamp: daysAgo(1).toISOString(), kind: 'usage' };
+    assert.deepStrictEqual(usageOf({ usageEntry: entry }), entry);
+    assert.strictEqual(usageOf({ usageEntry: null }), null);
+    assert.strictEqual(usageOf({}), null);
+  });
+
+  test('evidenceCountOf counts kind:evidence entries on the find-path shape', () => {
+    const doc = {
+      feedback: [
+        { kind: 'evidence', message: 'link A' },
+        { kind: 'usage', message: '[usage] {}' },
+        { kind: 'evidence', message: 'link B' }
+      ]
+    };
+    assert.strictEqual(evidenceCountOf(doc), 2);
+    assert.strictEqual(evidenceCountOf({ feedback: [] }), 0);
+  });
+
+  test('evidenceCountOf reads the pre-derived evidenceCount on the aggregation-path shape', () => {
+    assert.strictEqual(evidenceCountOf({ evidenceCount: 3 }), 3);
+    assert.strictEqual(evidenceCountOf({}), 0);
+    assert.strictEqual(evidenceCountOf({ evidenceCount: null }), 0);
+  });
+
+  test('both load paths agree for equivalent underlying data', () => {
+    const raw = { feedback: [
+      { kind: 'usage', message: '[usage] {}', timestamp: daysAgo(1).toISOString() },
+      { kind: 'evidence', message: 'link A' },
+      { kind: 'evidence', message: 'link B' }
+    ] };
+    const aggregated = {
+      usageEntry: { message: '[usage] {}', timestamp: daysAgo(1).toISOString(), kind: 'usage' },
+      evidenceCount: 2
+    };
+    assert.deepStrictEqual(usageOf(raw), usageOf(aggregated));
+    assert.strictEqual(evidenceCountOf(raw), evidenceCountOf(aggregated));
+  });
+});
+
 // The headline outcome metric (LIN-1596). One seed, exercised here through the
 // mock (find) path and again below through real MangoDB's aggregation path, so
 // the two shapes — a raw `feedback[]` vs a single derived `terminalEntry` —
@@ -1105,5 +1174,94 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     assert.strictEqual(projected[0].feedbackCount, 2);
     assert.deepStrictEqual(Object.keys(projected[0].terminalEntry).sort(), ['message', 'timestamp']);
     assert.ok(!JSON.stringify(projected).includes('BULKY-HEARTBEAT-PAYLOAD'), 'non-terminal entry content leaked');
+  });
+
+  // --- LIN-1957: the new usageEntry/evidenceCount/harness/issueIdentifier
+  // projection fields, exercised by calling the REAL `loadDispatchHistory`
+  // directly against a real MangoDB collection — not a hand-copied pipeline.
+  // A hand-copied $project (the pattern the terminalEntry-only test above
+  // uses) would stay green even if the actual production pipeline broke,
+  // since it never touches the real function; calling `loadDispatchHistory`
+  // itself closes that gap, which matters here because this field is new and
+  // under active change in this very beat.
+
+  test('harness and issueIdentifier are additive raw passthroughs, via loadDispatchHistory', async () => {
+    const collections = await realCollections({
+      dispatchHistory: [
+        { _id: 'h1', rootItemId: 'h1', status: 'taken', dispatchedAt: daysAgo(1), harness: 'opencode', issueIdentifier: 'LIN-42', feedback: [] },
+        { _id: 'h2', rootItemId: 'h2', status: 'taken', dispatchedAt: daysAgo(1), feedback: [] } // no harness/issueIdentifier at all
+      ]
+    });
+    const rows = await loadDispatchHistory(collections.dispatchHistory);
+    const byId = Object.fromEntries(rows.map(d => [d._id, d]));
+    assert.strictEqual(harnessOf(byId.h1), 'opencode');
+    assert.strictEqual(byId.h1.issueIdentifier, 'LIN-42');
+    assert.strictEqual(harnessOf(byId.h2), null);
+    assert.strictEqual(byId.h2.issueIdentifier, undefined);
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.ok(stats, 'collectKpiStats must not choke on the new fields'); // not surfaced yet — beat 3/4 wires the consumer
+  });
+
+  test('usageEntry (via loadDispatchHistory) takes the LAST kind:usage entry — proven against the REAL pipeline, not a copy (N1)', async () => {
+    const collections = await realCollections({
+      dispatchHistory: [{
+        _id: 'h1', rootItemId: 'h1', status: 'taken', dispatchedAt: daysAgo(1),
+        feedback: [
+          { message: 'heartbeat: still going', timestamp: daysAgo(2).toISOString(), kind: 'heartbeat' },
+          { message: '[usage] {"costUsd":1}', timestamp: daysAgo(1.5).toISOString(), kind: 'usage' },
+          { message: '[usage] {"costUsd":2}', timestamp: daysAgo(1).toISOString(), kind: 'usage' }
+        ]
+      }]
+    });
+
+    const rows = await loadDispatchHistory(collections.dispatchHistory);
+    assert.strictEqual(rows.length, 1);
+    // Last kind:usage entry wins, ignoring the earlier heartbeat — this reads
+    // `undefined` (or the wrong entry) if `kind` did not survive the $map
+    // before the $filter. Empirically confirmed: narrowing the production
+    // $map to {message,timestamp} (dropping `kind`) makes this assertion
+    // fail — see the beat-2 report for the mutation-probe transcript.
+    assert.strictEqual(usageOf(rows[0]).message, '[usage] {"costUsd":2}');
+    assert.strictEqual(evidenceCountOf(rows[0]), 0);
+  });
+
+  test('evidenceCount (via loadDispatchHistory) counts only kind:evidence entries — same N1 exposure as usageEntry', async () => {
+    const collections = await realCollections({
+      dispatchHistory: [{
+        _id: 'h1', rootItemId: 'h1', status: 'taken', dispatchedAt: daysAgo(1),
+        feedback: [
+          { message: 'link A', timestamp: daysAgo(2).toISOString(), kind: 'evidence' },
+          { message: '[usage] {}', timestamp: daysAgo(1.5).toISOString(), kind: 'usage' },
+          { message: 'link B', timestamp: daysAgo(1).toISOString(), kind: 'evidence' },
+          { message: 'heartbeat', timestamp: daysAgo(1).toISOString(), kind: 'heartbeat' }
+        ]
+      }]
+    });
+
+    const rows = await loadDispatchHistory(collections.dispatchHistory);
+    assert.strictEqual(rows.length, 1);
+    // 2, not 4 and not 0 — narrowing the map to drop `kind` collapses this to
+    // 0 (nothing matches `$eq: [undefined, 'evidence']`), and a filter-less
+    // bug would give 4 (every entry, unfiltered).
+    assert.strictEqual(evidenceCountOf(rows[0]), 2);
+  });
+
+  test('the find-path and aggregation-path readers agree on the same seed (via loadDispatchHistory + the mock)', async () => {
+    const seed = [{
+      _id: 'h1', rootItemId: 'h1', status: 'taken', dispatchedAt: daysAgo(1), harness: 'claude-code',
+      feedback: [
+        { message: '[usage] {"costUsd":1}', timestamp: daysAgo(2).toISOString(), kind: 'usage' },
+        { message: 'link A', timestamp: daysAgo(1).toISOString(), kind: 'evidence' }
+      ]
+    }];
+
+    const aggCollections = await realCollections({ dispatchHistory: seed });
+    const aggRows = await loadDispatchHistory(aggCollections.dispatchHistory);
+    const foundRows = await loadDispatchHistory(createMockCollection(seed));
+
+    assert.strictEqual(harnessOf(aggRows[0]), harnessOf(foundRows[0]));
+    assert.strictEqual(usageOf(aggRows[0]).message, usageOf(foundRows[0]).message);
+    assert.strictEqual(evidenceCountOf(aggRows[0]), evidenceCountOf(foundRows[0]));
   });
 });
