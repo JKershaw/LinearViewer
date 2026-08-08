@@ -17,6 +17,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const daysAgo = (n) => new Date(NOW.getTime() - n * DAY_MS);
 
 const doneMarker = (days) => ({ message: '[done] landed it', timestamp: daysAgo(days).toISOString() });
+const skippedMarker = (days) => ({ message: '[skipped] human-continued session (phase)', timestamp: daysAgo(days).toISOString() });
 
 function usageEntry({ costUsd, lane = null, days }) {
   const payload = { harness: 'irrelevant-to-payload-parsing', lane };
@@ -288,7 +289,18 @@ describe('computeTerminalMarkedTaskCost — zero-T degradation', () => {
     assert.equal(result.evidenceLinkedShare, null);
     assert.equal(result.opencodeSummedShare, null);
     assert.equal(result.unknownHarnessShare, null);
-    for (const key of ['costUsd', 'cashUsd', 'unknownLaneUsd', 'closeOutLineageShare', 'evidenceLinkedShare', 'opencodeSummedShare', 'unknownHarnessShare']) {
+    // F4/F5 (gap-beat 2): the two new USD lines and two new coverage shares
+    // must degrade the same way — null, never 0/NaN, when there is nothing
+    // in the category to report.
+    assert.equal(result.inFlightUsd, null);
+    assert.equal(result.overheadUsd, null);
+    assert.equal(result.pricedLineageShare, null);
+    assert.equal(result.attributableLineageShare, null);
+    for (const key of [
+      'costUsd', 'cashUsd', 'unknownLaneUsd', 'closeOutLineageShare', 'evidenceLinkedShare',
+      'opencodeSummedShare', 'unknownHarnessShare', 'inFlightUsd', 'overheadUsd',
+      'pricedLineageShare', 'attributableLineageShare'
+    ]) {
       assert.ok(!Number.isNaN(result[key]), `${key} must not be NaN`);
     }
   });
@@ -357,6 +369,182 @@ describe('computeTerminalMarkedTaskCost — disclosure shares', () => {
     });
     const result = computeTerminalMarkedTaskCost([opencode, claude], NOW);
     assert.equal(result.opencodeSummedShare, 0.5);
+  });
+});
+
+describe('computeTerminalMarkedTaskCost — F4 (LIN-1957 review round 2, Request Changes): in-flight and overhead spend must be published, not silently invisible', () => {
+  test('inFlightUsd counts windowed spend on an unresolved (no terminal marker) lineage, and does NOT fold into costUsd', () => {
+    const inFlight = row({
+      id: 'p1', issueIdentifier: 'LIN-200', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 50, lane: 'api', days: 1 })] // no terminal marker: still running
+    });
+    const resolved = row({
+      id: 'p2', issueIdentifier: 'LIN-201', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [usageEntry({ costUsd: 10, lane: 'api', days: 2 }), doneMarker(1.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([inFlight, resolved], NOW);
+    assert.equal(result.issueCount, 1, 'the in-flight lineage must not enter the T denominator');
+    assert.equal(result.costUsd, 10, 'in-flight spend must never fold into the resolved-task numerator');
+    assert.equal(result.inFlightUsd, 50);
+  });
+
+  test('overheadUsd counts windowed spend on a done, issue-less dispatch (autopilot/Collective/ad-hoc), and does NOT fold into costUsd', () => {
+    const issueLess = row({
+      id: 'q1', issueIdentifier: undefined, kind: 'autopilot', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 30, lane: 'api', days: 1 }), doneMarker(0.9)]
+    });
+    const resolved = row({
+      id: 'q2', issueIdentifier: 'LIN-202', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [usageEntry({ costUsd: 10, lane: 'api', days: 2 }), doneMarker(1.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([issueLess, resolved], NOW);
+    assert.equal(result.issueCount, 1, 'the issue-less dispatch must not enter the T denominator');
+    assert.equal(result.costUsd, 10, 'overhead spend must never fold into the resolved-task numerator');
+    assert.equal(result.overheadUsd, 30);
+  });
+
+  test('round 2\'s own reproduction: one resolved issue ($10), one in-flight lineage ($50), one issue-less dispatch ($30) — $80 of $90 must now be visible', () => {
+    const resolved = row({
+      id: 'r1', issueIdentifier: 'LIN-203', harness: 'claude-code', dispatchedAt: daysAgo(3),
+      feedback: [usageEntry({ costUsd: 10, lane: 'api', days: 3 }), doneMarker(2.9)]
+    });
+    const inFlight = row({
+      id: 'r2', issueIdentifier: 'LIN-204', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [usageEntry({ costUsd: 50, lane: 'api', days: 2 })]
+    });
+    const issueLess = row({
+      id: 'r3', issueIdentifier: undefined, kind: 'autopilot', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 30, lane: 'api', days: 1 }), doneMarker(0.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([resolved, inFlight, issueLess], NOW);
+    assert.equal(result.issueCount, 1);
+    assert.equal(result.costUsd, 10);
+    assert.equal(result.inFlightUsd, 50);
+    assert.equal(result.overheadUsd, 30);
+    assert.equal(result.costUsd + result.inFlightUsd + result.overheadUsd, 90, 'all $90 of windowed spend is now accounted for across the three published lines');
+  });
+
+  test('an unpriced in-flight lineage is excluded from inFlightUsd, never counted as $0 — degrades to null when it is the only in-flight lineage', () => {
+    const unpricedInFlight = row({
+      id: 's1', issueIdentifier: 'LIN-205', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [] // still running, nothing posted yet
+    });
+    const result = computeTerminalMarkedTaskCost([unpricedInFlight], NOW);
+    assert.equal(result.inFlightUsd, null, 'must be null, not 0 — an unpriced lineage is not zero spend');
+  });
+
+  test('a partially-priced (opencode, one unpriceable row) in-flight lineage is excluded from inFlightUsd entirely, not summed from what did price', () => {
+    const partiallyPriced = row({
+      id: 't1', issueIdentifier: 'LIN-206', harness: 'opencode', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 4, lane: 'api', days: 1 }), usageEntry({ lane: 'api', days: 0.5 })] // second row unpriceable, still running
+    });
+    const result = computeTerminalMarkedTaskCost([partiallyPriced], NOW);
+    assert.equal(result.inFlightUsd, null, 'a partially-priced in-flight lineage must be excluded wholesale, same fullyPriced discipline as costUsd');
+  });
+
+  test('an unpriced issue-less dispatch is excluded from overheadUsd, never counted as $0', () => {
+    const unpricedOverhead = row({
+      id: 'u1', issueIdentifier: undefined, kind: 'autopilot', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [doneMarker(0.9)] // done, but no usage ever posted
+    });
+    const result = computeTerminalMarkedTaskCost([unpricedOverhead], NOW);
+    assert.equal(result.overheadUsd, null, 'must be null, not 0');
+  });
+});
+
+describe('computeTerminalMarkedTaskCost — F5 (LIN-1957 review round 2, Request Changes): declared coverage over the whole lineage population', () => {
+  test('pricedLineageShare = fully-priced ÷ usage-bearing lineages — a lineage that never posted usage at all does not count against it', () => {
+    const neverPosted = row({
+      id: 'v1', issueIdentifier: 'LIN-207', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [doneMarker(0.9)]
+    });
+    const fullyPriced = row({
+      id: 'v2', issueIdentifier: 'LIN-208', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 5, days: 1 }), doneMarker(0.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([neverPosted, fullyPriced], NOW);
+    assert.equal(result.pricedLineageShare, 1, 'the never-posted lineage is not usage-bearing, so it is excluded from this ratio\'s denominator');
+  });
+
+  test('pricedLineageShare falls when a usage-bearing lineage is only partially priced', () => {
+    const partiallyPriced = row({
+      id: 'w1', issueIdentifier: 'LIN-209', harness: 'opencode', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 2, lane: 'api', days: 1 }), usageEntry({ lane: 'api', days: 0.5 }), doneMarker(0.4)]
+    });
+    const fullyPriced = row({
+      id: 'w2', issueIdentifier: 'LIN-210', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 5, days: 1 }), doneMarker(0.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([partiallyPriced, fullyPriced], NOW);
+    assert.equal(result.pricedLineageShare, 0.5, 'one of two usage-bearing lineages is fully priced');
+  });
+
+  test('attributableLineageShare = attributable ÷ ran lineages, over the WHOLE population (done, in-flight, and issue-less alike)', () => {
+    const doneAttributed = row({
+      id: 'x1', issueIdentifier: 'LIN-211', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 1, days: 1 }), doneMarker(0.9)]
+    });
+    const inFlightAttributed = row({
+      id: 'x2', issueIdentifier: 'LIN-212', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 1, days: 1 })]
+    });
+    const doneIssueLess = row({
+      id: 'x3', issueIdentifier: undefined, kind: 'autopilot', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 1, days: 1 }), doneMarker(0.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([doneAttributed, inFlightAttributed, doneIssueLess], NOW);
+    assert.equal(result.attributableLineageShare, 0.667, '2 of 3 ran lineages carry an issueIdentifier — the in-flight lineage counts toward "ran" too');
+  });
+
+  test('a `[skipped]` lineage is benign and counts toward neither ranLineages/attributableLineageShare nor inFlightUsd — same exclusion computeDispatchOutcomes applies', () => {
+    const skipped = row({
+      id: 'y1', issueIdentifier: undefined, harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 999, lane: 'api', days: 1 }), skippedMarker(0.9)]
+    });
+    const attributed = row({
+      id: 'y2', issueIdentifier: 'LIN-213', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 1, days: 1 }), doneMarker(0.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([skipped, attributed], NOW);
+    assert.equal(result.attributableLineageShare, 1, 'the skipped lineage must not dilute the denominator');
+    assert.equal(result.inFlightUsd, null, 'a skipped lineage\'s spend must not leak into inFlightUsd either');
+  });
+
+  test('realistic proportions (round 2 ledger row 6): when most done issues have a partially-priced lineage, costUsd is computed over a visibly small minority of T', () => {
+    // 5 done, attributable issues. 1 is fully priced. 4 each have ONE
+    // unpriceable opencode row alongside a priced one — realistic partial
+    // pricing, not "never posted usage at all" (that failure mode is
+    // covered separately above and correctly does not count against
+    // pricedLineageShare's denominator).
+    const clean = row({
+      id: 'z0', issueIdentifier: 'LIN-300', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 8, lane: 'api', days: 1 }), doneMarker(0.9)]
+    });
+    const partial = (n) => row({
+      id: `z${n}`, issueIdentifier: `LIN-30${n}`, harness: 'opencode', dispatchedAt: daysAgo(1),
+      feedback: [
+        usageEntry({ costUsd: 3, lane: 'api', days: 1 }),
+        usageEntry({ lane: 'api', days: 0.7 }), // unpriceable turn
+        doneMarker(0.6)
+      ]
+    });
+    const rows = [clean, partial(1), partial(2), partial(3), partial(4)];
+    const result = computeTerminalMarkedTaskCost(rows, NOW);
+    assert.equal(result.issueCount, 5, 'T is 5 — the gate does not shrink the denominator');
+    assert.equal(result.unpriced, 4, '4 of 5 issues are excluded from every dollar sum');
+    assert.equal(result.costUsd, 8, 'costUsd is computed over the ONE fully-priced issue — a small-sample figure presented as the headline');
+    assert.equal(result.pricedLineageShare, 0.2, 'declared coverage makes the small-sample risk visible: only 1 of 5 usage-bearing lineages is fully priced');
+    assert.equal(result.attributableLineageShare, 1, 'all 5 ran lineages carry an issueIdentifier in this fixture');
+  });
+
+  test('zero usage-bearing lineages degrades pricedLineageShare to null, never NaN/0 (distinct from the T-wide zero-T case)', () => {
+    const neverPosted = row({
+      id: 'aa1', issueIdentifier: 'LIN-400', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [doneMarker(0.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([neverPosted], NOW);
+    assert.equal(result.issueCount, 1, 'T is non-zero');
+    assert.equal(result.pricedLineageShare, null, 'usageBearingLineages is 0, so this must degrade to null, not divide-by-zero to NaN or read as 0');
   });
 });
 

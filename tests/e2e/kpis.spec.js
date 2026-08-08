@@ -92,6 +92,11 @@ test.describe('KPIs page', () => {
     expect(data.dispatchOutcomes.windowDays).toBe(30);
     expect(data.funnel).toBeTruthy();
     expect(data.hourOfDay.length).toBe(24);
+    // LIN-1957 review round 2 correction: this list never pinned the
+    // terminal-marked-task-cost block, so `collectKpiStats` could drop it
+    // entirely and this spec would still pass. Pin presence at the public
+    // boundary on the RENDERED page, not just in the unit privacy canary.
+    expect(data.terminalMarkedTaskCost).toBeTruthy();
   });
 
   test('chart areas render (chart or empty-state note) for each section', async ({ page }) => {
