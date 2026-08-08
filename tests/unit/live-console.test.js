@@ -27,8 +27,10 @@ import {
   normalizeEvidenceEvents,
   deriveLoopLanes,
   buildPulse,
+  latestHeartbeat,
   SUMMARY_MAX,
 } from '../../lib/live-console.js';
+import { parseHeartbeat } from '../../lib/session-telemetry.js';
 
 // A lean loop record, shaped like getLoopsForWorkspace(lean) output after the
 // route folds in { workspaceUrlKey, workspaceName }.
@@ -196,6 +198,49 @@ test('buildPulse buckets heartbeats-only into a fine window ending at now', () =
   assert.equal(pulse.buckets.reduce((a, b) => a + b, 0), 3);
 });
 
+// LIN-1929 (Phase C of LIN-1908): `load[]` is additive alongside `buckets[]` —
+// same anchors/length, summing each beat's magnitude instead of counting it.
+//
+// `total` is the session's running CUMULATIVE tool count (only ever increases);
+// `toolCount` is that beat's own window burst. The fixtures below are built from
+// real simple-dispatcher heartbeat wire strings run through the real
+// `parseHeartbeat`, not hand-authored {toolCount,total} pairs — a fixture that
+// invents its own relationship between the two fields can't catch a precedence
+// bug between them (implementation review f6eee867, finding F1).
+test('buildPulse load[] sums each bucket\'s toolCount burst, falling back to total, without disturbing buckets[]', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const s = 1000;
+  const busyBeat = parseHeartbeat(
+    '[working · edit] 12 tools in 30s: Bash×7 Read×5 · 12 total',
+    new Date(now - 3 * s).toISOString(),
+  );
+  const idleBeat = parseHeartbeat(
+    '[working] no tool calls in 1m · 20 total',
+    new Date(now - 4 * s).toISOString(),
+  );
+  const fallbackBeat = { toolCount: null, total: 9, timestamp: new Date(now - 12 * s).toISOString() }; // no burst reported: falls back to total
+  const hbLoop = loop({
+    telemetry: { producedArtifacts: [], metrics: [busyBeat, idleBeat, fallbackBeat] },
+  });
+  const pulse = buildPulse([hbLoop], { now, windowMs: 30 * s, bucketMs: 5 * s });
+  assert.equal(pulse.load.length, pulse.buckets.length);
+  // The busy beat (12 tools this window) outweighs the idle beat (0 tools this
+  // window, despite a cumulative `total` of 20) — a beat that did no work must
+  // never render louder than the busiest beat in the strip.
+  assert.equal(pulse.load[5], 12);  // busyBeat's toolCount (12), idleBeat's toolCount (0) adds nothing
+  assert.equal(pulse.load[3], 9);   // fallbackBeat has no toolCount, falls back to total
+  // buckets[] keeps counting beats, unaffected by the magnitude they carry.
+  assert.equal(pulse.buckets[5], 2);
+  assert.equal(pulse.buckets[3], 1);
+});
+
+test('buildPulse tolerates loops with no telemetry at all — load[] stays zeroed', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const pulse = buildPulse([{ issueIdentifier: 'LIN-1' }, null, undefined], { now });
+  assert.ok(pulse.load.every(v => v === 0));
+  assert.equal(pulse.load.length, pulse.buckets.length);
+});
+
 test('buildConsoleFeed exposes pulse + serverNow for the flowing strip', () => {
   const now = Date.parse('2026-07-19T12:00:00Z');
   const feed = buildConsoleFeed({ statusItems: [], loops: [loop()] }, { now });
@@ -218,6 +263,28 @@ test('deriveLoopLanes surfaces running loops with their latest heartbeat', () =>
   assert.equal(l.heartbeat.toolCount, 12);
   assert.equal(l.heartbeat.total, 15);
   assert.deepEqual(l.heartbeat.breakdown, { Bash: 7, Read: 5 });
+});
+
+// LIN-1929 (Phase C of LIN-1908): `latestHeartbeat` used to drop the parsed
+// `state` field even though `parseHeartbeat` already produces it — plumbing
+// only, no new parsing.
+test('latestHeartbeat plumbs the parsed state through (running/idle/absent)', () => {
+  const running = loop({ telemetry: { producedArtifacts: [], metrics: [
+    { toolCount: 1, total: 1, state: 'running', timestamp: '2026-07-19T11:59:00.000Z' },
+  ] } });
+  assert.equal(latestHeartbeat(running).state, 'running');
+
+  const idle = loop({ telemetry: { producedArtifacts: [], metrics: [
+    { toolCount: 0, total: 0, state: 'idle', timestamp: '2026-07-19T11:59:00.000Z' },
+  ] } });
+  assert.equal(latestHeartbeat(idle).state, 'idle');
+
+  // A metric with no parsed state (older data, or a non-heartbeat shape) reads
+  // as null, never a fabricated default.
+  const noState = loop({ telemetry: { producedArtifacts: [], metrics: [
+    { toolCount: 3, total: 3, timestamp: '2026-07-19T11:59:00.000Z' },
+  ] } });
+  assert.equal(latestHeartbeat(noState).state, null);
 });
 
 test('deriveLoopLanes excludes terminal / non-running loops', () => {
@@ -397,7 +464,7 @@ test('buildConsoleFeed with no credentialByToken → every lane unknown, rest of
     summary: 'editing lib/foo.js',
     sinceMs: Date.parse('2026-07-19T11:50:00.000Z'),
     lastActivityMs: Date.parse('2026-07-19T11:59:00.000Z'),
-    heartbeat: { toolCount: 12, elapsedSeconds: 540, breakdown: { Bash: 7, Read: 5 }, total: 15 },
+    heartbeat: { toolCount: 12, elapsedSeconds: 540, breakdown: { Bash: 7, Read: 5 }, total: 15, state: null },
   });
 });
 

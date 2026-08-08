@@ -132,13 +132,21 @@
     const m = Math.floor(s / 60), r = s % 60;
     return r ? `${m}m ${r}s` : `${m}m`;
   }
+  // Escaped HTML for the `.lc-lane-hb` tick — breakdown keys are tool names
+  // sourced from the agent's own message text and are not fully trusted, so
+  // every dynamic bit goes through `esc` before it becomes markup. When the
+  // parsed state is 'idle', the numeric "0 tools" bit is suppressed in favour
+  // of Observation's own idle chip (public/observation.js's renderActivityLog,
+  // `.obs-act-chip.obs-act-idle`, styled via public/observation.css) — reusing
+  // that vocabulary rather than inventing a parallel one.
   function fmtHeartbeat(hb) {
     if (!hb) return '';
+    const idle = hb.state === 'idle';
     const bits = [];
     const n = hb.total != null ? hb.total : hb.toolCount;
-    if (n != null) bits.push(`${n} tool${n === 1 ? '' : 's'}`);
+    if (!idle && n != null) bits.push(`${n} tool${n === 1 ? '' : 's'}`);
     if (hb.elapsedSeconds != null) bits.push(fmtDuration(hb.elapsedSeconds));
-    if (hb.breakdown) {
+    if (!idle && hb.breakdown) {
       const top = Object.keys(hb.breakdown)
         .map(k => [k, hb.breakdown[k]])
         .sort((a, b) => b[1] - a[1])
@@ -147,7 +155,10 @@
         .join(' ');
       if (top) bits.push(top);
     }
-    return bits.join(' · ');
+    const text = esc(bits.join(' · '));
+    const chip = idle ? '<span class="obs-act-chip obs-act-idle">no tools</span>' : '';
+    if (text && chip) return `${text} ${chip}`;
+    return text || chip;
   }
 
   // ─── Skeleton (first-paint) ─────────────────────────────────────────────────
@@ -729,13 +740,15 @@
     }
   }
 
-  let pulseData = { buckets: [], bucketMs: 5000, endTs: 0, serverNow: 0, perf: 0, events: [] };
+  let pulseData = { buckets: [], load: [], bucketMs: 5000, endTs: 0, serverNow: 0, perf: 0, events: [] };
   let humMax = 1;
+  let loadMax = 1;
   let rafId = null;
 
   function updatePulse(feed) {
     const p = feed.pulse || {};
     pulseData.buckets = Array.isArray(p.buckets) ? p.buckets : [];
+    pulseData.load = Array.isArray(p.load) ? p.load : [];
     pulseData.bucketMs = p.bucketMs || 5000;
     pulseData.endTs = p.endTs || feed.serverNow || 0;
     pulseData.serverNow = feed.serverNow || pulseData.endTs || 0;
@@ -743,6 +756,8 @@
     pulseData.events = (Array.isArray(feed.events) ? feed.events : []).map(e => ({ ts: e.ts, kind: e.kind }));
     const curMax = pulseData.buckets.length ? Math.max.apply(null, pulseData.buckets) : 0;
     humMax = Math.max(curMax, humMax * 0.9, 1); // slow-decay → stable vertical scale
+    const curLoadMax = pulseData.load.length ? Math.max.apply(null, pulseData.load) : 0;
+    loadMax = Math.max(curLoadMax, loadMax * 0.9, 1); // load's OWN slow-decay scale — independent of humMax
     if (REDUCED_MOTION) renderPulse(); // no rAF; repaint a static snapshot per poll
   }
 
@@ -767,15 +782,18 @@
     if (!effNow) return;
     const xFor = (ts) => W * (1 - (effNow - ts) / PULSE_WINDOW_MS);
 
-    // Heartbeat hum area.
+    // Heartbeat hum area — height driven ONLY by `buckets` (beat count).
     const b = pulseData.buckets;
+    const ld = pulseData.load;
     if (b.length) {
       ctx.beginPath();
       let firstX = null, lastX = null;
+      const humPts = [];
       for (let i = 0; i < b.length; i++) {
         const tsCenter = pulseData.endTs - (b.length - 1 - i) * pulseData.bucketMs + pulseData.bucketMs / 2;
         const x = xFor(tsCenter);
         const y = base - (b[i] / humMax) * humH;
+        humPts.push({ x, y });
         if (firstX === null) { ctx.moveTo(x, base); ctx.lineTo(x, y); firstX = x; }
         else ctx.lineTo(x, y);
         lastX = x;
@@ -787,6 +805,33 @@
         ctx.globalAlpha = 0.16;
         ctx.fill();
         ctx.globalAlpha = 1;
+      }
+
+      // Load overlay — magnitude, nested INSIDE the hum silhouette just drawn:
+      // at bucket i its height is `load[i]/loadMax` of THAT bucket's own hum
+      // height, never the hum's own y. A beating-but-idle bucket (load≈0)
+      // therefore leaves the hum area exactly as drawn above — nothing to undo,
+      // nothing to compensate for. loadMax is its own independent, slow-decaying
+      // scale (never humMax), so hum and load can never fight over one axis.
+      if (firstX !== null) {
+        ctx.beginPath();
+        let lFirstX = null, lLastX = null;
+        for (let i = 0; i < humPts.length; i++) {
+          const { x, y } = humPts[i];
+          const frac = Math.max(0, Math.min(1, (ld[i] || 0) / loadMax));
+          const ly = base - frac * (base - y);
+          if (lFirstX === null) { ctx.moveTo(x, base); ctx.lineTo(x, ly); lFirstX = x; }
+          else ctx.lineTo(x, ly);
+          lLastX = x;
+        }
+        if (lFirstX !== null) {
+          ctx.lineTo(lLastX, base);
+          ctx.closePath();
+          ctx.fillStyle = cssVar('--amber', '#FFB224');
+          ctx.globalAlpha = 0.4;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
       }
     }
 
@@ -882,7 +927,7 @@
     cred.textContent = CRED_TEXT[state];
     cred.setAttribute('data-state', state);
     cred.setAttribute('title', CRED_TITLE[state]);
-    li.querySelector('.lc-lane-hb').textContent = fmtHeartbeat(lane.heartbeat); // live tick
+    li.querySelector('.lc-lane-hb').innerHTML = fmtHeartbeat(lane.heartbeat); // live tick — pre-escaped HTML (idle chip)
     const sum = li.querySelector('.lc-lane-summary');
     sum.textContent = lane.summary || '';
     sum.setAttribute('title', lane.summary || '');

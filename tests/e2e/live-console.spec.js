@@ -337,6 +337,35 @@ test.describe('Live Console (experimental)', () => {
       await expect(evidence.locator('a.lc-event-summary-link')).toHaveAttribute('href', 'https://github.com/x/y/pull/9');
     });
 
+    // LIN-1929 (Phase C of LIN-1908): a beat with no tool calls parses to
+    // heartbeat.state:'idle' (lib/session-telemetry.js's parseHeartbeat), which
+    // the lane tick now surfaces as Observation's own idle chip instead of a
+    // "0 tools" number — reusing `.obs-act-chip.obs-act-idle` rather than
+    // inventing a parallel vocabulary.
+    test('an idle heartbeat ("no tool calls") shows Observation\'s idle chip, not "0 tools"', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+
+      const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+        data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-951', issueTitle: 'Idle heartbeat worker', target: 'cli' },
+      });
+      expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+      const workerId = (await worker.json()).item.id;
+      const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner-idle&urlKey=${URL_KEY}`)).json();
+      await page.request.post(`/api/dispatch/take/${workerId}`, { headers: { Authorization: `Bearer ${token}` } });
+      await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        data: { message: '[working] no tool calls in 20s · 0 total · next heartbeat in ≤30s' },
+      });
+
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-lane"]');
+
+      const hb = page.locator('[data-testid="live-console-heartbeat"]').first();
+      await expect(hb.locator('.obs-act-idle')).toHaveText('no tools');
+      await expect(hb).not.toContainText('0 tools');
+    });
+
     test('a stale "working" entry drops off the lanes but still shows in the stream', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
@@ -389,6 +418,122 @@ test.describe('Live Console (experimental)', () => {
         await moreBtn.click();
         await expect(page.locator('#live-console-history [data-testid="live-console-event"]').first()).toBeVisible();
       }
+    });
+  });
+
+  // LIN-1929 (Phase C of LIN-1908): the flow bar's magnitude overlay
+  // (`pulse.load`, rendered nested inside the hum) and the heartbeat lane's
+  // idle-chip escaping. `pulse`/`lanes` are mocked directly on the events
+  // response — a `heartbeat.breakdown` key can only ever contain
+  // `[A-Za-z0-9_+#-]` when parsed from a real feedback message
+  // (lib/session-telemetry.js's BREAKDOWN_RE), so these tests go around that
+  // parser to exercise the client's OWN escaping/rendering contract for
+  // whatever shape actually arrives over the wire.
+  test.describe('Pulse magnitude + heartbeat state (LIN-1929)', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+    });
+    test.afterEach(async ({ page }) => {
+      await clearFeed(page, URL_KEY);
+    });
+
+    test('a lane heartbeat with an unsafe breakdown key renders it literally, not as markup', async ({ page }) => {
+      let injected = false;
+      await page.route(`**${EVENTS_API}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!injected) {
+          injected = true;
+          const now = body.serverNow || Date.now();
+          body.lanes = [{
+            workspaceUrlKey: URL_KEY, workspaceName: 'Test workspace', task: 'LIN-9300',
+            action: 'implementation', summary: 'xss probe', sinceMs: now, lastActivityMs: now,
+            heartbeat: {
+              toolCount: 3, elapsedSeconds: 10,
+              breakdown: { '<img src=x onerror=alert(1)>': 3 },
+              total: 3, state: null,
+            },
+            credential: { state: 'unknown', label: null },
+          }];
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      const lane = page.locator('[data-testid="live-console-lane"]', { hasText: 'LIN-9300' });
+      await expect(lane).toBeVisible();
+      const hb = lane.locator('[data-testid="live-console-heartbeat"]');
+      await expect(hb).toContainText('<img src=x onerror=alert(1)>×3');
+      await expect(hb.locator('img')).toHaveCount(0);
+    });
+
+    // A global topY-across-the-whole-canvas scan can't discriminate "nested
+    // per-bucket" from "scaled to the global hum height": with a single spike
+    // bucket, that bucket IS the hum maximum, so the two scalings coincide —
+    // proven by mutation (implementation review f6eee867, finding F2): scaling
+    // the overlay to the page's global `humH` instead of that bucket's own
+    // `(base - y)` still passes the single-spike version of this test. The
+    // per-COLUMN scan below uses two separated buckets — a tall one with no
+    // load, and a short one with an enormous load — so a global-height mutant
+    // is caught: it would paint the short column's load at the TALL column's
+    // height instead of its own.
+    test('load nested inside the hum never grows taller than that bucket\'s OWN hum height (per-column scan, catches a global-height mutant)', async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' }); // one deterministic repaint per poll, no rAF drift
+      const canvasSel = '#live-console-tempo';
+      const bucketMs = 5000;
+      const bucketCount = 36; // matches the production 3min/5s pulse window (DEFAULT_PULSE_WINDOW_MS/BUCKET_MS)
+      const tallIdx = 10;  // tall hum, no load
+      const shortIdx = 30; // short hum, enormous load — the discriminating column
+
+      async function scanBucketColumn(page, bucketIndex) {
+        return page.locator(canvasSel).evaluate((canvas, { bucketIndex, bucketCount, bucketMs }) => {
+          const PULSE_WINDOW_MS = 3 * 60 * 1000; // public/live-console.js's fixed strip span
+          const dpr = window.devicePixelRatio || 1;
+          const cssW = canvas.clientWidth || canvas.offsetWidth || 0;
+          const tsOffsetFromNow = (bucketCount - 1 - bucketIndex) * bucketMs - bucketMs / 2;
+          const xCss = cssW * (1 - tsOffsetFromNow / PULSE_WINDOW_MS);
+          const xDev = Math.max(0, Math.min(canvas.width - 1, Math.round(xCss * dpr)));
+          const ctx = canvas.getContext('2d');
+          const data = ctx.getImageData(xDev, 0, 1, canvas.height).data;
+          let topY = null;
+          for (let y = 0; y < canvas.height; y++) {
+            if (data[y * 4 + 3] > 0) { topY = y; break; }
+          }
+          return { topY, height: canvas.height };
+        }, { bucketIndex, bucketCount, bucketMs });
+      }
+
+      await page.route(`**${EVENTS_API}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        const now = body.serverNow || Date.now();
+        const buckets = new Array(bucketCount).fill(0);
+        const load = new Array(bucketCount).fill(0);
+        buckets[tallIdx] = 6;                  // tall hum column, no load
+        buckets[shortIdx] = 1; load[shortIdx] = 500; // short hum column, wildly out-of-proportion load
+        body.pulse = { bucketMs, endTs: now, buckets, load };
+        body.events = []; // no blips competing for canvas pixels
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      // Poll the canvas itself rather than assume a fixed poll interval elapsed
+      // — the module's very first paint (startPulse's synchronous renderPulse,
+      // fired before the mocked fetch resolves) is an empty frame that would
+      // otherwise satisfy a backing-size-only wait and race the real data.
+      await expect.poll(() => scanBucketColumn(page, tallIdx).then(s => s.topY), { timeout: 15000 }).not.toBeNull();
+
+      const tall = await scanBucketColumn(page, tallIdx);
+      const short = await scanBucketColumn(page, shortIdx);
+      const tallHeight = tall.height - tall.topY;
+      const shortHeight = short.height - short.topY;
+
+      // The short bucket's enormous `load` value must not paint it as tall as
+      // the (unrelated) tall bucket — nested to ITS OWN hum height, not the
+      // strip's global maximum. A mutant that scales the load overlay against
+      // the global hum height instead of the bucket's own would fail this.
+      expect(shortHeight).toBeLessThan(tallHeight * 0.5);
     });
   });
 
