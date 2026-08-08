@@ -144,7 +144,9 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
         // LIN-1523: this IS a disconnect (unlike /logout) — the durable
         // credential must not outlive it, or a proxy token keeps resolving
         // indefinitely against a workspace the user believes is gone.
-        if (ownerCredentialStore) await ownerCredentialStore.delete(accountId, workspace.urlKey)
+        // LIN-1887 N2: whole-workspace teardown, so EVERY provider partition
+        // goes — a single-partition delete would orphan the others.
+        if (ownerCredentialStore) await ownerCredentialStore.deleteAll(accountId, workspace.urlKey)
       }
       return req.session.destroy(() => res.redirect('/'))
     }
@@ -159,7 +161,8 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
     // it as a destroy.
     evictWorkspaceTokenPair(evictWorkspaceToken, workspace.urlKey, req.session.accountId)
     // LIN-1523: durable delete alongside the cache eviction — see the note above.
-    if (ownerCredentialStore) await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey)
+    // LIN-1887 N2: whole-workspace teardown → every provider partition.
+    if (ownerCredentialStore) await ownerCredentialStore.deleteAll(req.session.accountId, workspace.urlKey)
 
     removeWorkspace(req.session, workspace.id)
     await saveSession(req.session)

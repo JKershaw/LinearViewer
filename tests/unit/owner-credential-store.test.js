@@ -56,7 +56,7 @@ describe('owner-credential-store', () => {
   });
 
   // OC2
-  test('put persists a record retrievable by get, keyed on accountId::urlKey', async () => {
+  test('put persists a record retrievable by get, keyed on accountId::urlKey::provider', async () => {
     const store = freshStore();
     const accountId = randomUUID();
     const urlKey = `acme-${randomUUID().slice(0, 8)}`;
@@ -67,7 +67,9 @@ describe('owner-credential-store', () => {
 
     const fetched = await store.get(accountId, urlKey);
     assert.ok(fetched, 'record should be retrievable after put');
-    assert.strictEqual(fetched._id, `${accountId}::${urlKey}`);
+    // LIN-1887 F1: the key gained a provider partition, derived from the
+    // record's OWN provider field so the two cannot disagree.
+    assert.strictEqual(fetched._id, `${accountId}::${urlKey}::linear`);
     assert.strictEqual(fetched.accountId, accountId);
     assert.strictEqual(fetched.urlKey, urlKey);
     assert.strictEqual(fetched.provider, 'linear');
@@ -121,7 +123,9 @@ describe('owner-credential-store', () => {
     const urlKey = `acme-${randomUUID().slice(0, 8)}`;
     await store.put(accountId, urlKey, sampleCredential({ token: 'access-1', refreshToken: 'refresh-1' }));
 
-    const ok = await store.patch(accountId, urlKey, { token: 'access-2' });
+    // LIN-1887: `provider` is explicit on patch — it selects the partition to
+    // read-merge against, exactly as it does on `get`.
+    const ok = await store.patch(accountId, urlKey, 'linear', { token: 'access-2' });
     assert.strictEqual(ok, true);
 
     const fetched = await store.get(accountId, urlKey);
@@ -164,7 +168,7 @@ describe('owner-credential-store', () => {
     assert.strictEqual(await store.get('acct-1', null), null);
     assert.strictEqual(await store.put(null, 'workspace-1', sampleCredential()), false);
     assert.strictEqual(await store.put('acct-1', null, sampleCredential()), false);
-    assert.strictEqual(await store.patch(null, 'workspace-1', { token: 'x' }), false);
+    assert.strictEqual(await store.patch(null, 'workspace-1', 'linear', { token: 'x' }), false);
     assert.strictEqual(await store.delete(null, 'workspace-1'), false);
   });
 

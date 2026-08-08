@@ -47,8 +47,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { selectExpiredOwnerRow, selectOwnerWorkspaceToken } from '../../lib/workspace-token-resolver.js';
-import { refreshOwnerWorkspaceToken, refreshLinearOwnerCredential, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
+import { refreshOwnerWorkspaceToken, refreshOwnerCredential, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
+import { REFRESH_STRATEGY, refreshStrategyFor } from '../../lib/refresh-strategy.js';
 
 const NOW = Date.now();
 const FAR_FUTURE_MS = 10_000_000; // ~2.8h — comfortably past the 5-minute refresh buffer
@@ -71,19 +72,24 @@ function fakeStore(seed = {}) {
   for (const [key, credential] of Object.entries(seed)) records.set(key, credential);
   return {
     calls,
-    async get(accountId, urlKey) {
-      return records.get(`${accountId}::${urlKey}`) ?? null;
+    // LIN-1887 G4: the fake learns the provider PARTITION, because the real
+    // store's `_id` is now `${accountId}::${urlKey}::${provider}` and the CAS
+    // witness must land on the same document the read hit. A fake that kept the
+    // 2-part key would let the single-flight/CAS specs pass against a shape the
+    // real store no longer has.
+    async get(accountId, urlKey, provider = 'linear') {
+      return records.get(`${accountId}::${urlKey}::${provider}`) ?? null;
     },
     async put(accountId, urlKey, credential) {
       calls.push({ accountId, urlKey, credential });
-      records.set(`${accountId}::${urlKey}`, credential);
+      records.set(`${accountId}::${urlKey}::${credential.provider || 'linear'}`, credential);
     },
     // LIN-1546: optimistic CAS. Models the real store — writes (and records the
     // landed write into `calls`, so the existing "the durable write landed"
     // assertions keep observing it) ONLY when the stored refreshToken still
     // equals `expected`; a miss returns false and records nothing.
     async putIfRefreshToken(accountId, urlKey, expected, next) {
-      const key = `${accountId}::${urlKey}`;
+      const key = `${accountId}::${urlKey}::${next.provider || 'linear'}`;
       const current = records.get(key);
       if (!current || current.refreshToken !== expected) return false;
       calls.push({ accountId, urlKey, credential: next });
@@ -207,7 +213,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373/1524, Block B — refresh orchest
       return { access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 };
     };
     const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
-    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
     const result = await refreshOwnerWorkspaceToken({
       sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store
@@ -237,7 +243,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373/1524, Block B — refresh orchest
     const sessions = [];
     const refreshAccessToken = async () => ({ access_token: 'fresh-token', refresh_token: 'refresh-A-new', expires_in: 3600 });
     const persistSession = async () => {};
-    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A-old', tokenExpiresAt: NOW + PAST_MS } });
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A-old', tokenExpiresAt: NOW + PAST_MS } });
 
     await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
@@ -255,7 +261,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373/1524, Block B — refresh orchest
     let persistCalled = false;
     const refreshAccessToken = async () => { throw new TokenRefreshError('Refresh token expired or invalid', 'EXPIRED'); };
     const persistSession = async () => { persistCalled = true; };
-    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'dead-refresh', tokenExpiresAt: NOW + PAST_MS } });
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'dead-refresh', tokenExpiresAt: NOW + PAST_MS } });
 
     await assert.rejects(
       () => refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store }),
@@ -276,7 +282,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373/1524, Block B — refresh orchest
       return { access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 };
     };
     const persistSession = async () => {};
-    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
     const p1 = refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
     const p2 = refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
@@ -296,7 +302,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373/1524, Block B — refresh orchest
       return { access_token: `fresh-token-${callCount}`, refresh_token: `refresh-A-rotated-${callCount}`, expires_in: 3600 };
     };
     const persistSession = async () => {};
-    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
     const r1 = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
     const r2 = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
@@ -314,7 +320,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373/1524, Block B — refresh orchest
       return { access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 };
     };
     const persistSession = async () => {};
-    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
     await assert.rejects(() => refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store }));
     const result = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
@@ -335,7 +341,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373/1524, Block B — refresh orchest
       assert.equal(args.length, 2);
       persistCalls.push(args);
     };
-    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
     await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
     assert.equal(persistCalls.length, 1);
@@ -344,7 +350,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373/1524, Block B — refresh orchest
   test('B8: durable record present but with NO refreshToken -> resolves null, no network call, no durable put', async () => {
     const refreshAccessToken = async () => { throw new Error('must not be called'); };
     const persistSession = async () => { throw new Error('must not be called'); };
-    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: undefined, tokenExpiresAt: NOW + PAST_MS } });
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: undefined, tokenExpiresAt: NOW + PAST_MS } });
 
     const result = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
@@ -377,7 +383,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1373/1524, Block B — refresh orchest
     };
     let persistSessionCalled = false;
     const persistSession = async () => { persistSessionCalled = true; };
-    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
     const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
 
@@ -685,7 +691,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1499, Block D — GitHub-family routin
     };
     const persisted = [];
     const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
-    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
 
     // No resolveProvider passed at all — the Linear arm must never call it.
     const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
@@ -723,15 +729,20 @@ const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 describe('ensureValidToken branch widening (LIN-1499, Block E — source-text pin)', () => {
   test("E1: the re-mint branch condition covers BOTH 'github' and 'github-projects'", () => {
+    // LIN-1887 Step 1 moved this condition OUT of the two dispatches and into
+    // one declaration both read, so the guard no longer names the providers —
+    // the table does. The D2 regression this test exists to prevent (the branch
+    // narrowing back to `github` only) is unchanged in substance and is now
+    // asserted where the answer actually lives.
     const conditionLine = SERVER_SRC.split('\n').find(l => l.includes("await remintActiveCredential(workspace, getProviderForWorkspace(workspace))"));
     assert.ok(conditionLine, 'expected to find the remintActiveCredential call site in server.js');
-    // Walk back to find the `if (...)` guarding this call.
     const lines = SERVER_SRC.split('\n');
     const callIdx = lines.indexOf(conditionLine);
     const ifLine = lines.slice(0, callIdx).reverse().find(l => l.trim().startsWith('if ('));
     assert.ok(ifLine, 'expected an `if (...)` guarding the remintActiveCredential call');
-    assert.match(ifLine, /provider === 'github'/);
-    assert.match(ifLine, /provider === 'github-projects'/, "D2 regression guard: the branch must not narrow back to 'github' only");
+    assert.match(ifLine, /declaration\.strategy === REFRESH_STRATEGY\.REMINT/, 'the re-mint arm must be selected by the shared declaration, not a re-inlined provider list');
+    assert.equal(refreshStrategyFor({ provider: 'github' }), REFRESH_STRATEGY.REMINT);
+    assert.equal(refreshStrategyFor({ provider: 'github-projects' }), REFRESH_STRATEGY.REMINT, "D2 regression guard: the re-mint set must not narrow back to 'github' only");
   });
 
   test('E2: the off-session refresh call site passes resolveProvider through to refreshOwnerWorkspaceToken', () => {
@@ -756,7 +767,7 @@ describe('ensureValidToken branch widening (LIN-1499, Block E — source-text pi
 // ---------------------------------------------------------------------------
 // Block F (LIN-1546) — race-safe refresh rotation: the shared single-flight
 // seam + durable CAS + re-read recovery, driven directly at
-// `refreshLinearOwnerCredential`.
+// `refreshOwnerCredential`.
 //
 // Why the seam and not the human sites: server.js is not import-safe in a unit
 // test (it connects to Mongo and listens at module load — see Block E's
@@ -775,7 +786,7 @@ describe('ensureValidToken branch widening (LIN-1499, Block E — source-text pi
 // block closes).
 // ---------------------------------------------------------------------------
 
-describe('refreshLinearOwnerCredential (LIN-1546, Block F — race-safe rotation)', () => {
+describe('refreshOwnerCredential (LIN-1546, Block F — race-safe rotation)', () => {
   beforeEach(() => {
     _resetInflightForTests();
   });
@@ -790,13 +801,13 @@ describe('refreshLinearOwnerCredential (LIN-1546, Block F — race-safe rotation
       await gate;
       return { access_token: 'access-R1', refresh_token: 'R1', expires_in: 3600 };
     };
-    const store = fakeStore({ 'account-A::acme': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS } });
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS } });
 
     // Entrant 1 = the proactive human; entrant 2 = the headless resolve. Same
     // key, launched concurrently — exactly the collision the ticket exists to
     // make safe.
-    const human = refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
-    const headless = refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+    const human = refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+    const headless = refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
 
     releaseRefresh();
     const [r1, r2] = await Promise.all([human, headless]);
@@ -836,7 +847,7 @@ describe('refreshLinearOwnerCredential (LIN-1546, Block F — race-safe rotation
       throw new TokenRefreshError('Refresh token expired or invalid', 'EXPIRED');
     };
 
-    const result = await refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
 
     // The seam RESOLVED (did not throw) with the winner's token — the loser
     // converges instead of concluding the credential is dead.
@@ -866,7 +877,7 @@ describe('refreshLinearOwnerCredential (LIN-1546, Block F — race-safe rotation
     };
     const refreshAccessToken = async () => ({ access_token: 'access-R_loser', refresh_token: 'R_loser', expires_in: 3600 });
 
-    const result = await refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
 
     assert.deepEqual(store.casAttempts, ['R0'], 'the CAS is witnessed on the token we actually read');
     assert.equal(result.token, 'access-relogin', 'converges on the re-login token, not our own now-orphaned refresh');
@@ -888,7 +899,7 @@ describe('refreshLinearOwnerCredential (LIN-1546, Block F — race-safe rotation
     const refreshAccessToken = async () => { throw new TokenRefreshError('Refresh token expired or invalid', 'EXPIRED'); };
 
     await assert.rejects(
-      () => refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store }),
+      () => refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store }),
       (err) => {
         assert.ok(err instanceof TokenRefreshError);
         assert.equal(err.code, 'EXPIRED', 'a genuine revocation must still surface EXPIRED, so the caller deletes the dead credential');
@@ -912,7 +923,7 @@ describe('refreshLinearOwnerCredential (LIN-1546, Block F — race-safe rotation
     const refreshAccessToken = async () => ({ access_token: 'access-R_loser', refresh_token: 'R_loser', expires_in: 3600 });
 
     await assert.rejects(
-      () => refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store }),
+      () => refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store }),
       (err) => {
         assert.ok(err instanceof TokenRefreshError);
         assert.notEqual(err.code, 'EXPIRED', 'must not be definitive — a live-but-unpersistable credential must never be deleted');
@@ -931,7 +942,7 @@ describe('refreshLinearOwnerCredential (LIN-1546, Block F — race-safe rotation
     const refreshAccessToken = async () => { throw new TokenRefreshError('boom', 'NETWORK'); };
 
     await assert.rejects(
-      () => refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store }),
+      () => refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store }),
       (err) => { assert.equal(err.code, 'NETWORK'); return true; }
     );
     assert.equal(getCount, 1, 'a transient blip triggers NO re-read — only a definitive EXPIRED does');
@@ -942,7 +953,7 @@ describe('refreshLinearOwnerCredential (LIN-1546, Block F — race-safe rotation
     let refreshCalled = false;
     const refreshAccessToken = async () => { refreshCalled = true; return {}; };
 
-    const result = await refreshLinearOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
     assert.equal(result, null);
     assert.equal(refreshCalled, false);
   });
