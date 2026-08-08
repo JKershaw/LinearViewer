@@ -399,6 +399,144 @@ describe('ADF → markdown → ADF property (LIN-1886 review Blocker 3)', () => 
 })
 
 // =============================================================================
+// THE REVIEWER'S ADVERSARIAL BATTERY (LIN-1886 review F1) — the acceptance
+// fixture for fix cycle 3, John's Option A.
+// =============================================================================
+//
+// Fix cycle 2 shipped the property suite above over fixtures the IMPLEMENTER
+// chose. The re-review (`49a3757c`) then probed the same docstring invariant
+// with an adversarial battery of its own and found **16 counterexamples in two
+// sub-classes** — permitted by the gate, silently rewritten by the write. The
+// human decision (`599551c2`) made that battery, not implementer-chosen
+// fixtures, the acceptance fixture for this cycle. This is the LIN-1731
+// real-fixture lesson: the cases are transcribed from the review, not picked.
+//
+// Option A routes them three ways, and every case below is labelled with which:
+//
+//   ESCAPE  — sub-class (a), Markdown-syntax collisions. `adfToMarkdown` now
+//             escapes them, so the content ROUND-TRIPS FAITHFULLY. Refusing
+//             ordinary prose was explicitly ruled out.
+//   FIX     — the two outright codec bugs in sub-class (b): `(`-in-href
+//             truncation and `]`-in-link-text destroying the link mark. Also
+//             round-trips.
+//   REFUSE  — what genuinely remains unrebuildable after the two above; a
+//             D1-style 422, never a silent lossy 200.
+//
+// ACCOUNTING. The review states 16 counterexamples and enumerates 13 of them in
+// prose (3 carried from fix cycle 2 + 5 under sub-class (a) + 5 under sub-class
+// (b)); the remaining 3 are counted but not individually named. Rather than
+// guess at them, the battery below encodes all 13 named cases PLUS every
+// sibling construct in the classes the human decision names ("inline `_`/`*`/
+// backtick runs") — `*`, backtick, `~~`, and literal link syntax — for 17
+// transcribed cases, and then a further block of residue cases found while
+// implementing. It over-covers rather than under-covers.
+
+/** Sub-class (a) + the two codec bugs: these must now ROUND-TRIP, not refuse. */
+const F1_MUST_ROUND_TRIP = {
+  // -- the three carried from fix cycle 2 ------------------------------------
+  // F1.1 "call foo_bar_baz now" -> text "call foo" + em "bar" + text "baz now"
+  'ESCAPE — an inline _ run must not invent an em mark':
+    adfDoc(adfPara(adfText('call foo_bar_baz now'))),
+  // F1.2 a paragraph whose text is "- not a list" -> an actual bulletList
+  'ESCAPE — a paragraph beginning "- " must not be promoted to a bulletList':
+    adfDoc(adfPara(adfText('- not a list'))),
+
+  // -- sub-class (a), block-level promotion ----------------------------------
+  'ESCAPE — a paragraph beginning "# " must not be promoted to a heading':
+    adfDoc(adfPara(adfText('# not a heading'))),
+  'ESCAPE — a paragraph beginning "> " must not be promoted to a blockquote':
+    adfDoc(adfPara(adfText('> not a quote'))),
+  'ESCAPE — a paragraph beginning "1. " must not be promoted to an orderedList':
+    adfDoc(adfPara(adfText('1. not a list'))),
+  'ESCAPE — a paragraph whose text is "---" must not be promoted to a rule':
+    adfDoc(adfPara(adfText('---'))),
+  // "the worst case in the whole set": the text is DELETED, not reinterpreted.
+  'ESCAPE — a paragraph beginning with a fence marker must not have its text deleted':
+    adfDoc(adfPara(adfText('```js'))),
+
+  // -- the inline-run siblings the human decision names ----------------------
+  'ESCAPE — an inline ** run must not invent a strong mark':
+    adfDoc(adfPara(adfText('a ** b ** c'))),
+  'ESCAPE — an inline backtick run must not invent a code mark':
+    adfDoc(adfPara(adfText('use `x` in the shell'))),
+  'ESCAPE — an inline ~~ run must not invent a strike mark':
+    adfDoc(adfPara(adfText('a ~~b~~ c'))),
+  'ESCAPE — literal link syntax must not invent a link mark':
+    adfDoc(adfPara(adfText('see [1](2) below'))),
+
+  // -- the two outright codec bugs -------------------------------------------
+  // F1 (b): href TRUNCATED to ".../Foo_(bar" — a silently broken link.
+  'FIX — a "(" in an href must not truncate it':
+    adfDoc(adfPara(adfText('Foo', [{ type: 'link', attrs: { href: 'https://e.com/wiki/Foo_(bar)' } }]))),
+  // F1 (b): the link mark is LOST and raw "[a]b](http://x)" leaks into the body.
+  'FIX — a "]" in link text must not destroy the link mark':
+    adfDoc(adfPara(adfText('a]b', [{ type: 'link', attrs: { href: 'http://x' } }]))),
+
+  // -- the same collisions where they are easiest to get wrong ---------------
+  'ESCAPE — collisions inside a heading':
+    adfDoc({ type: 'heading', attrs: { level: 2 }, content: [adfText('Release 1.0_rc *notes*')] }),
+  'ESCAPE — collisions inside a list item':
+    adfDoc({ type: 'bulletList', content: [adfItem(adfPara(adfText('- nested-looking _text_')))] }),
+  'ESCAPE — collisions inside a blockquote':
+    adfDoc({ type: 'blockquote', content: [adfPara(adfText('> deeper_looking'))] }),
+  'ESCAPE — collisions inside marked runs':
+    adfDoc(adfPara(
+      adfText('a_b', [{ type: 'strong' }]),
+      adfText(' and '),
+      adfText('c*d', [{ type: 'em' }]),
+      adfText(' and '),
+      adfText('e`f', [{ type: 'code' }]),
+    )),
+  // A code BLOCK body is fenced and read back verbatim, so it must be left
+  // exactly alone — escaping it would corrupt the very content it protects.
+  'ESCAPE — a codeBlock body is NOT escaped':
+    adfDoc({ type: 'codeBlock', attrs: { language: 'md' }, content: [adfText('# heading\n- item\n_under_')] }),
+}
+
+/** Sub-class (b) residue: genuinely unrebuildable, so a D1 refusal (not a lossy 200). */
+const F1_MUST_REFUSE = {
+  // F1.3 an empty spacer paragraph -> dropped entirely. There is no Markdown
+  // for "an empty paragraph": it renders to a blank line, and blank lines are
+  // exactly what markdownToAdf splits blocks ON. Escaping cannot reach it.
+  'REFUSE — an empty spacer paragraph is dropped': adfDoc(adfPara(), adfPara(adfText('after'))),
+  // F1 (b): attrs dropped; the list silently renumbers 5,6 -> 1,2.
+  'REFUSE — orderedList attrs {order:5} are dropped and the list renumbers':
+    adfDoc({ type: 'orderedList', attrs: { order: 5 }, content: [adfItem(adfPara(adfText('first'))), adfItem(adfPara(adfText('second')))] }),
+  // F1 (b): whitespace trimmed.
+  'REFUSE — listItem text "  padded  " is trimmed':
+    adfDoc({ type: 'bulletList', content: [adfItem(adfPara(adfText('  padded  ')))] }),
+  // F1 (b): clamped to 6. Not reachable in practice — ADF caps at 6 — but the
+  // gate should not depend on that being true of every tenant.
+  'REFUSE — heading attrs {level:7} are clamped to 6':
+    adfDoc({ type: 'heading', attrs: { level: 7 }, content: [adfText('Too deep')] }),
+}
+
+describe('LIN-1886 review F1 — the reviewer\'s adversarial battery (Option A)', () => {
+  for (const [name, doc] of Object.entries(F1_MUST_ROUND_TRIP)) {
+    test(name, () => {
+      assert.equal(
+        adfHasUnrenderableContent(doc), false,
+        'Option A escapes/fixes this rather than refusing it — refusing ordinary prose is not acceptable',
+      )
+      assert.deepEqual(
+        markdownToAdf(adfToMarkdown(doc)), doc,
+        `content was rewritten. markdown was: ${JSON.stringify(adfToMarkdown(doc))}`,
+      )
+    })
+  }
+
+  for (const [name, doc] of Object.entries(F1_MUST_REFUSE)) {
+    test(name, () => {
+      assert.equal(adfHasUnrenderableContent(doc), true, 'the write gate must refuse this doc')
+      assert.notDeepEqual(
+        markdownToAdf(adfToMarkdown(doc)), doc,
+        'this actually round-trips fine now — refusing it is a needless capability cost',
+      )
+    })
+  }
+})
+
+// =============================================================================
 // adfHasUnrenderableContent — D1 policy detection (LIN-1886 Step 1)
 // =============================================================================
 
@@ -1335,6 +1473,142 @@ describe('createJiraClient 429 handling', () => {
       assert.equal(isAuthError(err), false)
       assert.equal(classifyUpstreamError(err).category, 'upstream')
       assert.equal(classifyUpstreamError(err).retryable, true)
+    }
+  })
+})
+
+// =============================================================================
+// The invariant as a GENERATED property (LIN-1886 review F2)
+// =============================================================================
+//
+// F2's finding: the docstring states the round-trip invariant as a general
+// property, but the suite establishes it over ~21 hand-picked fixtures — "the
+// same failure mode as Blocker 3's proximate cause: a test whose framing claimed
+// coverage it did not have". Correcting only the docstring would have been the
+// cheap discharge; this is the other one. The corpus below is deliberately
+// adversarial (every character the codecs treat as markup, in every position
+// that matters) and it is CROSSED with every structural slot those characters
+// can occupy, so the claim is checked over hundreds of documents rather than a
+// list someone chose.
+//
+// Both directions are asserted, and the second is the one that keeps the gate
+// honest: a refusal must be a refusal of something genuinely lossy. A rule that
+// over-refuses shows up here as "refused, but actually round-trips", which is a
+// capability cost masquerading as safety.
+
+/** Payloads that collide with Markdown syntax in every way the codecs care about. */
+const ADVERSARIAL_TEXTS = [
+  'plain prose',
+  'foo_bar_baz', 'a _b_ c', '_leading', 'trailing_',
+  'a ** b ** c', '**bold-looking**', '*single*', 'a*b',
+  'use `x` here', '`tick', 'a``b',
+  'a ~~b~~ c', '~tilde',
+  'see [1](2) below', '[unclosed(', 'a]b', '[a](b)(c)',
+  'back\\slash', 'C:\\Users\\me', 'a \\* b', 'trailing\\',
+  '# not a heading', '## also not', '#nospace',
+  '> not a quote', '>nospace',
+  '- not a list', '-nospace', '* not a list either',
+  '1. not a list', '12. nor this', '1.nospace',
+  '---', '----', '- - -',
+  '```js', '```', '~~~',
+  '| a | b |', '<html>&amp;', 'emoji 🙂 and — dashes',
+  'mixed `code` and _em_ and [l](u) and **b**',
+  // Whitespace and newlines: these mostly drive the REFUSAL side of the
+  // property (a `.trim()` or a block split destroys them), so they are here to
+  // prove the refusals are earned rather than blanket.
+  '', ' ', '  padded  ', ' leading', 'trailing ', '\ttab',
+  'a\nb', 'a\n\nb', '\nleading newline', 'trailing newline\n',
+]
+
+/** Hrefs exercising the paren-truncation bug and its neighbours. */
+const ADVERSARIAL_HREFS = [
+  'https://e.com', 'https://e.com/wiki/Foo_(bar)', 'https://e.com/a(b)c(d)',
+  'https://e.com/a)b', 'https://e.com/a\\b', 'https://e.com/?q=a_b&r=*',
+  '', 'not a url at all',
+]
+
+const p = t => adfDoc(adfPara(adfText(t)))
+
+/** Every structural slot an adversarial payload can sit in. */
+const SLOTS = {
+  paragraph: t => p(t),
+  'paragraph, second block': t => adfDoc(adfPara(adfText('first')), adfPara(adfText(t))),
+  'paragraph with a hardBreak': t => adfDoc(adfPara(adfText(t), HARD_BREAK, adfText(t))),
+  'paragraph, mid-run': t => adfDoc(adfPara(adfText('before '), adfText(t), adfText(' after'))),
+  heading: t => adfDoc({ type: 'heading', attrs: { level: 2 }, content: [adfText(t)] }),
+  'bullet item': t => adfDoc({ type: 'bulletList', content: [adfItem(adfPara(adfText(t)))] }),
+  'ordered item': t => adfDoc({ type: 'orderedList', content: [adfItem(adfPara(adfText(t)))] }),
+  'two bullet items': t => adfDoc({ type: 'bulletList', content: [adfItem(adfPara(adfText(t))), adfItem(adfPara(adfText('plain')))] }),
+  blockquote: t => adfDoc({ type: 'blockquote', content: [adfPara(adfText(t))] }),
+  codeBlock: t => adfDoc({ type: 'codeBlock', content: [adfText(t)] }),
+  'codeBlock with a language': t => adfDoc({ type: 'codeBlock', attrs: { language: 'js' }, content: [adfText(t)] }),
+  'strong mark': t => adfDoc(adfPara(adfText(t, [{ type: 'strong' }]))),
+  'em mark': t => adfDoc(adfPara(adfText(t, [{ type: 'em' }]))),
+  'code mark': t => adfDoc(adfPara(adfText(t, [{ type: 'code' }]))),
+  'strike mark': t => adfDoc(adfPara(adfText(t, [{ type: 'strike' }]))),
+  'link text': t => adfDoc(adfPara(adfText(t, [{ type: 'link', attrs: { href: 'https://e.com' } }]))),
+}
+
+describe('ADF → markdown → ADF, as a generated property over an adversarial corpus', () => {
+  for (const [slot, build] of Object.entries(SLOTS)) {
+    test(`every adversarial payload holds the invariant in: ${slot}`, () => {
+      for (const text of ADVERSARIAL_TEXTS) {
+        const doc = build(text)
+        const md = adfToMarkdown(doc)
+        const rebuilt = markdownToAdf(md)
+        if (adfHasUnrenderableContent(doc)) {
+          assert.notDeepEqual(
+            rebuilt, doc,
+            `over-refusal: ${slot} / ${JSON.stringify(text)} round-trips fine but the gate refuses it`,
+          )
+        } else {
+          assert.deepEqual(
+            rebuilt, doc,
+            `INVARIANT BROKEN: ${slot} / ${JSON.stringify(text)}\nmarkdown was: ${JSON.stringify(md)}`,
+          )
+        }
+      }
+    })
+  }
+
+  test('every adversarial href holds the invariant', () => {
+    for (const href of ADVERSARIAL_HREFS) {
+      for (const text of ['link text', 'a]b', 'a_b']) {
+        const doc = adfDoc(adfPara(adfText(text, [{ type: 'link', attrs: { href } }])))
+        const rebuilt = markdownToAdf(adfToMarkdown(doc))
+        if (adfHasUnrenderableContent(doc)) {
+          assert.notDeepEqual(rebuilt, doc, `over-refusal: href ${JSON.stringify(href)}`)
+        } else {
+          assert.deepEqual(
+            rebuilt, doc,
+            `INVARIANT BROKEN: href ${JSON.stringify(href)} / text ${JSON.stringify(text)}\nmarkdown was: ${JSON.stringify(adfToMarkdown(doc))}`,
+          )
+        }
+      }
+    }
+  })
+
+  // Whole documents, not one payload in isolation: block ADJACENCY is its own
+  // hazard (a paragraph promoted to a rule changes how the NEXT block parses).
+  test('adversarial payloads hold the invariant when stacked into one document', () => {
+    for (let i = 0; i < ADVERSARIAL_TEXTS.length; i += 1) {
+      const doc = adfDoc(
+        { type: 'heading', attrs: { level: 1 }, content: [adfText(ADVERSARIAL_TEXTS[i])] },
+        adfPara(adfText(ADVERSARIAL_TEXTS[(i + 1) % ADVERSARIAL_TEXTS.length])),
+        { type: 'bulletList', content: [adfItem(adfPara(adfText(ADVERSARIAL_TEXTS[(i + 2) % ADVERSARIAL_TEXTS.length])))] },
+        adfPara(adfText(ADVERSARIAL_TEXTS[(i + 3) % ADVERSARIAL_TEXTS.length])),
+        { type: 'rule' },
+        { type: 'blockquote', content: [adfPara(adfText(ADVERSARIAL_TEXTS[(i + 4) % ADVERSARIAL_TEXTS.length]))] },
+      )
+      const rebuilt = markdownToAdf(adfToMarkdown(doc))
+      if (adfHasUnrenderableContent(doc)) {
+        assert.notDeepEqual(rebuilt, doc, `over-refusal on stacked document ${i}`)
+      } else {
+        assert.deepEqual(
+          rebuilt, doc,
+          `INVARIANT BROKEN on stacked document ${i}\nmarkdown was: ${JSON.stringify(adfToMarkdown(doc))}`,
+        )
+      }
     }
   })
 })

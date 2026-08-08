@@ -137,6 +137,83 @@ function seed() {
           labels: [], assignee: null, parent: null, _transitions: [],
         },
       },
+      // ---------------------------------------------------------------------
+      // LIN-1886 review F1: the five counterexamples the REVIEWER reproduced
+      // end-to-end through these same routes, each returning 200 `success:true`
+      // with the stored ADF silently rewritten. They are seeded here under the
+      // reviewer's own RES-n numbering so the re-review can find them, and
+      // asserted below at their post-Option-A dispositions.
+      // ---------------------------------------------------------------------
+      {
+        id: '30010', key: 'RES-1', // "run foo_bar_baz" gained an em mark
+        fields: {
+          summary: 'Inline underscore run',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'paragraph', content: [{ type: 'text', text: 'run foo_bar_baz' }] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
+      {
+        id: '30011', key: 'RES-2', // the "```js" paragraph vanished entirely
+        fields: {
+          summary: 'Fence-looking paragraph',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'paragraph', content: [{ type: 'text', text: '```js' }] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
+      {
+        id: '30012', key: 'RES-3', // href truncated at the "("
+        fields: {
+          summary: 'Link with a paren in the href',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'paragraph', content: [
+              { type: 'text', text: 'Foo', marks: [{ type: 'link', attrs: { href: 'https://e.com/wiki/Foo_(bar)' } }] },
+            ] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
+      {
+        id: '30013', key: 'RES-4', // orderedList order:5 dropped, renumbered 1,2
+        fields: {
+          summary: 'Ordered list starting at 5',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'orderedList', attrs: { order: 5 }, content: [
+              { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'fifth' }] }] },
+              { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'sixth' }] }] },
+            ] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
+      {
+        id: '30014', key: 'RES-5', // paragraph promoted to a heading
+        fields: {
+          summary: 'Heading-looking paragraph',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'paragraph', content: [{ type: 'text', text: '# not a heading' }] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
       {
         id: '30004', key: 'ENG-13', // done, no available transitions
         fields: {
@@ -451,5 +528,58 @@ describe('Jira-backed proxy PATCH /issues/:id — D4 patch-field refusal (LIN-18
     const { status, body } = await call(buildApp(), 'PATCH', '/api/proxy/issues/ENG-10', { parentId: null });
     assert.equal(status, 422);
     assert.match(body.error, /parent|top-level/i);
+  });
+});
+
+describe('Jira-backed proxy — the reviewer\'s five end-to-end reproductions (LIN-1886 review F1)', () => {
+  // Every one of these returned 200 `success:true` at head `5f3a2855` with the
+  // stored ADF silently rewritten. Option A routes four of them to a FAITHFUL
+  // round trip (escape / fix the codec) and one to a LOUD 422 (refuse what
+  // remains unrebuildable). Each assertion reads the fake store directly, so it
+  // witnesses what was actually persisted rather than what the response claimed.
+
+  test('RES-1: an append to "run foo_bar_baz" preserves it byte-for-byte (no invented em mark)', async () => {
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-1/description/append', { block: 'A new note.' });
+    assert.equal(status, 200);
+    const content = (await stored('RES-1')).fields.description.content;
+    assert.deepEqual(content[0], { type: 'paragraph', content: [{ type: 'text', text: 'run foo_bar_baz' }] },
+      'the original paragraph survived unchanged — no em mark invented from the identifier');
+    assert.deepEqual(content[1], { type: 'paragraph', content: [{ type: 'text', text: 'A new note.' }] });
+  });
+
+  test('RES-2: an append to a "```js" paragraph does not delete its text', async () => {
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-2/description/append', { block: 'A new note.' });
+    assert.equal(status, 200);
+    const content = (await stored('RES-2')).fields.description.content;
+    assert.deepEqual(content[0], { type: 'paragraph', content: [{ type: 'text', text: '```js' }] },
+      'the worst case in the review\'s set: the text used to be DELETED, not merely reinterpreted');
+  });
+
+  test('RES-3: an append to a paren-bearing href leaves the link intact', async () => {
+    // The reviewer drove this through PATCH, but the destruction happens in the
+    // read-modify-write's READ half — which `description/append` exercises with
+    // the stored body actually re-written, making the store a true witness.
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-3/description/append', { block: 'A new note.' });
+    assert.equal(status, 200);
+    const content = (await stored('RES-3')).fields.description.content;
+    assert.deepEqual(content[0], { type: 'paragraph', content: [
+      { type: 'text', text: 'Foo', marks: [{ type: 'link', attrs: { href: 'https://e.com/wiki/Foo_(bar)' } }] },
+    ] }, 'the href no longer truncates at the "(" — it used to persist as ".../Foo_(bar"');
+  });
+
+  test('RES-4: an append to an orderedList{order:5} is REFUSED (422) rather than renumbered', async () => {
+    const before = JSON.stringify((await stored('RES-4')).fields.description);
+    const { status, body } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-4/description/append', { block: 'A new note.' });
+    assert.equal(status, 422, 'the writer does not model `order`, so this is a loud refusal, not a lossy 200');
+    assert.match(body.error, /numbered list/i, 'the D1 message names this cause (review F3)');
+    assert.equal(JSON.stringify((await stored('RES-4')).fields.description), before, 'nothing was written');
+  });
+
+  test('RES-5: an append to a "# not a heading" paragraph does not promote it to a heading', async () => {
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-5/description/append', { block: 'A new note.' });
+    assert.equal(status, 200);
+    const content = (await stored('RES-5')).fields.description.content;
+    assert.deepEqual(content[0], { type: 'paragraph', content: [{ type: 'text', text: '# not a heading' }] },
+      'still a paragraph, still carrying its literal "# "');
   });
 });
