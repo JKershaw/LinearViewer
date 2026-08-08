@@ -19,8 +19,12 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert';
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
-import { refreshOwnerCredential, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
+import { refreshOwnerCredential, refreshOwnerWorkspaceToken, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
 import { persistOwnerCredential } from '../../lib/workspace.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
 
@@ -328,5 +332,95 @@ describe('LIN-1887 — the seam’s failure contract is unchanged by the paramet
     });
     assert.equal(result.token, 'winner-access', 'the loser converges rather than reporting a dead credential');
     assert.equal(result.refreshToken, 'R1');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Step 8 — the headless lane
+// ---------------------------------------------------------------------------
+
+describe('LIN-1887 Step 8 — the headless durable arm is provider-partitioned', () => {
+  beforeEach(() => _resetInflightForTests());
+
+  const sessionsFor = (provider) => [{
+    _id: 'sid-1',
+    session: {
+      accountId: 'acct-1',
+      workspaces: [{
+        id: 'ws-1', urlKey: 'acme', provider, accessToken: 'stale',
+        tokenExpiresAt: Date.now() - 10_000,
+        bindings: provider === 'jira'
+          ? [{ provider: 'jira', scope: 'https://acme.atlassian.net', credentials: { token: 'stale', authType: 'oauth', cloudId: 'cid-1' } }]
+          : [{ provider: 'linear', scope: 'org-1', credentials: { token: 'stale' } }],
+      }],
+    },
+  }];
+
+  const bothPartitions = () => new OwnerCredentialStore({
+    collection: fakeCollection({
+      'acct-1::acme::linear': { _id: 'acct-1::acme::linear', accountId: 'acct-1', urlKey: 'acme', provider: 'linear', scope: 'org-1', token: 'stale-linear', refreshToken: 'LINEAR-RT' },
+      'acct-1::acme::jira': { _id: 'acct-1::acme::jira', accountId: 'acct-1', urlKey: 'acme', provider: 'jira', scope: 'https://acme.atlassian.net', token: 'stale-jira', refreshToken: 'JIRA-RT' },
+    }),
+  });
+
+  test('a Jira headless refresh spends the JIRA partition, never Linear’s', async () => {
+    const spent = [];
+    const refreshed = await refreshOwnerWorkspaceToken({
+      sessions: sessionsFor('jira'),
+      urlKey: 'acme',
+      ownerAccountId: 'acct-1',
+      refreshAccessToken: async (rt) => { spent.push(['linear', rt]); return { access_token: 'x', refresh_token: 'y', expires_in: 1 }; },
+      resolveExchange: (p) => async (rt) => { spent.push([p, rt]); return { access_token: 'fresh-jira', refresh_token: 'JIRA-RT-2', expires_in: 3600 }; },
+      persistSession: async () => {},
+      resolveProvider: () => ({}),
+      store: bothPartitions(),
+    });
+
+    assert.deepEqual(spent, [['jira', 'JIRA-RT']], 'the Linear exchange must never see a Jira credential');
+    assert.equal(refreshed.token, 'fresh-jira');
+    assert.equal(refreshed.provider, 'jira');
+    // A structured-credential provider needs its call scope paired with the token.
+    assert.deepEqual(refreshed.scope, { authType: 'oauth', accessToken: 'fresh-jira', cloudId: 'cid-1', site: 'https://acme.atlassian.net' });
+  });
+
+  test('Linear’s headless return is unchanged — no `scope`, because a Linear call scope IS the bare token', async () => {
+    const refreshed = await refreshOwnerWorkspaceToken({
+      sessions: sessionsFor('linear'),
+      urlKey: 'acme',
+      ownerAccountId: 'acct-1',
+      refreshAccessToken: async () => ({ access_token: 'fresh-linear', refresh_token: 'LINEAR-RT-2', expires_in: 3600 }),
+      persistSession: async () => {},
+      resolveProvider: () => ({}),
+      store: bothPartitions(),
+    });
+    // Attaching the durable record's `scope` here would hand routes/proxy.js's
+    // provider-lane substitution a Linear ORG ID where it expects a credential.
+    assert.deepEqual(Object.keys(refreshed).sort(), ['expiresAt', 'provider', 'token']);
+    assert.equal(refreshed.token, 'fresh-linear');
+  });
+
+  test('with no exchange injected the lane is Linear-only — byte-identical to before this ticket', async () => {
+    const refreshed = await refreshOwnerWorkspaceToken({
+      sessions: sessionsFor('jira'),
+      urlKey: 'acme',
+      ownerAccountId: 'acct-1',
+      refreshAccessToken: async () => { throw new Error('the Linear exchange must not be reached for a jira workspace'); },
+      persistSession: async () => {},
+      resolveProvider: () => ({}),
+      store: bothPartitions(),
+    });
+    assert.equal(refreshed, null, '"nothing refreshable" — never destructive, and never another provider’s partition');
+  });
+
+  test('server.js INJECTS that exchange resolver — without it Step 8 is dead code', () => {
+    // The arm above is unreachable in production unless the one call site
+    // threads `resolveExchange`. server.js is not import-safe in a unit test, so
+    // this is a source-text pin on the wiring, alongside the behavioural tests.
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+    const callIdx = src.indexOf('refreshOwnerWorkspaceToken({');
+    assert.notEqual(callIdx, -1, 'expected the headless refresh call site in server.js');
+    const callArgs = src.slice(callIdx, src.indexOf('});', callIdx));
+    assert.match(callArgs, /resolveExchange:\s*refreshExchangeFor/, 'the headless lane must read the SAME exchange map both human dispatches do');
   });
 });

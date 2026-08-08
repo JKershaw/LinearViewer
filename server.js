@@ -1759,6 +1759,12 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
           refreshAccessToken,
           persistSession: persistSessionRow,
           resolveProvider: getProviderForWorkspace,
+          // LIN-1887 Step 8: without this the headless durable arm is
+          // Linear-only, so a Jira-OAuth workspace's proxy token simply stops
+          // resolving between refreshes once the MAX_SAFE_INTEGER sentinel is
+          // retired. Same map both human dispatches read, so a provider cannot
+          // be refreshable in a browser and not on this lane.
+          resolveExchange: refreshExchangeFor,
           store: ownerCredentialStore
         });
         if (refreshed) {
