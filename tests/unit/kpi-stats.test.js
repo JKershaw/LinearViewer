@@ -17,7 +17,7 @@ import {
   collectKpiStats, categorizeProxyEvent, PROXY_PHASES,
   ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS,
   OUTCOME_WINDOW_WEEKS, OUTCOME_WINDOW_DAYS,
-  harnessOf, usageOf, evidenceCountOf, loadDispatchHistory
+  harnessOf, usageOf, evidenceCountOf, loadDispatchHistory, groupDispatchLineages
 } from '../../lib/kpi-stats.js';
 
 // Minimal in-memory mock of the collection surface kpi-stats uses:
@@ -732,6 +732,72 @@ describe('harnessOf/usageOf/evidenceCountOf (LIN-1957)', () => {
     };
     assert.deepStrictEqual(usageOf(raw), usageOf(aggregated));
     assert.strictEqual(evidenceCountOf(raw), evidenceCountOf(aggregated));
+  });
+});
+
+describe('groupDispatchLineages (LIN-1957) — the shared extraction', () => {
+  const usageMarker = (costUsd, days) => ({
+    kind: 'usage', message: `[usage] {"costUsd":${costUsd}}`,
+    timestamp: new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
+  });
+
+  test('harness is captured ONCE from the earliest row only — a later follow-up with a DIFFERENT harness must not change it', () => {
+    // 'orig' dispatched 6 days ago (earlier); 'fu' is a follow-up dispatched
+    // 5 days ago (later, more recent) carrying a DIFFERENT harness. The
+    // approved-plan semantics (beat 2 decision (a)): the lineage's harness is
+    // whatever the earliest row carried, permanently.
+    const rows = [
+      { _id: 'orig', rootItemId: 'orig', harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] },
+      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', harness: 'opencode', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
+    ];
+    const lineages = groupDispatchLineages(rows);
+    assert.strictEqual(lineages.get('orig').harness, 'claude-code');
+  });
+
+  test('earliest-row-only capture is order-independent — the same result whichever row is processed first', () => {
+    const rows = [
+      { _id: 'orig', rootItemId: 'orig', harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] },
+      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', harness: 'opencode', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
+    ];
+    const forward = groupDispatchLineages(rows);
+    const reversed = groupDispatchLineages([...rows].reverse());
+    assert.strictEqual(forward.get('orig').harness, 'claude-code');
+    assert.strictEqual(reversed.get('orig').harness, 'claude-code');
+  });
+
+  test('issueIdentifier is captured from the same earliest row as harness', () => {
+    const rows = [
+      { _id: 'orig', rootItemId: 'orig', issueIdentifier: 'LIN-1', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] },
+      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', issueIdentifier: 'LIN-2', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
+    ];
+    const lineages = groupDispatchLineages(rows);
+    assert.strictEqual(lineages.get('orig').issueIdentifier, 'LIN-1');
+  });
+
+  test('rowUsage collects each contributing row\'s own usage entry, rows with none omitted', () => {
+    const rows = [
+      { _id: 'orig', rootItemId: 'orig', status: 'taken', dispatchedAt: daysAgo(3), feedback: [usageMarker(1, 3)] },
+      { _id: 'mid', rootItemId: 'orig', followUpTo: 'orig', status: 'taken', dispatchedAt: daysAgo(2), feedback: [] }, // no usage entry
+      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', status: 'taken', dispatchedAt: daysAgo(1), feedback: [usageMarker(2, 1)] }
+    ];
+    const lineages = groupDispatchLineages(rows);
+    const rowUsage = lineages.get('orig').rowUsage;
+    assert.strictEqual(rowUsage.length, 2);
+    assert.strictEqual(rowUsage[0].message, '[usage] {"costUsd":1}');
+    assert.strictEqual(rowUsage[1].message, '[usage] {"costUsd":2}');
+  });
+
+  test('computeDispatchOutcomes output is unaffected by the three new fields — the extraction is behavior-preserving', async () => {
+    // Same seed as the existing dispatch-outcomes suite, run through the
+    // extracted helper's consumer end-to-end via collectKpiStats.
+    const stats = await collectKpiStats(buildCollections({
+      dispatchHistory: createMockCollection(outcomeSeed())
+    }), { now: NOW });
+    assert.strictEqual(stats.dispatchOutcomes.done, 2);
+    assert.strictEqual(stats.dispatchOutcomes.failed, 1);
+    assert.strictEqual(stats.dispatchOutcomes.aborted, 1);
+    assert.strictEqual(stats.dispatchOutcomes.resolved, 4);
+    assert.strictEqual(stats.dispatchOutcomes.rate, 0.5);
   });
 });
 
