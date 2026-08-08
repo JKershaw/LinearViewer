@@ -41,6 +41,7 @@ const ISSUE = {
 let providerSeq = 0;
 function fakeProvider({
   inlineEdit = true,
+  priority = true,
   supportsStates = true,
   states = async () => [{ id: 'started', name: 'In Progress', position: 2 }],
   fetchIssueFields = async () => ISSUE,
@@ -48,7 +49,7 @@ function fakeProvider({
   const name = `fake-task-edit-${++providerSeq}`;
   registerProvider({
     name,
-    ui: { inlineEdit },
+    ui: { inlineEdit, priority },
     supports: (cap) => (cap === 'states' ? supportsStates : true),
     states,
     fetchIssueFields,
@@ -70,12 +71,12 @@ function makeRouter() {
   });
 }
 
-async function call({ provider, urlKey = 'acme', issueId = ISSUE.id }) {
+async function call({ provider, urlKey = 'acme', issueId = ISSUE.id, bindings, source }) {
   const req = {
     session: { workspaces: [], features: {} },
-    workspace: { urlKey, provider, accessToken: 'tok' },
+    workspace: { urlKey, provider, accessToken: 'tok', ...(bindings ? { bindings } : {}) },
     params: { urlKey, issueId },
-    query: {},
+    query: source ? { source } : {},
     get: () => 'localhost',
   };
   const res = {
@@ -200,5 +201,66 @@ describe('state control degradation', () => {
   test('renders a real <select> when states are available', async () => {
     const res = await call({ provider: fakeProvider() });
     assert.ok(/<select[^>]*name="stateId"/.test(res.body));
+  });
+});
+
+// =============================================================================
+// The merge-resolution pin (LIN-1886 review F4 × LIN-1904)
+// =============================================================================
+//
+// LIN-1904 replaced this route's `getProviderForWorkspace(workspace)` — the
+// workspace's ACTIVE provider — with `resolveIssueBinding(workspace, source)`,
+// the ISSUE's own binding. LIN-1886 independently added `ui` to the page
+// options so the priority control can be hidden for a provider that cannot
+// honour it (Jira). Merging the two is a correctness decision, not a textual
+// one, and NEITHER side's tests reach it: `render-task-edit.test.js:237` passes
+// `{ ui: { priority: false } }` straight to the RENDERER, never exercising the
+// route's choice of provider, and LIN-1904's tests predate the flag. A wrong
+// resolution — reading `ui` off the active provider — is silently green.
+//
+// So this is that test. It pins the resolution actually taken: `ui` comes from
+// the PER-BINDING provider. The only variable between the two cases below is
+// the `source` query param.
+describe('ui is read off the ISSUE\'s binding, not the workspace\'s active provider (F4 merge pin)', () => {
+  /** A two-binding workspace: active provider honours priority, the secondary one does not. */
+  function twoBindingWorkspace() {
+    const active = fakeProvider({ priority: true });
+    const secondary = fakeProvider({ priority: false });
+    return {
+      active,
+      secondary,
+      bindings: [
+        { provider: active, scope: 'ws-1', credentials: { token: 'tok' } },
+        { provider: secondary, scope: 'ws-2', credentials: { token: 'other-tok' } },
+      ],
+    };
+  }
+
+  test('a foreign-bound issue hides the priority control even in a priority-honouring workspace', async () => {
+    const { active, secondary, bindings } = twoBindingWorkspace();
+    const res = await call({ provider: active, bindings, source: secondary });
+    assert.strictEqual(res.statusCode, 200);
+    assert.ok(
+      !res.body.includes('data-testid="task-edit-priority"'),
+      'reading ui off the ACTIVE provider here would render a priority <select> the '
+      + 'resolved provider silently drops on submit — the D3 harm ui.priority exists to prevent',
+    );
+  });
+
+  test('the same workspace still renders it for an issue bound to the active provider', async () => {
+    const { active, bindings } = twoBindingWorkspace();
+    const res = await call({ provider: active, bindings, source: active });
+    assert.strictEqual(res.statusCode, 200);
+    assert.ok(
+      res.body.includes('data-testid="task-edit-priority"'),
+      'the pin must not degenerate into hiding priority for everyone',
+    );
+  });
+
+  test('an absent source falls back to the active provider\'s ui (single-binding workspaces unaffected)', async () => {
+    const { active, bindings } = twoBindingWorkspace();
+    const res = await call({ provider: active, bindings });
+    assert.strictEqual(res.statusCode, 200);
+    assert.ok(res.body.includes('data-testid="task-edit-priority"'));
   });
 });

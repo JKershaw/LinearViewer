@@ -108,6 +108,7 @@ describe('GitHubProvider capability profile (LIN-178)', () => {
       estimates: false,   // no estimate field
       subtasks: false,    // no hierarchy
       attachments: true,  // issue/comment bodies carry user-content uploads (LIN-771)
+      priority: true,     // abstract default, not overridden (LIN-1886)
       displayName: 'GitHub Issues', // relabeled from 'GitHub' (LIN-702)
     });
   });
