@@ -395,6 +395,111 @@ describe('LIN-1887 Step 1(c) — reactive: a `none` provider survives its first 
 });
 
 // ---------------------------------------------------------------------------
+// Close-out F2 — non-destructive spares the WORKSPACE, not a revoked credential
+// ---------------------------------------------------------------------------
+
+describe('LIN-1887 close-out F2 — a definitively-revoked non-destructive credential is revoked from its own partition', () => {
+  // The defect these pin: both non-destructive early returns sat BEFORE their
+  // dispatch's durable delete, so a Jira `invalid_grant` rendered the re-link
+  // page and left the dead rotating Atlassian token in the store indefinitely.
+  // The fix must revoke the dead partition and NOTHING else — sparing the
+  // workspace is the whole point of the branch it lives in.
+  const revoked = () => { throw new TokenRefreshError('invalid_grant', 'EXPIRED'); };
+
+  test('proactive: the jira partition is deleted, while the workspace, its sibling and the session all survive', async () => {
+    const workspace = expired({ provider: 'jira' });
+    const { calls, session, res } = await runProactive({
+      workspace,
+      extraWorkspaces: [{ id: 'w-y', urlKey: 'other', provider: 'linear' }],
+      definitiveRevocation: true,
+      refreshResult: revoked,
+    });
+
+    assert.deepEqual(calls.durableDeletes, [['acct-1', 'acme', 'jira']], 'exactly the dead partition — never Linear’s, never a deleteAll');
+    assert.deepEqual(calls.durableDeleteAlls, [], 'the whole-workspace verb would take every co-resident partition with it');
+    assert.equal(session.workspaces.length, 2, 'F2 is a hygiene fix, not a licence to remove the workspace');
+    assert.equal(calls.sessionDestroyed, false);
+    assert.deepEqual(calls.evictions, [], 'eviction tracks session-side removal, which did not happen');
+    assert.equal(res.statusCode, 401, 'the user still gets the actionable re-link page');
+  });
+
+  test('reactive: the same, on a 401 whose refresh comes back definitively revoked', async () => {
+    const workspace = { id: 'w-x', urlKey: 'acme', provider: 'jira' };
+    const calls = freshCalls();
+    const ctx = makeContext({
+      workspace,
+      extraWorkspaces: [{ id: 'w-y', urlKey: 'other', provider: 'linear' }],
+      durableRecord: { refreshToken: 'JIRA-RT', provider: 'jira' },
+      definitiveRevocation: true,
+      calls,
+    });
+    ctx.handleTokenRefreshAndRetry = async () => revoked();
+    const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, send(p) { this.body = p; return this; }, redirect(t) { this.body = `redirect:${t}`; return this; } };
+    const fn = vm.runInContext([
+      handleWorkspaceRemovalSrc(),
+      handleUnauthorizedErrorSrc(),
+      sliceBetween('const REFRESH_EXCHANGES = {', '\n/**\n * Render the non-destructive'),
+      sliceBetween('function sendRelinkNotice(workspace, res) {', '\n/**\n * Middleware to ensure access token is valid'),
+      'handleUnauthorizedError',
+    ].join('\n'), ctx);
+    await fn(workspace, ctx.__session, 'team-1', null, res);
+
+    assert.deepEqual(calls.durableDeletes, [['acct-1', 'acme', 'jira']]);
+    assert.deepEqual(calls.durableDeleteAlls, [], 'handleWorkspaceRemoval must still not be reached');
+    assert.equal(ctx.__session.workspaces.length, 2);
+    assert.equal(calls.sessionDestroyed, false);
+    assert.equal(res.statusCode, 401);
+  });
+
+  test('a NON-definitive failure still keeps the credential, in both dispatches', async () => {
+    // The gate is LIN-1545's, shared with the destructive arm: a transient blip
+    // returns a 503 earlier, and a plain Error (the "no durable credential"
+    // throw, or a post-refresh save failure where the token may in fact have
+    // just rotated) must never delete a record it cannot prove is dead.
+    const proactive = await runProactive({ workspace: expired({ provider: 'jira' }), refreshResult: null });
+    assert.deepEqual(proactive.calls.durableDeletes, []);
+
+    const calls = freshCalls();
+    const ctx = makeContext({
+      workspace: { id: 'w-x', urlKey: 'acme', provider: 'jira' },
+      durableRecord: { refreshToken: 'JIRA-RT', provider: 'jira' },
+      calls,
+    });
+    ctx.handleTokenRefreshAndRetry = async () => { throw new Error('post-refresh render blew up'); };
+    const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, send(p) { this.body = p; return this; } };
+    const fn = vm.runInContext([
+      handleWorkspaceRemovalSrc(),
+      handleUnauthorizedErrorSrc(),
+      sliceBetween('const REFRESH_EXCHANGES = {', '\n/**\n * Render the non-destructive'),
+      sliceBetween('function sendRelinkNotice(workspace, res) {', '\n/**\n * Middleware to ensure access token is valid'),
+      'handleUnauthorizedError',
+    ].join('\n'), ctx);
+    await fn({ id: 'w-x', urlKey: 'acme', provider: 'jira' }, ctx.__session, 'team-1', null, res);
+    assert.deepEqual(calls.durableDeletes, []);
+  });
+
+  test('the DESTRUCTIVE providers are unchanged: Linear still deletes-and-removes, github-family still never reads the store', async () => {
+    // The control that matters — F2 adds a delete to the branch Linear never
+    // enters, so Linear's own delete must still be the one below it (fired
+    // alongside removal), and github-family must still reach neither.
+    const linear = await runProactive({
+      workspace: expired({ provider: 'linear' }),
+      definitiveRevocation: true,
+      refreshResult: revoked,
+    });
+    assert.deepEqual(linear.calls.durableDeletes, [['acct-1', 'acme', 'linear']]);
+    assert.equal(linear.session.workspaces.length, 0, 'Linear’s removal-on-revocation semantics are byte-for-byte');
+    assert.equal(linear.calls.sessionDestroyed, true);
+
+    for (const provider of ['github', 'github-projects']) {
+      const { calls } = await runProactive({ workspace: expired({ provider }), definitiveRevocation: true });
+      assert.deepEqual(calls.durableDeletes, [], `${provider} re-mints and owns no durable record`);
+      assert.deepEqual(calls.durableDeleteAlls, []);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Step 10 — the monitor's key
 // ---------------------------------------------------------------------------
 

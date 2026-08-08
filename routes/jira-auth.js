@@ -299,8 +299,21 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     }
 
     // Durable-first: the rotating refresh token is persisted under the JIRA
-    // partition (never Linear's — `persistOwnerCredential`'s explicit provider
-    // argument, LIN-1887 F1) before anything else can fail.
+    // partition (never Linear's — LIN-1887 F1) before anything else can fail.
+    //
+    // This writes through the store's own `put` rather than
+    // `persistOwnerCredential`, and the difference is load-bearing rather than
+    // an oversight (LIN-1887 close-out): that helper derives the record's
+    // `token` from the workspace's binding for `provider`, falling back to the
+    // scalar `workspace.accessToken` mirror. At THIS point in the flow the site
+    // has not been picked yet, so there is no Jira binding to read — the helper
+    // would fall back and write LINEAR's access token into the Jira partition.
+    // Nor can the write simply move after `linkProvider` in
+    // `completeJiraOAuthLink`: the refresh token deliberately never enters
+    // `jiraPending`, so the callback is the only place it exists. The
+    // partitioning is identical either way — `put` derives the partition from
+    // the record's own `provider` field, which is exactly what
+    // `persistOwnerCredential` passes it.
     if (tokenBag.refresh_token && ownerCredentialStore) {
       await ownerCredentialStore.put(req.session.accountId, workspace.urlKey, {
         provider: 'jira',

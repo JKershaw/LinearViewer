@@ -777,7 +777,26 @@ async function ensureValidToken(req, res, next) {
     // This is the proactive twin of the rule handleUnauthorizedError's Jira
     // branch has stated since LIN-1885; the rationale never depended on which
     // dispatch was asking.
+    // LIN-1887 close-out F2: "non-destructive" is a claim about the WORKSPACE,
+    // not a reason to keep a credential its issuer has already revoked. The two
+    // decisions were fused by this branch's POSITION — it returns before the
+    // durable delete below — so an `invalid_grant` rendered the re-link page and
+    // left the dead Atlassian refresh token sitting in its partition until the
+    // human re-linked, unlinked, or deleted the workspace: in plaintext, against
+    // LIN-1522's stated posture for this collection, and re-spent on a doomed
+    // Atlassian round-trip at every subsequent expiry. Deleting the ROUTED
+    // partition (`provider`, not `workspace.provider` — same reasoning as N2's
+    // delete below) revokes exactly the dead credential and nothing else, which
+    // is what the partitioning was built to make safe: the co-resident Linear
+    // record, both bindings, the workspace and the session all survive. Gated on
+    // the same LIN-1545 (S1) predicate as the destructive arm, so the two can
+    // never diverge — a transient blip has already returned above, and a
+    // non-TokenRefreshError (e.g. a post-refresh save failure) must still not
+    // delete a record that may have just rotated successfully.
     if (!declaration.destructiveOnFailure) {
+      if (isDefinitiveRevocation(error)) {
+        await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey, provider)
+      }
       return sendRelinkNotice(workspace, res)
     }
 
@@ -1246,11 +1265,21 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
       // durable record on this failure either. lib/token-refresh.js:30-33 states
       // that contract ("both human refresh paths gate their durable delete on
       // this predicate so they can never diverge"); `false` is what upholds it.
-      // The independent reason it is correct regardless of parity: the durable
-      // owner-credential record is keyed per workspace identity (accountId,
-      // urlKey), not per binding, so a workspace with a co-resident Linear
-      // durable credential must not have it deleted just because its
-      // GitHub-family binding failed to re-mint (LIN-1503 implementation review).
+      // The independent reason it is correct regardless of parity — restated at
+      // LIN-1887 close-out (F1), because the premise it used to rest on is one
+      // this ticket REPEALED. It used to read "the durable record is keyed per
+      // workspace identity (accountId, urlKey), not per binding, so a co-resident
+      // Linear credential must not be deleted over a GitHub-family re-mint
+      // failure". Records are now keyed per binding-provider
+      // (accountId, urlKey, provider — LIN-1887 N2/G1), so that sentence is
+      // false. `false` is still right, and for a STRONGER reason than the old
+      // one gave: `deleteDurable: true` routes to `deleteAll`, the
+      // whole-workspace verb, which would revoke EVERY partition — including the
+      // co-resident Linear one — over one binding's re-mint failure. The
+      // partitioning made a narrower delete expressible; it did not make this
+      // one appropriate, because a GitHub-family re-mint failure is not evidence
+      // that any stored refresh token is dead (github-family owns no durable
+      // record at all). Nothing to revoke, so revoke nothing.
       console.error('GitHub credential re-mint failed after 401:', remintError);
       return handleWorkspaceRemoval(session, workspace.id, res, false);
     }
@@ -1303,7 +1332,15 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
       // provider name: a failed refresh may only tear the workspace down for a
       // provider that declares it. A failed Jira refresh degrades to the same
       // re-link page its Basic arm renders.
+      // LIN-1887 close-out F2, the reactive twin of `ensureValidToken`'s arm:
+      // sparing the workspace does not mean keeping a revoked credential. The
+      // durable delete lives below this early return, so without this a Jira
+      // `invalid_grant` on a 401 left the dead partition in the store forever.
+      // Same partition-scoped delete, same LIN-1545 definitive-revocation gate.
       if (!declaration.destructiveOnFailure) {
+        if (isDefinitiveRevocation(refreshError)) {
+          await ownerCredentialStore.delete(session.accountId, workspace.urlKey, provider);
+        }
         return sendRelinkNotice(workspace, res);
       }
       // LIN-1545 (S2): mirror the proactive path (S1). Only a DEFINITIVE

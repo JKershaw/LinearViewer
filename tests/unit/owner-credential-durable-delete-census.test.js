@@ -27,8 +27,20 @@
  * the source-order assertions below still hold), only the guard around the two
  * refresh sites narrowed from "refresh failed" to "definitively revoked".
  *
- * Known durable-delete call sites (5, all `if-guarded or unconditional`
- * `ownerCredentialStore.delete(`/`ownerCredentialStore.delete(` calls):
+ * LIN-1887 close-out F2 added the two NON-destructive refresh sites, which is a
+ * widening of the census's population rather than an exception to it. Before
+ * F2, "this provider's failed refresh must not remove the workspace" also meant
+ * "…and therefore never revokes anything", because the non-destructive early
+ * return sat above each dispatch's durable delete. Those are separable
+ * decisions: the workspace survives, and the definitively-revoked partition is
+ * revoked. So the rule this census enforces is unchanged and now stated in its
+ * general form — every path that learns a credential is dead revokes it, and
+ * only a path that tears the workspace down uses the whole-workspace verb.
+ *
+ * Known durable-delete call sites (7, all `if-guarded or unconditional`
+ * `ownerCredentialStore.delete(`/`ownerCredentialStore.deleteAll(` calls):
+ *   - server.js: ensureValidToken's NON-destructive arm (per-partition, gated on definitive revocation — LIN-1887 close-out F2)
+ *   - server.js: handleUnauthorizedError's NON-destructive arm (the reactive twin of the same — LIN-1887 close-out F2)
  *   - server.js: ensureValidToken's catch block (gated on definitive revocation — LIN-1545 S1)
  *   - server.js: handleWorkspaceRemoval (both the remaining>0 and destroy arms — one call site, shared; gated on `deleteDurable`, only ever reached on definitive revocation from the 401-retry path — LIN-1545 S2)
  *   - server.js: /workspace/:urlKey/settings/providers/remove (Linear-only, gated on an actual unlink — Finding #2)
@@ -62,10 +74,10 @@ function countDurableDeletes(source) {
   return (source.match(/\bownerCredentialStore\.delete(All)?\(/g) || []).length;
 }
 
-const KNOWN_DURABLE_DELETE_COUNT = 5;
+const KNOWN_DURABLE_DELETE_COUNT = 7;
 
 describe('LIN-1524 close-out Finding #1 — ownerCredentialStore.delete( census', () => {
-  test('the total count of ownerCredentialStore.delete( across server.js + routes/workspace.js is exactly 5', () => {
+  test('the total count of ownerCredentialStore.delete( across server.js + routes/workspace.js is exactly 7', () => {
     const counts = {
       'server.js': countDurableDeletes(read('server.js')),
       'routes/workspace.js': countDurableDeletes(read('routes/workspace.js')),
@@ -79,8 +91,9 @@ describe('LIN-1524 close-out Finding #1 — ownerCredentialStore.delete( census'
       `${KNOWN_DURABLE_DELETE_COUNT}. A NEW workspace/session-disconnect path needs a matching durable delete, ` +
       'per LIN-1524 close-out Finding #1: a durable Linear credential must not outlive the workspace connection ' +
       "that granted it. Before touching KNOWN_DURABLE_DELETE_COUNT, add (or remove) a matching " +
-      'ownerCredentialStore.delete(accountId, urlKey) call for the new/removed teardown path. See the existing ' +
-      'sites: server.js (ensureValidToken catch — per-partition, handleWorkspaceRemoval — deleteAll, providers/remove — per-partition) and routes/workspace.js ' +
+      'ownerCredentialStore.delete(accountId, urlKey, provider) call for the new/removed teardown path. See the existing ' +
+      'sites: server.js (ensureValidToken — non-destructive arm + catch, both per-partition; handleUnauthorizedError — non-destructive arm, per-partition; ' +
+      'handleWorkspaceRemoval — deleteAll; providers/remove — per-partition) and routes/workspace.js ' +
       '(/workspace/:urlKey/remove, both arms). Do NOT add one for a plain logout — durable credentials must ' +
       'survive human logout by design (see the /logout test below).'
     );
