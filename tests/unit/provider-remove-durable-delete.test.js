@@ -47,7 +47,7 @@ describe('provider-removal route: durable delete (LIN-1523, source-text pin)', (
     assert.match(body, /unlinkProvider\(workspace, provider, scope\)/);
   });
 
-  test('ownerCredentialStore.delete is called, AFTER unlinkProvider, scoped to provider === \'linear\'', () => {
+  test('ownerCredentialStore.delete is called, AFTER unlinkProvider, PARTITION-scoped to the unlinked provider', () => {
     const body = routeHandlerBody();
     const unlinkIdx = body.indexOf('unlinkProvider(workspace, provider, scope)');
     const deleteIdx = body.indexOf('ownerCredentialStore.delete(');
@@ -58,12 +58,25 @@ describe('provider-removal route: durable delete (LIN-1523, source-text pin)', (
     const beforeDelete = body.slice(0, deleteIdx);
     const ifLine = beforeDelete.split('\n').reverse().find(l => l.trim().startsWith('if ('));
     assert.ok(ifLine, 'expected an `if (...)` guarding the durable delete call');
-    assert.match(ifLine, /provider === 'linear'/, "the durable delete must be scoped to 'linear' — the store is Linear-only by design");
+    // LIN-1887 N2 REPEALED the `provider === 'linear'` gate this used to assert.
+    // Its rationale — "the store is Linear-only by design" — was true only while
+    // exactly one refreshable provider per workspace was true; Jira OAuth is the
+    // second, and its credential is as revocable as Linear's. The gate did not
+    // disappear, it became the PARTITION ARGUMENT, which is strictly more
+    // precise: unlinking Jira deletes exactly Jira's credential and provably
+    // cannot reach Linear's. What is worth pinning is therefore the scoping
+    // itself — that this delete names the provider being unlinked — not the
+    // repealed provider name.
+    assert.match(ifLine, /bindingRemoved/, 'the durable delete must still be gated on an actual binding removal');
   });
 
-  test('the durable delete call receives the session accountId and the workspace urlKey — the correct composite key', () => {
+  test('the durable delete call receives the session accountId, the workspace urlKey AND the provider — the correct partitioned key', () => {
     const body = routeHandlerBody();
-    assert.match(body, /ownerCredentialStore\.delete\(req\.session\.accountId,\s*workspace\.urlKey\)/);
+    assert.match(
+      body,
+      /ownerCredentialStore\.delete\(req\.session\.accountId,\s*workspace\.urlKey,\s*provider\)/,
+      'LIN-1887: the composite key gained a provider partition — an unlink must revoke exactly the unlinked binding’s credential, never a sibling provider’s'
+    );
   });
 
   test('LIN-1524 close-out Finding #2: the durable delete is ALSO gated on an actual binding removal, not provider alone', () => {

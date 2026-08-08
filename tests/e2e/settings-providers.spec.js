@@ -67,7 +67,52 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     await expect(jiraAdd).toBeVisible()
     await expect(jiraAdd).toContainText('Jira')
     await expect(jiraAdd).not.toHaveClass(/provider-add-blocked/)
-    await expect(jiraAdd.locator('button')).toHaveCount(1)
+    // LIN-1887 Step 9 (D5): Jira now has TWO auth shapes, so the row offers an
+    // explicit choice rather than a single button. The ROW stays enabled either
+    // way — Basic needs no server config, so gating the row on Jira OAuth config
+    // would disable an add path validated in production on 2026-08-07.
+    await expect(jiraAdd.locator('button')).toHaveCount(2)
+  })
+
+  // LIN-1887 Step 9 — the finding this step exists to close: without it, Steps
+  // 3-8 land a complete OAuth flow reachable ONLY by typing /auth/jira/oauth
+  // into the address bar. This is the assertion whose absence WAS the finding.
+  //
+  // It stops at Harbour's own redirect to the Atlassian consent URL and contacts
+  // nothing: `isJiraOAuthConfigured` is a presence check, so the placeholder
+  // JIRA_* vars in playwright.config.js are enough to prove reachability. What
+  // happens after that redirect is unobserved until a real app exists (D3).
+  test('the Jira OAuth option is reachable from Settings without a hand-typed URL (LIN-1887)', async ({ page }) => {
+    const oauthBtn = page.locator('[data-testid="settings-provider-add-btn-jira-oauth"]')
+    await expect(oauthBtn).toBeVisible()
+    const oauthForm = oauthBtn.locator('xpath=ancestor::form')
+    await expect(oauthForm.locator('input[name="authType"]')).toHaveValue('oauth')
+
+    // Follow the redirect chain through the request API rather than navigating,
+    // so the run never leaves localhost.
+    const addRes = await page.request.post(`/workspace/${urlKey}/settings/providers/add`, {
+      form: { provider: 'jira', authType: 'oauth' },
+      maxRedirects: 0,
+    })
+    expect(addRes.status()).toBe(302)
+    expect(addRes.headers()['location']).toBe(`/auth/jira/oauth?workspace=${urlKey}`)
+
+    const beginRes = await page.request.get(`/auth/jira/oauth?workspace=${urlKey}`, { maxRedirects: 0 })
+    expect(beginRes.status()).toBe(302)
+    const consent = new URL(beginRes.headers()['location'])
+    expect(consent.origin).toBe('https://auth.atlassian.com')
+    expect(consent.searchParams.get('scope')).toBe('read:jira-work read:jira-user offline_access')
+  })
+
+  test('the Basic add path is unchanged by the OAuth option (LIN-1887 D5)', async ({ page }) => {
+    // D5's whole reason for an explicit choice: the production-validated Basic
+    // add must behave exactly as it did before this ticket.
+    const basicRes = await page.request.post(`/workspace/${urlKey}/settings/providers/add`, {
+      form: { provider: 'jira' },
+      maxRedirects: 0,
+    })
+    expect(basicRes.status()).toBe(302)
+    expect(basicRes.headers()['location']).toBe(`/auth/jira?workspace=${urlKey}`)
   })
 
   test('the Jira add form posts to the providers/add route, which redirects to the GET link form (LIN-1885)', async ({ page }) => {
@@ -75,7 +120,7 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     // server.js redirects that to GET /auth/jira?workspace=<urlKey> (the
     // API-token link form), never an OAuth ?mode=add-source URL — Jira has no
     // redirect round-trip to carry session `mode` intent across.
-    await page.locator('[data-testid="settings-provider-add-jira"] button').click()
+    await page.locator('[data-testid="settings-provider-add-btn-jira-basic"]').click()
     await page.waitForLoadState('networkidle')
     const url = new URL(page.url())
     expect(url.pathname).toBe('/auth/jira')

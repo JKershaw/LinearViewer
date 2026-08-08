@@ -24,7 +24,7 @@ import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-p
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { getWorkspaceNorthStar as resolveNorthStar } from './lib/north-star-resolver.js'
 import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
-import { refreshOwnerWorkspaceToken, refreshLinearOwnerCredential } from './lib/workspace-token-refresh.js'
+import { refreshOwnerWorkspaceToken, refreshOwnerCredential } from './lib/workspace-token-refresh.js'
 import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
@@ -74,7 +74,9 @@ import { renderLandingPage } from './lib/render-landing.js'
 import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential } from './lib/workspace.js'
+import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, normalizeProvider } from './lib/workspace.js'
+import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from './lib/refresh-strategy.js'
+import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/jira/oauth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createEnsurePATSession } from './lib/pat-session.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
@@ -615,6 +617,42 @@ app.use(createEnsurePATSession({ accountStore, accountWorkspaceStore }));
 // Simplified approach: concurrent requests may both refresh, but this is harmless.
 
 /**
+ * Which exchange spends THIS provider's rotating refresh token (LIN-1887).
+ *
+ * An explicit map, not a default: routing an unknown provider to Linear's
+ * exchange is the exact defect the declared-strategy dispatch exists to make
+ * impossible, so a provider with no entry gets `null` and both dispatches
+ * degrade to the non-destructive re-link response instead of spending a
+ * credential at the wrong company's endpoint.
+ *
+ * Keyed on the NORMALIZED provider name, so legacy providerless workspaces
+ * (which normalize to `linear`) keep Linear's exchange.
+ */
+const REFRESH_EXCHANGES = {
+  linear: refreshAccessToken,
+  jira: refreshJiraAccessToken,
+}
+function refreshExchangeFor(provider) {
+  return REFRESH_EXCHANGES[provider] || null
+}
+
+/**
+ * Render the non-destructive "reconnect this source" response — the shared
+ * terminal for every refresh path that must NOT remove the workspace
+ * (LIN-1887 Steps 1/7, G3). The copy and action link are provider- and
+ * auth-shape-parameterised in lib/refresh-strategy.js; a `local` workspace must
+ * never be told to reconnect Jira.
+ */
+function sendRelinkNotice(workspace, res) {
+  const notice = relinkNotice(workspace)
+  const html = renderErrorPage(notice.title, notice.message, {
+    action: notice.action,
+    actionUrl: notice.actionUrl
+  })
+  return res.status(401).send(html)
+}
+
+/**
  * Middleware to ensure access token is valid before each authenticated request.
  * Automatically refreshes token if it's expired or about to expire (5-minute buffer).
  * Works with multi-workspace sessions - refreshes active workspace token only.
@@ -629,6 +667,27 @@ async function ensureValidToken(req, res, next) {
   // Check if token needs refresh (5-minute buffer)
   const needsTokenRefresh = workspace.tokenExpiresAt - Date.now() < TOKEN_REFRESH_BUFFER_MS
   if (!needsTokenRefresh) return next()
+
+  // LIN-1887 Step 1: ONE provider-declared strategy, read by BOTH refresh
+  // dispatches (this one and handleUnauthorizedError's ladder). See
+  // lib/refresh-strategy.js for why the two had to converge — "everything that
+  // isn't github-family goes to Linear's exchange" is the shape that deleted
+  // every github-projects workspace within an hour (LIN-1499) and would have
+  // deleted every Jira one (LIN-1885).
+  const declaration = refreshDeclarationFor(workspace)
+  const provider = normalizeProvider(workspace)
+  const exchange = refreshExchangeFor(provider)
+
+  // `none` is the fail-safe: no refresh, and — the part that makes it a genuine
+  // fail-safe rather than a delay — no removal, no eviction, no session
+  // teardown. An `oauth-refresh` provider with no wired exchange degrades to the
+  // same place rather than spending its refresh token at the wrong endpoint.
+  if (declaration.strategy === REFRESH_STRATEGY.NONE || (declaration.strategy === REFRESH_STRATEGY.OAUTH_REFRESH && !exchange)) {
+    if (declaration.strategy !== REFRESH_STRATEGY.NONE) {
+      console.error(`No refresh exchange wired for provider ${provider} — treating as non-refreshable`)
+    }
+    return sendRelinkNotice(workspace, res)
+  }
 
   try {
     // Provider-aware refresh / re-mint seam (LIN-712, widened to github-projects
@@ -646,7 +705,7 @@ async function ensureValidToken(req, res, next) {
     // needsTokenRefresh stays false.) Switching GitHub-family providers to a
     // real ~1h expiry means those bindings flow through this middleware for
     // the first time — that is intended, not a regression.
-    if (workspace.provider === 'github' || workspace.provider === 'github-projects') {
+    if (declaration.strategy === REFRESH_STRATEGY.REMINT) {
       await remintActiveCredential(workspace, getProviderForWorkspace(workspace))
     } else {
       // LIN-1524: Linear's rotating credential lives ONLY in the durable
@@ -669,14 +728,15 @@ async function ensureValidToken(req, res, next) {
       // return is the same explicit "no durable credential to refresh" failure
       // as before — a deliberate miss, not a silent no-op — thrown into the SAME
       // catch below that a real refresh failure has always fallen into.
-      const refreshed = await refreshLinearOwnerCredential({
+      const refreshed = await refreshOwnerCredential({
         ownerAccountId: req.session.accountId,
         urlKey: workspace.urlKey,
-        refreshAccessToken,
+        provider,
+        refreshAccessToken: exchange,
         store: ownerCredentialStore
       })
       if (!refreshed) {
-        throw new Error(`No durable Linear credential to refresh workspace ${workspace.id}`)
+        throw new Error(`No durable ${provider} credential to refresh workspace ${workspace.id}`)
       }
       // Session-side mirror ONLY (accessToken/tokenExpiresAt), kept OUTSIDE the
       // shared seam — this mutates THIS request's own session workspace, which
@@ -687,7 +747,12 @@ async function ensureValidToken(req, res, next) {
     }
 
     await saveSession(req.session)
-    console.log(`Token refreshed for workspace ${workspace.id}`)
+    // LIN-1887 Step 10: the elapsed-time refresh monitor keys on the LOG STRING
+    // `Token refreshed for workspace`, never on this line number — Step 1 edits
+    // the function directly above it, so the number moves. `provider=` is
+    // appended (never interpolated into the keyed prefix) so the monitor can
+    // filter to Jira workspaces without a second log site.
+    console.log(`Token refreshed for workspace ${workspace.id} (provider=${provider})`)
     next()
   } catch (error) {
     console.error(`Token refresh failed for workspace ${workspace.id}:`, error)
@@ -700,6 +765,20 @@ async function ensureValidToken(req, res, next) {
     // and leave the credential, the workspace, and the session untouched.
     if (isTransientRefreshFailure(error)) {
       return serviceUnavailable.html(res)
+    }
+
+    // LIN-1887 Step 1: a failed refresh may only tear the workspace down for a
+    // provider that DECLARES it. Linear (and legacy-providerless) keep today's
+    // removal semantics byte-for-byte — a Linear workspace with no refreshable
+    // credential genuinely is disconnected. Jira does not: a Jira binding is one
+    // binding on an otherwise multi-provider workspace, so removing the
+    // workspace over it deletes the co-resident Linear binding too — the same
+    // user-visible outcome F1/G1 exist to prevent, reached from the other end.
+    // This is the proactive twin of the rule handleUnauthorizedError's Jira
+    // branch has stated since LIN-1885; the rationale never depended on which
+    // dispatch was asking.
+    if (!declaration.destructiveOnFailure) {
+      return sendRelinkNotice(workspace, res)
     }
 
     // LIN-1507: capture accountId BEFORE any session mutation below — destroy()
@@ -721,8 +800,13 @@ async function ensureValidToken(req, res, next) {
     // rotate/save failure) still removes the now-unusable workspace, but must
     // not delete a durable record that is either already absent or was just
     // successfully rotated — preserving pre-cutover self-heal-on-re-login.
+    // LIN-1887 N2: PER-PARTITION, and the partition is the one that was ROUTED
+    // (`provider`), not `workspace.provider` — under Step 1's dispatch a
+    // co-resident workspace can route a refresh for a provider that is not the
+    // active one. Deleting the wrong partition would revoke a healthy credential
+    // and leave the dead one in place.
     if (isDefinitiveRevocation(error)) {
-      await ownerCredentialStore.delete(accountId, workspace.urlKey)
+      await ownerCredentialStore.delete(accountId, workspace.urlKey, provider)
     }
 
     // LIN-1518: hoisted above the branch for exactly the reason the durable
@@ -956,8 +1040,13 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
   // the same pre-branch order, for the LIN-1524 census); the reactive
   // 401-retry path passes it explicitly and, on a transient failure, never
   // calls this at all.
+  // LIN-1887 N2: WHOLE-WORKSPACE removal deletes EVERY provider partition, not
+  // one. A partition-scoped delete here would silently orphan the other
+  // provider's durable credential for a workspace that no longer exists — and
+  // since the partition arrived in this same change, using the old single-record
+  // verb would have been a silent regression rather than a visible one.
   if (removedWorkspace && deleteDurable) {
-    await ownerCredentialStore.delete(session.accountId, removedWorkspace.urlKey);
+    await ownerCredentialStore.deleteAll(session.accountId, removedWorkspace.urlKey);
   }
 
   // accountId is still live here — only `workspaces`/`activeWorkspaceId` were
@@ -1000,18 +1089,19 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
  * seam re-reads the durable record itself (a cheap redundant point-read past the
  * caller's gate), which is what lets it coalesce on the shared key.
  */
-async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res) {
-  const refreshed = await refreshLinearOwnerCredential({
+async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res, { provider, exchange } = {}) {
+  const refreshed = await refreshOwnerCredential({
     ownerAccountId: session.accountId,
     urlKey: workspace.urlKey,
-    refreshAccessToken,
+    provider,
+    refreshAccessToken: exchange,
     store: ownerCredentialStore
   });
   // The durable record vanished between the caller's gate and here (rare): treat
   // it as a non-definitive failure so the caller's catch 503s rather than
   // deleting — a genuine EXPIRED still throws from inside the seam above.
   if (!refreshed) {
-    throw new Error(`No durable Linear credential to refresh workspace ${workspace.id}`);
+    throw new Error(`No durable ${provider} credential to refresh workspace ${workspace.id}`);
   }
   // Session-side mirror only (accessToken/tokenExpiresAt), outside the seam —
   // the durable rotation already landed inside it.
@@ -1110,14 +1200,13 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
   // effect on the github-family branch's own pinned test slices below, but
   // keeps this branch from ever being silently swallowed by a future
   // widening of that guard's boundary.
-  if (workspace.provider === 'jira') {
-    const html = renderErrorPage('Access Token Invalid',
-      'Your Jira API token is no longer valid. Reconnect Jira with a fresh API token to continue.', {
-        action: 'Reconnect Jira',
-        actionUrl: `/auth/jira?workspace=${encodeURIComponent(workspace.urlKey)}`
-      });
-    return res.status(401).send(html);
-  }
+  // LIN-1887 Step 1: from here down this is the SAME provider-declared strategy
+  // `ensureValidToken` reads. Before, this ladder answered "how do I refresh
+  // this?" independently, which is why the proactive path's fail-safe was only
+  // half a fail-safe — a workspace it spared was destroyed one hop later at this
+  // function's fallthrough, on its first 401.
+  const declaration = refreshDeclarationFor(workspace);
+  const provider = normalizeProvider(workspace);
 
   // LIN-1503: GitHub-family credentials are RE-MINTED from installationId + the
   // App JWT, never refreshed from a stored refresh token — so they must never
@@ -1128,7 +1217,7 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
   // one: a successful re-mint followed by a failed render (e.g. a GitHub 403
   // rate-limit — isAuthError matches 403 as well as 401) must NOT be treated as
   // a remint failure and destroy the workspace.
-  if (workspace.provider === 'github' || workspace.provider === 'github-projects') {
+  if (declaration.strategy === REFRESH_STRATEGY.REMINT) {
     try {
       // Bounded to ONLY the re-mint + session-save, matching ensureValidToken's
       // own try scope exactly (server.js:631-689) — it never wraps a render.
@@ -1184,12 +1273,39 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
   // refreshing it (the same LIN-1499 destructive-mode defect class, this time
   // for Linear). GitHub-family is now branched above, so this remains the
   // Linear-only path — byte-identical to before this ticket otherwise.
-  const durableRecord = await ownerCredentialStore.get(session.accountId, workspace.urlKey);
+  // LIN-1887 Step 1: `none` — and an `oauth-refresh` provider with no wired
+  // exchange — render the non-destructive re-link response and STOP. No
+  // handleTokenRefreshAndRetry, no handleWorkspaceRemoval, no
+  // evictAllWorkspaceTokens, and no session teardown. This is the branch that makes
+  // the fail-safe real: before it, `local` and every unregistered provider
+  // reached the removal fallthrough at the bottom of this function on their
+  // first 401.
+  const exchange = refreshExchangeFor(provider);
+  if (declaration.strategy === REFRESH_STRATEGY.NONE || !exchange) {
+    if (declaration.strategy !== REFRESH_STRATEGY.NONE) {
+      console.error(`No refresh exchange wired for provider ${provider} — treating as non-refreshable`);
+    }
+    return sendRelinkNotice(workspace, res);
+  }
+
+  // LIN-1887 Step 2: provider-scoped read. A Jira 401 must never read, and never
+  // spend, the Linear partition.
+  const durableRecord = await ownerCredentialStore.get(session.accountId, workspace.urlKey, provider);
   if (durableRecord?.refreshToken) {
     try {
-      return await handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res);
+      // LIN-1887 Step 7: an OAuth Jira binding DOES have something to refresh,
+      // which is what Phase 1's branch could not say. Basic Jira still reaches
+      // the non-destructive response below (it has no durable record), unchanged.
+      return await handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res, { provider, exchange });
     } catch (refreshError) {
       console.error('Token refresh failed after 401:', refreshError);
+      // Step 7's invariant, enforced by the declaration rather than by a
+      // provider name: a failed refresh may only tear the workspace down for a
+      // provider that declares it. A failed Jira refresh degrades to the same
+      // re-link page its Basic arm renders.
+      if (!declaration.destructiveOnFailure) {
+        return sendRelinkNotice(workspace, res);
+      }
       // LIN-1545 (S2): mirror the proactive path (S1). Only a DEFINITIVE
       // revocation (invalid_grant → EXPIRED) may delete the shared durable
       // credential and tear the workspace down. A transient refresh blip
@@ -1205,9 +1321,18 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
     }
   }
 
-  // No durable record to refresh from: the workspace is genuinely disconnected,
-  // so remove it. The durable delete here is a no-op (nothing to delete), and
-  // leaving `deleteDurable` at its default keeps this path byte-equivalent.
+  // LIN-1887: no durable record AND the provider declares its failures
+  // destructive — the workspace is genuinely disconnected, so remove it. The
+  // durable delete here is a no-op (nothing to delete), and leaving
+  // `deleteDurable` at its default keeps this path byte-equivalent for Linear.
+  //
+  // A non-destructive provider stops at the re-link page instead. This is the
+  // line a Basic-auth Jira workspace lands on (it has no durable record at all),
+  // so LIN-1885's non-destructive guarantee is preserved by the declaration
+  // rather than by a hard-coded `provider === 'jira'` branch above.
+  if (!declaration.destructiveOnFailure) {
+    return sendRelinkNotice(workspace, res);
+  }
   return handleWorkspaceRemoval(session, workspace.id, res);
 }
 
@@ -2263,7 +2388,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     // Gate the GitHub add affordance on the SAME shared predicate the /auth/github
     // route guard and landing hero use (LIN-761), so the settings page never offers
     // an add that would 503/hang on a server where GitHub isn't fully configured.
-    githubEnabled: isGitHubConfigured()
+    githubEnabled: isGitHubConfigured(),
+    jiraOAuthEnabled: isJiraOAuthConfigured()
   });
   res.send(html);
 });
@@ -2779,17 +2905,25 @@ app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async
   unlinkProvider(workspace, provider, scope);
   const bindingRemoved = workspace.bindings !== bindingsBefore;
 
-  // LIN-1523: unlinking the active Linear binding revokes its durable
-  // credential too — the existing session-side delete (inside unlinkProvider,
-  // untouched, unlinkProvider stays a pure/sync mutator) stays; this is
-  // ADDITIVE alongside it, not a replacement. Scoped to 'linear' only: the
-  // durable store is Linear-only by design, so unlinking a non-Linear
-  // provider (e.g. github) must not touch it. Gated on `bindingRemoved` too
-  // (LIN-1524 close-out Finding #2): a POST with `provider=linear` and a
-  // non-matching `scope` must not destroy a durable record whose session
-  // binding is still intact.
-  if (provider === 'linear' && bindingRemoved) {
-    await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey);
+  // LIN-1523: unlinking a binding revokes its durable credential too — the
+  // existing session-side delete (inside unlinkProvider, untouched,
+  // unlinkProvider stays a pure/sync mutator) stays; this is ADDITIVE alongside
+  // it, not a replacement. Gated on `bindingRemoved` (LIN-1524 close-out
+  // Finding #2): a POST with a non-matching `scope` must not destroy a durable
+  // record whose session binding is still intact.
+  //
+  // LIN-1887 N2 REPEALS the `provider === 'linear'` gate that used to guard this
+  // line. Its rationale — "the durable store is Linear-only by design, so
+  // unlinking a non-Linear provider must not touch it" — was true only while one
+  // refreshable provider per workspace was true. Jira is the second, and its
+  // credential is as revocable as Linear's. The gate does not disappear; it
+  // becomes the PARTITION argument, which is strictly more precise: unlinking
+  // Jira now deletes exactly Jira's credential and provably cannot reach
+  // Linear's. Unlinking a provider that never had a durable record (github
+  // family) is a harmless no-op on a missing `_id`, the same no-op the old gate
+  // achieved by not running.
+  if (bindingRemoved) {
+    await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey, provider);
   }
 
   try {
@@ -2907,13 +3041,27 @@ app.post('/workspace/:urlKey/settings/providers/add', workspaceFromUrl, async (r
     return res.redirect(`/auth/linear?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`);
   }
 
-  // Jira add-source (LIN-1885 Phase 1): redirects to the GET page that renders
-  // the API-token Basic-auth link form (routes/jira-auth.js), NOT an
-  // OAuth-style `?mode=add-source` — Jira has no OAuth redirect round-trip to
-  // carry session `mode` intent across, so the target workspace rides as the
-  // same `?workspace=` query param convention instead (consumed directly by
-  // the GET route, no session-side intent to thread).
+  // Jira add-source. Two auth shapes now exist, so this fork is a real product
+  // choice (D5, John's): an EXPLICIT choice between them, rather than making
+  // OAuth the default for new links. That is the only option that does not
+  // change the behaviour of an add path validated in production on 2026-08-07,
+  // and it keeps the Basic form reachable on a server with no Atlassian app
+  // configured — which is also why `lib/render-settings.js`'s Jira row stays
+  // unconditionally enabled and the config gate applies to the OAuth OPTION
+  // rather than the row.
+  //
+  // `authType` rides as an explicit form value from the chooser. Absent (or
+  // anything else) means Basic — the Phase 1 default, byte-identical to before,
+  // including the `?workspace=` query-param convention: the Basic route has no
+  // redirect round-trip, so it needs no session-carried intent. The OAuth route
+  // does, and mints its own.
   if (provider === 'jira') {
+    if (req.body?.authType === 'oauth') {
+      if (!isJiraOAuthConfigured()) {
+        return res.redirect(`${settingsUrl}?provider_error=jira-oauth-not-configured`);
+      }
+      return res.redirect(`/auth/jira/oauth?workspace=${encodeURIComponent(workspace.urlKey)}`);
+    }
     return res.redirect(`/auth/jira?workspace=${encodeURIComponent(workspace.urlKey)}`);
   }
 

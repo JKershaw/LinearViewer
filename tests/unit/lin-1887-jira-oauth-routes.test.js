@@ -1,0 +1,300 @@
+/**
+ * LIN-1887 Step 4/5 — the Jira 3LO routes, driven end to end through a real
+ * Express app with only the network faked.
+ *
+ * The security properties this file exists to pin, in order of how badly they
+ * fail if they regress:
+ *
+ *  1. the rotating refresh token reaches the DURABLE STORE and never the session
+ *     (LIN-1524) — and lands in the JIRA partition, never Linear's (F1);
+ *  2. `state` is an opaque CSRF nonce, validated, and carries no intent;
+ *  3. the site is resolved against the server's OWN accessible-resources list,
+ *     so a client cannot assert a site the grant does not reach;
+ *  4. the binding carries a REAL expiry, not the Phase 1 sentinel.
+ *
+ * Nothing here proves Atlassian accepts any of it — see D3.
+ */
+import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert';
+import express from 'express';
+
+import { createJiraAuthRoutes } from '../../routes/jira-auth.js';
+
+const ENV_KEYS = ['JIRA_CLIENT_ID', 'JIRA_CLIENT_SECRET', 'JIRA_REDIRECT_URI'];
+let savedEnv;
+beforeEach(() => {
+  savedEnv = Object.fromEntries(ENV_KEYS.map(k => [k, process.env[k]]));
+  process.env.JIRA_CLIENT_ID = 'client-id-1';
+  process.env.JIRA_CLIENT_SECRET = 'secret-1';
+  process.env.JIRA_REDIRECT_URI = 'https://harbour.example/auth/jira/oauth/callback';
+});
+afterEach(() => { for (const k of ENV_KEYS) { if (savedEnv[k] === undefined) delete process.env[k]; else process.env[k] = savedEnv[k]; } });
+
+/** A session shared across a test's requests, mimicking express-session. */
+function makeSession(over = {}) {
+  return {
+    accountId: 'acct-1',
+    workspaces: [{ id: 'ws-1', urlKey: 'acme', provider: 'linear', accessToken: 'linear-access', bindings: [{ provider: 'linear', scope: 'org-1', credentials: { token: 'linear-access' } }] }],
+    activeWorkspaceId: 'ws-1',
+    save(cb) { if (cb) cb(null); },
+    ...over,
+  };
+}
+
+function makeStore() {
+  const records = new Map();
+  return {
+    records,
+    async put(accountId, urlKey, credential) { records.set(`${accountId}::${urlKey}::${credential.provider || 'linear'}`, credential); return true; },
+    async get(accountId, urlKey, provider = 'linear') { return records.get(`${accountId}::${urlKey}::${provider}`) ?? null; },
+    async delete() { return true; },
+    async deleteAll() { return true; },
+  };
+}
+
+/**
+ * Minimal account stores. Real ones, not nulls: `establishAccount` is the same
+ * seam Phase 1 uses, and stubbing it out would hide whether the OAuth link
+ * resolves to the same Harbour account a Basic link does.
+ */
+function makeAccountStores() {
+  const identities = new Map();
+  return {
+    accountStore: {
+      async findAccountByIdentity(provider, scope) { return identities.get(`${provider}:${scope}`) ?? null; },
+      async createAccount() { return { _id: 'acct-new' }; },
+      async linkIdentity(accountId, provider, scope) { identities.set(`${provider}:${scope}`, { _id: accountId }); return { ok: true }; },
+    },
+    accountWorkspaceStore: { async bindAccountToWorkspace() { return true; } },
+  };
+}
+
+function makeApp({ session, store, provider, fetches = {} }) {
+  const app = express();
+  app.use(express.urlencoded({ extended: false }));
+  app.use((req, _res, next) => { req.session = session; next(); });
+  // The routes read `fetch` off the module scope of lib/providers/jira/oauth.js,
+  // which resolves to globalThis.fetch — so the stub is installed there.
+  globalThis.fetch = async (url, opts) => {
+    for (const [match, handler] of Object.entries(fetches)) {
+      if (String(url).includes(match)) return handler(url, opts);
+    }
+    throw new Error(`unstubbed fetch: ${url}`);
+  };
+  app.use(createJiraAuthRoutes({ provider, ...makeAccountStores(), ownerCredentialStore: store }));
+  return app;
+}
+
+/**
+ * Minimal request driver — avoids a supertest dependency the repo does not have.
+ *
+ * ONE http server for the whole file, delegating to whichever app the current
+ * test built. Listening per request instead churned a socket and a port for
+ * every case, which is enough extra load to tip borderline specs elsewhere in
+ * the suite into timeouts.
+ */
+const realFetch = globalThis.fetch;
+let currentApp = null;
+const rootApp = express();
+rootApp.use((req, res, next) => (currentApp ? currentApp(req, res, next) : next()));
+let server;
+let baseUrl;
+
+before(async () => {
+  await new Promise(resolve => { server = rootApp.listen(0, resolve); });
+  baseUrl = `http://127.0.0.1:${server.address().port}`;
+});
+after(async () => {
+  globalThis.fetch = realFetch;
+  server.closeAllConnections?.();
+  await new Promise(resolve => server.close(resolve));
+});
+
+async function request(app, { method = 'GET', path, body }) {
+  currentApp = app;
+  const res = await realFetch(`${baseUrl}${path}`, {
+    method,
+    redirect: 'manual',
+    headers: body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : undefined,
+    body: body ? new URLSearchParams(body).toString() : undefined,
+  });
+  return { status: res.status, location: res.headers.get('location'), text: await res.text() };
+}
+
+const fakeProvider = (myself = { accountId: 'atlassian-acct-1', emailAddress: 'a@b.c', displayName: 'A' }) => ({
+  validateCredential: async (credential) => { fakeProvider.lastCredential = credential; return myself; },
+});
+
+const TOKEN_BAG = { access_token: 'jira-access-1', refresh_token: 'atlassian-refresh-ROTATING', expires_in: 3600 };
+const ONE_SITE = [{ id: 'cid-1', url: 'https://acme.atlassian.net', name: 'Acme' }];
+const TWO_SITES = [...ONE_SITE, { id: 'cid-2', url: 'https://other.atlassian.net', name: 'Other' }];
+
+// Order matters: Atlassian's accessible-resources path is
+// `/oauth/token/accessible-resources`, so a `/oauth/token` matcher would
+// swallow it. The more specific pattern is listed first.
+const stubs = (sites = ONE_SITE, bag = TOKEN_BAG) => ({
+  'accessible-resources': async () => ({ ok: true, status: 200, json: async () => sites }),
+  '/oauth/token': async () => ({ ok: true, status: 200, json: async () => bag }),
+});
+
+describe('LIN-1887 Step 4 — GET /auth/jira/oauth (begin)', () => {
+  test('redirects to Atlassian consent, minting an opaque state that carries no intent', async () => {
+    const session = makeSession();
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider() });
+    const res = await request(app, { path: '/auth/jira/oauth?workspace=acme' });
+
+    assert.equal(res.status, 302);
+    const url = new URL(res.location);
+    assert.equal(url.origin, 'https://auth.atlassian.com');
+    assert.equal(url.searchParams.get('state'), session.oauthState);
+    assert.doesNotMatch(url.searchParams.get('state'), /acme|add-source/, 'state must be an opaque nonce — intent lives in the session (LIN-562)');
+    assert.deepEqual(session.oauthIntent, { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' });
+  });
+
+  test('an unconfigured server refuses to begin a flow it cannot finish', async () => {
+    delete process.env.JIRA_CLIENT_SECRET;
+    const app = makeApp({ session: makeSession(), store: makeStore(), provider: fakeProvider() });
+    const res = await request(app, { path: '/auth/jira/oauth?workspace=acme' });
+    assert.equal(res.status, 503);
+    assert.match(res.text, /JIRA_CLIENT_SECRET/);
+  });
+
+  test('add-source only: an unknown workspace is refused before any redirect', async () => {
+    const app = makeApp({ session: makeSession(), store: makeStore(), provider: fakeProvider() });
+    const res = await request(app, { path: '/auth/jira/oauth?workspace=not-mine' });
+    assert.equal(res.status, 400);
+  });
+});
+
+describe('LIN-1887 Step 4/5 — the callback', () => {
+  test('a state mismatch is refused before the code is ever exchanged', async () => {
+    const session = makeSession({ oauthState: 'real-nonce', oauthIntent: { workspaceUrlKey: 'acme' } });
+    const store = makeStore();
+    const app = makeApp({ session, store, provider: fakeProvider(), fetches: stubs() });
+    const res = await request(app, { path: '/auth/jira/oauth/callback?code=c&state=forged' });
+    assert.equal(res.status, 400);
+    assert.equal(store.records.size, 0, 'nothing may be persisted on a failed CSRF check');
+  });
+
+  test('single site: the refresh token goes to the JIRA durable partition and NEVER into the session', async () => {
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' } });
+    const store = makeStore();
+    const app = makeApp({ session, store, provider: fakeProvider(), fetches: stubs() });
+    const res = await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
+
+    assert.equal(res.status, 302);
+    assert.equal(res.location, '/workspace/acme/settings?provider_ok=jira');
+
+    // 1. Durable, partitioned, correctly labelled.
+    const durable = await store.get('acct-1', 'acme', 'jira');
+    assert.equal(durable.refreshToken, 'atlassian-refresh-ROTATING');
+    assert.equal(durable.provider, 'jira');
+    assert.equal(await store.get('acct-1', 'acme', 'linear'), null, 'Linear’s partition must be untouched (F1)');
+
+    // 2. Never in the session — the whole point of LIN-1524.
+    const serialized = JSON.stringify(session);
+    assert.ok(!serialized.includes('atlassian-refresh-ROTATING'), 'the rotating refresh token must not be reachable from the session');
+
+    // 3. The binding carries a REAL expiry and the OAuth discriminator.
+    const binding = session.workspaces[0].bindings.find(b => b.provider === 'jira');
+    assert.equal(binding.scope, 'https://acme.atlassian.net', 'scope stays the human-facing site so browse links keep working');
+    assert.equal(binding.credentials.authType, 'oauth');
+    assert.equal(binding.credentials.cloudId, 'cid-1');
+    assert.equal(binding.credentials.token, 'jira-access-1');
+    assert.ok(binding.credentials.tokenExpiresAt < Number.MAX_SAFE_INTEGER, 'the Phase 1 sentinel is a lie for an OAuth token');
+    assert.ok(binding.credentials.tokenExpiresAt > Date.now(), 'and it must be in the future');
+    assert.equal(binding.credentials.refreshToken, undefined, 'the binding must never carry the rotating credential');
+
+    // 4. The single-site case skips the picker, so no pending state survives.
+    assert.equal(session.jiraPending, undefined);
+  });
+
+  test('identity is resolved from /rest/api/3/myself over the OAuth credential, not a second endpoint', async () => {
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { workspaceUrlKey: 'acme' } });
+    const provider = fakeProvider();
+    const app = makeApp({ session, store: makeStore(), provider, fetches: stubs() });
+    await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
+    assert.deepEqual(provider.constructor === Object ? fakeProvider.lastCredential : fakeProvider.lastCredential, {
+      authType: 'oauth', accessToken: 'jira-access-1', cloudId: 'cid-1', site: 'https://acme.atlassian.net',
+    });
+  });
+
+  test('several sites: the picker renders and the pending state carries NO rotating credential', async () => {
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { workspaceUrlKey: 'acme' } });
+    const store = makeStore();
+    const app = makeApp({ session, store, provider: fakeProvider(), fetches: stubs(TWO_SITES) });
+    const res = await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
+
+    assert.equal(res.status, 200);
+    assert.match(res.text, /data-testid="jira-site-select-page"/);
+    assert.match(res.text, /value="cid-2"/);
+    assert.deepEqual(session.jiraPending.sites.map(s => s.cloudId), ['cid-1', 'cid-2']);
+    assert.equal(session.jiraPending.refreshToken, undefined, 'jiraPending carries the pick’s inputs and the SHORT-LIVED access token only');
+    assert.ok(!JSON.stringify(session.jiraPending).includes('atlassian-refresh-ROTATING'));
+    // Durable-first: the credential is already safe before the user picks.
+    assert.equal((await store.get('acct-1', 'acme', 'jira')).refreshToken, 'atlassian-refresh-ROTATING');
+  });
+
+  test('an ABANDONED pick leaves an orphan durable record — inert, and asserted rather than assumed', async () => {
+    // Writing durable-first has this consequence. Nothing reads a provider
+    // partition whose binding does not exist, the next link attempt overwrites
+    // it, and whole-workspace removal deletes every partition.
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { workspaceUrlKey: 'acme' } });
+    const store = makeStore();
+    const app = makeApp({ session, store, provider: fakeProvider(), fetches: stubs(TWO_SITES) });
+    await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
+
+    assert.ok(await store.get('acct-1', 'acme', 'jira'), 'the orphan exists');
+    assert.equal(session.workspaces[0].bindings.find(b => b.provider === 'jira'), undefined, 'and has no binding to be read through');
+  });
+
+  test('a grant with no reachable Jira site is refused, not linked to nothing', async () => {
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { workspaceUrlKey: 'acme' } });
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), fetches: stubs([]) });
+    const res = await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
+    assert.equal(res.status, 400);
+    assert.equal(session.workspaces[0].bindings.length, 1);
+  });
+});
+
+describe('LIN-1887 Step 4 — POST /auth/jira/oauth/link (the pick)', () => {
+  async function beginTwoSitePick() {
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { workspaceUrlKey: 'acme' } });
+    const store = makeStore();
+    const app = makeApp({ session, store, provider: fakeProvider(), fetches: stubs(TWO_SITES) });
+    await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
+    return { session, store, app };
+  }
+
+  test('a cloudId the grant does not reach is REFUSED — the client cannot assert a site', async () => {
+    const { session, app } = await beginTwoSitePick();
+    const res = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-not-mine' } });
+    assert.equal(res.status, 400);
+    assert.equal(session.workspaces[0].bindings.find(b => b.provider === 'jira'), undefined);
+  });
+
+  test('the chosen site is linked with its own cloudId and site URL', async () => {
+    const { session, app } = await beginTwoSitePick();
+    const res = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-2' } });
+    assert.equal(res.status, 302);
+    const binding = session.workspaces[0].bindings.find(b => b.provider === 'jira');
+    assert.equal(binding.scope, 'https://other.atlassian.net');
+    assert.equal(binding.credentials.cloudId, 'cid-2');
+    assert.equal(session.jiraPending, undefined, 'the pending state is cleared once consumed');
+  });
+
+  test('a pick with no pending state is refused rather than 500ing', async () => {
+    const app = makeApp({ session: makeSession(), store: makeStore(), provider: fakeProvider() });
+    const res = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-1' } });
+    assert.equal(res.status, 400);
+  });
+});
+
+describe('LIN-1887 — the Phase 1 Basic routes are untouched', () => {
+  test('GET /auth/jira still renders the API-token form', async () => {
+    const app = makeApp({ session: makeSession(), store: makeStore(), provider: fakeProvider() });
+    const res = await request(app, { path: '/auth/jira?workspace=acme' });
+    assert.equal(res.status, 200);
+    assert.match(res.text, /data-testid="jira-link-form"/);
+  });
+});
