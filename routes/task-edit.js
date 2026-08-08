@@ -28,8 +28,7 @@ import { Router } from 'express';
 import { renderTaskEditPage } from '../lib/render-task-edit.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { getProviderForWorkspace } from '../lib/providers/registry.js';
-import { getWorkspaceCallScope, isValidIssueId } from '../lib/workspace.js';
+import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 
 /**
  * Best-effort workflow states for the page's state `<select>`.
@@ -78,17 +77,12 @@ export function createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     const { issueId } = req.params;
     const dashboardHref = `/workspace/${encodeURIComponent(workspace.urlKey)}/`;
 
-    const provider = getProviderForWorkspace(workspace);
-
     const pageOptions = {
       deployInfo: getDeployInfo(),
       urlKey: workspace.urlKey,
       openRouterSource: getOpenRouterSource(req),
       workspaces: req.session.workspaces,
-      featureFlags: getFeatureFlags(req.session),
-      // LIN-1886: threads the provider's ui surface through so the renderer can
-      // hide the priority control for a provider that cannot honor it (Jira).
-      ui: provider?.ui || {}
+      featureFlags: getFeatureFlags(req.session)
     };
 
     if (!isValidIssueId(issueId)) {
@@ -98,6 +92,30 @@ export function createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         { action: 'Back to tasks', actionUrl: dashboardHref }
       ));
     }
+
+    // LIN-1904: resolve the issue's OWN binding via the `source` provenance
+    // stamp the Edit link carries (lib/render.js), rather than always the
+    // workspace's active provider — same fix as /api/detail (LIN-1903) and the
+    // sibling routes above. Single-binding workspaces are unaffected: an
+    // absent/unmatched `source` falls back to the active provider/scope.
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
+    const { provider, callScope: scope } = resolveIssueBinding(workspace, requestedSource);
+
+    // LIN-1886: threads the provider's ui surface through so the renderer can
+    // hide the priority control for a provider that cannot honor it (Jira).
+    //
+    // MERGE DECISION (LIN-1886 review F4 × LIN-1904). This `ui` is read off the
+    // PER-BINDING provider resolved immediately above, never off the workspace's
+    // *active* provider (`getProviderForWorkspace`), which is what this branch
+    // originally used. On a multi-binding workspace the two differ, and the
+    // active-provider read reintroduces D3: a Jira-bound issue in a
+    // Linear-active workspace would compute `ui` from Linear (`priority: true`),
+    // render the priority `<select>`, and submit a priority the Jira provider
+    // silently drops — precisely the harm `ui.priority: false` exists to
+    // prevent. Set AFTER the resolution rather than at the object literal for
+    // that reason; no path reads `pageOptions` before this point (the
+    // invalid-id branch renders `renderErrorPage`, which takes none of it).
+    pageOptions.ui = provider?.ui || {};
 
     // Capability gate: `ui.inlineEdit` (derived from the provider's real
     // `updateIssue` support), read EXCLUSIVELY off `provider.ui` and never off
@@ -110,11 +128,15 @@ export function createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     }
 
     try {
-      const scope = getWorkspaceCallScope(workspace);
       const issue = await provider.fetchIssueFields(scope, issueId);
       const states = await loadStates(provider, scope, issue?.team?.id || null);
 
-      return res.send(renderTaskEditPage({ issue, states, urlKey: workspace.urlKey, issueId }, pageOptions));
+      // Stamp the RESOLVED provider's name onto the form so the client PATCH
+      // (public/task-edit.js) carries it forward as `?source=`, preserving
+      // provenance through the write hop. For a single-binding workspace this
+      // is the active provider's own name — a no-op in outcome, since the
+      // sole binding still matches.
+      return res.send(renderTaskEditPage({ issue, states, urlKey: workspace.urlKey, issueId, source: provider.name }, pageOptions));
     } catch (error) {
       // Unknown / cross-workspace / deleted id — the provider read seam signals
       // this by throwing `Issue not found: <id>`. Same message match the lazy

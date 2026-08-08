@@ -10,7 +10,7 @@
  */
 import { Router, json } from 'express';
 import { badRequest, jsonError, notFound, unauthorized } from '../lib/errors.js';
-import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
+import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { buildRoadmapNarrativeMessages } from '../lib/prompts/roadmap-narrative-template.js';
@@ -52,7 +52,7 @@ import { hashContext } from '../lib/recap-cache.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, getBindingsForWorkspace, getBindingCallScope } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, resolveIssueBinding, isActiveProviderLinear } from '../lib/workspace.js';
 // LIN-1552 Session A: the session-auth issue write routes reuse the SAME
 // symbolic-ref primitives the proxy write path uses, the shared trashed-signal
 // detector, and the shared issue-write validator — no rules re-inlined here.
@@ -320,6 +320,33 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         return res.json(report);
       }
 
+      // LIN-1899: the audit is a Linear-SPECIFIC capability — it reads the
+      // provider-agnostic scalar mirror `workspace.accessToken` and hands it to
+      // a statically Linear-bound GraphQL client (lib/audit.js:180). For a
+      // non-Linear active binding that mirror holds THAT provider's credential
+      // (a raw Jira API token, say), so the call below discloses it to
+      // api.linear.app — and returns a misleading 401 from the catch branch
+      // because Linear rejects it. Refuse instead: a capability endpoint with no
+      // meaningful non-Linear rendering declines with 422 CAPABILITY_NOT_SUPPORTED
+      // (the denyIfUnsupported envelope, routes/proxy.js:750-757), not the 503
+      // workspaceUnavailable envelope — a provider mismatch is not transient.
+      //
+      // Placed AFTER the test-mode mock branch above so the LIN-412 local
+      // carve-out keeps firing (tests/e2e/audit.spec.js runs on a genuine
+      // `provider: 'local'` seed). Consequence, recorded deliberately: a local
+      // workspace is mocked in test but REFUSED in production — today it sends
+      // its urlKey to Linear for a fake 401, and 422 is the honest answer.
+      // `linear`-only, never `linear` OR `local` (LIN-1891's settled rule); the
+      // sibling asset relay withholds the header instead of refusing, because
+      // capability endpoints refuse and asset relays degrade (see /api/image).
+      if (!isActiveProviderLinear(workspace)) {
+        return jsonError(res, 422, `This workspace's provider does not support this`, {
+          code: 'CAPABILITY_NOT_SUPPORTED',
+          capability: 'audit',
+          provider: workspace.provider,
+        });
+      }
+
       const report = await runAudit(workspace.accessToken);
       res.json(report);
     } catch (error) {
@@ -455,8 +482,13 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         })
       }
 
-      // Fetch issue context from Linear
-      const { issue, parent, siblings, project, children, comments, attachments } = await getProviderForWorkspace(workspace).fetchIssueContext(getWorkspaceCallScope(workspace), issueId)
+      // LIN-1904: resolve the issue's OWN binding (per the `source` provenance
+      // stamp LIN-561 puts on every merged-tree row, LIN-544) rather than
+      // always the workspace's active provider — same fix as /api/detail
+      // (LIN-1903), same helper.
+      const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
+      const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource)
+      const { issue, parent, siblings, project, children, comments, attachments } = await issueProvider.fetchIssueContext(issueCallScope, issueId)
 
       // Generate the prompt
       let result;
@@ -577,7 +609,10 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         })
       }
 
-      const { issue, project } = await getProviderForWorkspace(workspace).fetchIssueContext(getWorkspaceCallScope(workspace), issueId)
+      // LIN-1904: resolve the issue's own binding via `source`, same as /api/prompt.
+      const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
+      const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource)
+      const { issue, project } = await issueProvider.fetchIssueContext(issueCallScope, issueId)
       const prompt = buildAutopilotKickoff({
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title },
@@ -1338,7 +1373,10 @@ ${goal}`
       // (interactions.spec) reads comments through the local provider and no
       // test-token spec reaches this endpoint, so the old `testMockData` data-mock
       // branch was orphaned and removed (LIN-413). Linear + local both serve here.
-      const comments = await getProviderForWorkspace(workspace).fetchIssueComments(getWorkspaceCallScope(workspace), issueId)
+      // LIN-1904: resolve the issue's own binding via `source`, same as /api/detail.
+      const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
+      const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource)
+      const comments = await issueProvider.fetchIssueComments(issueCallScope, issueId)
       res.json({ comments })
     } catch (error) {
       console.error('Comments fetch error:', error)
@@ -1386,19 +1424,11 @@ ${goal}`
       // WORKSPACE's active provider/scope — misrouting a foreign-source row's id
       // to the wrong provider/credential. The client-supplied `source` (the
       // issue's own provenance, LIN-561) lets us resolve that issue's own
-      // binding instead. It is bounded to this workspace's OWN bindings via the
-      // `.find()` below — never passed to `getProvider()` directly — so it can
-      // only select among credentials the caller already has access to.
+      // binding instead, via resolveIssueBinding — bounded to this workspace's
+      // OWN bindings, so it can only select among credentials the caller
+      // already has access to (LIN-1904).
       const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
-      const matchedBinding = requestedSource
-        ? getBindingsForWorkspace(workspace).find(b => b.provider === requestedSource)
-        : null
-      const provider = matchedBinding ? getProvider(matchedBinding.provider) : getProviderForWorkspace(workspace)
-      // Security-critical: the resolved branch must use getBindingCallScope on
-      // THAT binding, never getWorkspaceCallScope(workspace)'s active-binding
-      // scope — reusing it would hand the active binding's credential to a
-      // different provider's client.
-      const callScope = matchedBinding ? getBindingCallScope(matchedBinding) : getWorkspaceCallScope(workspace)
+      const { provider, callScope } = resolveIssueBinding(workspace, requestedSource)
 
       // Test mode (test-token + testMockData): the homepage renders from the mock
       // fixtures, not the provider API, so the lazy detail must too — fetching via
@@ -2038,10 +2068,27 @@ ${goal}`
     const MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
     try {
+      // LIN-1899: attach the workspace credential ONLY when the active binding
+      // is Linear. `workspace.accessToken` is the provider-agnostic scalar
+      // mirror, so for a Jira-active workspace this template would send a raw
+      // Jira API token to uploads.linear.app — the same cross-provider
+      // credential egress LIN-1891 closed on the attachment relay
+      // (routes/proxy.js:2477-2479), and this route is the same site class, so
+      // it takes that precedent's consequence verbatim: SERVE the asset, WITHHOLD
+      // the header. Deliberately degrade rather than refuse (unlike the audit
+      // capability above) — a mixed workspace's already-rendered <img> still
+      // resolves for genuinely public linear.app assets, and the security
+      // property is identical either way: the credential does not leave the
+      // system. `linear`-only, never `linear` OR `local` (LIN-1891's rule);
+      // legacy providerless workspaces keep their header.
+      //
+      // Placed at the fetch, AFTER the https-only / exact-host-allowlist /
+      // path-traversal checks above — none of which are reordered or relaxed.
+      const fetchHeaders = isActiveProviderLinear(workspace)
+        ? { Authorization: `Bearer ${workspace.accessToken}` }
+        : {}
       const response = await fetch(imageUrl, {
-        headers: {
-          Authorization: `Bearer ${workspace.accessToken}`
-        },
+        headers: fetchHeaders,
         // Prevent redirects that could bypass SSRF protection
         redirect: 'error'
       })
@@ -2632,8 +2679,13 @@ ${goal}`
    */
   router.patch('/workspace/:urlKey/api/issues/:issueId', workspaceFromUrl, json(), async (req, res) => {
     const workspace = req.workspace;
-    const provider = getProviderForWorkspace(workspace);
-    const token = getWorkspaceCallScope(workspace);
+    // LIN-1904: resolve the issue's own binding via `source` (thread from the
+    // edit-link → task-edit → PATCH provenance hop), same helper as the read
+    // routes. Guard-read and write both derive from this single pairing, so
+    // they cannot land on different bindings (the invariant LIN-1903's review
+    // mutation-tested).
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
+    const { provider, callScope: token } = resolveIssueBinding(workspace, requestedSource);
 
     if (!provider.supports('updateIssue')) {
       return jsonError(res, 422, "This workspace's provider does not support updating issues", {

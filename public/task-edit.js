@@ -82,6 +82,14 @@
 
     var urlKey = form.dataset.urlKey;
     var issueId = form.dataset.issueId;
+    // LIN-1904: forward the resolved provider's name (stamped server-side by
+    // routes/task-edit.js) so the PATCH targets the SAME binding this page
+    // rendered, not the workspace's active provider. Single-binding
+    // workspaces still gain the query param (harmless — the sole binding
+    // matches either way).
+    var source = form.dataset.source;
+    var patchUrl = '/workspace/' + encodeURIComponent(urlKey) + '/api/issues/' + encodeURIComponent(issueId) +
+      (source ? '?source=' + encodeURIComponent(source) : '');
 
     try {
       setStatus('Saving…');
@@ -109,7 +117,7 @@
         body.priority = Number(val('priority'));
       }
 
-      await window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/issues/' + encodeURIComponent(issueId), {
+      await window.api(patchUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

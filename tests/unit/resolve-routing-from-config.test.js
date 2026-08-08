@@ -67,3 +67,64 @@ describe('resolveRoutingFromConfig', () => {
     assert.deepEqual(resolveRoutingFromConfig(config, 'implementation'), { model: 'anthropic/claude-opus-4.8', harness: 'claude-code' });
   });
 });
+
+// LIN-1694 — row-atomic model eligibility. The bug: `model` and `harness` resolved as two fully
+// independent chains, so an explicit `harness` could pair with a `model` configured on a row scoped
+// to a DIFFERENT harness. `harnessInForce` is how the caller (dispatch-factory) tells this resolver
+// which engine actually won, so a row scoped elsewhere is skipped instead of donating its model.
+describe('resolveRoutingFromConfig — row-atomic model eligibility (LIN-1694)', () => {
+  const workspaceConfig = {
+    byKind: { implementation: { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' } }
+  };
+
+  test('omitting harnessInForce keeps the pre-LIN-1694 behavior exactly', () => {
+    assert.deepEqual(
+      resolveRoutingFromConfig(workspaceConfig, 'implementation'),
+      { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' }
+    );
+  });
+
+  test('THE BUG: an opencode-scoped row does not donate its model when claude-code is in force', () => {
+    assert.deepEqual(
+      resolveRoutingFromConfig(workspaceConfig, 'implementation', { harnessInForce: 'claude-code' }),
+      { model: null, harness: 'opencode' },
+      'the row still reports its own harness; it just may not lend its model to another engine'
+    );
+  });
+
+  test('a row scoped to the harness in force donates normally', () => {
+    assert.deepEqual(
+      resolveRoutingFromConfig(workspaceConfig, 'implementation', { harnessInForce: 'opencode' }),
+      { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' }
+    );
+  });
+
+  test('a blank-harness row is unscoped and donates to any harness (blank = inherit)', () => {
+    const config = { byKind: { implementation: { model: 'anthropic/claude-sonnet-5' } } };
+    assert.equal(resolveRoutingFromConfig(config, 'implementation', { harnessInForce: 'claude-code' }).model, 'anthropic/claude-sonnet-5');
+    assert.equal(resolveRoutingFromConfig(config, 'implementation', { harnessInForce: 'opencode' }).model, 'anthropic/claude-sonnet-5');
+  });
+
+  test('an ineligible per-kind row is SKIPPED — the workspace-wide row still answers', () => {
+    const config = {
+      model: 'anthropic/claude-opus-4.8', // unscoped workspace-wide row
+      byKind: { implementation: { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' } }
+    };
+    assert.deepEqual(
+      resolveRoutingFromConfig(config, 'implementation', { harnessInForce: 'claude-code' }),
+      { model: 'anthropic/claude-opus-4.8', harness: 'opencode' }
+    );
+  });
+
+  test('the reverse cross is blocked too — a claude-code row does not donate to opencode', () => {
+    const config = { byKind: { implementation: { model: 'opus', harness: 'claude-code' } } };
+    assert.equal(resolveRoutingFromConfig(config, 'implementation', { harnessInForce: 'opencode' }).model, null);
+  });
+
+  test('a null harnessInForce disables the check — the row is then the harness source itself', () => {
+    assert.deepEqual(
+      resolveRoutingFromConfig(workspaceConfig, 'implementation', { harnessInForce: null }),
+      { model: 'deepseek/deepseek-v4-pro', harness: 'opencode' }
+    );
+  });
+});

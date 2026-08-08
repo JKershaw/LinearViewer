@@ -1127,10 +1127,15 @@ describe('task-edit link (LIN-1565)', () => {
   }
 
   test('inlineEdit true ⇒ the link renders with the right href', () => {
-    const html = render(true);
+    // LIN-1904: the href now carries `?source=<resolved provider>` so the
+    // task-edit page (and its PATCH submit) resolve THIS issue's own binding —
+    // capture the provider passed in rather than the `render()` wrapper's
+    // hidden one, so the expected href can name it.
+    const provider = providerWith(true);
+    const html = renderDetailsContent(issue, { isLanding: false, urlKey: 'ws', provider });
     assert.ok(html.includes('data-testid="issue-edit-link"'), 'edit link present');
-    assert.ok(html.includes('href="/workspace/ws/task/issue-uuid-1/edit"'),
-      'href points at the task-edit page for this issue');
+    assert.ok(html.includes(`href="/workspace/ws/task/issue-uuid-1/edit?source=${encodeURIComponent(provider.name)}"`),
+      'href points at the task-edit page for this issue, carrying the resolved provider as ?source=');
   });
 
   test('inlineEdit false ⇒ no link at all', () => {
@@ -1155,10 +1160,11 @@ describe('task-edit link (LIN-1565)', () => {
 
   test('urlKey and issue id are URL-encoded in the href', () => {
     const spicy = { id: 'a b/1', identifier: 'A B/1', title: 'Spicy', state: { type: 'started' }, labels: { nodes: [] } };
+    const provider = providerWith(true);
     const html = renderDetailsContent(spicy, {
-      isLanding: false, urlKey: 'w s/k', provider: providerWith(true)
+      isLanding: false, urlKey: 'w s/k', provider
     });
-    assert.ok(html.includes('href="/workspace/w%20s%2Fk/task/a%20b%2F1/edit"'),
+    assert.ok(html.includes(`href="/workspace/w%20s%2Fk/task/a%20b%2F1/edit?source=${encodeURIComponent(provider.name)}"`),
       'urlKey and issue id are percent-encoded, no raw spaces or slashes');
   });
 
