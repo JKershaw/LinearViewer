@@ -13,6 +13,12 @@
  *  4. the binding carries a REAL expiry, not the Phase 1 sentinel.
  *
  * Nothing here proves Atlassian accepts any of it — see D3.
+ *
+ * LIN-1890 E1 note: the add-source cases below now pass `mode=add-source`
+ * EXPLICITLY. They used to rely on the route hard-coding that mode; the landing
+ * entry made `new` the default, so the intent has to be stated. The assertions
+ * themselves are unchanged — this file still pins add-source behaviour, and a
+ * regression that ignored `mode` would now show up as a `new`-shaped result.
  */
 import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
@@ -141,7 +147,7 @@ describe('LIN-1887 Step 4 — GET /auth/jira/oauth (begin)', () => {
   test('redirects to Atlassian consent, minting an opaque state that carries no intent', async () => {
     const session = makeSession();
     const app = makeApp({ session, store: makeStore(), provider: fakeProvider() });
-    const res = await request(app, { path: '/auth/jira/oauth?workspace=acme' });
+    const res = await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme' });
 
     assert.equal(res.status, 302);
     const url = new URL(res.location);
@@ -154,21 +160,21 @@ describe('LIN-1887 Step 4 — GET /auth/jira/oauth (begin)', () => {
   test('an unconfigured server refuses to begin a flow it cannot finish', async () => {
     delete process.env.JIRA_CLIENT_SECRET;
     const app = makeApp({ session: makeSession(), store: makeStore(), provider: fakeProvider() });
-    const res = await request(app, { path: '/auth/jira/oauth?workspace=acme' });
+    const res = await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme' });
     assert.equal(res.status, 503);
     assert.match(res.text, /JIRA_CLIENT_SECRET/);
   });
 
   test('add-source only: an unknown workspace is refused before any redirect', async () => {
     const app = makeApp({ session: makeSession(), store: makeStore(), provider: fakeProvider() });
-    const res = await request(app, { path: '/auth/jira/oauth?workspace=not-mine' });
+    const res = await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=not-mine' });
     assert.equal(res.status, 400);
   });
 });
 
 describe('LIN-1887 Step 4/5 — the callback', () => {
   test('a state mismatch is refused before the code is ever exchanged', async () => {
-    const session = makeSession({ oauthState: 'real-nonce', oauthIntent: { workspaceUrlKey: 'acme' } });
+    const session = makeSession({ oauthState: 'real-nonce', oauthIntent: { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' } });
     const store = makeStore();
     const app = makeApp({ session, store, provider: fakeProvider(), fetches: stubs() });
     const res = await request(app, { path: '/auth/jira/oauth/callback?code=c&state=forged' });
@@ -210,7 +216,7 @@ describe('LIN-1887 Step 4/5 — the callback', () => {
   });
 
   test('identity is resolved from /rest/api/3/myself over the OAuth credential, not a second endpoint', async () => {
-    const session = makeSession({ oauthState: 'nonce', oauthIntent: { workspaceUrlKey: 'acme' } });
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' } });
     const provider = fakeProvider();
     const app = makeApp({ session, store: makeStore(), provider, fetches: stubs() });
     await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
@@ -220,7 +226,7 @@ describe('LIN-1887 Step 4/5 — the callback', () => {
   });
 
   test('several sites: the picker renders and the pending state carries NO rotating credential', async () => {
-    const session = makeSession({ oauthState: 'nonce', oauthIntent: { workspaceUrlKey: 'acme' } });
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' } });
     const store = makeStore();
     const app = makeApp({ session, store, provider: fakeProvider(), fetches: stubs(TWO_SITES) });
     const res = await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
@@ -239,7 +245,7 @@ describe('LIN-1887 Step 4/5 — the callback', () => {
     // Writing durable-first has this consequence. Nothing reads a provider
     // partition whose binding does not exist, the next link attempt overwrites
     // it, and whole-workspace removal deletes every partition.
-    const session = makeSession({ oauthState: 'nonce', oauthIntent: { workspaceUrlKey: 'acme' } });
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' } });
     const store = makeStore();
     const app = makeApp({ session, store, provider: fakeProvider(), fetches: stubs(TWO_SITES) });
     await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
@@ -249,7 +255,7 @@ describe('LIN-1887 Step 4/5 — the callback', () => {
   });
 
   test('a grant with no reachable Jira site is refused, not linked to nothing', async () => {
-    const session = makeSession({ oauthState: 'nonce', oauthIntent: { workspaceUrlKey: 'acme' } });
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' } });
     const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), fetches: stubs([]) });
     const res = await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
     assert.equal(res.status, 400);
@@ -259,7 +265,7 @@ describe('LIN-1887 Step 4/5 — the callback', () => {
 
 describe('LIN-1887 Step 4 — POST /auth/jira/oauth/link (the pick)', () => {
   async function beginTwoSitePick() {
-    const session = makeSession({ oauthState: 'nonce', oauthIntent: { workspaceUrlKey: 'acme' } });
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' } });
     const store = makeStore();
     const app = makeApp({ session, store, provider: fakeProvider(), fetches: stubs(TWO_SITES) });
     await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });

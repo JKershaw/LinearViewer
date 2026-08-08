@@ -1122,6 +1122,10 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // the mock short-circuit never fires.
   const JIRA_EMAIL = 'test-jira-user@example.com';
   const JIRA_API_TOKEN = 'fake_jira_api_token';
+  // The OAuth-shaped stand-ins (LIN-1890 E6b). Same discipline as the Basic
+  // pair: deliberately not 'test-token', so no mock short-circuit fires.
+  const JIRA_OAUTH_ACCESS_TOKEN = 'fake_jira_oauth_access_token';
+  const JIRA_CLOUD_ID = '11111111-2222-3333-4444-555555555555';
 
   // POST → seeds a custom `{ seed }` body (the clean {projects,issues} shape,
   //        falls back to defaultJiraSeed). GET → seeds the default.
@@ -1129,6 +1133,11 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       const body = req.body || {};
       const seed = (body.seed && typeof body.seed === 'object') ? body.seed : defaultJiraSeed;
+      // LIN-1890 E6b: `?authType=oauth` seeds the OAUTH binding shape LIN-1887
+      // writes (Bearer access token + cloudId), not Phase 1's Basic
+      // {email, apiToken}. Default stays Basic so every existing caller — and
+      // the production-validated Phase 1 shape — is byte-identical.
+      const authType = (body.authType || req.query.authType) === 'oauth' ? 'oauth' : 'basic';
 
       if (body.features && typeof body.features === 'object') {
         const validated = {}
@@ -1145,13 +1154,60 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       const provider = getProvider('jira');
       if (!provider) throw new Error('jira provider not registered');
       const fake = createFakeJiraClient(seed);
-      provider.configure({ client: fake, clientFactory: () => fake, site: JIRA_SITE });
+      // LIN-1890 E6b — the seam now ASSERTS the credential it is handed.
+      //
+      // `clientFactory: () => fake` discarded its argument, which made the
+      // fixture blind to the whole credential projection: an OAuth binding and a
+      // Basic one produced identical observable behaviour, so `?authType=oauth`
+      // would have changed nothing a test could see. Checking the shape here
+      // turns the fixture into a real assertion about what
+      // `getWorkspaceCallScope`/`getBindingCallScope` actually projected, and
+      // fails LOUDLY rather than silently serving the fake to a wrong-shaped
+      // credential.
+      //
+      // The check is on the credential's INTERNAL CONSISTENCY, deliberately not
+      // against this request's `authType`. `provider.configure` is a
+      // PROCESS-LEVEL side effect that outlives the seeding call (the
+      // detail-nonactive-binding spec depends on exactly that), so a factory
+      // pinned to the last seed's auth shape becomes order-dependent: an OAuth
+      // seed in one spec would make a Basic-seeded spec throw. Consistency is
+      // the property actually worth asserting anyway — a projection that mixed
+      // the two shapes (an OAuth token arriving in `apiToken` with no `email`,
+      // which is what a regressed Basic branch produces for an OAuth binding)
+      // fails this check regardless of which spec seeded last.
+      const expectCredential = (credential) => {
+        if (credential?.authType === 'oauth') {
+          if (!credential.accessToken || !credential.cloudId) {
+            throw new Error(`jira fixture: an OAuth call scope must carry accessToken + cloudId, got ${JSON.stringify(credential)}`);
+          }
+          if (credential.email || credential.apiToken) {
+            throw new Error(`jira fixture: an OAuth call scope must NOT carry Basic fields, got ${JSON.stringify(credential)}`);
+          }
+        } else {
+          if (!credential?.email || !credential?.apiToken) {
+            throw new Error(`jira fixture: a Basic call scope must carry email + apiToken, got ${JSON.stringify(credential)}`);
+          }
+          if (credential.accessToken || credential.cloudId) {
+            throw new Error(`jira fixture: a Basic call scope must NOT carry OAuth fields, got ${JSON.stringify(credential)}`);
+          }
+        }
+        return fake;
+      };
+      provider.configure({ client: fake, clientFactory: expectCredential, site: JIRA_SITE });
 
       // Jira Basic-auth binding shape (LIN-1885 beat 2): the credential is
       // {email, apiToken} and the SITE is the binding SCOPE (not the token).
       // The read seam threads {email, apiToken, site} so the provider builds a
       // request-time client from the credential. tokenExpiresAt:MAX_SAFE_INTEGER
       // mirrors what routes/jira-auth.js's real link handler writes.
+      //
+      // The OAuth arm (LIN-1890 E6b) mirrors what `completeJiraNewLogin` writes:
+      // `authType: 'oauth'` + `cloudId` in the binding credentials, a REAL finite
+      // expiry (never the Basic path's MAX_SAFE_INTEGER sentinel, which on an
+      // OAuth binding is the lie LIN-1887 removed), and no `email`.
+      const credentials = authType === 'oauth'
+        ? { token: JIRA_OAUTH_ACCESS_TOKEN, authType: 'oauth', cloudId: JIRA_CLOUD_ID, tokenExpiresAt: Date.now() + 3600_000 }
+        : { token: JIRA_API_TOKEN, email: JIRA_EMAIL, tokenExpiresAt: Number.MAX_SAFE_INTEGER };
       req.session.workspaces = [{
         id: JIRA_WS_UUID,
         name: 'Jira Workspace',
@@ -1160,11 +1216,11 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         bindings: [{
           provider: 'jira',
           scope: JIRA_SITE,
-          credentials: { token: JIRA_API_TOKEN, email: JIRA_EMAIL, tokenExpiresAt: Number.MAX_SAFE_INTEGER },
+          credentials,
         }],
-        credentials: { token: JIRA_API_TOKEN, email: JIRA_EMAIL },
-        accessToken: JIRA_API_TOKEN,
-        tokenExpiresAt: Number.MAX_SAFE_INTEGER,
+        credentials: { ...credentials },
+        accessToken: credentials.token,
+        tokenExpiresAt: credentials.tokenExpiresAt,
         addedAt: Date.now(),
       }];
       req.session.activeWorkspaceId = JIRA_WS_UUID;

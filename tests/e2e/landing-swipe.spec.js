@@ -14,8 +14,11 @@ test.describe('Landing Swipe Page (/swipe)', () => {
 
   test('shows landing nav with Sign in link', async ({ page }) => {
     // Should have the Sign in link (landing navbar)
-    await expect(page.locator('nav a.login')).toBeVisible();
-    await expect(page.locator('nav a.login')).toHaveAttribute('href', '/auth/linear');
+    // LIN-1890 N4: `nav a.login` is shared by every landing sign-in CTA (Linear,
+    // GitHub, and now Jira), so it is ambiguous under Playwright strict mode as
+    // soon as a second one renders. Name the Linear CTA by its own testid.
+    await expect(page.locator('[data-testid="nav-login-linear"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nav-login-linear"]')).toHaveAttribute('href', '/auth/linear');
 
     // Should have a back-to-projects link
     await expect(page.locator('nav a[href="/"]')).toBeVisible();
