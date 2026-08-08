@@ -77,7 +77,8 @@ test('renderLiveConsolePage emits the ambient shell with stable mount points', (
   assert.match(html, /\/live-console\.js/);
 });
 
-// ─── timeline (LIN-1742, Phase 1: static, non-zoomable last-24h swimlane) ────
+// ─── timeline (LIN-1742 Phase 1 + LIN-1743 Phase 2 zoom/pan + LIN-1928 Phase B
+// fit default) ─────────────────────────────────────────────────────────────
 
 test('renderer emits the timeline section mount points', () => {
   const html = renderLiveConsolePage({ urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }], featureFlags: { liveConsole: true } });
@@ -85,8 +86,21 @@ test('renderer emits the timeline section mount points', () => {
   assert.match(html, /data-testid="live-console-timeline"/);
   assert.match(html, /id="live-console-timeline-axis"/);
   assert.match(html, /id="live-console-timeline-empty"[^>]*hidden/);
+  assert.match(html, /data-testid="live-console-timeline-preset-fit"/);
   assert.match(html, /data-testid="live-console-timeline-preset-1h"/);
   assert.match(html, /data-testid="live-console-timeline-preset-24h"/);
+});
+
+// LIN-1928: `fit` is the default-on-load window (a first-paint latch derived
+// from the initial feed's runs), so it — not `24h` — carries the initial
+// server-rendered aria-pressed="true"; the client corrects the pressed state
+// to reflect the ACTUAL latched window as soon as the first feed lands, but
+// the pre-JS render must already agree so there's no flash of a wrong state.
+test('the fit preset — not 1h or 24h — carries the initial aria-pressed="true"', () => {
+  const html = renderLiveConsolePage({ urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }], featureFlags: { liveConsole: true } });
+  assert.match(html, /data-testid="live-console-timeline-preset-fit" data-range="fit" aria-pressed="true"/);
+  assert.match(html, /data-testid="live-console-timeline-preset-1h" data-range="1h" aria-pressed="false"/);
+  assert.match(html, /data-testid="live-console-timeline-preset-24h" data-range="24h" aria-pressed="false"/);
 });
 
 // LIN-1720 close-out: the connector overlay is a static, empty mount point

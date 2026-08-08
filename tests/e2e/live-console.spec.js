@@ -538,6 +538,11 @@ test.describe('Live Console (experimental)', () => {
       await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-8022' });
       await page.goto(PAGE_URL);
       await page.waitForSelector('[data-testid="live-console-timeline-bar"][data-kind="working"]');
+      // LIN-1928: the default-on-load window is now a `fit` latch, not a fixed
+      // 24h span — pin `24h` explicitly first so this asserts the floor at
+      // the long window the 0.6% figure below is actually derived from,
+      // regardless of what the now-shorter fit default happens to be.
+      await page.locator('[data-testid="live-console-timeline-preset-24h"]').click();
       const { barWidth, viewportWidth } = await page.evaluate(() => {
         const viewport = document.querySelector('[data-testid="live-console-timeline"]');
         const bar = document.querySelector('[data-testid="live-console-timeline-bar"][data-kind="working"]');
@@ -981,6 +986,7 @@ test.describe('Live Console (experimental)', () => {
   // reach, which would make its rendered width identical regardless of zoom.
   test.describe('Zoom & pan gestures (LIN-1743)', () => {
     const TIMELINE = '[data-testid="live-console-timeline"]';
+    const PRESET_FIT = '[data-testid="live-console-timeline-preset-fit"]';
     const PRESET_1H = '[data-testid="live-console-timeline-preset-1h"]';
     const PRESET_24H = '[data-testid="live-console-timeline-preset-24h"]';
     const DAY_MS = 24 * 60 * 60 * 1000;
@@ -994,18 +1000,56 @@ test.describe('Live Console (experimental)', () => {
       await clearFeed(page, URL_KEY);
     });
 
-    test('the 1h preset narrows the window to exactly 1h and marks itself pressed', async ({ page }) => {
+    // LIN-1928: the default-on-load window is now a `fit` latch, not a fixed
+    // 24h span. The e2e seed seam always dispatches at "now" (see
+    // seedTerminalWorker's comment), so the fit computation's
+    // `earliestVisibleRunStart` is ~seconds old and the clamp lands on
+    // TIMELINE_FIT_MIN_SPAN_MS — exactly 1h — in every one of these fixtures.
+    test('the default-on-load window is a fit latch (clamps to 1h here) with only `fit` pressed', async ({ page }) => {
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9000', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      const initial = await timelineWindow(page);
+
+      expect(initial.end - initial.start).toBe(HOUR_MS);
+      // The core LIN-1928 regression: a fit window clamped to 1h is
+      // span-identical to the `1h` preset, so pressed state must come from
+      // retained identity, not span equality — only `fit` reports pressed.
+      await expect(page.locator(PRESET_FIT)).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator(PRESET_1H)).toHaveAttribute('aria-pressed', 'false');
+      await expect(page.locator(PRESET_24H)).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    test('a poll tick right after first paint does not recompute the fit latch\'s span (it stays live-anchored, like every preset)', async ({ page }) => {
+      // `fit`, like `1h`/`24h`, is a LIVE preset (endMs: null) — its absolute
+      // bounds are expected to keep tracking "now" every poll, same as any
+      // other preset. What must NOT happen is a fresh `computeTimelineFit`
+      // call re-deriving a DIFFERENT span from the (by-then-changed) run
+      // list — so this asserts the span is unchanged and still live (the end
+      // keeps advancing with the clock), not that the window is frozen.
+      await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9000b', message: '[done] ok' });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
+      const latched = await timelineWindow(page);
+
+      await page.waitForTimeout(5500); // one more 5s poll tick
+      const after = await timelineWindow(page);
+      expect(after.end - after.start).toBe(latched.end - latched.start);
+      expect(after.end).toBeGreaterThan(latched.end);
+      await expect(page.locator(PRESET_FIT)).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    test('the 1h preset narrows the window to exactly 1h and marks itself (not fit) pressed', async ({ page }) => {
       await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9001', message: '[done] ok' });
       await page.goto(PAGE_URL);
       await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
-      const before = await timelineWindow(page);
-      expect(before.end - before.start).toBe(DAY_MS); // Phase 1's unchanged default
 
       await page.locator(PRESET_1H).click();
       const after = await timelineWindow(page);
 
       expect(after.end - after.start).toBe(HOUR_MS);
       await expect(page.locator(PRESET_1H)).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator(PRESET_FIT)).toHaveAttribute('aria-pressed', 'false');
       await expect(page.locator(PRESET_24H)).toHaveAttribute('aria-pressed', 'false');
     });
 
@@ -1035,7 +1079,8 @@ test.describe('Live Console (experimental)', () => {
       await wheelZoom(page, TIMELINE, { deltaY: -800, ctrlKey: true }); // negative deltaY: zoom in
       const zoomed = await timelineWindow(page);
       expect(zoomed.end - zoomed.start).toBeLessThan(baseline.end - baseline.start);
-      // Both presets go un-pressed once the span is a custom (non-preset) value.
+      // All presets go un-pressed once the span is a custom (non-preset) value.
+      await expect(page.locator(PRESET_FIT)).toHaveAttribute('aria-pressed', 'false');
       await expect(page.locator(PRESET_1H)).toHaveAttribute('aria-pressed', 'false');
       await expect(page.locator(PRESET_24H)).toHaveAttribute('aria-pressed', 'false');
     });
@@ -1070,8 +1115,12 @@ test.describe('Live Console (experimental)', () => {
       // At the default 24h span the window already covers the FULL allowed
       // axis [now-24h, now] — there is nowhere to pan without immediately
       // hitting both edge clamps, which would snap it right back to itself.
-      // Zoom in first (1h) so a pan has room to move.
-      await page.locator(PRESET_1H).click();
+      // Zoom in first so a pan has room to move. LIN-1928: the default-on-load
+      // window is now a `fit` latch that already clamps to 1h in this fixture
+      // (earliest run is seconds old), so clicking the `1h` preset here would
+      // be a same-span no-op — zoom in via an explicit gesture instead, which
+      // both sidesteps that and exercises the real zoom code path.
+      await wheelZoom(page, TIMELINE, { deltaY: -1200, ctrlKey: true });
       const before = await timelineWindow(page);
 
       // Dragging right reveals EARLIER time — the window shifts back in time,
@@ -1125,7 +1174,10 @@ test.describe('Live Console (experimental)', () => {
       await page.goto(PAGE_URL);
       await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
       const staleBar = page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9099"]');
-      // At the default 24h span both the fresh and the 22h-old run overlap the window.
+      // LIN-1928: the default window is now a fit latch, not a fixed 24h span —
+      // but the fit computation sees the 22h-old run in the very first feed
+      // (the route intercept above), so it clamps close to that run's own
+      // age (~23h, still < the 24h ceiling) and comfortably covers it too.
       await expect(staleBar).toBeVisible();
 
       // Zoom to 1h: the 22h-old run no longer overlaps the window at all, so it
@@ -1169,9 +1221,10 @@ test.describe('Live Console (experimental)', () => {
       await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9011', message: '[done] ok' });
       await page.goto(PAGE_URL);
       await page.waitForSelector('[data-testid="live-console-timeline-bar"]');
-      // Zoom in first (1h) so a pan has room to move, same reasoning as the
-      // touch drag-pan test above.
-      await page.locator(PRESET_1H).click();
+      // Zoom in first so a pan has room to move, same reasoning (and same
+      // LIN-1928 fit-latch-already-clamps-to-1h caveat) as the touch
+      // drag-pan test above.
+      await wheelZoom(page, TIMELINE, { deltaY: -1200, ctrlKey: true });
       const before = await timelineWindow(page);
 
       const box = await page.locator(TIMELINE).boundingBox();

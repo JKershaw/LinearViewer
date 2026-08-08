@@ -22,9 +22,11 @@ import {
 import {
   computeTimelineZoom,
   computeTimelinePan,
+  computeTimelineFit,
   timelineRunOverlapsWindow,
   TIMELINE_MIN_SPAN_MS,
   TIMELINE_MAX_SPAN_MS,
+  TIMELINE_FIT_MIN_SPAN_MS,
 } from '../../lib/timeline-zoom.js';
 
 const NOW = Date.parse('2026-07-31T12:00:00.000Z');
@@ -405,7 +407,9 @@ test('the history-page branch (loops: []) yields an empty/absent timeline shape'
 const VIEWPORT_W = 900;
 
 test('computeTimelineZoom clamps the span to [minSpanMs, maxSpanMs]', () => {
-  // A large zoom-IN delta would shrink the span far below 1h — clamps to the floor.
+  // A large zoom-IN delta would shrink the span far below the interactive
+  // floor (TIMELINE_MIN_SPAN_MS, LIN-1928: 5min — NOT the separate, larger
+  // TIMELINE_FIT_MIN_SPAN_MS default-window floor) — clamps to the floor.
   const zoomedIn = computeTimelineZoom({
     startMs: NOW - HOUR, endMs: NOW, focalX: VIEWPORT_W / 2,
     deltaZoom: -10, viewportWidthPx: VIEWPORT_W, nowMs: NOW,
@@ -550,4 +554,43 @@ test('timelineRunOverlapsWindow: an open-ended (still-running, end: null) run ov
 test('timelineRunOverlapsWindow: tolerant of a missing/malformed run', () => {
   assert.equal(timelineRunOverlapsWindow(null, NOW - HOUR, NOW, NOW), false);
   assert.equal(timelineRunOverlapsWindow({}, NOW - HOUR, NOW, NOW), false);
+});
+
+// ─── computeTimelineFit (LIN-1928, Phase B of LIN-1908) ──────────────────────
+// The default/"fit" window: a ONE-SHOT computation the caller (public/
+// live-console.js) latches at first paint and does not re-run on every poll.
+// Deliberately clamps to TIMELINE_FIT_MIN_SPAN_MS (1h), NOT the lowered
+// interactive TIMELINE_MIN_SPAN_MS floor (5min) — the two must stay separate
+// so a ctrl+wheel/pinch zoom-in past the fit baseline still has room to
+// shrink further (Revision 3's load-bearing finding).
+
+test('computeTimelineFit clamps to the fit floor when every run is near "now"', () => {
+  // Mirrors the e2e seed seam (always dispatches at "now"): the earliest
+  // visible run is ~seconds old, so the raw span collapses toward 0 and the
+  // fit window clamps to TIMELINE_FIT_MIN_SPAN_MS, NOT the lower interactive floor.
+  const fit = computeTimelineFit({ runs: [{ start: NOW - 2000, end: null }], now: NOW });
+  assert.equal(fit.endMs - fit.startMs, TIMELINE_FIT_MIN_SPAN_MS);
+  assert.equal(fit.endMs, NOW);
+});
+
+test('computeTimelineFit covers the earliest visible run with a 5% margin, above the floor', () => {
+  const earliest = NOW - 3 * HOUR;
+  const fit = computeTimelineFit({ runs: [{ start: earliest, end: null }, { start: NOW - HOUR, end: NOW }], now: NOW });
+  assert.equal(fit.endMs, NOW);
+  assert.equal(fit.startMs, NOW - (NOW - earliest) * 1.05);
+});
+
+test('computeTimelineFit clamps to maxSpanMs when the earliest run predates the axis', () => {
+  const fit = computeTimelineFit({ runs: [{ start: NOW - 30 * HOUR, end: null }], now: NOW });
+  assert.equal(fit.endMs - fit.startMs, TIMELINE_MAX_SPAN_MS);
+});
+
+test('computeTimelineFit with no runs clamps to the floor (empty window, not a full day)', () => {
+  const fit = computeTimelineFit({ runs: [], now: NOW });
+  assert.equal(fit.endMs - fit.startMs, TIMELINE_FIT_MIN_SPAN_MS);
+});
+
+test('computeTimelineFit ignores runs with a missing/malformed start', () => {
+  const fit = computeTimelineFit({ runs: [null, {}, { start: null }], now: NOW });
+  assert.equal(fit.endMs - fit.startMs, TIMELINE_FIT_MIN_SPAN_MS);
 });
