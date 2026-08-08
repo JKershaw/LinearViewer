@@ -58,6 +58,10 @@ window.computeFitZoom = function computeFitZoom(opts) {
 var TIMELINE_MIN_SPAN_MS = 60 * 60 * 1000; // 1h
 var TIMELINE_MAX_SPAN_MS = 24 * 60 * 60 * 1000; // 24h
 
+// Bar-width visibility floor — mirrors lib/timeline-zoom.js's
+// TIMELINE_BAR_MIN_WIDTH_PCT (LIN-1908 Phase A).
+window.TIMELINE_BAR_MIN_WIDTH_PCT = 0.6;
+
 function clampTimelineWindow(startMs, endMs, nowMs, maxSpanMs) {
   var span = endMs - startMs;
   var boundEnd = nowMs;

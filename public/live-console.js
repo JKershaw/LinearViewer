@@ -211,8 +211,11 @@
     // just `widthPct`'s upper bound) so the floor survives for a run starting
     // at/after that point — otherwise `100 - startPct` degenerates to the run's
     // own duration and the outer `min` always wins, defeating MIN_W for every
-    // fresh/still-running run.
-    const MIN_W = 0.6;
+    // fresh/still-running run. Relocated to lib/timeline-zoom.js's
+    // TIMELINE_BAR_MIN_WIDTH_PCT (LIN-1908 Phase A) — mirrored on `window` in
+    // common.js — so lib/live-console.js's TIMELINE_ROW_BUFFER_MS derives from
+    // the same value instead of a second, drift-prone copy.
+    const MIN_W = window.TIMELINE_BAR_MIN_WIDTH_PCT;
     const startPct = Math.min(pct(run.start), 100 - MIN_W);
     const widthPct = Math.min(Math.max(pct(clampedEnd) - startPct, MIN_W), 100 - startPct);
     div.style.left = `${startPct}%`;
