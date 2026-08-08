@@ -30,6 +30,7 @@ import {
   latestHeartbeat,
   SUMMARY_MAX,
 } from '../../lib/live-console.js';
+import { parseHeartbeat } from '../../lib/session-telemetry.js';
 
 // A lean loop record, shaped like getLoopsForWorkspace(lean) output after the
 // route folds in { workspaceUrlKey, workspaceName }.
@@ -199,20 +200,35 @@ test('buildPulse buckets heartbeats-only into a fine window ending at now', () =
 
 // LIN-1929 (Phase C of LIN-1908): `load[]` is additive alongside `buckets[]` —
 // same anchors/length, summing each beat's magnitude instead of counting it.
-test('buildPulse load[] sums each bucket\'s total, falling back to toolCount, without disturbing buckets[]', () => {
+//
+// `total` is the session's running CUMULATIVE tool count (only ever increases);
+// `toolCount` is that beat's own window burst. The fixtures below are built from
+// real simple-dispatcher heartbeat wire strings run through the real
+// `parseHeartbeat`, not hand-authored {toolCount,total} pairs — a fixture that
+// invents its own relationship between the two fields can't catch a precedence
+// bug between them (implementation review f6eee867, finding F1).
+test('buildPulse load[] sums each bucket\'s toolCount burst, falling back to total, without disturbing buckets[]', () => {
   const now = Date.parse('2026-07-19T12:00:00Z');
   const s = 1000;
+  const busyBeat = parseHeartbeat(
+    '[working · edit] 12 tools in 30s: Bash×7 Read×5 · 12 total',
+    new Date(now - 3 * s).toISOString(),
+  );
+  const idleBeat = parseHeartbeat(
+    '[working] no tool calls in 1m · 20 total',
+    new Date(now - 4 * s).toISOString(),
+  );
+  const fallbackBeat = { toolCount: null, total: 9, timestamp: new Date(now - 12 * s).toISOString() }; // no burst reported: falls back to total
   const hbLoop = loop({
-    telemetry: { producedArtifacts: [], metrics: [
-      { toolCount: 1, total: 5, timestamp: new Date(now - 3 * s).toISOString() },  // newest bucket: has `total`
-      { toolCount: 2, timestamp: new Date(now - 4 * s).toISOString() },            // newest bucket: falls back to toolCount
-      { toolCount: 3, total: 0, timestamp: new Date(now - 12 * s).toISOString() }, // older bucket: total present but 0
-    ] },
+    telemetry: { producedArtifacts: [], metrics: [busyBeat, idleBeat, fallbackBeat] },
   });
   const pulse = buildPulse([hbLoop], { now, windowMs: 30 * s, bucketMs: 5 * s });
   assert.equal(pulse.load.length, pulse.buckets.length);
-  assert.equal(pulse.load[5], 7);   // 5 (total) + 2 (toolCount fallback)
-  assert.equal(pulse.load[3], 0);   // total:0 is honoured, not treated as missing
+  // The busy beat (12 tools this window) outweighs the idle beat (0 tools this
+  // window, despite a cumulative `total` of 20) — a beat that did no work must
+  // never render louder than the busiest beat in the strip.
+  assert.equal(pulse.load[5], 12);  // busyBeat's toolCount (12), idleBeat's toolCount (0) adds nothing
+  assert.equal(pulse.load[3], 9);   // fallbackBeat has no toolCount, falls back to total
   // buckets[] keeps counting beats, unaffected by the magnitude they carry.
   assert.equal(pulse.buckets[5], 2);
   assert.equal(pulse.buckets[3], 1);

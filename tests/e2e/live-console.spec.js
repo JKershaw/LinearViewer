@@ -468,38 +468,50 @@ test.describe('Live Console (experimental)', () => {
       await expect(hb.locator('img')).toHaveCount(0);
     });
 
-    test('load nested inside the hum never grows the hum\'s own painted height (beating-but-idle stays visible, unchanged)', async ({ page }) => {
+    // A global topY-across-the-whole-canvas scan can't discriminate "nested
+    // per-bucket" from "scaled to the global hum height": with a single spike
+    // bucket, that bucket IS the hum maximum, so the two scalings coincide —
+    // proven by mutation (implementation review f6eee867, finding F2): scaling
+    // the overlay to the page's global `humH` instead of that bucket's own
+    // `(base - y)` still passes the single-spike version of this test. The
+    // per-COLUMN scan below uses two separated buckets — a tall one with no
+    // load, and a short one with an enormous load — so a global-height mutant
+    // is caught: it would paint the short column's load at the TALL column's
+    // height instead of its own.
+    test('load nested inside the hum never grows taller than that bucket\'s OWN hum height (per-column scan, catches a global-height mutant)', async ({ page }) => {
       await page.emulateMedia({ reducedMotion: 'reduce' }); // one deterministic repaint per poll, no rAF drift
       const canvasSel = '#live-console-tempo';
+      const bucketMs = 5000;
+      const bucketCount = 36; // matches the production 3min/5s pulse window (DEFAULT_PULSE_WINDOW_MS/BUCKET_MS)
+      const tallIdx = 10;  // tall hum, no load
+      const shortIdx = 30; // short hum, enormous load — the discriminating column
 
-      async function scan(page) {
-        return page.locator(canvasSel).evaluate((canvas) => {
+      async function scanBucketColumn(page, bucketIndex) {
+        return page.locator(canvasSel).evaluate((canvas, { bucketIndex, bucketCount, bucketMs }) => {
+          const PULSE_WINDOW_MS = 3 * 60 * 1000; // public/live-console.js's fixed strip span
+          const dpr = window.devicePixelRatio || 1;
+          const cssW = canvas.clientWidth || canvas.offsetWidth || 0;
+          const tsOffsetFromNow = (bucketCount - 1 - bucketIndex) * bucketMs - bucketMs / 2;
+          const xCss = cssW * (1 - tsOffsetFromNow / PULSE_WINDOW_MS);
+          const xDev = Math.max(0, Math.min(canvas.width - 1, Math.round(xCss * dpr)));
           const ctx = canvas.getContext('2d');
-          const { width, height } = canvas;
-          const data = ctx.getImageData(0, 0, width, height).data;
-          let topY = null, filled = 0;
-          for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-              if (data[(y * width + x) * 4 + 3] > 0) {
-                if (topY === null) topY = y;
-                filled++;
-              }
-            }
+          const data = ctx.getImageData(xDev, 0, 1, canvas.height).data;
+          let topY = null;
+          for (let y = 0; y < canvas.height; y++) {
+            if (data[y * 4 + 3] > 0) { topY = y; break; }
           }
-          return { topY, filled, height };
-        });
+          return { topY, height: canvas.height };
+        }, { bucketIndex, bucketCount, bucketMs });
       }
 
-      let phase = 'low-load';
       await page.route(`**${EVENTS_API}`, async (route) => {
         const response = await route.fetch();
         const body = await response.json();
         const now = body.serverNow || Date.now();
-        const bucketMs = 5000;
-        const buckets = new Array(8).fill(0);
-        buckets[4] = 3; // a single spike bucket — the only column with paint
-        const load = new Array(8).fill(0);
-        if (phase === 'high-load') load[4] = 500; // wildly out of proportion to the beat count
+        const buckets = new Array(bucketCount).fill(0);
+        const load = new Array(bucketCount).fill(0);
+        buckets[tallIdx] = 6;                  // tall hum column, no load
+        buckets[shortIdx] = 1; load[shortIdx] = 500; // short hum column, wildly out-of-proportion load
         body.pulse = { bucketMs, endTs: now, buckets, load };
         body.events = []; // no blips competing for canvas pixels
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
@@ -510,18 +522,18 @@ test.describe('Live Console (experimental)', () => {
       // — the module's very first paint (startPulse's synchronous renderPulse,
       // fired before the mocked fetch resolves) is an empty frame that would
       // otherwise satisfy a backing-size-only wait and race the real data.
-      await expect.poll(() => scan(page).then(s => s.filled), { timeout: 15000 }).toBeGreaterThan(0);
-      const low = await scan(page);
+      await expect.poll(() => scanBucketColumn(page, tallIdx).then(s => s.topY), { timeout: 15000 }).not.toBeNull();
 
-      phase = 'high-load';
-      await expect.poll(() => scan(page).then(s => s.filled), { timeout: 15000 }).toBeGreaterThan(low.filled);
-      const high = await scan(page);
+      const tall = await scanBucketColumn(page, tallIdx);
+      const short = await scanBucketColumn(page, shortIdx);
+      const tallHeight = tall.height - tall.topY;
+      const shortHeight = short.height - short.topY;
 
-      // The hum's own top edge (its bucket-driven height) is unchanged by an
-      // enormous load value in the same bucket — nested, never replacing.
-      expect(high.topY).toBe(low.topY);
-      // The load overlay DID render something extra beneath that top edge.
-      expect(high.filled).toBeGreaterThan(low.filled);
+      // The short bucket's enormous `load` value must not paint it as tall as
+      // the (unrelated) tall bucket — nested to ITS OWN hum height, not the
+      // strip's global maximum. A mutant that scales the load overlay against
+      // the global hum height instead of the bucket's own would fail this.
+      expect(shortHeight).toBeLessThan(tallHeight * 0.5);
     });
   });
 
