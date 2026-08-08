@@ -444,6 +444,35 @@ describe('collectKpiStats', () => {
     assert.ok(!serialized.includes('LIN-999'), 'issue identifier leaked');
     assert.ok(!serialized.includes('SECRET_TOKEN'), 'session token leaked');
   });
+
+  test('privacy (LIN-1957): issueIdentifier — key or value — never crosses into terminalMarkedTaskCost, the boundary itself, not just an assumption', async () => {
+    // The queue-seeded LIN-999 test above never actually exercises
+    // terminalMarkedTaskCost's issueIdentifier attribution (queue rows carry
+    // no feedback, so they never resolve `done`). This test seeds a genuinely
+    // DONE history row carrying a distinctive issueIdentifier so the
+    // assertion is real: computeTerminalMarkedTaskCost uses it internally to
+    // group lineages into issues, then the value must be discarded before
+    // anything crosses into the returned stats object.
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([{
+        _id: 'priv1', rootItemId: 'priv1', issueIdentifier: 'LIN-PRIVACY-CANARY',
+        harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(1),
+        feedback: [
+          { kind: 'usage', message: '[usage] {"harness":"claude-code","costUsd":3,"lane":"api"}', timestamp: daysAgo(1).toISOString() },
+          marker('[done] landed it', 0.9)
+        ]
+      }])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    // The metric must actually be live (proves the assertion isn't vacuous).
+    assert.equal(stats.terminalMarkedTaskCost.issueCount, 1);
+    assert.equal(stats.terminalMarkedTaskCost.costUsd, 3);
+
+    const serialized = JSON.stringify(stats);
+    assert.ok(!serialized.includes('LIN-PRIVACY-CANARY'), 'issueIdentifier value leaked into the public stats object');
+    assert.ok(!serialized.includes('"issueIdentifier"'), 'the issueIdentifier KEY itself must never appear in the output');
+  });
 });
 
 // LIN-1846: several metrics were labelled "· 30d" but applied no window in
