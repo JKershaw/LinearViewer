@@ -1067,6 +1067,26 @@ test.describe('Live Console (experimental)', () => {
       await expect(page.locator(PRESET_1H)).toHaveAttribute('aria-pressed', 'false');
     });
 
+    // LIN-1928 close-out F1: the section label, aria-label, and empty-state
+    // text are supposed to derive from the ACTIVE window (describeTimelineSpan),
+    // not a literal "24 hours" — nothing asserted this. Checking both the
+    // fit-latched default (1h here, no runs seeded) and an explicit 24h click
+    // proves the text tracks the window rather than being a fixed string.
+    test('the section label, aria-label, and empty-state text derive from the active window, not a literal "24 hours"', async ({ page }) => {
+      await page.goto(PAGE_URL);
+      await expect(page.locator('#live-console-timeline-empty')).toBeVisible();
+
+      await expect(page.locator('#live-console-timeline-label-text')).toHaveText('last 1 hour');
+      await expect(page.locator('#live-console-timeline-section')).toHaveAttribute('aria-label', 'Last 1 hour');
+      await expect(page.locator('#live-console-timeline-empty')).toHaveText('○ no runs in the last 1 hour');
+
+      await page.locator(PRESET_24H).click();
+
+      await expect(page.locator('#live-console-timeline-label-text')).toHaveText('last 24 hours');
+      await expect(page.locator('#live-console-timeline-section')).toHaveAttribute('aria-label', 'Last 24 hours');
+      await expect(page.locator('#live-console-timeline-empty')).toHaveText('○ no runs in the last 24 hours');
+    });
+
     test('ctrl+wheel zooms in smoothly; a plain wheel (no ctrl/meta) leaves the window untouched', async ({ page }) => {
       await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9003', message: '[done] ok' });
       await page.goto(PAGE_URL);
