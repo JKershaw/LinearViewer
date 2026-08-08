@@ -393,3 +393,39 @@ describe('LIN-1887 Step 1(c) — reactive: a `none` provider survives its first 
     assert.deepEqual(calls.durableDeleteAlls, [['acct-1', 'acme']], 'a single-partition delete here would orphan the sibling');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Step 10 — the monitor's key
+// ---------------------------------------------------------------------------
+
+describe('LIN-1887 Step 10 — the refresh monitor keys on a stable log string', () => {
+  test('the log line still carries the keyed prefix, and now names the provider so the monitor can filter to Jira', () => {
+    // Per LIN-1579 the two discriminating signals for this ticket (a session
+    // surviving past `expires_in`; a headless proxy call after expiry) are
+    // ELAPSED-TIME and route to a named monitor, never a pre-merge gate. The
+    // monitor keys on the LOG STRING, never on a line number — Step 1 edits the
+    // function directly above it, so the number moves. This is the pin that
+    // stops the key itself moving silently.
+    assert.match(SERVER_SRC, /console\.log\(`Token refreshed for workspace \$\{workspace\.id\} \(provider=\$\{provider\}\)`\)/);
+    // The keyed prefix must remain a contiguous substring — appending is safe,
+    // interpolating INTO it is not.
+    assert.ok(SERVER_SRC.includes('Token refreshed for workspace ${workspace.id}'));
+  });
+
+  test('a mislabelled durable record fails loudly rather than silently, so the credential-gate has a watchable signal too', async () => {
+    const { refreshOwnerCredential, _resetInflightForTests } = await import('../../lib/workspace-token-refresh.js');
+    _resetInflightForTests();
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (msg) => warnings.push(String(msg));
+    try {
+      const store = { async get() { return { provider: 'jira', refreshToken: 'JIRA-RT' }; } };
+      const result = await refreshOwnerCredential({ ownerAccountId: 'a', urlKey: 'acme', provider: 'linear', store, refreshAccessToken: async () => { throw new Error('must not be called'); } });
+      assert.equal(result, null);
+    } finally {
+      console.warn = originalWarn;
+    }
+    assert.equal(warnings.length, 1, 'the refusal must be observable, not a silent null');
+    assert.match(warnings[0], /labelled jira in the linear partition/);
+  });
+});
