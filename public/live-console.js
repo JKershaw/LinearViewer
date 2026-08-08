@@ -33,8 +33,12 @@
   const HISTORY_PAGE = 40;
   const TICK_MS = 30000;       // relative-time refresh cadence
   const PULSE_WINDOW_MS = 3 * 60 * 1000; // time span the flowing strip covers (right=now)
-  const TIMELINE_WINDOW_MS = 24 * 60 * 60 * 1000; // full axis bound + default/live span
-  const TIMELINE_MIN_SPAN_MS = 60 * 60 * 1000;    // 1h preset / interactive zoom-in floor
+  const TIMELINE_WINDOW_MS = 24 * 60 * 60 * 1000; // full axis bound + "24h" preset target span
+  const TIMELINE_PRESET_1H_MS = 60 * 60 * 1000;   // "1h" preset target span ONLY — NOT the
+                                                   // interactive zoom floor (that's the lowered
+                                                   // window.TIMELINE_MIN_SPAN_MS mirror in
+                                                   // common.js, LIN-1928); this local const used
+                                                   // to shadow that name and conflate the two.
   const TIMELINE_ROW_HEIGHT = 18;
   const TIMELINE_ROW_GAP = 4;
   const TIMELINE_WHEEL_ZOOM_SPEED = 0.0025;
@@ -55,6 +59,8 @@
     status: document.getElementById('live-console-status'),
     tempo: document.getElementById('live-console-tempo'),
     chips: document.getElementById('live-console-chips'),
+    timelineSection: document.getElementById('live-console-timeline-section'),
+    timelineLabelText: document.getElementById('live-console-timeline-label-text'),
     timeline: document.getElementById('live-console-timeline'),
     timelineConnectors: document.getElementById('live-console-timeline-connectors'),
     timelineEmpty: document.getElementById('live-console-timeline-empty'),
@@ -78,9 +84,19 @@
   // LIN-1743 (Phase 2): the timeline's zoom/pan viewport, module-scope and
   // untouched by paintTimeline's poll-driven reconcile — a poll tick mid-gesture
   // must not reset it. `endMs: null` means "live" (tracks lastServerNow every
-  // poll, i.e. the Phase 1 default); a gesture or a preset sets a concrete
-  // spanMs, and re-pins to live only once panned/zoomed back to the right edge.
+  // poll); a gesture or a preset sets a concrete spanMs, and re-pins to live
+  // only once panned/zoomed back to the right edge. Overwritten once by the
+  // first-paint fit latch (LIN-1928, applyFeed/latchTimelineFitWindow) before
+  // any bar is ever actually painted — this literal is only the pre-latch
+  // placeholder.
   let timelineView = { spanMs: TIMELINE_WINDOW_MS, endMs: null };
+  // Which preset (if any) produced the current timelineView — span alone
+  // can't tell a `fit` latch clamped to TIMELINE_FIT_MIN_SPAN_MS apart from
+  // the `1h` preset, since both are live-anchored spans of the same length
+  // (LIN-1928 research finding). 'fit' | '1h' | '24h' | null (custom gesture).
+  let timelineActivePreset = null;
+  let timelineFitSpanMs = null;         // the fit window's span, latched once (LIN-1928)
+  let timelineFitLatched = false;       // first-paint latch guard — never recomputed on a poll
   let timelineFlat = [];                // last { run, rowIndex } list, for viewport-only repaints
   let timelineConnectorEdges = [];      // last { fromId, toId } list (server-packed, LIN-1720)
   let timelineGesture = null;           // active touch gesture: { mode: 'pinch'|'pan', ... }
@@ -259,13 +275,23 @@
     els.timelineEmpty.hidden = visibleCount > 0;
   }
 
-  function paintTimeline(timeline) {
-    if (!els.timeline) return;
+  // Flatten the server-packed { rows: [[run,...],...] } shape into a single
+  // { run, rowIndex } list. Shared by paintTimeline and the first-paint fit
+  // latch (LIN-1928), which needs the run list before paintTimeline itself
+  // has run.
+  function flattenTimelineRows(timeline) {
     const rows = Array.isArray(timeline && timeline.rows) ? timeline.rows : [];
     const flat = [];
     rows.forEach((row, rowIndex) => {
       (Array.isArray(row) ? row : []).forEach(run => { if (run) flat.push({ run, rowIndex }); });
     });
+    return flat;
+  }
+
+  function paintTimeline(timeline) {
+    if (!els.timeline) return;
+    const rowCount = Array.isArray(timeline && timeline.rows) ? timeline.rows.length : 0;
+    const flat = flattenTimelineRows(timeline);
     timelineFlat = flat; // for gesture-driven repaints that touch no new data
     timelineConnectorEdges = Array.isArray(timeline && timeline.connectors) ? timeline.connectors : [];
     syncTimelineWindowAttrs();
@@ -279,7 +305,7 @@
       if (!node) { node = timelineBarNode(run); timelineBarNodes.set(run.id, node); els.timeline.appendChild(node); }
       updateTimelineBarNode(node, run, rowIndex);
     }
-    const rowsHeightPx = Math.max(rows.length, 1) * (TIMELINE_ROW_HEIGHT + TIMELINE_ROW_GAP);
+    const rowsHeightPx = Math.max(rowCount, 1) * (TIMELINE_ROW_HEIGHT + TIMELINE_ROW_GAP);
     els.timeline.style.height = `${rowsHeightPx}px`;
     if (els.timelineConnectors) {
       els.timelineConnectors.setAttribute('viewBox', `0 0 100 ${rowsHeightPx}`);
@@ -338,31 +364,89 @@
     paintTimelineConnectors();
   }
 
+  // Human-readable span, e.g. "24 hours" / "1 hour" / "47 minutes" / "2h 15m" —
+  // used to derive the section label/aria-label/empty-state text from the
+  // ACTUAL active window (LIN-1928) rather than a literal "24 hours".
+  function describeTimelineSpan(spanMs) {
+    const totalMinutes = Math.max(1, Math.round(spanMs / 60000));
+    if (totalMinutes < 60) return `${totalMinutes} minute${totalMinutes === 1 ? '' : 's'}`;
+    const totalHours = spanMs / 3600000;
+    const roundedHours = Math.round(totalHours);
+    if (Math.abs(totalHours - roundedHours) < 0.01) {
+      return `${roundedHours} hour${roundedHours === 1 ? '' : 's'}`;
+    }
+    const wholeHours = Math.floor(totalHours);
+    const remMinutes = totalMinutes - wholeHours * 60;
+    return `${wholeHours}h ${remMinutes}m`;
+  }
+
+  function updateTimelineWindowText() {
+    const label = `last ${describeTimelineSpan(timelineView.spanMs)}`;
+    if (els.timelineSection) {
+      els.timelineSection.setAttribute('aria-label', label.charAt(0).toUpperCase() + label.slice(1));
+    }
+    if (els.timelineLabelText) els.timelineLabelText.textContent = label;
+    if (els.timelineEmpty) els.timelineEmpty.textContent = `○ no runs in the ${label}`;
+  }
+
+  // Pressed state can't be inferred from span alone (LIN-1928 research
+  // finding): a `fit` window clamped to TIMELINE_FIT_MIN_SPAN_MS is
+  // byte-identical in span to the `1h` preset, so identity is retained
+  // explicitly in `timelineActivePreset` instead of re-derived here.
   function updateTimelinePresetPressed() {
     els.timelinePresets.forEach(btn => {
-      const target = btn.getAttribute('data-range') === '1h' ? TIMELINE_MIN_SPAN_MS : TIMELINE_WINDOW_MS;
-      btn.setAttribute('aria-pressed', String(timelineView.spanMs === target));
+      btn.setAttribute('aria-pressed', String(btn.getAttribute('data-range') === timelineActivePreset));
     });
+    updateTimelineWindowText();
   }
 
   // Adopt a { startMs, endMs } window computed by computeTimelineZoom/Pan.
   // Re-pins to "live" (endMs: null) once panned/zoomed back to the current
   // right edge, so the view keeps tracking new runs without another gesture —
-  // matching the 1h/24h presets, which are always live.
+  // matching the presets, which are always live. A gesture always yields a
+  // custom (non-preset) window.
   function applyTimelineWindow({ startMs, endMs }) {
     const now = lastServerNow || Date.now();
     timelineView = {
       spanMs: endMs - startMs,
       endMs: (now - endMs) < 1000 ? null : endMs,
     };
+    timelineActivePreset = null;
     updateTimelinePresetPressed();
     repaintTimelineViewport();
   }
 
-  function setTimelinePreset(spanMs) {
+  function setTimelinePreset(spanMs, presetName) {
     timelineView = { spanMs, endMs: null };
+    timelineActivePreset = presetName || null;
     updateTimelinePresetPressed();
     repaintTimelineViewport();
+  }
+
+  // Resolve a preset button's target span. `fit` replays the ONE latched
+  // computation from first paint (LIN-1928) rather than recomputing — fit is
+  // deliberately a one-shot default, not a live re-fit button. The fallback
+  // only matters if a click somehow races the first feed response.
+  function presetTargetSpanMs(range) {
+    if (range === '1h') return TIMELINE_PRESET_1H_MS;
+    if (range === '24h') return TIMELINE_WINDOW_MS;
+    if (range === 'fit') return timelineFitSpanMs != null ? timelineFitSpanMs : window.TIMELINE_FIT_MIN_SPAN_MS;
+    return TIMELINE_WINDOW_MS;
+  }
+
+  // First-paint fit latch (LIN-1928): compute the default window ONCE from
+  // the first feed response's run list and hold it — a later poll must never
+  // recompute or move it out from under the user (only a fresh gesture or
+  // preset click changes it after this). Deliberately does not repaint;
+  // applyFeed's own paintTimeline(feed.timeline) call right after this does
+  // the real paint, keyed off the now-latched timelineView.
+  function latchTimelineFitWindow(timeline) {
+    const flat = flattenTimelineRows(timeline);
+    const fit = window.computeTimelineFit({ runs: flat.map(f => f.run), now: lastServerNow || Date.now() });
+    timelineFitSpanMs = fit.endMs - fit.startMs;
+    timelineView = { spanMs: timelineFitSpanMs, endMs: null };
+    timelineActivePreset = 'fit';
+    updateTimelinePresetPressed();
   }
 
   // ─── Timeline gestures (LIN-1743, Phase 2 of LIN-1720) ──────────────────────
@@ -565,7 +649,8 @@
     els.timeline.addEventListener('touchcancel', onTimelineTouchEnd, { passive: true });
     els.timelinePresets.forEach(btn => {
       btn.addEventListener('click', () => {
-        setTimelinePreset(btn.getAttribute('data-range') === '1h' ? TIMELINE_MIN_SPAN_MS : TIMELINE_WINDOW_MS);
+        const range = btn.getAttribute('data-range');
+        setTimelinePreset(presetTargetSpanMs(range), range);
       });
     });
   }
@@ -940,6 +1025,10 @@
     liveOldestTs = feed.oldestTs != null ? feed.oldestTs : liveOldestTs;
     liveHasMore = !!feed.hasMore;
     lastServerNow = feed.serverNow || lastServerNow;
+    if (!timelineFitLatched) {
+      timelineFitLatched = true;
+      latchTimelineFitWindow(feed.timeline);
+    }
     paintBanner(feed.summary);
     updatePulse(feed);
     paintLanes(feed.lanes);
