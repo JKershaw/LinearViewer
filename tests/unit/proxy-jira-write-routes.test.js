@@ -214,6 +214,57 @@ function seed() {
           labels: [], assignee: null, parent: null, _transitions: [],
         },
       },
+      // ---------------------------------------------------------------------
+      // LIN-1886 re-review `5ae61f22`: the two counterexamples found at head
+      // `36a53a80`, after the five above were already fixed. Same numbering
+      // convention, continued. RES-6 is the one that mattered most — the gate
+      // PERMITTED it and the `#` line was silently deleted on a 200 OK.
+      // ---------------------------------------------------------------------
+      {
+        id: '30015', key: 'RES-6', // bare "#" line promoted the paragraph to a heading
+        fields: {
+          summary: 'Paragraph whose first line is a bare hash',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'paragraph', content: [
+              { type: 'text', text: '#' },
+              { type: 'hardBreak' },
+              { type: 'text', text: '1  Scope of works' },
+            ] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
+      {
+        id: '30016', key: 'RES-7', // whitespace-only separator line 422'd although it round-trips
+        fields: {
+          summary: 'Code block with a stray space on its blank line',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'codeBlock', attrs: { language: 'python' },
+              content: [{ type: 'text', text: 'def a():\n    pass\n \ndef b():\n    pass' }] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
+      {
+        id: '30017', key: 'RES-8', // the control: a GENUINELY blank line, still refused
+        fields: {
+          summary: 'Code block with a truly blank line',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'codeBlock', attrs: { language: 'python' },
+              content: [{ type: 'text', text: 'def a():\n    pass\n\ndef b():\n    pass' }] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
       {
         id: '30004', key: 'ENG-13', // done, no available transitions
         fields: {
@@ -581,5 +632,46 @@ describe('Jira-backed proxy — the reviewer\'s five end-to-end reproductions (L
     const content = (await stored('RES-5')).fields.description.content;
     assert.deepEqual(content[0], { type: 'paragraph', content: [{ type: 'text', text: '# not a heading' }] },
       'still a paragraph, still carrying its literal "# "');
+  });
+});
+
+describe('Jira-backed proxy — the re-review\'s two end-to-end reproductions (LIN-1886 re-review 5ae61f22)', () => {
+  // Found at head `36a53a80`, i.e. AFTER the five above were fixed, and missed
+  // by both the 17-case battery and the generated sweep. Same discipline: the
+  // assertion reads the fake store, so it witnesses what was persisted rather
+  // than what the 200 claimed.
+
+  test('RES-6: an append to a paragraph whose first line is a bare "#" does not delete that line', async () => {
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-6/description/append', { block: 'A new note.' });
+    assert.equal(status, 200);
+    const content = (await stored('RES-6')).fields.description.content;
+    assert.deepEqual(content[0], { type: 'paragraph', content: [
+      { type: 'text', text: '#' },
+      { type: 'hardBreak' },
+      { type: 'text', text: '1  Scope of works' },
+    ] }, 'the gate permitted this, so the round trip must be FAITHFUL — it used to persist as {heading, level:1} with the "#" line gone');
+    assert.deepEqual(content[1], { type: 'paragraph', content: [{ type: 'text', text: 'A new note.' }] });
+  });
+
+  test('RES-7: an append to a codeBlock whose blank line carries a stray space succeeds rather than 422ing', async () => {
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-7/description/append', { block: 'A new note.' });
+    assert.equal(status, 200, 'this round-trips perfectly — refusing it was a capability cost with no safety behind it');
+    const content = (await stored('RES-7')).fields.description.content;
+    assert.deepEqual(content[0], { type: 'codeBlock', attrs: { language: 'python' },
+      content: [{ type: 'text', text: 'def a():\n    pass\n \ndef b():\n    pass' }] },
+    'the body survived byte-for-byte, stray space included');
+    assert.deepEqual(content[1], { type: 'paragraph', content: [{ type: 'text', text: 'A new note.' }] });
+  });
+
+  test('RES-8: a TRULY blank separator line is still refused — the fix narrowed the rule, it did not remove it', async () => {
+    // The control for RES-7, and the reason this pair is worth seeding rather
+    // than deriving: `"\n\n"` really does split the block, so it stays lossy
+    // and must stay a loud 422. Note it cannot be built through the markdown
+    // lane at all — a PATCH of a fenced body containing a blank line splits
+    // into two blocks on the way in, which is precisely the loss being refused.
+    const before = JSON.stringify((await stored('RES-8')).fields.description);
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-8/description/append', { block: 'A new note.' });
+    assert.equal(status, 422, 'two literal newlines DO split a block, so this remains unrebuildable');
+    assert.equal(JSON.stringify((await stored('RES-8')).fields.description), before, 'nothing was written');
   });
 });

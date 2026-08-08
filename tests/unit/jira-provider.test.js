@@ -320,6 +320,18 @@ const WRITER_SAFE_ADF = {
     { type: 'rule' },
     { type: 'blockquote', content: [adfPara(adfText('closing thought'))] },
   ),
+  // ---------------------------------------------------------------------
+  // LIN-1886 re-review `5ae61f22` — the two counterexamples the reviewer
+  // reproduced at head `36a53a80`, pinned here so neither can regress. Both
+  // belong in the SAFE list: after the fix each is permitted AND round-trips,
+  // which is the whole claim. Before it, the first was permitted and silently
+  // DELETED its `#` line (a false docstring invariant, not an over-refusal),
+  // and the second was refused although it round-tripped perfectly.
+  // ---------------------------------------------------------------------
+  'paragraph whose first line is a bare "#" (re-review R2)':
+    adfDoc(adfPara(adfText('#'), HARD_BREAK, adfText('1  Scope of works'))),
+  'codeBlock whose blank separator line carries a stray space (re-review R3.1)':
+    adfDoc({ type: 'codeBlock', attrs: { language: 'python' }, content: [adfText('def a():\n    pass\n \ndef b():\n    pass')] }),
 }
 
 /**
@@ -1518,6 +1530,19 @@ const ADVERSARIAL_TEXTS = [
   // prove the refusals are earned rather than blanket.
   '', ' ', '  padded  ', ' leading', 'trailing ', '\ttab',
   'a\nb', 'a\n\nb', '\nleading newline', 'trailing newline\n',
+  // BARE MARKERS (LIN-1886 re-review R2). The corpus above carries `'# not a
+  // heading'` and `'#nospace'` but no marker ALONE, and that is exactly the gap
+  // the escape asymmetry hid in: `escapeBlockLeader` wanted whitespace on the
+  // same line, while `parseBlock`'s `\s+` is happy to consume the newline a
+  // hardBreak rendered. A payload with nothing after the marker is the only
+  // shape that tells those two rules apart. `-`/`>`/`1.` are here as the
+  // controls — both sides require whitespace there, so they must stay safe.
+  '#', '##', '###', '####', '#####', '######', '#######',
+  '-', '>', '1.', '*', '+',
+  // A blank-looking interior line that is not blank (R3.1). `markdownToAdf`
+  // splits on `/\n{2,}/`, so this never splits a block and the content
+  // survives — refusing it is a capability cost with no safety behind it.
+  'a\n \nb', 'a\n\t\nb', ' \n \n ',
 ]
 
 /** Hrefs exercising the paren-truncation bug and its neighbours. */
@@ -1547,6 +1572,15 @@ const SLOTS = {
   'code mark': t => adfDoc(adfPara(adfText(t, [{ type: 'code' }]))),
   'strike mark': t => adfDoc(adfPara(adfText(t, [{ type: 'strike' }]))),
   'link text': t => adfDoc(adfPara(adfText(t, [{ type: 'link', attrs: { href: 'https://e.com' } }]))),
+  // ASYMMETRIC multi-line slots (LIN-1886 re-review R2). The `'paragraph with a
+  // hardBreak'` slot above puts the SAME payload on both sides of the break, so
+  // "marker alone before, ordinary content after" — the shape that promotes a
+  // whole paragraph to a heading and deletes the marker line — was unreachable
+  // by construction. Both orders, because only the leading position is a block
+  // leader and the trailing one is the control that proves it.
+  'paragraph, payload before a hardBreak': t => adfDoc(adfPara(adfText(t), HARD_BREAK, adfText('1  Scope of works'))),
+  'paragraph, payload after a hardBreak': t => adfDoc(adfPara(adfText('1  Scope of works'), HARD_BREAK, adfText(t))),
+  'paragraph, payload across three lines': t => adfDoc(adfPara(adfText(t), HARD_BREAK, adfText('middle'), HARD_BREAK, adfText('tail'))),
 }
 
 describe('ADF → markdown → ADF, as a generated property over an adversarial corpus', () => {
