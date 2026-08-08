@@ -337,6 +337,35 @@ test.describe('Live Console (experimental)', () => {
       await expect(evidence.locator('a.lc-event-summary-link')).toHaveAttribute('href', 'https://github.com/x/y/pull/9');
     });
 
+    // LIN-1929 (Phase C of LIN-1908): a beat with no tool calls parses to
+    // heartbeat.state:'idle' (lib/session-telemetry.js's parseHeartbeat), which
+    // the lane tick now surfaces as Observation's own idle chip instead of a
+    // "0 tools" number — reusing `.obs-act-chip.obs-act-idle` rather than
+    // inventing a parallel vocabulary.
+    test('an idle heartbeat ("no tool calls") shows Observation\'s idle chip, not "0 tools"', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+
+      const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+        data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-951', issueTitle: 'Idle heartbeat worker', target: 'cli' },
+      });
+      expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+      const workerId = (await worker.json()).item.id;
+      const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner-idle&urlKey=${URL_KEY}`)).json();
+      await page.request.post(`/api/dispatch/take/${workerId}`, { headers: { Authorization: `Bearer ${token}` } });
+      await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        data: { message: '[working] no tool calls in 20s · 0 total · next heartbeat in ≤30s' },
+      });
+
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-lane"]');
+
+      const hb = page.locator('[data-testid="live-console-heartbeat"]').first();
+      await expect(hb.locator('.obs-act-idle')).toHaveText('no tools');
+      await expect(hb).not.toContainText('0 tools');
+    });
+
     test('a stale "working" entry drops off the lanes but still shows in the stream', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
@@ -389,6 +418,110 @@ test.describe('Live Console (experimental)', () => {
         await moreBtn.click();
         await expect(page.locator('#live-console-history [data-testid="live-console-event"]').first()).toBeVisible();
       }
+    });
+  });
+
+  // LIN-1929 (Phase C of LIN-1908): the flow bar's magnitude overlay
+  // (`pulse.load`, rendered nested inside the hum) and the heartbeat lane's
+  // idle-chip escaping. `pulse`/`lanes` are mocked directly on the events
+  // response — a `heartbeat.breakdown` key can only ever contain
+  // `[A-Za-z0-9_+#-]` when parsed from a real feedback message
+  // (lib/session-telemetry.js's BREAKDOWN_RE), so these tests go around that
+  // parser to exercise the client's OWN escaping/rendering contract for
+  // whatever shape actually arrives over the wire.
+  test.describe('Pulse magnitude + heartbeat state (LIN-1929)', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+    });
+    test.afterEach(async ({ page }) => {
+      await clearFeed(page, URL_KEY);
+    });
+
+    test('a lane heartbeat with an unsafe breakdown key renders it literally, not as markup', async ({ page }) => {
+      let injected = false;
+      await page.route(`**${EVENTS_API}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!injected) {
+          injected = true;
+          const now = body.serverNow || Date.now();
+          body.lanes = [{
+            workspaceUrlKey: URL_KEY, workspaceName: 'Test workspace', task: 'LIN-9300',
+            action: 'implementation', summary: 'xss probe', sinceMs: now, lastActivityMs: now,
+            heartbeat: {
+              toolCount: 3, elapsedSeconds: 10,
+              breakdown: { '<img src=x onerror=alert(1)>': 3 },
+              total: 3, state: null,
+            },
+            credential: { state: 'unknown', label: null },
+          }];
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      const lane = page.locator('[data-testid="live-console-lane"]', { hasText: 'LIN-9300' });
+      await expect(lane).toBeVisible();
+      const hb = lane.locator('[data-testid="live-console-heartbeat"]');
+      await expect(hb).toContainText('<img src=x onerror=alert(1)>×3');
+      await expect(hb.locator('img')).toHaveCount(0);
+    });
+
+    test('load nested inside the hum never grows the hum\'s own painted height (beating-but-idle stays visible, unchanged)', async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' }); // one deterministic repaint per poll, no rAF drift
+      const canvasSel = '#live-console-tempo';
+
+      async function scan(page) {
+        return page.locator(canvasSel).evaluate((canvas) => {
+          const ctx = canvas.getContext('2d');
+          const { width, height } = canvas;
+          const data = ctx.getImageData(0, 0, width, height).data;
+          let topY = null, filled = 0;
+          for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+              if (data[(y * width + x) * 4 + 3] > 0) {
+                if (topY === null) topY = y;
+                filled++;
+              }
+            }
+          }
+          return { topY, filled, height };
+        });
+      }
+
+      let phase = 'low-load';
+      await page.route(`**${EVENTS_API}`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        const now = body.serverNow || Date.now();
+        const bucketMs = 5000;
+        const buckets = new Array(8).fill(0);
+        buckets[4] = 3; // a single spike bucket — the only column with paint
+        const load = new Array(8).fill(0);
+        if (phase === 'high-load') load[4] = 500; // wildly out of proportion to the beat count
+        body.pulse = { bucketMs, endTs: now, buckets, load };
+        body.events = []; // no blips competing for canvas pixels
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      // Poll the canvas itself rather than assume a fixed poll interval elapsed
+      // — the module's very first paint (startPulse's synchronous renderPulse,
+      // fired before the mocked fetch resolves) is an empty frame that would
+      // otherwise satisfy a backing-size-only wait and race the real data.
+      await expect.poll(() => scan(page).then(s => s.filled), { timeout: 15000 }).toBeGreaterThan(0);
+      const low = await scan(page);
+
+      phase = 'high-load';
+      await expect.poll(() => scan(page).then(s => s.filled), { timeout: 15000 }).toBeGreaterThan(low.filled);
+      const high = await scan(page);
+
+      // The hum's own top edge (its bucket-driven height) is unchanged by an
+      // enormous load value in the same bucket — nested, never replacing.
+      expect(high.topY).toBe(low.topY);
+      // The load overlay DID render something extra beneath that top edge.
+      expect(high.filled).toBeGreaterThan(low.filled);
     });
   });
 

@@ -27,6 +27,7 @@ import {
   normalizeEvidenceEvents,
   deriveLoopLanes,
   buildPulse,
+  latestHeartbeat,
   SUMMARY_MAX,
 } from '../../lib/live-console.js';
 
@@ -196,6 +197,34 @@ test('buildPulse buckets heartbeats-only into a fine window ending at now', () =
   assert.equal(pulse.buckets.reduce((a, b) => a + b, 0), 3);
 });
 
+// LIN-1929 (Phase C of LIN-1908): `load[]` is additive alongside `buckets[]` —
+// same anchors/length, summing each beat's magnitude instead of counting it.
+test('buildPulse load[] sums each bucket\'s total, falling back to toolCount, without disturbing buckets[]', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const s = 1000;
+  const hbLoop = loop({
+    telemetry: { producedArtifacts: [], metrics: [
+      { toolCount: 1, total: 5, timestamp: new Date(now - 3 * s).toISOString() },  // newest bucket: has `total`
+      { toolCount: 2, timestamp: new Date(now - 4 * s).toISOString() },            // newest bucket: falls back to toolCount
+      { toolCount: 3, total: 0, timestamp: new Date(now - 12 * s).toISOString() }, // older bucket: total present but 0
+    ] },
+  });
+  const pulse = buildPulse([hbLoop], { now, windowMs: 30 * s, bucketMs: 5 * s });
+  assert.equal(pulse.load.length, pulse.buckets.length);
+  assert.equal(pulse.load[5], 7);   // 5 (total) + 2 (toolCount fallback)
+  assert.equal(pulse.load[3], 0);   // total:0 is honoured, not treated as missing
+  // buckets[] keeps counting beats, unaffected by the magnitude they carry.
+  assert.equal(pulse.buckets[5], 2);
+  assert.equal(pulse.buckets[3], 1);
+});
+
+test('buildPulse tolerates loops with no telemetry at all — load[] stays zeroed', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const pulse = buildPulse([{ issueIdentifier: 'LIN-1' }, null, undefined], { now });
+  assert.ok(pulse.load.every(v => v === 0));
+  assert.equal(pulse.load.length, pulse.buckets.length);
+});
+
 test('buildConsoleFeed exposes pulse + serverNow for the flowing strip', () => {
   const now = Date.parse('2026-07-19T12:00:00Z');
   const feed = buildConsoleFeed({ statusItems: [], loops: [loop()] }, { now });
@@ -218,6 +247,28 @@ test('deriveLoopLanes surfaces running loops with their latest heartbeat', () =>
   assert.equal(l.heartbeat.toolCount, 12);
   assert.equal(l.heartbeat.total, 15);
   assert.deepEqual(l.heartbeat.breakdown, { Bash: 7, Read: 5 });
+});
+
+// LIN-1929 (Phase C of LIN-1908): `latestHeartbeat` used to drop the parsed
+// `state` field even though `parseHeartbeat` already produces it — plumbing
+// only, no new parsing.
+test('latestHeartbeat plumbs the parsed state through (running/idle/absent)', () => {
+  const running = loop({ telemetry: { producedArtifacts: [], metrics: [
+    { toolCount: 1, total: 1, state: 'running', timestamp: '2026-07-19T11:59:00.000Z' },
+  ] } });
+  assert.equal(latestHeartbeat(running).state, 'running');
+
+  const idle = loop({ telemetry: { producedArtifacts: [], metrics: [
+    { toolCount: 0, total: 0, state: 'idle', timestamp: '2026-07-19T11:59:00.000Z' },
+  ] } });
+  assert.equal(latestHeartbeat(idle).state, 'idle');
+
+  // A metric with no parsed state (older data, or a non-heartbeat shape) reads
+  // as null, never a fabricated default.
+  const noState = loop({ telemetry: { producedArtifacts: [], metrics: [
+    { toolCount: 3, total: 3, timestamp: '2026-07-19T11:59:00.000Z' },
+  ] } });
+  assert.equal(latestHeartbeat(noState).state, null);
 });
 
 test('deriveLoopLanes excludes terminal / non-running loops', () => {
@@ -397,7 +448,7 @@ test('buildConsoleFeed with no credentialByToken → every lane unknown, rest of
     summary: 'editing lib/foo.js',
     sinceMs: Date.parse('2026-07-19T11:50:00.000Z'),
     lastActivityMs: Date.parse('2026-07-19T11:59:00.000Z'),
-    heartbeat: { toolCount: 12, elapsedSeconds: 540, breakdown: { Bash: 7, Read: 5 }, total: 15 },
+    heartbeat: { toolCount: 12, elapsedSeconds: 540, breakdown: { Bash: 7, Read: 5 }, total: 15, state: null },
   });
 });
 
