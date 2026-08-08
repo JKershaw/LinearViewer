@@ -122,7 +122,22 @@ test.describe('Sibling id-scoped routes on a non-active (Jira) binding (LIN-1904
     await expect(jiraNode.locator('.comments-list')).toContainText('Investigating.');
   });
 
-  test('no Edit link renders for the Jira row — Jira has no updateIssue, so ui.inlineEdit is false for its OWN binding', async ({ page, seedLocal }) => {
+  // LIN-1886 (Phase 2) SUPERSEDES this test's original premise, and the change
+  // is deliberate. It used to assert "no Edit link renders for the Jira row —
+  // Jira has no updateIssue, so ui.inlineEdit is false for its OWN binding".
+  // Phase 2 implements `updateIssue` on the Jira provider, so `ui.inlineEdit`
+  // derives TRUE and the Edit link now correctly renders. Jira was simply
+  // LIN-1904's handiest example of a read-only binding; the negative case it
+  // illustrated is unchanged for any provider that really is read-only.
+  //
+  // Rather than delete the coverage, it is re-pointed at what this PR makes
+  // true — and at the observable the LIN-1886 review's ledger item 4 named as
+  // undischarged: "that the priority control's absence behaves correctly in a
+  // browser. Route tests never execute public/task-edit.js." This is that
+  // browser-level check, on the exact shape the F4 merge decision turns on: a
+  // JIRA-bound row in a LOCAL-active workspace. Reading `ui` off the active
+  // provider there would render a priority <select> Jira silently drops.
+  test('the Jira row\'s Edit link resolves its OWN binding and the page hides the priority control (LIN-1886 D3, review ledger 4)', async ({ page, seedLocal }) => {
     await page.request.post('/test/set-jira-session', { data: { seed: defaultJiraSeed } });
     const { dashboard } = await seedLocal(null, {
       extraBindings: [
@@ -140,11 +155,24 @@ test.describe('Sibling id-scoped routes on a non-active (Jira) binding (LIN-1904
     await jiraNode.locator('[data-toggle="details"]').first().click();
 
     // The Details panel is populated (proves the fragment actually rendered,
-    // not just an empty/failed fetch), but carries no Edit affordance at all —
-    // the observable this ticket's plan-review (F3) flagged as previously only
-    // implied, never asserted directly.
+    // not just an empty/failed fetch) and now carries an Edit affordance
+    // stamped with the row's OWN provider.
     await expect(jiraNode.locator('.detail-content[data-content="details"]')).toContainText('A todo Jira issue.');
-    await expect(jiraNode.locator('[data-testid="issue-edit-link"]')).toHaveCount(0);
+    const editLink = jiraNode.locator('[data-testid="issue-edit-link"]');
+    await expect(editLink).toBeAttached();
+    await expect(editLink).toHaveAttribute('href', /\/edit\?source=jira$/);
+
+    await editLink.click();
+
+    // Landed on the Jira binding's own task-edit page…
+    await expect(page.locator('[data-testid="task-edit-title"]')).toHaveValue('Jira task to do');
+    // …with NO priority control. Jira's priority is unmapped, so `ui.priority`
+    // is false and rendering the <select> would invite a value the provider
+    // silently drops (D3). The workspace's ACTIVE provider here is local,
+    // whose `ui.priority` is not false — so this passes only because the page
+    // reads `ui` off the per-binding provider, which is the merge resolution
+    // routes/task-edit.js takes (LIN-1886 review F4 × LIN-1904).
+    await expect(page.locator('[data-testid="task-edit-priority"]')).toHaveCount(0);
   });
 });
 

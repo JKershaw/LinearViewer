@@ -2765,6 +2765,12 @@ One convention across every endpoint, so you can branch on the same fields every
       logEvent(req, endpoint, 200);
       res.json(issueUpdate);
     } catch (err) {
+      // A provider that REFUSES the write (Jira's D1 unrenderable-content guard,
+      // LIN-1886) throws RefResolutionError with its own status. Map it the same
+      // way PATCH /issues/:id does, so a permanent, caller-visible refusal reads
+      // as a 422 with its reason — not a 500 telling an agent to back off and
+      // retry something that can never succeed.
+      if (refResolutionFailed(req, res, endpoint, err)) return;
       const status = graphqlErrorStatus(err);
       logEvent(req, endpoint, status);
       console.error('Proxy description edit (write) error:', err.message);

@@ -101,6 +101,22 @@ export function createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
     const { provider, callScope: scope } = resolveIssueBinding(workspace, requestedSource);
 
+    // LIN-1886: threads the provider's ui surface through so the renderer can
+    // hide the priority control for a provider that cannot honor it (Jira).
+    //
+    // MERGE DECISION (LIN-1886 review F4 × LIN-1904). This `ui` is read off the
+    // PER-BINDING provider resolved immediately above, never off the workspace's
+    // *active* provider (`getProviderForWorkspace`), which is what this branch
+    // originally used. On a multi-binding workspace the two differ, and the
+    // active-provider read reintroduces D3: a Jira-bound issue in a
+    // Linear-active workspace would compute `ui` from Linear (`priority: true`),
+    // render the priority `<select>`, and submit a priority the Jira provider
+    // silently drops — precisely the harm `ui.priority: false` exists to
+    // prevent. Set AFTER the resolution rather than at the object literal for
+    // that reason; no path reads `pageOptions` before this point (the
+    // invalid-id branch renders `renderErrorPage`, which takes none of it).
+    pageOptions.ui = provider?.ui || {};
+
     // Capability gate: `ui.inlineEdit` (derived from the provider's real
     // `updateIssue` support), read EXCLUSIVELY off `provider.ui` and never off
     // `supports()` — the LIN-177 convention the tree's link gate also follows, so

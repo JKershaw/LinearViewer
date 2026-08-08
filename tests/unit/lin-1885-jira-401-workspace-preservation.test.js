@@ -34,7 +34,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 
-import { removeWorkspace } from '../../lib/workspace.js';
+import { removeWorkspace, normalizeProvider } from '../../lib/workspace.js';
+import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from '../../lib/refresh-strategy.js';
 import { serviceUnavailable } from '../../lib/errors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -60,24 +61,28 @@ function sliceHandleWorkspaceRemoval(source = SERVER_SRC) {
   return source.slice(startIdx, endIdx);
 }
 
-const JIRA_GUARD = "if (workspace.provider === 'jira') {";
-const GITHUB_FAMILY_GUARD = "if (workspace.provider === 'github' || workspace.provider === 'github-projects') {";
+// LIN-1887 Step 1 RE-ANCHORED these two markers. The github-family guard is no
+// longer spelled out as a pair of provider names — it is the shared declared
+// strategy. And there is no longer a Jira `if` block at all: the guarantee this
+// file exists to pin (a dead Jira credential never removes the workspace) moved
+// from a hard-coded `provider === 'jira'` branch to the provider's DECLARATION
+// plus the non-destructive terminal every such provider reaches. The behavioural
+// assertions below are unchanged and still pass, which is the point — the
+// guarantee survived the generalisation.
+const NON_DESTRUCTIVE_TERMINAL = "if (!declaration.destructiveOnFailure) {\n    return sendRelinkNotice(workspace, res);\n  }\n  return handleWorkspaceRemoval(session, workspace.id, res);";
+const GITHUB_FAMILY_GUARD = "if (declaration.strategy === REFRESH_STRATEGY.REMINT) {";
 
 /**
- * Just the Jira `if` block, anchored INSIDE handleUnauthorizedError's body
- * (the guard string is unique to this function — unlike the github-family
- * guard, which also appears in ensureValidToken — but sliced from the body,
- * not raw SERVER_SRC, for the same defensive-anchoring discipline). Used only
- * by the mutation-check harness below, which needs a standalone unit smaller
- * than the full-body one so a single mutation's blast radius is obvious.
+ * The non-destructive terminal a Basic-auth Jira 401 now lands on — the
+ * successor to Phase 1's Jira `if` block, and the unit the mutation-check
+ * harness below breaks. Sliced from the body, not raw SERVER_SRC, for the same
+ * defensive-anchoring discipline as before.
  */
 function sliceJiraBranch(source = SERVER_SRC) {
   const body = sliceHandleUnauthorizedErrorBody(source);
-  const guardIdx = body.indexOf(JIRA_GUARD);
-  assert.notEqual(guardIdx, -1, 'expected the Jira guard inside handleUnauthorizedError');
-  const followingIdx = body.indexOf(GITHUB_FAMILY_GUARD, guardIdx);
-  assert.notEqual(followingIdx, -1, 'expected the github-family guard to follow the Jira branch');
-  const upTo = body.slice(guardIdx, followingIdx);
+  const guardIdx = body.indexOf(NON_DESTRUCTIVE_TERMINAL);
+  assert.notEqual(guardIdx, -1, 'expected the non-destructive terminal inside handleUnauthorizedError');
+  const upTo = body.slice(guardIdx, guardIdx + NON_DESTRUCTIVE_TERMINAL.length);
   const branch = upTo.slice(0, upTo.lastIndexOf('}') + 1);
   assert.equal(
     (branch.match(/{/g) || []).length,
@@ -124,6 +129,7 @@ async function runHandleUnauthorizedError({
     tokenRefreshAndRetry: 0,
     durableDeletes: [],
     durableGets: 0,
+    durableGetProviders: [],
     evictions: [],
     evictAllWorkspaceTokensCalls: 0,
     removalArgs: null,
@@ -151,6 +157,20 @@ async function runHandleUnauthorizedError({
   const context = vm.createContext({
     // Real implementations — the removal path's session mutation and the
     // retryable-503 response are genuine, not modelled.
+    // LIN-1887 Step 1: handleUnauthorizedError now reads the shared
+    // provider-declared refresh strategy instead of asking its own question.
+    // These are the REAL implementations — the declaration is exactly what this
+    // harness must exercise, not a stand-in for it.
+    REFRESH_STRATEGY,
+    refreshDeclarationFor,
+    relinkNotice,
+    normalizeProvider,
+    refreshExchangeFor: () => (async () => ({})),
+    sendRelinkNotice: (workspace, res) => {
+      const notice = relinkNotice(workspace);
+      calls.renderErrorPage.push({ title: notice.title, message: notice.message, opts: { action: notice.action, actionUrl: notice.actionUrl } });
+      return res.status(401).send(`<error:${notice.title}>`);
+    },
     removeWorkspace,
     serviceUnavailable,
 
@@ -166,8 +186,9 @@ async function runHandleUnauthorizedError({
     handleTokenRefreshAndRetry: async (...args) => { calls.tokenRefreshAndRetry++; return tokenRefreshAndRetry(...args); },
     isDefinitiveRevocation: () => isDefinitiveRevocationResult,
     ownerCredentialStore: {
-      get: async () => { calls.durableGets++; return durableRecord; },
-      delete: async (accountId, urlKey) => { calls.durableDeletes.push([accountId, urlKey]); }
+      get: async (_a, _u, provider) => { calls.durableGets++; calls.durableGetProviders.push(provider); return durableRecord; },
+      delete: async (accountId, urlKey, provider) => { calls.durableDeletes.push([accountId, urlKey, provider]); },
+      deleteAll: async (accountId, urlKey) => { calls.durableDeletes.push([accountId, urlKey, 'ALL']); }
     },
     getDeployInfo: () => ({}),
     renderLandingPage: () => '<landing/>',
@@ -238,7 +259,11 @@ describe('LIN-1885: Jira 401/403 does not destroy the workspace (executed, not j
     const { calls, session } = await runHandleUnauthorizedError({ workspace, extraWorkspaces: [linearWorkspace] });
 
     assert.deepEqual(session.workspaces.map(w => w.id), ['ws-jira', 'ws-linear'], 'both workspaces survive, in place');
-    assert.equal(calls.durableGets, 0, 'the Jira branch returns before ever reading the Linear durableRecord — no wasted/incorrect read either');
+    // LIN-1887: a Jira 401 now DOES perform one durable read — Step 7 needs it
+    // to tell an OAuth binding (refreshable) from a Basic one (not). What must
+    // never happen is that read touching LINEAR's partition, which the
+    // provider-scoped `get` makes structurally impossible.
+    assert.deepEqual(calls.durableGetProviders, ['jira'], 'the read must be jira-partitioned — never Linear’s');
   });
 
   test('regression: isPAT is unaffected by the new branch (still destroys the session, unlike Jira)', async () => {
@@ -304,7 +329,7 @@ describe('LIN-1885 mutation-check: each preservation assertion must actually cat
   test('mutation 1: route the Jira branch through handleTokenRefreshAndRetry — caught by the "no refresh" assertion', async () => {
     const mutatedSource = mutate(branch =>
       branch.replace(
-        "return res.status(401).send(html);",
+        "return sendRelinkNotice(workspace, res);",
         "return handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res);"
       )
     );
@@ -317,7 +342,7 @@ describe('LIN-1885 mutation-check: each preservation assertion must actually cat
   test('mutation 2: route the Jira branch through handleWorkspaceRemoval — caught by the "no removal" assertion', async () => {
     const mutatedSource = mutate(branch =>
       branch.replace(
-        "return res.status(401).send(html);",
+        "return sendRelinkNotice(workspace, res);",
         "return handleWorkspaceRemoval(session, workspace.id, res);"
       )
     );
@@ -330,21 +355,21 @@ describe('LIN-1885 mutation-check: each preservation assertion must actually cat
   test('mutation 3: delete the durable credential before rendering — caught by the "no credential deletion" assertion', async () => {
     const mutatedSource = mutate(branch =>
       branch.replace(
-        "if (workspace.provider === 'jira') {",
-        "if (workspace.provider === 'jira') {\n    await ownerCredentialStore.delete(session.accountId, workspace.urlKey);"
+        "if (!declaration.destructiveOnFailure) {",
+        "if (!declaration.destructiveOnFailure) {\n    await ownerCredentialStore.delete(session.accountId, workspace.urlKey, provider);"
       )
     );
     const workspace = { id: 'ws-jira', urlKey: 'acme', provider: 'jira' };
     const { calls } = await runHandleUnauthorizedError({ workspace, source: mutatedSource });
-    assert.deepEqual(calls.durableDeletes, [['acct-1', 'acme']], 'sanity: the mutation must actually delete');
+    assert.deepEqual(calls.durableDeletes, [['acct-1', 'acme', 'jira']], 'sanity: the mutation must actually delete');
     assert.throws(() => assert.deepEqual(calls.durableDeletes, []));
   });
 
   test('mutation 4: evict tokens before rendering (isPAT-style) — caught by the "no eviction" assertion', async () => {
     const mutatedSource = mutate(branch =>
       branch.replace(
-        "if (workspace.provider === 'jira') {",
-        "if (workspace.provider === 'jira') {\n    evictAllWorkspaceTokens(evictWorkspaceToken, session.workspaces, session.accountId);"
+        "if (!declaration.destructiveOnFailure) {",
+        "if (!declaration.destructiveOnFailure) {\n    evictAllWorkspaceTokens(evictWorkspaceToken, session.workspaces, session.accountId);"
       )
     );
     const workspace = { id: 'ws-jira', urlKey: 'acme', provider: 'jira' };
@@ -356,8 +381,8 @@ describe('LIN-1885 mutation-check: each preservation assertion must actually cat
   test('mutation 5: destroy the session before rendering (isPAT-style) — caught by the "no session.destroy" assertion', async () => {
     const mutatedSource = mutate(branch =>
       branch.replace(
-        "if (workspace.provider === 'jira') {",
-        "if (workspace.provider === 'jira') {\n    session.destroy(() => {});"
+        "if (!declaration.destructiveOnFailure) {",
+        "if (!declaration.destructiveOnFailure) {\n    session.destroy(() => {});"
       )
     );
     const workspace = { id: 'ws-jira', urlKey: 'acme', provider: 'jira' };

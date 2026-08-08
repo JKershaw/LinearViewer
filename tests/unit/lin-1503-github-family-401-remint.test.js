@@ -35,7 +35,7 @@ function getHandleUnauthorizedErrorBody() {
 describe('LIN-1503: handleUnauthorizedError GitHub-family branch (source-text pin)', () => {
   test('the GitHub-family guard exists and precedes the Linear durableRecord check', () => {
     const body = getHandleUnauthorizedErrorBody();
-    const guardIdx = body.indexOf("if (workspace.provider === 'github' || workspace.provider === 'github-projects') {");
+    const guardIdx = body.indexOf("if (declaration.strategy === REFRESH_STRATEGY.REMINT) {");
     const linearCheckIdx = body.indexOf('const durableRecord = await ownerCredentialStore.get(');
     assert.notEqual(guardIdx, -1, 'expected the GitHub-family provider guard in handleUnauthorizedError');
     assert.notEqual(linearCheckIdx, -1, 'expected the Linear durableRecord check in handleUnauthorizedError');
@@ -44,7 +44,7 @@ describe('LIN-1503: handleUnauthorizedError GitHub-family branch (source-text pi
 
   test('the remint try/catch is scoped to ONLY the re-mint + saveSession — it does not contain the render or the fetch', () => {
     const body = getHandleUnauthorizedErrorBody();
-    const guardIdx = body.indexOf("if (workspace.provider === 'github' || workspace.provider === 'github-projects') {");
+    const guardIdx = body.indexOf("if (declaration.strategy === REFRESH_STRATEGY.REMINT) {");
     const remintCallIdx = body.indexOf('await remintActiveCredential(workspace, getProviderForWorkspace(workspace));', guardIdx);
     assert.notEqual(remintCallIdx, -1, 'expected a remintActiveCredential( call in the GitHub-family branch');
     assert.ok(remintCallIdx > guardIdx, 'the remint call must be inside the GitHub-family guard');
@@ -73,14 +73,14 @@ describe('LIN-1503: handleUnauthorizedError GitHub-family branch (source-text pi
 
   test('the render call is explicitly awaited so a rejection reaches catch (renderError), not catch (remintError)', () => {
     const body = getHandleUnauthorizedErrorBody();
-    const guardIdx = body.indexOf("if (workspace.provider === 'github' || workspace.provider === 'github-projects') {");
+    const guardIdx = body.indexOf("if (declaration.strategy === REFRESH_STRATEGY.REMINT) {");
     const renderReturnIdx = body.indexOf('return await renderDashboardAfterRefresh(workspace, session, teamId, openRouterSource, res);', guardIdx);
     assert.notEqual(renderReturnIdx, -1, 'expected `return await renderDashboardAfterRefresh(...)` — a bare `return renderDashboardAfterRefresh(...)` without await would not route a rejection through catch (renderError)');
   });
 
   test('catch (renderError) preserves the workspace: returns a retryable 503 and never calls handleWorkspaceRemoval', () => {
     const body = getHandleUnauthorizedErrorBody();
-    const guardIdx = body.indexOf("if (workspace.provider === 'github' || workspace.provider === 'github-projects') {");
+    const guardIdx = body.indexOf("if (declaration.strategy === REFRESH_STRATEGY.REMINT) {");
     const renderCatchIdx = body.indexOf('catch (renderError)', guardIdx);
     assert.notEqual(renderCatchIdx, -1, 'expected a catch (renderError) clause in the GitHub-family branch');
 

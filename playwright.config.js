@@ -31,7 +31,13 @@ export default defineConfig({
     // /test/set-session?openRouterConnected=true.
     // YAP_BASE_URL points at the in-process mock Yap server (routes/test.js) so
     // the Collective live view (poll/say) is exercised without real egress.
-    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_DAILY_LIMIT=5 YAP_BASE_URL=http://localhost:3001/test/yap node server.js',
+    // JIRA_* are PRESENCE-ONLY placeholders (LIN-1887): `isJiraOAuthConfigured`
+    // checks that the three vars are set, never that they are valid, so this is
+    // what lets settings-providers.spec.js prove the OAuth add is REACHABLE from
+    // Settings without a hand-typed URL. No live Atlassian app exists (D3) and
+    // none is contacted — the spec stops at Harbour's own redirect to the
+    // consent URL. Deliberately NOT dropped into .env.example as if usable.
+    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_DAILY_LIMIT=5 YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback node server.js',
     url: 'http://localhost:3001',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,

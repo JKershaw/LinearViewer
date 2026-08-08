@@ -41,14 +41,15 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 
-import { removeWorkspace } from '../../lib/workspace.js';
+import { removeWorkspace, normalizeProvider } from '../../lib/workspace.js';
+import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from '../../lib/refresh-strategy.js';
 import { serviceUnavailable } from '../../lib/errors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 const GITHUB_FAMILY_GUARD =
-  "if (workspace.provider === 'github' || workspace.provider === 'github-projects') {";
+  "if (declaration.strategy === REFRESH_STRATEGY.REMINT) {";
 
 /**
  * The body of handleUnauthorizedError, sliced by the same two markers the
@@ -146,6 +147,20 @@ async function runGitHubFamilyBranch({
   const context = vm.createContext({
     // Real implementations — the removal path's session mutation and the
     // retryable-503 response are genuine, not modelled.
+    // LIN-1887 Step 1: handleUnauthorizedError now reads the shared
+    // provider-declared refresh strategy instead of asking its own question.
+    // These are the REAL implementations — the declaration is exactly what this
+    // harness must exercise, not a stand-in for it.
+    REFRESH_STRATEGY,
+    refreshDeclarationFor,
+    relinkNotice,
+    normalizeProvider,
+    refreshExchangeFor: () => (async () => ({})),
+    sendRelinkNotice: (workspace, res) => {
+      const notice = relinkNotice(workspace);
+      calls.renderErrorPage.push({ title: notice.title, message: notice.message, opts: { action: notice.action, actionUrl: notice.actionUrl } });
+      return res.status(401).send(`<error:${notice.title}>`);
+    },
     removeWorkspace,
     serviceUnavailable,
 
@@ -173,6 +188,14 @@ async function runGitHubFamilyBranch({
     // trailing sentinel is what a non-GitHub-family workspace returns by
     // falling through — i.e. reaching the Linear arm this branch must not eat.
     'async function __runBranch(workspace, session, teamId, openRouterSource, res) {',
+    // LIN-1887 Step 1: the branch's guard now reads the shared refresh
+    // declaration, which handleUnauthorizedError computes once at the top of its
+    // body. Recomputed here with the REAL `refreshDeclarationFor` — the slice
+    // stays verbatim, and the declaration is a genuine collaborator rather than
+    // a hard-coded truthy stand-in, so a wrong declaration still fails this
+    // harness.
+    '  const declaration = refreshDeclarationFor(workspace);',
+    '  const provider = normalizeProvider(workspace);',
     sliceGitHubFamilyBranch(),
     "  return '__FELL_THROUGH_TO_LINEAR__';",
     '}',
