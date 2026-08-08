@@ -283,6 +283,28 @@ describe('LIN-1887 Step 5 — the OAuth binding carries a REAL expiry', () => {
     assert.equal(workspace.bindings[0].credentials.refreshToken, undefined);
   });
 
+  test('mirrorActiveBinding carries the real expiry AND the discriminator across a re-point', async () => {
+    // `setActiveProvider` re-points the scalar mirror from the binding. If the
+    // expiry did not travel, a re-point would resurrect the Phase 1 sentinel's
+    // behaviour (never expires -> never refreshes) on an OAuth binding, and if
+    // `authType` did not travel the merged `workspace.credentials` would read as
+    // Basic. `mirrorActiveBinding` full-replaces `workspace.credentials`, which
+    // is what makes both true — pinned here because Step 5 depends on it.
+    const { setActiveProvider } = await import('../../lib/workspace.js');
+    const expiry = Date.now() + 3_600_000;
+    const workspace = { urlKey: 'acme', provider: 'linear', accessToken: 'linear-tok', tokenExpiresAt: Number.MAX_SAFE_INTEGER, bindings: [] };
+    linkProvider(workspace, 'linear', 'org-1', { token: 'linear-tok', tokenExpiresAt: Number.MAX_SAFE_INTEGER });
+    linkProvider(workspace, 'jira', 'https://acme.atlassian.net', { token: 'at-1', authType: 'oauth', cloudId: 'cid-1', tokenExpiresAt: expiry });
+
+    setActiveProvider(workspace, 'jira', 'https://acme.atlassian.net');
+
+    assert.equal(workspace.provider, 'jira');
+    assert.equal(workspace.accessToken, 'at-1');
+    assert.equal(workspace.tokenExpiresAt, expiry, 'the real expiry must survive the re-point');
+    assert.equal(workspace.credentials.authType, 'oauth');
+    assert.equal(workspace.credentials.refreshToken, undefined, 'and the rotating credential is still nowhere near the session object');
+  });
+
   test('D1: a same-site Basic→OAuth link is an upgrade IN PLACE, and authType is what stops the merge being read as Basic', () => {
     // Bindings key on `(provider, scope)` and MERGE, so two shapes cannot
     // coexist on one site. Without the discriminator the merged binding would
