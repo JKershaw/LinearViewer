@@ -265,6 +265,27 @@ function seed() {
           labels: [], assignee: null, parent: null, _transitions: [],
         },
       },
+      // LIN-1886 Option C ruling `d38d3755` — the orderedList relaxation, and
+      // its control. RES-9's identity `{order: 1}` is the shape residual #1
+      // says real Jira may stamp on EVERY ordered list; under the old
+      // any-attrs-at-all rule that made every numbered-list description
+      // unwritable. RES-4 above is the control and stays a 422.
+      {
+        id: '30018', key: 'RES-9', // orderedList {order: 1} — the identity value
+        fields: {
+          summary: 'Ordered list carrying the identity order',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'orderedList', attrs: { order: 1 }, content: [
+              { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'first' }] }] },
+              { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'second' }] }] },
+            ] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
       {
         id: '30004', key: 'ENG-13', // done, no available transitions
         fields: {
@@ -673,5 +694,37 @@ describe('Jira-backed proxy — the re-review\'s two end-to-end reproductions (L
     const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-8/description/append', { block: 'A new note.' });
     assert.equal(status, 422, 'two literal newlines DO split a block, so this remains unrebuildable');
     assert.equal(JSON.stringify((await stored('RES-8')).fields.description), before, 'nothing was written');
+  });
+});
+
+describe('Jira-backed proxy — the orderedList identity relaxation (LIN-1886 ruling d38d3755)', () => {
+  test('RES-9: an append to an orderedList{order:1} now SUCCEEDS, and the list survives intact', async () => {
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-9/description/append', { block: 'A new note.' });
+    assert.equal(
+      status, 200,
+      'the identity order renumbers nothing, so refusing it was a pure capability cost — '
+      + 'and if real Jira stamps {order:1} on every list (residual #1), the old rule made '
+      + 'every numbered-list description unwritable',
+    );
+
+    const content = (await stored('RES-9')).fields.description.content;
+    // Every item, its order, and its text survive. What does NOT survive is the
+    // `attrs` key itself — the documented exception, witnessed here against the
+    // real store rather than asserted in the abstract.
+    assert.deepEqual(content[0], { type: 'orderedList', content: [
+      { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'first' }] }] },
+      { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'second' }] }] },
+    ] }, 'items and their numbering are untouched; only the redundant attrs key is gone');
+    assert.equal(content[0].attrs, undefined, 'the identity attrs key is dropped — exception 2 in adfHasUnrenderableContent\'s docstring');
+    assert.deepEqual(content[1], { type: 'paragraph', content: [{ type: 'text', text: 'A new note.' }] });
+  });
+
+  test('RES-4 remains the control: a NON-identity order is still refused after the relaxation', async () => {
+    // Pinned in this describe too, not just above, so that a future widening of
+    // the exception cannot quietly take {order:5} with it.
+    const before = JSON.stringify((await stored('RES-4')).fields.description);
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-4/description/append', { block: 'A new note.' });
+    assert.equal(status, 422, 'dropping {order:5} really does renumber 5,6 → 1,2 — that is a content change, not an identity');
+    assert.equal(JSON.stringify((await stored('RES-4')).fields.description), before, 'nothing was written');
   });
 });
