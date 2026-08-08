@@ -803,6 +803,23 @@ describe('groupDispatchLineages (LIN-1957) — the shared extraction', () => {
     assert.strictEqual(lineages.get('orig').issueIdentifier, 'LIN-1');
   });
 
+  test('F2 (LIN-1957 review, Request Changes, expected-red): issueIdentifier must be captured from ANY row carrying one, not just the earliest — while harness stays earliest-row-only', () => {
+    // Approved plan, Surface 2: "issueIdentifier — set from any row carrying
+    // one." Unlike the pinned test above (which documents today's coupled,
+    // buggy behavior), this asserts the plan's actual requirement: a
+    // null-identifier earliest row must not blank out a later row's
+    // identifier. harness is a SEPARATE field captured the same two places
+    // today (beat 2 decision (a), explicitly kept as earliest-row-only) — the
+    // fix must decouple the two, not take harness with it.
+    const rows = [
+      { _id: 'orig', rootItemId: 'orig', harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] }, // earliest row: no issueIdentifier
+      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', issueIdentifier: 'LIN-100', harness: 'opencode', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
+    ];
+    const lineages = groupDispatchLineages(rows);
+    assert.strictEqual(lineages.get('orig').issueIdentifier, 'LIN-100', 'plan: "issueIdentifier — set from any row carrying one"');
+    assert.strictEqual(lineages.get('orig').harness, 'claude-code', 'harness must stay earliest-row-only — the fix must not decouple this pin too');
+  });
+
   test('rowUsage collects each contributing row\'s own usage entry, rows with none omitted', () => {
     const rows = [
       { _id: 'orig', rootItemId: 'orig', status: 'taken', dispatchedAt: daysAgo(3), feedback: [usageMarker(1, 3)] },

@@ -123,6 +123,100 @@ describe('computeTerminalMarkedTaskCost — unpriced exclusion', () => {
   });
 });
 
+describe('computeTerminalMarkedTaskCost — F1 (LIN-1957 review, Request Changes): partial pricing must never be silently counted as $0', () => {
+  // The review's own repro at the PR head (#1090, 6c2eadd2): an issue/lineage
+  // that is only PARTLY priced contributes a partial sum presented as full
+  // cost, flagged nowhere. Approved plan (quoted twice in the review): "a row
+  // with priced: false excludes that row's contribution and flags unpriced —
+  // never counted as $0." Expected-red until fix-beat 2/3 lands.
+
+  test('F1a: an issue with one priced lineage and a sibling lineage that never posted usage must flag unpriced, not silently present only the priced lineage\'s sum', () => {
+    const priced = row({
+      id: 'f1a-priced', rootItemId: 'f1a-priced', issueIdentifier: 'LIN-100', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [usageEntry({ costUsd: 6, lane: 'api', days: 2 }), doneMarker(1.9)]
+    });
+    const neverPriced = row({
+      id: 'f1a-unpriced', rootItemId: 'f1a-unpriced', issueIdentifier: 'LIN-100', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [doneMarker(0.9)] // done, but no [usage] entry ever posted
+    });
+    const result = computeTerminalMarkedTaskCost([priced, neverPriced], NOW);
+    assert.equal(result.issueCount, 1);
+    // Review repro at PR head: { issueCount: 1, costUsd: 6, unpriced: 0 } — the
+    // second lineage's $0 contribution is invisible.
+    assert.equal(result.unpriced, 1, 'the partially-priced issue must be flagged unpriced, not read as fully priced');
+    assert.equal(result.costUsd, null, 'a partially-priced issue\'s partial sum must not be presented as its full cost');
+  });
+
+  test('F1b: an opencode lineage with one unpriceable row among priced ones must flag unpriced, not silently sum only the priced rows', () => {
+    const r1 = row({
+      id: 'f1b-1', rootItemId: 'f1b-1', issueIdentifier: 'LIN-101', harness: 'opencode', dispatchedAt: daysAgo(3),
+      feedback: [usageEntry({ costUsd: 1, lane: 'api', days: 3 })]
+    });
+    const r2 = row({
+      id: 'f1b-2', rootItemId: 'f1b-1', issueIdentifier: 'LIN-101', harness: 'opencode', dispatchedAt: daysAgo(2),
+      feedback: [usageEntry({ lane: 'api', days: 2 })] // no costUsd, no model — unpriceable
+    });
+    const r3 = row({
+      id: 'f1b-3', rootItemId: 'f1b-1', issueIdentifier: 'LIN-101', harness: 'opencode', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 2, lane: 'api', days: 1 }), doneMarker(0.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([r1, r2, r3], NOW);
+    assert.equal(result.issueCount, 1);
+    // Review repro at PR head: { issueCount: 1, costUsd: 3, unpriced: 0 } — the
+    // middle row's failure to price is invisible.
+    assert.equal(result.unpriced, 1, 'a lineage with any unpriceable row must be flagged unpriced');
+    assert.equal(result.costUsd, null, 'a partially-priced lineage\'s partial sum must not be presented as its full cost');
+  });
+});
+
+describe('computeTerminalMarkedTaskCost — F2 (LIN-1957 review, Request Changes): a null-identifier earliest row must not drop the lineage', () => {
+  // Approved plan, Surface 2: "issueIdentifier — set from any row carrying
+  // one." The implementation instead captures it from the earliest row only
+  // (the same place it captures harness), and computeTerminalMarkedTaskCost
+  // hard-drops a lineage with no issueIdentifier. Expected-red until
+  // fix-beat 2/3 lands.
+
+  test('F2: a lineage whose earliest retained row has no issueIdentifier, but a later contributing row does, must stay attributable', () => {
+    const earliestNoId = row({
+      id: 'f2-1', rootItemId: 'f2-1', issueIdentifier: undefined, harness: 'claude-code', dispatchedAt: daysAgo(3),
+      feedback: [usageEntry({ costUsd: 4, days: 3 })]
+    });
+    const laterWithId = row({
+      id: 'f2-2', rootItemId: 'f2-1', issueIdentifier: 'LIN-102', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [usageEntry({ costUsd: 9, days: 2 }), doneMarker(1.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([earliestNoId, laterWithId], NOW);
+    // Review repro at PR head: { issueCount: 0, costUsd: null, ... } — the
+    // whole lineage vanishes, numerator and denominator both, with no trace.
+    assert.equal(result.issueCount, 1, 'plan: issueIdentifier must be set from any row carrying one, not just the earliest');
+    assert.equal(result.costUsd, 9);
+  });
+});
+
+describe('computeTerminalMarkedTaskCost — F3 (LIN-1957 review, should-fix): rowUsage must not be order-dependent', () => {
+  // Every other accumulator field (earliest/status/harness/issueIdentifier)
+  // resolves by explicit comparison; rowUsage appends in array order and the
+  // claude-code/unknown arm takes the last element. The input
+  // (`lib/kpi-stats.js:715`) is an unsorted concatenation of an unsorted
+  // aggregate and an unsorted find, so array order is not guaranteed.
+  // Expected-red until fix-beat 2/3 lands.
+
+  test('F3: the same two rows in reversed array order must give the same costUsd', () => {
+    const earlier = row({
+      id: 'f3-1', rootItemId: 'f3-1', issueIdentifier: 'LIN-103', harness: 'claude-code', dispatchedAt: daysAgo(4),
+      feedback: [usageEntry({ costUsd: 2, days: 4 })]
+    });
+    const later = row({
+      id: 'f3-2', rootItemId: 'f3-1', issueIdentifier: 'LIN-103', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 11, days: 1 }), doneMarker(0.9)]
+    });
+    const forward = computeTerminalMarkedTaskCost([earlier, later], NOW);
+    const reversed = computeTerminalMarkedTaskCost([later, earlier], NOW);
+    // Review repro at PR head: $11 forward vs $2 reversed on this exact shape.
+    assert.equal(forward.costUsd, reversed.costUsd, 'rowUsage order must not change the last-wins result');
+  });
+});
+
 describe('computeTerminalMarkedTaskCost — lane split', () => {
   test('null lane maps to unknownLaneUsd, never defaulted to subscription', () => {
     const rows = [row({
