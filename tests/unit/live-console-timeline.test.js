@@ -17,6 +17,7 @@ import {
   isFreshlyActive,
   buildConsoleFeed,
   TIMELINE_RUN_CAP,
+  TIMELINE_ROW_BUFFER_MS,
 } from '../../lib/live-console.js';
 import {
   computeTimelineZoom,
@@ -240,11 +241,66 @@ test('an open-ended (still-running) run occupies its row through the window — 
   assert.equal(rows.length, 2);
 });
 
-test('different groups always land in different rows, even with no time overlap', () => {
+// LIN-1908 Phase A split this test's old claim ("different groups ALWAYS land
+// in different rows") into the two behaviors it used to conflate: two group-
+// rows closer together than TIMELINE_ROW_BUFFER_MS still split (unchanged —
+// sharing them would visually merge non-overlapping runs), but two group-rows
+// farther apart than the buffer now SHARE a display row (the new dense-
+// packing behavior — this is what collapses many standalone session groups
+// onto a handful of rows).
+test('two groups closer together than the row buffer still land in different rows', () => {
   const a = run({ id: 'a', groupKey: 'g1', start: NOW - 3 * HOUR, end: NOW - 2 * HOUR });
-  const b = run({ id: 'b', groupKey: 'g2', start: NOW - HOUR, end: NOW - 30 * MIN });
+  const b = run({ id: 'b', groupKey: 'g2', start: (NOW - 2 * HOUR) + MIN, end: NOW - HOUR }); // 1min gap, well under the buffer
   const { rows } = packTimelineRows([a, b]);
   assert.equal(rows.length, 2);
+});
+
+test('two groups farther apart than the row buffer now SHARE a display row', () => {
+  const a = run({ id: 'a', groupKey: 'g1', start: NOW - 3 * HOUR, end: NOW - 2 * HOUR });
+  const b = run({ id: 'b', groupKey: 'g2', start: NOW - HOUR, end: NOW - 30 * MIN }); // 1h gap, well over the buffer
+  const { rows } = packTimelineRows([a, b]);
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0].map(r => r.id), ['a', 'b']);
+});
+
+test('two runs exactly TIMELINE_ROW_BUFFER_MS apart in different groups share a row; one ms closer, they split', () => {
+  const a = run({ id: 'a', groupKey: 'g1', start: NOW - 3 * HOUR, end: NOW - 2 * HOUR });
+
+  const atBuffer = run({
+    id: 'atBuffer', groupKey: 'g2',
+    start: (NOW - 2 * HOUR) + TIMELINE_ROW_BUFFER_MS,
+    end: (NOW - 2 * HOUR) + TIMELINE_ROW_BUFFER_MS + MIN,
+  });
+  assert.equal(packTimelineRows([a, atBuffer]).rows.length, 1);
+
+  const underBuffer = run({
+    id: 'underBuffer', groupKey: 'g2',
+    start: (NOW - 2 * HOUR) + TIMELINE_ROW_BUFFER_MS - 1,
+    end: (NOW - 2 * HOUR) + TIMELINE_ROW_BUFFER_MS - 1 + MIN,
+  });
+  assert.equal(packTimelineRows([a, underBuffer]).rows.length, 2);
+});
+
+// LIN-1908 Phase A anti-no-op fixture — this is the load-bearing regression
+// test for the plan review's finding 1: a literal implementation of the
+// cross-group first-fit that feeds units in descending-start order (the
+// order `orderedGroups` used to produce) measures ZERO row reduction here
+// (200 rows either way). Sorting ascending before first-fit is what actually
+// collapses them.
+test('LIN-1908 Phase A: 200 standalone single-run groups collapse onto a small constant row count, not 200', () => {
+  const N = 200;
+  const spacedRuns = (spacingMs) => Array.from({ length: N }, (_, i) => {
+    const start = NOW - (N - i) * spacingMs;
+    return run({ id: `r${i}`, groupKey: `g${i}`, start, end: start + MIN });
+  });
+
+  const tight = packTimelineRows(spacedRuns(7 * MIN)); // < the ~8.6min row buffer
+  assert.equal(tight.rows.length, 2);
+  assert.equal(tight.rows.flat().length, N); // no run dropped
+
+  const wide = packTimelineRows(spacedRuns(20 * MIN)); // > the ~8.6min row buffer
+  assert.equal(wide.rows.length, 1);
+  assert.equal(wide.rows.flat().length, N);
 });
 
 // LIN-1744 (Phase 3): a run missing groupKey entirely must never throw, and
@@ -260,12 +316,19 @@ test('packTimelineRows tolerates a missing groupKey, falling back to a sane ungr
   assert.deepEqual(rows[0].map(r => r.id), ['a', 'b']);
 });
 
-test('groups are emitted most-recently-active first', () => {
+// LIN-1908 Phase A: rows are no longer emitted most-recently-active-first —
+// that ordering was the deliberate, accepted trade-off named in the design
+// (a row no longer means "one session lineage"). Display-row order is now
+// first-fit / ascending-start creation order. The fixture keeps the two
+// groups' gap under the row buffer so they don't collapse into one row,
+// which would make the ordering claim unobservable.
+test('rows are emitted in ascending-start creation order, not most-recently-active-first', () => {
   const older = run({ id: 'old', groupKey: 'g1', start: NOW - 5 * HOUR, end: NOW - 4 * HOUR });
-  const newer = run({ id: 'new', groupKey: 'g2', start: NOW - HOUR, end: NOW - 30 * MIN });
+  const newer = run({ id: 'new', groupKey: 'g2', start: (NOW - 4 * HOUR) + MIN, end: NOW - 3 * HOUR }); // 1min gap, under the buffer
   const { rows } = packTimelineRows([older, newer]);
-  assert.equal(rows[0][0].id, 'new');
-  assert.equal(rows[1][0].id, 'old');
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0][0].id, 'old');
+  assert.equal(rows[1][0].id, 'new');
 });
 
 test('a followUpTo pointing at an in-window run gets a connector edge', () => {
