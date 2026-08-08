@@ -54,9 +54,14 @@ window.computeFitZoom = function computeFitZoom(opts) {
 };
 
 // Default window bounds for the Live Console timeline zoom/pan primitives —
-// mirrors lib/timeline-zoom.js's TIMELINE_MIN_SPAN_MS/TIMELINE_MAX_SPAN_MS.
-var TIMELINE_MIN_SPAN_MS = 60 * 60 * 1000; // 1h
+// mirrors lib/timeline-zoom.js's TIMELINE_MIN_SPAN_MS/TIMELINE_MAX_SPAN_MS/
+// TIMELINE_FIT_MIN_SPAN_MS.
+var TIMELINE_MIN_SPAN_MS = 5 * 60 * 1000; // 5min — interactive zoom-in floor only
 var TIMELINE_MAX_SPAN_MS = 24 * 60 * 60 * 1000; // 24h
+// Separate, larger floor for the `fit` default window — see the pure
+// version's comment (lib/timeline-zoom.js) for why this must stay distinct
+// from TIMELINE_MIN_SPAN_MS.
+window.TIMELINE_FIT_MIN_SPAN_MS = 60 * 60 * 1000; // 1h
 
 // Bar-width visibility floor — mirrors lib/timeline-zoom.js's
 // TIMELINE_BAR_MIN_WIDTH_PCT (LIN-1908 Phase A).
@@ -124,6 +129,26 @@ window.timelineRunOverlapsWindow = function timelineRunOverlapsWindow(run, windo
   if (!run || run.start == null) return false;
   var end = run.end != null ? run.end : nowMs;
   return run.start < windowEnd && end > windowStart;
+};
+
+/**
+ * Live Console timeline default/"fit" window (LIN-1928, Phase B of LIN-1908).
+ * Mirror of lib/timeline-zoom.js computeTimelineFit — a one-shot computation
+ * the caller latches at first paint, not re-run on every poll. Keep in sync
+ * with the pure version.
+ * @global
+ */
+window.computeTimelineFit = function computeTimelineFit(opts) {
+  var runs = opts.runs, now = opts.now;
+  var minSpanMs = opts.minSpanMs === undefined ? window.TIMELINE_FIT_MIN_SPAN_MS : opts.minSpanMs;
+  var maxSpanMs = opts.maxSpanMs === undefined ? TIMELINE_MAX_SPAN_MS : opts.maxSpanMs;
+  var starts = (Array.isArray(runs) ? runs : [])
+    .map(function (run) { return run && run.start; })
+    .filter(function (start) { return typeof start === 'number' && isFinite(start); });
+  var earliestVisibleRunStart = starts.length ? Math.min.apply(Math, starts) : now;
+  var rawSpan = (now - earliestVisibleRunStart) * 1.05;
+  var span = Math.max(minSpanMs, Math.min(maxSpanMs, rawSpan));
+  return { startMs: now - span, endMs: now };
 };
 
 // =============================================================================
