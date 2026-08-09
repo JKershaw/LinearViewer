@@ -5,6 +5,7 @@
  * Only mounted when NODE_ENV === 'test'.
  */
 import { Router } from 'express';
+import crypto from 'crypto';
 import { isValidFeatureKey, isValidWorkspaceFeatureKey } from '../lib/feature-defaults.js';
 import { setWorkspaceFeature } from '../lib/workspace-preferences.js';
 import { getProvider } from '../lib/providers/registry.js';
@@ -652,6 +653,41 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       const urlKey = req.query.urlKey || 'test-workspace'
       if (reportHistoryStore) await reportHistoryStore.clear(urlKey)
       res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to seed multiple report-history runs for testing (LIN-1675 P3).
+  // `/test/clear-report-history` above is clear-only — there is no existing
+  // seam to seed several runs with varied `orientation`/`northStar` (needed to
+  // exercise the Ship Journey playback: waypoints, coverage, and north-star
+  // change markers all derive from MULTIPLE retained runs). This bypasses the
+  // LLM-generation save path (`POST /api/roadmap/reports`, which always stamps
+  // `generatedAt: new Date()` — see ReportHistoryStore.save) and writes
+  // directly via the store's own collection so each record's `generatedAt` can
+  // be set explicitly, exactly as deriveJourney's chronological walk needs.
+  router.post('/test/seed-report-history', async (req, res) => {
+    try {
+      if (!reportHistoryStore) return res.status(503).json({ error: 'Report history not configured' })
+      const urlKey = req.query.urlKey || req.body?.urlKey || 'test-workspace'
+      const records = Array.isArray(req.body?.records) ? req.body.records : []
+      const inserted = []
+      for (const record of records) {
+        const doc = {
+          _id: crypto.randomUUID(),
+          urlKey,
+          generatedAt: new Date(record.generatedAt || Date.now()),
+          model: 'test-seed',
+          northStar: typeof record.northStar === 'string' ? record.northStar : '',
+          narrative: { digest: 'seeded', technical: null, product: null, trajectory: null, northStarReading: null, gap: null },
+          orientation: Array.isArray(record.orientation) ? record.orientation : []
+        }
+        await reportHistoryStore.collection.insertOne(doc)
+        inserted.push(doc._id)
+      }
+      await reportHistoryStore._pruneToCapacity(urlKey)
+      res.status(201).json({ inserted })
     } catch (err) {
       res.status(500).json({ error: err.message })
     }

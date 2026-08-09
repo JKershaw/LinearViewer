@@ -63,6 +63,9 @@ Members (the shared `EXPERIMENTAL_VIEWS` list, in order):
 - **nextRun** (`next-run`) — grounded goal options for the next autopilot run (LIN-603)
 - **flightCompanion** (`flight-companion`) — realtime chat with work in flight (LIN-922)
 - **shipBiscuit** (`ship-biscuit`) — LLM-set newspaper of autopilot activity (LIN-818)
+- **shipJourney** (`ship-journey`) — animated playback of waypoints charted
+  against your north star over retained report history, with a coverage
+  figure and north-star-change markers (LIN-1675)
 
 `/ship` is **not** a retirement candidate. It is a key experiment in active
 development — its (previous) lack of an inbound link reflected its in-dev status,
