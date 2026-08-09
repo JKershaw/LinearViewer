@@ -1,0 +1,172 @@
+/* Dedicated task-create page (LIN-1973).
+ *
+ * Sibling of task-edit.css (LIN-1565) — the two pages share the same field/
+ * label/input/actions rhythm, so the rules below mirror `.task-edit-*` under a
+ * `.task-create-*` prefix rather than widening a shared class (the pages render
+ * a different, capability-derived set of controls, so a shared class would need
+ * per-field overrides anyway). Semantic-token-only throughout so it is dark-safe
+ * under .theme-dark with no second colour vocabulary.
+ *
+ * Typographic split, per the project's design principles: sans (--font-content)
+ * for human structure — labels, headings, controls. */
+
+.task-create-page {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 1rem 3rem;
+  overflow-x: hidden;
+}
+
+.task-create-back {
+  display: inline-block;
+  margin: 0.25rem 0 0.5rem;
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+.task-create-back:hover { color: var(--brand); }
+
+.task-create-header {
+  text-align: left;
+  padding: 0 0 0.7rem;
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.task-create-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-family: var(--font-content);
+}
+
+.task-create-section { margin-bottom: var(--space-5); }
+
+.task-create-section > .section-header {
+  font-family: var(--font-content);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  margin: 0 0 var(--space-3) 0;
+  padding: 0 0 0.4rem 0.7rem;
+  border-left: 3px solid var(--brand);
+  border-bottom: 1px solid var(--line);
+}
+
+/* =============================================================================
+   Form
+   ============================================================================= */
+
+.task-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.task-create-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.task-create-label {
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.task-create-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.7rem;
+  font-family: var(--font-content);
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.task-create-input:hover { border-color: var(--brand); }
+
+.task-create-input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 25%, transparent);
+}
+
+select.task-create-input {
+  cursor: pointer;
+  padding-right: 2rem;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+                    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 1.05rem) 50%, calc(100% - 0.7rem) 50%;
+  background-size: 0.35rem 0.35rem, 0.35rem 0.35rem;
+  background-repeat: no-repeat;
+}
+
+.task-create-textarea {
+  min-height: 10rem;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* =============================================================================
+   Actions
+   ============================================================================= */
+
+.task-create-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+.task-create-submit {
+  padding: 0.5rem var(--space-4);
+  font-family: var(--font-content);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 40%, transparent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.task-create-submit:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand) 22%, transparent);
+}
+
+.task-create-submit:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.task-create-submit:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.task-create-cancel {
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+.task-create-cancel:hover { color: var(--text); }
+
+.task-create-status {
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

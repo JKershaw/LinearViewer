@@ -2652,6 +2652,21 @@ ${goal}`
       return badRequest.json(res, fieldError);
     }
 
+    // LIN-1973: the restrictive half of the LIN-1972 contract. A submitted
+    // stateId/priority the provider's createFields() does NOT declare is now a
+    // clean 400, not a silent drop (the one-layer-down forwarding guard below is
+    // unchanged and still applies to every OTHER undeclared field). This is safe
+    // only now that the inline create form is gone — that form submitted an
+    // unconditional priority number for every provider, which would 400 here.
+    // Checked by presence, not truthiness, so an explicit `stateId: ''` from a
+    // non-form caller is still caught.
+    if (stateId !== undefined && !fields.includes('stateId')) {
+      return badRequest.json(res, 'stateId is not supported by this provider');
+    }
+    if (priority !== undefined && !fields.includes('priority')) {
+      return badRequest.json(res, 'priority is not supported by this provider');
+    }
+
     try {
       // LIN-1972: a create has no fetched issue to derive a team from (unlike
       // the PATCH path's issueWriteGuard placeholder), so supply provider.name
@@ -2666,6 +2681,10 @@ ${goal}`
         title,
         // LIN-1552: stamp the creating account from the session (NOT
         // linearUserId), mirroring the LIN-1376 owner-stamping convention.
+        // Pre-existing, unrelated to LIN-1973, and unverifiable offline against
+        // a real Linear IssueCreateInput — per LIN-1579 the discharge is the
+        // NAMED monitor below (the catch block's own error log), not a bare
+        // "watch for a spike".
         createdBy: req.session?.accountId || null,
       };
       if (requiresTeam) input.teamId = resolvedTeamId;
@@ -2684,6 +2703,14 @@ ${goal}`
       return res.status(201).json({ success: true, issue: result.issue });
     } catch (err) {
       if (issueRefResolutionFailed(res, err)) return;
+      // NAMED MONITOR (LIN-1579) for the createdBy stamp above: this is the
+      // discharge path for "does Linear ever reject the unconditional
+      // createdBy stamp with a 5xx/502", not a bare post-landing "watch for a
+      // spike". A createdBy-related rejection surfaces here as a caught error
+      // and is logged with this exact message — grep server logs for
+      // "Workspace-api create issue error" to check it. No dedicated
+      // metric/oplog entry exists for this specific cause; a spike in this
+      // log line correlated with Linear-backed workspaces is the signal.
       console.error('Workspace-api create issue error:', err.message);
       return jsonError(res, 500, 'Failed to create issue');
     }

@@ -290,29 +290,35 @@ test.describe('Detail Section Toggles', () => {
     await expect(viewLink).toContainText('View in Local');
   });
 
-  test('Create task affordance is the in-app form for an inline-create provider (LIN-1553)', async ({ page }) => {
+  test('Create task affordance is a click-through to the dedicated /task/new page (LIN-1553/LIN-1973)', async ({ page }) => {
     // The Local provider derives ui.inlineCreate (session-auth createIssue), so
-    // render.js replaces the external linear.app deep-link with an in-app create
-    // trigger + form (no target="_blank" link). The deep-link path remains only
-    // for providers that expose an external create URL but NOT in-app create.
+    // render.js replaces the external linear.app deep-link with a link to the
+    // dedicated task-create page (no target="_blank", no inline form). The
+    // deep-link path remains only for providers that expose an external create
+    // URL but NOT in-app create.
     const project = page.locator('.project').first();
 
     // No external deep-link anchor for this provider.
     await expect(project.locator('[data-action="create-task"]')).toHaveCount(0);
 
-    // The in-app trigger is visible; the form exists but is hidden until clicked.
     const trigger = project.locator('[data-testid="create-task-trigger"]');
     await expect(trigger).toBeVisible();
     await expect(trigger).toContainText('+ Add task');
+    // A plain link carrying the project id, not a reveal-toggle button.
+    await expect(trigger).toHaveAttribute('href', /\/task\/new\?projectId=/);
 
-    const form = project.locator('[data-testid="create-task-form"]');
-    await expect(form).toBeHidden();
     await trigger.click();
+    await page.waitForLoadState('networkidle');
+
+    const form = page.locator('[data-testid="task-create-form"]');
     await expect(form).toBeVisible();
-    // v1 field set is present.
-    for (const field of ['title', 'description', 'teamId', 'projectId', 'priority', 'stateId']) {
-      await expect(form.locator(`[data-testid="create-task-${field}"]`)).toBeAttached();
+    // The page renders EXACTLY Local's declared createFields() — no teamId
+    // (Local is teamless), unlike the old inline form which rendered all six
+    // v1 fields for every provider regardless of what it could round-trip.
+    for (const field of ['title', 'description', 'projectId', 'priority', 'stateId']) {
+      await expect(form.locator(`[data-testid="task-create-${field}"]`)).toBeAttached();
     }
+    await expect(form.locator('[data-testid="task-create-teamId"]')).toHaveCount(0);
   });
 
 });

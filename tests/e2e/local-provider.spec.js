@@ -64,41 +64,105 @@ test.describe('Local provider (no test-token mock)', () => {
   });
 
   // ===========================================================================
-  // LIN-1553 — in-app create/edit UI end-to-end against the writable Local
-  // provider. Drives the real beat-2 markup + beat-3 client wiring through the
-  // Session A session-auth routes (POST/PATCH /workspace/:urlKey/api/issues) and
-  // asserts persistence via the same Local provider read seam the dashboard
-  // renders from. Selects through the beat-2 `data-testid` contract only.
+  // LIN-1973 — the dedicated /task/new page end-to-end against the writable
+  // Local provider, superseding LIN-1553's inline form (removed). Drives the
+  // real route + renderer + client wiring through the unchanged Session A
+  // session-auth route (POST /workspace/:urlKey/api/issues) and asserts
+  // persistence via the same Local provider read seam the dashboard renders
+  // from. Selects through the task-create `data-testid` contract only.
+  //
+  // Carries forward BOTH distinguishing assertions from the LIN-1972 close-out
+  // ledger (a permanent pin the old form's spec never provided, since it typed
+  // a fake teamId and selected the project by NAME):
+  //   1. teamId is never even renderable — Local's createFields() excludes it,
+  //      so an empty/absent team input is structural, not just untyped.
+  //   2. the project is set via its real, provider-native COMPOSITE id (the
+  //      server-rendered <option value>, prefilled from the "+ Add task" link's
+  //      ?projectId=), never a name substitution — proving the LIN-1972
+  //      resolveProjectRef exact-id-match-first fix on the path that needs it.
   // ===========================================================================
-  test('in-app create form creates a task through the Session A route and it persists', async ({ page }) => {
-    const CREATE_TITLE = 'Created via inline form';
+  test('the task-create page creates a task through the Session A route and it persists', async ({ page }) => {
+    const CREATE_TITLE = 'Created via task-create page';
     const project = page.locator('.project').first();
 
-    // The Local provider derives ui.inlineCreate, so the create affordance is the
-    // in-app trigger + form (the external deep-link is replaced). Reveal it.
-    await project.locator('[data-testid="create-task-trigger"]').click();
-    const form = project.locator('[data-testid="create-task-form"]');
+    // The Local provider derives ui.inlineCreate, so the create affordance is a
+    // link to the dedicated page, carrying the project as ?projectId= — the
+    // provider's own composite id, not a name.
+    const trigger = project.locator('[data-testid="create-task-trigger"]');
+    const href = await trigger.getAttribute('href');
+    expect(href).toMatch(/\/task\/new\?projectId=/);
+    await trigger.click();
+    await page.waitForLoadState('networkidle');
+
+    const form = page.locator('[data-testid="task-create-form"]');
     await expect(form).toBeVisible();
 
-    await form.locator('[data-testid="create-task-title"]').fill(CREATE_TITLE);
-    // teamId is a required v1 field; the Local provider has no teams and ignores
-    // the value, so any UUID satisfies the route's create contract.
-    await form.locator('[data-testid="create-task-teamId"]').fill('00000000-0000-0000-0000-0000000000aa');
-    // The symbolic ref resolver accepts a project NAME (or UUID). NOTE: the form
-    // prefills projectId with the provider's project id, which for the Local
-    // provider is a composite (non-UUID, non-name) id the resolver can't match —
-    // so we set the project by name here. (Follow-up: prefill/resolve local ids.)
-    await form.locator('[data-testid="create-task-projectId"]').fill('Local Project');
-    // Create it as started so the state clearly took (visible in In Progress).
-    await form.locator('[data-testid="create-task-stateId"]').fill('In Progress');
+    // Distinguishing assertion 1: no team control exists at all for a teamless
+    // provider — not just left empty, structurally absent.
+    await expect(form.locator('[data-testid="task-create-teamId"]')).toHaveCount(0);
 
-    await form.locator('[data-testid="create-task-submit"]').click();
+    await form.locator('[data-testid="task-create-title"]').fill(CREATE_TITLE);
+
+    // Distinguishing assertion 2: the project select's pre-selected option is
+    // the REAL composite id carried in from ?projectId= — prove it round-trips
+    // by submitting without touching the control at all.
+    const projectSelect = form.locator('[data-testid="task-create-projectId"]');
+    await expect(projectSelect).toHaveCount(1);
+    const selectedProjectId = await projectSelect.inputValue();
+    expect(selectedProjectId).toBe(new URL(href, page.url()).searchParams.get('projectId'));
+
+    // Create it as started so the state clearly took (visible in In Progress).
+    // Local's state ids are name-valued slugs (LOCAL_STATES), so this selects
+    // by the same value the old inline form's free-text box sent.
+    await form.locator('[data-testid="task-create-stateId"]').selectOption('In Progress');
+
+    await form.locator('[data-testid="task-create-submit"]').click();
     await page.waitForLoadState('networkidle');
 
     // Persisted: read back through the Local provider on the reloaded dashboard,
     // and it surfaces in the In Progress section (the started state took).
     await expect(page.locator('.line', { hasText: CREATE_TITLE }).first()).toBeAttached();
     await expect(page.locator('.in-progress-items .line', { hasText: CREATE_TITLE }).first()).toBeAttached();
+  });
+
+  // F1a regression pin (LIN-1973 review, PR #1101): before this fix, an
+  // unmatched ?projectId= (e.g. GitHub's unresolvable repo-container id, or any
+  // stale/bad prefill) rendered a <select> with no way to represent "nothing
+  // chosen" — the browser auto-selected the first real <option> and the client
+  // silently submitted THAT project instead. Browser-verified against this same
+  // 2-project seed via an ad-hoc spec (removed) before the fix landed:
+  //   options rendered = ["Local Project", "Local Beta"], selected count = 0,
+  //   value submitted = the FIRST project's id, task created under it.
+  // The fix adds a leading empty placeholder option that ships selected
+  // whenever nothing resolved, so this must now submit no project at all.
+  test('an unmatched ?projectId= creates the task with NO project — never silently the first project (F1a)', async ({ page, localWorkerUrlKey }) => {
+    const CREATE_TITLE = 'Created with unmatched projectId';
+
+    await page.goto(`/workspace/${localWorkerUrlKey}/task/new?projectId=does-not-exist-xyz`);
+    await page.waitForLoadState('networkidle');
+
+    const form = page.locator('[data-testid="task-create-form"]');
+    await expect(form).toBeVisible();
+
+    // The unmatched value never becomes a synthetic selection — the
+    // placeholder ("nothing chosen") is selected, never the first real
+    // project (which the seed orders "Local Project" then "Local Beta").
+    const projectSelect = form.locator('[data-testid="task-create-projectId"]');
+    await expect(projectSelect).toHaveValue('');
+
+    await form.locator('[data-testid="task-create-title"]').fill(CREATE_TITLE);
+
+    const [request] = await Promise.all([
+      page.waitForRequest(req => req.url().includes('/api/issues') && req.method() === 'POST'),
+      form.locator('[data-testid="task-create-submit"]').click(),
+    ]);
+    // The distinguishing assertion: the wire body the client actually sent
+    // carries no project — not the seed's first project id.
+    const body = request.postDataJSON();
+    expect(body.projectId).toBeFalsy();
+
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.line', { hasText: CREATE_TITLE }).first()).toBeAttached();
   });
 
   // LIN-1565 ported this from the inline form (which no longer exists) onto the

@@ -109,6 +109,7 @@ import { createSessionsFeedCache } from './lib/sessions-feed-cache.js'
 import { fetchIssueContext } from './lib/linear.js'
 import { createTaskChatRoutes } from './routes/task-chat.js'
 import { createTaskEditRoutes } from './routes/task-edit.js'
+import { createTaskCreateRoutes } from './routes/task-create.js'
 import { createNextRunRoutes } from './routes/next-run.js'
 import { createLiveConsoleRoutes } from './routes/live-console.js'
 import { createShipJourneyRoutes } from './routes/ship-journey.js'
@@ -1953,6 +1954,11 @@ app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePrefere
 // the inline edit form formerly hidden inside a tree row's Details panel. No
 // feature flag: it is a drill-down page, gated only on the provider's ui.inlineEdit.
 app.use(createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
+
+// Mount the task-create page (LIN-1973) — the dedicated drill-down that replaces
+// the inline create form formerly rendered inline per-project. No feature flag:
+// it is a drill-down page, gated only on the provider's ui.inlineCreate.
+app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
 
 // Mount next-run routes (experimental "suggest the next autopilot run" — LIN-603).
 app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, reportHistoryStore }))

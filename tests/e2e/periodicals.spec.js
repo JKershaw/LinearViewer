@@ -75,7 +75,18 @@ test.describe('Periodicals group', () => {
     await row.click();
     const docNode = group.locator('.node', { has: page.locator('.line:has-text("Documentation Review")') });
     await expect(docNode.locator('[data-kind="periodical"]')).toHaveCount(1);
-    await expect(group.locator('[data-action="create-task"]')).toHaveCount(0);
+    // LIN-1973 review F3: `[data-action="create-task"]` only exists on the
+    // ui.write-only (e.g. Jira) branch of render.js's add-task link — under
+    // this spec's Local provider (ui.inlineCreate: true), that selector is
+    // never emitted for ANY real project either, so the old assertion was
+    // vacuous (it would pass even if the group wrongly rendered the create
+    // affordance). Both branches always share the `.add-task-link` wrapper
+    // class (`data-testid="create-task"` on the inlineCreate branch, bare on
+    // the write-only branch) — assert on that shared wrapper so the guard
+    // actually distinguishes "no create affordance" from "no create affordance
+    // of this one specific shape".
+    await expect(group.locator('.add-task-link')).toHaveCount(0);
+    await expect(group.locator('[data-testid="create-task"]')).toHaveCount(0);
   });
 
   // LIN-345: the periodical row is issueless (no Linear issue backing it), so the
