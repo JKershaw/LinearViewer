@@ -125,6 +125,46 @@ test.describe('Local provider (no test-token mock)', () => {
     await expect(page.locator('.in-progress-items .line', { hasText: CREATE_TITLE }).first()).toBeAttached();
   });
 
+  // F1a regression pin (LIN-1973 review, PR #1101): before this fix, an
+  // unmatched ?projectId= (e.g. GitHub's unresolvable repo-container id, or any
+  // stale/bad prefill) rendered a <select> with no way to represent "nothing
+  // chosen" — the browser auto-selected the first real <option> and the client
+  // silently submitted THAT project instead. Browser-verified against this same
+  // 2-project seed via an ad-hoc spec (removed) before the fix landed:
+  //   options rendered = ["Local Project", "Local Beta"], selected count = 0,
+  //   value submitted = the FIRST project's id, task created under it.
+  // The fix adds a leading empty placeholder option that ships selected
+  // whenever nothing resolved, so this must now submit no project at all.
+  test('an unmatched ?projectId= creates the task with NO project — never silently the first project (F1a)', async ({ page, localWorkerUrlKey }) => {
+    const CREATE_TITLE = 'Created with unmatched projectId';
+
+    await page.goto(`/workspace/${localWorkerUrlKey}/task/new?projectId=does-not-exist-xyz`);
+    await page.waitForLoadState('networkidle');
+
+    const form = page.locator('[data-testid="task-create-form"]');
+    await expect(form).toBeVisible();
+
+    // The unmatched value never becomes a synthetic selection — the
+    // placeholder ("nothing chosen") is selected, never the first real
+    // project (which the seed orders "Local Project" then "Local Beta").
+    const projectSelect = form.locator('[data-testid="task-create-projectId"]');
+    await expect(projectSelect).toHaveValue('');
+
+    await form.locator('[data-testid="task-create-title"]').fill(CREATE_TITLE);
+
+    const [request] = await Promise.all([
+      page.waitForRequest(req => req.url().includes('/api/issues') && req.method() === 'POST'),
+      form.locator('[data-testid="task-create-submit"]').click(),
+    ]);
+    // The distinguishing assertion: the wire body the client actually sent
+    // carries no project — not the seed's first project id.
+    const body = request.postDataJSON();
+    expect(body.projectId).toBeFalsy();
+
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.line', { hasText: CREATE_TITLE }).first()).toBeAttached();
+  });
+
   // LIN-1565 ported this from the inline form (which no longer exists) onto the
   // dedicated task-edit page. Same two persistence assertions, read back through
   // the same Local provider seam — but ONE interaction from the row to a focused

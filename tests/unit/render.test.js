@@ -18,6 +18,13 @@ import { testMockPeriodicalsTree } from '../fixtures/mock-data.js';
 import '../../lib/providers/linear/index.js';
 import { linearProvider } from '../../lib/providers/linear/index.js';
 import { registerProvider } from '../../lib/providers/registry.js';
+// Side-effect imports (LIN-1973 F2): self-register Local/GitHub/github-projects/
+// Jira so the "+ Add task across real providers" describe block below can
+// resolve them by name through getProviderForWorkspace, same as Linear above.
+import '../../lib/providers/local/index.js';
+import '../../lib/providers/github/index.js';
+import '../../lib/providers/github-projects/index.js';
+import '../../lib/providers/jira/index.js';
 
 // =============================================================================
 // renderLabels Tests
@@ -561,6 +568,112 @@ describe('add-task link guard (LIN-341)', () => {
       urlKey: 'test-workspace'
     });
     assert.ok(!result.includes('data-testid="create-task"'), 'periodicals should NOT have create-task affordance');
+  });
+
+  // LIN-1973 review F2: the prior pin only checked the `create-task-form`
+  // TESTID was gone, which is weaker than the ticket's test plan asked for
+  // ("a test asserting the old inline-form markup classes are fully
+  // absent"). Pin every CSS class/attribute the removed `renderInlineCreateForm`
+  // (LIN-1553, `lib/render.js` @ be218338) emitted, by exact string — a class
+  // name reintroduced anywhere on the page (not just the create-task testid)
+  // must fail this test.
+  test('every removed inline-create-form CSS class/attribute is absent, not just its testid (F2)', () => {
+    const result = renderPage([projectTreeWithId('real-project', 'Real')], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'test-workspace'
+    });
+    const removedMarkers = [
+      'inline-issue"', 'inline-issue-trigger', 'inline-issue-form', 'inline-issue-submit',
+      'inline-issue-status', 'inline-field"', 'inline-field-label', 'inline-field-input',
+      'inline-field-textarea', 'inline-field-actions', 'data-inline-create', 'data-inline-status',
+      'create-task-toggle', 'create-task-title', 'create-task-description', 'create-task-teamId',
+      'create-task-projectId', 'create-task-priority', 'create-task-stateId', 'create-task-submit',
+    ];
+    for (const marker of removedMarkers) {
+      assert.ok(!result.includes(marker), `removed inline-create marker "${marker}" must not appear anywhere in the page`);
+    }
+  });
+});
+
+// =============================================================================
+// "+ Add task" per real provider (LIN-1973 review F2): the guard block above
+// only exercised Linear (via getProviderForWorkspace's no-match fallback) and
+// a generic stub (further below); this pins the affordance — and which of the
+// two branches it takes — against every REAL in-tree provider that ships one.
+// =============================================================================
+
+describe('"+ Add task" across real providers (LIN-1973 F2)', () => {
+  function projectTreeWithId(id, name) {
+    return {
+      project: { id, name, content: null, url: null },
+      incomplete: [{
+        issue: { id: `${id}-issue`, title: 'A task', state: { type: 'started' }, labels: { nodes: [] } },
+        children: [],
+        depth: 0
+      }],
+      completed: [],
+      completedCount: 0
+    };
+  }
+
+  function renderForProvider(providerName) {
+    return renderPage([projectTreeWithId('real-project', 'Real')], [], [], 'Test', {
+      isLanding: false,
+      urlKey: 'ws',
+      workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws', provider: providerName }]
+    });
+  }
+
+  test('Linear (ui.inlineCreate: createIssue implemented) — links to the dedicated /task/new page', () => {
+    const result = renderForProvider('linear');
+    assert.ok(result.includes('data-testid="create-task-trigger"'));
+    assert.ok(/href="\/workspace\/ws\/task\/new\?projectId=real-project"/.test(result));
+  });
+
+  test('Local (ui.inlineCreate: createIssue implemented) — links to the dedicated /task/new page', () => {
+    const result = renderForProvider('local');
+    assert.ok(result.includes('data-testid="create-task-trigger"'));
+    assert.ok(/href="\/workspace\/ws\/task\/new\?projectId=real-project"/.test(result));
+  });
+
+  test('GitHub (ui.inlineCreate: createIssue implemented) — links to the dedicated /task/new page', () => {
+    const result = renderForProvider('github');
+    assert.ok(result.includes('data-testid="create-task-trigger"'));
+    assert.ok(/href="\/workspace\/ws\/task\/new\?projectId=real-project"/.test(result));
+  });
+
+  test('github-projects (no createIssue, no getCreateTaskUrl) — no "+ Add task" affordance at all', () => {
+    const result = renderForProvider('github-projects');
+    assert.ok(!result.includes('data-testid="create-task"'), 'no in-app create');
+    assert.ok(!result.includes('data-action="create-task"'), 'no external deep-link either');
+  });
+
+  test('Jira (createIssue NOT implemented, external create URL only) — keeps the unchanged deep-link, never /task/new', () => {
+    const result = renderForProvider('jira');
+    assert.ok(!result.includes('data-testid="create-task-trigger"'), 'Jira never gets the in-app create page');
+    assert.ok(result.includes('data-action="create-task"'), 'Jira keeps its external deep-link affordance');
+  });
+});
+
+// =============================================================================
+// Jira external deep-link branch byte-identity (LIN-1973 review F2): the
+// landing comment for PR #1101 claimed this was pinned by a diff-equality
+// check that did not actually exist. This is that pin — any edit to the
+// `ui.write` branch below must be a deliberate, reviewed change, not a silent
+// side effect of touching the neighbouring `ui.inlineCreate` branch this
+// session added.
+// =============================================================================
+
+describe('Jira/external deep-link branch stays byte-identical (LIN-1973 F2)', () => {
+  test('the `else if (isRealProject && ui.write)` branch in lib/render.js is pinned verbatim', async () => {
+    const fs = await import('node:fs/promises');
+    const src = await fs.readFile(new URL('../../lib/render.js', import.meta.url), 'utf8');
+    const match = src.match(/ {2}\} else if \(isRealProject && ui\.write\) \{\n( {4}addTaskLink = `.*`\n)( {2}\})/);
+    assert.ok(match, 'the Jira/external-deep-link branch must still exist, unchanged in shape');
+    assert.strictEqual(
+      match[1],
+      '    addTaskLink = `<div class="add-task-link"><a href="${createTaskProvider.getCreateTaskUrl(urlKey, project.id)}" target="_blank" class="detail-link" data-action="create-task">+ Add task</a></div>`\n'
+    );
   });
 });
 

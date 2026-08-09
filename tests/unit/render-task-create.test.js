@@ -91,20 +91,33 @@ describe('team / project selects', () => {
     assert.ok(!/<select[^>]*name="projectId"/.test(html));
   });
 
-  test('a matching ?projectId= is marked selected', () => {
+  test('a matching ?projectId= is marked selected, and the placeholder is not', () => {
     const html = render({ projectId: 'proj-1' });
     assert.ok(html.includes('<option value="proj-1" selected>Roadmap</option>'));
+    assert.ok(!html.includes('<option value="" selected>No project</option>'));
   });
 
-  test('an UNMATCHED projectId is dropped silently — no synthetic selected option', () => {
+  test('an UNMATCHED projectId is dropped silently — the placeholder is selected instead, never the first real option (F1)', () => {
     const html = render({ projectId: 'does-not-exist' });
     assert.ok(html.includes('<option value="proj-1">Roadmap</option>'), 'the real option stays unselected');
     assert.ok(!html.includes('does-not-exist'), 'the unmatched value never appears in the markup');
+    assert.ok(html.includes('<option value="" selected>No project</option>'), 'the placeholder represents "nothing chosen" so the browser cannot auto-pick the first project');
   });
 
-  test('a resolved teamId is marked selected on the team select', () => {
+  test('with no ?projectId= at all, the placeholder is selected — no project is implicitly chosen', () => {
+    const html = render({ projectId: '' });
+    assert.ok(html.includes('<option value="" selected>No project</option>'));
+  });
+
+  test('a resolved teamId is marked selected on the team select, and the placeholder is not', () => {
     const html = render({ teamId: 'team-1' });
     assert.ok(html.includes('<option value="team-1" selected>ENG — Engineering</option>'));
+    assert.ok(!html.includes('<option value="" selected>Select a team</option>'));
+  });
+
+  test('with no resolved teamId, the placeholder is selected — no team is implicitly chosen (F1b)', () => {
+    const html = render({ teamId: '' });
+    assert.ok(html.includes('<option value="" selected>Select a team</option>'));
   });
 });
 
@@ -126,9 +139,11 @@ describe('state control (shared resolution with render-task-edit.js)', () => {
     assert.ok(!/<select[^>]*name="stateId"/.test(html));
   });
 
-  test('no state option ships pre-selected (there is no "current" state for a new task)', () => {
+  test('no REAL state option ships pre-selected (there is no "current" state for a new task) — only the empty placeholder is (F1)', () => {
     const html = render({ states: LINEAR_STATES });
-    assert.ok(!/<option[^>]*selected/.test(html.match(/<select[^>]*name="stateId"[\s\S]*?<\/select>/)[0]));
+    const stateSelect = html.match(/<select[^>]*name="stateId"[\s\S]*?<\/select>/)[0];
+    assert.ok(stateSelect.startsWith('<select class="task-create-input" id="task-create-stateId" name="stateId" data-testid="task-create-stateId"><option value="" selected>No state</option>'));
+    assert.strictEqual((stateSelect.match(/ selected/g) || []).length, 1, 'exactly one option is selected: the empty placeholder');
   });
 });
 
