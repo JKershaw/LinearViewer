@@ -615,7 +615,7 @@ function dispatchWatchChanged(baseline, item) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, onProviderRejectedCredential = null, onProviderAcceptedCredential = null, provider: injectedProvider = null }) {
   const router = Router();
 
   /**
@@ -948,9 +948,57 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // order; without the delete, a hot key keeps its original position and can
     // be evicted while cold keys survive.
     credentialResolutions.delete(key);
-    credentialResolutions.set(key, describeCredentialResolution(descriptorInput));
+    // `descriptor` is the secret-safe payload and the ONLY half that is ever
+    // logged. `credential` is the raw call scope, held in memory purely so a
+    // rejection can be reported back by fingerprint — it must never reach a log
+    // line, an audit row, or a response body. The two are kept as separate
+    // fields rather than merged precisely so that boundary is visible at every
+    // read site.
+    credentialResolutions.set(key, {
+      descriptor: describeCredentialResolution(descriptorInput),
+      credential: descriptorInput.credential,
+    });
     if (credentialResolutions.size > RESOLUTION_TRAIL_LIMIT) {
       credentialResolutions.delete(credentialResolutions.keys().next().value);
+    }
+  }
+
+  /**
+   * Report a provider verdict on the credential this request used, so a dead
+   * credential stops being re-served (2026-08-09 incident, follow-up 1).
+   *
+   * Both directions matter. A refusal is what eventually suspends the
+   * credential; a SUCCESS is what keeps the counting consecutive, so a healthy
+   * credential cannot accumulate unrelated refusals into a suspension. Failures
+   * here are swallowed: this is a self-healing aid, and it must never be able to
+   * turn a working request into a failed one.
+   */
+  function reportCredentialVerdict(req, status) {
+    const entry = credentialResolutions.get(resolutionKey(req.proxyUrlKey, req.proxyCreatedBy));
+    if (!entry?.credential) return;
+    try {
+      if (status === 401) {
+        const suspended = onProviderRejectedCredential?.(entry.credential, req.proxyUrlKey, req.proxyCreatedBy);
+        // The transition line, and the LAST diagnostic this credential produces:
+        // from here the route answers 503, so `[credential-rejected]` stops firing.
+        // It therefore carries the full descriptor rather than just the workspace
+        // slug — `credentialFingerprint`, `expiryKind` and `shapeMismatch` are the
+        // fields that identify WHICH credential died and why, and a suspension that
+        // omitted them would silence the diagnostic at exactly the moment it became
+        // conclusive.
+        if (suspended) {
+          console.warn('[credential-suspended]', JSON.stringify({
+            reason: 'provider refused this credential on consecutive requests',
+            effect: 'selection will skip it; refresh-on-resolve can now mint a replacement',
+            proxyTokenId: req.proxyTokenId ?? null,
+            ...entry.descriptor,
+          }));
+        }
+      } else if (status < 400) {
+        onProviderAcceptedCredential?.(entry.credential);
+      }
+    } catch (err) {
+      console.error('Credential verdict reporting failed:', err.message);
     }
   }
 
@@ -977,7 +1025,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * exists to capture. It costs one line per already-failing request.
    */
   function logCredentialRejection(req, endpoint) {
-    const descriptor = credentialResolutions.get(resolutionKey(req.proxyUrlKey, req.proxyCreatedBy));
+    const descriptor = credentialResolutions.get(resolutionKey(req.proxyUrlKey, req.proxyCreatedBy))?.descriptor;
     console.warn('[credential-rejected]', JSON.stringify({
       stage: descriptor ? 'provider-lane' : 'proxy-token',
       endpoint,
@@ -993,6 +1041,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   function logEvent(req, endpoint, status, note = null) {
     if (status === 401) logCredentialRejection(req, endpoint);
+    reportCredentialVerdict(req, status);
     proxyEventStore.recordEvent({
       urlKey: req.proxyUrlKey,
       tokenId: req.proxyTokenId,
