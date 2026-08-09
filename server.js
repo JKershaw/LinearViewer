@@ -125,6 +125,7 @@ import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPA
 import { DISPATCH_DEFAULT_KINDS } from './lib/prompt-templates.js'
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from './lib/dispatch-validation.js'
 import { getDeployInfo } from './lib/deploy-info.js'
+import { getPlanFeeConfig } from './lib/plan-fee-config.js'
 
 // =============================================================================
 // Environment Variable Validation
@@ -1568,12 +1569,12 @@ app.get('/kpis', async (req, res) => {
         await refreshKpiStatsOnce()
       }
     }
-    res.send(renderKpisPage(kpiCache.stats, { deployInfo: getDeployInfo() }))
+    res.send(renderKpisPage(kpiCache.stats, { deployInfo: getDeployInfo(), planFeeConfig: getPlanFeeConfig() }))
   } catch (error) {
     console.error('Failed to render KPIs page:', error)
     if (kpiCache.stats) {
       // Degrade to the last good snapshot rather than erroring the whole page.
-      res.send(renderKpisPage(kpiCache.stats, { deployInfo: getDeployInfo() }))
+      res.send(renderKpisPage(kpiCache.stats, { deployInfo: getDeployInfo(), planFeeConfig: getPlanFeeConfig() }))
     } else {
       res.status(500).send(renderErrorPage('Error', 'Could not load instance KPIs. Please try again.'))
     }
