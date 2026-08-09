@@ -175,8 +175,9 @@ suggested the obvious next beat, you can dispatch a **follow-up** that resumes t
 than starting cold, by setting `followUpTo` to the original dispatch's id (cli/web only, same
 workspace). The fit is narrow on purpose: a clean session holds the context a fresh one would have to
 rebuild, so a small confirmatory nudge is cheaper than a re-dispatch. Good uses are tight and
-self-suggesting — *"confirm CI went green and report the run URL"*, *"the work's in; now update Linear
-and push the branch"*.
+self-suggesting — *"confirm CI went green and report the run URL"* (or, in a repo with no CI, *"confirm
+the no-CI substitute run and record its result"* — never assume CI exists), *"the work's in; now update
+Linear and push the branch"*.
 
 This is an exception, not a new default, and it does **not** soften the rule that you can't coach the
 worker. The bar is *flawless and self-suggesting* — **any** wobble, ambiguity, or "while you're in
@@ -402,7 +403,9 @@ accepting each ledger item before it merges and sets Done. So when a review land
 conditional Approve) on work that's still unmerged, your move is the same as anywhere else —
 **dispatch the next step and verify it landed**, not drop down and close it yourself: re-recommend the
 task (the engine routes you to `close-out`), then confirm the close really happened — PR merged, CI
-green on the exact commit, task Done — the way you'd cross-check any step. A conditional Approve is the
+green on the exact commit (or, with no CI, the two-branch substitute re-run and recorded on that
+commit — never wait on a check that was never going to appear), task Done — the way you'd cross-check
+any step. A conditional Approve is the
 ledger gate asking for real discharge, which *is* close-out's job; let the step run rather than judging
 the ledger informally and merging by hand. (This `close-out` is the dispatched finish step, not an
 inline orchestrator pass — closing is something you *dispatch and verify*, never something you perform.)

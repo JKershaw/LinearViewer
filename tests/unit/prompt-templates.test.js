@@ -3292,3 +3292,112 @@ describe('attachment perception discipline (LIN-872)', () => {
     assert.ok(/side-by-side/.test(p), 'meta-prompt review rule must require viewing spec and result side-by-side');
   });
 });
+
+// =============================================================================
+// Capability-gated CI gate: conditional on CI actually existing (LIN-1455)
+// =============================================================================
+
+describe('capability-gated CI/checks directive (LIN-1455)', () => {
+  const issue = {
+    id: 'ci-1', identifier: 'LIN-1455', title: 'No-CI repos',
+    description: 'work', url: 'https://linear.app/test/issue/LIN-1455',
+    labels: [], createdAt: '2026-01-01T00:00:00.000Z'
+  };
+  const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+
+  test('implementation/review/close-out all establish CI presence boundedly before asserting the gate', () => {
+    for (const key of ['implementation', 'review', 'close-out']) {
+      const { prompt } = generatePrompt(key, issue, context);
+      assert.ok(/Establish CI \(or Its Substitute\)/.test(prompt), `${key} carries the CI-gate directive`);
+      assert.ok(/CI configuration/.test(prompt) && /one settle/.test(prompt), `${key} bounds the CI-presence determination`);
+      assert.ok(/CI is genuinely absent/.test(prompt), `${key} names the no-CI branch`);
+      assert.ok(/diffing failure \*\*names\*\*/.test(prompt), `${key} requires diffing failure names, not counts`);
+      assert.ok(/never\*\* arm a Monitor/.test(prompt), `${key} forbids arming a watch on an unobserved check set`);
+    }
+  });
+
+  test('review independently re-runs the substitute rather than trusting the implementer\'s numbers', () => {
+    const { prompt } = generatePrompt('review', issue, context);
+    assert.ok(/independence matters here/.test(prompt), 'review is told independence matters');
+    assert.ok(/re-run both branches yourself rather than citing an earlier stage's numbers/.test(prompt),
+      'review re-runs the differential itself');
+  });
+
+  test('implementation does not carry the reviewer-independence framing (only review does)', () => {
+    const { prompt } = generatePrompt('implementation', issue, context);
+    assert.ok(!/independence matters here/.test(prompt), 'implementation is the first run, not a re-run');
+  });
+
+  test('close-out still does not key on the review ledger heading (LIN-810 decoupling preserved)', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(!prompt.includes('### What CI Did Not Prove'), 'close-out CI-gate block does not leak the ledger heading');
+  });
+
+  test('the substitute\'s own limits are folded into review\'s ledger residue, not treated as proof', () => {
+    const { prompt } = generatePrompt('review', issue, context);
+    assert.ok(/its own limits belong here as ledger items too|its known limits belong here as ledger items too/.test(prompt),
+      'review records the substitute\'s limits as ledger residue');
+  });
+
+  test('implementation/review/close-out CI mentions are conditional, not a bare unconditional gate', () => {
+    const review = generatePrompt('review', issue, context).prompt;
+    const closeout = generatePrompt('close-out', issue, context).prompt;
+    assert.ok(
+      /CI green \(or, in a repo with no CI, the established-absence substitute recorded\)/.test(PROMPT_TEMPLATES['implementation'].aiHint.goal),
+      'implementation aiHint goal is conditional'
+    );
+    assert.ok(/or, if CI is genuinely absent, that the substitute above has been independently re-run and recorded/.test(review),
+      'review\'s pre-Approve CI confirmation is conditional');
+    assert.ok(/or CI is genuinely absent and the substitute has been re-run and recorded on it/.test(closeout),
+      'close-out\'s all-clear gate is conditional');
+  });
+
+  test('completion signals: review readinessCheck and signals are conditional on CI existing (human decision, 2026-08-09)', () => {
+    const review = COMPLETION_SIGNALS['review'];
+    assert.ok(/CI green on the PR, or, when CI is genuinely absent, with the two-branch substitute independently re-run and recorded/.test(review.readinessCheck),
+      'review readinessCheck no longer routes CI-absence to a closure blocker');
+    assert.ok(review.signals.some(s => /genuinely absent and the two-branch substitute recorded/.test(s)),
+      'review signals name the no-CI substitute');
+    assert.ok(review.signals.some(s => /CI genuinely absent with no substitute recorded, or a blocker surfaced/.test(s)),
+      'review signals route an unrecorded no-CI substitute to the closure blocker, same as CI-red');
+  });
+
+  test('completion signals: close-out signal accepts the recorded substitute alongside green CI', () => {
+    const closeout = COMPLETION_SIGNALS['close-out'];
+    assert.ok(closeout.signals.some(s => /CI genuinely absent with the substitute re-run and recorded on it/.test(s)),
+      'close-out signal names the no-CI substitute path');
+    assert.ok(closeout.signals.some(s => /green CI alone never discharges a ledger item/.test(s)),
+      'the never-discharges-a-ledger-item parenthetical is preserved verbatim');
+  });
+
+  test('meta-prompt mirrors the conditional CI gate in all three stage rules and the close-out routing clause', () => {
+    const p = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-1455',
+      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'implementation, review, close-out',
+      completionSignals: 'S', focusedSubtaskId: null, isTerminal: true, hasOpenChildren: false
+    });
+    assert.ok(/if CI is genuinely absent, say so explicitly and run the substitute/.test(p),
+      'meta-prompt implementation rule is conditional');
+    assert.ok(/reviewer independently RE-RAN the substitute/.test(p),
+      'meta-prompt review rule requires an independent re-run');
+    assert.ok(/CI is genuinely absent and the substitute is recorded on it/.test(p),
+      'meta-prompt close-out rule is conditional');
+    assert.ok(/the close can only proceed when CI is green \(or CI is genuinely absent and the two-branch substitute has been run and recorded\)/.test(p),
+      'meta-prompt close-out routing clause (Step 0 Cannot-close branch) is conditional');
+    assert.ok(/never a Monitor armed on a check set not observed to exist/.test(p),
+      'meta-prompt close-out rule forbids arming a watch on an unobserved check set');
+  });
+
+  test('meta-prompt CI/CD flag-gated block also names the no-CI substitute', () => {
+    const p = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-1455',
+      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'implementation',
+      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false,
+      featureFlags: { codeReview: true, codeReviewCicd: true }
+    });
+    assert.ok(/If the repo has no CI configured, say so explicitly and run the local-suite substitute/.test(p),
+      'flag-gated CI/CD block is conditional');
+  });
+});
