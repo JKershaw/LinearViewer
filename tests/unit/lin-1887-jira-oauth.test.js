@@ -95,13 +95,26 @@ describe('LIN-1887 F6 — the OAuth API base is hard-pinned to api.atlassian.com
 });
 
 describe('LIN-1887 D2 — the requested scope set', () => {
-  test('is read-only and includes offline_access', () => {
-    assert.deepEqual(JIRA_OAUTH_SCOPES, ['read:jira-work', 'read:jira-user', 'offline_access']);
+  test('is read+write and includes offline_access', () => {
+    assert.deepEqual(JIRA_OAUTH_SCOPES, ['read:jira-work', 'write:jira-work', 'read:jira-user', 'offline_access']);
+  });
+
+  test('requests write:jira-work — LIN-1968, so an OAuth binding can honour the inlineEdit it advertises', () => {
+    // The capability gate is provider-level: `get ui()`/`supports()` derive from
+    // which methods are implemented, so `inlineEdit` is true for Basic and OAuth
+    // bindings alike. Without this scope an OAuth binding renders edit
+    // affordances that 403 at Atlassian, and a Basic→OAuth link (bindings key on
+    // `(provider, scope)` and MERGE) silently downgrades a read-write binding.
+    //
+    // Dropping it is not a tidy-up: it re-opens LIN-1968 AND, because widening a
+    // consent screen re-prompts every consented user, re-adding it later is a
+    // one-way door that is no longer cheap. John's ruling, 2026-08-09.
+    assert.ok(JIRA_OAUTH_SCOPES.includes('write:jira-work'));
   });
 
   test('does NOT request read:me — identity comes from /rest/api/3/myself instead', () => {
     // The plan's Step 4 proposed `GET api.atlassian.com/me`, which needs
-    // `read:me`. D2 fixed the scope set at three, and widening a consent screen
+    // `read:me`. D2 fixed the scope set explicitly, and widening a consent screen
     // is the one-way door D2 exists to protect. `/rest/api/3/myself` is covered
     // by `read:jira-user`, returns the same Atlassian accountId, and is already
     // Phase 1's identity probe — so a human upgrading a Basic link to OAuth
