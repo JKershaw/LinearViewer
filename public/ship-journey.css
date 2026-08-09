@@ -1,0 +1,101 @@
+/*
+ * Ship Journey (experimental, LIN-1675 P3)
+ *
+ * Semantic-token-only so it is dark-safe under .theme-dark with no per-theme
+ * overrides here (matches live-console.css / ship.css conventions).
+ */
+
+.sj-page {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 0 1rem 3rem;
+}
+
+.sj-experimental {
+  font-family: var(--font-content);
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 1rem;
+}
+
+.sj-coverage {
+  font-family: var(--font-content);
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+}
+
+.sj-cap-note {
+  font-family: var(--font-content);
+  color: var(--amber-dim);
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.sj-empty {
+  font-family: var(--font-content);
+  color: var(--muted);
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+/* ── Playback controls ─────────────────────────────────────────────────── */
+.sj-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.sj-control-btn {
+  font-family: var(--font-structural);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+}
+.sj-control-btn:hover { background: var(--card-h); }
+.sj-control-btn[aria-pressed="true"] { border-color: var(--brand); color: var(--brand-dim); }
+
+.sj-scrub {
+  flex: 1;
+  accent-color: var(--brand);
+}
+
+/* ── Map ────────────────────────────────────────────────────────────────── */
+.sj-map-wrap {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  aspect-ratio: 1;
+}
+
+.sj-map {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.sj-trail-segment {
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.sj-waypoint {
+  fill: var(--brand);
+  stroke: var(--card);
+  stroke-width: 0.75;
+}
+
+.sj-star-marker {
+  font-size: 8px;
+  fill: var(--amber);
+  text-anchor: start;
+}

@@ -175,3 +175,48 @@ test('the router works with no verdict handlers injected (back-compat)', async (
   }));
   assert.equal(await get(app, `/api/proxy/issues/${ISSUE_UUID}`), 401);
 });
+
+test('the suspension line carries the full descriptor, not just the workspace slug', async () => {
+  // Suspension is where the 401 diagnostic STOPS firing (the route answers 503
+  // from here on), so this line is the last chance to record which credential
+  // died and why. If it carried only a urlKey, merging the self-heal would
+  // silence the diagnostic exactly when it became conclusive.
+  const { app } = buildHarness();
+  const lines = [];
+  const original = console.warn;
+  console.warn = (...args) => { if (args[0] === '[credential-suspended]') lines.push(JSON.parse(args[1])); };
+  try {
+    for (let i = 0; i < 3; i++) await get(app, `/api/proxy/issues/${ISSUE_UUID}`);
+  } finally {
+    console.warn = original;
+  }
+
+  assert.equal(lines.length, 1, 'exactly one transition line');
+  const line = lines[0];
+  assert.match(line.credentialFingerprint, /^[0-9a-f]{12}$/, 'names WHICH credential');
+  assert.equal(line.expiryKind, 'finite');
+  assert.equal(line.credentialSource, 'session-scan');
+  assert.equal(line.provider, 'linear');
+  assert.equal(line.shapeMismatch, false);
+  assert.equal(line.urlKey, 'acme');
+  assert.equal(line.proxyTokenId, 'tok-1');
+});
+
+test('the suspension line never carries credential bytes', async () => {
+  const secret = 'lin_api_never_log_me';
+  const { app } = buildHarness({
+    resolveWorkspaceAccess: async () => ({
+      token: secret, reason: 'ok', provider: 'linear', source: 'cache', expiresAt: Date.now() + 1000,
+    }),
+  });
+  const raw = [];
+  const original = console.warn;
+  console.warn = (...args) => { if (args[0] === '[credential-suspended]') raw.push(args[1]); };
+  try {
+    for (let i = 0; i < 3; i++) await get(app, `/api/proxy/issues/${ISSUE_UUID}`);
+  } finally {
+    console.warn = original;
+  }
+  assert.equal(raw.length, 1);
+  assert.ok(!raw[0].includes(secret));
+});

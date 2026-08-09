@@ -977,8 +977,26 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     const entry = credentialResolutions.get(resolutionKey(req.proxyUrlKey, req.proxyCreatedBy));
     if (!entry?.credential) return;
     try {
-      if (status === 401) onProviderRejectedCredential?.(entry.credential, req.proxyUrlKey, req.proxyCreatedBy);
-      else if (status < 400) onProviderAcceptedCredential?.(entry.credential);
+      if (status === 401) {
+        const suspended = onProviderRejectedCredential?.(entry.credential, req.proxyUrlKey, req.proxyCreatedBy);
+        // The transition line, and the LAST diagnostic this credential produces:
+        // from here the route answers 503, so `[credential-rejected]` stops firing.
+        // It therefore carries the full descriptor rather than just the workspace
+        // slug — `credentialFingerprint`, `expiryKind` and `shapeMismatch` are the
+        // fields that identify WHICH credential died and why, and a suspension that
+        // omitted them would silence the diagnostic at exactly the moment it became
+        // conclusive.
+        if (suspended) {
+          console.warn('[credential-suspended]', JSON.stringify({
+            reason: 'provider refused this credential on consecutive requests',
+            effect: 'selection will skip it; refresh-on-resolve can now mint a replacement',
+            proxyTokenId: req.proxyTokenId ?? null,
+            ...entry.descriptor,
+          }));
+        }
+      } else if (status < 400) {
+        onProviderAcceptedCredential?.(entry.credential);
+      }
     } catch (err) {
       console.error('Credential verdict reporting failed:', err.message);
     }

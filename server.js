@@ -112,6 +112,7 @@ import { createTaskChatRoutes } from './routes/task-chat.js'
 import { createTaskEditRoutes } from './routes/task-edit.js'
 import { createNextRunRoutes } from './routes/next-run.js'
 import { createLiveConsoleRoutes } from './routes/live-console.js'
+import { createShipJourneyRoutes } from './routes/ship-journey.js'
 import { createFlightCompanionRoutes } from './routes/flight-companion.js'
 import { createPassagePlannerRoutes } from './routes/passage-planner.js'
 import { createShipBiscuitRoutes } from './routes/ship-biscuit.js'
@@ -1719,15 +1720,19 @@ const rejectedCredentials = createRejectedCredentialRegistry();
  *
  * Only acts once the credential is actually suspended (three consecutive
  * refusals), so a single scope-403 costs nothing: no eviction, no re-resolve.
+ *
+ * Returns whether the credential is now suspended, so the caller — which holds
+ * the secret-safe descriptor and this function does not — can log the transition
+ * with the fields that actually identify it. Suspension is the point at which the
+ * 401 diagnostic stops firing (the route answers 503 from here on), so that one
+ * line is the last chance to capture `credentialFingerprint` / `expiryKind` /
+ * `shapeMismatch`. Logging it here, with only the workspace slug to hand, would
+ * make the most important line in the sequence the least informative one.
  */
 function onProviderRejectedCredential(credential, urlKey, ownerAccountId) {
-  if (!rejectedCredentials.reject(credential)) return;
+  if (!rejectedCredentials.reject(credential)) return false;
   evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, ownerAccountId);
-  console.warn('[credential-suspended]', JSON.stringify({
-    urlKey,
-    reason: 'provider refused this credential on consecutive requests',
-    nextStep: 'selection will skip it, allowing refresh-on-resolve to mint a replacement',
-  }));
+  return true;
 }
 
 /** The other half of consecutive counting: a credential that worked is not failing. */
@@ -1997,6 +2002,11 @@ app.use(createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getD
 
 // Mount live-console routes (experimental ambient "watch the swarm" feed — LIN-1436).
 app.use(createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, dispatchQueueStore, proxyEventStore, getOpenRouterSource, getDeployInfo }))
+
+// Mount ship-journey routes (experimental animated journey map — LIN-1675 P3).
+// fetchWorkspaceIssues is the current-issue-state seam (mirrors createDashboardRoutes'
+// wiring, NOT fetchAndPrepareProjects's project trees — see routes/ship-journey.js).
+app.use(createShipJourneyRoutes({ workspaceFromUrl, reportHistoryStore, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo }))
 
 // The Ship's Biscuit (experimental, LIN-818): flag-gated LLM-set newspaper — a
 // deterministic edition model over the wired event stores + one editor-in-chief
