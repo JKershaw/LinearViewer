@@ -26,6 +26,7 @@ import {
 } from '../../lib/feature-defaults.js';
 import { getViewNavLinks } from '../../lib/components/view-nav.js';
 import { renderShipJourneyPage } from '../../lib/render-ship-journey.js';
+import { deriveJourney } from '../../lib/ship-journey.js';
 
 // ─── feature wiring ───────────────────────────────────────────────────────────
 
@@ -155,6 +156,43 @@ test('a waypoint with no completedAt is skipped from the trail and the coverage 
   assert.match(html, /2 of 2 completed tasks charted/);
   assert.ok(!html.includes('"identifier":"LIN-3"'));
   assert.match(html, /data-testid="ship-journey-scrub"[^>]*max="1"/);
+});
+
+// LIN-1970 defect 1 regression: feed deriveJourney's REAL output (not a
+// hand-built coverage fixture) through the renderer. This is exactly the
+// shape that produced the self-contradictory "150% coverage — 2 of 2
+// completed tasks charted" — 3 retained runs, one candidate's issue never
+// got a completedAt set (reachable on the local provider), so deriveJourney
+// yields 3 unfiltered waypoints over 2 completions (coverage.ratio === 1.5),
+// while the renderer must display the FILTERED (placeable) count in both the
+// numerator and the percentage.
+test('a real deriveJourney output with a null-completedAt candidate renders an internally consistent coverage figure', () => {
+  const reports = [
+    { id: 'r1', generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation: [{ identifier: 'LOCAL-1', bearing: 'N', reason: '', archived: false }] },
+    { id: 'r2', generatedAt: '2026-01-05T00:00:00Z', northStar: 'Ship A', orientation: [{ identifier: 'LOCAL-2', bearing: 'S', reason: '', archived: false }] },
+    { id: 'r3', generatedAt: '2026-01-10T00:00:00Z', northStar: 'Ship A', orientation: [{ identifier: 'LOCAL-3', bearing: 'E', reason: '', archived: false }] },
+  ];
+  const issues = [
+    { identifier: 'LOCAL-1', state: { type: 'completed' }, completedAt: '2026-01-02T00:00:00Z' },
+    { identifier: 'LOCAL-2', state: { type: 'completed' }, completedAt: '2026-01-06T00:00:00Z' },
+    // completedAt never set — the local-provider case LIN-1684 ledger item 2 routed to P3.
+    { identifier: 'LOCAL-3', state: { type: 'completed' }, completedAt: null },
+  ];
+
+  const journey = deriveJourney({ reports, issues });
+  // Sanity-check this is the exact repro shape: 3 unfiltered waypoints over 2
+  // completions, i.e. coverage.ratio (1.5) disagrees with the filtered count.
+  assert.equal(journey.waypoints.length, 3);
+  assert.equal(journey.coverage.completions, 2);
+  assert.equal(journey.coverage.ratio, 1.5);
+
+  const html = renderShipJourneyPage(journey, baseOptions());
+  const match = html.match(/(\d+)% coverage — (\d+) of (\d+) completed/);
+  assert.ok(match, 'coverage figure renders a percentage sentence');
+  const [, pct, numerator, denominator] = match;
+  assert.equal(numerator, '2', 'numerator is the placeable (filtered) count');
+  assert.equal(denominator, '2');
+  assert.equal(pct, '100', 'percentage derives from the filtered numerator, not coverage.ratio');
 });
 
 test('embeds the filtered waypoint + starChanges data for client-side playback', () => {

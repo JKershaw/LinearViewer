@@ -83,6 +83,28 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
     await expect(page.locator('[data-testid="ship-journey-controls"]')).toBeVisible();
     await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(3);
     await expect(page.locator('[data-testid="ship-journey-star-marker"]')).toHaveCount(1);
+
+    // LIN-1970 defect 2 regression: these 3 waypoints (bearings N/S/E — not
+    // centred on the origin) are the exact scenario that previously scaled
+    // the third waypoint to x=112 in the ±100 viewBox, clipping it. A DOM
+    // count alone can't catch this (the clipped node is still present), so
+    // assert each waypoint's own client rect lies inside the SVG's.
+    const geometry = await page.evaluate(() => {
+      const svg = document.getElementById('ship-journey-map');
+      const svgRect = svg.getBoundingClientRect();
+      return Array.from(document.querySelectorAll('[data-testid="ship-journey-waypoint"]')).map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          insideX: r.left >= svgRect.left - 0.5 && r.right <= svgRect.right + 0.5,
+          insideY: r.top >= svgRect.top - 0.5 && r.bottom <= svgRect.bottom + 0.5,
+        };
+      });
+    });
+    expect(geometry).toHaveLength(3);
+    for (const point of geometry) {
+      expect(point.insideX).toBe(true);
+      expect(point.insideY).toBe(true);
+    }
   });
 
   test('playback controls step through the trail', async ({ page, seedLocal, localWorkerUrlKey }) => {
