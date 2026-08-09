@@ -142,6 +142,14 @@ describe('shared two-stage contract (all periodicals)', () => {
         assert.doesNotMatch(prompt, /save_comment|home issue/i);
       });
 
+      // LIN-1692: discovery finding no report-location convention is not the
+      // same as no fallback existing — the prompt must say what to do then.
+      test('discovery-failure fallback: report-in-comment is a valid terminal artifact when no location is found', () => {
+        assert.match(prompt, /if discovery genuinely turns up no such place, put the full report in this task's own comment/i);
+        // The fallback must not itself prescribe a location.
+        assert.doesNotMatch(prompt, /comments on the minted task/i);
+      });
+
       // LIN-700: the Stage-1 scaffold scopes by discovery, not recall. These
       // four pins lock the four generic wordings across all 15 builders (the
       // shared helper/vocab renders each once, so the loop covers every one).
