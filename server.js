@@ -110,6 +110,7 @@ import { createTaskChatRoutes } from './routes/task-chat.js'
 import { createTaskEditRoutes } from './routes/task-edit.js'
 import { createNextRunRoutes } from './routes/next-run.js'
 import { createLiveConsoleRoutes } from './routes/live-console.js'
+import { createShipJourneyRoutes } from './routes/ship-journey.js'
 import { createFlightCompanionRoutes } from './routes/flight-companion.js'
 import { createPassagePlannerRoutes } from './routes/passage-planner.js'
 import { createShipBiscuitRoutes } from './routes/ship-biscuit.js'
@@ -1963,6 +1964,11 @@ app.use(createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getD
 
 // Mount live-console routes (experimental ambient "watch the swarm" feed — LIN-1436).
 app.use(createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, dispatchQueueStore, proxyEventStore, getOpenRouterSource, getDeployInfo }))
+
+// Mount ship-journey routes (experimental animated journey map — LIN-1675 P3).
+// fetchWorkspaceIssues is the current-issue-state seam (mirrors createDashboardRoutes'
+// wiring, NOT fetchAndPrepareProjects's project trees — see routes/ship-journey.js).
+app.use(createShipJourneyRoutes({ workspaceFromUrl, reportHistoryStore, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo }))
 
 // The Ship's Biscuit (experimental, LIN-818): flag-gated LLM-set newspaper — a
 // deterministic edition model over the wired event stores + one editor-in-chief
