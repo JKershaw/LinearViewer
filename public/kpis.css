@@ -89,7 +89,9 @@ a.kpi-headline-value:hover {
   color: var(--fg);
 }
 
-.kpi-cost-cash {
+.kpi-cost-window,
+.kpi-cost-cash,
+.kpi-cost-sample {
   font-family: var(--font-structural);
   font-size: 0.78rem;
   color: var(--fg-dim);

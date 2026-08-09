@@ -48,9 +48,20 @@ test.describe('KPIs page', () => {
     await expect(card.locator('.kpi-cost-label')).toHaveText('cost per terminal-marked task');
     await expect(card.locator('.kpi-cost-value')).toBeVisible();
 
+    // The figure's window (LIN-1958 review F3) — a separate span, never
+    // folded into the pinned label above.
+    await expect(card.locator('.kpi-cost-window')).toBeVisible();
+    await expect(card.locator('.kpi-cost-window')).toHaveText(/\d+d window/);
+
     // No plan fee is configured in the e2e environment, so the cash headline
     // stays "—" with the unset-state blocker named.
     await expect(card.locator('.kpi-cost-cash')).toHaveText(/cash: — · pending plan-fee configuration/);
+
+    // The sample size + exclusion count (LIN-1958 review F4) — the
+    // issue-level coverage story the LIN-1957 handoff nominated, unlike
+    // pricedLineageShare which is blind to whole-lineage capture loss.
+    await expect(card.locator('.kpi-cost-sample')).toBeVisible();
+    await expect(card.locator('.kpi-cost-sample')).toHaveText(/\d+ terminal-marked issues · \d+ unpriced \(excluded\)/);
 
     // The four bias/coverage shares are load-bearing disclosures (the
     // ruling's condition for publishing the number at all) — assert they are
@@ -70,7 +81,9 @@ test.describe('KPIs page', () => {
     const usdLines = card.locator('.kpi-cost-usd-lines');
     await expect(usdLines).toBeVisible();
     await expect(usdLines).toHaveText(/unresolved/);
-    await expect(usdLines).toHaveText(/overhead/);
+    // "resolved overhead", never a bare "overhead" (LIN-1958 review F2) — the
+    // LIN-1957 handoff forbids deriving a rendered label from the field name.
+    await expect(usdLines).toHaveText(/resolved overhead/);
 
     // Sits above and outside .kpi-cards — the pinned grid count of 11 (below)
     // must be unaffected by this card.

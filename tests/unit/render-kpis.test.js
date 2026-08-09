@@ -370,13 +370,33 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
         pricedLineageShare: 1, attributableLineageShare: 1
       }
     }));
-    assert.ok(html.includes('unresolved — · overhead —'), 'null USD lines render as dashes, never $0');
+    assert.ok(html.includes('unresolved — · resolved overhead —'), 'null USD lines render as dashes, never $0');
   });
 
   test('labels inFlightUsd "unresolved", never "in-flight" — it includes failed/aborted spend, not just running work', () => {
     const html = renderKpisPage(buildStats());
     assert.ok(html.includes('unresolved $42.50'), 'inFlightUsd must be labelled "unresolved"');
     assert.ok(!/in-flight/i.test(html), 'the rendered page must never say "in-flight"');
+  });
+
+  test('labels overheadUsd "resolved overhead", never a bare "overhead" (LIN-1958 review F2)', () => {
+    // The LIN-1957 blocking handoff forbids deriving a rendered label from a
+    // field name: overheadUsd is done AND issue-less spend ONLY (unresolved
+    // issue-less spend routes to inFlightUsd/"unresolved" instead), so a
+    // bare "overhead" would overstate it to a public reader as covering all
+    // non-task spend. This test fails if the label regresses to the field
+    // name, mirroring the existing "unresolved" regression test above.
+    const html = renderKpisPage(buildStats());
+    assert.ok(html.includes('resolved overhead $12.30'), 'overheadUsd must be labelled "resolved overhead"');
+    // Scope the "no bare overhead" check to the rendered usd-lines span, not
+    // the whole document — the embedded __KPI_DATA__ JSON payload legitimately
+    // contains the raw "overheadUsd" field name (the ticket's own carve-out:
+    // "the whole stats object is already embedded publicly ... anything
+    // Session 1 emitted is already readable here"), which is not a rendered
+    // label and must not fail this test.
+    const usdLines = html.match(/<span class="kpi-cost-usd-lines">([^<]*)<\/span>/)[1];
+    const withoutQualifiedLabel = usdLines.replace(/resolved overhead/g, '');
+    assert.ok(!withoutQualifiedLabel.includes('overhead'), 'must never render a bare "overhead" once the qualified label text is stripped out');
   });
 
   test('plan-fee seam: unset renders "—" with the unset sub-label', () => {
@@ -425,6 +445,79 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     const html = renderKpisPage(stats);
     assert.ok(html.includes('<span class="kpi-cost-value">—</span>'));
     assert.ok(html.includes('close-out linked — · evidence linked — · opencode summed — · unknown harness —'));
-    assert.ok(html.includes('unresolved — · overhead —'));
+    assert.ok(html.includes('unresolved — · resolved overhead —'));
+  });
+
+  test('publishes the figure\'s window as its own span, separate from the pinned label (LIN-1958 review F3)', () => {
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 10, unpriced: 2, costUsd: 176.4,
+        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
+        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
+        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
+        pricedLineageShare: 0.8, attributableLineageShare: 0.95
+      }
+    }));
+    assert.ok(html.includes('<span class="kpi-cost-window">30d window</span>'), 'the window must be disclosed');
+    // The pinned label itself must stay byte-identical — the window is a
+    // sibling span, never appended into the label text.
+    assert.ok(html.includes('<span class="kpi-cost-label">cost per terminal-marked task</span>'));
+  });
+
+  test('publishes the sample size (issueCount) and exclusion count (unpriced) beside the shares (LIN-1958 review F4)', () => {
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 14, unpriced: 3, costUsd: 251.9384,
+        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
+        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
+        opencodeSummedShare: 0.4, unknownHarnessShare: 1,
+        pricedLineageShare: 0.8, attributableLineageShare: 0.95
+      }
+    }));
+    // The handoff specifically nominated unpriced/issueCount as the coverage
+    // story that DOES cover whole-lineage capture loss, unlike
+    // pricedLineageShare — so a reader of "unknown harness 100%" can see the
+    // N it is a share of, not just the bare ratio.
+    assert.ok(html.includes('<span class="kpi-cost-sample">14 terminal-marked issues · 3 unpriced (excluded)</span>'));
+  });
+
+  test('formatShare: a real non-zero share below the rounding threshold renders "<1%", never a false "0%" (LIN-1958 review F5)', () => {
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 250, unpriced: 0, costUsd: 100,
+        cashUsd: 0, unknownLaneUsd: 0, inFlightUsd: null, overheadUsd: null,
+        closeOutLineageShare: 0.004, evidenceLinkedShare: 1,
+        opencodeSummedShare: 0, unknownHarnessShare: 0,
+        pricedLineageShare: 1, attributableLineageShare: 1
+      }
+    }));
+    // "<1%" is HTML-escaped by escapeHtml() like any other rendered text.
+    assert.ok(html.includes('close-out linked &lt;1%'), 'a real non-zero share under the rounding threshold must not collapse to a false "0%"');
+  });
+
+  test('formatShare: a genuine zero still renders "0%", distinct from "<1%" and "—"', () => {
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 4, unpriced: 0, costUsd: 40,
+        cashUsd: 0, unknownLaneUsd: 0, inFlightUsd: null, overheadUsd: null,
+        closeOutLineageShare: 0, evidenceLinkedShare: 1,
+        opencodeSummedShare: 0, unknownHarnessShare: 0,
+        pricedLineageShare: 1, attributableLineageShare: 1
+      }
+    }));
+    assert.ok(html.includes('close-out linked 0%'), 'an exact 0 must still render as 0%, not <1% or —');
+  });
+
+  test('formatShare: null still renders "—", distinct from "0%" and "<1%"', () => {
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 0, unpriced: 0, costUsd: null,
+        cashUsd: null, unknownLaneUsd: null, inFlightUsd: null, overheadUsd: null,
+        closeOutLineageShare: null, evidenceLinkedShare: null,
+        opencodeSummedShare: null, unknownHarnessShare: null,
+        pricedLineageShare: null, attributableLineageShare: null
+      }
+    }));
+    assert.ok(html.includes('close-out linked —'), 'null must still render as a dash, not 0% or <1%');
   });
 });
