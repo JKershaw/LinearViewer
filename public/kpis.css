@@ -60,6 +60,50 @@ a.kpi-headline-value:hover {
   scroll-margin-top: var(--space-3);
 }
 
+/* Cost-per-terminal-marked-task card (LIN-1958) — a second bespoke headline-
+   style card, sitting above the grid alongside `.kpi-headline` but with its
+   own rules: `.kpi-headline*` stays specific to the outcome headline. The
+   bias/coverage disclosures (`.kpi-cost-shares`/`.kpi-cost-coverage`) and the
+   `.kpi-cost-usd-lines` are load-bearing content the 2026-08-03 ruling
+   requires alongside the number, not fine print — they get the same legible
+   treatment as `.kpi-headline-slices`/`.kpi-headline-coverage`, never
+   display:none or near-invisible sizing at any breakpoint. */
+.kpi-cost-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: var(--space-4);
+}
+
+.kpi-cost-value {
+  font-family: var(--font-structural);
+  font-size: 2.2rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--fg);
+}
+
+.kpi-cost-label {
+  font-family: var(--font-content);
+  font-size: 0.95rem;
+  color: var(--fg);
+}
+
+.kpi-cost-cash {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--fg-dim);
+}
+
+.kpi-cost-shares,
+.kpi-cost-coverage,
+.kpi-cost-usd-lines {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--fg-dim);
+  line-height: 1.5;
+}
+
 /* Stat cards */
 .kpi-cards {
   display: grid;
@@ -205,6 +249,21 @@ a.kpi-headline-value:hover {
 
   .kpi-headline-value {
     font-size: 2rem;
+  }
+
+  .kpi-cost-value {
+    font-size: 1.75rem;
+  }
+
+  /* The four shares + two coverage ratios + two USD lines are the ruling's
+     required disclosures, not decoration — they must stay fully legible
+     (never truncated, never nowrap-and-scroll) down to narrow viewports.
+     Normal wrapping at the existing " · " word breaks is enough on its own,
+     but the line-height is opened up here so wrapped lines don't crowd. */
+  .kpi-cost-shares,
+  .kpi-cost-coverage,
+  .kpi-cost-usd-lines {
+    line-height: 1.6;
   }
 
   .kpi-chart-canvas {
