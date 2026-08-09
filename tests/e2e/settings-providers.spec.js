@@ -95,9 +95,13 @@ test.describe('Settings — Providers section (LIN-634)', () => {
       maxRedirects: 0,
     })
     expect(addRes.status()).toBe(302)
-    expect(addRes.headers()['location']).toBe(`/auth/jira/oauth?workspace=${urlKey}`)
+    // LIN-1890 E1: `mode=add-source` is now EXPLICIT. The route's default became
+    // `new` (the landing "Continue with Jira" entry), so an add-source caller
+    // that omitted it would mint a SECOND workspace instead of binding onto this
+    // one. Asserting the literal URL here is what pins that.
+    expect(addRes.headers()['location']).toBe(`/auth/jira/oauth?mode=add-source&workspace=${urlKey}`)
 
-    const beginRes = await page.request.get(`/auth/jira/oauth?workspace=${urlKey}`, { maxRedirects: 0 })
+    const beginRes = await page.request.get(`/auth/jira/oauth?mode=add-source&workspace=${urlKey}`, { maxRedirects: 0 })
     expect(beginRes.status()).toBe(302)
     const consent = new URL(beginRes.headers()['location'])
     expect(consent.origin).toBe('https://auth.atlassian.com')

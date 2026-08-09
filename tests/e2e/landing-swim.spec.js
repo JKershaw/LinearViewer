@@ -15,8 +15,16 @@ test.describe('Landing Swim Page (/swim)', () => {
   });
 
   test('shows landing nav with Sign in link', async ({ page }) => {
-    await expect(page.locator('nav a.login')).toBeVisible();
-    await expect(page.locator('nav a.login')).toHaveAttribute('href', '/auth/linear');
+    // LIN-1890 N4: `nav a.login` is shared by every landing sign-in CTA (Linear,
+    // GitHub, and now Jira), so it is ambiguous under Playwright strict mode as
+    // soon as a second one renders. Name the Linear CTA by its own testid.
+    await expect(page.locator('[data-testid="nav-login-linear"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nav-login-linear"]')).toHaveAttribute('href', '/auth/linear');
+    // LIN-1890 close-out, ledger item 3 — see the identical note in
+    // landing-swipe.spec.js: E4's approved nav assertion, landed in the polarity
+    // this (Jira-CONFIGURED) server actually has.
+    await expect(page.locator('[data-testid="nav-login-jira"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nav-login-jira"]')).toHaveAttribute('href', '/auth/jira/oauth?mode=new');
     await expect(page.locator('nav a[href="/"]')).toBeVisible();
   });
 

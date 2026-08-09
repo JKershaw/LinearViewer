@@ -1094,7 +1094,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
   return new Promise((resolve) => {
     session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      const html = renderLandingPage({ deployInfo, githubEnabled: isGitHubConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY });
+      const html = renderLandingPage({ deployInfo, githubEnabled: isGitHubConfigured(), jiraEnabled: isJiraOAuthConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY });
       res.send(html);
       resolve();
     });
@@ -1398,7 +1398,7 @@ app.get('/', (req, res) => {
   const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
 
   // Unauthenticated users see the bespoke Harbour showcase landing (LIN-980).
-  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: isGitHubConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY })
+  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: isGitHubConfigured(), jiraEnabled: isJiraOAuthConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY })
   res.send(html)
 })
 
@@ -3117,7 +3117,12 @@ app.post('/workspace/:urlKey/settings/providers/add', workspaceFromUrl, async (r
       if (!isJiraOAuthConfigured()) {
         return res.redirect(`${settingsUrl}?provider_error=jira-oauth-not-configured`);
       }
-      return res.redirect(`/auth/jira/oauth?workspace=${encodeURIComponent(workspace.urlKey)}`);
+      // `mode=add-source` is now EXPLICIT (LIN-1890 E1). The route used to
+      // hard-code add-source and this link relied on that; the landing entry
+      // made `new` the default, so an add-source caller must say so or it would
+      // silently mint a second workspace instead of binding onto this one.
+      // Mirrors the GitHub add-source link above, verbatim.
+      return res.redirect(`/auth/jira/oauth?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`);
     }
     return res.redirect(`/auth/jira?workspace=${encodeURIComponent(workspace.urlKey)}`);
   }

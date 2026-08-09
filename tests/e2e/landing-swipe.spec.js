@@ -14,8 +14,21 @@ test.describe('Landing Swipe Page (/swipe)', () => {
 
   test('shows landing nav with Sign in link', async ({ page }) => {
     // Should have the Sign in link (landing navbar)
-    await expect(page.locator('nav a.login')).toBeVisible();
-    await expect(page.locator('nav a.login')).toHaveAttribute('href', '/auth/linear');
+    // LIN-1890 N4: `nav a.login` is shared by every landing sign-in CTA (Linear,
+    // GitHub, and now Jira), so it is ambiguous under Playwright strict mode as
+    // soon as a second one renders. Name the Linear CTA by its own testid.
+    await expect(page.locator('[data-testid="nav-login-linear"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nav-login-linear"]')).toHaveAttribute('href', '/auth/linear');
+
+    // LIN-1890 close-out, ledger item 3 (E4's approved assertion, in its
+    // CORRECT polarity). E4 named an absence check here — count 0 — on the
+    // premise that this server is Jira-unconfigured. It is not: the webServer
+    // sets the three JIRA_* placeholders, so the gate is open and the Jira CTA
+    // is what a Jira-only human uses to sign in from this preview. Asserting
+    // presence is what actually guards the gate; the absence version would have
+    // failed, which is why it was dropped rather than landed.
+    await expect(page.locator('[data-testid="nav-login-jira"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nav-login-jira"]')).toHaveAttribute('href', '/auth/jira/oauth?mode=new');
 
     // Should have a back-to-projects link
     await expect(page.locator('nav a[href="/"]')).toBeVisible();

@@ -177,6 +177,13 @@ async function runGitHubFamilyBranch({
     getDeployInfo: () => ({}),
     renderLandingPage: () => '<landing/>',
     isGitHubConfigured: () => true,
+    // LIN-1890: this harness evals REAL server.js source, so every free
+    // identifier that source references must be declared here. The landing
+    // render inside handleWorkspaceRemoval now gates a Jira CTA on this
+    // predicate; without the binding the slice throws ReferenceError mid-removal
+    // and the preservation assertions fail for a reason unrelated to what they
+    // test.
+    isJiraOAuthConfigured: () => true,
     process: { env: {} },
     console: { log() {}, error() {} }
   });

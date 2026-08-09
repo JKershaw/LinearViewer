@@ -15,18 +15,36 @@
  *                             /rest/api/3/myself), then linkProvider it onto
  *                             that same workspace.
  *
- * Jira Phase 1 is ADD-SOURCE ONLY — there is no top-level "Continue with
- * Jira" login entry point (no KNOWN_ADD_PROVIDERS/landing wiring points here
- * without an existing workspace; that wiring is LIN-1885 beat 4). Because
- * there is no OAuth redirect round-trip, the target workspace's urlKey rides
- * as a plain form field (GET → hidden POST field) rather than session-carried
- * `mode`/`workspaceUrlKey` intent the way GitHub's flow needs it.
+ * The Phase 1 BASIC routes above remain ADD-SOURCE ONLY, and deliberately so:
+ * an API token authenticates a workspace binding, not a human, so it cannot
+ * establish a login. Because they have no OAuth redirect round-trip, the target
+ * workspace's urlKey rides as a plain form field (GET → hidden POST field)
+ * rather than session-carried `mode`/`workspaceUrlKey` intent.
+ *
+ * The OAuth 3LO routes (LIN-1887, further down) DO carry that intent, and
+ * LIN-1890 uses it to add the second entry point — a top-level "Continue with
+ * Jira" login for a Jira-only human:
+ *
+ *   GET  /auth/jira/oauth?mode=new           → landing sign-in (the default)
+ *   GET  /auth/jira/oauth?workspace=<urlKey>&mode=add-source
+ *                                            → settings "add a source"
+ *
+ * Both entry points share the SAME three routes and differ only by the
+ * server-side `mode` in `req.session.oauthIntent` — the GitHub precedent
+ * (`routes/github-auth.js`), never intent encoded into the `state` nonce.
  */
 import crypto from 'crypto'
 import { Router } from 'express'
 import { renderErrorPage, renderJiraLinkForm, renderJiraSiteSelectPage } from '../lib/render-pages.js'
-import { getWorkspaceByUrlKey, validateWorkspaceUrlKey, linkProvider, saveSession } from '../lib/workspace.js'
+import {
+  getWorkspaceByUrlKey,
+  validateWorkspaceUrlKey,
+  linkProvider,
+  saveSession,
+  upsertWorkspace,
+} from '../lib/workspace.js'
 import { establishAccount } from '../lib/account-session.js'
+import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import {
   getMissingJiraOAuthConfig,
@@ -71,13 +89,53 @@ export function normalizeJiraSite(site) {
 }
 
 /**
+ * Derive a workspace `urlKey` for a Jira-only login container from the SITE
+ * tenant (LIN-1890 N2).
+ *
+ * The identity cannot supply it: an Atlassian `accountId` is commonly
+ * `557058:<uuid>`, and the colon fails `URL_KEY_REGEX` (`lib/workspace.js`), so
+ * `jira:${accountId}` is a legal workspace *id* but never a legal urlKey. The
+ * tenant label of `https://<tenant>.atlassian.net` is the only human-meaningful
+ * value in hand at pick time.
+ *
+ * The collision fallback is load-bearing rather than defensive: tenant names are
+ * company names, so two humans connecting `acme.atlassian.net` and an unrelated
+ * `acme` Linear workspace in the SAME session is an ordinary case, not a freak
+ * one. A urlKey collision would make `getWorkspaceByUrlKey` resolve the wrong
+ * workspace for every subsequent request.
+ *
+ * @param {{url: string}} site - the picked site (its `url` is the tenant base).
+ * @param {Array<{urlKey?: string}>} [existingWorkspaces] - the session's current workspaces.
+ * @returns {string} a urlKey that passes `validateWorkspaceUrlKey` and is unused in this session.
+ */
+export function deriveJiraUrlKey(site, existingWorkspaces = []) {
+  let tenant = ''
+  try {
+    tenant = new URL(String(site?.url)).hostname.split('.')[0]
+  } catch {
+    tenant = ''
+  }
+  const base = validateWorkspaceUrlKey(tenant) ? tenant.toLowerCase() : 'jira'
+  const taken = new Set((existingWorkspaces || []).map(w => w?.urlKey).filter(Boolean))
+  if (!taken.has(base)) return base
+  // Bounded by MAX_WORKSPACES-worth of headroom; `upsertWorkspace` refuses long
+  // before this loop could exhaust, so it cannot spin.
+  for (let n = 2; n <= 100; n++) {
+    const candidate = `${base}-${n}`.slice(0, 50)
+    if (!taken.has(candidate)) return candidate
+  }
+  return `jira-${Date.now()}`.slice(0, 50)
+}
+
+/**
  * @param {Object} options
  * @param {import('../lib/providers/jira/index.js').JiraProvider} options.provider - injected by JiraProvider.getAuthRouter().
  * @param {import('../lib/account-store.js').AccountStore} [options.accountStore] - LIN-1329: find-or-create the durable account for the signing-in Jira identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} [options.accountWorkspaceStore] - LIN-1329: bind the account to the workspace.
+ * @param {Object} [options.userPreferencesStore] - LIN-1890 N1: rehydrates durable preferences onto the regenerated session of a `mode: 'new'` Jira login, mirroring routes/github-auth.js. `server.js`'s auth-mount loop has always passed this and `getAuthRouter` has always spread it through — this router simply dropped it on the floor until the bootstrap needed it.
  * @returns {import('express').Router}
  */
-export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceStore, ownerCredentialStore } = {}) {
+export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceStore, ownerCredentialStore, userPreferencesStore } = {}) {
   const router = Router()
 
   const notConfigured = (res) => res.status(503).send(renderErrorPage(
@@ -87,16 +145,35 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
   ))
 
   /**
-   * Resolve the add-source target workspace for an OAuth hop. Same contract as
-   * the Basic routes above (an existing workspace is required — Jira has no
-   * `mode: 'new'` this phase; that is LIN-1890's), but the urlKey arrives from
-   * `req.session.oauthIntent` rather than a form field, because an OAuth
-   * round-trip has nowhere else to carry it.
+   * Resolve the ADD-SOURCE target workspace for an OAuth hop. Same contract as
+   * the Basic routes above (an existing workspace is required), but the urlKey
+   * arrives from `req.session.oauthIntent` rather than a form field, because an
+   * OAuth round-trip has nowhere else to carry it. Never called on the
+   * `mode: 'new'` path, which by definition has no workspace to resolve.
    */
   const resolveIntentWorkspace = (req) => {
     const urlKey = req.session.oauthIntent?.workspaceUrlKey
     if (!validateWorkspaceUrlKey(urlKey)) return null
     return getWorkspaceByUrlKey(req.session, urlKey) || null
+  }
+
+  /**
+   * LIN-1890 close-out (review F3). The `mode: 'new'` MULTI-SITE pick is the one
+   * path that parks a rotating refresh token in the session (see the callback's
+   * note below), and the success path deletes it in `finish()`. Every exit that
+   * answers an error INSTEAD of reaching `finish()` drops it here, so the
+   * "written once, read exactly once, and deleted the moment it is consumed"
+   * bound the deviation was accepted on holds on the failure paths too, not
+   * only the happy one.
+   *
+   * The bound this CANNOT extend to, stated rather than left implicit: a pick
+   * the human simply abandons sends no further request, so nothing runs to
+   * clear it. That residue lives until the session's own expiry or the next
+   * successful sign-in — which is why the value is deliberately not the
+   * credential a refresh rotates against.
+   */
+  const dropCarriedRefreshToken = (req) => {
+    if (req.session?.jiraPending) delete req.session.jiraPending.refreshToken
   }
 
   /**
@@ -203,15 +280,27 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
    *
    * `state` is an OPAQUE CSRF nonce and carries no intent; intent lives in
    * `req.session.oauthIntent`, the LIN-562 convention every other router follows
-   * (`routes/github-auth.js`). Add-source only this phase — there is no `mode:
-   * 'new'` — but `mode` is still recorded so LIN-1890 can add one without
-   * reshaping the session state.
+   * (`routes/github-auth.js`). LIN-1887 built the whole round-trip — nonce,
+   * intent carry, config gate — and recorded `mode` so this could be added
+   * without reshaping the session state.
+   *
+   * LIN-1890 E1 is that addition, and ONLY that: the `mode` ternary now defaults
+   * to `'new'` (the landing "Continue with Jira" entry, which has no workspace
+   * yet) instead of hard-coding `'add-source'`, and the target workspace is
+   * required — and attached — only on the `add-source` branch. Every other line
+   * here is LIN-1887's, deliberately untouched; the byte-for-byte shape of the
+   * ternary matches `routes/github-auth.js:100`, which is the point.
    */
   router.get('/auth/jira/oauth', (req, res) => {
     if (getMissingJiraOAuthConfig().length > 0) return notConfigured(res)
 
+    const mode = req.query.mode === 'add-source' ? 'add-source' : 'new'
     const workspaceUrlKey = req.query.workspace
-    if (!validateWorkspaceUrlKey(workspaceUrlKey) || !getWorkspaceByUrlKey(req.session, workspaceUrlKey)) {
+    // Add-source still REFUSES without a resolvable target — the Phase 1
+    // contract (`NO_WORKSPACE_MESSAGE`) is unchanged for that entry point. A
+    // `mode: 'new'` login has no workspace by definition, so the guard cannot
+    // apply to it; the container is found-or-created at pick time instead.
+    if (mode === 'add-source' && (!validateWorkspaceUrlKey(workspaceUrlKey) || !getWorkspaceByUrlKey(req.session, workspaceUrlKey))) {
       return res.status(400).send(renderErrorPage('No Workspace Selected', NO_WORKSPACE_MESSAGE, {
         action: 'Go to homepage', actionUrl: '/'
       }))
@@ -227,7 +316,9 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     }
 
     req.session.oauthState = state
-    req.session.oauthIntent = { mode: 'add-source', provider: 'jira', workspaceUrlKey }
+    const intent = { mode, provider: 'jira' }
+    if (mode === 'add-source') intent.workspaceUrlKey = workspaceUrlKey
+    req.session.oauthIntent = intent
     req.session.save(() => res.redirect(authorizeUrl))
   })
 
@@ -266,8 +357,12 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       }))
     }
 
-    const workspace = resolveIntentWorkspace(req)
-    if (!workspace) {
+    // LIN-1890 E2: `mode: 'new'` has no workspace to resolve — the container is
+    // found-or-created at pick time, once identity and the site are both known.
+    // `add-source` keeps LIN-1887's guard verbatim.
+    const mode = req.session.oauthIntent?.mode === 'add-source' ? 'add-source' : 'new'
+    const workspace = mode === 'add-source' ? resolveIntentWorkspace(req) : null
+    if (mode === 'add-source' && !workspace) {
       return res.status(400).send(renderErrorPage('No Workspace Selected', NO_WORKSPACE_MESSAGE, {
         action: 'Go to homepage', actionUrl: '/'
       }))
@@ -314,7 +409,16 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     // partitioning is identical either way — `put` derives the partition from
     // the record's own `provider` field, which is exactly what
     // `persistOwnerCredential` passes it.
-    if (tokenBag.refresh_token && ownerCredentialStore) {
+    //
+    // LIN-1890 E2 — why this is add-source ONLY. The store is keyed
+    // `(accountId, urlKey)`, and on a `mode: 'new'` login NEITHER key exists
+    // yet: there is no `session.accountId` until `establishAccount` runs (which
+    // needs the identity, which needs a picked site), and no `urlKey` until the
+    // container is created from that same site. Writing durable-first is not
+    // merely inconvenient there — it is unaddressable. The `new` branch performs
+    // the identical write inside `completeJiraOAuthLink`, at the first point
+    // both keys exist.
+    if (mode === 'add-source' && tokenBag.refresh_token && ownerCredentialStore) {
       await ownerCredentialStore.put(req.session.accountId, workspace.urlKey, {
         provider: 'jira',
         token: tokenBag.access_token,
@@ -323,20 +427,37 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       })
     }
 
-    // `jiraPending` carries NO rotating credential — only the pick's inputs and
-    // the short-lived access token.
+    // `jiraPending` carries NO rotating credential on the add-source path —
+    // only the pick's inputs and the short-lived access token.
     req.session.jiraPending = {
-      mode: 'add-source',
-      workspaceUrlKey: workspace.urlKey,
+      mode,
+      workspaceUrlKey: workspace?.urlKey,
       sites,
       accessToken: tokenBag.access_token,
       expiresIn: tokenBag.expires_in,
     }
 
+    // The one `mode: 'new'` exception, stated rather than discovered later. With
+    // MULTIPLE sites the pick is a separate HTTP round-trip, and the durable
+    // write cannot happen until after it (see above), so the rotating token has
+    // nowhere else to wait. This is narrower than the LIN-1524 anti-pattern it
+    // resembles: the value is written once, read exactly once, and deleted the
+    // moment it is consumed — on the success path in `finish()`, and on every
+    // error exit that returns instead via `dropCarriedRefreshToken` (LIN-1890
+    // close-out, review F3). The one residue that survives is a pick the human
+    // ABANDONS, which sends no request for anything to run on. Even then it is
+    // never the credential a REFRESH rotates against (that is always the
+    // durable record), so it cannot go stale and cannot lose a rotation. With a
+    // single site the pick is skipped entirely and the token is passed as an
+    // argument, never touching the session at all.
+    if (mode === 'new' && sites.length > 1 && tokenBag.refresh_token) {
+      req.session.jiraPending.refreshToken = tokenBag.refresh_token
+    }
+
     // One site is the common case: skip the picker entirely, which removes the
     // pending state altogether.
     if (sites.length === 1) {
-      return completeJiraOAuthLink(req, res, sites[0])
+      return completeJiraOAuthLink(req, res, sites[0], tokenBag.refresh_token)
     }
     return req.session.save(() => res.send(renderJiraSiteSelectPage(sites)))
   })
@@ -354,11 +475,12 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     }
     const site = (pending.sites || []).find(s => s.cloudId === req.body?.cloudId)
     if (!site) {
+      dropCarriedRefreshToken(req)
       return res.status(400).send(renderErrorPage('Unknown Jira Site', 'That Jira site is not one your account authorized. Please try again.', {
         action: 'Go to homepage', actionUrl: '/'
       }))
     }
-    return completeJiraOAuthLink(req, res, site)
+    return completeJiraOAuthLink(req, res, site, pending.refreshToken)
   })
 
   /**
@@ -369,10 +491,11 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
    * Basic link to OAuth resolves to the same Harbour account. Keying on cloudId
    * or site instead would false-conflict two humans on one site (LIN-1329 Q1).
    */
-  async function completeJiraOAuthLink(req, res, site) {
+  async function completeJiraOAuthLink(req, res, site, refreshToken) {
     const pending = req.session.jiraPending
-    const workspace = getWorkspaceByUrlKey(req.session, pending.workspaceUrlKey)
-    if (!workspace) {
+    const mode = pending?.mode === 'add-source' ? 'add-source' : 'new'
+    const workspace = mode === 'add-source' ? getWorkspaceByUrlKey(req.session, pending.workspaceUrlKey) : null
+    if (mode === 'add-source' && !workspace) {
       return res.status(400).send(renderErrorPage('No Active Workspace', NO_WORKSPACE_MESSAGE, {
         action: 'Go to homepage', actionUrl: '/'
       }))
@@ -383,9 +506,14 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       myself = await provider.validateCredential({ authType: 'oauth', accessToken: pending.accessToken, cloudId: site.cloudId, site: site.url })
     } catch (err) {
       console.error('Jira OAuth identity lookup error:', err)
+      dropCarriedRefreshToken(req)
       return res.status(400).send(renderErrorPage('Authentication Failed', 'Could not verify your Jira account. Please try again.', {
         action: 'Go to homepage', actionUrl: '/'
       }))
+    }
+
+    if (mode === 'new') {
+      return completeJiraNewLogin(req, res, site, myself, refreshToken)
     }
 
     const established = await establishAccount(
@@ -432,6 +560,176 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     delete req.session.oauthIntent
     await saveSession(req.session)
     res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?provider_ok=jira`)
+  }
+
+  /**
+   * LIN-1890 E2 — the `mode: 'new'` bootstrap: a Jira-only human, holding zero
+   * Linear and zero GitHub bindings, lands in a working workspace.
+   *
+   * Mirrors `routes/github-auth.js:413-500` step for step, because the sequence
+   * is not arbitrary — each step depends on the one before it:
+   *
+   *   find-or-create `jira:${accountId}` → regenerate → restore workspaces →
+   *   upsertWorkspace → establishAccount → applyUserPreferencesToSession →
+   *   activeWorkspaceId → save → redirect to the workspace (NOT settings)
+   *
+   * The container is keyed on the human's Atlassian `accountId`, so a second
+   * SITE for the same human adds a binding rather than minting a second
+   * workspace — bindings are keyed `(provider, scope)` and the scope is the site
+   * (LIN-1329 Q1: identity is the human, never the site, which is a resource
+   * address). The urlKey cannot come from that same id and is derived from the
+   * tenant instead — see {@link deriveJiraUrlKey}.
+   *
+   * `regenerate()` is the session-fixation defence every fresh-login path runs.
+   * It wipes the session, which is why `existingWorkspaces` is captured BEFORE
+   * it and restored after (a user adding Jira as a second identity must not lose
+   * their other workspaces), why `establishAccount` re-resolves the account by
+   * IDENTITY rather than session continuity, and why preferences are rehydrated
+   * afterwards rather than assumed to have survived.
+   */
+  async function completeJiraNewLogin(req, res, site, myself, refreshToken) {
+    const pending = req.session.jiraPending
+    const credentials = {
+      token: pending.accessToken,
+      authType: 'oauth',
+      cloudId: site.cloudId,
+      tokenExpiresAt: calculateExpiresAt(pending.expiresIn),
+    }
+    const workspaceId = `jira:${myself.accountId}`
+
+    // The durable rotating-credential write, shared by both arms below. Deferred
+    // from the callback (where neither key exists on this path) to here, the
+    // first point at which `accountId` and `urlKey` are BOTH known.
+    const persistRefresh = async (accountId, urlKey) => {
+      if (!refreshToken || !ownerCredentialStore) return
+      await ownerCredentialStore.put(accountId, urlKey, {
+        provider: 'jira',
+        token: pending.accessToken,
+        refreshToken,
+        tokenExpiresAt: credentials.tokenExpiresAt,
+      })
+    }
+
+    const finish = async (workspace) => {
+      delete req.session.jiraPending
+      delete req.session.oauthState
+      delete req.session.oauthIntent
+      await saveSession(req.session)
+      res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
+    }
+
+    // Returning user, same session: the container already exists, so this is a
+    // binding add — no regenerate (the session is already theirs, and wiping it
+    // would drop the workspaces we are adding to).
+    const existing = (req.session.workspaces || []).find(w => w.id === workspaceId)
+    if (existing) {
+      const established = await establishAccount(
+        req.session, accountStore, accountWorkspaceStore, 'jira', myself.accountId,
+        { email: myself.emailAddress, displayName: myself.displayName }, existing.id
+      )
+      if (!established.ok) {
+        // The one 409 that runs no regenerate — the session, and the carried
+        // token in it, both survive this exit unless dropped here.
+        dropCarriedRefreshToken(req)
+        return res.status(409).send(renderErrorPage('Account Conflict', 'This Jira account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
+          action: 'Go to homepage', actionUrl: '/'
+        }))
+      }
+      linkProvider(existing, 'jira', site.url, credentials)
+      req.session.activeWorkspaceId = existing.id
+      await persistRefresh(established.accountId, existing.urlKey)
+      return finish(existing)
+    }
+
+    // Fresh container. `deriveJiraUrlKey` reads the CURRENT session workspaces,
+    // so it must run before regenerate() wipes them.
+    const workspace = {
+      id: workspaceId,
+      name: site.name || site.url,
+      urlKey: deriveJiraUrlKey(site, req.session.workspaces),
+      addedAt: Date.now(),
+      // Stamp the real expiry explicitly so the workspace is never momentarily
+      // marked never-expires; linkProvider's active-binding mirror overwrites it
+      // with the same value (mirrors github-auth.js's identical note).
+      tokenExpiresAt: credentials.tokenExpiresAt,
+    }
+    linkProvider(workspace, 'jira', site.url, credentials)
+
+    const existingWorkspaces = req.session.workspaces || []
+    // Awaited for the same reason github-auth.js awaits it: regenerate() does
+    // not await its own callback, so without this the handler could resolve
+    // before the async account/preference work inside it finished.
+    //
+    // The try/catch around the CALL (not just inside the callback) is the
+    // LIN-761 lesson applied here: a throw that escapes an async callback
+    // outside Express's middleware chain reaches no error handler and no
+    // response is ever written, so the request hangs until the platform kills it
+    // at 30s. A synchronous throw from `regenerate` itself has exactly that
+    // shape, and it is strictly better to answer 500 than to hang.
+    try {
+      await new Promise((resolve, reject) => {
+        try {
+          req.session.regenerate(async (regenerateErr) => {
+        try {
+              if (regenerateErr) {
+                console.error('Jira session regeneration error:', regenerateErr)
+                return res.status(500).send(renderErrorPage('Session Error', 'Could not create a secure session. Please try again.', {
+                  action: 'Go to homepage', actionUrl: '/'
+                }))
+              }
+              req.session.workspaces = existingWorkspaces
+
+              try {
+                upsertWorkspace(req.session, workspace)
+              } catch (limitError) {
+                return res.status(400).send(renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
+                  action: 'Go to dashboard', actionUrl: '/'
+                }))
+              }
+
+              const established = await establishAccount(
+                req.session, accountStore, accountWorkspaceStore, 'jira', myself.accountId,
+                { email: myself.emailAddress, displayName: myself.displayName }, workspace.id
+              )
+              if (!established.ok) {
+                return res.status(409).send(renderErrorPage('Account Conflict', 'This Jira account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
+                  action: 'Go to homepage', actionUrl: '/'
+                }))
+              }
+
+              // Strictly after established.accountId is populated (LIN-1353 S9).
+              if (userPreferencesStore) {
+                const savedPrefs = await userPreferencesStore.getUserPreferences(established.accountId)
+                applyUserPreferencesToSession(req.session, savedPrefs)
+              }
+
+              await persistRefresh(established.accountId, workspace.urlKey)
+
+              req.session.activeWorkspaceId = workspace.id
+              await finish(workspace)
+            } catch (err) {
+              console.error('Jira post-regenerate callback error:', err)
+              if (!res.headersSent) {
+                res.status(500).send(renderErrorPage('Something Went Wrong', 'Could not complete your Jira sign-in. Please try again.', {
+                  action: 'Go to homepage', actionUrl: '/'
+                }))
+              }
+            } finally {
+              resolve()
+            }
+          })
+        } catch (regenerateThrow) {
+          reject(regenerateThrow)
+        }
+      })
+    } catch (err) {
+      console.error('Jira session regenerate threw:', err)
+      if (!res.headersSent) {
+        res.status(500).send(renderErrorPage('Session Error', 'Could not create a secure session. Please try again.', {
+          action: 'Go to homepage', actionUrl: '/'
+        }))
+      }
+    }
   }
 
   return router

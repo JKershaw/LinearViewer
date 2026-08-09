@@ -135,9 +135,14 @@ export const defaultJiraSeed = {
  * `page`. Shares the page's cookie jar so a subsequent page.goto is
  * authenticated. @returns {Promise<{urlKey, site, dashboard}>}
  */
-export async function seedJiraWorkspace(page, seed = defaultJiraSeed, { features } = {}) {
+export async function seedJiraWorkspace(page, seed = defaultJiraSeed, { features, authType } = {}) {
   const data = { seed };
   if (features) data.features = features;
+  // LIN-1890 E6b: `authType: 'oauth'` seeds the binding shape the LIN-1890
+  // landing bootstrap writes (Bearer access token + cloudId + a real finite
+  // expiry) rather than Phase 1's Basic {email, apiToken}. Omitted, the fixture
+  // stays byte-identical for every existing caller.
+  if (authType) data.authType = authType;
   const resp = await page.request.post('/test/set-jira-session', { data });
   if (!resp.ok()) {
     throw new Error(`seedJiraWorkspace failed: ${resp.status()} ${await resp.text()}`);
