@@ -88,8 +88,21 @@
       maxZoom: 4,
     });
 
+    // computeFitZoom only sizes content to the viewport — it does not centre
+    // it. The trail spirals outward from the SVG origin, and the revealed
+    // bounding box is not centred on the origin (e.g. every waypoint on the
+    // same bearing), so scaling about the origin alone pushes the outermost
+    // points outside viewBox="-100 -100 200 200". Pair the scale with a
+    // translate that maps the bounding-box centre to the viewBox centre (0,0)
+    // — same pattern as public/ship.js:1493's translate(...) scale(...), just
+    // in SVG's user-space units instead of CSS pixels (LIN-1970 defect 2).
+    var boxCenterX = (box.minX + box.maxX) / 2;
+    var boxCenterY = (box.minY + box.maxY) / 2;
+    var translateX = -zoom * boxCenterX;
+    var translateY = -zoom * boxCenterY;
+
     var g = document.createElementNS(SVG_NS, 'g');
-    g.setAttribute('transform', 'scale(' + zoom + ')');
+    g.setAttribute('transform', 'translate(' + translateX + ',' + translateY + ') scale(' + zoom + ')');
     g.setAttribute('data-testid', 'ship-journey-trail');
 
     // Path segments, broken wherever a north-star change falls between two
