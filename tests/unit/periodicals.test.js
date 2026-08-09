@@ -146,7 +146,14 @@ describe('shared two-stage contract (all periodicals)', () => {
       // same as no fallback existing — the prompt must say what to do then.
       test('discovery-failure fallback: report-in-comment is a valid terminal artifact when no location is found', () => {
         assert.match(prompt, /if discovery genuinely turns up no such place, put the full report in this task's own comment/i);
-        // The fallback must not itself prescribe a location.
+        // The close-out bullet must accept a comment-only report as a legitimate
+        // terminal artifact, not just a pointer to a file — the other half of the
+        // discovery-failure contract (review finding on LIN-1692/#1093).
+        assert.match(prompt, /or the report in full when it has no separate location/i);
+        // Narrow regression guard, not a general "no location prescribed" check:
+        // this is the exact LIN-369-scoped wording forbidden at :434. The general
+        // invariant (no baked-in report location) is already covered by the
+        // "stays general" pin above.
         assert.doesNotMatch(prompt, /comments on the minted task/i);
       });
 
