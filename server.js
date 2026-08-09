@@ -26,6 +26,7 @@ import { getWorkspaceNorthStar as resolveNorthStar } from './lib/north-star-reso
 import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken, refreshOwnerCredential } from './lib/workspace-token-refresh.js'
 import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
+import { CREDENTIAL_SOURCES } from './lib/credential-diagnostics.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -1756,7 +1757,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
   // check (business logic, not cache mechanics) stays here.
   const cached = workspaceTokenCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
-    return { token: cached.token, reason: 'ok', provider: cached.provider, scope: cached.scope };
+    return { token: cached.token, reason: 'ok', provider: cached.provider, scope: cached.scope, source: CREDENTIAL_SOURCES.CACHE, expiresAt: cached.expiresAt };
   }
 
   // Look up the access token from the sessions collection, scoped to
@@ -1767,7 +1768,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
 
     if (selected.token) {
       workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider, scope: selected.scope });
-      return { token: selected.token, reason: 'ok', provider: selected.provider, scope: selected.scope };
+      return { token: selected.token, reason: 'ok', provider: selected.provider, scope: selected.scope, source: CREDENTIAL_SOURCES.SESSION_SCAN, expiresAt: selected.expiresAt };
     }
 
     // LIN-1373 refresh-on-resolve, widened LIN-1524: the selector above only
@@ -1807,7 +1808,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
         });
         if (refreshed) {
           workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider, scope: refreshed.scope });
-          return { token: refreshed.token, reason: 'ok', provider: refreshed.provider, scope: refreshed.scope };
+          return { token: refreshed.token, reason: 'ok', provider: refreshed.provider, scope: refreshed.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: refreshed.expiresAt };
         }
       } catch (err) {
         console.error(`Token refresh-on-resolve failed for workspace ${urlKey}:`, err);
