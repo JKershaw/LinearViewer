@@ -16,7 +16,8 @@ import { MangoClient } from '@jkershaw/mangodb';
 import {
   collectKpiStats, categorizeProxyEvent, PROXY_PHASES,
   ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS,
-  OUTCOME_WINDOW_WEEKS, OUTCOME_WINDOW_DAYS
+  OUTCOME_WINDOW_WEEKS, OUTCOME_WINDOW_DAYS,
+  harnessOf, usageOf, evidenceCountOf, loadDispatchHistory, groupDispatchLineages
 } from '../../lib/kpi-stats.js';
 
 // Minimal in-memory mock of the collection surface kpi-stats uses:
@@ -443,6 +444,35 @@ describe('collectKpiStats', () => {
     assert.ok(!serialized.includes('LIN-999'), 'issue identifier leaked');
     assert.ok(!serialized.includes('SECRET_TOKEN'), 'session token leaked');
   });
+
+  test('privacy (LIN-1957): issueIdentifier — key or value — never crosses into terminalMarkedTaskCost, the boundary itself, not just an assumption', async () => {
+    // The queue-seeded LIN-999 test above never actually exercises
+    // terminalMarkedTaskCost's issueIdentifier attribution (queue rows carry
+    // no feedback, so they never resolve `done`). This test seeds a genuinely
+    // DONE history row carrying a distinctive issueIdentifier so the
+    // assertion is real: computeTerminalMarkedTaskCost uses it internally to
+    // group lineages into issues, then the value must be discarded before
+    // anything crosses into the returned stats object.
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([{
+        _id: 'priv1', rootItemId: 'priv1', issueIdentifier: 'LIN-PRIVACY-CANARY',
+        harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(1),
+        feedback: [
+          { kind: 'usage', message: '[usage] {"harness":"claude-code","costUsd":3,"lane":"api"}', timestamp: daysAgo(1).toISOString() },
+          marker('[done] landed it', 0.9)
+        ]
+      }])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    // The metric must actually be live (proves the assertion isn't vacuous).
+    assert.equal(stats.terminalMarkedTaskCost.issueCount, 1);
+    assert.equal(stats.terminalMarkedTaskCost.costUsd, 3);
+
+    const serialized = JSON.stringify(stats);
+    assert.ok(!serialized.includes('LIN-PRIVACY-CANARY'), 'issueIdentifier value leaked into the public stats object');
+    assert.ok(!serialized.includes('"issueIdentifier"'), 'the issueIdentifier KEY itself must never appear in the output');
+  });
 });
 
 // LIN-1846: several metrics were labelled "· 30d" but applied no window in
@@ -663,6 +693,157 @@ describe('PROXY_FIELDS keeps the free-text note out of the unauthenticated read 
     ]);
     const stats = await collectKpiStats(buildCollections({ proxyEvents }), { now: NOW });
     assert.ok(!JSON.stringify(stats).includes('SENSITIVE-NOTE-BREADCRUMB'), 'proxy event note leaked');
+  });
+});
+
+// The LIN-1957 dual-shape readers for the terminal-marked-task-cost numerator
+// (Session 1 of LIN-1625) — exact siblings of feedbackLen/terminalFeedbackOf
+// above, exported (like categorizeProxyEvent) for direct coverage ahead of
+// their beat 3/4 consumer, which doesn't exist yet.
+describe('harnessOf/usageOf/evidenceCountOf (LIN-1957)', () => {
+  test('harnessOf reads the raw field on either shape, null when absent/non-string', () => {
+    assert.strictEqual(harnessOf({ harness: 'claude-code' }), 'claude-code');
+    assert.strictEqual(harnessOf({ harness: 'opencode', feedback: [] }), 'opencode');
+    assert.strictEqual(harnessOf({}), null);
+    assert.strictEqual(harnessOf({ harness: null }), null);
+  });
+
+  test('usageOf takes the LAST kind:usage entry on the find-path feedback[] shape', () => {
+    const doc = {
+      feedback: [
+        { kind: 'usage', message: '[usage] {"costUsd":1}' },
+        { kind: 'heartbeat', message: 'still going' },
+        { kind: 'usage', message: '[usage] {"costUsd":2}' }
+      ]
+    };
+    assert.deepStrictEqual(usageOf(doc), { kind: 'usage', message: '[usage] {"costUsd":2}' });
+  });
+
+  test('usageOf returns null when no feedback entry carries kind:usage', () => {
+    assert.strictEqual(usageOf({ feedback: [{ kind: 'heartbeat', message: 'still going' }] }), null);
+    assert.strictEqual(usageOf({ feedback: [] }), null);
+  });
+
+  test('usageOf reads the pre-derived usageEntry on the aggregation-path shape', () => {
+    const entry = { message: '[usage] {}', timestamp: daysAgo(1).toISOString(), kind: 'usage' };
+    assert.deepStrictEqual(usageOf({ usageEntry: entry }), entry);
+    assert.strictEqual(usageOf({ usageEntry: null }), null);
+    assert.strictEqual(usageOf({}), null);
+  });
+
+  test('evidenceCountOf counts kind:evidence entries on the find-path shape', () => {
+    const doc = {
+      feedback: [
+        { kind: 'evidence', message: 'link A' },
+        { kind: 'usage', message: '[usage] {}' },
+        { kind: 'evidence', message: 'link B' }
+      ]
+    };
+    assert.strictEqual(evidenceCountOf(doc), 2);
+    assert.strictEqual(evidenceCountOf({ feedback: [] }), 0);
+  });
+
+  test('evidenceCountOf reads the pre-derived evidenceCount on the aggregation-path shape', () => {
+    assert.strictEqual(evidenceCountOf({ evidenceCount: 3 }), 3);
+    assert.strictEqual(evidenceCountOf({}), 0);
+    assert.strictEqual(evidenceCountOf({ evidenceCount: null }), 0);
+  });
+
+  test('both load paths agree for equivalent underlying data', () => {
+    const raw = { feedback: [
+      { kind: 'usage', message: '[usage] {}', timestamp: daysAgo(1).toISOString() },
+      { kind: 'evidence', message: 'link A' },
+      { kind: 'evidence', message: 'link B' }
+    ] };
+    const aggregated = {
+      usageEntry: { message: '[usage] {}', timestamp: daysAgo(1).toISOString(), kind: 'usage' },
+      evidenceCount: 2
+    };
+    assert.deepStrictEqual(usageOf(raw), usageOf(aggregated));
+    assert.strictEqual(evidenceCountOf(raw), evidenceCountOf(aggregated));
+  });
+});
+
+describe('groupDispatchLineages (LIN-1957) — the shared extraction', () => {
+  const usageMarker = (costUsd, days) => ({
+    kind: 'usage', message: `[usage] {"costUsd":${costUsd}}`,
+    timestamp: new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
+  });
+
+  test('harness is captured ONCE from the earliest row only — a later follow-up with a DIFFERENT harness must not change it', () => {
+    // 'orig' dispatched 6 days ago (earlier); 'fu' is a follow-up dispatched
+    // 5 days ago (later, more recent) carrying a DIFFERENT harness. The
+    // approved-plan semantics (beat 2 decision (a)): the lineage's harness is
+    // whatever the earliest row carried, permanently.
+    const rows = [
+      { _id: 'orig', rootItemId: 'orig', harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] },
+      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', harness: 'opencode', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
+    ];
+    const lineages = groupDispatchLineages(rows);
+    assert.strictEqual(lineages.get('orig').harness, 'claude-code');
+  });
+
+  test('earliest-row-only capture is order-independent — the same result whichever row is processed first', () => {
+    const rows = [
+      { _id: 'orig', rootItemId: 'orig', harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] },
+      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', harness: 'opencode', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
+    ];
+    const forward = groupDispatchLineages(rows);
+    const reversed = groupDispatchLineages([...rows].reverse());
+    assert.strictEqual(forward.get('orig').harness, 'claude-code');
+    assert.strictEqual(reversed.get('orig').harness, 'claude-code');
+  });
+
+  test('issueIdentifier is captured from the same earliest row as harness', () => {
+    const rows = [
+      { _id: 'orig', rootItemId: 'orig', issueIdentifier: 'LIN-1', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] },
+      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', issueIdentifier: 'LIN-2', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
+    ];
+    const lineages = groupDispatchLineages(rows);
+    assert.strictEqual(lineages.get('orig').issueIdentifier, 'LIN-1');
+  });
+
+  test('F2 (LIN-1957 review, Request Changes, expected-red): issueIdentifier must be captured from ANY row carrying one, not just the earliest — while harness stays earliest-row-only', () => {
+    // Approved plan, Surface 2: "issueIdentifier — set from any row carrying
+    // one." Unlike the pinned test above (which documents today's coupled,
+    // buggy behavior), this asserts the plan's actual requirement: a
+    // null-identifier earliest row must not blank out a later row's
+    // identifier. harness is a SEPARATE field captured the same two places
+    // today (beat 2 decision (a), explicitly kept as earliest-row-only) — the
+    // fix must decouple the two, not take harness with it.
+    const rows = [
+      { _id: 'orig', rootItemId: 'orig', harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(6), feedback: [] }, // earliest row: no issueIdentifier
+      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', issueIdentifier: 'LIN-100', harness: 'opencode', status: 'taken', dispatchedAt: daysAgo(5), feedback: [] }
+    ];
+    const lineages = groupDispatchLineages(rows);
+    assert.strictEqual(lineages.get('orig').issueIdentifier, 'LIN-100', 'plan: "issueIdentifier — set from any row carrying one"');
+    assert.strictEqual(lineages.get('orig').harness, 'claude-code', 'harness must stay earliest-row-only — the fix must not decouple this pin too');
+  });
+
+  test('rowUsage collects each contributing row\'s own usage entry, rows with none omitted', () => {
+    const rows = [
+      { _id: 'orig', rootItemId: 'orig', status: 'taken', dispatchedAt: daysAgo(3), feedback: [usageMarker(1, 3)] },
+      { _id: 'mid', rootItemId: 'orig', followUpTo: 'orig', status: 'taken', dispatchedAt: daysAgo(2), feedback: [] }, // no usage entry
+      { _id: 'fu', rootItemId: 'orig', followUpTo: 'orig', status: 'taken', dispatchedAt: daysAgo(1), feedback: [usageMarker(2, 1)] }
+    ];
+    const lineages = groupDispatchLineages(rows);
+    const rowUsage = lineages.get('orig').rowUsage;
+    assert.strictEqual(rowUsage.length, 2);
+    assert.strictEqual(rowUsage[0].message, '[usage] {"costUsd":1}');
+    assert.strictEqual(rowUsage[1].message, '[usage] {"costUsd":2}');
+  });
+
+  test('computeDispatchOutcomes output is unaffected by the three new fields — the extraction is behavior-preserving', async () => {
+    // Same seed as the existing dispatch-outcomes suite, run through the
+    // extracted helper's consumer end-to-end via collectKpiStats.
+    const stats = await collectKpiStats(buildCollections({
+      dispatchHistory: createMockCollection(outcomeSeed())
+    }), { now: NOW });
+    assert.strictEqual(stats.dispatchOutcomes.done, 2);
+    assert.strictEqual(stats.dispatchOutcomes.failed, 1);
+    assert.strictEqual(stats.dispatchOutcomes.aborted, 1);
+    assert.strictEqual(stats.dispatchOutcomes.resolved, 4);
+    assert.strictEqual(stats.dispatchOutcomes.rate, 0.5);
   });
 });
 
@@ -1105,5 +1286,94 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     assert.strictEqual(projected[0].feedbackCount, 2);
     assert.deepStrictEqual(Object.keys(projected[0].terminalEntry).sort(), ['message', 'timestamp']);
     assert.ok(!JSON.stringify(projected).includes('BULKY-HEARTBEAT-PAYLOAD'), 'non-terminal entry content leaked');
+  });
+
+  // --- LIN-1957: the new usageEntry/evidenceCount/harness/issueIdentifier
+  // projection fields, exercised by calling the REAL `loadDispatchHistory`
+  // directly against a real MangoDB collection — not a hand-copied pipeline.
+  // A hand-copied $project (the pattern the terminalEntry-only test above
+  // uses) would stay green even if the actual production pipeline broke,
+  // since it never touches the real function; calling `loadDispatchHistory`
+  // itself closes that gap, which matters here because this field is new and
+  // under active change in this very beat.
+
+  test('harness and issueIdentifier are additive raw passthroughs, via loadDispatchHistory', async () => {
+    const collections = await realCollections({
+      dispatchHistory: [
+        { _id: 'h1', rootItemId: 'h1', status: 'taken', dispatchedAt: daysAgo(1), harness: 'opencode', issueIdentifier: 'LIN-42', feedback: [] },
+        { _id: 'h2', rootItemId: 'h2', status: 'taken', dispatchedAt: daysAgo(1), feedback: [] } // no harness/issueIdentifier at all
+      ]
+    });
+    const rows = await loadDispatchHistory(collections.dispatchHistory);
+    const byId = Object.fromEntries(rows.map(d => [d._id, d]));
+    assert.strictEqual(harnessOf(byId.h1), 'opencode');
+    assert.strictEqual(byId.h1.issueIdentifier, 'LIN-42');
+    assert.strictEqual(harnessOf(byId.h2), null);
+    assert.strictEqual(byId.h2.issueIdentifier, undefined);
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.ok(stats, 'collectKpiStats must not choke on the new fields'); // not surfaced yet — beat 3/4 wires the consumer
+  });
+
+  test('usageEntry (via loadDispatchHistory) takes the LAST kind:usage entry — proven against the REAL pipeline, not a copy (N1)', async () => {
+    const collections = await realCollections({
+      dispatchHistory: [{
+        _id: 'h1', rootItemId: 'h1', status: 'taken', dispatchedAt: daysAgo(1),
+        feedback: [
+          { message: 'heartbeat: still going', timestamp: daysAgo(2).toISOString(), kind: 'heartbeat' },
+          { message: '[usage] {"costUsd":1}', timestamp: daysAgo(1.5).toISOString(), kind: 'usage' },
+          { message: '[usage] {"costUsd":2}', timestamp: daysAgo(1).toISOString(), kind: 'usage' }
+        ]
+      }]
+    });
+
+    const rows = await loadDispatchHistory(collections.dispatchHistory);
+    assert.strictEqual(rows.length, 1);
+    // Last kind:usage entry wins, ignoring the earlier heartbeat — this reads
+    // `undefined` (or the wrong entry) if `kind` did not survive the $map
+    // before the $filter. Empirically confirmed: narrowing the production
+    // $map to {message,timestamp} (dropping `kind`) makes this assertion
+    // fail — see the beat-2 report for the mutation-probe transcript.
+    assert.strictEqual(usageOf(rows[0]).message, '[usage] {"costUsd":2}');
+    assert.strictEqual(evidenceCountOf(rows[0]), 0);
+  });
+
+  test('evidenceCount (via loadDispatchHistory) counts only kind:evidence entries — same N1 exposure as usageEntry', async () => {
+    const collections = await realCollections({
+      dispatchHistory: [{
+        _id: 'h1', rootItemId: 'h1', status: 'taken', dispatchedAt: daysAgo(1),
+        feedback: [
+          { message: 'link A', timestamp: daysAgo(2).toISOString(), kind: 'evidence' },
+          { message: '[usage] {}', timestamp: daysAgo(1.5).toISOString(), kind: 'usage' },
+          { message: 'link B', timestamp: daysAgo(1).toISOString(), kind: 'evidence' },
+          { message: 'heartbeat', timestamp: daysAgo(1).toISOString(), kind: 'heartbeat' }
+        ]
+      }]
+    });
+
+    const rows = await loadDispatchHistory(collections.dispatchHistory);
+    assert.strictEqual(rows.length, 1);
+    // 2, not 4 and not 0 — narrowing the map to drop `kind` collapses this to
+    // 0 (nothing matches `$eq: [undefined, 'evidence']`), and a filter-less
+    // bug would give 4 (every entry, unfiltered).
+    assert.strictEqual(evidenceCountOf(rows[0]), 2);
+  });
+
+  test('the find-path and aggregation-path readers agree on the same seed (via loadDispatchHistory + the mock)', async () => {
+    const seed = [{
+      _id: 'h1', rootItemId: 'h1', status: 'taken', dispatchedAt: daysAgo(1), harness: 'claude-code',
+      feedback: [
+        { message: '[usage] {"costUsd":1}', timestamp: daysAgo(2).toISOString(), kind: 'usage' },
+        { message: 'link A', timestamp: daysAgo(1).toISOString(), kind: 'evidence' }
+      ]
+    }];
+
+    const aggCollections = await realCollections({ dispatchHistory: seed });
+    const aggRows = await loadDispatchHistory(aggCollections.dispatchHistory);
+    const foundRows = await loadDispatchHistory(createMockCollection(seed));
+
+    assert.strictEqual(harnessOf(aggRows[0]), harnessOf(foundRows[0]));
+    assert.strictEqual(usageOf(aggRows[0]).message, usageOf(foundRows[0]).message);
+    assert.strictEqual(evidenceCountOf(aggRows[0]), evidenceCountOf(foundRows[0]));
   });
 });
