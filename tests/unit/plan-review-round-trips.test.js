@@ -502,6 +502,16 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
     assert.equal('rulerContamination' in agg.diagnostics, false);
   });
 
+  test('LIN-1984: completeness is a top-level, advisory sibling of diagnostics', () => {
+    const clean = computePlanReviewRoundTrips([issue('a1')], { asOf: ASOF });
+    assert.deepEqual(clean.completeness, { attempted: 1, read: 1, skipped: 0, complete: true });
+
+    const withSkips = computePlanReviewRoundTrips([issue('a1')], {
+      asOf: ASOF, skipped: [{ id: 'x' }, { id: 'y' }],
+    });
+    assert.deepEqual(withSkips.completeness, { attempted: 3, read: 1, skipped: 2, complete: false });
+  });
+
   test('perIssue exposes the R0 resolution for validation against a real record', () => {
     const iss = issue('LIN-1408-shape', {
       rows: [

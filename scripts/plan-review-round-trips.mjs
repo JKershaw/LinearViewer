@@ -47,6 +47,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { computePlanReviewRoundTrips } from '../lib/plan-review-round-trips.js';
+import { classifyUpstreamError } from '../lib/errors.js';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -106,7 +107,16 @@ function readCodeVersion() {
 
 // ─── proxy fetch (same retry/backoff discipline as follow-on-ratio.mjs) ──────
 
-async function getJson(url, token, { tries = 4, tolerate = false } = {}) {
+/**
+ * One GET with Bearer auth, retried on 429 AND 5xx up to `tries` attempts with
+ * a widening backoff. Returns null when `tolerate` is set and every attempt
+ * failed AND the failure is classified retryable, so one bad issue cannot
+ * lose a long pass; throws otherwise. A non-retryable failure (401/403 auth,
+ * 400/404/422, …) always throws regardless of `tolerate` — it is total and
+ * will not improve on a re-read, so silently skipping it would corrupt the
+ * published artifact instead of just costing a retry (LIN-1984).
+ */
+export async function getJson(url, token, { tries = 4, tolerate = false } = {}) {
   let lastErr = null;
   for (let attempt = 0; attempt < tries; attempt++) {
     let res;
@@ -126,7 +136,8 @@ async function getJson(url, token, { tries = 4, tolerate = false } = {}) {
     if (!res.ok) {
       const body = await res.text();
       const err = new Error(`proxy ${res.status} on ${url}: ${body.slice(0, 200)}`);
-      if (tolerate) return null;
+      err.status = res.status;
+      if (tolerate && classifyUpstreamError(err).retryable) return null;
       throw err;
     }
     return res.json();
@@ -197,12 +208,21 @@ async function fetchIssuePlanReviewShape(row, { base, token, cache, noCache }, c
   await sleep(1100);
   if (!detail) return { failed: true, id: row.id, identifier: row.identifier || null };
 
+  // Failures below are retryable-only (getJson now throws non-retryable ones
+  // straight through — LIN-1984), so a `null` here is a transient miss. It
+  // must still be counted rather than silently read as "no rows" / "no
+  // feedback" — that was the two previously-invisible skip sites.
+  const shapeSkips = [];
+
   const listUrl = new URL(`${base}/dispatch`);
   listUrl.searchParams.set('issueIdentifier', detail.identifier || row.identifier);
   listUrl.searchParams.set('limit', '250');
   const dispatchList = await getJson(listUrl.toString(), token, { tolerate: true });
   counters.fetched++;
   await sleep(1100);
+  if (dispatchList === null) {
+    shapeSkips.push({ id: detail.id, identifier: detail.identifier, reason: 'dispatch pipeline list fetch failed after retries' });
+  }
   const items = Array.isArray(dispatchList?.items) ? dispatchList.items : [];
 
   const rows = [];
@@ -214,6 +234,9 @@ async function fetchIssuePlanReviewShape(row, { base, token, cache, noCache }, c
     const rowDetail = await getJson(`${base}/dispatch/${item.id}`, token, { tolerate: true });
     counters.fetched++;
     await sleep(1100);
+    if (rowDetail === null) {
+      shapeSkips.push({ id: item.id, identifier: detail.identifier, reason: 'plan-review row detail fetch failed after retries' });
+    }
     rows.push({
       id: item.id, kind: item.kind, status: item.status,
       dispatchedAt: item.dispatchedAt, completedAt: item.completedAt,
@@ -226,6 +249,7 @@ async function fetchIssuePlanReviewShape(row, { base, token, cache, noCache }, c
     description: detail.description || '',
     comments: Array.isArray(detail.comments) ? detail.comments : [],
     rows,
+    skipped: shapeSkips,
   };
 
   if (!noCache && TERMINAL_STATES.includes(detail.state?.type)) {
@@ -249,6 +273,10 @@ async function fetchAll(listRows, args) {
       log(`  ⚠ skipped ${shaped.identifier || shaped.id} — detail fetch failed`);
     } else {
       issues.push(shaped);
+      if (shaped.skipped.length) {
+        skipped.push(...shaped.skipped);
+        log(`  ⚠ ${shaped.identifier || shaped.id} — ${shaped.skipped.length} within-issue read(s) failed`);
+      }
     }
     if ((i + 1) % 25 === 0) {
       log(`  …issues ${i + 1}/${listRows.length} (${counters.fetched} calls, ${counters.cached} cached, ${skipped.length} skipped)`);
@@ -342,6 +370,7 @@ async function main() {
     asOf,
     rulerChangeAt: args.rulerChangeAt || undefined,
     codeVersion: readCodeVersion(),
+    skipped,
   });
 
   const meta = { calls, skipped, cache: args.noCache ? null : args.cache, listedIssues: rows.length };
@@ -350,4 +379,6 @@ async function main() {
   else console.log(render(result, meta));
 }
 
-main().catch((e) => { console.error(e?.message || e); process.exit(1); });
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((e) => { console.error(e?.message || e); process.exit(1); });
+}
