@@ -27,6 +27,7 @@ import { join, basename } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { parseTranscriptLines, sessionSpend, partitionByDispatchTime, __internal } from '../lib/transcript-spend.js';
 import { decomposeEffort } from '../lib/wall-clock-summary.js';
+import { classifyUpstreamError } from '../lib/errors.js';
 
 const BASE = process.env.PROXY_BASE || 'https://projects.jkershaw.com/api/proxy';
 const TOKEN = process.env.PROXY_TOKEN;
@@ -49,12 +50,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ─── proxy fetch (cached, rate-limited to the 60/min proxy cap) ──────────────
 let calls = 0;
-async function proxy(path) {
+export async function proxy(path) {
   const cacheFile = join(CACHE, path.replace(/[^\w.-]/g, '_') + '.json');
   if (USE_CACHE && existsSync(cacheFile)) return JSON.parse(readFileSync(cacheFile, 'utf8'));
   if (++calls % 55 === 0) { log('  …rate-limit pause 60s'); await sleep(60_000); }
   const res = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
-  if (!res.ok) throw new Error(`${path} → ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(`${path} → ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
   const body = await res.json();
   writeFileSync(cacheFile, JSON.stringify(body));
   return body;
@@ -109,10 +114,20 @@ async function main() {
 
   log('Fetching item details (for join marker + kind + outcome)…');
   const joinByPrefix = new Map(); // 8hex prefix → dispatch meta
+  const detailSkipped = [];
   let n = 0;
   for (const [id, row] of items) {
     let detail;
-    try { detail = await proxy(`/dispatch/${id}`); } catch (e) { continue; }
+    try {
+      detail = await proxy(`/dispatch/${id}`);
+    } catch (e) {
+      // A non-retryable failure (auth, etc.) is total and would corrupt the
+      // rest of this pass too — fail loud via main().catch rather than
+      // silently drop this item and every one after it (LIN-1984).
+      if (!classifyUpstreamError(e).retryable) throw e;
+      detailSkipped.push({ id, reason: e.message });
+      continue;
+    }
     const prefix = launchedPrefix(detail.feedback);
     if (!prefix) continue;
     joinByPrefix.set(prefix, {
@@ -189,7 +204,13 @@ async function main() {
 
   const report = buildReport(results);
   const beforeAfter = BOUNDARY ? buildBeforeAfter(results, BOUNDARY) : null;
-  if (AS_JSON) { console.log(JSON.stringify({ sessions: results, report, beforeAfter }, null, 2)); return; }
+  const completeness = {
+    attempted: items.size,
+    joined: joined.length,
+    detailSkipped: detailSkipped.length,
+    complete: detailSkipped.length === 0,
+  };
+  if (AS_JSON) { console.log(JSON.stringify({ sessions: results, report, beforeAfter, completeness }, null, 2)); return; }
   printReport(results, report);
   if (beforeAfter) printBeforeAfter(beforeAfter);
 }
@@ -370,4 +391,6 @@ function printReport(results, rep) {
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}
