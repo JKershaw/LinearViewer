@@ -22,10 +22,13 @@
  *     "add a source" quietly minting a second workspace.
  *  4. The urlKey derivation, which cannot come from the identity.
  *
- * NOT proven here, stated rather than left implicit: no test in this repo drives
- * `/auth/jira/oauth` as HTTP against a real Atlassian exchange (LIN-1890 plan
- * R1 — the config predicate guards the callback too, so an e2e server 503s
- * both). Everything below fakes the network. Atlassian's runtime contract
+ * NOT proven here, stated rather than left implicit — and narrowed at close-out
+ * (review F1 corrected plan R1, which had generalised a GitHub measurement to
+ * Jira): the ENTRY route is driven as HTTP by the e2e suite, whose server is
+ * Jira-OAuth-configured (`landing.spec.js` asserts the `mode=new` 302 to
+ * Atlassian, `settings-providers.spec.js` the add-source one). What no test in
+ * this repo drives as HTTP is the CALLBACK — the code→token exchange has no stub
+ * seam — so everything below fakes that network. Atlassian's runtime contract
  * remains unobserved by this ticket, exactly as it was by LIN-1887 (D3).
  */
 import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
@@ -384,6 +387,76 @@ describe('LIN-1890 E2 — a Jira-only sign-in lands in a working workspace', () 
     const forged = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-not-granted' } });
     assert.equal(forged.status, 400);
     assert.equal(session.workspaces.length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-1890 close-out — review F3: the carried refresh token on the FAILURE
+// exits.
+//
+// The multi-site `mode: 'new'` pick parks a rotating refresh token in the
+// session, and the deviation that allows it was accepted on a stated bound:
+// written once, read once, deleted on consumption. `finish()` only ever runs on
+// the success path, so before this the bound held there and nowhere else. Each
+// test below drives ONE exit that answers an error instead, and asserts the
+// value is gone — the distinguishing precondition in every case is `sites.length
+// > 1`, since a single-site grant never puts the token in the session at all.
+//
+// The abandoned pick is deliberately absent: it issues no request, so there is
+// no exit to test. That residue is documented in-tree rather than claimed away.
+// ---------------------------------------------------------------------------
+
+describe('LIN-1890 close-out (F3) — the carried refresh token is dropped on every error exit', () => {
+  /** Drive begin → callback with TWO sites, stopping at the pick page. */
+  async function pendingPick({ session, provider = fakeProvider(), stores = makeAccountStores() }) {
+    const app = makeApp({ session, store: makeStore(), provider, stores, fetches: stubs(TWO_SITES) });
+    await request(app, { path: '/auth/jira/oauth?mode=new' });
+    const callback = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+    assert.equal(callback.status, 200, 'the premise: two sites, so the token IS parked in the session');
+    assert.equal(session.jiraPending.refreshToken, 'atlassian-refresh-ROTATING');
+    return app;
+  }
+
+  const assertNoResidue = (session) => {
+    assert.equal(session.jiraPending?.refreshToken, undefined, 'the carried token is gone');
+    assert.equal(JSON.stringify(session).includes('atlassian-refresh-ROTATING'), false,
+      'and nothing else in the session kept a copy of it');
+  };
+
+  test('the unknown-site 400 — a forged cloudId does not leave the token parked', async () => {
+    const session = jiraOnlySession();
+    const app = await pendingPick({ session });
+    const forged = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-not-granted' } });
+    assert.equal(forged.status, 400);
+    assertNoResidue(session);
+  });
+
+  test('the identity-lookup 400 — a Jira /myself failure does not leave the token parked', async () => {
+    const session = jiraOnlySession();
+    const throwingProvider = { validateCredential: async () => { throw new Error('jira 500'); } };
+    const app = await pendingPick({ session, provider: throwingProvider });
+    const picked = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-2' } });
+    assert.equal(picked.status, 400);
+    assert.match(picked.text, /Authentication Failed/);
+    assertNoResidue(session);
+  });
+
+  test('the returning-container 409 — the one conflict exit that runs no regenerate', async () => {
+    // The `existing` branch answers 409 with the session fully intact (no
+    // regenerate to wipe it), which is what makes it the exit where residue
+    // would actually persist.
+    const session = makeSession({
+      accountId: 'acct-A',
+      workspaces: [{ id: `jira:${MYSELF.accountId}`, urlKey: 'acme', provider: 'jira', bindings: [] }],
+    });
+    const stores = makeAccountStores();
+    stores.accountStore.findAccountByIdentity = async () => ({ _id: 'acct-B' });
+
+    const app = await pendingPick({ session, stores });
+    const picked = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-2' } });
+    assert.equal(picked.status, 409);
+    assert.match(picked.text, /Account Conflict/);
+    assertNoResidue(session);
   });
 });
 

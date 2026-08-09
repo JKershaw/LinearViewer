@@ -48,6 +48,35 @@ test.describe('Landing Page (bespoke showcase)', () => {
     await expect(page.locator('header .reset-view')).toHaveCount(0);
   });
 
+  // LIN-1890 close-out, ledger items 1–2. The plan's R1 recorded "no configured
+  // Jira CTA is rendered by a real server" and "no test drives /auth/jira/oauth
+  // as HTTP" as harness LIMITATIONS. Both were false: this Playwright server IS
+  // Jira-OAuth-configured (playwright.config.js's webServer sets the three
+  // JIRA_* presence-only placeholders), so the CTA renders here today and the
+  // entry route answers. They were UNASSERTED, not unavailable — which is a
+  // missing test, not a missing mechanism. These two assertions are the fix, and
+  // they close the entry chain end to end: the CTA a Jira-only human actually
+  // clicks → the route it points at → Harbour's own redirect to Atlassian.
+  test('the configured server renders the Jira entry CTA, and it reaches Atlassian (LIN-1890)', async ({ page }) => {
+    await page.goto('/');
+    const jiraCta = page.locator('[data-testid="landing-cta-jira"]');
+    await expect(jiraCta).toBeVisible();
+    // `mode=new` is the landing entry point. Omitting it would still work (the
+    // route defaults to `new`), but the CTA states its intent explicitly, and an
+    // add-source URL appearing here would be a real bug — it would bind onto
+    // some other workspace instead of bootstrapping one.
+    await expect(jiraCta).toHaveAttribute('href', '/auth/jira/oauth?mode=new');
+
+    // The HTTP leg. Stops at Harbour's own redirect — no live Atlassian app
+    // exists (D3) and none is contacted, same bound as settings-providers.spec.js.
+    const begin = await page.request.get('/auth/jira/oauth?mode=new', { maxRedirects: 0 });
+    expect(begin.status()).toBe(302);
+    const consent = new URL(begin.headers()['location']);
+    expect(consent.origin).toBe('https://auth.atlassian.com');
+    expect(consent.pathname).toBe('/authorize');
+    expect(consent.searchParams.get('client_id')).toBeTruthy();
+  });
+
   test('shows the showcase sections', async ({ page }) => {
     await page.goto('/');
     for (const id of ['landing-loop', 'landing-observation', 'landing-swim', 'landing-prompt', 'landing-try', 'landing-providers', 'landing-os']) {

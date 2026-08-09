@@ -107,9 +107,13 @@ test.describe('Jira provider — empty project', () => {
 // HEAD. It is a real user path: a Jira-only human whose dashboard renders but
 // whose prompts 500 has not been given a working workspace.
 //
-// NOT proven here (plan R1): nothing drives `/auth/jira/oauth` as HTTP. The
-// config predicate guards the callback as well as the entry route, so on this
-// unconfigured e2e server both 503 — the bootstrap is unit-proven only.
+// NOT proven here, narrowed at close-out (review F1 corrected plan R1): the
+// entry route IS driven as HTTP elsewhere — this server is Jira-OAuth-configured
+// (playwright.config.js), so `landing.spec.js` asserts `/auth/jira/oauth?mode=new`
+// → 302 to Atlassian and `settings-providers.spec.js` asserts the add-source
+// leg. What genuinely has no e2e coverage is the CALLBACK: the code→token
+// exchange has no stub seam, so the bootstrap round trip is unit-proven only.
+// That is a real harness limitation, not a config one.
 // ---------------------------------------------------------------------------
 test.describe('LIN-1890 — a Jira-only session on an OAuth binding', () => {
   test.beforeEach(async ({ page }) => {

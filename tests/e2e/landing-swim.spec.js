@@ -20,6 +20,11 @@ test.describe('Landing Swim Page (/swim)', () => {
     // soon as a second one renders. Name the Linear CTA by its own testid.
     await expect(page.locator('[data-testid="nav-login-linear"]')).toBeVisible();
     await expect(page.locator('[data-testid="nav-login-linear"]')).toHaveAttribute('href', '/auth/linear');
+    // LIN-1890 close-out, ledger item 3 — see the identical note in
+    // landing-swipe.spec.js: E4's approved nav assertion, landed in the polarity
+    // this (Jira-CONFIGURED) server actually has.
+    await expect(page.locator('[data-testid="nav-login-jira"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nav-login-jira"]')).toHaveAttribute('href', '/auth/jira/oauth?mode=new');
     await expect(page.locator('nav a[href="/"]')).toBeVisible();
   });
 

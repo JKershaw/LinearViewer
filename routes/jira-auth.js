@@ -158,6 +158,25 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
   }
 
   /**
+   * LIN-1890 close-out (review F3). The `mode: 'new'` MULTI-SITE pick is the one
+   * path that parks a rotating refresh token in the session (see the callback's
+   * note below), and the success path deletes it in `finish()`. Every exit that
+   * answers an error INSTEAD of reaching `finish()` drops it here, so the
+   * "written once, read exactly once, and deleted the moment it is consumed"
+   * bound the deviation was accepted on holds on the failure paths too, not
+   * only the happy one.
+   *
+   * The bound this CANNOT extend to, stated rather than left implicit: a pick
+   * the human simply abandons sends no further request, so nothing runs to
+   * clear it. That residue lives until the session's own expiry or the next
+   * successful sign-in — which is why the value is deliberately not the
+   * credential a refresh rotates against.
+   */
+  const dropCarriedRefreshToken = (req) => {
+    if (req.session?.jiraPending) delete req.session.jiraPending.refreshToken
+  }
+
+  /**
    * Step 1: render the link form for the workspace the user is adding Jira
    * onto. `?workspace=<urlKey>` mirrors every other add-source entry point's
    * `workspace` query param (routes/github-auth.js), even though Jira never
@@ -423,10 +442,14 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     // write cannot happen until after it (see above), so the rotating token has
     // nowhere else to wait. This is narrower than the LIN-1524 anti-pattern it
     // resembles: the value is written once, read exactly once, and deleted the
-    // moment it is consumed — it is never the credential a REFRESH rotates
-    // against (that is always the durable record), so it cannot go stale and
-    // cannot lose a rotation. With a single site the pick is skipped entirely
-    // and the token is passed as an argument, never touching the session at all.
+    // moment it is consumed — on the success path in `finish()`, and on every
+    // error exit that returns instead via `dropCarriedRefreshToken` (LIN-1890
+    // close-out, review F3). The one residue that survives is a pick the human
+    // ABANDONS, which sends no request for anything to run on. Even then it is
+    // never the credential a REFRESH rotates against (that is always the
+    // durable record), so it cannot go stale and cannot lose a rotation. With a
+    // single site the pick is skipped entirely and the token is passed as an
+    // argument, never touching the session at all.
     if (mode === 'new' && sites.length > 1 && tokenBag.refresh_token) {
       req.session.jiraPending.refreshToken = tokenBag.refresh_token
     }
@@ -452,6 +475,7 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     }
     const site = (pending.sites || []).find(s => s.cloudId === req.body?.cloudId)
     if (!site) {
+      dropCarriedRefreshToken(req)
       return res.status(400).send(renderErrorPage('Unknown Jira Site', 'That Jira site is not one your account authorized. Please try again.', {
         action: 'Go to homepage', actionUrl: '/'
       }))
@@ -482,6 +506,7 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       myself = await provider.validateCredential({ authType: 'oauth', accessToken: pending.accessToken, cloudId: site.cloudId, site: site.url })
     } catch (err) {
       console.error('Jira OAuth identity lookup error:', err)
+      dropCarriedRefreshToken(req)
       return res.status(400).send(renderErrorPage('Authentication Failed', 'Could not verify your Jira account. Please try again.', {
         action: 'Go to homepage', actionUrl: '/'
       }))
@@ -603,6 +628,9 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
         { email: myself.emailAddress, displayName: myself.displayName }, existing.id
       )
       if (!established.ok) {
+        // The one 409 that runs no regenerate — the session, and the carried
+        // token in it, both survive this exit unless dropped here.
+        dropCarriedRefreshToken(req)
         return res.status(409).send(renderErrorPage('Account Conflict', 'This Jira account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
           action: 'Go to homepage', actionUrl: '/'
         }))
