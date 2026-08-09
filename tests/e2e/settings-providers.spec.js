@@ -101,7 +101,7 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     expect(beginRes.status()).toBe(302)
     const consent = new URL(beginRes.headers()['location'])
     expect(consent.origin).toBe('https://auth.atlassian.com')
-    expect(consent.searchParams.get('scope')).toBe('read:jira-work read:jira-user offline_access')
+    expect(consent.searchParams.get('scope')).toBe('read:jira-work write:jira-work read:jira-user offline_access')
   })
 
   test('the Basic add path is unchanged by the OAuth option (LIN-1887 D5)', async ({ page }) => {
