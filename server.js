@@ -27,6 +27,7 @@ import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describe
 import { refreshOwnerWorkspaceToken, refreshOwnerCredential } from './lib/workspace-token-refresh.js'
 import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
 import { CREDENTIAL_SOURCES } from './lib/credential-diagnostics.js'
+import { createRejectedCredentialRegistry } from './lib/rejected-credentials.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -1702,6 +1703,38 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 const TOKEN_CACHE_TTL_MS = 30 * 1000; // 30 seconds
 const workspaceTokenCache = createWorkspaceTokenCache({ ttlMs: TOKEN_CACHE_TTL_MS });
 
+// 2026-08-09 incident, follow-up 1: credentials the PROVIDER has refused, so
+// selection can stop re-serving one that is dead upstream but not yet expired.
+// See docs/incidents/2026-08-09-proxy-401-flood.md and lib/rejected-credentials.js.
+const rejectedCredentials = createRejectedCredentialRegistry();
+
+/**
+ * Feedback edge from the consumer proxy: the provider refused this credential.
+ *
+ * Does BOTH halves, because either alone is a no-op. Recording the refusal makes
+ * the credential unselectable (which is what lets refresh-on-resolve replace
+ * it), and evicting the cache pair is what stops the 30s entry from continuing
+ * to serve it in the meantime — a suspension that leaves a warm cache entry
+ * behind would not take effect until the entry aged out.
+ *
+ * Only acts once the credential is actually suspended (three consecutive
+ * refusals), so a single scope-403 costs nothing: no eviction, no re-resolve.
+ */
+function onProviderRejectedCredential(credential, urlKey, ownerAccountId) {
+  if (!rejectedCredentials.reject(credential)) return;
+  evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, ownerAccountId);
+  console.warn('[credential-suspended]', JSON.stringify({
+    urlKey,
+    reason: 'provider refused this credential on consecutive requests',
+    nextStep: 'selection will skip it, allowing refresh-on-resolve to mint a replacement',
+  }));
+}
+
+/** The other half of consecutive counting: a credential that worked is not failing. */
+function onProviderAcceptedCredential(credential) {
+  rejectedCredentials.accept(credential);
+}
+
 // LIN-1507: prompt (not 30s-fuzzy) cache eviction. Threaded into every
 // session-destruction call site so a revoked session's cached token is gone
 // immediately rather than served for up to TOKEN_CACHE_TTL_MS after the
@@ -1764,7 +1797,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
   // ownerAccountId (or owner-blind for UNSCOPED) via the pure selector.
   try {
     const sessions = await sessionsCollection.find({}).toArray();
-    const selected = selectOwnerWorkspaceToken(sessions, urlKey, ownerAccountId);
+    const selected = selectOwnerWorkspaceToken(sessions, urlKey, ownerAccountId, rejectedCredentials.isSuspended);
 
     if (selected.token) {
       workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider, scope: selected.scope });
@@ -1930,7 +1963,7 @@ async function getWorkspaceNorthStar(urlKey, accountId) {
   return resolveNorthStar(userPreferencesStore, urlKey, accountId);
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, onProviderRejectedCredential, onProviderAcceptedCredential }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore }))
