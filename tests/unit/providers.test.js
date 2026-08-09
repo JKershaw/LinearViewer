@@ -42,6 +42,10 @@ import { LinearProvider, linearProvider } from '../../lib/providers/linear/index
 import * as shim from '../../lib/linear.js';
 import * as provider from '../../lib/providers/linear/index.js';
 import { makeStubProvider } from '../fixtures/stub-provider.js';
+import { localProvider } from '../../lib/providers/local/index.js';
+import { githubProvider } from '../../lib/providers/github/index.js';
+import { jiraProvider } from '../../lib/providers/jira/index.js';
+import { githubProjectsProvider } from '../../lib/providers/github-projects/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -482,5 +486,63 @@ describe('provider.ui surface (LIN-332)', () => {
     assert.deepStrictEqual(linearProvider.ui, {
       write: true, comments: true, inlineCreate: true, inlineEdit: true, estimates: true, subtasks: true, attachments: true, priority: true, displayName: 'Linear',
     });
+  });
+});
+
+// =============================================================================
+// createFields() capability contract (LIN-1504/LIN-1972)
+// =============================================================================
+//
+// The create form's field set is capability-derived from this list, per
+// provider — never a fixed six-field/hard-teamId form. `labels` must never
+// appear (no in-tree create path round-trips it), and Jira/github-projects
+// must inherit the base default unmodified (ui.inlineCreate is false for
+// both, so createFields() is never consulted for them, but the contract
+// should still be the harmless base default rather than something wider).
+
+describe('createFields() capability contract (LIN-1504/LIN-1972)', () => {
+  test('base ProviderInterface default: title + description only', () => {
+    const base = new ProviderInterface();
+    assert.deepStrictEqual(base.createFields(), ['title', 'description']);
+  });
+
+  test('Linear: full contract including teamId — always declares teamId', () => {
+    assert.deepStrictEqual(linearProvider.createFields(), [
+      'title', 'description', 'teamId', 'projectId', 'stateId', 'priority',
+    ]);
+    assert.ok(linearProvider.createFields().includes('teamId'));
+  });
+
+  test('Local: no teamId (teamless provider)', () => {
+    assert.deepStrictEqual(localProvider.createFields(), [
+      'title', 'description', 'projectId', 'stateId', 'priority',
+    ]);
+    assert.strictEqual(localProvider.createFields().includes('teamId'), false);
+  });
+
+  test('GitHub: projectId (milestone id) only — no teamId, no stateId, no priority', () => {
+    assert.deepStrictEqual(githubProvider.createFields(), ['title', 'description', 'projectId']);
+    assert.strictEqual(githubProvider.createFields().includes('teamId'), false);
+    assert.strictEqual(githubProvider.createFields().includes('stateId'), false);
+    assert.strictEqual(githubProvider.createFields().includes('priority'), false);
+  });
+
+  test('Jira and github-projects: no override — inherit the base default', () => {
+    assert.deepStrictEqual(jiraProvider.createFields(), ['title', 'description']);
+    assert.deepStrictEqual(githubProjectsProvider.createFields(), ['title', 'description']);
+  });
+
+  test('labels is absent from every registered provider\'s createFields()', () => {
+    for (const p of [new ProviderInterface(), linearProvider, localProvider, githubProvider, jiraProvider, githubProjectsProvider]) {
+      assert.strictEqual(p.createFields().includes('labels'), false, `${p.name} must not declare labels`);
+    }
+  });
+
+  test('createFields() is NOT sourced from supports() or fetchTeams() — Local/GitHub are writable with no teams', () => {
+    // supports('createIssue') is true for both, yet neither declares teamId.
+    assert.strictEqual(localProvider.supports('createIssue'), true);
+    assert.strictEqual(githubProvider.supports('createIssue'), true);
+    assert.strictEqual(localProvider.createFields().includes('teamId'), false);
+    assert.strictEqual(githubProvider.createFields().includes('teamId'), false);
   });
 });

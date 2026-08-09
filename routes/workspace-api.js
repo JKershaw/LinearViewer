@@ -2631,7 +2631,13 @@ ${goal}`
 
     const { title, description, teamId, projectId, stateId, priority } = req.body || {};
 
-    if (!teamId || typeof teamId !== 'string') {
+    // LIN-1972: teamId is only required when the provider's create contract
+    // declares it — a teamless provider (Local, GitHub) must never be asked
+    // for one. Sourced from createFields(), never supports()/fetchTeams().
+    const fields = provider.createFields();
+    const requiresTeam = fields.includes('teamId');
+
+    if (requiresTeam && (!teamId || typeof teamId !== 'string')) {
       return badRequest.json(res, 'Valid teamId is required');
     }
     if (!title || typeof title !== 'string') {
@@ -2647,18 +2653,29 @@ ${goal}`
     }
 
     try {
-      const resolvedTeamId = await resolveIssueTeamRef(provider, token, teamId);
+      // LIN-1972: a create has no fetched issue to derive a team from (unlike
+      // the PATCH path's issueWriteGuard placeholder), so supply provider.name
+      // directly when the contract excludes teamId — a real non-empty string
+      // every teamless states() implementation accepts and ignores, and one
+      // that provably never reaches createIssue since input.teamId is only
+      // set below when requiresTeam.
+      const resolvedTeamId = requiresTeam
+        ? await resolveIssueTeamRef(provider, token, teamId)
+        : provider.name;
       const input = {
-        teamId: resolvedTeamId,
         title,
         // LIN-1552: stamp the creating account from the session (NOT
         // linearUserId), mirroring the LIN-1376 owner-stamping convention.
         createdBy: req.session?.accountId || null,
       };
-      if (description) input.description = description;
-      if (projectId) input.projectId = await resolveIssueProjectRef(provider, token, projectId);
-      if (stateId) input.stateId = await resolveIssueStateRef(provider, token, resolvedTeamId, stateId);
-      if (priority !== undefined && isValidPriority(priority)) input.priority = priority;
+      if (requiresTeam) input.teamId = resolvedTeamId;
+      // LIN-1972: only forward optional fields the provider both declares AND
+      // the caller submitted — restrictive but lossless (an undeclared field
+      // is already dropped one layer down by every in-tree provider write).
+      if (fields.includes('description') && description) input.description = description;
+      if (fields.includes('projectId') && projectId) input.projectId = await resolveIssueProjectRef(provider, token, projectId);
+      if (fields.includes('stateId') && stateId) input.stateId = await resolveIssueStateRef(provider, token, resolvedTeamId, stateId);
+      if (fields.includes('priority') && priority !== undefined && isValidPriority(priority)) input.priority = priority;
 
       const result = normalizeIssueWrite(await provider.createIssue(token, input));
       if (!result.success || !result.issue) {

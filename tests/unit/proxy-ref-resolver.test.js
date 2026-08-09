@@ -176,6 +176,33 @@ test('resolveProjectRef: UUID passthrough + case-insensitive name', () => {
   assert.throws(() => resolveProjectRef(projects, 'Other'), RefResolutionError);
 });
 
+// LIN-1972: real Local composite ids (`${urlKey}-proj-1`) and GitHub milestone
+// ids (number-strings) are non-UUID by construction — resolveProjectRef must
+// match them by exact raw id, short-circuiting before any name sweep.
+test('resolveProjectRef: exact non-UUID id match (Local composite id)', () => {
+  const projects = [
+    { id: 'acme-proj-1', name: 'Product' },
+    { id: 'acme-proj-2', name: 'Marketing' },
+  ];
+  assert.equal(resolveProjectRef(projects, 'acme-proj-1'), 'acme-proj-1');
+});
+
+test('resolveProjectRef: exact non-UUID id match (GitHub milestone-number id)', () => {
+  const projects = [
+    { id: '7', name: 'v2.0' },
+    { id: '12', name: 'v2.1' },
+  ];
+  assert.equal(resolveProjectRef(projects, '7'), '7');
+});
+
+test('resolveProjectRef: id/name ambiguity — id match wins, no false NOT_UNIQUE', () => {
+  // Project A's id equals project B's name: a merged id+name filter would
+  // throw NOT_UNIQUE here; the id match must short-circuit before that sweep.
+  const projectA = { id: 'Product', name: 'Alpha' };
+  const projectB = { id: 'proj-2', name: 'Product' };
+  assert.equal(resolveProjectRef([projectA, projectB], 'Product'), 'Product');
+});
+
 test('resolveTeamRef: UUID passthrough + key + name, all case-insensitive', () => {
   const teams = [{ id: UUID, name: 'Linear Team', key: 'LIN' }];
   assert.equal(resolveTeamRef(teams, UUID), UUID);
