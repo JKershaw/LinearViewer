@@ -33,9 +33,18 @@ function makeFakeProvider(overrides = {}) {
     fetchTeams: [], fetchProjectsList: [], states: [],
   };
   const caps = overrides.caps || { createIssue: true, updateIssue: true };
+  // LIN-1972: this stub is a plain object literal, not a ProviderInterface
+  // subclass, so it has no inherited createFields() — the route now calls it
+  // unconditionally, so every test needs a real contract. Defaults to the
+  // full Linear-shaped contract (every field declared) so pre-existing tests,
+  // which submit teamId/projectId/stateId/priority freely, are unaffected;
+  // tests exercising the teamless/narrowed path pass their own override.
+  const createFieldsResult = overrides.createFields
+    || ['title', 'description', 'teamId', 'projectId', 'stateId', 'priority'];
   const provider = {
     name: PROVIDER_NAME,
     supports: (cap) => caps[cap] === true,
+    createFields: () => createFieldsResult,
     async createIssue(token, input) {
       calls.createIssue.push(input);
       if (overrides.createIssue) return overrides.createIssue(input);
@@ -193,6 +202,67 @@ describe('POST /workspace/:urlKey/api/issues (create)', () => {
     const { status, body } = await postIssue(buildApp({ provider }), { teamId: TEAM_UUID, title: 'ok' });
     assert.strictEqual(status, 502);
     assert.match(body.error, /not created/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createFields() capability contract (LIN-1972)
+// ---------------------------------------------------------------------------
+describe('POST /workspace/:urlKey/api/issues — createFields() capability contract (LIN-1972)', () => {
+  test('regression pin: a GitHub-shaped payload (priority: 0, no teamId) still 200s', async () => {
+    // GitHub's real contract: ['title', 'description', 'projectId'] — no teamId,
+    // no stateId, no priority. The live inline form's priority <select> always
+    // submits a real number (0 included), so this payload must not regress.
+    const { provider, calls } = makeFakeProvider({
+      createFields: ['title', 'description', 'projectId'],
+    });
+
+    const { status, body } = await postIssue(buildApp({ provider }), {
+      title: 'GitHub-shaped create', priority: 0,
+    });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(calls.createIssue.length, 1);
+    const input = calls.createIssue[0];
+    assert.strictEqual('teamId' in input, false);
+    assert.strictEqual('priority' in input, false); // undeclared field dropped, not rejected
+  });
+
+  test('Local create: declared non-UUID stateId + no submitted teamId resolves via the provider.name placeholder, no 422', async () => {
+    // Local's real contract: ['title', 'description', 'projectId', 'stateId', 'priority']
+    // — no teamId. Local's state ids (backlog/started/…) are never UUIDs, so this
+    // exercises resolveIssueStateRef's symbolic path with the non-null placeholder
+    // team supplied in place of a real (nonexistent) teamId.
+    const STATE_UUID = '00000000-0000-0000-0000-0000000000dd';
+    const { provider, calls } = makeFakeProvider({
+      createFields: ['title', 'description', 'projectId', 'stateId', 'priority'],
+      states: (teamId) => [{ id: STATE_UUID, name: 'Started', type: 'started' }],
+    });
+
+    const { status, body } = await postIssue(buildApp({ provider }), {
+      title: 'Local create', stateId: 'started',
+    });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+    assert.notStrictEqual(status, 422);
+    assert.strictEqual(calls.createIssue.length, 1);
+    assert.strictEqual(calls.createIssue[0].stateId, STATE_UUID);
+    assert.strictEqual('teamId' in calls.createIssue[0], false); // placeholder never transmitted
+    // The proving assertion: states() was scoped to the provider.name
+    // placeholder (PROVIDER_NAME), not a real team — and it was never falsy,
+    // which is what would have 422'd inside resolveIssueStateRef.
+    assert.strictEqual(calls.states.length, 1);
+    assert.strictEqual(calls.states[0].teamId, PROVIDER_NAME);
+  });
+
+  test('400 teamId is NOT required when the provider contract excludes it', async () => {
+    const { provider, calls } = makeFakeProvider({ createFields: ['title', 'description'] });
+    const { status, body } = await postIssue(buildApp({ provider }), { title: 'no team needed' });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(calls.createIssue.length, 1);
   });
 });
 
