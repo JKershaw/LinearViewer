@@ -66,6 +66,22 @@ export async function proxy(path) {
   return body;
 }
 
+// `complete` covers every path that can drop a row from `results` — both the
+// dispatch-detail loop (`detailSkipped`) AND the transcript-parse loop
+// (`transcriptSkipped`, e.g. an unreadable/corrupt transcript file). A run
+// that silently lost transcripts must not report `complete: true` (LIN-1984
+// review F7): before this, `complete` covered only `detailSkipped` and would
+// read `true` over an artifact whose `sessions` were quietly empty.
+export function computeCompleteness({ attempted, joined, detailSkipped, transcriptSkipped }) {
+  return {
+    attempted,
+    joined,
+    detailSkipped: detailSkipped.length,
+    transcriptSkipped: transcriptSkipped.length,
+    complete: detailSkipped.length === 0 && transcriptSkipped.length === 0,
+  };
+}
+
 const LAUNCH_RE = /session\s+launched\s*\(session:\s*([0-9a-f]{6,})/i;
 function launchedPrefix(feedback = []) {
   for (const f of feedback) {
@@ -183,6 +199,7 @@ async function main() {
 
   log('Parsing transcripts + computing spend…');
   const results = [];
+  const transcriptSkipped = [];
   for (const j of joined) {
     try {
       const lines = readFileSync(j.path, 'utf8').split('\n');
@@ -200,17 +217,15 @@ async function main() {
                      dispatchedAt: j.dispatchedAt || null, // LIN-1241: before/after key
                      d2OnboardShare, d2HasBeats: !!d2.hasBeats,
                      sizeKb: Math.round(statSync(j.path).size / 1024), subagentCount: j.subagents.length });
-    } catch (e) { log(`  skip ${j.sessionId.slice(0, 8)}: ${e.message}`); }
+    } catch (e) {
+      log(`  skip ${j.sessionId.slice(0, 8)}: ${e.message}`);
+      transcriptSkipped.push({ sessionId: j.sessionId, reason: e.message });
+    }
   }
 
   const report = buildReport(results);
   const beforeAfter = BOUNDARY ? buildBeforeAfter(results, BOUNDARY) : null;
-  const completeness = {
-    attempted: items.size,
-    joined: joined.length,
-    detailSkipped: detailSkipped.length,
-    complete: detailSkipped.length === 0,
-  };
+  const completeness = computeCompleteness({ attempted: items.size, joined: joined.length, detailSkipped, transcriptSkipped });
   if (AS_JSON) { console.log(JSON.stringify({ sessions: results, report, beforeAfter, completeness }, null, 2)); return; }
   printReport(results, report);
   if (beforeAfter) printBeforeAfter(beforeAfter);
