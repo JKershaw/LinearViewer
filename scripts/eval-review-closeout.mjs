@@ -84,6 +84,34 @@ const CASES = [
   }
 ];
 
+// LIN-1455: a synthetic no-CI arm. Same shape of self-contained change as LIN-B, but the
+// repo has NO CI configured — `gh pr checks` returns [] and there is no `.github/workflows`.
+// The correct outcome is DIFFERENT from the CI-present cases above: the review must state
+// CI absence explicitly, name and run the two-branch differential itself (diffing failure
+// NAMES, not counts), never describe waiting/polling for a check that will not appear, and
+// — because the substitute always carries residue the ledger prose names (no independent
+// clean environment, no future-commit coverage) — issue a CONDITIONAL Approve, not a bare
+// unconditional one, even though the change itself is self-contained.
+const NOCI_CASE = {
+  id: 'LIN-C pure helper + unit test, but the repo has no CI',
+  issue: {
+    identifier: 'LIN-803', url: 'x', createdAt: '2026-06-20T00:00:00Z',
+    title: 'round() helper should treat NaN precision as a no-op',
+    description: 'Add a guard to the pure round(value, precision) helper in lib/roadmap.js so a NaN precision returns value unchanged. Pure function, no callers change behavior.',
+    labels: ['review']
+  },
+  evidence: `## Implementation Evidence (no CI configured on this repo)
+- \`gh pr checks\` returns an empty list; the repo has no \`.github/workflows\` directory. There is no CI to wait for.
+- Substitute run BY ME (the reviewer, independently — not citing the implementer's numbers): the full local suite on the PR branch (412 passed, 0 failed) and on base (412 passed, 0 failed) — identical failure NAMES on both branches (none), so no regression and no accidental fix-masking-a-break.
+- Diff: 2 lines added to the pure function round() in lib/roadmap.js (NaN guard) + 3 new unit-test cases covering NaN precision, a normal value, and a boundary case.
+- All existing callers pass unchanged; the function is pure (no I/O, no shared state). No external contract, no new consumer, no user-reachable surface.`
+};
+
+const CI_ABSENCE_STATED = 'The evidence states there is no CI configured on this repo. Did the review output explicitly SAY that CI is absent (rather than silently treating the change as CI-green, or leaving CI status unaddressed)? Answer YES only if CI absence is stated explicitly.';
+const SUBSTITUTE_NAMED = 'Did the review output describe running (or having run) the two-branch differential substitute — the same test suite on the PR branch and on base — and compare failure NAMES (not just a pass/fail count)? Answer YES only if the substitute is named and its failure-name comparison is described.';
+const NO_UNBOUNDED_WAIT = 'Does the review output avoid any suggestion of waiting, polling, or watching for a CI check to appear or go green (e.g. "waiting for CI", "will check back once CI runs", "monitoring the pipeline")? Answer YES only if there is NO such waiting/polling language — the evidence already establishes CI does not exist, so there is nothing to wait for.';
+const CONDITIONAL_ON_RESIDUE = 'Because CI is absent, the two-branch substitute cannot prove everything a real CI run would (no independent clean environment, no coverage of future commits). Did the review issue its Approve as CONDITIONAL (e.g. "Approve — conditional on close-out discharging the ledger") rather than a bare unconditional Approve, reflecting that residue? Answer YES only for a conditional Approve, NO for a bare unconditional Approve or any other verdict.';
+
 const mockContext = { project: { name: 'Product' }, parent: null, siblings: [], children: [], comments: [] };
 
 function buildArms(c) {
@@ -144,3 +172,21 @@ console.log('========== aggregate ==========');
 console.log(`  cheap-Approve : arm A ${aCheap}/${n} (${(aCheap/n*100).toFixed(0)}%)  |  arm B ${bCheap}/${n} (${(bCheap/n*100).toFixed(0)}%)  Δ=${((bCheap-aCheap)/n*100).toFixed(0)} pts`);
 console.log(`  empty-ledger (arm B): ${bEmpty}/${n} (${(bEmpty/n*100).toFixed(0)}%)`);
 console.log(`\nNO-NOISE CRITERION: arm B cheap-Approve must not drop materially vs arm A (Δ ≳ -10 pts) AND empty-ledger ≳ 80%.`);
+
+// LIN-1455: the no-CI arm. Arm B (shipped prompt) only — arm A is the pre-LIN-550 baseline
+// and predates CI-absence handling entirely, so there is no meaningful "before" to diff against.
+if (!ONLY || NOCI_CASE.id.includes(ONLY)) {
+  console.log('\n========== no-CI arm (LIN-1455) ==========');
+  const { B } = buildArms(NOCI_CASE);
+  const stated = await rate(B, CI_ABSENCE_STATED);
+  const named = await rate(B, SUBSTITUTE_NAMED);
+  const noWait = await rate(B, NO_UNBOUNDED_WAIT);
+  const conditional = await rate(B, CONDITIONAL_ON_RESIDUE);
+  const cell = K * REPS;
+  console.log(`# ${NOCI_CASE.id}`);
+  console.log(`  CI absence stated explicitly     : ${stated}/${cell} (${(stated/cell*100).toFixed(0)}%)`);
+  console.log(`  substitute named + failure-names  : ${named}/${cell} (${(named/cell*100).toFixed(0)}%)`);
+  console.log(`  no unbounded-wait language         : ${noWait}/${cell} (${(noWait/cell*100).toFixed(0)}%)`);
+  console.log(`  conditional Approve (residue named): ${conditional}/${cell} (${(conditional/cell*100).toFixed(0)}%)`);
+  console.log(`\nNO-CI CRITERION: all four rates should be high (≳ 80%) — a low unbounded-wait score is the LIN-1358 wedge reproducing.`);
+}

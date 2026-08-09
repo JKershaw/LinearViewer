@@ -145,8 +145,10 @@ and a fresh session is dispatched into the same wall.
    `done` whose final words say it's *waiting* on something it kicked off (e2e running, CI in
    flight, a deploy settling) ended **while that's still in the air**, so the deliverable (the green
    run) doesn't exist yet. That's a *not-yet*, not a done: keep watching the artifact, or — if the
-   session itself has ended — send the small confirmatory follow-up (*"confirm CI went green and
-   report the run URL"*) rather than advancing on a finish line that hasn't landed. Otherwise, on a
+   session itself has ended — send the small confirmatory follow-up naming what's actually
+   outstanding (e.g. *"confirm CI went green and report the run URL"* when the repo has CI, or
+   *"confirm the no-CI substitute run and record its result"* when it does not — never assume CI
+   exists) rather than advancing on a finish line that hasn't landed. Otherwise, on a
    clean `done`, take the `[evidence]` URLs
    and any IDs and **fetch them**. Confirm the **deliverable this task was meant to produce**
    actually exists as a real *change* — and let the task's kind tell you what that deliverable
