@@ -536,11 +536,15 @@ describe('add-task link guard (LIN-341)', () => {
       isLanding: false,
       urlKey: 'test-workspace'
     });
-    // LIN-1553: Linear now derives ui.inlineCreate (session-auth createIssue),
-    // so a real project renders the in-app create form instead of the external
-    // deep-link. Assert the create affordance via its stable container testid.
+    // LIN-1553/LIN-1973: Linear derives ui.inlineCreate (session-auth
+    // createIssue), so a real project links to the dedicated /task/new page
+    // instead of the external deep-link (and, before this landing, an inline
+    // form). Assert the create affordance via its stable container testid and
+    // that it points at the drill-down page, not an inline form.
     assert.ok(result.includes('data-testid="create-task"'), 'real project should have create-task affordance');
-    assert.ok(result.includes('data-testid="create-task-form"'), 'real project renders the in-app create form');
+    assert.ok(result.includes('data-testid="create-task-trigger"'), 'renders a link, not an inline form');
+    assert.ok(/href="\/workspace\/test-workspace\/task\/new\?projectId=real-project"/.test(result), 'links to the dedicated create page, carrying the project id');
+    assert.ok(!result.includes('data-testid="create-task-form"'), 'the inline create form is gone (LIN-1973)');
   });
 
   test('__no_project__ suppresses the add-task link (latent bug fixed)', () => {
@@ -886,9 +890,11 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
       urlKey: 'ws',
       workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }]
     });
-    // LIN-1553: Linear's ui.inlineCreate is now true, so the project renders the
-    // in-app create form (the external linear.app deep-link is replaced for it).
-    assert.ok(result.includes('data-testid="create-task-form"'), 'in-app create form present for Linear');
+    // LIN-1553/LIN-1973: Linear's ui.inlineCreate is true, so the project links
+    // to the dedicated /task/new page (the external linear.app deep-link is
+    // replaced for it).
+    assert.ok(result.includes('data-testid="create-task-trigger"'), 'create-page link present for Linear');
+    assert.ok(/href="\/workspace\/ws\/task\/new\?projectId=/.test(result), 'links to the dedicated create page');
 
     const detail = renderDetailsContent(stubTree().incomplete[0].issue, {
       isLanding: false,

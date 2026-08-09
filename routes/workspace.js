@@ -27,9 +27,9 @@ function slugifyName(name) {
 
 /**
  * Starter content seeded into a fresh local workspace so it is not a dead-end.
- * There is no user-facing create-task route yet (LIN-377 follow-up), so an empty
- * local workspace would have no in-app way to add content. Shape mirrors the E2E
- * harness seed (routes/test.js).
+ * Predates the in-app create flow (LIN-1553/LIN-1973 landed the "+ Add task"
+ * page since); kept as a friendly first-run seed rather than an empty board.
+ * Shape mirrors the E2E harness seed (routes/test.js).
  * @param {string} urlKey - Workspace partition scope (also the issue URL prefix).
  */
 function starterSeed(urlKey) {
@@ -39,7 +39,7 @@ function starterSeed(urlKey) {
     ],
     issues: [
       { id: `${urlKey}-issue-1`, identifier: 'LOCAL-1', title: 'Welcome to your local workspace', description: 'This workspace is backed by the local provider — no Linear account required. It lives entirely in this app.', projectId: `${urlKey}-proj-1`, sortOrder: 1, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${urlKey}/issue/${urlKey}-issue-1` },
-      { id: `${urlKey}-issue-2`, identifier: 'LOCAL-2', title: 'Add your own tasks', description: 'Use the Linear API proxy or CLI to create issues until the in-app create flow lands.', projectId: `${urlKey}-proj-1`, parentId: `${urlKey}-issue-1`, sortOrder: 2, state: { name: 'Todo', type: 'unstarted' }, url: `/workspace/${urlKey}/issue/${urlKey}-issue-2` },
+      { id: `${urlKey}-issue-2`, identifier: 'LOCAL-2', title: 'Add your own tasks', description: 'Use the "+ Add task" affordance, the Linear API proxy, or the CLI to create issues.', projectId: `${urlKey}-proj-1`, parentId: `${urlKey}-issue-1`, sortOrder: 2, state: { name: 'Todo', type: 'unstarted' }, url: `/workspace/${urlKey}/issue/${urlKey}-issue-2` },
     ],
   }
 }

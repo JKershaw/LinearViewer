@@ -2652,6 +2652,21 @@ ${goal}`
       return badRequest.json(res, fieldError);
     }
 
+    // LIN-1973: the restrictive half of the LIN-1972 contract. A submitted
+    // stateId/priority the provider's createFields() does NOT declare is now a
+    // clean 400, not a silent drop (the one-layer-down forwarding guard below is
+    // unchanged and still applies to every OTHER undeclared field). This is safe
+    // only now that the inline create form is gone — that form submitted an
+    // unconditional priority number for every provider, which would 400 here.
+    // Checked by presence, not truthiness, so an explicit `stateId: ''` from a
+    // non-form caller is still caught.
+    if (stateId !== undefined && !fields.includes('stateId')) {
+      return badRequest.json(res, 'stateId is not supported by this provider');
+    }
+    if (priority !== undefined && !fields.includes('priority')) {
+      return badRequest.json(res, 'priority is not supported by this provider');
+    }
+
     try {
       // LIN-1972: a create has no fetched issue to derive a team from (unlike
       // the PATCH path's issueWriteGuard placeholder), so supply provider.name

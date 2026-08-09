@@ -209,16 +209,18 @@ describe('POST /workspace/:urlKey/api/issues (create)', () => {
 // createFields() capability contract (LIN-1972)
 // ---------------------------------------------------------------------------
 describe('POST /workspace/:urlKey/api/issues — createFields() capability contract (LIN-1972)', () => {
-  test('regression pin: a GitHub-shaped payload (priority: 0, no teamId) still 200s', async () => {
+  test('regression pin: a GitHub-shaped payload with no undeclared fields still 200s', async () => {
     // GitHub's real contract: ['title', 'description', 'projectId'] — no teamId,
-    // no stateId, no priority. The live inline form's priority <select> always
-    // submits a real number (0 included), so this payload must not regress.
+    // no stateId, no priority. LIN-1973 replaced the inline form (which always
+    // submitted an unconditional priority number, GitHub-undeclared or not) with
+    // the capability-derived /task/new page, which never submits a control the
+    // provider didn't declare — so this is the shape it actually sends now.
     const { provider, calls } = makeFakeProvider({
       createFields: ['title', 'description', 'projectId'],
     });
 
     const { status, body } = await postIssue(buildApp({ provider }), {
-      title: 'GitHub-shaped create', priority: 0,
+      title: 'GitHub-shaped create',
     });
 
     assert.strictEqual(status, 201);
@@ -226,7 +228,7 @@ describe('POST /workspace/:urlKey/api/issues — createFields() capability contr
     assert.strictEqual(calls.createIssue.length, 1);
     const input = calls.createIssue[0];
     assert.strictEqual('teamId' in input, false);
-    assert.strictEqual('priority' in input, false); // undeclared field dropped, not rejected
+    assert.strictEqual('priority' in input, false);
   });
 
   test('Local create: declared non-UUID stateId + no submitted teamId resolves via the provider.name placeholder, no 422', async () => {
@@ -263,6 +265,76 @@ describe('POST /workspace/:urlKey/api/issues — createFields() capability contr
     assert.strictEqual(status, 201);
     assert.strictEqual(body.success, true);
     assert.strictEqual(calls.createIssue.length, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Undeclared-field rejection (LIN-1973, restrictive half of LIN-1972's contract)
+// ---------------------------------------------------------------------------
+// Safe only now that the inline form (which submitted an unconditional priority
+// for every provider) is gone — see routes/task-create.js and the removal of
+// renderInlineCreateForm in lib/render.js.
+describe('POST /workspace/:urlKey/api/issues — undeclared stateId/priority is REJECTED (LIN-1973)', () => {
+  test('a submitted stateId the provider does NOT declare is 400, not silently dropped', async () => {
+    const { provider, calls } = makeFakeProvider({
+      createFields: ['title', 'description', 'projectId'], // GitHub-shaped: no stateId
+    });
+    const { status, body } = await postIssue(buildApp({ provider }), {
+      title: 'attempt undeclared state', stateId: 'started',
+    });
+    assert.strictEqual(status, 400);
+    assert.match(body.error, /stateId/i);
+    assert.strictEqual(calls.createIssue.length, 0, 'rejected before any provider write');
+  });
+
+  test('a submitted priority the provider does NOT declare is 400, not silently dropped', async () => {
+    const { provider, calls } = makeFakeProvider({
+      createFields: ['title', 'description', 'projectId'], // GitHub-shaped: no priority
+    });
+    const { status, body } = await postIssue(buildApp({ provider }), {
+      title: 'attempt undeclared priority', priority: 2,
+    });
+    assert.strictEqual(status, 400);
+    assert.match(body.error, /priority/i);
+    assert.strictEqual(calls.createIssue.length, 0);
+  });
+
+  test('priority: 0 (falsy but present) is still caught — presence, not truthiness, gates the rejection', async () => {
+    const { provider, calls } = makeFakeProvider({
+      createFields: ['title', 'description', 'projectId'],
+    });
+    const { status } = await postIssue(buildApp({ provider }), {
+      title: 'falsy undeclared priority', priority: 0,
+    });
+    assert.strictEqual(status, 400);
+    assert.strictEqual(calls.createIssue.length, 0);
+  });
+
+  test('a DECLARED stateId/priority is unaffected — still forwarded, no 400', async () => {
+    const { provider, calls } = makeFakeProvider(); // full Linear-shaped contract
+    const { status, body } = await postIssue(buildApp({ provider }), {
+      teamId: TEAM_UUID, title: 'declared fields', stateId: '00000000-0000-0000-0000-0000000000dd', priority: 1,
+    });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(calls.createIssue.length, 1);
+  });
+
+  test('an out-of-range priority still 400s via the existing range validator BEFORE the new undeclared-field gate', async () => {
+    // Documents the pre-existing exception the LIN-1972 review flagged:
+    // validateIssueWriteFields(..., {validatePriority: true}) runs first and
+    // already 400s an out-of-range priority even for a provider that doesn't
+    // declare priority at all (GitHub) — unchanged by this landing. The new
+    // gate only adds coverage for an IN-RANGE-but-undeclared value.
+    const { provider, calls } = makeFakeProvider({
+      createFields: ['title', 'description', 'projectId'],
+    });
+    const { status, body } = await postIssue(buildApp({ provider }), {
+      title: 'out of range and undeclared', priority: 99,
+    });
+    assert.strictEqual(status, 400);
+    assert.match(body.error, /priority must be an integer between 0 and 4/i);
+    assert.strictEqual(calls.createIssue.length, 0);
   });
 });
 
