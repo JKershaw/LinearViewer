@@ -23,8 +23,9 @@
  *   ... --no-cache             ignore the on-disk detail cache
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join, basename, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { parseTranscriptLines, sessionSpend, partitionByDispatchTime, __internal } from '../lib/transcript-spend.js';
 import { decomposeEffort } from '../lib/wall-clock-summary.js';
 import { classifyUpstreamError } from '../lib/errors.js';
@@ -391,6 +392,6 @@ function printReport(results, rep) {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   main().catch((e) => { console.error(e); process.exit(1); });
 }
