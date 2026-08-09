@@ -524,7 +524,7 @@ describe('E. sufficiency floor and freeze-list shape', () => {
   test('the freeze list is returned whole, with window and definition echoed verbatim', () => {
     const r = run([source('s', '2026-06-15T00:00:00.000Z')]);
     assert.deepEqual(Object.keys(r).sort(), [
-      'arms', 'codeVersion', 'definition', 'denominator', 'diagnostics', 'distinctPeers',
+      'arms', 'codeVersion', 'completeness', 'definition', 'denominator', 'diagnostics', 'distinctPeers',
       'matured7d', 'minDenominator', 'minNumerator', 'numerator', 'planScoped', 'primary',
       'ratio', 'scale', 'sufficient', 'window',
     ]);
@@ -546,6 +546,14 @@ describe('E. sufficiency floor and freeze-list shape', () => {
     assert.equal(r.diagnostics.skipped, 0);
     assert.equal(run([], { skipped: ['a', 'b'] }).diagnostics.skipped, 2);
     assert.equal(r.scale.totalIssues, 1);
+  });
+
+  test('LIN-1984: completeness is a top-level, advisory sibling of diagnostics', () => {
+    const clean = run([source('s', '2026-06-15T00:00:00.000Z')]);
+    assert.deepEqual(clean.completeness, { attempted: 1, read: 1, skipped: 0, complete: true });
+
+    const withSkips = run([source('s', '2026-06-15T00:00:00.000Z')], { skipped: [{ id: 'a' }, { id: 'b' }] });
+    assert.deepEqual(withSkips.completeness, { attempted: 3, read: 1, skipped: 2, complete: false });
   });
 });
 

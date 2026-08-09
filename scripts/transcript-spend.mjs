@@ -23,10 +23,12 @@
  *   ... --no-cache             ignore the on-disk detail cache
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join, basename, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { parseTranscriptLines, sessionSpend, partitionByDispatchTime, __internal } from '../lib/transcript-spend.js';
 import { decomposeEffort } from '../lib/wall-clock-summary.js';
+import { classifyUpstreamError } from '../lib/errors.js';
 
 const BASE = process.env.PROXY_BASE || 'https://projects.jkershaw.com/api/proxy';
 const TOKEN = process.env.PROXY_TOKEN;
@@ -49,15 +51,35 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ─── proxy fetch (cached, rate-limited to the 60/min proxy cap) ──────────────
 let calls = 0;
-async function proxy(path) {
+export async function proxy(path) {
   const cacheFile = join(CACHE, path.replace(/[^\w.-]/g, '_') + '.json');
   if (USE_CACHE && existsSync(cacheFile)) return JSON.parse(readFileSync(cacheFile, 'utf8'));
   if (++calls % 55 === 0) { log('  …rate-limit pause 60s'); await sleep(60_000); }
   const res = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
-  if (!res.ok) throw new Error(`${path} → ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(`${path} → ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
   const body = await res.json();
   writeFileSync(cacheFile, JSON.stringify(body));
   return body;
+}
+
+// `complete` covers every path that can drop a row from `results` — both the
+// dispatch-detail loop (`detailSkipped`) AND the transcript-parse loop
+// (`transcriptSkipped`, e.g. an unreadable/corrupt transcript file). A run
+// that silently lost transcripts must not report `complete: true` (LIN-1984
+// review F7): before this, `complete` covered only `detailSkipped` and would
+// read `true` over an artifact whose `sessions` were quietly empty.
+export function computeCompleteness({ attempted, joined, detailSkipped, transcriptSkipped }) {
+  return {
+    attempted,
+    joined,
+    detailSkipped: detailSkipped.length,
+    transcriptSkipped: transcriptSkipped.length,
+    complete: detailSkipped.length === 0 && transcriptSkipped.length === 0,
+  };
 }
 
 const LAUNCH_RE = /session\s+launched\s*\(session:\s*([0-9a-f]{6,})/i;
@@ -109,10 +131,20 @@ async function main() {
 
   log('Fetching item details (for join marker + kind + outcome)…');
   const joinByPrefix = new Map(); // 8hex prefix → dispatch meta
+  const detailSkipped = [];
   let n = 0;
   for (const [id, row] of items) {
     let detail;
-    try { detail = await proxy(`/dispatch/${id}`); } catch (e) { continue; }
+    try {
+      detail = await proxy(`/dispatch/${id}`);
+    } catch (e) {
+      // A non-retryable failure (auth, etc.) is total and would corrupt the
+      // rest of this pass too — fail loud via main().catch rather than
+      // silently drop this item and every one after it (LIN-1984).
+      if (!classifyUpstreamError(e).retryable) throw e;
+      detailSkipped.push({ id, reason: e.message });
+      continue;
+    }
     const prefix = launchedPrefix(detail.feedback);
     if (!prefix) continue;
     joinByPrefix.set(prefix, {
@@ -167,6 +199,7 @@ async function main() {
 
   log('Parsing transcripts + computing spend…');
   const results = [];
+  const transcriptSkipped = [];
   for (const j of joined) {
     try {
       const lines = readFileSync(j.path, 'utf8').split('\n');
@@ -184,12 +217,16 @@ async function main() {
                      dispatchedAt: j.dispatchedAt || null, // LIN-1241: before/after key
                      d2OnboardShare, d2HasBeats: !!d2.hasBeats,
                      sizeKb: Math.round(statSync(j.path).size / 1024), subagentCount: j.subagents.length });
-    } catch (e) { log(`  skip ${j.sessionId.slice(0, 8)}: ${e.message}`); }
+    } catch (e) {
+      log(`  skip ${j.sessionId.slice(0, 8)}: ${e.message}`);
+      transcriptSkipped.push({ sessionId: j.sessionId, reason: e.message });
+    }
   }
 
   const report = buildReport(results);
   const beforeAfter = BOUNDARY ? buildBeforeAfter(results, BOUNDARY) : null;
-  if (AS_JSON) { console.log(JSON.stringify({ sessions: results, report, beforeAfter }, null, 2)); return; }
+  const completeness = computeCompleteness({ attempted: items.size, joined: joined.length, detailSkipped, transcriptSkipped });
+  if (AS_JSON) { console.log(JSON.stringify({ sessions: results, report, beforeAfter, completeness }, null, 2)); return; }
   printReport(results, report);
   if (beforeAfter) printBeforeAfter(beforeAfter);
 }
@@ -370,4 +407,6 @@ function printReport(results, rep) {
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}

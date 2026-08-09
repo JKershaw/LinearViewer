@@ -77,11 +77,12 @@
  */
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { computeFollowOnRatio } from '../lib/follow-on-ratio.js';
+import { classifyUpstreamError } from '../lib/errors.js';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -152,9 +153,13 @@ function readCodeVersion() {
 /**
  * One GET with Bearer auth, retried on 429 AND 5xx up to `tries` attempts with
  * a widening backoff. Returns null when `tolerate` is set and every attempt
- * failed, so one bad issue cannot lose a 29-minute pass; throws otherwise.
+ * failed AND the failure is classified retryable, so one bad issue cannot
+ * lose a 29-minute pass; throws otherwise. A non-retryable failure (401/403
+ * auth, 400/404/422, …) always throws regardless of `tolerate` — it is total
+ * and will not improve on a re-read, so silently skipping it would corrupt
+ * the published artifact instead of just costing a retry (LIN-1984).
  */
-async function getJson(url, token, { tries = 4, tolerate = false } = {}) {
+export async function getJson(url, token, { tries = 4, tolerate = false } = {}) {
   let lastErr = null;
   for (let attempt = 0; attempt < tries; attempt++) {
     let res;
@@ -174,7 +179,8 @@ async function getJson(url, token, { tries = 4, tolerate = false } = {}) {
     if (!res.ok) {
       const body = await res.text();
       const err = new Error(`proxy ${res.status} on ${url}: ${body.slice(0, 200)}`);
-      if (tolerate) return null;
+      err.status = res.status;
+      if (tolerate && classifyUpstreamError(err).retryable) return null;
       throw err;
     }
     return res.json();
@@ -382,4 +388,6 @@ async function main() {
   else console.log(render(result, meta));
 }
 
-main().catch((e) => { console.error(e?.message || e); process.exit(1); });
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main().catch((e) => { console.error(e?.message || e); process.exit(1); });
+}
