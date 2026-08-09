@@ -10,7 +10,10 @@
  */
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { getJson } from '../../scripts/plan-review-round-trips.mjs';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { getJson, fetchAll } from '../../scripts/plan-review-round-trips.mjs';
 
 describe('getJson — non-retryable vs retryable (LIN-1984)', () => {
   let realFetch;
@@ -53,5 +56,32 @@ describe('getJson — non-retryable vs retryable (LIN-1984)', () => {
     globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ hello: 'world' }) });
     const result = await getJson('https://proxy.example/issues/x', 'tok', { tolerate: true });
     assert.deepEqual(result, { hello: 'world' });
+  });
+});
+
+describe('fetchAll — cache-hit path with a pre-existing cache entry (LIN-1984 review F1)', () => {
+  let realFetch;
+  let cacheDir;
+  afterEach(() => { globalThis.fetch = realFetch; rmSync(cacheDir, { recursive: true, force: true }); });
+  beforeEach(() => {
+    realFetch = globalThis.fetch;
+    cacheDir = mkdtempSync(join(tmpdir(), 'plan-review-round-trips-cache-test-'));
+  });
+
+  test('a cache file written before the `skipped` field existed does not crash fetchAll', async () => {
+    globalThis.fetch = async () => { throw new Error('fetchAll should not hit the network on a cache hit'); };
+    const row = { id: 'issue-1', identifier: 'LIN-1', state: { type: 'completed' } };
+    // Pre-LIN-1984 cache shape: no `skipped` key at all.
+    writeFileSync(join(cacheDir, 'issue-1.json'), JSON.stringify({
+      id: 'issue-1', identifier: 'LIN-1', description: '', comments: [], rows: [],
+    }));
+
+    const { issues, skipped } = await fetchAll(
+      [row],
+      { base: 'https://proxy.example', token: 'tok', cache: cacheDir, noCache: false },
+    );
+
+    assert.equal(issues.length, 1);
+    assert.deepEqual(skipped, []);
   });
 });

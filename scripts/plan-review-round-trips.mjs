@@ -42,7 +42,7 @@
  */
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
@@ -258,7 +258,7 @@ async function fetchIssuePlanReviewShape(row, { base, token, cache, noCache }, c
   return shaped;
 }
 
-async function fetchAll(listRows, args) {
+export async function fetchAll(listRows, args) {
   if (!args.noCache) mkdirSync(args.cache, { recursive: true });
   const issues = [];
   const skipped = [];
@@ -273,8 +273,8 @@ async function fetchAll(listRows, args) {
       log(`  ⚠ skipped ${shaped.identifier || shaped.id} — detail fetch failed`);
     } else {
       issues.push(shaped);
-      if (shaped.skipped.length) {
-        skipped.push(...shaped.skipped);
+      if (shaped.skipped?.length) {
+        skipped.push(...(shaped.skipped || []));
         log(`  ⚠ ${shaped.identifier || shaped.id} — ${shaped.skipped.length} within-issue read(s) failed`);
       }
     }
@@ -379,6 +379,6 @@ async function main() {
   else console.log(render(result, meta));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   main().catch((e) => { console.error(e?.message || e); process.exit(1); });
 }
