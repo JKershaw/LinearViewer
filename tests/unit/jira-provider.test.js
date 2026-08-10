@@ -1053,7 +1053,11 @@ describe('JiraProvider reads (fake client)', () => {
     assert.equal(result.projects[0].id, '30001')
     assert.equal(result.projects[0].name, 'Platform Epic')
     assert.equal(result.projects[0].url, `${SITE}/browse/ENG-9`, 'project url is the epic\'s own browsable /browse/ link')
-    assert.equal(result.issues.length, 3, 'ENG-1, ENG-2, and the epic ENG-9 itself (it is part of the same project-scoped batch)')
+    // LIN-2011 review finding F1: the epic itself (ENG-9) is excluded from
+    // `issues` — it already surfaces as the canonical project above, and
+    // including it too double-rendered it (project header + "No Project" row).
+    assert.equal(result.issues.length, 2, 'ENG-1 and ENG-2 only — the epic ENG-9 is not also an issue')
+    assert.ok(!result.issues.some(i => i.identifier === 'ENG-9'), 'the epic must not double-render as an ungrouped issue')
     for (const issue of result.issues) assert.equal(issue.source, SOURCE_JIRA)
 
     const parent = result.issues.find(i => i.identifier === 'ENG-1')
@@ -1102,7 +1106,7 @@ describe('JiraProvider reads (fake client)', () => {
     const result = await multi.fetchProjects(scope, 'ENG')
     assert.equal(result.projects.length, 1)
     assert.equal(result.projects[0].id, '30001', 'the ENG epic, not the ENG Jira project (LIN-2011)')
-    assert.deepEqual(result.issues.map(i => i.identifier).sort(), ['ENG-1', 'ENG-9'], 'OPS-1/OPS-9 must be absent — the read is genuinely scoped, not filtered client-side')
+    assert.deepEqual(result.issues.map(i => i.identifier).sort(), ['ENG-1'], 'OPS-1/OPS-9 must be absent (scoped read) and ENG-9 must be absent too (F1: the epic is not also an issue)')
     assert.equal(listAllCalls.count, 0, 'a team-scoped read must use getProject, never the full listAllProjects walk')
   })
 
@@ -1113,7 +1117,8 @@ describe('JiraProvider reads (fake client)', () => {
     // LIN-2011: each Jira project's OWN epic surfaces as its canonical
     // project — 30001 (ENG-9) and 40002 (OPS-9), not the Jira project ids.
     assert.deepEqual(result.projects.map(p => p.id).sort(), ['30001', '40002'])
-    assert.deepEqual(result.issues.map(i => i.identifier).sort(), ['ENG-1', 'ENG-9', 'OPS-1', 'OPS-9'])
+    // F1: neither epic (ENG-9, OPS-9) is also an issue — each is a project header only.
+    assert.deepEqual(result.issues.map(i => i.identifier).sort(), ['ENG-1', 'OPS-1'])
   })
 
   test('fetchProjects(scope, teamId) preserves the truncated flag (LIN-2006) on the SCOPED branch too', async () => {
@@ -1394,6 +1399,24 @@ describe('JiraProvider — company-managed legacy "Epic Link" resolution (LIN-20
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
     await provider.fetchIssueFields(scope, 'ENG-2') // native subtask parent (ENG-1) — no legacy fallback needed
     assert.equal(listFieldsCalls.count, 0)
+  })
+
+  // LIN-2011 review finding F2: fetchIssueContext used to call
+  // _resolveEpicLinkFieldId unconditionally but never threaded epicByKey
+  // through to _toCanonicalIssue, so the legacy resolution could never
+  // actually resolve — a dead branch that still paid for a listFields()
+  // round trip on every detail read. Fixed by removing the call entirely
+  // (children are native subtasks, which cannot carry a legacy Epic Link).
+  test('fetchIssueContext never calls listFields() — the legacy Epic Link path was dead code (F2)', async () => {
+    const client = companyManagedClient()
+    const listFieldsCalls = { count: 0 }
+    const original = client.listFields.bind(client)
+    client.listFields = async (...args) => { listFieldsCalls.count += 1; return original(...args) }
+    const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+
+    await provider.fetchIssueContext(scope, 'CMP-1')
+    assert.equal(listFieldsCalls.count, 0, 'fetchIssueContext must not pay for legacy Epic Link discovery on any read')
   })
 })
 

@@ -39,6 +39,22 @@ test.describe('Jira provider (no test-token mock)', () => {
     await expect(page.locator('.line:has-text("Subtask of the in-progress task")').first()).toBeAttached();
   });
 
+  // LIN-2011 review finding F1: the epic (ENG-0) used to surface BOTH as the
+  // canonical project header AND as an ungrouped issue row in "No Project"
+  // (its own canonical `project` is null — an epic has no epic parent).
+  // ENG-0's summary is deliberately "Engineering", matching the project
+  // header text, so a double-render would show up as a second "Engineering"
+  // row rather than just an extra unrelated line.
+  test('the epic does not double-render as an ungrouped "No Project" issue (F1)', async ({ page }) => {
+    await expect(page.locator('.project-header:has-text("Engineering")')).toHaveCount(1);
+    const noProjectGroup = page.locator('.project[data-id="__no_project__"]');
+    await expect(noProjectGroup.locator('.line:has-text("Engineering")')).toHaveCount(0);
+    // The "No Project" group still exists and holds the genuinely project-less
+    // issues (ENG-3/5/6 carry neither a native nor legacy epic link) — the
+    // fix removes the epic from `issues`, it doesn't remove the group itself.
+    await expect(noProjectGroup.locator('.line:has-text("Jira task shipped")').first()).toBeAttached();
+  });
+
   test('detail link is provider-aware: "View in Jira" (not Linear) — the ui.displayName trap, rendered', async ({ page }) => {
     // render.js interpolates provider.ui.displayName into the detail link. The
     // detail block is lazy — expand an issue to load it first.
