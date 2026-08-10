@@ -313,6 +313,33 @@ test.describe('Proxy API — local workspace e2e (LIN-584)', () => {
     expect(comments.some(c => c.id === recreateBody.comment.id)).toBe(true);
   });
 
+  test('comments: dedupe invalidation survives mixed issue-id forms — create via identifier, delete via raw id (LIN-2005)', async ({ request }) => {
+    const body = 'Mixed-id-form comment body';
+
+    // Create addressed via the identifier form (LOCAL-1)...
+    const first = await write(request, 'post', '/api/proxy/issues/LOCAL-1/comments', { body });
+    expect(first.status()).toBe(201);
+    const firstId = (await first.json()).comment.id;
+
+    // ...but delete addressed via the LocalStore's underlying raw id (i1),
+    // per the seed at the top of this file. Per-issue-id-keyed invalidation
+    // would bump a different generation key than the create used, leaving
+    // the create's dedupe entry live — exactly the LIN-2005 bug.
+    const del = await write(request, 'delete', `/api/proxy/issues/i1/comments/${firstId}`);
+    expect(del.status()).toBe(200);
+
+    const recreate = await write(request, 'post', '/api/proxy/issues/LOCAL-1/comments', { body });
+    expect(recreate.status()).toBe(201);
+    const recreateBody = await recreate.json();
+    expect(recreateBody.deduped).toBeFalsy();
+    expect(recreateBody.comment.id).not.toBe(firstId);
+
+    const after = await read(request, '/api/proxy/issues/LOCAL-1');
+    const comments = (await after.json()).comments;
+    expect(comments.some(c => c.id === firstId)).toBe(false);
+    expect(comments.some(c => c.id === recreateBody.comment.id)).toBe(true);
+  });
+
   // ---- Writes: description splices -----------------------------------------
 
   test('description/append adds a block, preserving the existing body', async ({ request }) => {

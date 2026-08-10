@@ -14,8 +14,7 @@
 
 import { Router, json } from 'express';
 import rateLimit from 'express-rate-limit';
-import { randomUUID } from 'crypto';
-import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
+import { createDedupeCache, createGenerationTracker, dedupeKey } from '../lib/proxy-dedupe.js';
 import { describeCredentialResolution } from '../lib/credential-diagnostics.js';
 import { deriveTerminalStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.js';
@@ -311,6 +310,43 @@ function buildMockBriefFromContext(context) {
 // collapses to the first comment instead of minting a duplicate, so a
 // consumer that retries after a lost response gets the original back.
 const commentDedupe = createDedupeCache();
+
+/**
+ * Per-workspace generation tag for comment dedupe invalidation (LIN-1160,
+ * widened to workspace-only keying by LIN-2005).
+ *
+ * `commentDedupe` above has no delete/invalidate method, and Linear's
+ * `commentDelete` mutation returns no comment body — so a delete route has no
+ * way to reconstruct the exact `dedupeKey(...)` a prior create would have
+ * used, only to invalidate coarsely. `POST .../comments` folds the current
+ * tag for the request's workspace into its `dedupeKey(...)` call;
+ * `DELETE`/`PATCH .../comments/:commentId` mint a fresh tag on success. Every
+ * prior dedupe entry for that WORKSPACE then silently stops matching (cache
+ * miss -> fresh mint), regardless of which issue or comment changed.
+ *
+ * Keyed on workspace (`req.proxyUrlKey`) only, NOT `(urlKey, issueId)`:
+ * neither the delete nor the edit route resolves `issueId` to a canonical
+ * issue identity (Linear's `updateComment`/`deleteComment` and the Local
+ * provider's equivalents take only `commentId`; `issueId` is validated for
+ * format only), so a create/delete pair using different id forms for the
+ * SAME issue (e.g. `LIN-123` vs its UUID) would bump a different per-issue
+ * key than the create used, leaving the create's dedupe entry live and
+ * letting a re-create within the TTL echo back a deleted/edited comment as a
+ * false fresh success. Keying on workspace alone is immune to id form. The
+ * tradeoff is coarser blast radius — a delete/edit on any issue resets every
+ * issue's dedupe window in that workspace — never a stale success; the safe
+ * direction to err per the LIN-399 no-misleading-success contract.
+ *
+ * Module scope (not inside `createProxyRoutes`) so a second factory call
+ * shares invalidation state with `commentDedupe` rather than diverging from
+ * it. Eviction is sized effectively unreachable for workspace cardinality
+ * (bounded by resolved tokens, not attacker-controlled input) — unlike
+ * `credentialResolutions` below, a lost generation here is not merely a
+ * logging fingerprint: falling back to the pre-bump value would resurrect a
+ * dedupe entry a bump was meant to kill, so this tracker must never evict in
+ * practice.
+ */
+const commentDedupeGenerations = createGenerationTracker();
 
 // Rate limiters
 // Note: proxyLimiter is applied before authenticateProxyToken on consumer
@@ -952,48 +988,6 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     credentialResolutions.set(key, describeCredentialResolution(descriptorInput));
     if (credentialResolutions.size > RESOLUTION_TRAIL_LIMIT) {
       credentialResolutions.delete(credentialResolutions.keys().next().value);
-    }
-  }
-
-  /**
-   * Per-(urlKey, issueId) generation tag for comment dedupe invalidation
-   * (LIN-1160).
-   *
-   * `commentDedupe` (lib/proxy-dedupe.js) has no delete/invalidate method, and
-   * Linear's `commentDelete` mutation returns no comment body — so a delete
-   * route has no way to reconstruct the exact `dedupeKey(...)` a prior create
-   * would have used, only to invalidate coarsely. `POST .../comments` folds
-   * the current tag for `(urlKey, issueId)` into its `dedupeKey(...)` call;
-   * `DELETE`/`PATCH .../comments/:commentId` mint a fresh tag on success. Every
-   * prior dedupe entry for that issue then silently stops matching (cache miss
-   * -> fresh mint) regardless of which specific comment changed — deliberately
-   * per-issue, not per-comment, because fetching the comment first just to
-   * compute a precise key to invalidate costs a network round-trip for a
-   * 5-minute-TTL correctness edge case. This can never return stale/deleted
-   * data as a fresh success; the tradeoff is an occasional avoidable duplicate
-   * create within the TTL window right after an edit — the safe direction to
-   * err per the LIN-399 no-misleading-success contract. Same bounded-Map
-   * eviction pattern as `credentialResolutions` above.
-   */
-  const COMMENT_DEDUPE_GEN_LIMIT = 256;
-  const commentDedupeGenerations = new Map();
-
-  function commentDedupeGenKey(urlKey, issueId) {
-    return `${urlKey ?? ''} ${issueId ?? ''}`;
-  }
-
-  function currentCommentDedupeGen(urlKey, issueId) {
-    return commentDedupeGenerations.get(commentDedupeGenKey(urlKey, issueId)) || '';
-  }
-
-  function bumpCommentDedupeGen(urlKey, issueId) {
-    const key = commentDedupeGenKey(urlKey, issueId);
-    // Re-insert so the most recently used key moves to the back of the
-    // eviction order, same rationale as recordCredentialResolution above.
-    commentDedupeGenerations.delete(key);
-    commentDedupeGenerations.set(key, randomUUID());
-    if (commentDedupeGenerations.size > COMMENT_DEDUPE_GEN_LIMIT) {
-      commentDedupeGenerations.delete(commentDedupeGenerations.keys().next().value);
     }
   }
 
@@ -1784,8 +1778,9 @@ POST ${baseUrl}/api/proxy/issues/{issueId}/comments
   → { "success": true, "comment": { "id": "...", "body": "...", "createdAt": "...", "user": { "name": "..." } } }
   → Deduped within a short window: a repeat of the same (issue + body) returns the
     original comment with "deduped": true and HTTP 200 (not 201) — no duplicate is created.
-    Deleting or editing a comment invalidates that window for the issue, so a re-post
-    right after either one always mints a fresh comment.
+    Deleting or editing ANY comment in the workspace invalidates EVERY issue's dedupe
+    window in that workspace (a workspace-wide reset, not scoped to the edited comment's
+    own issue), so a re-post right after either one always mints a fresh comment.
 
 DELETE ${baseUrl}/api/proxy/issues/{issueId}/comments/{commentId}
   → Remove a comment. commentId is the comment's own id (the \`id\` field on each
@@ -3019,9 +3014,10 @@ One convention across every endpoint, so you can branch on the same fields every
 
       // Deterministic dedupe (LIN-399): if an identical comment was just
       // created for this issue, return that one instead of minting a duplicate.
-      // The generation tag (LIN-1160) folds in so a delete/edit on this issue
-      // invalidates every prior dedupe entry for it (see bumpCommentDedupeGen).
-      const key = dedupeKey(req.proxyUrlKey, issueId, body, currentCommentDedupeGen(req.proxyUrlKey, issueId));
+      // The generation tag (LIN-1160/LIN-2005) folds in so a delete/edit
+      // anywhere in this workspace invalidates every prior dedupe entry in it
+      // (see commentDedupeGenerations above).
+      const key = dedupeKey(req.proxyUrlKey, issueId, body, commentDedupeGenerations.current(req.proxyUrlKey));
       const prior = commentDedupe.get(key);
       if (prior) {
         logEvent(req, '/api/proxy/issues/comments', 200);
@@ -3075,7 +3071,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const commentDelete = await provider.deleteComment(token, commentId);
       if (writeRejected(req, res, '/api/proxy/issues/comments', commentDelete, 'Comment was not deleted')) return;
-      bumpCommentDedupeGen(req.proxyUrlKey, issueId);
+      commentDedupeGenerations.bump(req.proxyUrlKey);
       logEvent(req, '/api/proxy/issues/comments', 200);
       res.json(commentDelete);
     } catch (err) {
@@ -3123,7 +3119,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
       const commentUpdate = normalizeWritePayload(await provider.updateComment(token, commentId, body), 'comment');
       if (writeRejected(req, res, '/api/proxy/issues/comments', commentUpdate, 'Comment was not updated')) return;
-      bumpCommentDedupeGen(req.proxyUrlKey, issueId);
+      commentDedupeGenerations.bump(req.proxyUrlKey);
       logEvent(req, '/api/proxy/issues/comments', 200);
       res.status(200).json(commentUpdate);
     } catch (err) {

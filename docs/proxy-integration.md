@@ -1330,7 +1330,7 @@ Returns `201`:
 }
 ```
 
-Posting the same `(issue + body)` again within a short window does not create a second comment — the original is returned with `"deduped": true` and HTTP `200` (not `201`). This makes a confirming retry after a lost response safe. Deleting or editing a comment invalidates that dedupe window for the issue, so a re-post right after either one always mints a fresh comment rather than echoing stale data.
+Posting the same `(issue + body)` again within a short window does not create a second comment — the original is returned with `"deduped": true` and HTTP `200` (not `201`). This makes a confirming retry after a lost response safe. Deleting or editing *any* comment in the workspace invalidates *every* issue's dedupe window in that workspace (a workspace-wide reset, not scoped to the edited comment's own issue), so a re-post right after either one always mints a fresh comment rather than echoing stale data.
 
 #### Delete Comment
 
