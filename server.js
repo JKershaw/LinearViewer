@@ -1157,7 +1157,7 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, openRoute
   const deployInfo = getDeployInfo()
   // Pass urlKey so the periodicals group renders consistently after a token
   // refresh, matching the primary dashboard route (LIN-341).
-  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
+  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
@@ -1167,7 +1167,8 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, openRoute
     urlKey: workspace.urlKey,
     featureFlags: getFeatureFlags(session),
     customPrompts,
-    showSource
+    showSource,
+    truncated
   });
   return res.send(html);
 }
