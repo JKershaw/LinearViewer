@@ -117,6 +117,51 @@ describe('shouldAttemptRefresh cooldown', () => {
     registry.markSuspect('fp-a'); // another rejection arrives, well within cooldown
     assert.equal(registry.shouldAttemptRefresh('fp-a'), false, 'cooldown is still governed by the original attempt time');
   });
+
+  describe('scope-keyed cooldown (LIN-1980 review F1)', () => {
+    test('a scope cooldown bounds attempts across DIFFERENT fingerprints sharing the same scope key', () => {
+      let now = 1000;
+      const registry = createRejectedCredentialRegistry({ refreshCooldownMs: 60_000, now: () => now });
+      registry.markSuspect('fp-a');
+      assert.equal(registry.shouldAttemptRefresh('fp-a', 'owner:workspace'), true, 'first attempt for this scope is allowed');
+      // fp-a is superseded by a brand-new fingerprint (e.g. a rotated OAuth
+      // token) that is ALSO rejected — a fresh mark with no attempt history
+      // of its own, the exact shape of the reviewed flaw.
+      registry.accept('fp-a');
+      registry.markSuspect('fp-b');
+      now += 1_000; // still well within the cooldown window
+      assert.equal(registry.shouldAttemptRefresh('fp-b', 'owner:workspace'), false, 'the scope cooldown blocks a second attempt this window even though fp-b has no attempt history of its own');
+    });
+
+    test('the scope cooldown is per-scope: a DIFFERENT (owner, workspace) scope gets its own independent attempt', () => {
+      let now = 1000;
+      const registry = createRejectedCredentialRegistry({ refreshCooldownMs: 60_000, now: () => now });
+      registry.markSuspect('fp-a');
+      registry.markSuspect('fp-c');
+      assert.equal(registry.shouldAttemptRefresh('fp-a', 'owner:workspace-1'), true);
+      assert.equal(registry.shouldAttemptRefresh('fp-c', 'owner:workspace-2'), true, 'an unrelated workspace is not blocked by another workspace\'s cooldown');
+    });
+
+    test('once the scope cooldown elapses, a churned fingerprint can attempt again', () => {
+      let now = 1000;
+      const registry = createRejectedCredentialRegistry({ refreshCooldownMs: 60_000, now: () => now });
+      registry.markSuspect('fp-a');
+      registry.shouldAttemptRefresh('fp-a', 'owner:workspace');
+      registry.accept('fp-a');
+      registry.markSuspect('fp-b');
+      now += 60_001;
+      assert.equal(registry.shouldAttemptRefresh('fp-b', 'owner:workspace'), true, 'cooldown elapsed for the scope');
+    });
+
+    test('omitting scopeKey preserves the old per-fingerprint-only behaviour (backward compatible)', () => {
+      let now = 1000;
+      const registry = createRejectedCredentialRegistry({ refreshCooldownMs: 60_000, now: () => now });
+      registry.markSuspect('fp-a');
+      registry.accept('fp-a');
+      registry.markSuspect('fp-b');
+      assert.equal(registry.shouldAttemptRefresh('fp-b'), true, 'no scopeKey means no scope-level gate');
+    });
+  });
 });
 
 describe('accept', () => {

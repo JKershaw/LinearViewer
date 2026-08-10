@@ -127,7 +127,7 @@ async function candidateResolve({ collection, urlKey, ownerAccountId, refreshAcc
 async function attemptSuspectRefresh({ fingerprint, urlKey, ownerAccountId, registry, refreshAccessToken, persistSession, store, loadSessions }) {
   if (ownerAccountId === UNSCOPED) return null;
   if (!registry.isSuspect(fingerprint)) return null;
-  if (!registry.shouldAttemptRefresh(fingerprint)) return null;
+  if (!registry.shouldAttemptRefresh(fingerprint, `${ownerAccountId}:${urlKey}`)) return null;
   try {
     const sessions = await loadSessions();
     const refreshed = await refreshOwnerWorkspaceToken({
@@ -312,6 +312,59 @@ describe('LIN-1980 non-worsening acceptance witness', () => {
     }
     assert.ok(served.every(t => t === 'dead-github-token'));
   });
+
+  test('REPLACEMENT ADOPTED BUT STILL REJECTED world: refresh attempts stay bounded across N requests, not one OAuth rotation per request (LIN-1980 review F1)', async () => {
+    // The reviewed flaw: the per-fingerprint cooldown alone does not bound
+    // attempts once a replacement is adopted. `accept()` deletes the
+    // superseded fingerprint's cooldown entry, so a freshly-marked
+    // replacement fingerprint starts with `lastAttemptAt: null` — and if the
+    // provider keeps rejecting the credential for a reason a refresh cannot
+    // fix (a routine 403 collapsed to 401 against a healthy-but-scope-limited
+    // credential, not a freshness problem), every refresh succeeds at
+    // minting a NEW token/fingerprint that is immediately rejected again,
+    // re-arming the per-fingerprint gate on every single request. The
+    // reviewer's own harness measured 29 OAuth rotations across 30 requests
+    // against this PR's real modules before the fix below.
+    const collection = inMemorySessionsCollection([liveButDeadSessionRow()]);
+    let durableRecord = { provider: 'linear', token: 'dead-upstream-token', refreshToken: 'refresh-0', tokenExpiresAt: Date.now() - 1000 };
+    const store = {
+      async get() { return durableRecord; },
+      async putIfRefreshToken(accountId, urlKey, expected, next) {
+        if (!durableRecord || durableRecord.refreshToken !== expected) return false;
+        durableRecord = { ...durableRecord, ...next };
+        return true;
+      },
+    };
+    let rotation = 0;
+    let refreshAttempts = 0;
+    const refreshAccessToken = async () => {
+      // Every call SUCCEEDS — a genuine OAuth rotation, exactly like a real
+      // refresh token that still works — but the newly-minted token is
+      // STILL rejected upstream, because the rejection was never about
+      // freshness in the first place.
+      refreshAttempts++;
+      rotation++;
+      return { access_token: `rotated-token-${rotation}`, refresh_token: `rotated-refresh-${rotation}`, expires_in: 3600 };
+    };
+    const persistSession = makePersistSessionRow(collection);
+    let now = 1_000;
+    const registry = createRejectedCredentialRegistry({ now: () => now });
+    const cache = createWorkspaceTokenCache({ now: () => now });
+
+    const served = [];
+    for (let i = 0; i < 30; i++) {
+      const c = await candidateResolve({ collection, urlKey: URL_KEY, ownerAccountId: ACCOUNT, refreshAccessToken, persistSession, store, registry, cache });
+      served.push(c.token);
+      // Every request in this simulation is rejected again — the population
+      // this ticket's own risk argument targets (see the review comment).
+      registry.markSuspect(c.credentialFingerprint, { reason: 'provider-401' });
+      now += 100; // rapid resolves, well within the default 60s cooldown window
+    }
+
+    assert.ok(refreshAttempts <= 1, `refresh (OAuth rotation) attempts must stay bounded to ~1 per cooldown window across fingerprint churn, got ${refreshAttempts} across ${served.length} requests`);
+    assert.equal(served[0], 'dead-upstream-token', 'first request is unrefreshed — nothing was suspect yet');
+    assert.ok(served.slice(1).every(t => t === served[1]), 'once the single bounded attempt lands, the SAME resulting credential is re-served — no further rotation this window');
+  });
 });
 
 // --- Anti-drift pin: the mirror above must not silently diverge from server.js ---
@@ -365,6 +418,11 @@ describe('LIN-1980 anti-drift pin (production source, not the mirror)', () => {
     const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
     assert.match(flat, /if \(!refreshed\) return null/);
     assert.match(flat, /refreshedFingerprint === fingerprint\) return null/);
+  });
+
+  test('shouldAttemptRefresh is called with a (ownerAccountId, urlKey) scope key — review F1: bounds attempts across fingerprint churn, not just per-fingerprint', () => {
+    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
+    assert.match(flat, /shouldAttemptRefresh\(fingerprint,\s*`\$\{ownerAccountId\}:\$\{urlKey\}`\)/, 'a bare shouldAttemptRefresh(fingerprint) reintroduces the unbounded-rotation flaw F1 found');
   });
 
   test('selectOwnerWorkspaceToken (the selector) is untouched by this ticket — no isSuspended parameter, matching the accepted design', () => {

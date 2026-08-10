@@ -1914,13 +1914,20 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
  * actually suspect AND due for a refresh attempt (both cheap, synchronous,
  * no-IO checks against the registry).
  *
+ * LIN-1980 review F1: `shouldAttemptRefresh` is also given a `scopeKey`
+ * (`${ownerAccountId}:${urlKey}`) so the attempt cap holds across fingerprint
+ * churn — a credential that rotates to a new fingerprint on every refresh
+ * while still being rejected would otherwise re-trigger a forced refresh on
+ * every request (each new fingerprint starts with no attempt history of its
+ * own), since `accept()` deletes the superseded fingerprint's cooldown entry.
+ *
  * @param {{fingerprint: string|null, urlKey: string, ownerAccountId: string|symbol, loadSessions: () => Promise<Array>}} args
  * @returns {Promise<{token: *, expiresAt: number, provider: string, scope: *, credentialFingerprint: string}|null>}
  */
 async function attemptSuspectCredentialRefresh({ fingerprint, urlKey, ownerAccountId, loadSessions }) {
   if (ownerAccountId === UNSCOPED) return null;
   if (!rejectedCredentialRegistry.isSuspect(fingerprint)) return null;
-  if (!rejectedCredentialRegistry.shouldAttemptRefresh(fingerprint)) return null;
+  if (!rejectedCredentialRegistry.shouldAttemptRefresh(fingerprint, `${ownerAccountId}:${urlKey}`)) return null;
   try {
     const sessions = await loadSessions();
     const refreshed = await refreshOwnerWorkspaceToken({
