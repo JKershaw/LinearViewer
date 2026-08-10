@@ -33,6 +33,8 @@ import {
   adfToMarkdown,
   markdownToAdf,
   adfHasUnrenderableContent,
+  isEpicParent,
+  JIRA_ISSUE_FIELDS,
 } from '../../lib/providers/jira/index.js'
 import { RefResolutionError } from '../../lib/proxy-ref-resolver.js'
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js'
@@ -69,6 +71,9 @@ const ENG_PROJECT_STATUSES = [
   },
 ]
 
+/** Jira's own epic-level `issuetype` marker (LIN-2011) — `hierarchyLevel: 1`. */
+const EPIC_ISSUETYPE = { id: '10000', name: 'Epic', hierarchyLevel: 1 }
+
 function seededProvider() {
   const client = createFakeJiraClient({
     projects: [
@@ -91,7 +96,10 @@ function seededProvider() {
           resolutiondate: null,
           labels: ['backend'],
           assignee: { displayName: 'Ada Lovelace' },
-          parent: null,
+          // LIN-2011: a native team-managed epic link — `fields.parent` points
+          // at an EPIC (the nested `issuetype` is what `isEpicParent` reads),
+          // so this routes to canonical `project`, not `parent`.
+          parent: { id: '30001', key: 'ENG-9', fields: { issuetype: EPIC_ISSUETYPE, summary: 'Platform Epic' } },
           _comments: [
             { id: '1', body: { type: 'doc', version: 1, content: [
               { type: 'paragraph', content: [{ type: 'text', text: 'First comment' }] },
@@ -112,7 +120,27 @@ function seededProvider() {
           resolutiondate: '2026-01-04T00:00:00.000Z',
           labels: [],
           assignee: null,
+          // Native one-level subtask parent — ENG-1 is a STORY, not an epic
+          // (no nested `issuetype`), so this must stay routed to canonical
+          // `parent`, unaffected by LIN-2011 (regression coverage).
           parent: { id: '20001', key: 'ENG-1' },
+        },
+      },
+      {
+        id: '30001',
+        key: 'ENG-9',
+        fields: {
+          summary: 'Platform Epic',
+          description: null,
+          issuetype: EPIC_ISSUETYPE,
+          status: { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z',
+          duedate: null,
+          resolutiondate: null,
+          labels: [],
+          assignee: null,
+          parent: null,
         },
       },
     ],
@@ -121,7 +149,7 @@ function seededProvider() {
   return { provider, client }
 }
 
-/** A second-project variant of `seededProvider` (LIN-2018) — proves a team-scoped read is actually SCOPED, not client-side-filtered after a full walk. */
+/** A second-project variant of `seededProvider` (LIN-2018) — proves a team-scoped read is actually SCOPED, not client-side-filtered after a full walk. Each project (LIN-2011) carries its own epic, so the epic-derivation walk has something real to find per project. */
 function multiTeamSeededProvider() {
   const client = createFakeJiraClient({
     projects: [
@@ -140,6 +168,17 @@ function multiTeamSeededProvider() {
           status: { id: '12', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null,
+          parent: { id: '30001', key: 'ENG-9', fields: { issuetype: EPIC_ISSUETYPE, summary: 'Platform Epic' } },
+        },
+      },
+      {
+        id: '30001', key: 'ENG-9',
+        fields: {
+          summary: 'Platform Epic', description: null, issuetype: EPIC_ISSUETYPE,
+          status: { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: [], assignee: null, parent: null,
         },
       },
@@ -147,6 +186,16 @@ function multiTeamSeededProvider() {
         id: '40001', key: 'OPS-1',
         fields: {
           summary: 'Operations issue', description: null,
+          status: { id: '21', name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10002', key: 'OPS', name: 'Operations' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+        },
+      },
+      {
+        id: '40002', key: 'OPS-9',
+        fields: {
+          summary: 'Ops Epic', description: null, issuetype: EPIC_ISSUETYPE,
           status: { id: '21', name: 'To Do', statusCategory: { key: 'new' } },
           project: { id: '10002', key: 'OPS', name: 'Operations' },
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
@@ -993,14 +1042,18 @@ describe('JiraProvider reads (fake client)', () => {
     assert.deepEqual(teams, [{ id: 'ENG', name: 'Engineering', key: 'ENG' }])
   })
 
-  test('fetchProjects returns canonical projects + issues, stamped with SOURCE_JIRA', async () => {
+  test('fetchProjects returns canonical projects + issues, stamped with SOURCE_JIRA (LIN-2011: projects are epic-derived)', async () => {
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
     const result = await provider.fetchProjects(scope)
     assert.equal(result.organizationName, 'acme')
+    // LIN-2011: the canonical project is the EPIC (ENG-9), not the Jira
+    // project (ENG) — the Jira project's own numeric id no longer surfaces
+    // as a canonical project anywhere.
     assert.equal(result.projects.length, 1)
-    assert.equal(result.projects[0].id, '10001')
-    assert.equal(result.projects[0].url, `${SITE}/browse/ENG`, 'project url is the browsable /browse/ link, never the raw REST resource URL (project.self)')
-    assert.equal(result.issues.length, 2)
+    assert.equal(result.projects[0].id, '30001')
+    assert.equal(result.projects[0].name, 'Platform Epic')
+    assert.equal(result.projects[0].url, `${SITE}/browse/ENG-9`, 'project url is the epic\'s own browsable /browse/ link')
+    assert.equal(result.issues.length, 3, 'ENG-1, ENG-2, and the epic ENG-9 itself (it is part of the same project-scoped batch)')
     for (const issue of result.issues) assert.equal(issue.source, SOURCE_JIRA)
 
     const parent = result.issues.find(i => i.identifier === 'ENG-1')
@@ -1015,11 +1068,18 @@ describe('JiraProvider reads (fake client)', () => {
     // own precedence — is what makes `loadStates(..., issue.team.id)` and the
     // proxy wire's flat `teamId` mirror stop always seeing null for Jira.
     assert.deepEqual(parent.team, { id: 'ENG', name: 'Engineering' })
+    // LIN-2011: ENG-1's parent is the epic ENG-9, so it routes to canonical
+    // `project`, not `parent` — an epic is not a subtask-parent.
+    assert.deepEqual(parent.project, { id: '30001', name: 'Platform Epic' })
+    assert.equal(parent.parent, null)
 
     const child = result.issues.find(i => i.identifier === 'ENG-2')
     assert.equal(child.state.type, 'completed')
     assert.equal(child.completedAt, '2026-01-04T00:00:00.000Z')
+    // ENG-2's parent (ENG-1) is a story, not an epic — regression: the native
+    // subtask mapping stays byte-identical, unaffected by LIN-2011.
     assert.deepEqual(child.parent, { id: '20001', identifier: 'ENG-1' })
+    assert.equal(child.project, null, 'accepted limitation: a subtask\'s project is not back-filled from its parent story\'s epic')
   })
 
   test('an issue with no project stamps team: null (mirrors project: null)', async () => {
@@ -1041,8 +1101,8 @@ describe('JiraProvider reads (fake client)', () => {
 
     const result = await multi.fetchProjects(scope, 'ENG')
     assert.equal(result.projects.length, 1)
-    assert.equal(result.projects[0].id, '10001')
-    assert.deepEqual(result.issues.map(i => i.identifier), ['ENG-1'], 'OPS-1 must be absent — the read is genuinely scoped, not filtered client-side')
+    assert.equal(result.projects[0].id, '30001', 'the ENG epic, not the ENG Jira project (LIN-2011)')
+    assert.deepEqual(result.issues.map(i => i.identifier).sort(), ['ENG-1', 'ENG-9'], 'OPS-1/OPS-9 must be absent — the read is genuinely scoped, not filtered client-side')
     assert.equal(listAllCalls.count, 0, 'a team-scoped read must use getProject, never the full listAllProjects walk')
   })
 
@@ -1050,8 +1110,10 @@ describe('JiraProvider reads (fake client)', () => {
     const { provider: multi } = multiTeamSeededProvider()
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
     const result = await multi.fetchProjects(scope)
-    assert.deepEqual(result.projects.map(p => p.id).sort(), ['10001', '10002'])
-    assert.deepEqual(result.issues.map(i => i.identifier).sort(), ['ENG-1', 'OPS-1'])
+    // LIN-2011: each Jira project's OWN epic surfaces as its canonical
+    // project — 30001 (ENG-9) and 40002 (OPS-9), not the Jira project ids.
+    assert.deepEqual(result.projects.map(p => p.id).sort(), ['30001', '40002'])
+    assert.deepEqual(result.issues.map(i => i.identifier).sort(), ['ENG-1', 'ENG-9', 'OPS-1', 'OPS-9'])
   })
 
   test('fetchProjects(scope, teamId) preserves the truncated flag (LIN-2006) on the SCOPED branch too', async () => {
@@ -1067,6 +1129,7 @@ describe('JiraProvider reads (fake client)', () => {
     const stubClient = {
       getProject: async () => ({ id: '10001', key: 'ENG', name: 'Engineering' }),
       searchAllIssues: async () => cappedIssues,
+      listFields: async () => [],
     }
     const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
@@ -1106,6 +1169,7 @@ describe('JiraProvider reads (fake client)', () => {
     const stubClient = {
       listAllProjects: async () => [{ id: '10001', key: 'ENG', name: 'Engineering' }],
       searchAllIssues: async () => cappedIssues,
+      listFields: async () => [],
     }
     const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
@@ -1171,12 +1235,165 @@ describe('JiraProvider reads (fake client)', () => {
     assert.throws(() => provider.createIssue({}, {}), NotImplementedError)
   })
 
-  test('fetchProjectsList returns the same canonical projects fetchProjects emits (LIN-1886 Step 2)', async () => {
+  test('fetchProjectsList returns the same canonical projects fetchProjects emits (LIN-1886 Step 2; LIN-2011 epic-derived)', async () => {
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
     const projects = await provider.fetchProjectsList(scope)
     assert.equal(projects.length, 1)
-    assert.equal(projects[0].id, '10001')
-    assert.equal(projects[0].url, `${SITE}/browse/ENG`)
+    assert.equal(projects[0].id, '30001')
+    assert.equal(projects[0].url, `${SITE}/browse/ENG-9`)
+  })
+})
+
+// =============================================================================
+// LIN-2011 — epic-vs-subtask parent detection + company-managed legacy
+// "Epic Link" custom-field discovery
+// =============================================================================
+
+describe('isEpicParent (LIN-2011)', () => {
+  test('true when hierarchyLevel === 1', () => {
+    assert.equal(isEpicParent({ fields: { issuetype: { hierarchyLevel: 1, name: 'Epic' } } }), true)
+  })
+
+  test('false when hierarchyLevel is present and not 1 — the value wins over the name fallback', () => {
+    assert.equal(isEpicParent({ fields: { issuetype: { hierarchyLevel: 0, name: 'Epic' } } }), false)
+  })
+
+  test('falls back to issuetype.name === "Epic" only when hierarchyLevel is absent', () => {
+    assert.equal(isEpicParent({ fields: { issuetype: { name: 'Epic' } } }), true)
+    assert.equal(isEpicParent({ fields: { issuetype: { name: 'Story' } } }), false)
+  })
+
+  test('degrades to false on missing/malformed input — never throws', () => {
+    assert.equal(isEpicParent(null), false)
+    assert.equal(isEpicParent(undefined), false)
+    assert.equal(isEpicParent({}), false)
+    assert.equal(isEpicParent({ fields: null }), false)
+    assert.equal(isEpicParent({ fields: {} }), false)
+    assert.equal(isEpicParent({ fields: { issuetype: null } }), false)
+    assert.equal(isEpicParent({ fields: { issuetype: 'Epic' } }), false, 'a string issuetype (malformed) is not an object')
+  })
+
+  test('JIRA_ISSUE_FIELDS requests issuetype — the signal a top-level issue\'s own epic-ness needs (fetchProjects\' epic filter)', () => {
+    assert.ok(JIRA_ISSUE_FIELDS.includes('issuetype'))
+  })
+})
+
+describe('JiraProvider — company-managed legacy "Epic Link" resolution (LIN-2011 Surface D)', () => {
+  const EPIC_LINK_FIELD = { id: 'customfield_10014', name: 'Epic Link', schema: { custom: 'com.pyxis.greenhopper.jira:gh-epic-link' } }
+
+  function companyManagedClient(extraIssues = []) {
+    return createFakeJiraClient({
+      projects: [{ id: '50001', key: 'CMP', name: 'Company' }],
+      fields: [EPIC_LINK_FIELD],
+      issues: [
+        {
+          id: '60001', key: 'CMP-1',
+          fields: {
+            summary: 'Company Epic', description: null, issuetype: EPIC_ISSUETYPE,
+            status: { statusCategory: { key: 'new' } },
+            project: { id: '50001', key: 'CMP', name: 'Company' },
+            created: '2026-02-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+            labels: [], assignee: null, parent: null,
+          },
+        },
+        {
+          id: '60002', key: 'CMP-2',
+          fields: {
+            summary: 'Story under the legacy epic link', description: null,
+            status: { statusCategory: { key: 'new' } },
+            project: { id: '50001', key: 'CMP', name: 'Company' },
+            created: '2026-02-02T00:00:00.000Z', duedate: null, resolutiondate: null,
+            labels: [], assignee: null, parent: null,
+            customfield_10014: 'CMP-1',
+          },
+        },
+        ...extraIssues,
+      ],
+    })
+  }
+
+  test('fetchProjects (batch): resolves via listFields() discovery + a same-batch epic map, with no extra HTTP call per issue', async () => {
+    const client = companyManagedClient()
+    const listFieldsCalls = { count: 0 }
+    const originalListFields = client.listFields.bind(client)
+    client.listFields = async (...args) => { listFieldsCalls.count += 1; return originalListFields(...args) }
+    const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+
+    const result = await provider.fetchProjects(scope)
+    assert.equal(listFieldsCalls.count, 1, 'field discovery happens once per fetchProjects call, not once per issue')
+    assert.equal(result.projects.length, 1)
+    assert.equal(result.projects[0].id, '60001')
+    const story = result.issues.find(i => i.identifier === 'CMP-2')
+    assert.deepEqual(story.project, { id: '60001', name: 'Company Epic' })
+    assert.equal(story.parent, null)
+  })
+
+  test('field discovered but unset on a given issue → project: null, no crash', async () => {
+    const client = companyManagedClient([{
+      id: '60003', key: 'CMP-3',
+      fields: {
+        summary: 'Story with no epic link at all', description: null,
+        status: { statusCategory: { key: 'new' } },
+        project: { id: '50001', key: 'CMP', name: 'Company' },
+        created: '2026-02-03T00:00:00.000Z', duedate: null, resolutiondate: null,
+        labels: [], assignee: null, parent: null,
+      },
+    }])
+    const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const result = await provider.fetchProjects(scope)
+    const bare = result.issues.find(i => i.identifier === 'CMP-3')
+    assert.equal(bare.project, null)
+  })
+
+  test('listFields() returns no Epic Link field at all → unchanged pre-ticket behavior, no extra per-issue request attempted', async () => {
+    const client = createFakeJiraClient({
+      projects: [{ id: '50001', key: 'CMP', name: 'Company' }],
+      issues: [{
+        id: '60002', key: 'CMP-2',
+        fields: {
+          summary: 'Story with no native parent, no legacy field on this tenant', description: null,
+          status: { statusCategory: { key: 'new' } },
+          project: { id: '50001', key: 'CMP', name: 'Company' },
+          created: '2026-02-02T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+        },
+      }],
+    })
+    const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const result = await provider.fetchProjects(scope)
+    assert.equal(result.issues[0].project, null)
+  })
+
+  test('fetchIssueFields (single-issue): resolves via ONE bounded getIssue(epicKey) call, only on the no-native-parent fallback path', async () => {
+    const client = companyManagedClient()
+    const getIssueCalls = { count: 0 }
+    const originalGetIssue = client.getIssue.bind(client)
+    client.getIssue = async (...args) => { getIssueCalls.count += 1; return originalGetIssue(...args) }
+    const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+
+    const issue = await provider.fetchIssueFields(scope, 'CMP-2')
+    assert.deepEqual(issue.project, { id: '60001', name: 'Company Epic' })
+    assert.equal(getIssueCalls.count, 2, 'one for the primary issue, one bounded fallback call for the epic')
+
+    getIssueCalls.count = 0
+    // The epic itself has no legacy field value (it isn't itself epic-linked) —
+    // the fallback must not fire a second time when there is nothing to resolve.
+    await provider.fetchIssueFields(scope, 'CMP-1')
+    assert.equal(getIssueCalls.count, 1, 'no legacy field value on this issue -> no fallback call')
+  })
+
+  test('a native-parent single-issue read never calls listFields() — legacy discovery is skipped entirely when unnecessary', async () => {
+    const { provider, client } = seededProvider()
+    const listFieldsCalls = { count: 0 }
+    const original = client.listFields.bind(client)
+    client.listFields = async (...args) => { listFieldsCalls.count += 1; return original(...args) }
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    await provider.fetchIssueFields(scope, 'ENG-2') // native subtask parent (ENG-1) — no legacy fallback needed
+    assert.equal(listFieldsCalls.count, 0)
   })
 })
 

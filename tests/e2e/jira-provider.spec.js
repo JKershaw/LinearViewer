@@ -51,7 +51,9 @@ test.describe('Jira provider (no test-token mock)', () => {
     const projectLink = page.locator('.project-meta .detail-link', { hasText: 'View in Jira' }).first();
     await expect(projectLink).toBeAttached();
     const href = await projectLink.getAttribute('href');
-    expect(href).toBe('https://acme.atlassian.net/browse/ENG');
+    // LIN-2011: the canonical project is the epic ENG-0, not the Jira project
+    // ENG — its "View in Jira" link is the epic's own browsable issue page.
+    expect(href).toBe('https://acme.atlassian.net/browse/ENG-0');
     expect(href).not.toContain('/rest/api/');
   });
 
@@ -119,15 +121,32 @@ test.describe('Jira provider — team selector (LIN-2018)', () => {
 
 // An empty / unresolved project still renders its container (empty state),
 // consistent with how Linear/Local/GitHub render an empty project.
+//
+// LIN-2011: the canonical project level is now derived from EPICS, not Jira
+// project objects — a Jira project with literally zero issues has zero
+// epics too, so it renders NO canonical project at all (an intentional
+// consequence of the epic-derivation redesign: there is no project-shaped
+// entity left to point a header at). The equivalent empty-state coverage is
+// now an epic with zero CHILD issues, which still renders its own container.
 test.describe('Jira provider — empty project', () => {
-  test('a project with zero issues still renders its container', async ({ page }) => {
+  test('an epic with zero child issues still renders its container', async ({ page }) => {
     await seedJiraWorkspace(page, {
       projects: [{ id: '20001', key: 'EMPTY', name: 'Empty Project' }],
-      issues: [],
+      issues: [{
+        id: '30500', key: 'EMPTY-1',
+        fields: {
+          summary: 'Empty Epic', description: null,
+          issuetype: { id: '10000', name: 'Epic', hierarchyLevel: 1 },
+          status: { statusCategory: { key: 'new' } },
+          project: { id: '20001', key: 'EMPTY', name: 'Empty Project' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+        },
+      }],
     });
     await page.goto(jiraDashboardUrl(JIRA_WORKSPACE_URL_KEY));
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('.project-header:has-text("Empty Project")')).toBeVisible();
+    await expect(page.locator('.project-header:has-text("Empty Epic")')).toBeVisible();
   });
 });
 
