@@ -286,6 +286,41 @@ function seed() {
           labels: [], assignee: null, parent: null, _transitions: [],
         },
       },
+      // ---------------------------------------------------------------------
+      // LIN-1942 (routed from LIN-2019's close-out): the D1 relaxation is unit
+      // -pinned (tests/unit/jira-provider.test.js) at the `adfHasUnrenderableContent`
+      // level, but nothing drove it through the actual PATCH/proxy route — so a
+      // regression in how `updateIssue` calls that gate could pass every existing
+      // test here while still refusing (or worse, mis-permitting) real writes.
+      // ---------------------------------------------------------------------
+      {
+        id: '30020', key: 'RES-10', // localId (LIN-2019 exception 3): benign, must SAVE
+        fields: {
+          summary: 'Jira-editor-shaped paragraph carrying a localId',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'paragraph', attrs: { localId: '0647076c05f3' }, content: [{ type: 'text', text: 'Editor-stamped body.' }] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
+      {
+        id: '30021', key: 'RES-11', // mid-document empty paragraph (LIN-2019 exception 4): benign, must SAVE
+        fields: {
+          summary: 'Mid-document empty paragraph',
+          description: { type: 'doc', version: 1, content: [
+            { type: 'paragraph', content: [{ type: 'text', text: 'one' }] },
+            { type: 'paragraph', content: [] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'two' }] },
+          ] },
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
+        },
+      },
       {
         id: '30004', key: 'ENG-13', // done, no available transitions
         fields: {
@@ -726,5 +761,51 @@ describe('Jira-backed proxy — the orderedList identity relaxation (LIN-1886 ru
     const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-4/description/append', { block: 'A new note.' });
     assert.equal(status, 422, 'dropping {order:5} really does renumber 5,6 → 1,2 — that is a content change, not an identity');
     assert.equal(JSON.stringify((await stored('RES-4')).fields.description), before, 'nothing was written');
+  });
+});
+
+describe('Jira-backed proxy — the LIN-2019 localId + empty-paragraph relaxations, through the real PATCH route (LIN-1942)', () => {
+  // tests/unit/jira-provider.test.js pins these two exceptions at the
+  // `adfHasUnrenderableContent` level. Neither was ever driven through the
+  // actual PATCH/proxy route this app serves — this closes that gap, routed
+  // here from LIN-2019's close-out.
+
+  test('RES-10: a PATCH overwriting a localId-carrying description succeeds (LIN-2019 exception 3)', async () => {
+    const { status, body } = await call(buildApp(), 'PATCH', '/api/proxy/issues/RES-10', { description: 'Rewritten body.' });
+    assert.equal(status, 200, 'a `localId`-only attrs key must not trip the D1 gate');
+    assert.equal(body.issue.description, 'Rewritten body.');
+    assert.equal((await stored('RES-10')).fields.description.content[0].attrs, undefined,
+      'the write path never re-emits `localId` — it is not modeled by markdownToAdf either');
+  });
+
+  test('RES-10: an append to a localId-carrying description succeeds and the original text survives', async () => {
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-10/description/append', { block: 'A new note.' });
+    assert.equal(status, 200);
+    const content = (await stored('RES-10')).fields.description.content;
+    // `applyDescriptionEdit` (routes/proxy.js) splices at the MARKDOWN layer —
+    // read current → splice → markdownToAdf the result — the same lane a PATCH
+    // takes, so the re-emitted paragraph carries no `attrs` here either.
+    assert.deepEqual(content[0], { type: 'paragraph', content: [{ type: 'text', text: 'Editor-stamped body.' }] });
+    assert.deepEqual(content[1], { type: 'paragraph', content: [{ type: 'text', text: 'A new note.' }] });
+  });
+
+  test('RES-11: a PATCH overwriting a description with a mid-document empty paragraph succeeds (LIN-2019 exception 4)', async () => {
+    const { status, body } = await call(buildApp(), 'PATCH', '/api/proxy/issues/RES-11', { description: 'Rewritten body.' });
+    assert.equal(status, 200, 'a mid-document empty paragraph must not trip the D1 gate');
+    assert.equal(body.issue.description, 'Rewritten body.');
+  });
+
+  test('RES-11: an append to a description with a mid-document empty paragraph succeeds and the surrounding text survives', async () => {
+    const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/RES-11/description/append', { block: 'A new note.' });
+    assert.equal(status, 200);
+    const content = (await stored('RES-11')).fields.description.content;
+    // Same markdown-layer splice as RES-10 above: the blank line collapses on
+    // the way through (LIN-2019 exception 4's documented behaviour, pinned at
+    // the unit level in tests/unit/jira-provider.test.js), so the empty
+    // paragraph node itself does not survive — only "one"/"two" plus the
+    // appended block do.
+    assert.deepEqual(content[0], { type: 'paragraph', content: [{ type: 'text', text: 'one' }] });
+    assert.deepEqual(content[1], { type: 'paragraph', content: [{ type: 'text', text: 'two' }] });
+    assert.deepEqual(content[2], { type: 'paragraph', content: [{ type: 'text', text: 'A new note.' }] });
   });
 });

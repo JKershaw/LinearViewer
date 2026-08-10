@@ -1153,9 +1153,10 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   const JIRA_WS_UUID = '66666666-6666-6666-6666-666666666666';
   // Stand-in Basic-auth credential (mirrors the Projects harness's stand-in
   // installation token): the binding credential is {email, apiToken}, NOT the
-  // site — the clientFactory seam ignores it (returns the fake) but it travels
-  // through the real read scope, and it is deliberately NOT 'test-token' so
-  // the mock short-circuit never fires.
+  // site — the clientFactory seam below (`expectCredential`, LIN-1890 E6b)
+  // ASSERTS this shape rather than ignoring it, but it still travels through
+  // the real read scope, and it is deliberately NOT 'test-token' so the mock
+  // short-circuit never fires.
   const JIRA_EMAIL = 'test-jira-user@example.com';
   const JIRA_API_TOKEN = 'fake_jira_api_token';
   // The OAuth-shaped stand-ins (LIN-1890 E6b). Same discipline as the Basic
