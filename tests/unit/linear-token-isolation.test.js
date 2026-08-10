@@ -438,33 +438,40 @@ describe('resolveWorkspaceAccess wiring (LIN-1506, Block F — witness C, source
     assert.match(ifLine, /ownerAccountId !== UNSCOPED/, 'the durable-refresh attempt must stay gated on a real (non-UNSCOPED) owner — an owner-blind caller must never trigger a durable-store read/write on anyone\'s behalf');
   });
 
-  test('LIN-1891 (witness — text and position, not behaviour): all three token-bearing returns and both cache writes carry `scope`', () => {
+  test('LIN-1891 (witness — text and position, not behaviour): every token-bearing return and cache write carries `scope`', () => {
     // This proves resolveWorkspaceAccess's own copy of the additive `scope`
     // field is textually present at every site the plan requires — it does
     // NOT prove `scope` is populated correctly at runtime (no behavioural
     // test in this suite exercises the real resolveWorkspaceAccess; every
     // caller injects a stub for it, per the plan's own "what this does not
-    // deliver" section). A dropped field on one of these five sites would
+    // deliver" section). A dropped field on one of these sites would
     // slip through every other test in this repo.
+    //
+    // LIN-1980 widened the site count from 3 to 5 (and cache writes from 2 to
+    // 4): the cache-hit and session-scan branches each gained a second
+    // success return + cache write for the "a suspect credential was
+    // recovered via forced refresh" case, sitting alongside their original
+    // "serve what was already selected" return. Both new sites carry
+    // `scope: recovered.scope`, same as their neighbours.
     const body = extractResolveWorkspaceAccessBody(SERVER_SRC);
     const lines = body.split('\n');
 
-    // The three SUCCESS returns (cache-hit, selector, refresh) all carry the
-    // literal `reason: 'ok'` — unlike the failure-path return further down,
-    // which forwards a variable `reason` instead. That literal is what
-    // distinguishes them without hard-coding line numbers. Excludes the
-    // NODE_ENV=test shortcut's own `reason: 'ok'` return (`'test-token'`) —
-    // deliberately out of the plan's five edits, a hard-coded Linear-shaped
-    // test fixture with no session/cache path to widen.
+    // The SUCCESS returns (cache-hit x2, selector x2, refresh-on-resolve) all
+    // carry the literal `reason: 'ok'` — unlike the failure-path return
+    // further down, which forwards a variable `reason` instead. That literal
+    // is what distinguishes them without hard-coding line numbers. Excludes
+    // the NODE_ENV=test shortcut's own `reason: 'ok'` return (`'test-token'`)
+    // — deliberately out of the plan's edits, a hard-coded Linear-shaped test
+    // fixture with no session/cache path to widen.
     const successReturnLines = lines.filter(l => l.includes('return {') && l.includes("reason: 'ok'") && !l.includes("'test-token'"));
-    assert.equal(successReturnLines.length, 3, `expected exactly 3 token-bearing success returns, found ${successReturnLines.length}`);
+    assert.equal(successReturnLines.length, 5, `expected exactly 5 token-bearing success returns, found ${successReturnLines.length}`);
     for (const line of successReturnLines) {
       assert.match(line, /scope:/, `success return missing scope: ${line.trim()}`);
     }
 
-    // Both workspaceTokenCache.set(...) calls.
+    // All workspaceTokenCache.set(...) calls.
     const cacheWriteLines = lines.filter(l => l.includes('workspaceTokenCache.set('));
-    assert.equal(cacheWriteLines.length, 2, `expected exactly 2 cache writes, found ${cacheWriteLines.length}`);
+    assert.equal(cacheWriteLines.length, 4, `expected exactly 4 cache writes, found ${cacheWriteLines.length}`);
     for (const line of cacheWriteLines) {
       assert.match(line, /scope:/, `cache write missing scope: ${line.trim()}`);
     }

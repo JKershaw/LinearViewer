@@ -18,6 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
+import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
 
 const ISSUE_UUID = '266f0841-ef9a-40de-a7b4-e18890efbf05';
 
@@ -34,7 +35,19 @@ function linearAuthError() {
   return err;
 }
 
-function buildApp({ resolveWorkspaceAccess, validateToken, issueDetail } = {}) {
+/** A fake mirroring lib/rejected-credentials.js's real interface, for spying. */
+function fakeRejectedCredentialRegistry() {
+  const markSuspectCalls = [];
+  return {
+    markSuspectCalls,
+    markSuspect: (fingerprint, opts) => markSuspectCalls.push({ fingerprint, opts }),
+    isSuspect: () => false,
+    shouldAttemptRefresh: () => false,
+    accept: () => {},
+  };
+}
+
+function buildApp({ resolveWorkspaceAccess, validateToken, issueDetail, rejectedCredentialRegistry } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -46,6 +59,7 @@ function buildApp({ resolveWorkspaceAccess, validateToken, issueDetail } = {}) {
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: resolveWorkspaceAccess ?? (async () => ({
       token: 'linear-tok', reason: 'ok', provider: 'linear', source: 'session-scan', expiresAt: Date.now() + 3600_000,
+      credentialFingerprint: fingerprintCredential('linear-tok'),
     })),
     getWorkspaceAccessToken: async () => 'linear-tok',
     agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
@@ -58,6 +72,7 @@ function buildApp({ resolveWorkspaceAccess, validateToken, issueDetail } = {}) {
       supports: () => true,
       issueDetail: issueDetail ?? (async () => { throw linearAuthError(); }),
     },
+    rejectedCredentialRegistry,
   }));
   return app;
 }
@@ -181,4 +196,64 @@ test('never logs credential bytes, in either stage', async () => {
   }
   assert.equal(captured.length, 1);
   assert.ok(!captured[0].includes(secret));
+});
+
+// LIN-1980: logEvent's 401 branch must mark the ACTUALLY-resolved credential
+// suspect, reading req.resolvedCredentialFingerprint — never a fresh
+// fingerprint computed independently, and never `credentialResolutions`
+// (logging-only). These tests exercise the real router end to end, same as
+// the ones above, because the value is entirely in the wiring.
+test('a provider-rejected credential is marked suspect via the shared registry', async () => {
+  const registry = fakeRejectedCredentialRegistry();
+  const app = buildApp({ rejectedCredentialRegistry: registry });
+  const server = app.listen(0);
+  await new Promise(resolve => server.once('listening', resolve));
+  await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/issues/${ISSUE_UUID}`, {
+    headers: { Authorization: 'Bearer agent-token' },
+  });
+  await new Promise(resolve => server.close(resolve));
+
+  assert.equal(registry.markSuspectCalls.length, 1);
+  assert.equal(registry.markSuspectCalls[0].fingerprint, fingerprintCredential('linear-tok'));
+  assert.equal(registry.markSuspectCalls[0].opts.reason, 'provider-401');
+  assert.equal(typeof registry.markSuspectCalls[0].opts.now, 'number');
+});
+
+test('a rejected CALLER token (no workspace credential ever resolved) does not mark anything suspect', async () => {
+  // authenticateProxyToken's rejection calls logCredentialRejection directly
+  // (see its own comment: "this route never reaches logEvent — no workspace
+  // is resolved yet, so there is nothing to audit"), bypassing logEvent's
+  // status===401 branch — and therefore markSuspect — entirely. Correct: there
+  // is no workspace credential fingerprint to mark in the first place.
+  const registry = fakeRejectedCredentialRegistry();
+  const app = buildApp({ validateToken: async () => null, rejectedCredentialRegistry: registry });
+  const server = app.listen(0);
+  await new Promise(resolve => server.once('listening', resolve));
+  await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/issues/${ISSUE_UUID}`, {
+    headers: { Authorization: 'Bearer agent-token' },
+  });
+  await new Promise(resolve => server.close(resolve));
+
+  assert.equal(registry.markSuspectCalls.length, 0);
+});
+
+test('a successful request never marks anything suspect', async () => {
+  const registry = fakeRejectedCredentialRegistry();
+  const app = buildApp({
+    issueDetail: async () => ({ id: ISSUE_UUID, identifier: 'LIN-1', title: 'ok', state: { name: 'Todo', type: 'unstarted' } }),
+    rejectedCredentialRegistry: registry,
+  });
+  const server = app.listen(0);
+  await new Promise(resolve => server.once('listening', resolve));
+  await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/issues/${ISSUE_UUID}`, {
+    headers: { Authorization: 'Bearer agent-token' },
+  });
+  await new Promise(resolve => server.close(resolve));
+
+  assert.equal(registry.markSuspectCalls.length, 0);
+});
+
+test('no rejectedCredentialRegistry injected (e.g. an older test harness) never throws — the wiring is optional-chained', async () => {
+  const { status } = await requestCapturingWarnings(buildApp(), `/api/proxy/issues/${ISSUE_UUID}`);
+  assert.equal(status, 401, 'the request completes normally with no registry wired in');
 });
