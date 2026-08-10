@@ -46,13 +46,24 @@ export const defaultJiraSeed = {
       id: '20001', key: 'ENG-1',
       fields: {
         summary: 'Jira task to do',
+        // LIN-1942: the description carries a `localId` attrs key (LIN-2019
+        // exception 3) so this issue is Jira-editor-shaped — proving a write
+        // lane E2E can save a BENIGN issue of exactly the kind the D1 gate now
+        // permits, not just an issue the gate never had an opinion on.
         description: { type: 'doc', version: 1, content: [
-          { type: 'paragraph', content: [{ type: 'text', text: 'A todo Jira issue.' }] },
+          { type: 'paragraph', attrs: { localId: '0647076c05f3' }, content: [{ type: 'text', text: 'A todo Jira issue.' }] },
         ] },
         status: { name: 'To Do', statusCategory: { key: 'new' } },
         project: { id: '10001', key: 'ENG', name: 'Engineering' },
         created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
         labels: [], assignee: null, parent: null,
+        // LIN-1942: one forward transition (To Do → In Progress), seeded so the
+        // write-lane E2E can drive a genuine status move through the browser.
+        // Inert for detail-nonactive-binding.spec.js's Jira read test, which
+        // asserts title/description/priority-absence only.
+        _transitions: [
+          { id: '31', name: 'Start Progress', to: { name: 'In Progress', statusCategory: { key: 'indeterminate' } } },
+        ],
       },
     },
     {

@@ -152,3 +152,112 @@ test.describe('LIN-1890 — a Jira-only session on an OAuth binding', () => {
     await expect(page.locator('.detail-link', { hasText: 'View in Linear' })).toHaveCount(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// LIN-1942 — the Jira browser WRITE lane. Phase 2 (LIN-1886) shipped
+// `updateIssue`, status transitions, and the D1-D4 refusal gates, but every
+// prior E2E spec here (and detail-nonactive-binding.spec.js) only exercised
+// READS. Three cases against the in-tree fake, all in THIS file rather than a
+// new seeding file: `provider.configure` (routes/test.js) is a process-level
+// side effect that outlives one seed call, and Playwright runs parallel BY
+// FILE (playwright.config.js) — splitting these into a second file would risk
+// a mid-flight reseed racing a concurrently-running read spec here.
+//
+// Case A proves a BENIGN, Jira-editor-shaped description (ENG-1 now carries a
+// `localId` attrs key, LIN-2019 exception 3) actually SAVES — the obligation
+// LIN-2019's close-out routed here, not just that a hazard refuses. Case B
+// drives a genuine status transition through ENG-1's seeded `_transitions`
+// sidecar. Case C is the D1 refusal this ticket exists for: an honest
+// in-browser error, no navigation, no persisted change.
+// ---------------------------------------------------------------------------
+test.describe('Jira provider — browser write lane (LIN-1942)', () => {
+  test.beforeEach(async ({ page }) => {
+    await seedJiraWorkspace(page);
+    await page.goto(DASHBOARD);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('a benign field write persists and reads back through the UI after a fresh dashboard render', async ({ page }) => {
+    await page.locator('.line:has-text("Jira task to do")').first().click();
+    await page.locator('[data-toggle="details"]').first().click();
+    await page.locator('[data-testid="issue-edit-link"]').first().click();
+
+    const form = page.locator('[data-testid="task-edit-form"]');
+    await expect(form).toBeVisible();
+    // public/task-edit.js always resends `description` on submit (the full-body
+    // replace) — ENG-1's stored description carries a `localId` attrs key, so
+    // this write proves that resend does not trip the D1 gate on a benign issue.
+    const NEW_TITLE = 'Jira task to do — edited (LIN-1942)';
+    await form.locator('[data-testid="task-edit-title"]').fill(NEW_TITLE);
+    await form.locator('[data-testid="task-edit-submit"]').click();
+
+    await page.waitForURL(DASHBOARD);
+
+    // Read back through a FRESH render, not just the post-save DOM.
+    await page.goto(DASHBOARD);
+    await page.waitForLoadState('networkidle');
+    // The renamed title is a superstring of the old one ("Jira task to do —
+    // edited …"), so the positive assertion below is the meaningful proof of
+    // persistence — a stale/unwritten title would not contain the ` — edited`
+    // suffix at all.
+    await expect(page.locator('.line', { hasText: NEW_TITLE }).first()).toBeAttached();
+  });
+
+  test('a status transition moves the issue, rendered by outcome (status pill + section), not a synthetic id', async ({ page }) => {
+    await page.locator('.line:has-text("Jira task to do")').first().click();
+    await page.locator('[data-toggle="details"]').first().click();
+    await page.locator('[data-testid="issue-edit-link"]').first().click();
+
+    const form = page.locator('[data-testid="task-edit-form"]');
+    await expect(form).toBeVisible();
+    // Jira's own state ids ('in-progress') are not UUIDs, so the option VALUE
+    // sent is the state NAME (stateOptionValue, lib/render-task-edit.js) —
+    // select by the visible label, matching what a human actually picks.
+    await form.locator('[data-testid="task-edit-stateId"]').selectOption('In Progress');
+    await form.locator('[data-testid="task-edit-submit"]').click();
+    await page.waitForURL(DASHBOARD);
+
+    // Fresh render: the row now carries the "in-progress" status pill and
+    // lives under the dashboard's In Progress section — the rendered outcome,
+    // never the fake's internal transition id.
+    await page.goto(DASHBOARD);
+    await page.waitForLoadState('networkidle');
+    const row = page.locator('.in-progress-items .line:has-text("Jira task to do")').first();
+    await expect(row).toBeAttached();
+    await expect(row.locator('[data-status="in-progress"]')).toBeAttached();
+  });
+
+  test('a D1 refusal renders honestly: the real error text, no navigation, no persisted change', async ({ page }) => {
+    // ENG-6's description carries an unmodeled underline MARK — the D1 gate
+    // (adfHasUnrenderableContent) refuses any write while it stands, since the
+    // check runs against the CURRENT stored ADF, not the incoming patch.
+    await page.locator('.line:has-text("Issue with an underline mark in its description")').first().click();
+    await page.locator('[data-toggle="details"]').first().click();
+    await page.locator('[data-testid="issue-edit-link"]').first().click();
+
+    const form = page.locator('[data-testid="task-edit-form"]');
+    await expect(form).toBeVisible();
+    const editUrl = page.url();
+    const REJECTED_TITLE = 'Should never persist (LIN-1942 D1)';
+    await form.locator('[data-testid="task-edit-title"]').fill(REJECTED_TITLE);
+    await form.locator('[data-testid="task-edit-submit"]').click();
+
+    // Honest rendering: [data-task-edit-status] carries the real 422 message
+    // (the toast auto-dismisses, so it is not a reliable assertion target).
+    await expect(form.locator('[data-task-edit-status]')).toContainText(
+      "Cannot overwrite this issue's description",
+    );
+    // No navigation: still on the same edit page.
+    await expect(page).toHaveURL(editUrl);
+    // The form is re-armed for a retry, not left stuck mid-submit.
+    await expect(form.locator('[data-testid="task-edit-submit"]')).toBeEnabled();
+
+    // No persisted change — including the title, per N1 ordering (every
+    // refusable check runs before the first write): a fresh dashboard render
+    // still shows the original title, never the rejected one.
+    await page.goto(DASHBOARD);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.line', { hasText: REJECTED_TITLE })).toHaveCount(0);
+    await expect(page.locator('.line:has-text("Issue with an underline mark in its description")').first()).toBeAttached();
+  });
+});
