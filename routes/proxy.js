@@ -1780,7 +1780,11 @@ POST ${baseUrl}/api/proxy/issues/{issueId}/comments
     original comment with "deduped": true and HTTP 200 (not 201) — no duplicate is created.
     Deleting or editing ANY comment in the workspace invalidates EVERY issue's dedupe
     window in that workspace (a workspace-wide reset, not scoped to the edited comment's
-    own issue), so a re-post right after either one always mints a fresh comment.
+    own issue), so a re-post right after either one mints a fresh comment.
+    That invalidation is in-process, like the dedupe window itself: it covers the
+    server instance that handled the delete/edit. Behind more than one instance, a
+    re-post routed elsewhere can still return the pre-delete deduped response until
+    the window expires — re-read the issue's comments if you need certainty.
 
 DELETE ${baseUrl}/api/proxy/issues/{issueId}/comments/{commentId}
   → Remove a comment. commentId is the comment's own id (the \`id\` field on each

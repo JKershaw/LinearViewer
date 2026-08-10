@@ -1330,7 +1330,9 @@ Returns `201`:
 }
 ```
 
-Posting the same `(issue + body)` again within a short window does not create a second comment — the original is returned with `"deduped": true` and HTTP `200` (not `201`). This makes a confirming retry after a lost response safe. Deleting or editing *any* comment in the workspace invalidates *every* issue's dedupe window in that workspace (a workspace-wide reset, not scoped to the edited comment's own issue), so a re-post right after either one always mints a fresh comment rather than echoing stale data.
+Posting the same `(issue + body)` again within a short window does not create a second comment — the original is returned with `"deduped": true` and HTTP `200` (not `201`). This makes a confirming retry after a lost response safe. Deleting or editing *any* comment in the workspace invalidates *every* issue's dedupe window in that workspace (a workspace-wide reset, not scoped to the edited comment's own issue), so a re-post right after either one mints a fresh comment rather than echoing stale data.
+
+That invalidation has the same scope as the dedupe window it invalidates: **in-process**, on the server instance that handled the delete or edit. Behind more than one instance, a delete on instance A does not invalidate instance B, so a re-post routed to B can still return the pre-delete deduped response until the window expires. Like the dedupe cache itself, treat it as best-effort rather than a guarantee — if you need certainty that a comment is gone or changed, re-read the issue's comments.
 
 #### Delete Comment
 
