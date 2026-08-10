@@ -427,6 +427,26 @@ const WRITER_PERMITTED_LOSSY_ADF = {
     lost: 'the empty run — it slips the empty-run rule (which needs a mark) and the adjacent-unmarked-pair rule (which needs both neighbours unmarked). Nothing visible: the run is empty',
     closedBy: 'LIN-1939 — teaching one of those two rules about an empty unmarked run whose neighbours are marked',
   },
+  // LIN-2019 exception 3: `localId` is Jira-editor-stamped collaborative-editing
+  // metadata, present on virtually every node a human has touched in Jira's web
+  // editor. The writer emits no `localId` anywhere, so the key is simply ABSENT
+  // after the round trip — same shape of exception as the orderedList entries
+  // above, just keyed on an attrs NAME rather than a node type.
+  'paragraph carrying a localId (LIN-2019)': {
+    doc: adfDoc({ type: 'paragraph', attrs: { localId: '0647076c05f3' }, content: [adfText('hello')] }),
+    lost: 'the `localId` attrs key itself — the writer emits no `attrs` for a paragraph, so the key is absent after the round trip; the rendered text is untouched',
+    closedBy: 'the writer round-tripping arbitrary editor-stamped attrs verbatim, which is explicitly out of scope — see PRESENTATION_NEUTRAL_ATTRS',
+  },
+  'heading carrying a level and a localId (LIN-2019)': {
+    doc: adfDoc({ type: 'heading', attrs: { level: 2, localId: '901afc0118a6' }, content: [adfText('H')] }),
+    lost: 'the `localId` attrs key; `level` survives untouched',
+    closedBy: 'the writer round-tripping arbitrary editor-stamped attrs verbatim, which is explicitly out of scope — see PRESENTATION_NEUTRAL_ATTRS',
+  },
+  'listItem carrying a localId (LIN-2019)': {
+    doc: adfDoc({ type: 'bulletList', content: [{ type: 'listItem', attrs: { localId: 'abc123' }, content: [adfPara(adfText('a'))] }] }),
+    lost: 'the `localId` attrs key itself — the writer emits no `attrs` for a listItem',
+    closedBy: 'the writer round-tripping arbitrary editor-stamped attrs verbatim, which is explicitly out of scope — see PRESENTATION_NEUTRAL_ATTRS',
+  },
 }
 
 describe('ADF → markdown → ADF property (LIN-1886 review Blocker 3)', () => {
@@ -462,7 +482,7 @@ describe('ADF → markdown → ADF property (LIN-1886 review Blocker 3)', () => 
   })
 })
 
-describe('LIN-1886 ruling d38d3755 — the invariant\'s two enumerated exceptions', () => {
+describe('LIN-1886 ruling d38d3755 & LIN-2019 — the invariant\'s non-lossy attrs exceptions', () => {
   for (const [name, { doc, lost, closedBy }] of Object.entries(WRITER_PERMITTED_LOSSY_ADF)) {
     test(`permitted, renders identically, but does NOT deep-equal: ${name}`, () => {
       assert.equal(
@@ -518,6 +538,92 @@ describe('LIN-1886 ruling d38d3755 — the invariant\'s two enumerated exception
       )
     })
   }
+
+  // LIN-2019: the `localId` allowlist is exactly one key. Any OTHER unrecognized
+  // attrs key must still refuse, whether or not `localId` is also present —
+  // fail-closed by construction, not a heuristic.
+  for (const [label, attrs] of Object.entries({
+    '{localId, unknownKey} — an extra key alongside localId still refuses': { localId: 'x', unknownKey: 'y' },
+    '{unknownKey} alone still refuses': { unknownKey: 'y' },
+  })) {
+    test(`a paragraph with attrs ${label}`, () => {
+      const doc = adfDoc({ type: 'paragraph', attrs, content: [adfText('hello')] })
+      assert.equal(adfHasUnrenderableContent(doc), true, 'only a bare localId is allowlisted')
+    })
+  }
+
+  // LIN-2019: the attrs relaxation must not paper over an independently
+  // unrebuildable SHAPE — structural refusals still win over `localId`.
+  test('a nested bulletList carrying localId on the inner list still refuses', () => {
+    const doc = adfDoc({
+      type: 'bulletList',
+      content: [{
+        type: 'listItem',
+        content: [adfPara(adfText('parent')), { type: 'bulletList', attrs: { localId: 'x' }, content: [adfItem(adfPara(adfText('child')))] }],
+      }],
+    })
+    assert.equal(adfHasUnrenderableContent(doc), true, 'a nested list is unrebuildable regardless of attrs')
+  })
+
+  test('a multi-paragraph blockquote carrying localId still refuses', () => {
+    const doc = adfDoc({
+      type: 'blockquote',
+      attrs: { localId: 'x' },
+      content: [adfPara(adfText('one')), adfPara(adfText('two'))],
+    })
+    assert.equal(adfHasUnrenderableContent(doc), true, 'a multi-paragraph blockquote is unrebuildable regardless of attrs')
+  })
+
+  test('a non-identity orderedList order carrying localId still refuses', () => {
+    const doc = adfDoc({
+      type: 'orderedList',
+      attrs: { order: 5, localId: 'x' },
+      content: [adfItem(adfPara(adfText('first'))), adfItem(adfPara(adfText('second')))],
+    })
+    assert.equal(adfHasUnrenderableContent(doc), true, 'a non-identity order still renumbers the list regardless of localId')
+  })
+})
+
+// =============================================================================
+// LIN-2019 exception 4: a top-level empty paragraph. Its own describe block —
+// unlike the attrs exceptions above, the render is NOT identical across the
+// round trip for the mid-document/trailing cases (a blank line is genuinely
+// dropped), so it cannot share WRITER_PERMITTED_LOSSY_ADF's render-identical
+// assertion.
+// =============================================================================
+
+describe('LIN-2019 exception 4 — a top-level empty paragraph', () => {
+  test('mid-document: permitted, and the blank line collapses', () => {
+    const doc = adfDoc(adfPara(adfText('one')), adfPara(), adfPara(adfText('two')))
+    assert.equal(adfHasUnrenderableContent(doc), false, 'a mid-document empty paragraph must be permitted')
+    assert.equal(adfToMarkdown(doc), 'one\n\n\n\ntwo')
+    const rebuilt = markdownToAdf(adfToMarkdown(doc))
+    assert.equal(adfToMarkdown(rebuilt), 'one\n\ntwo', 'the blank line collapses to a single blank line on read-back')
+    assert.notDeepEqual(rebuilt, doc, 'the empty paragraph node itself is dropped, so this is not a deep-equal round trip')
+  })
+
+  test('trailing: permitted, and the trailing empty paragraph is silently dropped', () => {
+    const doc = adfDoc(adfPara(adfText('one')), adfPara())
+    assert.equal(adfHasUnrenderableContent(doc), false, 'a trailing empty paragraph must be permitted')
+    const rebuilt = markdownToAdf(adfToMarkdown(doc))
+    assert.equal(rebuilt.content.length, doc.content.length - 1, 'the rebuilt doc must have one fewer top-level node')
+    assert.equal(adfToMarkdown(rebuilt), 'one')
+    assert.notDeepEqual(rebuilt, doc)
+  })
+
+  test('leading: still refused — the doc-edge trimStart rule has no relief for this position', () => {
+    const doc = adfDoc(adfPara(), adfPara(adfText('one')))
+    assert.equal(adfHasUnrenderableContent(doc), true, 'a leading empty paragraph must still refuse')
+    assert.notDeepEqual(
+      markdownToAdf(adfToMarkdown(doc)), doc,
+      'the leading empty paragraph is genuinely dropped, which is exactly why refusing it is not a needless capability cost',
+    )
+  })
+
+  test('empty paragraph alone: still refused', () => {
+    const doc = adfDoc(adfPara())
+    assert.equal(adfHasUnrenderableContent(doc), true, 'a description that is a single empty paragraph must still refuse')
+  })
 })
 
 // =============================================================================
@@ -1693,6 +1799,20 @@ const SLOTS = {
   'paragraph, payload across three lines': t => adfDoc(adfPara(adfText(t), HARD_BREAK, adfText('middle'), HARD_BREAK, adfText('tail'))),
 }
 
+// LIN-2019: the ONE corpus cell the empty-paragraph relaxation (exception 4)
+// actually produces — 'paragraph, second block' builds `doc(para('first'),
+// para(t))`, and `t === ''` is exactly the newly-permitted TRAILING
+// empty-paragraph shape. Permitted ⟹ deep-equal no longer holds for this cell,
+// same discipline as WRITER_PERMITTED_LOSSY_ADF's exceptions: assert
+// render-identity and the notDeepEqual gap explicitly rather than either
+// silently swallowing it in the generic branch or deleting `''` from
+// `ADVERSARIAL_TEXTS` and shrinking the corpus. Every OTHER permitted cell in
+// the matrix keeps the strict deep-equal assertion below, so a NEW
+// unaccounted-for permission anywhere else still fails loud.
+const GENERATED_CORPUS_EXCEPTIONS = new Set([
+  'paragraph, second block::',
+])
+
 describe('ADF → markdown → ADF, as a generated property over an adversarial corpus', () => {
   for (const [slot, build] of Object.entries(SLOTS)) {
     test(`every adversarial payload holds the invariant in: ${slot}`, () => {
@@ -1700,10 +1820,21 @@ describe('ADF → markdown → ADF, as a generated property over an adversarial 
         const doc = build(text)
         const md = adfToMarkdown(doc)
         const rebuilt = markdownToAdf(md)
+        const isKnownException = GENERATED_CORPUS_EXCEPTIONS.has(`${slot}::${text}`)
         if (adfHasUnrenderableContent(doc)) {
           assert.notDeepEqual(
             rebuilt, doc,
             `over-refusal: ${slot} / ${JSON.stringify(text)} round-trips fine but the gate refuses it`,
+          )
+        } else if (isKnownException) {
+          assert.equal(
+            adfToMarkdown(rebuilt), md,
+            `LIN-2019 exception 4 must not change what a reader sees: ${slot} / ${JSON.stringify(text)}`,
+          )
+          assert.notDeepEqual(
+            rebuilt, doc,
+            `GOOD NEWS, NOT A FAILURE: ${slot} / ${JSON.stringify(text)} now deep-equals — the gap has closed. `
+            + 'Remove this cell from GENERATED_CORPUS_EXCEPTIONS.',
           )
         } else {
           assert.deepEqual(
