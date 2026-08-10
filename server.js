@@ -924,6 +924,11 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
   let organizationName = 'Projects';
   const mergedProjects = [];
   const mergedIssues = [];
+  // Whether ANY binding's read hit its provider-side cap (LIN-2006) — read off
+  // each binding's own result object, never off mergedIssues/issues after the
+  // push/filter below, which would silently drop an array-property flag the
+  // same way `.map()` does inside the provider.
+  let truncated = false;
 
   for (let i = 0; i < bindings.length; i++) {
     const binding = bindings[i];
@@ -947,7 +952,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
     // `slim` (LIN-442) is the homepage's description-trim: it only reaches the
     // dashboard + its token-refresh retry, never swim/ship/swipe, which keep the
     // full query.
-    let { organizationName: orgName, projects, issues } = isTestMode
+    let { organizationName: orgName, projects, issues, truncated: bindingTruncated } = isTestMode
       ? (mockOverride || testMockData)
       : await provider.fetchProjects(bindingScope, teamId, { slim });
 
@@ -962,6 +967,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
     }
     mergedProjects.push(...projects);
     mergedIssues.push(...issues);
+    truncated = truncated || !!bindingTruncated;
   }
 
   // Multi-source workspace → render a per-task source badge (suppressed for a
@@ -1040,7 +1046,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       return { project, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: teamId, periodicalsEnabled, showSource };
+  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: teamId, periodicalsEnabled, showSource, truncated };
 }
 
 /**
@@ -1153,7 +1159,7 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, openRoute
   const deployInfo = getDeployInfo()
   // Pass urlKey so the periodicals group renders consistently after a token
   // refresh, matching the primary dashboard route (LIN-341).
-  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
+  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
@@ -1163,7 +1169,8 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, openRoute
     urlKey: workspace.urlKey,
     featureFlags: getFeatureFlags(session),
     customPrompts,
-    showSource
+    showSource,
+    truncated
   });
   return res.send(html);
 }
@@ -2136,7 +2143,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
@@ -2148,7 +2155,8 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       featureFlags: getFeatureFlags(req.session),
       customPrompts,
       isLocalhost,
-      showSource
+      showSource,
+      truncated
     });
     res.send(html);
   } catch (error) {

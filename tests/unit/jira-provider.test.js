@@ -938,6 +938,46 @@ describe('JiraProvider reads (fake client)', () => {
     assert.deepEqual(child.parent, { id: '20001', identifier: 'ENG-1' })
   })
 
+  test('fetchProjects reports truncated: false by default (LIN-2006)', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const result = await provider.fetchProjects(scope)
+    assert.equal(result.truncated, false, 'the shared fake client never sets .truncated, so the untruncated path must coerce to false, not undefined')
+  })
+
+  test('fetchProjects surfaces truncated: true when the client hit its search cap (LIN-2006)', async () => {
+    // A dedicated stub, not the shared fake client (which never sets .truncated) —
+    // mirrors the shape client.js's real searchAllIssues produces on a capped walk:
+    // an array with a `.truncated` property attached.
+    const cappedIssues = [
+      {
+        id: '20001',
+        key: 'ENG-1',
+        fields: {
+          summary: 'Parent story',
+          description: null,
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z',
+          duedate: null,
+          resolutiondate: null,
+          labels: [],
+          assignee: null,
+          parent: null,
+        },
+      },
+    ]
+    cappedIssues.truncated = true
+    const stubClient = {
+      listAllProjects: async () => [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+      searchAllIssues: async () => cappedIssues,
+    }
+    const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const result = await provider.fetchProjects(scope)
+    assert.equal(result.truncated, true, 'the .truncated flag must survive the canonical .map() mapping, not be silently dropped')
+    assert.equal(result.issues.length, 1, 'the mapped issues themselves are unaffected by reading the flag first')
+  })
+
   test('fetchIssueContext maps the issue, best-effort subtask children, and comments', async () => {
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
     const ctx = await provider.fetchIssueContext(scope, 'ENG-1')

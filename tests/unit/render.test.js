@@ -993,6 +993,27 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     assert.ok(!withoutBadge.includes('data-testid="issue-source"'), 'badge suppressed when showSource off (single-provider parity)');
   });
 
+  test('truncation notice appears only when truncated is on (LIN-2006)', () => {
+    const opts = { isLanding: false, urlKey: 'ws', workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }] };
+
+    const withNotice = renderPage([], [], [], 'Test', { ...opts, truncated: true });
+    assert.ok(withNotice.includes('truncation-notice'), 'notice present when truncated is on');
+    // The `truncated` boolean this page receives is sourced ONLY from
+    // provider.fetchProjects()'s issues.truncated (jira/index.js:1123) — the
+    // sibling projects.truncated (listAllProjects) is a separate, unfixed
+    // .map()-destroys-the-flag site routed to LIN-2015. The copy must not
+    // claim broader coverage than the signal actually carries (plan-review
+    // correction 2): say "issues", not "projects or issues".
+    assert.ok(withNotice.includes('issues could not be loaded'), 'copy names issues specifically');
+    assert.ok(!withNotice.includes('projects or issues'), 'copy must not claim project coverage the boolean does not carry');
+
+    const withoutNotice = renderPage([], [], [], 'Test', { ...opts, truncated: false });
+    assert.ok(!withoutNotice.includes('truncation-notice'), 'notice suppressed when truncated is off');
+
+    const defaultRender = renderPage([], [], [], 'Test', opts);
+    assert.ok(!defaultRender.includes('truncation-notice'), 'notice suppressed by default (truncated omitted)');
+  });
+
   test('legacy/Linear workspace renders byte-identically (back-compat)', () => {
     // No `provider` field on the workspace → resolves the Linear provider, whose
     // ui keeps all affordances on and displayName 'Linear'. Page-level affordances

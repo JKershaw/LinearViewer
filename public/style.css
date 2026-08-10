@@ -1901,6 +1901,21 @@ a.wordmark:hover {
   color: var(--blue);
 }
 
+.truncation-notice {
+  margin: var(--space-4) auto;
+  max-width: 60ch;
+  padding: 0.75rem var(--space-3);
+  background: var(--bg-muted);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.truncation-notice p {
+  margin: 0;
+  color: var(--amber-dim);
+}
+
 /* =============================================================================
    Login Page (Landing Page CTA)
    =============================================================================
