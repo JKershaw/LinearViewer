@@ -21,7 +21,12 @@ import {
   resolveIssueBinding,
   remintActiveCredential,
   saveSession,
-  MAX_WORKSPACES
+  MAX_WORKSPACES,
+  matchTeamId,
+  requireTeamMembership,
+  TeamNotFoundError,
+  isPersistableTeamRef,
+  MAX_TEAM_REF_LENGTH
 } from '../../lib/workspace.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 
@@ -1423,5 +1428,99 @@ describe('saveSession', () => {
 
     await saveSession(session);
     assert.strictEqual(callbackCalled, true);
+  });
+});
+
+// LIN-2025: replaces the 11 inline UUID_REGEX team-ref format gates with a
+// membership check against the workspace's already-fetched team list. Two
+// helpers, deliberately split — graceful for page routes, strict for the
+// three agent-facing proxy reads (John's ruling, 2026-08-10).
+describe('matchTeamId (graceful — page/dashboard/roadmap routes)', () => {
+  const TEAMS = [{ id: 'team-a' }, { id: 'team-b' }];
+
+  test('no rawTeamId → null, regardless of team list', () => {
+    assert.strictEqual(matchTeamId(TEAMS, null), null);
+    assert.strictEqual(matchTeamId(TEAMS, undefined), null);
+    assert.strictEqual(matchTeamId([], null), null);
+  });
+
+  test('a matching id resolves to that team\'s id', () => {
+    assert.strictEqual(matchTeamId(TEAMS, 'team-a'), 'team-a');
+  });
+
+  // F1: a teamless provider's fetchTeams() always returns [] — the raw value
+  // must pass through unvalidated rather than being treated as "no match",
+  // so each provider's own downstream teamId handling stays the source of
+  // truth (e.g. LocalProvider.issues() returning [] for any truthy teamId).
+  test('empty team list (teamless provider) passes the raw value through unchanged', () => {
+    assert.strictEqual(matchTeamId([], 'anything-at-all'), 'anything-at-all');
+    assert.strictEqual(matchTeamId(null, 'anything-at-all'), 'anything-at-all');
+  });
+
+  // The key case per the ticket: a well-formed id that simply isn't in THIS
+  // workspace's non-empty team list. Graceful helper drops to unscoped.
+  test('a non-empty team list with no match drops to unscoped (null) — the page-route policy', () => {
+    assert.strictEqual(matchTeamId(TEAMS, 'not-a-real-team'), null);
+  });
+});
+
+describe('requireTeamMembership (strict — GET /api/proxy/issues|labels|cycles)', () => {
+  const TEAMS = [{ id: 'team-a' }, { id: 'team-b' }];
+
+  test('no rawTeamId → null, regardless of team list', () => {
+    assert.strictEqual(requireTeamMembership(TEAMS, null), null);
+    assert.strictEqual(requireTeamMembership([], undefined), null);
+  });
+
+  test('a matching id resolves to that team\'s id', () => {
+    assert.strictEqual(requireTeamMembership(TEAMS, 'team-b'), 'team-b');
+  });
+
+  // F1 preserved for the strict helper too: an empty team list can never
+  // throw — the throw path is only reachable on a workspace whose provider
+  // actually has teams.
+  test('empty team list (teamless provider) passes the raw value through unchanged, never throws', () => {
+    assert.strictEqual(requireTeamMembership([], 'anything-at-all'), 'anything-at-all');
+    assert.strictEqual(requireTeamMembership(null, 'anything-at-all'), 'anything-at-all');
+  });
+
+  // The ruling this helper exists to enforce: a well-formed-but-unmatched id
+  // on a non-empty (real) team list must fail loud, not silently widen to
+  // the whole workspace.
+  test('a non-empty team list with no match throws TeamNotFoundError', () => {
+    assert.throws(() => requireTeamMembership(TEAMS, 'not-a-real-team'), (err) => {
+      assert.ok(err instanceof TeamNotFoundError);
+      assert.equal(err.teamId, 'not-a-real-team');
+      return true;
+    });
+  });
+});
+
+// LIN-2025 close-out (implementation-review finding 6): dropping the read-side
+// UUID gate also dropped the incidental bound it put on what the dashboard
+// persists as a remembered team selection. This is the replacement bound —
+// a type + length cap only, NOT the write-time validation fetch F4 rejected.
+describe('isPersistableTeamRef (remembered team selection, LIN-727 write site)', () => {
+  test('null is persistable — that is how a selection is cleared', () => {
+    assert.strictEqual(isPersistableTeamRef(null), true);
+  });
+
+  test('an ordinary ref of either provider shape is persistable', () => {
+    assert.strictEqual(isPersistableTeamRef('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'), true);
+    assert.strictEqual(isPersistableTeamRef('ENG'), true); // Jira project key (LIN-2018)
+  });
+
+  test('an over-long ref is refused', () => {
+    assert.strictEqual(isPersistableTeamRef('a'.repeat(MAX_TEAM_REF_LENGTH)), true);
+    assert.strictEqual(isPersistableTeamRef('a'.repeat(MAX_TEAM_REF_LENGTH + 1)), false);
+  });
+
+  // `?team=a&team=b` reaches the route as an Array, and `?team[x]=y` as an
+  // object; the old UUID_REGEX gate coerced both to a failing string.
+  test('a non-string ref is refused', () => {
+    assert.strictEqual(isPersistableTeamRef(['team-a', 'team-b']), false);
+    assert.strictEqual(isPersistableTeamRef({ id: 'team-a' }), false);
+    assert.strictEqual(isPersistableTeamRef(undefined), false);
+    assert.strictEqual(isPersistableTeamRef(''), false);
   });
 });

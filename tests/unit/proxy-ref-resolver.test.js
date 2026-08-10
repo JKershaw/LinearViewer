@@ -95,6 +95,26 @@ test('resolveStateRef: a UUID is passed through untouched (escape hatch, no list
   assert.equal(resolveStateRef(STATES, UUID_2), UUID_2);
 });
 
+// LIN-2025: mirrors resolveProjectRef's exact non-UUID id match (LIN-1972) —
+// a future non-UUID native state id (e.g. a Jira stateId) must match by exact
+// raw id, short-circuiting before the alias/name sweep.
+test('resolveStateRef: exact non-UUID id match short-circuits before alias/name sweep', () => {
+  const states = [
+    { id: '10001', name: 'To Do', type: 'unstarted' },
+    { id: '10002', name: 'In Progress', type: 'started' },
+  ];
+  assert.equal(resolveStateRef(states, '10001'), '10001');
+});
+
+test('resolveStateRef: id/type-alias ambiguity — id match wins, no false NOT_UNIQUE', () => {
+  // A state's non-UUID id equals another state's alias-resolved type ('done');
+  // a merged id+alias filter would throw NOT_UNIQUE here — the id match must
+  // short-circuit before that sweep, mirroring resolveProjectRef's id/name test.
+  const stateA = { id: 'done', name: 'Archived', type: 'unstarted' };
+  const stateB = { id: '10003', name: 'Done', type: 'completed' };
+  assert.equal(resolveStateRef([stateA, stateB], 'done'), 'done');
+});
+
 test('resolveStateRef: symbolic type aliases resolve to the matching state id', () => {
   assert.equal(resolveStateRef(STATES, 'done'), UUID_2);
   assert.equal(resolveStateRef(STATES, 'completed'), UUID_2);

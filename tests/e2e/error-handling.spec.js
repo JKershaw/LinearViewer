@@ -122,6 +122,26 @@ test.describe('Team Filtering', () => {
     await expect(betaProject).toBeVisible();
     await expect(betaProject.locator('.node')).toHaveCount(0);
   });
+
+  // LIN-2025 close-out (implementation review, "What CI Did Not Prove" #2):
+  // the page routes' GRACEFUL arm — a well-formed team id that is not in a
+  // NON-EMPTY team list — had no CI coverage. `error-handling.spec.js:25`
+  // covers the teamless-provider passthrough (Local) and the tests above cover
+  // a matching id; this covers the third arm, which is the one John's ruling
+  // deliberately left graceful for pages: render the full board, not an empty
+  // one, and let the toggle report the filter as dropped.
+  test('an unmatched team filter drops to unscoped: full board renders, toggle reads all', async ({ page }) => {
+    const UNMATCHED_TEAM_UUID = '99999999-9999-9999-9999-999999999999';
+    await page.goto(`${WORKSPACE_URL}?team=${UNMATCHED_TEAM_UUID}`);
+
+    // Dropped to unscoped, and the UI says so rather than showing a stale name.
+    await expect(page.locator('#team-toggle')).toHaveText('all');
+
+    // Both teams' work is present — Alpha is Engineering, Beta is Design — so
+    // this is genuinely the whole board, not one team's slice or an empty one.
+    await expect(page.locator('.project[data-id="proj-alpha"] .node')).not.toHaveCount(0);
+    await expect(page.locator('.project[data-id="proj-beta"] .node')).not.toHaveCount(0);
+  });
 });
 
 test.describe('OAuth Error Handling', () => {

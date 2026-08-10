@@ -310,6 +310,38 @@ test.describe('Roadmap Generate Endpoint', () => {
     expect(body).not.toContain('"layer":"gap"');
   });
 
+  // LIN-2025 close-out (implementation review, "What CI Did Not Prove" #3):
+  // roadmap-generate's new `matchTeamId(testMode ? testMockTeams : await
+  // provider.fetchTeams(scope), teamId)` line was only ever exercised on its
+  // `teamId`-absent branch — every existing generate test posts without a
+  // `team`. These drive the branch that actually calls the helper, on both
+  // arms of the graceful policy. `isRoadmapTestMode` is `shouldMockAi`, so the
+  // AI-mocked local session takes the `testMockTeams` side: a real, non-empty
+  // team list, and no provider round trip ahead of the fixture data.
+  test('a matching team filter resolves and the stream completes', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+    const response = await page.request.post(localGenerateUrl(localWorkerUrlKey), {
+      data: { northStar: '', team: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' } // Engineering, in testMockTeams
+    });
+    expect(response.status()).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('"layer":"digest"');
+    expect(body.trim().endsWith('event: done\ndata: {}')).toBe(true);
+  });
+
+  test('an unmatched team filter drops to unscoped rather than failing — the page-route policy', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, ROADMAP_SEED_OPTS);
+    const response = await page.request.post(localGenerateUrl(localWorkerUrlKey), {
+      data: { northStar: '', team: '99999999-9999-9999-9999-999999999999' }
+    });
+    // Graceful, not loud: this is a page surface, not one of the three
+    // agent-facing proxy reads that 404 on the same input (John's ruling).
+    expect(response.status()).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('"layer":"digest"');
+    expect(body.trim().endsWith('event: done\ndata: {}')).toBe(true);
+  });
+
   // --- Orientation (LIN-300) -------------------------------------------------
   // The orientation step rides the same stream as a single structured
   // `orientation` event (not streamed prose). The route owns 8-point vocabulary
