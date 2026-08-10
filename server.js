@@ -9,6 +9,7 @@
  */
 import 'dotenv/config'
 import path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import express from 'express'
 import { installAsyncErrorForwarding } from './lib/async-errors.js'
 
@@ -1711,6 +1712,15 @@ const workspaceTokenCache = createWorkspaceTokenCache({ ttlMs: TOKEN_CACHE_TTL_M
 // refresh. One shared instance so a mark made on the proxy lane is visible to
 // the very next resolve — see createProxyRoutes's `rejectedCredentialRegistry` wiring.
 const rejectedCredentialRegistry = createRejectedCredentialRegistry();
+// LIN-1980 close-out, ledger item 2: the registry is per-process, so a mark made
+// on one instance never reaches another and recovery latency scales with the
+// instance count. Nothing in the repo records that count (no deploy manifest;
+// production is Railway, which defaults to 1 replica unless explicitly scaled),
+// so this line makes it directly countable in the log stream: one line per boot,
+// carrying a stable per-process id. Distinct ids in the same window = distinct
+// processes. Deliberately at the single production construction site rather than
+// inside the factory, which unit tests build many times per run.
+console.log('[rejected-credentials] registry init', JSON.stringify({ processId: randomUUID(), pid: process.pid }));
 
 // LIN-1507: prompt (not 30s-fuzzy) cache eviction. Threaded into every
 // session-destruction call site so a revoked session's cached token is gone
