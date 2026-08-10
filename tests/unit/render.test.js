@@ -993,6 +993,19 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     assert.ok(!withoutBadge.includes('data-testid="issue-source"'), 'badge suppressed when showSource off (single-provider parity)');
   });
 
+  test('truncation notice appears only when truncated is on (LIN-2006)', () => {
+    const opts = { isLanding: false, urlKey: 'ws', workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }] };
+
+    const withNotice = renderPage([], [], [], 'Test', { ...opts, truncated: true });
+    assert.ok(withNotice.includes('truncation-notice'), 'notice present when truncated is on');
+
+    const withoutNotice = renderPage([], [], [], 'Test', { ...opts, truncated: false });
+    assert.ok(!withoutNotice.includes('truncation-notice'), 'notice suppressed when truncated is off');
+
+    const defaultRender = renderPage([], [], [], 'Test', opts);
+    assert.ok(!defaultRender.includes('truncation-notice'), 'notice suppressed by default (truncated omitted)');
+  });
+
   test('legacy/Linear workspace renders byte-identically (back-compat)', () => {
     // No `provider` field on the workspace → resolves the Linear provider, whose
     // ui keeps all affordances on and displayName 'Linear'. Page-level affordances
