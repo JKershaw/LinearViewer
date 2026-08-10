@@ -85,6 +85,27 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   });
   router.get('/test/yap/clear', (req, res) => { yapBuffers.clear(); res.send('ok'); });
 
+  // ── Mock Atlassian OAuth token/accessible-resources endpoints (LIN-2001) ───
+  // In-process stand-ins for the two direct-`fetch` calls
+  // `lib/providers/jira/oauth.js` makes to Atlassian during the OAuth 3LO
+  // callback (`postJiraToken`'s POST, `fetchJiraAccessibleResources`'s GET) —
+  // same idiom as the Yap block above, enabled by pointing the new
+  // JIRA_OAUTH_TEST_BASE env var at `http://localhost:PORT/test/atlassian`
+  // (see playwright.config.js). Both are stateless canned responses: in
+  // production the token endpoint and the accessible-resources endpoint live
+  // on two DIFFERENT hosts with two DIFFERENT path shapes, but the fake only
+  // needs its two path SUFFIXES to stay distinct, which one shared base
+  // achieves for free. No `myself`/REST-gateway fake is needed here — the
+  // identity lookup and the post-redirect dashboard reads both resolve
+  // through the existing `clientFactory` seam above once a spec seeds it.
+  const JIRA_OAUTH_TEST_CLOUD_ID = 'test-oauth-cloud-id';
+  router.post('/test/atlassian/oauth/token', (req, res) => {
+    res.json({ access_token: 'fake-oauth-access-token', refresh_token: 'fake-oauth-refresh-token', expires_in: 3600 });
+  });
+  router.get('/test/atlassian/oauth/token/accessible-resources', (req, res) => {
+    res.json([{ id: JIRA_OAUTH_TEST_CLOUD_ID, url: JIRA_SITE, name: 'Acme' }]);
+  });
+
   // Endpoint to set a test session without going through OAuth flow
   // Query parameters:
   //   ?tokenExpired=true        - Set token expiry in the past

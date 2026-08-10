@@ -39,10 +39,20 @@ export default defineConfig({
     // JIRA_* are PRESENCE-ONLY placeholders (LIN-1887): `isJiraOAuthConfigured`
     // checks that the three vars are set, never that they are valid, so this is
     // what lets settings-providers.spec.js prove the OAuth add is REACHABLE from
-    // Settings without a hand-typed URL. No live Atlassian app exists (D3) and
-    // none is contacted — the spec stops at Harbour's own redirect to the
-    // consent URL. Deliberately NOT dropped into .env.example as if usable.
-    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_DAILY_LIMIT=5 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback node server.js',
+    // Settings without a hand-typed URL. No live Atlassian app exists (D3) for
+    // `landing.spec.js`/`settings-providers.spec.js` — those specs stop at
+    // Harbour's own redirect to the consent URL, and none of Atlassian is
+    // contacted. That blanket claim no longer covers every Jira spec, though
+    // (LIN-2001): JIRA_OAUTH_TEST_BASE points the two direct-fetch call sites in
+    // `lib/providers/jira/oauth.js` (token exchange, accessible-resources) at
+    // the in-process fake Atlassian routes below, so Harbour's SERVER process
+    // (never the Playwright browser) makes two real HTTP calls to
+    // `http://localhost:3001/test/atlassian/...` — an in-process stand-in for
+    // Atlassian, not Atlassian itself. It is gated the same way JIRA_* above is
+    // presence-only: inert unless NODE_ENV=test AND the var is set, so it is
+    // strictly a test-only widening of the OAuth token/accessible-resources
+    // call sites, never the authorize host or the REST-gateway guard.
+    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_DAILY_LIMIT=5 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian node server.js',
     url: 'http://localhost:3001',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
