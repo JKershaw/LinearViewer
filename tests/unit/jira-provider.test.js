@@ -1228,7 +1228,21 @@ function writableSeededProvider() {
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: [], assignee: null, parent: null,
           _transitions: [
-            { id: '31', name: 'Resolve', to: { name: 'Done', statusCategory: { key: 'done' } }, fields: { resolution: { required: true } } },
+            { id: '31', name: 'Resolve', to: { name: 'Done', statusCategory: { key: 'done' } }, hasScreen: true },
+          ],
+        },
+      },
+      {
+        id: '30006', key: 'ENG-15', // its only forward transition carries `fields` but no `hasScreen` — must NOT be refused
+        fields: {
+          summary: 'Issue whose only transition carries fields but not hasScreen',
+          description: null,
+          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+          _transitions: [
+            { id: '32', name: 'Resolve', to: { name: 'Done', statusCategory: { key: 'done' } }, fields: { resolution: { required: true } } },
           ],
         },
       },
@@ -1328,6 +1342,11 @@ describe('JiraProvider.updateIssue (LIN-1886 Step 3)', () => {
         return true
       }
     )
+  })
+
+  test('D2: a transition carrying `fields` but no `hasScreen` is NOT refused (LIN-2020: `fields` is never populated by real Jira without `expand`, so it must not drive the guard)', async () => {
+    const issue = await provider.updateIssue(SCOPE, 'ENG-15', { stateId: 'done' })
+    assert.equal(issue.state.type, 'completed')
   })
 
   test('D2: a symbolic stateId of "canceled"/"duplicate" is refused (422) — Jira has no such statusCategory, never silently folds to done', async () => {

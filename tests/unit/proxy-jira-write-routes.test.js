@@ -307,7 +307,7 @@ function seed() {
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: [], assignee: null, parent: null,
           _transitions: [
-            { id: '31', name: 'Resolve', to: { name: 'Done', statusCategory: { key: 'done' } }, fields: { resolution: { required: true } } },
+            { id: '31', name: 'Resolve', to: { name: 'Done', statusCategory: { key: 'done' } }, hasScreen: true },
           ],
         },
       },
