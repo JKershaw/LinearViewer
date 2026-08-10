@@ -214,6 +214,81 @@ describe('LIN-1887 — the Jira exchange is substitutable with Linear’s at the
 });
 
 // ---------------------------------------------------------------------------
+// LIN-2001 — the OAuth test-override base
+// ---------------------------------------------------------------------------
+
+describe('LIN-2001 — the OAuth test-override base', () => {
+  const OVERRIDE_KEYS = ['NODE_ENV', 'JIRA_OAUTH_TEST_BASE'];
+  let savedOverrideEnv;
+  beforeEach(() => {
+    savedOverrideEnv = Object.fromEntries(OVERRIDE_KEYS.map(k => [k, process.env[k]]));
+    withConfig();
+  });
+  afterEach(() => {
+    for (const k of OVERRIDE_KEYS) {
+      if (savedOverrideEnv[k] === undefined) delete process.env[k];
+      else process.env[k] = savedOverrideEnv[k];
+    }
+  });
+
+  const okResponse = (body) => ({ ok: true, status: 200, json: async () => body });
+  const okResources = (body) => ({ ok: true, json: async () => body });
+
+  test('override unset: the code exchange and accessible-resources hit the real hosts, byte-identical to today', async () => {
+    delete process.env.JIRA_OAUTH_TEST_BASE;
+    let tokenUrl, resourcesUrl;
+    await exchangeJiraCode('code-1', { fetchImpl: async (url) => { tokenUrl = url; return okResponse({ access_token: 'a', expires_in: 3600 }); } });
+    await fetchJiraAccessibleResources('at-1', { fetchImpl: async (url) => { resourcesUrl = url; return okResources([]); } });
+    assert.equal(tokenUrl, 'https://auth.atlassian.com/oauth/token');
+    assert.equal(resourcesUrl, 'https://api.atlassian.com/oauth/token/accessible-resources');
+  });
+
+  test('override set but NODE_ENV !== "test": still the real hosts — fails closed', async () => {
+    process.env.JIRA_OAUTH_TEST_BASE = 'http://localhost:9999/fake-atlassian';
+    process.env.NODE_ENV = 'production';
+    let tokenUrl;
+    await exchangeJiraCode('code-1', { fetchImpl: async (url) => { tokenUrl = url; return okResponse({ access_token: 'a', expires_in: 3600 }); } });
+    assert.equal(tokenUrl, 'https://auth.atlassian.com/oauth/token');
+  });
+
+  test('override set AND NODE_ENV === "test": both call sites resolve to the override base with the path suffix preserved', async () => {
+    process.env.JIRA_OAUTH_TEST_BASE = 'http://localhost:9999/test/atlassian';
+    process.env.NODE_ENV = 'test';
+    let exchangeUrl, resourcesUrl;
+    await exchangeJiraCode('code-1', { fetchImpl: async (url) => { exchangeUrl = url; return okResponse({ access_token: 'a', expires_in: 3600 }); } });
+    await fetchJiraAccessibleResources('at-1', { fetchImpl: async (url) => { resourcesUrl = url; return okResources([]); } });
+    // No `.origin` normalisation anywhere in the resolution — a base carrying a
+    // path prefix (`/test/atlassian`) must survive verbatim (F8).
+    assert.equal(exchangeUrl, 'http://localhost:9999/test/atlassian/oauth/token');
+    assert.equal(resourcesUrl, 'http://localhost:9999/test/atlassian/oauth/token/accessible-resources');
+  });
+
+  // N3: `postJiraToken` is shared by `exchangeJiraCode` AND `refreshJiraAccessToken`
+  // — the live durable-credential refresh caller (server.js) — so the override
+  // reaches it too. Pinned on both sides of the gate: it must resolve the same
+  // way the code exchange does when active, and must NOT when inactive.
+  test('N3: the REFRESH caller (refreshJiraAccessToken) resolves the same way as the code exchange', async () => {
+    process.env.JIRA_OAUTH_TEST_BASE = 'http://localhost:9999/test/atlassian';
+    process.env.NODE_ENV = 'test';
+    let refreshUrl;
+    await refreshJiraAccessToken('r1', { fetchImpl: async (url) => { refreshUrl = url; return okResponse({ access_token: 'a', refresh_token: 'r2', expires_in: 3600 }); } });
+    assert.equal(refreshUrl, 'http://localhost:9999/test/atlassian/oauth/token');
+  });
+
+  test('N3: the refresh caller stays on the real host when the override is unset or NODE_ENV !== "test"', async () => {
+    delete process.env.JIRA_OAUTH_TEST_BASE;
+    let refreshUrl;
+    await refreshJiraAccessToken('r1', { fetchImpl: async (url) => { refreshUrl = url; return okResponse({ access_token: 'a', refresh_token: 'r2', expires_in: 3600 }); } });
+    assert.equal(refreshUrl, 'https://auth.atlassian.com/oauth/token');
+
+    process.env.JIRA_OAUTH_TEST_BASE = 'http://localhost:9999/test/atlassian';
+    process.env.NODE_ENV = 'production';
+    await refreshJiraAccessToken('r1', { fetchImpl: async (url) => { refreshUrl = url; return okResponse({ access_token: 'a', refresh_token: 'r2', expires_in: 3600 }); } });
+    assert.equal(refreshUrl, 'https://auth.atlassian.com/oauth/token');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Step 3 — the client fork
 // ---------------------------------------------------------------------------
 

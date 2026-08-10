@@ -261,3 +261,84 @@ test.describe('Jira provider — browser write lane (LIN-1942)', () => {
     await expect(page.locator('.line:has-text("Issue with an underline mark in its description")').first()).toBeAttached();
   });
 });
+
+// ---------------------------------------------------------------------------
+// LIN-2001 — the Jira OAuth callback driven as real HTTP.
+//
+// Every other Jira OAuth spec in this repo (settings-providers.spec.js,
+// landing.spec.js) stops at the begin leg's 302 to Atlassian's consent
+// screen — no live Atlassian app exists (D3). The callback
+// (`GET /auth/jira/oauth/callback`) and the `mode:'new'` session-bootstrap it
+// drives were previously proven only by unit tests that fake `fetch`
+// (tests/unit/lin-1890-jira-entry-layer.test.js); nothing exercised the
+// sequence over a real cookie round-trip, which is exactly where
+// `session.regenerate()` bugs live. `JIRA_OAUTH_TEST_BASE`
+// (playwright.config.js) points the two direct-fetch call sites in
+// `lib/providers/jira/oauth.js` at the in-process fake Atlassian routes
+// (routes/test.js), so this spec drives begin → callback → dashboard for a
+// zero-Linear `mode=new` session with no live Atlassian app and no other
+// fake HTTP endpoint.
+//
+// Explicit non-goal: this does not re-prove the unit-tested error branches
+// (`regenerate()` throwing → 500, refresh-token dropped on an error exit,
+// the multi-site picker, add-source mode) — those stay owned by
+// tests/unit/lin-1890-jira-entry-layer.test.js. This spec proves the one
+// thing that suite structurally cannot: that the sequence survives a real
+// cookie round-trip over real HTTP.
+test.describe('LIN-2001 — Jira OAuth callback driven as real HTTP', () => {
+  test('begin -> callback -> dashboard lands a zero-Linear mode=new session on a real HTTP round-trip', async ({ page, browser }) => {
+    // Pin the `clientFactory` seam deterministically before touching the OAuth
+    // flow at all. `provider.configure({ clientFactory })` (routes/test.js) is
+    // a PROCESS-LEVEL side effect, not a per-session one — without seeding it
+    // first, the identity lookup in `completeJiraOAuthLink` falls back to a
+    // real `createJiraClient` and attempts genuine outbound HTTPS to
+    // Atlassian. A SEPARATE, isolated browser context (not this test's own
+    // `page`/`page.request`) keeps that call's session-side effects out of
+    // this flow's own cookie jar. That isolation is cheap hygiene, not a fix
+    // for a urlKey collision: the seeding call's own seeded workspace uses the
+    // fixture's fixed `jira-workspace` urlKey, which never collides with this
+    // flow's derived `acme` (deriveJiraUrlKey, routes/jira-auth.js) — the
+    // fake's only load-bearing effect is the process-level `clientFactory`
+    // registration, and the response/session it creates is discarded.
+    const seedContext = await browser.newContext();
+    await seedContext.request.post('/test/set-jira-session', { data: { authType: 'oauth' } });
+    await seedContext.close();
+
+    // Begin: the same call landing.spec.js/settings-providers.spec.js already
+    // make, on THIS test's own `page.request` context so it shares cookies
+    // with the callback below and the later `page.goto`.
+    const beginRes = await page.request.get('/auth/jira/oauth?mode=new', { maxRedirects: 0 });
+    expect(beginRes.status()).toBe(302);
+    const consent = new URL(beginRes.headers()['location']);
+    expect(consent.origin).toBe('https://auth.atlassian.com');
+    const state = consent.searchParams.get('state');
+    expect(state).toBeTruthy();
+
+    // Callback: same context as begin, so `state !== req.session.oauthState`
+    // (routes/jira-auth.js) resolves against the SAME session. `code` is
+    // arbitrary — the fake token endpoint accepts any body.
+    const callbackRes = await page.request.get(`/auth/jira/oauth/callback?code=fake-code&state=${encodeURIComponent(state)}`, { maxRedirects: 0 });
+    expect(callbackRes.status()).toBe(302);
+    // The `mode:'new'` single-site bootstrap lands IN the workspace, no query
+    // string (`completeJiraNewLogin`'s `finish()`, routes/jira-auth.js) — this
+    // is the add-source arm's `?provider_ok=jira`, not this one.
+    // `deriveJiraUrlKey` derives `acme` from the fake accessible-resources
+    // site (`https://acme.atlassian.net`) against this flow's own empty
+    // `existingWorkspaces` (the seeding call never touched this session).
+    expect(callbackRes.headers()['location']).toBe('/workspace/acme/');
+
+    // Dashboard: the post-redirect read resolves through the SAME seeded
+    // `clientFactory` fake (JiraProvider._clientFor's OAuth arm), proving the
+    // seeding call in step 1 covers both the identity probe and this read —
+    // no third fake HTTP endpoint required.
+    await page.goto(callbackRes.headers()['location']);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.project-header:has-text("Engineering")')).toBeVisible();
+
+    // Session shape via a page-rendered signal, not `req.session` directly —
+    // the zero-Linear/zero-GitHub premise (mirrors LIN-1890's own check
+    // above): exactly one connected workspace, named from the fake site.
+    await expect(page.locator('.nav-options-row a.nav-option[role="option"]')).toHaveCount(1);
+    await expect(page.locator('.nav-item[data-selector="workspace"] .nav-value')).toContainText('Acme');
+  });
+});
