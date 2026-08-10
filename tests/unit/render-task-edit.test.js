@@ -18,11 +18,13 @@ import { renderTaskEditPage } from '../../lib/render-task-edit.js';
 // Side-effect import: the shared shell's nav resolves a provider for the
 // workspace switcher, so the Linear provider must be registered in this context.
 import '../../lib/providers/linear/index.js';
-// LIN-1886: the Jira preselect case is driven off the REAL provider — its own
-// states() vocabulary and its own canonical state mapping — so the render
-// assertion cannot pass against a hand-written state shape the provider
-// never actually emits.
+// LIN-1886/LIN-2018: the Jira preselect case is driven off the REAL provider
+// — its own states() vocabulary (now the project's real per-project statuses,
+// LIN-2018) and its own canonical state mapping — so the render assertion
+// cannot pass against a hand-written state shape the provider never actually
+// emits.
 import { JiraProvider, jiraStatusCategoryToCanonical } from '../../lib/providers/jira/index.js';
+import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
 
 const ISSUE = {
   id: '11111111-2222-3333-4444-555555555555',
@@ -217,31 +219,51 @@ describe('renderTaskEditPage — the state control', () => {
     assert.ok(html.includes('<option value="Triage">Triage</option>'));
   });
 
-  // LIN-1886 D2. Driven with a CUSTOM Jira workflow status name on purpose: the
-  // preselect falls back to matching on NAME when the issue's state carries no
-  // `id`, and Jira's synthetic states() names (To Do / In Progress / Done)
-  // coincide with a default workflow's real names — so only a custom status
-  // name can catch a missing id stamp. Without it, NO option is selected, the
-  // browser defaults the <select> to its first entry ('To Do'), and a user
-  // saving a title-only edit silently regresses the issue's status.
+  // LIN-1886 D2 / LIN-2018. Driven with a CUSTOM Jira workflow status name on
+  // purpose, against a REAL per-project states() read (LIN-2018 — previously
+  // the fixed synthetic todo/in-progress/done vocabulary): only a real id
+  // match proves the preselect isn't a name coincidence. Without the id
+  // stamp, NO option is selected, the browser defaults the <select> to its
+  // first entry ('To Do'), and a user saving a title-only edit silently
+  // regresses the issue's status.
   test('preselects the current option for a CUSTOM Jira status name, via the canonical state id', async () => {
-    const states = await new JiraProvider({ site: 'https://acme.atlassian.net' }).states();
+    const client = createFakeJiraClient({
+      projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+      projectStatuses: {
+        ENG: [{
+          id: '1', name: 'Task', subtask: false,
+          statuses: [
+            { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
+            { id: '12', name: 'Ready for QA', statusCategory: { key: 'indeterminate' } },
+            { id: '13', name: 'Done', statusCategory: { key: 'done' } },
+          ],
+        }],
+      },
+    });
+    const provider = new JiraProvider({ clientFactory: () => client, site: 'https://acme.atlassian.net' });
+    const states = await provider.states({ email: 'a@b.com', apiToken: 't', site: 'https://acme.atlassian.net' }, 'ENG');
     const jiraIssue = {
       ...ISSUE,
       state: jiraStatusCategoryToCanonical({
-        fields: { status: { name: 'Ready for QA', statusCategory: { key: 'indeterminate' } } }
+        fields: { status: { id: '12', name: 'Ready for QA', statusCategory: { key: 'indeterminate' } } }
       }),
     };
     // Jira's ui.priority is false, so the priority control (and its own selected
     // option) is not rendered — every selected option below is a state option.
     const html = renderTaskEditPage({ issue: jiraIssue, states, urlKey: 'acme' }, { ui: { priority: false } });
 
-    assert.ok(html.includes('<option value="In Progress" selected>In Progress</option>'),
-      'the option matching the issue\'s real (indeterminate-category) status is preselected');
+    assert.ok(html.includes('<option value="Ready for QA" selected>Ready for QA</option>'),
+      'the option matching the issue\'s real custom status is preselected, via its real id');
     assert.strictEqual((html.match(/<option[^>]* selected>/g) || []).length, 1,
       'exactly one option is selected');
     assert.ok(!html.includes('<option value="To Do" selected>'),
       'the first option is NOT the one selected — that is the silent status regression');
+  });
+
+  test('a Jira states() read with no team (no id stamp available) degrades to the free-text input, never a broken <select>', () => {
+    const html = render({ states: [] }); // states() with no teamId now returns [] (LIN-2018)
+    assert.ok(html.includes('name="stateId"'));
+    assert.ok(html.includes('<input type="text"'), 'degrades to the text input, mirroring every other capability-gated read');
   });
 });
 

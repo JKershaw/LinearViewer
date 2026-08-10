@@ -1,15 +1,22 @@
 /**
  * Unit tests for lib/providers/jira/{index,client,fake-client}.js (LIN-1885,
- * Phase 1 of LIN-275).
+ * Phase 1 of LIN-275; LIN-2018 canonical project→team remap).
  *
  * Mirrors github-provider.test.js's shape. Pins:
- *   - the pure statusCategory → canonical state mapping;
+ *   - the pure statusCategory → canonical state mapping (now id-stamped off
+ *     the issue's REAL Jira status id, LIN-2018);
  *   - the capability profile (method capabilities + the ui surface, incl. the
  *     displayName override that keeps a bound row from rendering lowercase 'jira');
  *   - module-load self-registration under 'jira';
  *   - reads returning the canonical shape, driven through the in-memory fake
- *     client (no network, no auth) — fetchProjects, fetchIssueContext (best-effort
- *     subtask children), fetchIssueComments, fetchTeams → [];
+ *     client (no network, no auth) — fetchProjects (incl. team-scoped),
+ *     fetchIssueContext (best-effort subtask children), fetchIssueComments,
+ *     fetchTeams → the tenant's projects as canonical teams (LIN-2018);
+ *   - states() reading a project's REAL per-project workflow statuses
+ *     (LIN-2018) — flattened/deduped-by-id across issue types, synthetic
+ *     position, degrade to [] with no teamId;
+ *   - updateIssue's D2 exact-status-id transition match (LIN-2018, LIN-1941's
+ *     root fix) — never first-match-on-category;
  *   - adfToMarkdown covering the ADF node/mark types real Jira content uses;
  *   - createJiraClient's serial pagination and bounded 429/Retry-After retry,
  *     against a captured fetchImpl (real client, not the fake — the fake never
@@ -23,7 +30,6 @@ import {
   JiraProvider,
   jiraProvider,
   jiraStatusCategoryToCanonical,
-  jiraStateIdToCanonicalType,
   adfToMarkdown,
   markdownToAdf,
   adfHasUnrenderableContent,
@@ -37,11 +43,38 @@ import { SOURCE_JIRA } from '../../lib/providers/models.js'
 
 const SITE = 'https://acme.atlassian.net'
 
+// LIN-2018: ENG's real per-project statuses, seeded across TWO issue types on
+// purpose — 'Task' and 'Bug' each repeat status id '11' ('To Do') and '13'
+// ('Done'), so a dedup-by-id bug (vs. a correct implementation) is
+// distinguishable. '15' ('Ready for QA') is a CUSTOM name only 'Bug' carries,
+// and '13'/'14' are two DISTINCT done-category statuses ('Done' / "Won't
+// Do") — the exact shape LIN-1941's hazard needs to be provable against.
+const ENG_PROJECT_STATUSES = [
+  {
+    id: '1', name: 'Task', subtask: false,
+    statuses: [
+      { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
+      { id: '12', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+      { id: '13', name: 'Done', statusCategory: { key: 'done' } },
+      { id: '14', name: "Won't Do", statusCategory: { key: 'done' } },
+    ],
+  },
+  {
+    id: '2', name: 'Bug', subtask: false,
+    statuses: [
+      { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
+      { id: '15', name: 'Ready for QA', statusCategory: { key: 'indeterminate' } },
+      { id: '13', name: 'Done', statusCategory: { key: 'done' } },
+    ],
+  },
+]
+
 function seededProvider() {
   const client = createFakeJiraClient({
     projects: [
       { id: '10001', key: 'ENG', name: 'Engineering' },
     ],
+    projectStatuses: { ENG: ENG_PROJECT_STATUSES },
     issues: [
       {
         id: '20001',
@@ -51,7 +84,7 @@ function seededProvider() {
           description: { type: 'doc', version: 1, content: [
             { type: 'paragraph', content: [{ type: 'text', text: 'A parent issue.' }] },
           ] },
-          status: { name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+          status: { id: '12', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-01T00:00:00.000Z',
           duedate: null,
@@ -72,7 +105,7 @@ function seededProvider() {
         fields: {
           summary: 'Subtask of ENG-1',
           description: null,
-          status: { name: 'Done', statusCategory: { key: 'done' } },
+          status: { id: '13', name: 'Done', statusCategory: { key: 'done' } },
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-03T00:00:00.000Z',
           duedate: null,
@@ -88,45 +121,90 @@ function seededProvider() {
   return { provider, client }
 }
 
+/** A second-project variant of `seededProvider` (LIN-2018) — proves a team-scoped read is actually SCOPED, not client-side-filtered after a full walk. */
+function multiTeamSeededProvider() {
+  const client = createFakeJiraClient({
+    projects: [
+      { id: '10001', key: 'ENG', name: 'Engineering' },
+      { id: '10002', key: 'OPS', name: 'Operations' },
+    ],
+    projectStatuses: {
+      ENG: ENG_PROJECT_STATUSES,
+      OPS: [{ id: '3', name: 'Task', subtask: false, statuses: [{ id: '21', name: 'To Do', statusCategory: { key: 'new' } }] }],
+    },
+    issues: [
+      {
+        id: '20001', key: 'ENG-1',
+        fields: {
+          summary: 'Engineering issue', description: null,
+          status: { id: '12', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+        },
+      },
+      {
+        id: '40001', key: 'OPS-1',
+        fields: {
+          summary: 'Operations issue', description: null,
+          status: { id: '21', name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10002', key: 'OPS', name: 'Operations' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+        },
+      },
+    ],
+  })
+  const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+  return { provider, client }
+}
+
 // =============================================================================
 // Pure state mapping
 // =============================================================================
 
 describe('jiraStatusCategoryToCanonical', () => {
   test('new → unstarted', () => {
-    const state = jiraStatusCategoryToCanonical({ fields: { status: { name: 'To Do', statusCategory: { key: 'new' } } } })
-    assert.deepEqual(state, { id: 'todo', name: 'To Do', type: 'unstarted' })
+    const state = jiraStatusCategoryToCanonical({ fields: { status: { id: '1', name: 'To Do', statusCategory: { key: 'new' } } } })
+    assert.deepEqual(state, { id: '1', name: 'To Do', type: 'unstarted' })
   })
 
   test('indeterminate → started', () => {
-    const state = jiraStatusCategoryToCanonical({ fields: { status: { name: 'In Progress', statusCategory: { key: 'indeterminate' } } } })
-    assert.deepEqual(state, { id: 'in-progress', name: 'In Progress', type: 'started' })
+    const state = jiraStatusCategoryToCanonical({ fields: { status: { id: '3', name: 'In Progress', statusCategory: { key: 'indeterminate' } } } })
+    assert.deepEqual(state, { id: '3', name: 'In Progress', type: 'started' })
   })
 
   test('done → completed', () => {
-    const state = jiraStatusCategoryToCanonical({ fields: { status: { name: 'Done', statusCategory: { key: 'done' } } } })
-    assert.deepEqual(state, { id: 'done', name: 'Done', type: 'completed' })
+    const state = jiraStatusCategoryToCanonical({ fields: { status: { id: '10001', name: 'Done', statusCategory: { key: 'done' } } } })
+    assert.deepEqual(state, { id: '10001', name: 'Done', type: 'completed' })
   })
 
   test('an unrecognized/missing category defaults to unstarted, never canceled/duplicate', () => {
-    assert.equal(jiraStatusCategoryToCanonical({ fields: { status: { name: 'Weird', statusCategory: { key: 'something-else' } } } }).type, 'unstarted')
+    assert.equal(jiraStatusCategoryToCanonical({ fields: { status: { id: '9', name: 'Weird', statusCategory: { key: 'something-else' } } } }).type, 'unstarted')
     assert.equal(jiraStatusCategoryToCanonical({}).type, 'unstarted')
   })
 
-  test('stamps the states() id for the category — the id, NOT the free-text status name, is what the task-edit <select> preselects on (LIN-1886 D2)', async () => {
-    // A CUSTOM workflow status name: the exact case name-matching cannot serve.
-    const state = jiraStatusCategoryToCanonical({ fields: { status: { name: 'Ready for QA', statusCategory: { key: 'indeterminate' } } } })
-    assert.equal(state.id, 'in-progress')
+  // LIN-2018: the id stamp is now the issue's REAL Jira status id (previously
+  // a synthetic 3-entry vocabulary id, LIN-1886 D2) — the id, NOT the
+  // free-text status name, is what the task-edit <select> preselects on. A
+  // CUSTOM workflow status name proves the stamp cannot be coming from a name
+  // match: only the id ties it back to the real per-project status.
+  test('stamps the REAL Jira status id — not a synthetic vocabulary id', () => {
+    const state = jiraStatusCategoryToCanonical({ fields: { status: { id: '10050', name: 'Ready for QA', statusCategory: { key: 'indeterminate' } } } })
+    assert.equal(state.id, '10050')
     assert.equal(state.name, 'Ready for QA')
-    // The stamped id is always one this provider's own states() vocabulary emits.
-    const ids = new Set((await new JiraProvider({ site: SITE }).states()).map(s => s.id))
-    assert.ok(ids.has(state.id), 'stamped id is a real states() id')
-    assert.ok(ids.has(jiraStatusCategoryToCanonical({}).id), 'even the fallback branch stamps a real states() id')
+    assert.equal(state.type, 'started')
+  })
+
+  test('a status with no id (defensive — real Jira REST responses always carry one) stamps id: null rather than a synthetic placeholder', () => {
+    const state = jiraStatusCategoryToCanonical({ fields: { status: { name: 'Ready for QA', statusCategory: { key: 'indeterminate' } } } })
+    assert.equal(state.id, null)
+    assert.equal(jiraStatusCategoryToCanonical({}).id, null)
   })
 
   test('never maps from the free-text status name', () => {
     // A status literally named "Done" but in the 'new' category must still read unstarted.
-    const state = jiraStatusCategoryToCanonical({ fields: { status: { name: 'Done', statusCategory: { key: 'new' } } } })
+    const state = jiraStatusCategoryToCanonical({ fields: { status: { id: '1', name: 'Done', statusCategory: { key: 'new' } } } })
     assert.equal(state.type, 'unstarted')
   })
 })
@@ -909,8 +987,10 @@ describe('JiraProvider reads (fake client)', () => {
     ({ provider } = seededProvider())
   })
 
-  test('fetchTeams always returns [] (capability teams:false)', async () => {
-    assert.deepEqual(await provider.fetchTeams({ email: 'a@b.com', apiToken: 't', site: SITE }), [])
+  // LIN-2018: a Jira project surfaces as a canonical team, id = project key.
+  test('fetchTeams maps projects to {id, name, key}, id = project key (LIN-2018, Option 2 of the LIN-2007 ruling)', async () => {
+    const teams = await provider.fetchTeams({ email: 'a@b.com', apiToken: 't', site: SITE })
+    assert.deepEqual(teams, [{ id: 'ENG', name: 'Engineering', key: 'ENG' }])
   })
 
   test('fetchProjects returns canonical projects + issues, stamped with SOURCE_JIRA', async () => {
@@ -931,11 +1011,67 @@ describe('JiraProvider reads (fake client)', () => {
     assert.equal(parent.assignee.name, 'Ada Lovelace')
     assert.deepEqual(parent.labels.nodes, [{ name: 'backend' }])
     assert.equal(parent.id, '20001', 'the immutable issue id is the primary identity, key is human-readable only')
+    // LIN-2018: the team stamp — id = project key, matching issueWriteGuard's
+    // own precedence — is what makes `loadStates(..., issue.team.id)` and the
+    // proxy wire's flat `teamId` mirror stop always seeing null for Jira.
+    assert.deepEqual(parent.team, { id: 'ENG', name: 'Engineering' })
 
     const child = result.issues.find(i => i.identifier === 'ENG-2')
     assert.equal(child.state.type, 'completed')
     assert.equal(child.completedAt, '2026-01-04T00:00:00.000Z')
     assert.deepEqual(child.parent, { id: '20001', identifier: 'ENG-1' })
+  })
+
+  test('an issue with no project stamps team: null (mirrors project: null)', async () => {
+    const client = createFakeJiraClient({
+      projects: [], issues: [{ id: '99', key: 'X-1', fields: { summary: 'orphan', status: { statusCategory: { key: 'new' } }, project: null } }],
+    })
+    const orphanProvider = new JiraProvider({ clientFactory: () => client, site: SITE })
+    const issue = await orphanProvider.fetchIssueFields({ email: 'a@b.com', apiToken: 't', site: SITE }, 'X-1')
+    assert.equal(issue.team, null)
+    assert.equal(issue.project, null)
+  })
+
+  test('fetchProjects(scope, teamId) scopes to ONE project via getProject + a single-project JQL — not a client-side filter after a full walk (LIN-2018)', async () => {
+    const { provider: multi, client } = multiTeamSeededProvider()
+    const listAllCalls = { count: 0 }
+    const originalListAllProjects = client.listAllProjects.bind(client)
+    client.listAllProjects = async (...args) => { listAllCalls.count += 1; return originalListAllProjects(...args) }
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+
+    const result = await multi.fetchProjects(scope, 'ENG')
+    assert.equal(result.projects.length, 1)
+    assert.equal(result.projects[0].id, '10001')
+    assert.deepEqual(result.issues.map(i => i.identifier), ['ENG-1'], 'OPS-1 must be absent — the read is genuinely scoped, not filtered client-side')
+    assert.equal(listAllCalls.count, 0, 'a team-scoped read must use getProject, never the full listAllProjects walk')
+  })
+
+  test('fetchProjects with no teamId still walks every project (unscoped, unchanged)', async () => {
+    const { provider: multi } = multiTeamSeededProvider()
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const result = await multi.fetchProjects(scope)
+    assert.deepEqual(result.projects.map(p => p.id).sort(), ['10001', '10002'])
+    assert.deepEqual(result.issues.map(i => i.identifier).sort(), ['ENG-1', 'OPS-1'])
+  })
+
+  test('fetchProjects(scope, teamId) preserves the truncated flag (LIN-2006) on the SCOPED branch too', async () => {
+    const cappedIssues = [{
+      id: '1', key: 'ENG-1',
+      fields: {
+        summary: 'x', description: null, status: { statusCategory: { key: 'new' } },
+        project: { id: '10001', key: 'ENG', name: 'Engineering' },
+        created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null, labels: [], assignee: null, parent: null,
+      },
+    }]
+    cappedIssues.truncated = true
+    const stubClient = {
+      getProject: async () => ({ id: '10001', key: 'ENG', name: 'Engineering' }),
+      searchAllIssues: async () => cappedIssues,
+    }
+    const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const result = await provider.fetchProjects(scope, 'ENG')
+    assert.equal(result.truncated, true)
   })
 
   test('fetchProjects reports truncated: false by default (LIN-2006)', async () => {
@@ -1045,36 +1181,7 @@ describe('JiraProvider reads (fake client)', () => {
 })
 
 // =============================================================================
-// jiraStateIdToCanonicalType — the reverse of jiraStatusCategoryToCanonical
-// (LIN-1886 Step 2, mirrors githubStateIdToCanonicalType)
-// =============================================================================
-
-describe('jiraStateIdToCanonicalType', () => {
-  test('maps the three synthetic states() ids to their canonical types', () => {
-    assert.equal(jiraStateIdToCanonicalType('todo'), 'unstarted')
-    assert.equal(jiraStateIdToCanonicalType('in-progress'), 'started')
-    assert.equal(jiraStateIdToCanonicalType('done'), 'completed')
-  })
-
-  test('an unknown id (e.g. a UUID that slipped the routes\' UUID fast-path) throws a 422-shaped RefResolutionError', () => {
-    assert.throws(() => jiraStateIdToCanonicalType('11111111-1111-1111-1111-111111111111'), err => {
-      assert.ok(err instanceof RefResolutionError)
-      assert.equal(err.status, 422)
-      return true
-    })
-  })
-
-  test('there is no id mapping to canceled/duplicate — those categories are unreachable from Jira\'s statusCategory vocabulary', () => {
-    for (const id of ['todo', 'in-progress', 'done']) {
-      const type = jiraStateIdToCanonicalType(id)
-      assert.notEqual(type, 'canceled')
-      assert.notEqual(type, 'duplicate')
-    }
-  })
-})
-
-// =============================================================================
-// Step 2 — states()/labels()/route-internal reads (LIN-1886)
+// Step 2 — states()/labels()/route-internal reads (LIN-1886; LIN-2018 remap)
 // =============================================================================
 
 describe('JiraProvider Step 2 reads (fake client)', () => {
@@ -1084,15 +1191,59 @@ describe('JiraProvider Step 2 reads (fake client)', () => {
     ({ provider } = seededProvider())
   })
 
-  test('states() returns the fixed synthetic todo/in-progress/done vocabulary, never real per-workflow status names', async () => {
+  test('states() with no teamId degrades to [] rather than throwing (LIN-2018) — states are per-project now, there is no team-less answer', async () => {
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
-    const states = await provider.states(scope, null)
-    assert.deepEqual(states.map(s => s.id), ['todo', 'in-progress', 'done'])
-    assert.deepEqual(states.map(s => s.type), ['unstarted', 'started', 'completed'])
+    assert.deepEqual(await provider.states(scope, null), [])
+    assert.deepEqual(await provider.states(scope), [])
+  })
+
+  test('states(scope, teamId) returns the REAL per-project statuses, never the old synthetic todo/in-progress/done vocabulary (LIN-2018)', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const states = await provider.states(scope, 'ENG')
+    const names = states.map(s => s.name).sort()
+    assert.deepEqual(names, ['Done', 'In Progress', 'Ready for QA', 'To Do', "Won't Do"])
+    assert.ok(states.some(s => s.name === 'Ready for QA'), 'a CUSTOM status name must appear — proves this is not the fixed synthetic vocabulary')
     for (const s of states) {
+      assert.equal(typeof s.id, 'string')
       assert.equal(typeof s.name, 'string')
       assert.equal(typeof s.position, 'number')
+      assert.ok(['unstarted', 'started', 'completed'].includes(s.type))
     }
+  })
+
+  test('states() dedupes by status id across issue types, never by name (LIN-2018)', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const states = await provider.states(scope, 'ENG')
+    // ENG_PROJECT_STATUSES repeats id '11' ('To Do') and '13' ('Done') across
+    // the 'Task' and 'Bug' issue types — each must appear exactly ONCE.
+    const ids = states.map(s => s.id)
+    assert.equal(new Set(ids).size, ids.length, 'no duplicate ids survived the flatten')
+    assert.equal(ids.filter(id => id === '11').length, 1)
+    assert.equal(ids.filter(id => id === '13').length, 1)
+    assert.equal(states.length, 5, 'exactly the 5 DISTINCT ids across both issue types (11,12,13,14,15)')
+  })
+
+  test('states() synthesizes position from first-appearance order (the endpoint carries none) (LIN-2018)', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const states = await provider.states(scope, 'ENG')
+    const byId = Object.fromEntries(states.map(s => [s.id, s.position]))
+    // First-appearance order walking ENG_PROJECT_STATUSES's 'Task' entries
+    // then 'Bug' entries: 11, 12, 13, 14 (Task) then 15 (Bug; 11/13 already seen).
+    assert.deepEqual(byId, { 11: 0, 12: 1, 13: 2, 14: 3, 15: 4 })
+  })
+
+  test('states() surfaces two DISTINCT done-category statuses (Done / Won\'t Do) — the exact shape LIN-1941\'s hazard needs (LIN-2018)', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const states = await provider.states(scope, 'ENG')
+    const doneCategory = states.filter(s => s.type === 'completed')
+    assert.deepEqual(doneCategory.map(s => s.name).sort(), ['Done', "Won't Do"])
+  })
+
+  test('states() for a project with no seeded statuses returns [] rather than throwing', async () => {
+    const client = createFakeJiraClient({ projects: [{ id: '999', key: 'BARE', name: 'Bare' }] })
+    const bareProvider = new JiraProvider({ clientFactory: () => client, site: SITE })
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    assert.deepEqual(await bareProvider.states(scope, 'BARE'), [])
   })
 
   test('labels() returns the site-wide label vocabulary as {id, name} pairs (id = name, mirrors GitHub)', async () => {
@@ -1165,6 +1316,7 @@ describe('JiraProvider Step 2 reads (fake client)', () => {
 function writableSeededProvider() {
   const client = createFakeJiraClient({
     projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+    projectStatuses: { ENG: ENG_PROJECT_STATUSES },
     issues: [
       {
         id: '30001', key: 'ENG-10',
@@ -1173,13 +1325,15 @@ function writableSeededProvider() {
           description: { type: 'doc', version: 1, content: [
             { type: 'paragraph', content: [{ type: 'text', text: 'Plain description.' }] },
           ] },
-          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          status: { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: ['bug'], assignee: null, parent: null,
+          // LIN-2018: `to.id` is what D2 now matches EXACTLY — the id, not the
+          // statusCategory, decides which transition a `stateId` resolves to.
           _transitions: [
-            { id: '11', name: 'Start Progress', to: { name: 'In Progress', statusCategory: { key: 'indeterminate' } } },
-            { id: '21', name: 'Done', to: { name: 'Done', statusCategory: { key: 'done' } } },
+            { id: '111', name: 'Start Progress', to: { id: '12', name: 'In Progress', statusCategory: { key: 'indeterminate' } } },
+            { id: '211', name: 'Done', to: { id: '13', name: 'Done', statusCategory: { key: 'done' } } },
           ],
         },
       },
@@ -1188,7 +1342,7 @@ function writableSeededProvider() {
         fields: {
           summary: 'Issue with a table in its description',
           description: { type: 'doc', version: 1, content: [{ type: 'table', content: [] }] },
-          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          status: { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: [], assignee: null, parent: null, _transitions: [],
@@ -1201,7 +1355,7 @@ function writableSeededProvider() {
           description: { type: 'doc', version: 1, content: [
             { type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'underline' }] }] },
           ] },
-          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          status: { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: [], assignee: null, parent: null, _transitions: [],
@@ -1212,7 +1366,7 @@ function writableSeededProvider() {
         fields: {
           summary: 'Done issue with nothing else available',
           description: null,
-          status: { name: 'Done', statusCategory: { key: 'done' } },
+          status: { id: '13', name: 'Done', statusCategory: { key: 'done' } },
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: [], assignee: null, parent: null, _transitions: [],
@@ -1223,12 +1377,12 @@ function writableSeededProvider() {
         fields: {
           summary: 'Issue whose only transition to Done requires a screen',
           description: null,
-          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          status: { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: [], assignee: null, parent: null,
           _transitions: [
-            { id: '31', name: 'Resolve', to: { name: 'Done', statusCategory: { key: 'done' } }, hasScreen: true },
+            { id: '31', name: 'Resolve', to: { id: '13', name: 'Done', statusCategory: { key: 'done' } }, hasScreen: true },
           ],
         },
       },
@@ -1237,12 +1391,27 @@ function writableSeededProvider() {
         fields: {
           summary: 'Issue whose only transition carries fields but not hasScreen',
           description: null,
-          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          status: { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: [], assignee: null, parent: null,
           _transitions: [
-            { id: '32', name: 'Resolve', to: { name: 'Done', statusCategory: { key: 'done' } }, fields: { resolution: { required: true } } },
+            { id: '32', name: 'Resolve', to: { id: '13', name: 'Done', statusCategory: { key: 'done' } }, fields: { resolution: { required: true } } },
+          ],
+        },
+      },
+      {
+        id: '30007', key: 'ENG-16', // two DISTINCT done-category transitions available — LIN-1941's root-fix proof
+        fields: {
+          summary: 'Issue with two done-category transitions available (Done / Won\'t Do)',
+          description: null,
+          status: { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+          _transitions: [
+            { id: '41', name: 'Resolve', to: { id: '13', name: 'Done', statusCategory: { key: 'done' } } },
+            { id: '42', name: 'Abandon', to: { id: '14', name: "Won't Do", statusCategory: { key: 'done' } } },
           ],
         },
       },
@@ -1295,24 +1464,41 @@ describe('JiraProvider.updateIssue (LIN-1886 Step 3)', () => {
     )
   })
 
-  test('D2: happy-path status transition (todo → in-progress) actually moves the issue', async () => {
-    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { stateId: 'in-progress' })
+  test('D2: happy-path status transition (To Do id 11 → In Progress id 12) actually moves the issue', async () => {
+    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { stateId: '12' })
     assert.equal(issue.state.type, 'started')
+    assert.equal(issue.state.id, '12')
   })
 
-  test('D2: happy-path status transition (todo → done)', async () => {
-    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { stateId: 'done' })
+  test('D2: happy-path status transition (To Do id 11 → Done id 13)', async () => {
+    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { stateId: '13' })
     assert.equal(issue.state.type, 'completed')
+    assert.equal(issue.state.id, '13')
   })
 
-  test('D2: a same-category stateId is a SKIPPED no-op — no getTransitions/doTransition call at all', async () => {
+  test('D2 (LIN-2018 root fix): an EXACT status id wins even when another transition shares its statusCategory — never first-match', async () => {
+    // ENG-16 offers BOTH a Done (id 13) and a Won't Do (id 14) transition,
+    // both statusCategory 'done'. Requesting each id must land on THAT exact
+    // status, proving the match is on id, not "first done-category transition".
+    const toDone = await provider.updateIssue(SCOPE, 'ENG-16', { stateId: '13' })
+    assert.equal(toDone.state.id, '13')
+    assert.equal(toDone.state.name, 'Done')
+  })
+
+  test('D2 (LIN-2018 root fix): the other exact id (Won\'t Do) is reachable too — proves the match is not hardcoded to the first candidate', async () => {
+    const toWontDo = await provider.updateIssue(SCOPE, 'ENG-16', { stateId: '14' })
+    assert.equal(toWontDo.state.id, '14')
+    assert.equal(toWontDo.state.name, "Won't Do")
+  })
+
+  test('D2: a same-id stateId is a SKIPPED no-op — no getTransitions/doTransition call at all', async () => {
     let getTransitionsCalls = 0
     const originalGetTransitions = client.getTransitions.bind(client)
     client.getTransitions = async (...args) => { getTransitionsCalls += 1; return originalGetTransitions(...args) }
 
-    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { stateId: 'todo' })
+    const issue = await provider.updateIssue(SCOPE, 'ENG-10', { stateId: '11' })
     assert.equal(issue.state.type, 'unstarted')
-    assert.equal(getTransitionsCalls, 0, 'the current type already matched — no transitions call should have been made')
+    assert.equal(getTransitionsCalls, 0, 'the current status id already matched — no transitions call should have been made')
   })
 
   test('a title-only patch leaves status untouched (no stateId in the patch at all)', async () => {
@@ -1321,10 +1507,10 @@ describe('JiraProvider.updateIssue (LIN-1886 Step 3)', () => {
     assert.equal(issue.state.type, before.state.type)
   })
 
-  test('D2: no available transition to the target category → 422, never a silent no-op', async () => {
-    // ENG-13 is `done` with an EMPTY _transitions list; targeting `todo` finds nothing.
+  test('D2: no available transition to the target id → 422, never a silent no-op', async () => {
+    // ENG-13 is `done` with an EMPTY _transitions list; targeting id '11' ('To Do') finds nothing.
     await assert.rejects(
-      () => provider.updateIssue(SCOPE, 'ENG-13', { stateId: 'todo' }),
+      () => provider.updateIssue(SCOPE, 'ENG-13', { stateId: '11' }),
       err => {
         assert.ok(err instanceof RefResolutionError)
         assert.equal(err.status, 422)
@@ -1335,7 +1521,7 @@ describe('JiraProvider.updateIssue (LIN-1886 Step 3)', () => {
 
   test('D2: a screen-required transition refuses (422) rather than attempting a screen-driven update', async () => {
     await assert.rejects(
-      () => provider.updateIssue(SCOPE, 'ENG-14', { stateId: 'done' }),
+      () => provider.updateIssue(SCOPE, 'ENG-14', { stateId: '13' }),
       err => {
         assert.ok(err instanceof RefResolutionError)
         assert.equal(err.status, 422)
@@ -1345,11 +1531,11 @@ describe('JiraProvider.updateIssue (LIN-1886 Step 3)', () => {
   })
 
   test('D2: a transition carrying `fields` but no `hasScreen` is NOT refused (LIN-2020: `fields` is never populated by real Jira without `expand`, so it must not drive the guard)', async () => {
-    const issue = await provider.updateIssue(SCOPE, 'ENG-15', { stateId: 'done' })
+    const issue = await provider.updateIssue(SCOPE, 'ENG-15', { stateId: '13' })
     assert.equal(issue.state.type, 'completed')
   })
 
-  test('D2: a symbolic stateId of "canceled"/"duplicate" is refused (422) — Jira has no such statusCategory, never silently folds to done', async () => {
+  test('D2: a stateId this integration cannot match against any transition (a stale/legacy synthetic id like "canceled") is refused (422) — never silently folds to any status', async () => {
     await assert.rejects(() => provider.updateIssue(SCOPE, 'ENG-10', { stateId: 'canceled' }), RefResolutionError)
     await assert.rejects(() => provider.updateIssue(SCOPE, 'ENG-10', { stateId: 'duplicate' }), RefResolutionError)
   })
@@ -1550,6 +1736,35 @@ describe('createJiraClient serial pagination', () => {
     const all = await client.listAllProjects({ cap: 5 })
     assert.equal(all.length, 5, `capped at exactly 5 projects, got ${all.length}`)
     assert.equal(all.truncated, true, 'stopping on the cap, not the natural end, must be signalled')
+  })
+
+  test('getProjectStatuses (LIN-2018) GETs /rest/api/3/project/{key}/statuses and returns the plain array verbatim — no pagination, one request', async () => {
+    const payload = [
+      { id: '1', name: 'Task', subtask: false, statuses: [{ id: '11', name: 'To Do', statusCategory: { key: 'new' } }] },
+    ]
+    const calls = []
+    const fetchImpl = async (url) => {
+      calls.push(url)
+      return { status: 200, ok: true, headers: { get: () => null }, text: async () => JSON.stringify(payload) }
+    }
+    const client = createJiraClient({ email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl })
+    const result = await client.getProjectStatuses('ENG')
+    assert.equal(calls.length, 1, 'exactly one request — this endpoint is not paginated')
+    assert.ok(calls[0].endsWith('/rest/api/3/project/ENG/statuses'))
+    assert.deepEqual(result, payload)
+  })
+
+  test('getProjectStatuses reuses the shared request() rate-limit path — a 429 here retries exactly like any other read, no second backoff implementation', async () => {
+    let attempt = 0
+    const fetchImpl = async () => {
+      attempt += 1
+      if (attempt === 1) return { status: 429, ok: false, headers: { get: h => (h === 'Retry-After' ? '0' : null) } }
+      return { status: 200, ok: true, headers: { get: () => null }, text: async () => JSON.stringify([]) }
+    }
+    const client = createJiraClient({ email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl, sleepImpl: async () => {} })
+    const result = await client.getProjectStatuses('ENG')
+    assert.equal(attempt, 2, 'retried exactly once through the shared 429 handling')
+    assert.deepEqual(result, [])
   })
 
   test('searchIssues posts to /search/jql (not the removed /search) with jql/maxResults/fields, no startAt', async () => {

@@ -32,6 +32,24 @@ export function jiraDashboardUrl(urlKey = JIRA_WORKSPACE_URL_KEY) {
  * mapping — new (→ unstarted), indeterminate (→ started), done (→ completed) —
  * plus a native one-level subtask (best-effort parent/children).
  */
+// LIN-2018: ENG's real per-project workflow statuses (one issue type is
+// enough for this fixture's purposes) — `states()` now reads THIS, not a
+// fixed synthetic vocabulary. Every seeded issue's `status`/`_transitions.to`
+// below carries the matching real id, mirroring what real Jira REST payloads
+// always carry.
+export const defaultJiraProjectStatuses = {
+  ENG: [
+    {
+      id: '1', name: 'Task', subtask: false,
+      statuses: [
+        { id: '101', name: 'To Do', statusCategory: { key: 'new' } },
+        { id: '102', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+        { id: '103', name: 'Done', statusCategory: { key: 'done' } },
+      ],
+    },
+  ],
+};
+
 export const defaultJiraSeed = {
   projects: [
     // Deliberately no `self` field: the provider's canonical project `url`
@@ -41,6 +59,7 @@ export const defaultJiraSeed = {
     // regression back to `project.self` pass unnoticed.
     { id: '10001', key: 'ENG', name: 'Engineering' },
   ],
+  projectStatuses: defaultJiraProjectStatuses,
   issues: [
     {
       id: '20001', key: 'ENG-1',
@@ -53,16 +72,17 @@ export const defaultJiraSeed = {
         description: { type: 'doc', version: 1, content: [
           { type: 'paragraph', attrs: { localId: '0647076c05f3' }, content: [{ type: 'text', text: 'A todo Jira issue.' }] },
         ] },
-        status: { name: 'To Do', statusCategory: { key: 'new' } },
+        status: { id: '101', name: 'To Do', statusCategory: { key: 'new' } },
         project: { id: '10001', key: 'ENG', name: 'Engineering' },
         created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
         labels: [], assignee: null, parent: null,
         // LIN-1942: one forward transition (To Do → In Progress), seeded so the
         // write-lane E2E can drive a genuine status move through the browser.
         // Inert for detail-nonactive-binding.spec.js's Jira read test, which
-        // asserts title/description/priority-absence only.
+        // asserts title/description/priority-absence only. `to.id` (LIN-2018)
+        // is what the provider's D2 write path now matches EXACTLY.
         _transitions: [
-          { id: '31', name: 'Start Progress', to: { name: 'In Progress', statusCategory: { key: 'indeterminate' } } },
+          { id: '31', name: 'Start Progress', to: { id: '102', name: 'In Progress', statusCategory: { key: 'indeterminate' } } },
         ],
       },
     },
@@ -73,7 +93,7 @@ export const defaultJiraSeed = {
         description: { type: 'doc', version: 1, content: [
           { type: 'paragraph', content: [{ type: 'text', text: 'An in-progress Jira issue.' }] },
         ] },
-        status: { name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+        status: { id: '102', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
         project: { id: '10001', key: 'ENG', name: 'Engineering' },
         created: '2026-01-02T00:00:00.000Z', duedate: null, resolutiondate: null,
         labels: ['bug'], assignee: { displayName: 'Ada Lovelace' }, parent: null,
@@ -89,7 +109,7 @@ export const defaultJiraSeed = {
       fields: {
         summary: 'Jira task shipped',
         description: null,
-        status: { name: 'Done', statusCategory: { key: 'done' } },
+        status: { id: '103', name: 'Done', statusCategory: { key: 'done' } },
         project: { id: '10001', key: 'ENG', name: 'Engineering' },
         created: '2026-01-03T00:00:00.000Z', duedate: null, resolutiondate: '2026-01-05T00:00:00.000Z',
         labels: [], assignee: null, parent: null,
@@ -100,7 +120,7 @@ export const defaultJiraSeed = {
       fields: {
         summary: 'Subtask of the in-progress task',
         description: null,
-        status: { name: 'To Do', statusCategory: { key: 'new' } },
+        status: { id: '101', name: 'To Do', statusCategory: { key: 'new' } },
         project: { id: '10001', key: 'ENG', name: 'Engineering' },
         created: '2026-01-04T00:00:00.000Z', duedate: null, resolutiondate: null,
         labels: [], assignee: null, parent: { id: '20002', key: 'ENG-2' },
@@ -119,7 +139,7 @@ export const defaultJiraSeed = {
         description: { type: 'doc', version: 1, content: [
           { type: 'table', content: [] },
         ] },
-        status: { name: 'To Do', statusCategory: { key: 'new' } },
+        status: { id: '101', name: 'To Do', statusCategory: { key: 'new' } },
         project: { id: '10001', key: 'ENG', name: 'Engineering' },
         created: '2026-01-05T00:00:00.000Z', duedate: null, resolutiondate: null,
         labels: [], assignee: null, parent: null,
@@ -132,7 +152,7 @@ export const defaultJiraSeed = {
         description: { type: 'doc', version: 1, content: [
           { type: 'paragraph', content: [{ type: 'text', text: 'underlined', marks: [{ type: 'underline' }] }] },
         ] },
-        status: { name: 'To Do', statusCategory: { key: 'new' } },
+        status: { id: '101', name: 'To Do', statusCategory: { key: 'new' } },
         project: { id: '10001', key: 'ENG', name: 'Engineering' },
         created: '2026-01-06T00:00:00.000Z', duedate: null, resolutiondate: null,
         labels: [], assignee: null, parent: null,
