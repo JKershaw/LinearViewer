@@ -76,7 +76,7 @@ import { BOOTSTRAP_TOKEN_TTL_SECONDS, WORKING_TOKEN_TTL_SECONDS } from '../lib/p
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
-import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, requireTeamMembership, TeamNotFoundError } from '../lib/workspace.js';
 import {
   parseSourceNamespace,
   resolveStateRef,
@@ -2159,7 +2159,7 @@ One convention across every endpoint, so you can branch on the same fields every
         return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
 
-      const teamId = req.query.teamId;
+      let teamId = req.query.teamId || null;
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 250);
       // Opaque page cursor: pass the previous response's pageInfo.endCursor back
       // as `after` (or the `cursor` alias) to fetch the next slice. Treated
@@ -2168,12 +2168,17 @@ One convention across every endpoint, so you can branch on the same fields every
       // Absent → null, i.e. today's first-page behaviour (LIN-1511).
       const after = req.query.after ?? req.query.cursor ?? null;
 
-      if (teamId && !UUID_REGEX.test(teamId)) {
-        logEvent(req, '/api/proxy/issues', 400);
-        return badRequest.json(res, 'Invalid teamId format');
+      // LIN-2025: a well-formed-but-unmatched team id must fail loud instead
+      // of silently widening to the whole workspace — an autonomous caller
+      // cannot detect a dropped filter (John's ruling, 2026-08-10). Guarded
+      // on teamId being present so the hot unfiltered-issues path pays no
+      // extra provider round trip; a teamless provider's empty fetchTeams()
+      // passes the raw value straight through (F1).
+      if (teamId) {
+        teamId = requireTeamMembership(await provider.fetchTeams(token), teamId);
       }
 
-      const { nodes, pageInfo } = await provider.issues(token, { teamId: teamId || null, first: limit, after });
+      const { nodes, pageInfo } = await provider.issues(token, { teamId, first: limit, after });
       logEvent(req, '/api/proxy/issues', 200);
       res.json({
         issues: nodes.map(flattenIssue),
@@ -2183,6 +2188,10 @@ One convention across every endpoint, so you can branch on the same fields every
         }
       });
     } catch (err) {
+      if (err instanceof TeamNotFoundError) {
+        logEvent(req, '/api/proxy/issues', 404);
+        return jsonError(res, 404, `Team not found: ${err.teamId}`, { code: 'TEAM_NOT_FOUND' });
+      }
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues', status);
       console.error('Proxy /issues error:', err.message);
@@ -2280,10 +2289,9 @@ One convention across every endpoint, so you can branch on the same fields every
       }
 
       const { teamId } = req.params;
-      if (!UUID_REGEX.test(teamId)) {
-        logEvent(req, '/api/proxy/states', 400);
-        return badRequest.json(res, 'Invalid team ID format');
-      }
+      // LIN-2025: no local format gate — an invalid/unmatched team id is
+      // surfaced by the provider itself (caught below), same as any other
+      // provider-rejected input on this route.
 
       // Provider already sorts by board position (drop the route's duplicate sort).
       const stateList = await provider.states(token, teamId);
@@ -2307,16 +2315,21 @@ One convention across every endpoint, so you can branch on the same fields every
         return workspaceUnavailable(req, res, '/api/proxy/labels', reason);
       }
 
-      const teamId = req.query.teamId;
-      if (teamId && !UUID_REGEX.test(teamId)) {
-        logEvent(req, '/api/proxy/labels', 400);
-        return badRequest.json(res, 'Invalid team ID format');
+      let teamId = req.query.teamId || null;
+      // LIN-2025: fail loud on a well-formed-but-unmatched team id rather
+      // than silently widening to the whole workspace — see /api/proxy/issues.
+      if (teamId) {
+        teamId = requireTeamMembership(await provider.fetchTeams(token), teamId);
       }
 
-      const labelList = await provider.labels(token, teamId || null);
+      const labelList = await provider.labels(token, teamId);
       logEvent(req, '/api/proxy/labels', 200);
       res.json({ labels: labelList });
     } catch (err) {
+      if (err instanceof TeamNotFoundError) {
+        logEvent(req, '/api/proxy/labels', 404);
+        return jsonError(res, 404, `Team not found: ${err.teamId}`, { code: 'TEAM_NOT_FOUND' });
+      }
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/labels', status);
       console.error('Proxy /labels error:', err.message);
@@ -2335,16 +2348,21 @@ One convention across every endpoint, so you can branch on the same fields every
         return workspaceUnavailable(req, res, '/api/proxy/cycles', reason);
       }
 
-      const teamId = req.query.teamId;
-      if (teamId && !UUID_REGEX.test(teamId)) {
-        logEvent(req, '/api/proxy/cycles', 400);
-        return badRequest.json(res, 'Invalid team ID format');
+      let teamId = req.query.teamId || null;
+      // LIN-2025: fail loud on a well-formed-but-unmatched team id rather
+      // than silently widening to the whole workspace — see /api/proxy/issues.
+      if (teamId) {
+        teamId = requireTeamMembership(await provider.fetchTeams(token), teamId);
       }
 
-      const cycleList = await provider.cycles(token, teamId || null);
+      const cycleList = await provider.cycles(token, teamId);
       logEvent(req, '/api/proxy/cycles', 200);
       res.json({ cycles: cycleList });
     } catch (err) {
+      if (err instanceof TeamNotFoundError) {
+        logEvent(req, '/api/proxy/cycles', 404);
+        return jsonError(res, 404, `Team not found: ${err.teamId}`, { code: 'TEAM_NOT_FOUND' });
+      }
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/cycles', status);
       console.error('Proxy /cycles error:', err.message);

@@ -52,7 +52,7 @@ import { hashContext } from '../lib/recap-cache.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, resolveIssueBinding, isActiveProviderLinear } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, resolveIssueBinding, isActiveProviderLinear, matchTeamId } from '../lib/workspace.js';
 // LIN-1552 Session A: the session-auth issue write routes reuse the SAME
 // symbolic-ref primitives the proxy write path uses, the shared trashed-signal
 // detector, and the shared issue-write validator — no rules re-inlined here.
@@ -3423,15 +3423,25 @@ ${goal}`
     const hasNorthStar = !!(northStar && northStar.trim());
 
     const rawTeam = req.body?.team;
-    const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+    const teamId = rawTeam && rawTeam !== 'all' ? rawTeam : null;
 
     // Fetch Linear once and build the model into a local variable. Errors here
     // happen before any SSE headers are flushed, so they stay normal HTTP codes.
     let roadmapModel;
     try {
+      const provider = getProviderForWorkspace(req.workspace);
+      const scope = getWorkspaceCallScope(req.workspace);
+      // LIN-2025: resolve teamId against the workspace's actual team list
+      // (graceful drop-to-unscoped), replacing the UUID format gate. Guarded
+      // on teamId being present (no extra round trip when unfiltered) AND
+      // kept inside the same testMode arm as the projects fetch below, so a
+      // test-token session never issues a real provider call ahead of it.
+      const resolvedTeamId = teamId
+        ? matchTeamId(testMode ? testMockTeams : await provider.fetchTeams(scope), teamId)
+        : null;
       const { projects, issues } = testMode
         ? testMockData
-        : await getProviderForWorkspace(req.workspace).fetchProjects(getWorkspaceCallScope(req.workspace), teamId);
+        : await provider.fetchProjects(scope, resolvedTeamId);
       roadmapModel = buildRoadmapModel(projects, issues);
     } catch (error) {
       console.error('Roadmap generate fetch error:', error);

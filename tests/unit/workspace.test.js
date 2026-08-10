@@ -21,7 +21,10 @@ import {
   resolveIssueBinding,
   remintActiveCredential,
   saveSession,
-  MAX_WORKSPACES
+  MAX_WORKSPACES,
+  matchTeamId,
+  requireTeamMembership,
+  TeamNotFoundError
 } from '../../lib/workspace.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 
@@ -1423,5 +1426,70 @@ describe('saveSession', () => {
 
     await saveSession(session);
     assert.strictEqual(callbackCalled, true);
+  });
+});
+
+// LIN-2025: replaces the 11 inline UUID_REGEX team-ref format gates with a
+// membership check against the workspace's already-fetched team list. Two
+// helpers, deliberately split — graceful for page routes, strict for the
+// three agent-facing proxy reads (John's ruling, 2026-08-10).
+describe('matchTeamId (graceful — page/dashboard/roadmap routes)', () => {
+  const TEAMS = [{ id: 'team-a' }, { id: 'team-b' }];
+
+  test('no rawTeamId → null, regardless of team list', () => {
+    assert.strictEqual(matchTeamId(TEAMS, null), null);
+    assert.strictEqual(matchTeamId(TEAMS, undefined), null);
+    assert.strictEqual(matchTeamId([], null), null);
+  });
+
+  test('a matching id resolves to that team\'s id', () => {
+    assert.strictEqual(matchTeamId(TEAMS, 'team-a'), 'team-a');
+  });
+
+  // F1: a teamless provider's fetchTeams() always returns [] — the raw value
+  // must pass through unvalidated rather than being treated as "no match",
+  // so each provider's own downstream teamId handling stays the source of
+  // truth (e.g. LocalProvider.issues() returning [] for any truthy teamId).
+  test('empty team list (teamless provider) passes the raw value through unchanged', () => {
+    assert.strictEqual(matchTeamId([], 'anything-at-all'), 'anything-at-all');
+    assert.strictEqual(matchTeamId(null, 'anything-at-all'), 'anything-at-all');
+  });
+
+  // The key case per the ticket: a well-formed id that simply isn't in THIS
+  // workspace's non-empty team list. Graceful helper drops to unscoped.
+  test('a non-empty team list with no match drops to unscoped (null) — the page-route policy', () => {
+    assert.strictEqual(matchTeamId(TEAMS, 'not-a-real-team'), null);
+  });
+});
+
+describe('requireTeamMembership (strict — GET /api/proxy/issues|labels|cycles)', () => {
+  const TEAMS = [{ id: 'team-a' }, { id: 'team-b' }];
+
+  test('no rawTeamId → null, regardless of team list', () => {
+    assert.strictEqual(requireTeamMembership(TEAMS, null), null);
+    assert.strictEqual(requireTeamMembership([], undefined), null);
+  });
+
+  test('a matching id resolves to that team\'s id', () => {
+    assert.strictEqual(requireTeamMembership(TEAMS, 'team-b'), 'team-b');
+  });
+
+  // F1 preserved for the strict helper too: an empty team list can never
+  // throw — the throw path is only reachable on a workspace whose provider
+  // actually has teams.
+  test('empty team list (teamless provider) passes the raw value through unchanged, never throws', () => {
+    assert.strictEqual(requireTeamMembership([], 'anything-at-all'), 'anything-at-all');
+    assert.strictEqual(requireTeamMembership(null, 'anything-at-all'), 'anything-at-all');
+  });
+
+  // The ruling this helper exists to enforce: a well-formed-but-unmatched id
+  // on a non-empty (real) team list must fail loud, not silently widen to
+  // the whole workspace.
+  test('a non-empty team list with no match throws TeamNotFoundError', () => {
+    assert.throws(() => requireTeamMembership(TEAMS, 'not-a-real-team'), (err) => {
+      assert.ok(err instanceof TeamNotFoundError);
+      assert.equal(err.teamId, 'not-a-real-team');
+      return true;
+    });
   });
 });

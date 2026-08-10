@@ -431,13 +431,6 @@ test.describe('Proxy API - Consumer Endpoints', () => {
     expect(resp.status()).toBe(400);
   });
 
-  test('states endpoint validates team ID format', async ({ request }) => {
-    const resp = await request.get('/api/proxy/states/not-a-uuid', {
-      headers: { Authorization: `Bearer ${readToken}` }
-    });
-    expect(resp.status()).toBe(400);
-  });
-
   test('comment endpoint validates body', async ({ request }) => {
     const resp = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/comments', {
       headers: {
@@ -612,15 +605,6 @@ test.describe('Proxy API - Consumer Endpoints', () => {
     expect(resp.status()).toBe(400);
     const data = await resp.json();
     expect(data.error).toContain('No valid fields');
-  });
-
-  test('cycles endpoint validates teamId format', async ({ request }) => {
-    const resp = await request.get('/api/proxy/cycles?teamId=not-a-uuid', {
-      headers: { Authorization: `Bearer ${readToken}` }
-    });
-    expect(resp.status()).toBe(400);
-    const data = await resp.json();
-    expect(data.error).toContain('team ID');
   });
 
   test('cycle detail validates cycle ID format', async ({ request }) => {

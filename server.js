@@ -77,7 +77,7 @@ import { renderLandingPage } from './lib/render-landing.js'
 import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
-import { UUID_REGEX, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, normalizeProvider } from './lib/workspace.js'
+import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, normalizeProvider, matchTeamId } from './lib/workspace.js'
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from './lib/refresh-strategy.js'
 import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/jira/oauth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
@@ -929,6 +929,12 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
   // push/filter below, which would silently drop an array-property flag the
   // same way `.map()` does inside the provider.
   let truncated = false;
+  // LIN-2025: the raw, unvalidated teamId is resolved against the PRIMARY
+  // binding's already-fetched team list (below) — graceful drop-to-unscoped
+  // on no match, byte-identical passthrough on a teamless provider's empty
+  // list (F1). Resolving only once, on the primary iteration, costs no extra
+  // round trip: every binding already fetches its own team list this loop.
+  let resolvedTeamId = teamId;
 
   for (let i = 0; i < bindings.length; i++) {
     const binding = bindings[i];
@@ -948,17 +954,21 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       ? testMockTeams
       : await provider.fetchTeams(bindingScope);
 
+    if (isPrimary) {
+      resolvedTeamId = matchTeamId(bindingTeams, teamId);
+    }
+
     // Fetch projects and issues (filtered by team if specified).
     // `slim` (LIN-442) is the homepage's description-trim: it only reaches the
     // dashboard + its token-refresh retry, never swim/ship/swipe, which keep the
     // full query.
     let { organizationName: orgName, projects, issues, truncated: bindingTruncated } = isTestMode
       ? (mockOverride || testMockData)
-      : await provider.fetchProjects(bindingScope, teamId, { slim });
+      : await provider.fetchProjects(bindingScope, resolvedTeamId, { slim });
 
     // In test mode, manually filter issues by team
-    if (isTestMode && teamId) {
-      issues = issues.filter(i => i.team?.id === teamId);
+    if (isTestMode && resolvedTeamId) {
+      issues = issues.filter(i => i.team?.id === resolvedTeamId);
     }
 
     if (isPrimary) {
@@ -1046,7 +1056,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       return { project, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: teamId, periodicalsEnabled, showSource, truncated };
+  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated };
 }
 
 /**
@@ -2110,14 +2120,20 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace
   const deployInfo = getDeployInfo()
 
-  // Parse and validate team filter from query string (must be valid UUID)
+  // Parse team filter from query string. LIN-2025: no longer format-validated
+  // here — the raw ref is resolved against the workspace's actual team list
+  // (graceful drop-to-unscoped on no match) inside fetchAndPrepareProjects,
+  // which already fetches that list for the primary binding at no extra cost.
   const rawTeam = req.query.team;
-  let teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+  let teamId = rawTeam && rawTeam !== 'all' ? rawTeam : null;
 
   // Remember team selection per {user, workspace} (LIN-727). An explicit ?team=
   // param (including 'all') is the source of truth and is persisted; when the
   // param is absent we restore the prior selection so leaving a workspace and
   // returning preserves the filter. Best-effort: persistence never blocks the page.
+  // LIN-2025 (F4): the raw value is persisted with no write-time validation
+  // fetch — a stale/unmatched value self-corrects on every later read via the
+  // same membership check fetchAndPrepareProjects already runs.
   const accountId = req.session.accountId;
   if (accountId) {
     if (rawTeam !== undefined) {
@@ -2126,7 +2142,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     } else {
       try {
         const remembered = await userPreferencesStore.getSelectedTeam(accountId, workspace.urlKey);
-        if (remembered && UUID_REGEX.test(remembered)) teamId = remembered;
+        if (remembered) teamId = remembered;
       } catch (err) {
         console.error('Failed to read remembered team selection:', err);
       }
@@ -2193,9 +2209,10 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
   const deployInfo = getDeployInfo();
   const openRouterSource = getOpenRouterSource(req);
 
-  // Parse team filter (same as main dashboard)
+  // Parse team filter (same as main dashboard; LIN-2025 — resolved by
+  // fetchAndPrepareProjects, not format-validated here)
   const rawTeam = req.query.team;
-  const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+  const teamId = rawTeam && rawTeam !== 'all' ? rawTeam : null;
 
   try {
     // Load custom prompts (non-blocking, fallback to empty)
@@ -2255,7 +2272,7 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
   const deployInfo = getDeployInfo();
   const openRouterSource = getOpenRouterSource(req);
   const rawTeam = req.query.team;
-  const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+  const teamId = rawTeam && rawTeam !== 'all' ? rawTeam : null;
 
   try {
     // Use swim sample data if session flag is set (for E2E tests/screenshots)
@@ -2305,7 +2322,7 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
   }
 
   const rawTeam = req.query.team;
-  const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+  const teamId = rawTeam && rawTeam !== 'all' ? rawTeam : null;
 
   try {
     // shipSample = dense fixture (8 projects, 6 WIP, ~36 cards) for density tests.
@@ -2372,7 +2389,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
   }
 
   const rawTeam = req.query.team;
-  const teamId = rawTeam && rawTeam !== 'all' && UUID_REGEX.test(rawTeam) ? rawTeam : null;
+  const teamId = rawTeam && rawTeam !== 'all' ? rawTeam : null;
 
   try {
     // Fetch raw data — roadmap needs raw issues for velocity/queue calculations.
@@ -2383,9 +2400,22 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
     // stays on the test-token mock fixtures (not local), so without it this route
     // auth-errors and the roadmap baseline silently captured the landing page.
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const provider = getProviderForWorkspace(workspace);
+    const scope = getWorkspaceCallScope(workspace);
+    // LIN-2025: resolve teamId against the workspace's actual team list
+    // (graceful drop-to-unscoped on no match), replacing the UUID format
+    // gate. This route doesn't go through fetchAndPrepareProjects, so it
+    // needs its own team fetch — guarded on teamId being present (no team
+    // filter, no extra round trip) AND kept inside the same isTestMode arm as
+    // the projects fetch below, so a test-token session never issues a real
+    // provider call ahead of it (that would break the roadmap.spec.js
+    // LIN-1034 regression guard's test-token coverage).
+    const resolvedTeamId = teamId
+      ? matchTeamId(isTestMode ? testMockTeams : await provider.fetchTeams(scope), teamId)
+      : null;
     const { organizationName, projects, issues } = isTestMode
       ? testMockData
-      : await getProviderForWorkspace(workspace).fetchProjects(getWorkspaceCallScope(workspace), teamId);
+      : await provider.fetchProjects(scope, resolvedTeamId);
 
     // Build roadmap model from deterministic layer
     const roadmapModel = buildRoadmapModel(projects, issues);

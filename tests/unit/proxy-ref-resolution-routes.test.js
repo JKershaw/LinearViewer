@@ -33,7 +33,18 @@ function makeProvider(overrides = {}) {
         { id: DONE_UUID, name: 'Done', type: 'completed' },
       ];
     },
-    labels: async () => [{ id: BUG_UUID, name: 'bug' }],
+    labels: async (_t, teamId) => {
+      calls.labelsTeamId = teamId;
+      return [{ id: BUG_UUID, name: 'bug' }];
+    },
+    cycles: async (_t, teamId) => {
+      calls.cyclesTeamId = teamId;
+      return [];
+    },
+    issues: async (_t, opts) => {
+      calls.issuesTeamId = opts?.teamId;
+      return { nodes: [], pageInfo: {} };
+    },
     fetchProjectsList: async () => [{ id: PROJECT_UUID, name: 'Providers & API Unification' }],
     issueWriteGuard: async () => ({ id: ISSUE_UUID, trashed: false, team: { id: TEAM_UUID } }),
     issueLabels: async () => ({ id: ISSUE_UUID, trashed: false, labels: { nodes: [] } }),
@@ -223,4 +234,95 @@ test('DELETE /issues/:id/labels/:labelId: a label name path param resolves to it
   });
   assert.equal(status, 200);
   assert.deepEqual(calls.labelIds, []);
+});
+
+// ---------------------------------------------------------------------------
+// LIN-2025: team-ref membership on the three agent-facing reads.
+// The fake provider's fetchTeams() returns exactly one real team (TEAM_UUID),
+// so a well-formed but different id is "well-formed but unmatched" — the
+// exact case John's ruling requires to fail loud rather than silently widen.
+// ---------------------------------------------------------------------------
+
+const UNMATCHED_TEAM_UUID = '77777777-7777-7777-7777-777777777777';
+
+test('GET /issues: a matched teamId resolves and reaches the provider', async () => {
+  const { provider, calls } = makeProvider();
+  const { status } = await request(buildApp(provider), `/api/proxy/issues?teamId=${TEAM_UUID}`);
+  assert.equal(status, 200);
+  assert.equal(calls.issuesTeamId, TEAM_UUID);
+});
+
+test('GET /issues: a well-formed but unmatched teamId fails loud (404 TEAM_NOT_FOUND), provider.issues never called', async () => {
+  const { provider, calls } = makeProvider();
+  const { status, body } = await request(buildApp(provider), `/api/proxy/issues?teamId=${UNMATCHED_TEAM_UUID}`);
+  assert.equal(status, 404);
+  assert.equal(body.code, 'TEAM_NOT_FOUND');
+  assert.equal(calls.issuesTeamId, undefined);
+});
+
+test('GET /issues: no teamId never calls fetchTeams (hot unfiltered path pays no extra round trip)', async () => {
+  let fetchTeamsCalled = false;
+  const { provider, calls } = makeProvider({
+    fetchTeams: async () => { fetchTeamsCalled = true; return [{ id: TEAM_UUID }]; },
+  });
+  const { status } = await request(buildApp(provider), '/api/proxy/issues');
+  assert.equal(status, 200);
+  assert.equal(fetchTeamsCalled, false);
+  assert.equal(calls.issuesTeamId, null);
+});
+
+test('GET /issues: a teamless provider (empty fetchTeams) passes any teamId through unvalidated (F1)', async () => {
+  const { provider, calls } = makeProvider({ fetchTeams: async () => [] });
+  const { status } = await request(buildApp(provider), `/api/proxy/issues?teamId=${UNMATCHED_TEAM_UUID}`);
+  assert.equal(status, 200);
+  assert.equal(calls.issuesTeamId, UNMATCHED_TEAM_UUID);
+});
+
+test('GET /labels: a well-formed but unmatched teamId fails loud (404 TEAM_NOT_FOUND)', async () => {
+  const { provider } = makeProvider();
+  const { status, body } = await request(buildApp(provider), `/api/proxy/labels?teamId=${UNMATCHED_TEAM_UUID}`);
+  assert.equal(status, 404);
+  assert.equal(body.code, 'TEAM_NOT_FOUND');
+});
+
+test('GET /labels: a matched teamId resolves and reaches the provider', async () => {
+  const { provider, calls } = makeProvider();
+  const { status } = await request(buildApp(provider), `/api/proxy/labels?teamId=${TEAM_UUID}`);
+  assert.equal(status, 200);
+  assert.equal(calls.labelsTeamId, TEAM_UUID);
+});
+
+test('GET /cycles: a well-formed but unmatched teamId fails loud (404 TEAM_NOT_FOUND)', async () => {
+  const { provider } = makeProvider();
+  const { status, body } = await request(buildApp(provider), `/api/proxy/cycles?teamId=${UNMATCHED_TEAM_UUID}`);
+  assert.equal(status, 404);
+  assert.equal(body.code, 'TEAM_NOT_FOUND');
+});
+
+test('GET /cycles: a matched teamId resolves and reaches the provider', async () => {
+  const { provider, calls } = makeProvider();
+  const { status } = await request(buildApp(provider), `/api/proxy/cycles?teamId=${TEAM_UUID}`);
+  assert.equal(status, 200);
+  assert.equal(calls.cyclesTeamId, TEAM_UUID);
+});
+
+// LIN-2025: states/:teamId dropped its local format gate entirely — an
+// invalid/unmatched id is now the PROVIDER's problem, surfaced through the
+// route's existing graphqlErrorStatus/graphqlErrorDetail error mapping. Proven
+// by observing the raw, unvalidated id reach `provider.states` (never a local
+// short-circuit) and by the route relaying a provider-thrown error untouched.
+test('GET /states/:teamId: no local gate — the raw id reaches the provider unvalidated', async () => {
+  const { provider, calls } = makeProvider();
+  const { status } = await request(buildApp(provider), `/api/proxy/states/${UNMATCHED_TEAM_UUID}`);
+  assert.equal(status, 200);
+  assert.equal(calls.statesTeamId, UNMATCHED_TEAM_UUID);
+});
+
+test('GET /states/:teamId: a provider-thrown error is relayed via the existing error mapping, not swallowed by a local gate', async () => {
+  const graphqlError = Object.assign(new Error('boom'), { response: { status: 400, errors: [{ extensions: { userError: true } }] } });
+  const { provider } = makeProvider({
+    states: async () => { throw graphqlError; },
+  });
+  const { status } = await request(buildApp(provider), `/api/proxy/states/${UNMATCHED_TEAM_UUID}`);
+  assert.equal(status, 400);
 });
