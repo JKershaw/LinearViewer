@@ -75,6 +75,48 @@ test.describe('Jira provider (no test-token mock)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// LIN-2018 — the Jira canonical project→team remap: a Jira project now
+// surfaces as a canonical team (fetchTeams), so the dashboard's team selector
+// goes from permanently empty to populated for a Jira-backed workspace.
+// `#team-toggle`'s presence is the genuine end-to-end signal (renderTeamNavItem
+// emits nothing when `teams` is empty) that fetchTeams -> nav -> `?team=`
+// survived every layer, not just that fetchTeams itself returns something in
+// isolation. The additive guarantee from LIN-2007's sequencing warning — a
+// Jira project stays a canonical PROJECT too, until LIN-2011 lands — is
+// asserted alongside it (mirrors the existing project-mapping test above).
+// ---------------------------------------------------------------------------
+test.describe('Jira provider — team selector (LIN-2018)', () => {
+  test('the team selector renders once fetchTeams is non-empty, and the project mapping stays additive', async ({ page }) => {
+    await seedJiraWorkspace(page);
+    await page.goto(DASHBOARD);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('#team-toggle')).toBeAttached();
+    await expect(page.locator('#team-toggle')).toHaveText('all');
+    // Additive mapping: the project container is still there, unaffected.
+    await expect(page.locator('.project-header:has-text("Engineering")')).toBeVisible();
+  });
+
+  test('selecting the team (?team=<project key>) scopes the dashboard to that project\'s own issues', async ({ page }) => {
+    await seedJiraWorkspace(page);
+    await page.goto(`${DASHBOARD}?team=ENG`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('#team-toggle')).toHaveText('Engineering');
+    await expect(page.locator('.line:has-text("Jira task to do")').first()).toBeAttached();
+  });
+
+  test('an unmatched team ref drops to unscoped (graceful, never a 500/blank page)', async ({ page }) => {
+    await seedJiraWorkspace(page);
+    await page.goto(`${DASHBOARD}?team=NOPE`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('#team-toggle')).toHaveText('all');
+    await expect(page.locator('.project-header:has-text("Engineering")')).toBeVisible();
+  });
+});
+
 // An empty / unresolved project still renders its container (empty state),
 // consistent with how Linear/Local/GitHub render an empty project.
 test.describe('Jira provider — empty project', () => {

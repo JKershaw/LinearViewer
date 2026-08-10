@@ -447,6 +447,8 @@ Returns up to 50 matching issues. Response shape matches the list issues endpoin
 GET /api/proxy/states/{teamId}
 ```
 
+`{teamId}` accepts a provider-native team id, not only a Linear UUID — e.g. on a Jira-backed workspace it is the Jira project key (`ENG`), returned by `GET /api/proxy/teams`. On Jira this reads the project's REAL per-project workflow statuses (not a fixed vocabulary), so `name`/`type` reflect that project's own workflow.
+
 Response:
 ```json
 {
@@ -1145,6 +1147,8 @@ Write inputs accept LLM-friendly references in addition to raw UUIDs — you no 
 - **Teams** (`teamId`): a UUID, the team key (e.g. `LIN`), or the team name (case-insensitive).
 
 Resolution order is **UUID → native identifier → symbolic name/type**, so a UUID is always an unambiguous escape hatch. If a symbolic reference matches more than one entity (e.g. two workflow states of the same type, or two labels differing only by case) the request fails with **`422`** and lists the candidate `{id, name}` pairs — pass the UUID to disambiguate. An unmatched name also fails with `422` rather than being silently dropped.
+
+**Jira workspaces:** a Jira workspace's `stateId` alias ref (e.g. `"done"`) may now legitimately 422 as **ambiguous** with candidates, since Jira's workflow states are the project's own real per-project vocabulary (not a fixed 3-entry one) and a project commonly has more than one status in the same category (e.g. "Done" and "Won't Do" are both `done`-category). This is a **documented behavior change**, not a bug — pass the exact status id (from `GET /api/proxy/states/{teamId}`) to disambiguate.
 
 References may optionally carry a provider namespace prefix of the form `<source>:<ref>` (e.g. `linear:LIN`, `linear:done`). The proxy is Linear-only today, so only `linear:` (or a bare, un-prefixed reference) is accepted; any other namespace is rejected with `422`. The prefix exists so multi-provider workspaces stay collision-safe in future without reopening the addressing scheme.
 

@@ -46,9 +46,25 @@ const savedClient = jiraProvider.client;
 const savedClientFactory = jiraProvider.clientFactory;
 const savedSite = jiraProvider.site;
 
+// LIN-2018: ENG's real per-project statuses — one per category, so the
+// symbolic aliases these tests drive ('todo'/'in-progress'/'done') still
+// resolve unambiguously through the real resolveStateInput -> states() ->
+// resolveStateRef path, exactly as an agent's request would.
+const ENG_PROJECT_STATUSES = [
+  {
+    id: '1', name: 'Task', subtask: false,
+    statuses: [
+      { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
+      { id: '12', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+      { id: '13', name: 'Done', statusCategory: { key: 'done' } },
+    ],
+  },
+];
+
 function seed() {
   return createFakeJiraClient({
     projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+    projectStatuses: { ENG: ENG_PROJECT_STATUSES },
     issues: [
       {
         id: '30001', key: 'ENG-10',
@@ -57,13 +73,13 @@ function seed() {
           description: { type: 'doc', version: 1, content: [
             { type: 'paragraph', content: [{ type: 'text', text: 'Original body.' }] },
           ] },
-          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          status: { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: [], assignee: null, parent: null,
           _transitions: [
-            { id: '11', name: 'Start Progress', to: { name: 'In Progress', statusCategory: { key: 'indeterminate' } } },
-            { id: '21', name: 'Done', to: { name: 'Done', statusCategory: { key: 'done' } } },
+            { id: '111', name: 'Start Progress', to: { id: '12', name: 'In Progress', statusCategory: { key: 'indeterminate' } } },
+            { id: '211', name: 'Done', to: { id: '13', name: 'Done', statusCategory: { key: 'done' } } },
           ],
         },
       },
@@ -326,7 +342,7 @@ function seed() {
         fields: {
           summary: 'Already done, nothing else available',
           description: null,
-          status: { name: 'Done', statusCategory: { key: 'done' } },
+          status: { id: '13', name: 'Done', statusCategory: { key: 'done' } },
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: [], assignee: null, parent: null, _transitions: [],
@@ -337,12 +353,12 @@ function seed() {
         fields: {
           summary: 'Only transition requires a screen',
           description: null,
-          status: { name: 'To Do', statusCategory: { key: 'new' } },
+          status: { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: [], assignee: null, parent: null,
           _transitions: [
-            { id: '31', name: 'Resolve', to: { name: 'Done', statusCategory: { key: 'done' } }, hasScreen: true },
+            { id: '31', name: 'Resolve', to: { id: '13', name: 'Done', statusCategory: { key: 'done' } }, hasScreen: true },
           ],
         },
       },
@@ -580,7 +596,11 @@ describe('Jira-backed proxy PATCH /issues/:id — refusals precede every write (
     const { status, body } = await call(buildApp(), 'PATCH', '/api/proxy/issues/ENG-10',
       { title: 'CHANGED', stateId: '11111111-1111-1111-1111-111111111111' });
     assert.equal(status, 422);
-    assert.match(body.error, /Cannot resolve state/);
+    // A UUID short-circuits resolveStateInput's own resolution (it never
+    // consults states()), so it reaches updateIssue's D2 as a raw stateId —
+    // LIN-2018's exact-id match then refuses it as "no matching transition",
+    // not the old synthetic-vocabulary "Cannot resolve state" wording.
+    assert.match(body.error, /No available Jira transition/);
     assert.equal((await stored('ENG-10')).fields.summary, 'Original title', 'the title write never happened');
   });
 
