@@ -14,7 +14,7 @@
 
 import { Router, json } from 'express';
 import rateLimit from 'express-rate-limit';
-import { createDedupeCache, dedupeKey } from '../lib/proxy-dedupe.js';
+import { createDedupeCache, createGenerationTracker, dedupeKey } from '../lib/proxy-dedupe.js';
 import { describeCredentialResolution } from '../lib/credential-diagnostics.js';
 import { deriveTerminalStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.js';
@@ -310,6 +310,43 @@ function buildMockBriefFromContext(context) {
 // collapses to the first comment instead of minting a duplicate, so a
 // consumer that retries after a lost response gets the original back.
 const commentDedupe = createDedupeCache();
+
+/**
+ * Per-workspace generation tag for comment dedupe invalidation (LIN-1160,
+ * widened to workspace-only keying by LIN-2005).
+ *
+ * `commentDedupe` above has no delete/invalidate method, and Linear's
+ * `commentDelete` mutation returns no comment body — so a delete route has no
+ * way to reconstruct the exact `dedupeKey(...)` a prior create would have
+ * used, only to invalidate coarsely. `POST .../comments` folds the current
+ * tag for the request's workspace into its `dedupeKey(...)` call;
+ * `DELETE`/`PATCH .../comments/:commentId` mint a fresh tag on success. Every
+ * prior dedupe entry for that WORKSPACE then silently stops matching (cache
+ * miss -> fresh mint), regardless of which issue or comment changed.
+ *
+ * Keyed on workspace (`req.proxyUrlKey`) only, NOT `(urlKey, issueId)`:
+ * neither the delete nor the edit route resolves `issueId` to a canonical
+ * issue identity (Linear's `updateComment`/`deleteComment` and the Local
+ * provider's equivalents take only `commentId`; `issueId` is validated for
+ * format only), so a create/delete pair using different id forms for the
+ * SAME issue (e.g. `LIN-123` vs its UUID) would bump a different per-issue
+ * key than the create used, leaving the create's dedupe entry live and
+ * letting a re-create within the TTL echo back a deleted/edited comment as a
+ * false fresh success. Keying on workspace alone is immune to id form. The
+ * tradeoff is coarser blast radius — a delete/edit on any issue resets every
+ * issue's dedupe window in that workspace — never a stale success; the safe
+ * direction to err per the LIN-399 no-misleading-success contract.
+ *
+ * Module scope (not inside `createProxyRoutes`) so a second factory call
+ * shares invalidation state with `commentDedupe` rather than diverging from
+ * it. Eviction is sized effectively unreachable for workspace cardinality
+ * (bounded by resolved tokens, not attacker-controlled input) — unlike
+ * `credentialResolutions` below, a lost generation here is not merely a
+ * logging fingerprint: falling back to the pre-bump value would resurrect a
+ * dedupe entry a bump was meant to kill, so this tracker must never evict in
+ * practice.
+ */
+const commentDedupeGenerations = createGenerationTracker();
 
 // Rate limiters
 // Note: proxyLimiter is applied before authenticateProxyToken on consumer
@@ -1457,6 +1494,8 @@ GET ${baseUrl}/api/proxy/issues/{issueId}
     }
   → labels / children / comments / relations are plain arrays (never wrapped);
     labels are plain name strings. The same flat convention holds everywhere.
+  → Each comments entry's \`id\` is the comment id — pass it to DELETE/PATCH
+    .../comments/{id} below to remove or edit that comment.
   → team is the issue's owning team as { id, name }, with a flat "teamId" mirror —
     feed teamId straight to /states/{teamId} and /labels?teamId= without a /teams
     lookup. priorityLabel is the human-readable priority name (Urgent/High/Medium/
@@ -1739,6 +1778,23 @@ POST ${baseUrl}/api/proxy/issues/{issueId}/comments
   → { "success": true, "comment": { "id": "...", "body": "...", "createdAt": "...", "user": { "name": "..." } } }
   → Deduped within a short window: a repeat of the same (issue + body) returns the
     original comment with "deduped": true and HTTP 200 (not 201) — no duplicate is created.
+    Deleting or editing ANY comment in the workspace invalidates EVERY issue's dedupe
+    window in that workspace (a workspace-wide reset, not scoped to the edited comment's
+    own issue), so a re-post right after either one mints a fresh comment.
+    That invalidation is in-process, like the dedupe window itself: it covers the
+    server instance that handled the delete/edit. Behind more than one instance, a
+    re-post routed elsewhere can still return the pre-delete deduped response until
+    the window expires — re-read the issue's comments if you need certainty.
+
+DELETE ${baseUrl}/api/proxy/issues/{issueId}/comments/{commentId}
+  → Remove a comment. commentId is the comment's own id (the \`id\` field on each
+    node in GET /issues/{id}'s comments), NOT an issue id.
+  → { "success": true }
+
+PATCH ${baseUrl}/api/proxy/issues/{issueId}/comments/{commentId}
+  Body: { "body": "..." }
+  → Edit a comment's body. Returns 200:
+  → { "success": true, "comment": { "id": "...", "body": "...", "createdAt": "...", "user": { "name": "..." } } }
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/relations
   Body: { "type": "blocks|related|duplicate", "relatedIssueId": "..." }
@@ -2962,7 +3018,10 @@ One convention across every endpoint, so you can branch on the same fields every
 
       // Deterministic dedupe (LIN-399): if an identical comment was just
       // created for this issue, return that one instead of minting a duplicate.
-      const key = dedupeKey(req.proxyUrlKey, issueId, body);
+      // The generation tag (LIN-1160/LIN-2005) folds in so a delete/edit
+      // anywhere in this workspace invalidates every prior dedupe entry in it
+      // (see commentDedupeGenerations above).
+      const key = dedupeKey(req.proxyUrlKey, issueId, body, commentDedupeGenerations.current(req.proxyUrlKey));
       const prior = commentDedupe.get(key);
       if (prior) {
         logEvent(req, '/api/proxy/issues/comments', 200);
@@ -2983,6 +3042,95 @@ One convention across every endpoint, so you can branch on the same fields every
       logEvent(req, '/api/proxy/issues/comments', status);
       console.error('Proxy create comment error:', err.message);
       jsonError(res, status, 'Failed to create comment', { detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
+   * DELETE /api/proxy/issues/:issueId/comments/:commentId
+   * Remove a comment. The commentId is the comment's own id, exposed on the
+   * nodes returned by GET /issues/:id.
+   *
+   * Note: :issueId is accepted for a consistent URL shape with the other
+   * /issue/:issueId/... endpoints, but the delete is keyed solely on
+   * commentId (mirrors DELETE .../relations/:relationId exactly). No trashed
+   * guard: removing a stray/bad comment from a trashed issue is exactly the
+   * use case this endpoint exists for.
+   */
+  router.delete('/api/proxy/issues/:issueId/comments/:commentId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+    try {
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      if (!token) {
+        return workspaceUnavailable(req, res, '/api/proxy/issues/comments', reason);
+      }
+      if (denyIfUnsupported(provider, 'deleteComment', req, res, '/api/proxy/issues/comments')) return;
+
+      const { issueId, commentId } = req.params;
+      if (!isValidIssueId(issueId)) {
+        return badRequest.json(res, 'Invalid issue ID format');
+      }
+      if (!UUID_REGEX.test(commentId)) {
+        logEvent(req, '/api/proxy/issues/comments', 400);
+        return badRequest.json(res, 'Invalid comment ID format');
+      }
+
+      const commentDelete = await provider.deleteComment(token, commentId);
+      if (writeRejected(req, res, '/api/proxy/issues/comments', commentDelete, 'Comment was not deleted')) return;
+      commentDedupeGenerations.bump(req.proxyUrlKey);
+      logEvent(req, '/api/proxy/issues/comments', 200);
+      res.json(commentDelete);
+    } catch (err) {
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/issues/comments', status);
+      console.error('Proxy delete comment error:', err.message);
+      jsonError(res, status, 'Failed to delete comment', { detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
+   * PATCH /api/proxy/issues/:issueId/comments/:commentId
+   * Edit a comment's body. Same URL-shape note and no-trashed-guard rationale
+   * as DELETE above — an edit is a correction to existing content, not new
+   * content added to a dead issue.
+   */
+  router.patch('/api/proxy/issues/:issueId/comments/:commentId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+    try {
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      if (!token) {
+        return workspaceUnavailable(req, res, '/api/proxy/issues/comments', reason);
+      }
+      if (denyIfUnsupported(provider, 'updateComment', req, res, '/api/proxy/issues/comments')) return;
+
+      const { issueId, commentId } = req.params;
+      if (!isValidIssueId(issueId)) {
+        return badRequest.json(res, 'Invalid issue ID format');
+      }
+      if (!UUID_REGEX.test(commentId)) {
+        logEvent(req, '/api/proxy/issues/comments', 400);
+        return badRequest.json(res, 'Invalid comment ID format');
+      }
+
+      const { body } = req.body;
+      if (!body || typeof body !== 'string') {
+        logEvent(req, '/api/proxy/issues/comments', 400);
+        return badRequest.json(res, 'body is required');
+      }
+      if (body.length > MAX_COMMENT_LENGTH) {
+        return badRequest.json(res, `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`);
+      }
+      if (DANGEROUS_CHARS_REGEX.test(body)) {
+        return badRequest.json(res, 'body contains invalid characters');
+      }
+
+      const commentUpdate = normalizeWritePayload(await provider.updateComment(token, commentId, body), 'comment');
+      if (writeRejected(req, res, '/api/proxy/issues/comments', commentUpdate, 'Comment was not updated')) return;
+      commentDedupeGenerations.bump(req.proxyUrlKey);
+      logEvent(req, '/api/proxy/issues/comments', 200);
+      res.status(200).json(commentUpdate);
+    } catch (err) {
+      const status = graphqlErrorStatus(err);
+      logEvent(req, '/api/proxy/issues/comments', status);
+      console.error('Proxy update comment error:', err.message);
+      jsonError(res, status, 'Failed to update comment', { detail: graphqlErrorDetail(err) });
     }
   });
 

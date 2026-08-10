@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createDedupeCache, dedupeKey } from '../../lib/proxy-dedupe.js';
+import { createDedupeCache, createGenerationTracker, dedupeKey } from '../../lib/proxy-dedupe.js';
 
 test('dedupeKey is stable for identical parts and differs otherwise', () => {
   assert.equal(dedupeKey('ws', 'LIN-1', 'hello'), dedupeKey('ws', 'LIN-1', 'hello'));
@@ -44,4 +44,63 @@ test('setting a new entry prunes expired ones', () => {
   clock = 200; // both expired
   cache.set(dedupeKey('c'), 3);
   assert.equal(cache.size, 1);
+});
+
+// ---- createGenerationTracker (LIN-1160 / LIN-2005) -------------------------
+
+test('generation tracker: current() on a cold key is stable and falsy', () => {
+  const tracker = createGenerationTracker();
+  assert.equal(tracker.current('ws1'), '');
+  assert.equal(tracker.current('ws1'), tracker.current('ws1')); // repeated reads agree
+});
+
+test('generation tracker: bump() changes what current() returns', () => {
+  const tracker = createGenerationTracker();
+  const before = tracker.current('ws1');
+  tracker.bump('ws1');
+  const after = tracker.current('ws1');
+  assert.notEqual(after, before);
+  assert.equal(tracker.current('ws1'), after); // stable until the next bump
+});
+
+test('generation tracker: independent keys do not interfere', () => {
+  const tracker = createGenerationTracker();
+  tracker.bump('ws1');
+  assert.equal(tracker.current('ws2'), ''); // unaffected by ws1's bump
+  tracker.bump('ws2');
+  assert.notEqual(tracker.current('ws1'), tracker.current('ws2'));
+});
+
+test("generation tracker: an evicted key's tag falls back to the cold value (accepted residual)", () => {
+  // A small limit forces eviction. An evicted key's next current() read DOES
+  // collapse back to '' — which would resurrect dedupe entries minted before
+  // that key's most recent bump. This is the known residual LIN-2005 bounded
+  // rather than eliminated; see the accepted-consequence note on the
+  // assertion below.
+  const tracker = createGenerationTracker({ limit: 2 });
+  tracker.bump('ws1');
+  const ws1Gen = tracker.current('ws1');
+
+  tracker.bump('ws2');
+  tracker.bump('ws3'); // evicts ws1 (oldest, size now exceeds limit of 2)
+
+  assert.equal(tracker.size, 2);
+  // ws1 was evicted, so its tag reads back to the cold value — this is the
+  // known, accepted consequence of eviction (an avoidable duplicate create
+  // is safe; the production tracker sizes `limit` far above real workspace
+  // cardinality so this path is not expected to trigger there).
+  assert.equal(tracker.current('ws1'), '');
+  assert.notEqual(ws1Gen, '');
+});
+
+test('generation tracker: re-bumping a key keeps it from being evicted ahead of colder keys', () => {
+  const tracker = createGenerationTracker({ limit: 2 });
+  tracker.bump('a');
+  tracker.bump('b');
+  tracker.bump('a'); // touch 'a' again — moves it to the back of eviction order
+  tracker.bump('c'); // should evict 'b', the now-oldest, not 'a'
+
+  assert.notEqual(tracker.current('a'), '');
+  assert.equal(tracker.current('b'), '');
+  assert.notEqual(tracker.current('c'), '');
 });

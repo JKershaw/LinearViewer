@@ -76,7 +76,7 @@ Response:
 | Scope | Access |
 |-------|--------|
 | `read` | Query all read endpoints (issues, teams, projects, cycles, labels, etc.) |
-| `readWrite` | All read access plus create/update issues, comments, relations, labels |
+| `readWrite` | All read access plus create/update/delete issues, comments, relations, labels |
 
 ### Single-Use Tokens
 
@@ -154,7 +154,7 @@ One convention across every endpoint, so a consumer can branch on the same field
 Issue-scoped endpoints are canonical under `/issues/{id}/...`, so the read and write halves of a resource share one base. The documented forms below are the canonical ones:
 
 - `GET  /issues/{id}/relations` (read) pairs with `POST` / `DELETE /issues/{id}/relations[/{relationId}]` (write).
-- `POST /issues/{id}/comments` (write); reads of comments come back inside `GET /issues/{id}`.
+- `POST /issues/{id}/comments` (write) pairs with `PATCH` / `DELETE /issues/{id}/comments/{commentId}` (write); reads of comments come back inside `GET /issues/{id}`.
 - `GET  /issues/{id}/recommend`, `/issues/{id}/recap`, `/issues/{id}/brief` (issue-derived AI reads).
 - Cycle detail is canonical as the plural by-id form `GET /cycles/{cycleId}`, mirroring the `GET /cycles` list.
 
@@ -1330,7 +1330,55 @@ Returns `201`:
 }
 ```
 
-Posting the same `(issue + body)` again within a short window does not create a second comment — the original is returned with `"deduped": true` and HTTP `200` (not `201`). This makes a confirming retry after a lost response safe.
+Posting the same `(issue + body)` again within a short window does not create a second comment — the original is returned with `"deduped": true` and HTTP `200` (not `201`). This makes a confirming retry after a lost response safe. Deleting or editing *any* comment in the workspace invalidates *every* issue's dedupe window in that workspace (a workspace-wide reset, not scoped to the edited comment's own issue), so a re-post right after either one mints a fresh comment rather than echoing stale data.
+
+That invalidation has the same scope as the dedupe window it invalidates: **in-process**, on the server instance that handled the delete or edit. Behind more than one instance, a delete on instance A does not invalidate instance B, so a re-post routed to B can still return the pre-delete deduped response until the window expires. Like the dedupe cache itself, treat it as best-effort rather than a guarantee — if you need certainty that a comment is gone or changed, re-read the issue's comments.
+
+#### Delete Comment
+
+```
+DELETE /api/proxy/issues/{issueId}/comments/{commentId}
+```
+
+Removes a comment. `commentId` is the comment's own `id` (the `id` field on each node in `GET /issues/{id}`'s `comments`), **not** an issue id.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `issueId` | UUID/identifier | Yes | Issue the comment belongs to (URL consistency; not used to resolve the comment) |
+| `commentId` | UUID | Yes | The comment's own id |
+
+Response:
+```json
+{ "success": true }
+```
+
+#### Edit Comment
+
+```
+PATCH /api/proxy/issues/{issueId}/comments/{commentId}
+Content-Type: application/json
+
+{ "body": "Investigation complete. Root cause identified (corrected)." }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `issueId` | UUID/identifier | Yes | Issue the comment belongs to (URL consistency; not used to resolve the comment) |
+| `commentId` | UUID | Yes | The comment's own id |
+| `body` | string | Yes | New comment body in Markdown (max 50K chars) |
+
+Returns `200`:
+```json
+{
+  "success": true,
+  "comment": {
+    "id": "uuid",
+    "body": "Investigation complete. Root cause identified (corrected).",
+    "createdAt": "2026-06-10T12:00:00.000Z",
+    "user": { "name": "Jane Doe" }
+  }
+}
+```
 
 #### Create Relation
 

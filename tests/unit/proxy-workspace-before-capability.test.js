@@ -34,6 +34,7 @@ import { githubProvider } from '../../lib/providers/github/index.js';
 
 const UUID = '11111111-1111-1111-1111-111111111111';
 const REL = '33333333-3333-3333-3333-333333333333';
+const COMMENT = '44444444-4444-4444-4444-444444444444';
 
 // `providerName` is what resolveWorkspaceAccess reports for the workspace; the
 // proxy resolves the active provider from it through the registry (the real
@@ -103,6 +104,30 @@ test('unavailable GitHub workspace + unsupported deleteRelation → 503 workspac
     buildApp('github', { token: null, reason: 'store_unreachable' }),
     `/api/proxy/issues/${UUID}/relations/${REL}`,
     { method: 'DELETE' }
+  );
+  assert.equal(status, 503);
+  assert.equal(body.code, 'WORKSPACE_STORE_UNAVAILABLE');
+  assert.equal(body.retryable, true);
+  assert.notEqual(body.code, 'CAPABILITY_NOT_SUPPORTED');
+});
+
+test('unavailable GitHub workspace + unsupported deleteComment → 503 workspace envelope, not 422 capability (LIN-1160)', async () => {
+  const { status, body } = await request(
+    buildApp('github', { token: null, reason: 'store_unreachable' }),
+    `/api/proxy/issues/${UUID}/comments/${COMMENT}`,
+    { method: 'DELETE' }
+  );
+  assert.equal(status, 503);
+  assert.equal(body.code, 'WORKSPACE_STORE_UNAVAILABLE');
+  assert.equal(body.retryable, true);
+  assert.notEqual(body.code, 'CAPABILITY_NOT_SUPPORTED');
+});
+
+test('unavailable GitHub workspace + unsupported updateComment → 503 workspace envelope, not 422 capability (LIN-1160)', async () => {
+  const { status, body } = await request(
+    buildApp('github', { token: null, reason: 'store_unreachable' }),
+    `/api/proxy/issues/${UUID}/comments/${COMMENT}`,
+    { method: 'PATCH', body: { body: 'corrected' } }
   );
   assert.equal(status, 503);
   assert.equal(body.code, 'WORKSPACE_STORE_UNAVAILABLE');

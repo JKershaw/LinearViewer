@@ -528,6 +528,54 @@ test.describe('Proxy API - Consumer Endpoints', () => {
     expect(data.error).toContain('read-write');
   });
 
+  test('delete comment endpoint validates commentId format (LIN-1160)', async ({ request }) => {
+    const resp = await request.delete('/api/proxy/issues/11111111-1111-1111-1111-111111111111/comments/not-a-uuid', {
+      headers: { Authorization: `Bearer ${writeToken}` }
+    });
+    expect(resp.status()).toBe(400);
+    const data = await resp.json();
+    expect(data.error).toContain('comment ID');
+  });
+
+  test('delete comment endpoint requires write scope (LIN-1160)', async ({ request }) => {
+    const resp = await request.delete('/api/proxy/issues/11111111-1111-1111-1111-111111111111/comments/22222222-2222-2222-2222-222222222222', {
+      headers: { Authorization: `Bearer ${readToken}` }
+    });
+    expect(resp.status()).toBe(403);
+    const data = await resp.json();
+    expect(data.error).toContain('read-write');
+  });
+
+  test('edit comment endpoint validates commentId format (LIN-1160)', async ({ request }) => {
+    const resp = await request.patch('/api/proxy/issues/11111111-1111-1111-1111-111111111111/comments/not-a-uuid', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { body: 'corrected' }
+    });
+    expect(resp.status()).toBe(400);
+    const data = await resp.json();
+    expect(data.error).toContain('comment ID');
+  });
+
+  test('edit comment endpoint requires a body', async ({ request }) => {
+    const resp = await request.patch('/api/proxy/issues/11111111-1111-1111-1111-111111111111/comments/22222222-2222-2222-2222-222222222222', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: {}
+    });
+    expect(resp.status()).toBe(400);
+    const data = await resp.json();
+    expect(data.error).toContain('body');
+  });
+
+  test('edit comment endpoint requires write scope (LIN-1160)', async ({ request }) => {
+    const resp = await request.patch('/api/proxy/issues/11111111-1111-1111-1111-111111111111/comments/22222222-2222-2222-2222-222222222222', {
+      headers: { Authorization: `Bearer ${readToken}`, 'Content-Type': 'application/json' },
+      data: { body: 'corrected' }
+    });
+    expect(resp.status()).toBe(403);
+    const data = await resp.json();
+    expect(data.error).toContain('read-write');
+  });
+
   test('label add requires labelId but accepts a label name (LIN-556)', async ({ request }) => {
     // Presence is still enforced: a missing labelId fails fast with 400.
     const missing = await request.post('/api/proxy/issues/11111111-1111-1111-1111-111111111111/labels', {

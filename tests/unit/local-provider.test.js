@@ -41,7 +41,7 @@ describe('LocalProvider capability profile (LIN-356 step D)', () => {
   });
 
   test('implements the required writes + reads', () => {
-    for (const m of ['createIssue', 'updateIssue', 'createComment', 'createRelation',
+    for (const m of ['createIssue', 'updateIssue', 'createComment', 'updateComment', 'deleteComment', 'createRelation',
       'addLabel', 'removeLabel', 'fetchIssueComments', 'fetchIssueFields', 'search', 'states', 'labels',
       'fetchProjects', 'fetchProjectsList', 'fetchTeams']) {
       assert.equal(provider.supports(m), true, `expected supports('${m}')`);
@@ -296,6 +296,20 @@ describe('LocalProvider proxy surface (LIN-583)', () => {
     assert.deepEqual((await store.getIssue(SCOPE, 'i1')).relations, []);
     assert.deepEqual(await provider.deleteRelation(SCOPE, 'missing'), { success: false });
   });
+
+  test('deleteComment removes by comment id and echoes { success } (LIN-1160)', async () => {
+    assert.deepEqual(await provider.deleteComment(SCOPE, 'c1'), { success: true });
+    assert.deepEqual((await store.getIssue(SCOPE, 'i1')).comments, []);
+    assert.deepEqual(await provider.deleteComment(SCOPE, 'missing'), { success: false });
+  });
+
+  test('updateComment replaces the body and returns the bare updated comment, or null (LIN-1160)', async () => {
+    const updated = await provider.updateComment(SCOPE, 'c1', 'edited');
+    assert.equal(updated.body, 'edited');
+    assert.equal(updated.id, 'c1');
+    assert.equal((await store.getIssue(SCOPE, 'i1')).comments[0].body, 'edited');
+    assert.equal(await provider.updateComment(SCOPE, 'missing', 'x'), null);
+  });
 });
 
 describe('LocalProvider writes', () => {
@@ -517,7 +531,10 @@ describe('LocalProvider capability declines (LIN-582)', () => {
   const { provider } = makeProvider();
 
   // Surface methods LocalProvider does NOT override → inherit the base throw.
-  const DECLINED = ['fetchOrganization', 'fetchViewer', 'fetchFocusedChild', 'updateComment', 'deleteComment'];
+  // updateComment/deleteComment moved OUT of this list under LIN-1160 — Local
+  // now implements both (the only real e2e read-back witness for proxy comment
+  // delete/edit; see tests/e2e/proxy-local.spec.js).
+  const DECLINED = ['fetchOrganization', 'fetchViewer', 'fetchFocusedChild'];
 
   test('supports() is false for the unimplemented surface methods', () => {
     for (const m of DECLINED) {
@@ -545,7 +562,7 @@ describe('LocalProvider capability declines (LIN-582)', () => {
       assert.ok(!implemented.includes(m), `${m} should not be implemented`);
     }
     // Sanity floor: the writes the suite above exercises ARE implemented.
-    for (const m of ['createIssue', 'updateIssue', 'createComment', 'createRelation', 'addLabel', 'removeLabel']) {
+    for (const m of ['createIssue', 'updateIssue', 'createComment', 'updateComment', 'deleteComment', 'createRelation', 'addLabel', 'removeLabel']) {
       assert.ok(implemented.includes(m), `${m} should be implemented`);
     }
   });

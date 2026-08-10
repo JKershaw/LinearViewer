@@ -96,6 +96,30 @@ describe('LocalStore', () => {
     assert.equal(await store.addComment(SCOPE, 'missing', 'x'), null);
   });
 
+  test('removeComment finds the holder issue and removes the matching entry (LIN-1160)', async () => {
+    const issue = await store.createIssue(SCOPE, { title: 'Commented' });
+    const c1 = await store.addComment(SCOPE, issue._id, 'first');
+    await store.addComment(SCOPE, issue._id, 'second');
+    assert.equal(await store.removeComment(SCOPE, c1.id), true);
+    const reloaded = await store.getIssue(SCOPE, issue._id);
+    assert.equal(reloaded.comments.length, 1);
+    assert.equal(reloaded.comments[0].body, 'second');
+    assert.equal(await store.removeComment(SCOPE, 'missing'), false);
+    assert.equal(await store.removeComment(SCOPE, null), false);
+  });
+
+  test('updateComment finds the holder issue and replaces the body (LIN-1160)', async () => {
+    const issue = await store.createIssue(SCOPE, { title: 'Commented' });
+    const c1 = await store.addComment(SCOPE, issue._id, 'first');
+    const updated = await store.updateComment(SCOPE, c1.id, 'edited');
+    assert.equal(updated.id, c1.id);
+    assert.equal(updated.body, 'edited');
+    const reloaded = await store.getIssue(SCOPE, issue._id);
+    assert.equal(reloaded.comments[0].body, 'edited');
+    assert.equal(await store.updateComment(SCOPE, 'missing', 'x'), null);
+    assert.equal(await store.updateComment(SCOPE, null, 'x'), null);
+  });
+
   test('labels add (idempotent) / remove', async () => {
     const issue = await store.createIssue(SCOPE, { title: 'Labeled' });
     assert.equal(await store.addLabel(SCOPE, issue._id, 'bug'), true);

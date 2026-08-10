@@ -107,6 +107,27 @@ test('a GitHub-backed workspace declines deleteRelation → clean 422', async ()
   assert.equal(body.capability, 'deleteRelation');
 });
 
+test('a GitHub-backed workspace declines deleteComment → clean 422 (LIN-1160)', async () => {
+  const commentId = '44444444-4444-4444-4444-444444444444';
+  const { status, body } = await request(buildApp('github'), `/api/proxy/issues/${UUID}/comments/${commentId}`, {
+    method: 'DELETE',
+  });
+  assert.equal(status, 422);
+  assert.equal(body.code, 'CAPABILITY_NOT_SUPPORTED');
+  assert.equal(body.capability, 'deleteComment');
+});
+
+test('a GitHub-backed workspace declines updateComment → clean 422 (LIN-1160)', async () => {
+  const commentId = '44444444-4444-4444-4444-444444444444';
+  const { status, body } = await request(buildApp('github'), `/api/proxy/issues/${UUID}/comments/${commentId}`, {
+    method: 'PATCH',
+    body: { body: 'corrected' },
+  });
+  assert.equal(status, 422);
+  assert.equal(body.code, 'CAPABILITY_NOT_SUPPORTED');
+  assert.equal(body.capability, 'updateComment');
+});
+
 test('a SUPPORTED write is not blocked by the gate (createIssue falls through)', async () => {
   // GitHub implements createIssue, so the gate passes. With a null workspace
   // token the request then short-circuits to the 503 workspace envelope — the
@@ -136,7 +157,7 @@ test('a workspace with no explicit provider falls back to Linear — gate is a p
 });
 
 test('the default provider (Linear) supports the full write surface — gate is a pass', () => {
-  for (const m of ['createIssue', 'updateIssue', 'createComment', 'createRelation', 'deleteRelation', 'addLabel', 'removeLabel']) {
+  for (const m of ['createIssue', 'updateIssue', 'createComment', 'updateComment', 'deleteComment', 'createRelation', 'deleteRelation', 'addLabel', 'removeLabel']) {
     assert.equal(linearProvider.supports(m), true, `Linear must support ${m}`);
   }
 });
