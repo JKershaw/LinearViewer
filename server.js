@@ -77,7 +77,7 @@ import { renderLandingPage } from './lib/render-landing.js'
 import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
-import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, normalizeProvider, matchTeamId } from './lib/workspace.js'
+import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, normalizeProvider, matchTeamId, isPersistableTeamRef } from './lib/workspace.js'
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from './lib/refresh-strategy.js'
 import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/jira/oauth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
@@ -2133,11 +2133,14 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
   // returning preserves the filter. Best-effort: persistence never blocks the page.
   // LIN-2025 (F4): the raw value is persisted with no write-time validation
   // fetch — a stale/unmatched value self-corrects on every later read via the
-  // same membership check fetchAndPrepareProjects already runs.
+  // same membership check fetchAndPrepareProjects already runs. The cheap
+  // type/length cap is not that validation: it just keeps the store's shape
+  // bounded now that the UUID gate no longer bounds it for free.
   const accountId = req.session.accountId;
   if (accountId) {
     if (rawTeam !== undefined) {
-      userPreferencesStore.setSelectedTeam(accountId, workspace.urlKey, teamId)
+      const persistedTeamId = isPersistableTeamRef(teamId) ? teamId : null;
+      userPreferencesStore.setSelectedTeam(accountId, workspace.urlKey, persistedTeamId)
         .catch(err => console.error('Failed to persist team selection:', err));
     } else {
       try {

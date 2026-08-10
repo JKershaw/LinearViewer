@@ -24,7 +24,9 @@ import {
   MAX_WORKSPACES,
   matchTeamId,
   requireTeamMembership,
-  TeamNotFoundError
+  TeamNotFoundError,
+  isPersistableTeamRef,
+  MAX_TEAM_REF_LENGTH
 } from '../../lib/workspace.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 
@@ -1491,5 +1493,34 @@ describe('requireTeamMembership (strict — GET /api/proxy/issues|labels|cycles)
       assert.equal(err.teamId, 'not-a-real-team');
       return true;
     });
+  });
+});
+
+// LIN-2025 close-out (implementation-review finding 6): dropping the read-side
+// UUID gate also dropped the incidental bound it put on what the dashboard
+// persists as a remembered team selection. This is the replacement bound —
+// a type + length cap only, NOT the write-time validation fetch F4 rejected.
+describe('isPersistableTeamRef (remembered team selection, LIN-727 write site)', () => {
+  test('null is persistable — that is how a selection is cleared', () => {
+    assert.strictEqual(isPersistableTeamRef(null), true);
+  });
+
+  test('an ordinary ref of either provider shape is persistable', () => {
+    assert.strictEqual(isPersistableTeamRef('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'), true);
+    assert.strictEqual(isPersistableTeamRef('ENG'), true); // Jira project key (LIN-2018)
+  });
+
+  test('an over-long ref is refused', () => {
+    assert.strictEqual(isPersistableTeamRef('a'.repeat(MAX_TEAM_REF_LENGTH)), true);
+    assert.strictEqual(isPersistableTeamRef('a'.repeat(MAX_TEAM_REF_LENGTH + 1)), false);
+  });
+
+  // `?team=a&team=b` reaches the route as an Array, and `?team[x]=y` as an
+  // object; the old UUID_REGEX gate coerced both to a failing string.
+  test('a non-string ref is refused', () => {
+    assert.strictEqual(isPersistableTeamRef(['team-a', 'team-b']), false);
+    assert.strictEqual(isPersistableTeamRef({ id: 'team-a' }), false);
+    assert.strictEqual(isPersistableTeamRef(undefined), false);
+    assert.strictEqual(isPersistableTeamRef(''), false);
   });
 });

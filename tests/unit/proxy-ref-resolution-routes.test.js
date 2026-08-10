@@ -278,11 +278,15 @@ test('GET /issues: a teamless provider (empty fetchTeams) passes any teamId thro
   assert.equal(calls.issuesTeamId, UNMATCHED_TEAM_UUID);
 });
 
-test('GET /labels: a well-formed but unmatched teamId fails loud (404 TEAM_NOT_FOUND)', async () => {
-  const { provider } = makeProvider();
+test('GET /labels: a well-formed but unmatched teamId fails loud (404 TEAM_NOT_FOUND), provider.labels never called', async () => {
+  const { provider, calls } = makeProvider();
   const { status, body } = await request(buildApp(provider), `/api/proxy/labels?teamId=${UNMATCHED_TEAM_UUID}`);
   assert.equal(status, 404);
   assert.equal(body.code, 'TEAM_NOT_FOUND');
+  // The refusal is local and pre-provider — the point of the ruling is that the
+  // filter is never dropped on the way to the provider, not merely that the
+  // response carries a 404 (implementation-review finding 5).
+  assert.equal(calls.labelsTeamId, undefined);
 });
 
 test('GET /labels: a matched teamId resolves and reaches the provider', async () => {
@@ -292,11 +296,12 @@ test('GET /labels: a matched teamId resolves and reaches the provider', async ()
   assert.equal(calls.labelsTeamId, TEAM_UUID);
 });
 
-test('GET /cycles: a well-formed but unmatched teamId fails loud (404 TEAM_NOT_FOUND)', async () => {
-  const { provider } = makeProvider();
+test('GET /cycles: a well-formed but unmatched teamId fails loud (404 TEAM_NOT_FOUND), provider.cycles never called', async () => {
+  const { provider, calls } = makeProvider();
   const { status, body } = await request(buildApp(provider), `/api/proxy/cycles?teamId=${UNMATCHED_TEAM_UUID}`);
   assert.equal(status, 404);
   assert.equal(body.code, 'TEAM_NOT_FOUND');
+  assert.equal(calls.cyclesTeamId, undefined);
 });
 
 test('GET /cycles: a matched teamId resolves and reaches the provider', async () => {
@@ -325,4 +330,56 @@ test('GET /states/:teamId: a provider-thrown error is relayed via the existing e
   });
   const { status } = await request(buildApp(provider), `/api/proxy/states/${UNMATCHED_TEAM_UUID}`);
   assert.equal(status, 400);
+});
+
+// ---------------------------------------------------------------------------
+// LIN-2025: the motivating case, at ROUTE level rather than helper level —
+// a non-UUID team id. Every case above uses UUIDs, which the old UUID_REGEX
+// gates also passed; only a Jira-shaped key (LIN-2018 remaps Jira team ids to
+// real project keys like "ENG") proves the format gate is genuinely gone and
+// the membership check is what decides. The ticket's Testing section asked for
+// this by name; the implementation review discharged it with a throwaway probe
+// (finding 4) and these are that probe's four cases, landed.
+// ---------------------------------------------------------------------------
+
+function makeJiraShapedProvider(overrides = {}) {
+  return makeProvider({
+    fetchTeams: async () => [{ id: 'ENG', name: 'Engineering', key: 'ENG' }],
+    ...overrides,
+  });
+}
+
+test('GET /issues: a matched non-UUID team key (Jira-shaped) reaches the provider', async () => {
+  const { provider, calls } = makeJiraShapedProvider();
+  const { status } = await request(buildApp(provider), '/api/proxy/issues?teamId=ENG');
+  assert.equal(status, 200);
+  assert.equal(calls.issuesTeamId, 'ENG');
+});
+
+test('GET /labels: a matched non-UUID team key passes through; an unmatched one 404s without calling the provider', async () => {
+  const matched = makeJiraShapedProvider();
+  const okRes = await request(buildApp(matched.provider), '/api/proxy/labels?teamId=ENG');
+  assert.equal(okRes.status, 200);
+  assert.equal(matched.calls.labelsTeamId, 'ENG');
+
+  const unmatched = makeJiraShapedProvider();
+  const { status, body } = await request(buildApp(unmatched.provider), '/api/proxy/labels?teamId=OPS');
+  assert.equal(status, 404);
+  assert.equal(body.code, 'TEAM_NOT_FOUND');
+  assert.equal(unmatched.calls.labelsTeamId, undefined);
+});
+
+test('GET /cycles: an unmatched non-UUID team key 404s without calling the provider', async () => {
+  const { provider, calls } = makeJiraShapedProvider();
+  const { status, body } = await request(buildApp(provider), '/api/proxy/cycles?teamId=OPS');
+  assert.equal(status, 404);
+  assert.equal(body.code, 'TEAM_NOT_FOUND');
+  assert.equal(calls.cyclesTeamId, undefined);
+});
+
+test('GET /states/:teamId: a non-UUID team key reaches the provider (gate-free — was a hard 400 before)', async () => {
+  const { provider, calls } = makeJiraShapedProvider();
+  const { status } = await request(buildApp(provider), '/api/proxy/states/ENG');
+  assert.equal(status, 200);
+  assert.equal(calls.statesTeamId, 'ENG');
 });
