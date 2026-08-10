@@ -21,7 +21,24 @@ const REPO_SEED = {
   projects: [
     { id: 'local-proj-1', name: 'Project Alpha', content: 'repo=test-repo', sortOrder: 1 },
   ],
-  issues: [],
+  // LIN-1948: the dangling-referent guard refuses a dispatch whose
+  // `issueIdentifier` resolves to no issue in the workspace. Tests below that
+  // dispatch against an identifier must therefore seed one that EXISTS — an
+  // empty issue list made every such dispatch a legitimate 422. Seeding real
+  // referents is also the more faithful fixture: in production you dispatch
+  // against an issue you picked from this workspace.
+  issues: [
+    {
+      id: 'cccccccc-cccc-cccc-cccc-cccccccccccc', identifier: 'LIN-999', title: 'Flaky login test',
+      description: '', projectId: 'local-proj-1', sortOrder: 1,
+      state: { name: 'Todo', type: 'unstarted' },
+    },
+    {
+      id: 'dddddddd-dddd-dddd-dddd-dddddddddddd', identifier: 'LIN-42', title: 'Feedback fixture',
+      description: '', projectId: 'local-proj-1', sortOrder: 2,
+      state: { name: 'Todo', type: 'unstarted' },
+    },
+  ],
 };
 
 // Seed the `request` fixture's OWN session (a separate cookie jar from `page`)
