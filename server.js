@@ -9,6 +9,7 @@
  */
 import 'dotenv/config'
 import path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import express from 'express'
 import { installAsyncErrorForwarding } from './lib/async-errors.js'
 
@@ -26,7 +27,8 @@ import { getWorkspaceNorthStar as resolveNorthStar } from './lib/north-star-reso
 import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken, refreshOwnerCredential } from './lib/workspace-token-refresh.js'
 import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
-import { CREDENTIAL_SOURCES } from './lib/credential-diagnostics.js'
+import { CREDENTIAL_SOURCES, fingerprintCredential } from './lib/credential-diagnostics.js'
+import { createRejectedCredentialRegistry } from './lib/rejected-credentials.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -1704,6 +1706,22 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 const TOKEN_CACHE_TTL_MS = 30 * 1000; // 30 seconds
 const workspaceTokenCache = createWorkspaceTokenCache({ ttlMs: TOKEN_CACHE_TTL_MS });
 
+// LIN-1980: the suspect-credential registry. `routes/proxy.js`'s `logEvent`
+// marks a fingerprint suspect on a provider-rejected 401; `resolveWorkspaceAccess`
+// below (the only reader) consults it to decide whether to attempt a forced
+// refresh. One shared instance so a mark made on the proxy lane is visible to
+// the very next resolve — see createProxyRoutes's `rejectedCredentialRegistry` wiring.
+const rejectedCredentialRegistry = createRejectedCredentialRegistry();
+// LIN-1980 close-out, ledger item 2: the registry is per-process, so a mark made
+// on one instance never reaches another and recovery latency scales with the
+// instance count. Nothing in the repo records that count (no deploy manifest;
+// production is Railway, which defaults to 1 replica unless explicitly scaled),
+// so this line makes it directly countable in the log stream: one line per boot,
+// carrying a stable per-process id. Distinct ids in the same window = distinct
+// processes. Deliberately at the single production construction site rather than
+// inside the factory, which unit tests build many times per run.
+console.log('[rejected-credentials] registry init', JSON.stringify({ processId: randomUUID(), pid: process.pid }));
+
 // LIN-1507: prompt (not 30s-fuzzy) cache eviction. Threaded into every
 // session-destruction call site so a revoked session's cached token is gone
 // immediately rather than served for up to TOKEN_CACHE_TTL_MS after the
@@ -1749,7 +1767,11 @@ function persistSessionRow(sid, session) {
 // credential disclosure there is LIN-1899's, not closed by anything here.
 async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
-    return { token: 'test-token', reason: 'ok', provider: 'linear' };
+    // LIN-1980: this is a credential-bearing return path like every other
+    // below (plan-review round 2, F2) — stamped so a test exercising the
+    // per-route fingerprint plumbing under NODE_ENV=test never sees
+    // `credentialFingerprint: undefined` on this short-circuit.
+    return { token: 'test-token', reason: 'ok', provider: 'linear', credentialFingerprint: fingerprintCredential('test-token') };
   }
 
   const cacheKey = workspaceTokenCacheKey(urlKey, ownerAccountId);
@@ -1759,7 +1781,25 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
   // check (business logic, not cache mechanics) stays here.
   const cached = workspaceTokenCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
-    return { token: cached.token, reason: 'ok', provider: cached.provider, scope: cached.scope, source: CREDENTIAL_SOURCES.CACHE, expiresAt: cached.expiresAt };
+    const cachedFingerprint = fingerprintCredential(cached.scope ?? cached.token);
+    // LIN-1980: the cache-hit path needs the SAME suspect check the
+    // session-scan path gets below (plan-review round 2 flagged this as the
+    // easiest-to-miss edge — a suspect fingerprint can be sitting in the 30s
+    // cache). `attemptSuspectCredentialRefresh` checks `isSuspect` (a sync,
+    // no-IO lookup) before its caller-supplied `loadSessions` ever runs, so
+    // the ordinary (non-suspect) hot path still never touches Mongo here.
+    const recovered = await attemptSuspectCredentialRefresh({
+      fingerprint: cachedFingerprint,
+      urlKey,
+      ownerAccountId,
+      loadSessions: () => sessionsCollection.find({}).toArray(),
+    });
+    if (recovered) {
+      workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
+      rejectedCredentialRegistry.accept(cachedFingerprint);
+      return { token: recovered.token, reason: 'ok', provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint };
+    }
+    return { token: cached.token, reason: 'ok', provider: cached.provider, scope: cached.scope, source: CREDENTIAL_SOURCES.CACHE, expiresAt: cached.expiresAt, credentialFingerprint: cachedFingerprint };
   }
 
   // Look up the access token from the sessions collection, scoped to
@@ -1769,8 +1809,22 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     const selected = selectOwnerWorkspaceToken(sessions, urlKey, ownerAccountId);
 
     if (selected.token) {
+      const selectedFingerprint = fingerprintCredential(selected.scope ?? selected.token);
+      // LIN-1980: `sessions` is already loaded on this path, so recovery costs
+      // no extra read beyond the forced-refresh round-trip itself.
+      const recovered = await attemptSuspectCredentialRefresh({
+        fingerprint: selectedFingerprint,
+        urlKey,
+        ownerAccountId,
+        loadSessions: () => Promise.resolve(sessions),
+      });
+      if (recovered) {
+        workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
+        rejectedCredentialRegistry.accept(selectedFingerprint);
+        return { token: recovered.token, reason: 'ok', provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint };
+      }
       workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider, scope: selected.scope });
-      return { token: selected.token, reason: 'ok', provider: selected.provider, scope: selected.scope, source: CREDENTIAL_SOURCES.SESSION_SCAN, expiresAt: selected.expiresAt };
+      return { token: selected.token, reason: 'ok', provider: selected.provider, scope: selected.scope, source: CREDENTIAL_SOURCES.SESSION_SCAN, expiresAt: selected.expiresAt, credentialFingerprint: selectedFingerprint };
     }
 
     // LIN-1373 refresh-on-resolve, widened LIN-1524: the selector above only
@@ -1810,7 +1864,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
         });
         if (refreshed) {
           workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider, scope: refreshed.scope });
-          return { token: refreshed.token, reason: 'ok', provider: refreshed.provider, scope: refreshed.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: refreshed.expiresAt };
+          return { token: refreshed.token, reason: 'ok', provider: refreshed.provider, scope: refreshed.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: refreshed.expiresAt, credentialFingerprint: fingerprintCredential(refreshed.scope ?? refreshed.token) };
         }
       } catch (err) {
         console.error(`Token refresh-on-resolve failed for workspace ${urlKey}:`, err);
@@ -1844,11 +1898,68 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     });
 
     // reason/provider are already the right shape for the workspaceUnavailable
-    // 503 envelope — see lib/workspace-token-resolver.js.
-    return { token: selected.token, reason, provider: selected.provider };
+    // 503 envelope — see lib/workspace-token-resolver.js. selected.token is
+    // falsy on every path that reaches here, so there is no credential to
+    // fingerprint.
+    return { token: selected.token, reason, provider: selected.provider, credentialFingerprint: null };
   } catch (err) {
     console.error('Error looking up workspace access token:', err);
-    return { token: null, reason: 'store_unreachable', provider: null };
+    return { token: null, reason: 'store_unreachable', provider: null, credentialFingerprint: null };
+  }
+}
+
+/**
+ * LIN-1980: attempt a forced refresh for a credential `resolveWorkspaceAccess`
+ * just selected (cache-hit or session-scan) that the rejected-credential
+ * registry has marked suspect. Strictly non-worsening by construction: on
+ * `null` (nothing refreshable), a throw, or the SAME fingerprint coming back,
+ * this returns `null` and the caller keeps serving the credential it already
+ * selected, unchanged. Never attempted for UNSCOPED (owner-blind) callers —
+ * the existing `ownerAccountId !== UNSCOPED` exclusion below mirrors the one
+ * refresh-on-resolve already applies.
+ *
+ * `loadSessions` is a thunk rather than an eagerly-loaded array so the
+ * cache-hit call site — whose whole reason to exist is avoiding a Mongo read
+ * — never pays for `sessionsCollection.find({})` unless the fingerprint is
+ * actually suspect AND due for a refresh attempt (both cheap, synchronous,
+ * no-IO checks against the registry).
+ *
+ * LIN-1980 review F1: `shouldAttemptRefresh` is also given a `scopeKey`
+ * (`${ownerAccountId}:${urlKey}`) so the attempt cap holds across fingerprint
+ * churn — a credential that rotates to a new fingerprint on every refresh
+ * while still being rejected would otherwise re-trigger a forced refresh on
+ * every request (each new fingerprint starts with no attempt history of its
+ * own), since `accept()` deletes the superseded fingerprint's cooldown entry.
+ *
+ * @param {{fingerprint: string|null, urlKey: string, ownerAccountId: string|symbol, loadSessions: () => Promise<Array>}} args
+ * @returns {Promise<{token: *, expiresAt: number, provider: string, scope: *, credentialFingerprint: string}|null>}
+ */
+async function attemptSuspectCredentialRefresh({ fingerprint, urlKey, ownerAccountId, loadSessions }) {
+  if (ownerAccountId === UNSCOPED) return null;
+  if (!rejectedCredentialRegistry.isSuspect(fingerprint)) return null;
+  if (!rejectedCredentialRegistry.shouldAttemptRefresh(fingerprint, `${ownerAccountId}:${urlKey}`)) return null;
+  try {
+    const sessions = await loadSessions();
+    const refreshed = await refreshOwnerWorkspaceToken({
+      sessions,
+      urlKey,
+      ownerAccountId,
+      refreshAccessToken,
+      persistSession: persistSessionRow,
+      resolveProvider: getProviderForWorkspace,
+      resolveExchange: refreshExchangeFor,
+      store: ownerCredentialStore
+    });
+    if (!refreshed) return null;
+    const refreshedFingerprint = fingerprintCredential(refreshed.scope ?? refreshed.token);
+    // The provider hasn't necessarily fixed anything — a re-mint/re-read can
+    // hand back the identical dead credential. Only a GENUINE replacement
+    // counts as recovery; anything else falls through untouched.
+    if (refreshedFingerprint === fingerprint) return null;
+    return { ...refreshed, credentialFingerprint: refreshedFingerprint };
+  } catch (err) {
+    console.error(`Suspect-credential forced refresh failed for workspace ${urlKey}:`, err);
+    return null;
   }
 }
 
@@ -1932,7 +2043,7 @@ async function getWorkspaceNorthStar(urlKey, accountId) {
   return resolveNorthStar(userPreferencesStore, urlKey, accountId);
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, rejectedCredentialRegistry }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore }))

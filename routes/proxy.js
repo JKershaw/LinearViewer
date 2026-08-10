@@ -652,7 +652,7 @@ function dispatchWatchChanged(baseline, item) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null }) {
   const router = Router();
 
   /**
@@ -759,13 +759,25 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * token was already present, so a missing credential still resolves `token:
    * null` and 503s exactly as before.
    *
+   * LIN-1980: also stamps `req.resolvedCredentialFingerprint` with the
+   * fingerprint of the credential THIS call actually resolved (sourced from
+   * `resolveWorkspaceAccess`'s own return value, never from
+   * `credentialResolutions` below — that trail is logging-only and can miss
+   * or lag a direct caller). `logEvent`'s 401 branch reads it to mark the
+   * rejected credential suspect. Stamped before the early TEST_LOCAL_URL_KEY
+   * return too, so a local-provider 401 (rare, but possible on a capability
+   * decline) never reads a stale fingerprint from a previous request on the
+   * same `req`-shaped object in a test harness.
+   *
    * @returns {Promise<{provider: Object, token: (string|Object|null), reason: string}>}
    */
-  async function resolveProviderAccess(urlKey, ownerAccountId) {
+  async function resolveProviderAccess(urlKey, ownerAccountId, req) {
     if (process.env.NODE_ENV === 'test' && urlKey === TEST_LOCAL_URL_KEY) {
+      if (req) req.resolvedCredentialFingerprint = null;
       return { provider: localProvider, token: urlKey, reason: 'ok' };
     }
-    const { token, scope, reason, provider: providerName, source, expiresAt } = await resolveWorkspaceAccess(urlKey, ownerAccountId);
+    const { token, scope, reason, provider: providerName, source, expiresAt, credentialFingerprint } = await resolveWorkspaceAccess(urlKey, ownerAccountId);
+    if (req) req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
     const activeProvider = injectedProvider || getProviderForWorkspace({ provider: providerName });
     // Record WHICH credential this resolution handed out, so a later 401 from the
     // upstream can name it (see recordCredentialResolution / logEvent). Secret-safe
@@ -1029,7 +1041,17 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   }
 
   function logEvent(req, endpoint, status, note = null) {
-    if (status === 401) logCredentialRejection(req, endpoint);
+    if (status === 401) {
+      logCredentialRejection(req, endpoint);
+      // LIN-1980: mark the credential THIS request actually resolved suspect
+      // — sourced from `req.resolvedCredentialFingerprint` (stamped at
+      // resolution time by resolveProviderAccess / the 9 direct
+      // resolveWorkspaceAccess call sites), never from `credentialResolutions`
+      // above, which is logging-only and can miss a direct-resolve site. A
+      // proxy-token-stage 401 (no workspace credential ever resolved) leaves
+      // the fingerprint unset, and `markSuspect` fails open on that (no-op).
+      rejectedCredentialRegistry?.markSuspect(req.resolvedCredentialFingerprint, { reason: 'provider-401', now: Date.now() });
+    }
     proxyEventStore.recordEvent({
       urlKey: req.proxyUrlKey,
       tokenId: req.proxyTokenId,
@@ -2069,7 +2091,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/me', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/me', reason);
       }
@@ -2090,7 +2112,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/teams', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/teams', reason);
       }
@@ -2111,7 +2133,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/projects', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/projects', reason);
       }
@@ -2132,7 +2154,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/issues', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
@@ -2173,7 +2195,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
@@ -2220,7 +2242,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/search', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/search', reason);
       }
@@ -2252,7 +2274,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/states/:teamId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/states', reason);
       }
@@ -2280,7 +2302,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/labels', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/labels', reason);
       }
@@ -2308,7 +2330,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/cycles', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/cycles', reason);
       }
@@ -2337,7 +2359,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get(['/api/proxy/cycles/:cycleId', '/api/proxy/cycle/:cycleId'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/cycle', reason);
       }
@@ -2372,7 +2394,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get(['/api/proxy/issues/:issueId/relations', '/api/proxy/relations/:issueId'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/relations', reason);
       }
@@ -2503,7 +2525,7 @@ One convention across every endpoint, so you can branch on the same fields every
       // capability (422 CAPABILITY_NOT_SUPPORTED for a provider with no
       // formal-attachment node — GitHub Issues included, since it correctly
       // never mints `att:` handles), then look up the attachment.
-      const resolved = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const resolved = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (denyIfUnsupported(resolved.provider, 'fetchAttachment', req, res, endpoint)) return;
       if (!resolved.token) {
         return workspaceUnavailable(req, res, endpoint, resolved.reason);
@@ -2586,7 +2608,7 @@ One convention across every endpoint, so you can branch on the same fields every
       // Redirect-safe relaying of those is owned by S5; `user-images.
       // githubusercontent.com` serves bytes directly and works today.
       isGithubAssetHost = GITHUB_UPLOAD_HOSTS.includes(urlObj.hostname);
-      const resolved = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const resolved = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!isGithubAssetHost && !resolved.token) {
         return workspaceUnavailable(req, res, endpoint, resolved.reason);
       }
@@ -2698,7 +2720,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
@@ -2782,7 +2804,7 @@ One convention across every endpoint, so you can branch on the same fields every
 
   router.patch('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
@@ -2866,7 +2888,7 @@ One convention across every endpoint, so you can branch on the same fields every
    * recur. `merge` may throw DescriptionEditError for a loud 422.
    */
   async function applyDescriptionEdit(req, res, endpoint, merge) {
-    const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+    const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
     if (!token) {
       return workspaceUnavailable(req, res, endpoint, reason);
     }
@@ -2989,7 +3011,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post(['/api/proxy/issues/:issueId/comments', '/api/proxy/comments/:issueId'], proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/comments', reason);
       }
@@ -3058,7 +3080,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.delete('/api/proxy/issues/:issueId/comments/:commentId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/comments', reason);
       }
@@ -3094,7 +3116,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.patch('/api/proxy/issues/:issueId/comments/:commentId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/comments', reason);
       }
@@ -3170,7 +3192,7 @@ One convention across every endpoint, so you can branch on the same fields every
   router.post('/api/proxy/issues/:issueId/attachments', proxyLimiter, authenticateProxyToken, requireWriteScope, attachmentUploadBodyParser, async (req, res) => {
     const endpoint = '/api/proxy/issues/:id/attachments';
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, endpoint, reason);
       }
@@ -3274,7 +3296,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues/:issueId/relations', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/relations', reason);
       }
@@ -3323,7 +3345,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.delete('/api/proxy/issues/:issueId/relations/:relationId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/relations', reason);
       }
@@ -3362,7 +3384,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/issues/:issueId/labels', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/labels', reason);
       }
@@ -3424,7 +3446,7 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.delete('/api/proxy/issues/:issueId/labels/:labelId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/labels', reason);
       }
@@ -3484,7 +3506,11 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get('/api/proxy/stack', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      // LIN-1980: stamp before any other logic (incl. the !accessToken early
+      // return below) so the fingerprint is present even when this request
+      // later 401s from a shared credential another site marked suspect.
+      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/stack', reason);
       }
@@ -3525,7 +3551,11 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get(['/api/proxy/issues/:identifier/prompt/:templateKey', '/api/proxy/prompt/:identifier/:templateKey'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      // LIN-1980: stamp before any other logic (incl. the !accessToken early
+      // return below) so the fingerprint is present even when this request
+      // later 401s from a shared credential another site marked suspect.
+      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/prompt', reason);
       }
@@ -3791,7 +3821,11 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get(['/api/proxy/issues/:identifier/recommend', '/api/proxy/recommend/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      // LIN-1980: stamp before any other logic (incl. the !accessToken early
+      // return below) so the fingerprint is present even when this request
+      // later 401s from a shared credential another site marked suspect.
+      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/recommend', reason);
       }
@@ -4367,7 +4401,11 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get(['/api/proxy/issues/:identifier/recap', '/api/proxy/recap/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      // LIN-1980: stamp before any other logic (incl. the !accessToken early
+      // return below) so the fingerprint is present even when this request
+      // later 401s from a shared credential another site marked suspect.
+      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/recap', reason);
       }
@@ -4516,7 +4554,11 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/recap/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      // LIN-1980: stamp before any other logic (incl. the !accessToken early
+      // return below) so the fingerprint is present even when this request
+      // later 401s from a shared credential another site marked suspect.
+      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/recap', reason);
       }
@@ -4650,7 +4692,11 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.get(['/api/proxy/issues/:identifier/brief', '/api/proxy/brief/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      // LIN-1980: stamp before any other logic (incl. the !accessToken early
+      // return below) so the fingerprint is present even when this request
+      // later 401s from a shared credential another site marked suspect.
+      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/brief', reason);
       }
@@ -4798,7 +4844,11 @@ One convention across every endpoint, so you can branch on the same fields every
    */
   router.post('/api/proxy/brief/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      // LIN-1980: stamp before any other logic (incl. the !accessToken early
+      // return below) so the fingerprint is present even when this request
+      // later 401s from a shared credential another site marked suspect.
+      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/brief', reason);
       }
@@ -5203,7 +5253,11 @@ One convention across every endpoint, so you can branch on the same fields every
       let issue = null;
       let resolvedRepo = repo || null;
       if (issueIdentifier) {
-        const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+        const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+        // LIN-1980: stamp before any other logic (incl. the !accessToken early
+        // return below) so the fingerprint is present even when this request
+        // later 401s from a shared credential another site marked suspect.
+        req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
         if (!accessToken) {
           return workspaceUnavailable(req, res, '/api/proxy/autopilot/kickoff', reason);
         }
@@ -5753,7 +5807,11 @@ One convention across every endpoint, so you can branch on the same fields every
       const subscriptionResolved = subscription ?? DEFAULT_SUBSCRIPTION;
 
       // Recommendation preconditions — identical to GET /recommend.
-      const { token: accessToken, reason } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      // LIN-1980: stamp before any other logic (incl. the !accessToken early
+      // return below) so the fingerprint is present even when this request
+      // later 401s from a shared credential another site marked suspect.
+      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/recommend-and-dispatch', reason);
       }
