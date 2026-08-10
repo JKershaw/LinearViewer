@@ -252,6 +252,67 @@ test.describe('Proxy API — local workspace e2e (LIN-584)', () => {
     expect((await back.json()).comments.some(c => c.body === 'A proxy comment')).toBe(true);
   });
 
+  // ---- Writes: comment delete/edit (LIN-1160) ------------------------------
+
+  test('comments: create → delete → read-back round-trip (comment is actually gone)', async ({ request }) => {
+    const created = await write(request, 'post', '/api/proxy/issues/LOCAL-1/comments', { body: 'Doomed comment' });
+    expect(created.status()).toBe(201);
+    const commentId = (await created.json()).comment.id;
+    expect(commentId).toBeTruthy();
+
+    const del = await write(request, 'delete', `/api/proxy/issues/LOCAL-1/comments/${commentId}`);
+    expect(del.status()).toBe(200);
+    expect(await del.json()).toEqual({ success: true });
+
+    const after = await read(request, '/api/proxy/issues/LOCAL-1');
+    expect((await after.json()).comments.some(c => c.id === commentId)).toBe(false);
+  });
+
+  test('comments: create → edit → read-back round-trip (new body lands)', async ({ request }) => {
+    const created = await write(request, 'post', '/api/proxy/issues/LOCAL-1/comments', { body: 'Typo-ed comment' });
+    expect(created.status()).toBe(201);
+    const commentId = (await created.json()).comment.id;
+
+    const edit = await write(request, 'patch', `/api/proxy/issues/LOCAL-1/comments/${commentId}`, { body: 'Corrected comment' });
+    expect(edit.status()).toBe(200);
+    const editBody = await edit.json();
+    expect(editBody.success).toBe(true);
+    expect(editBody.comment.body).toBe('Corrected comment');
+
+    const after = await read(request, '/api/proxy/issues/LOCAL-1');
+    const afterComment = (await after.json()).comments.find(c => c.id === commentId);
+    expect(afterComment.body).toBe('Corrected comment');
+  });
+
+  test('comments: delete does not confess a non-UUID/missing id, and non-Linear ids 400', async ({ request }) => {
+    const del = await write(request, 'delete', '/api/proxy/issues/LOCAL-1/comments/not-a-uuid');
+    expect(del.status()).toBe(400);
+  });
+
+  test('comments: dedupe invalidation — create → delete → identical re-create mints a fresh comment, not a stale dedupe echo', async ({ request }) => {
+    const body = 'Repeatable comment body';
+
+    const first = await write(request, 'post', '/api/proxy/issues/LOCAL-1/comments', { body });
+    expect(first.status()).toBe(201);
+    const firstId = (await first.json()).comment.id;
+
+    const del = await write(request, 'delete', `/api/proxy/issues/LOCAL-1/comments/${firstId}`);
+    expect(del.status()).toBe(200);
+
+    // Without generation-tag invalidation, this would hit the LIN-399 dedupe
+    // cache and come back 200 { deduped: true } carrying the now-deleted id.
+    const recreate = await write(request, 'post', '/api/proxy/issues/LOCAL-1/comments', { body });
+    expect(recreate.status()).toBe(201);
+    const recreateBody = await recreate.json();
+    expect(recreateBody.deduped).toBeFalsy();
+    expect(recreateBody.comment.id).not.toBe(firstId);
+
+    const after = await read(request, '/api/proxy/issues/LOCAL-1');
+    const comments = (await after.json()).comments;
+    expect(comments.some(c => c.id === firstId)).toBe(false);
+    expect(comments.some(c => c.id === recreateBody.comment.id)).toBe(true);
+  });
+
   // ---- Writes: description splices -----------------------------------------
 
   test('description/append adds a block, preserving the existing body', async ({ request }) => {
