@@ -36,6 +36,9 @@ function makeFakeProvider({ assetUrl } = {}) {
   const provider = {
     name: PROVIDER_NAME,
     supports: (cap) => ['createIssue', 'uploadFile', 'fetchTeams'].includes(cap),
+    // LIN-1557: the feedback route's priority write-contract check consults
+    // this unconditionally.
+    apiWriteFields: () => ['title', 'description', 'teamId', 'projectId', 'priority'],
     async fetchTeams() { return [{ id: 'team-default', name: 'Default' }]; },
     async uploadFile(token, bytes, meta) {
       calls.uploadFile.push({ bytes, meta });

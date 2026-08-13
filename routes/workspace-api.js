@@ -21,7 +21,7 @@ import { buildRoadmapGapMessages } from '../lib/prompts/roadmap-gap-template.js'
 import { buildRoadmapDigestMessages } from '../lib/prompts/roadmap-digest-template.js';
 import { buildRoadmapOrientationMessages, serializeOrientationCandidates, countOrientationCandidates, parseOrientationLines, ORIENTATION_BEARINGS } from '../lib/prompts/roadmap-orientation-template.js';
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
-import { renderDetailsContent } from '../lib/render.js';
+import { renderDetailsContent, PRIORITY_OPTION_LABELS } from '../lib/render.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext } from '../lib/proxy-preamble.js';
@@ -2535,6 +2535,18 @@ ${goal}`
         description += `\n\n![](${assetUrl})`;
       }
 
+      // LIN-1557: an explicit non-default priority the provider's headless
+      // write contract (apiWriteFields()) can't honour is folded into the
+      // description as visible text instead of being silently dropped, or
+      // refusing the whole submission — this is a fire-and-forget human form
+      // with no retry loop, so a hard failure would mean the report is never
+      // filed at all. 0 ("No priority") is indistinguishable from "unset", so
+      // it is never folded or forwarded, only omitted.
+      const canSetPriority = provider.apiWriteFields().includes('priority');
+      if (priority > 0 && !canSetPriority) {
+        description += `\n\n---\n**Reported priority:** ${PRIORITY_OPTION_LABELS[priority]}`;
+      }
+
       // Origin/triage marker (LIN-947) — additive, deterministic, and always
       // appended last so the stored ticket announces itself as raw, un-triaged
       // feedback whose natural next step is triage. This is what activates the
@@ -2575,8 +2587,9 @@ ${goal}`
         }
       }
 
-      const createInput = { teamId: resolvedTeamId, title: ticketTitle, description, priority };
+      const createInput = { teamId: resolvedTeamId, title: ticketTitle, description };
       if (resolvedProjectId) createInput.projectId = resolvedProjectId;
+      if (priority > 0 && canSetPriority) createInput.priority = priority;
 
       const result = await provider.createIssue(token, createInput);
       if (!result?.success || !result.issue) {

@@ -1208,7 +1208,13 @@ Content-Type: application/json
 | `cycleId` | UUID | No | Assign to cycle |
 | `priority` | int | No | Priority 0 (none) to 4 (urgent) |
 
-Returns `201`. The echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus the `children` / `comments` / `relations` collections, which a create cannot set) — self-verifying, so you do **not** need a follow-up `GET` to confirm the fields the request set:
+**Provider compatibility.** Not every optional field above is honoured by every provider. An unsupported one is **refused with `400`** rather than silently dropped on a false `201` (a behavior change — earlier versions of this endpoint accepted and silently discarded these fields):
+
+- **GitHub-backed workspaces** do not support `stateId`, `assigneeId`, `parentId`, `cycleId`, `priority`.
+- **Local-backed workspaces** do not support `assigneeId`, `cycleId`.
+- **Linear-backed workspaces** support every field above.
+
+Returns `201`. The echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus the `children` / `comments` / `relations` collections, which a create cannot set) — self-verifying, so you do **not** need a follow-up `GET` to confirm the fields the request set (an unsupported field never reaches this point, per the compatibility note above):
 ```json
 {
   "success": true,
@@ -1258,7 +1264,15 @@ At least one field must be provided.
 | `cycleId` | UUID | Assign to cycle |
 | `priority` | int | Priority 0 (none) to 4 (urgent) |
 
-Response. As with create, the echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus `children` / `comments` / `relations`) and is **self-verifying** — every mutable field (`priority`/`priorityLabel`, `labels`, `parent`, `project`, `assignee`, `state`, `cycle`, `estimate`, `team`/`teamId`) reflects the post-write state, so a round-trip write→read shows no field absent from the write response that the request set:
+**Provider compatibility — unlike create, this endpoint does not refuse an unsupported field.** It accepts it and silently drops it, returning `200` with the field simply absent from the echo:
+
+- **GitHub-backed workspaces silently drop** `priority`, `assigneeId`, `parentId`, `cycleId` — only `title`, `description`, and `stateId` take effect.
+- **Local-backed workspaces silently drop** `assigneeId`, `cycleId`.
+- **Linear-backed workspaces:** every field below takes effect.
+
+If you need certainty that a field you set actually landed, follow up with a `GET` on the issue — the echo below is **not** a reliable guarantee for every provider.
+
+Response. As with create, the echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus `children` / `comments` / `relations`). For a Linear-backed workspace every mutable field (`priority`/`priorityLabel`, `labels`, `parent`, `project`, `assignee`, `state`, `cycle`, `estimate`, `team`/`teamId`) reflects the post-write state; for GitHub/Local-backed workspaces, only the fields named above as supported do:
 ```json
 {
   "success": true,
