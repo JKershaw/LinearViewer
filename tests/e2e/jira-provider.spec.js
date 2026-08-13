@@ -39,6 +39,22 @@ test.describe('Jira provider (no test-token mock)', () => {
     await expect(page.locator('.line:has-text("Subtask of the in-progress task")').first()).toBeAttached();
   });
 
+  // LIN-2011 review finding F1: the epic (ENG-0) used to surface BOTH as the
+  // canonical project header AND as an ungrouped issue row in "No Project"
+  // (its own canonical `project` is null — an epic has no epic parent).
+  // ENG-0's summary is deliberately "Engineering", matching the project
+  // header text, so a double-render would show up as a second "Engineering"
+  // row rather than just an extra unrelated line.
+  test('the epic does not double-render as an ungrouped "No Project" issue (F1)', async ({ page }) => {
+    await expect(page.locator('.project-header:has-text("Engineering")')).toHaveCount(1);
+    const noProjectGroup = page.locator('.project[data-id="__no_project__"]');
+    await expect(noProjectGroup.locator('.line:has-text("Engineering")')).toHaveCount(0);
+    // The "No Project" group still exists and holds the genuinely project-less
+    // issues (ENG-3/5/6 carry neither a native nor legacy epic link) — the
+    // fix removes the epic from `issues`, it doesn't remove the group itself.
+    await expect(noProjectGroup.locator('.line:has-text("Jira task shipped")').first()).toBeAttached();
+  });
+
   test('detail link is provider-aware: "View in Jira" (not Linear) — the ui.displayName trap, rendered', async ({ page }) => {
     // render.js interpolates provider.ui.displayName into the detail link. The
     // detail block is lazy — expand an issue to load it first.
@@ -51,8 +67,26 @@ test.describe('Jira provider (no test-token mock)', () => {
     const projectLink = page.locator('.project-meta .detail-link', { hasText: 'View in Jira' }).first();
     await expect(projectLink).toBeAttached();
     const href = await projectLink.getAttribute('href');
-    expect(href).toBe('https://acme.atlassian.net/browse/ENG');
+    // LIN-2011: the canonical project is the epic ENG-0, not the Jira project
+    // ENG — its "View in Jira" link is the epic's own browsable issue page.
+    expect(href).toBe('https://acme.atlassian.net/browse/ENG-0');
     expect(href).not.toContain('/rest/api/');
+  });
+
+  // LIN-2011 re-review finding F4: the "+ Add task" deep link used to pass the
+  // canonical project's id straight through as Jira's `pid=` query param.
+  // Since LIN-2011 that id is the EPIC issue's id (ENG-0 -> '10500'), not a
+  // Jira project id — Jira allocates project/issue ids from the same numeric
+  // space, so the old link opened the create dialog scoped to whatever
+  // unrelated project happened to hold that id (or a dead one). The fix
+  // drops the `pid=` scoping entirely for Jira rather than pointing it
+  // somewhere untrustworthy.
+  test('the "+ Add task" link never passes the epic id as Jira\'s pid (F4)', async ({ page }) => {
+    const addTaskLink = page.locator('.add-task-link a[data-action="create-task"]').first();
+    await expect(addTaskLink).toBeAttached();
+    const href = await addTaskLink.getAttribute('href');
+    expect(href).toBe('https://acme.atlassian.net/secure/CreateIssue!default.jspa');
+    expect(href).not.toContain('pid=');
   });
 
   test('an issue description renders the ADF→Markdown conversion, not raw ADF JSON', async ({ page }) => {
@@ -119,15 +153,32 @@ test.describe('Jira provider — team selector (LIN-2018)', () => {
 
 // An empty / unresolved project still renders its container (empty state),
 // consistent with how Linear/Local/GitHub render an empty project.
+//
+// LIN-2011: the canonical project level is now derived from EPICS, not Jira
+// project objects — a Jira project with literally zero issues has zero
+// epics too, so it renders NO canonical project at all (an intentional
+// consequence of the epic-derivation redesign: there is no project-shaped
+// entity left to point a header at). The equivalent empty-state coverage is
+// now an epic with zero CHILD issues, which still renders its own container.
 test.describe('Jira provider — empty project', () => {
-  test('a project with zero issues still renders its container', async ({ page }) => {
+  test('an epic with zero child issues still renders its container', async ({ page }) => {
     await seedJiraWorkspace(page, {
       projects: [{ id: '20001', key: 'EMPTY', name: 'Empty Project' }],
-      issues: [],
+      issues: [{
+        id: '30500', key: 'EMPTY-1',
+        fields: {
+          summary: 'Empty Epic', description: null,
+          issuetype: { id: '10000', name: 'Epic', hierarchyLevel: 1 },
+          status: { statusCategory: { key: 'new' } },
+          project: { id: '20001', key: 'EMPTY', name: 'Empty Project' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+        },
+      }],
     });
     await page.goto(jiraDashboardUrl(JIRA_WORKSPACE_URL_KEY));
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('.project-header:has-text("Empty Project")')).toBeVisible();
+    await expect(page.locator('.project-header:has-text("Empty Epic")')).toBeVisible();
   });
 });
 

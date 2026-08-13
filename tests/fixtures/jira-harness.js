@@ -25,12 +25,21 @@ export function jiraDashboardUrl(urlKey = JIRA_WORKSPACE_URL_KEY) {
   return `/workspace/${urlKey}/`;
 }
 
+/** Jira's own epic-level `issuetype` marker (LIN-2011) — `hierarchyLevel: 1`. */
+const EPIC_ISSUETYPE = { id: '10000', name: 'Epic', hierarchyLevel: 1 };
+
 /**
  * Canonical seed for a Jira Cloud site, in the REST v3 shape createFakeJiraClient
  * expects (the fake returns it close to verbatim, so the provider's mapping runs
  * unchanged): one project with three issues exercising the statusCategory
  * mapping — new (→ unstarted), indeterminate (→ started), done (→ completed) —
- * plus a native one-level subtask (best-effort parent/children).
+ * plus a native one-level subtask (best-effort parent/children), plus a native
+ * epic (ENG-0) that ENG-1 is parented to (LIN-2011: epic -> canonical
+ * project). ENG-0's summary is deliberately "Engineering", matching the Jira
+ * PROJECT's own name — the canonical project header this fixture renders was
+ * "Engineering" before LIN-2011 too (then via the Jira project, now via this
+ * epic), so the many pre-existing `.project-header:has-text("Engineering")`
+ * assertions stay meaningful without themselves needing to change.
  */
 // LIN-2018: ENG's real per-project workflow statuses (one issue type is
 // enough for this fixture's purposes) — `states()` now reads THIS, not a
@@ -62,6 +71,18 @@ export const defaultJiraSeed = {
   projectStatuses: defaultJiraProjectStatuses,
   issues: [
     {
+      id: '10500', key: 'ENG-0',
+      fields: {
+        summary: 'Engineering',
+        description: null,
+        issuetype: EPIC_ISSUETYPE,
+        status: { id: '101', name: 'To Do', statusCategory: { key: 'new' } },
+        project: { id: '10001', key: 'ENG', name: 'Engineering' },
+        created: '2025-12-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+        labels: [], assignee: null, parent: null,
+      },
+    },
+    {
       id: '20001', key: 'ENG-1',
       fields: {
         summary: 'Jira task to do',
@@ -75,7 +96,10 @@ export const defaultJiraSeed = {
         status: { id: '101', name: 'To Do', statusCategory: { key: 'new' } },
         project: { id: '10001', key: 'ENG', name: 'Engineering' },
         created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
-        labels: [], assignee: null, parent: null,
+        labels: [], assignee: null,
+        // LIN-2011: a native team-managed epic link (ENG-0) — routes to
+        // canonical `project`, not `parent` (an epic is not a subtask-parent).
+        parent: { id: '10500', key: 'ENG-0', fields: { issuetype: EPIC_ISSUETYPE, summary: 'Engineering' } },
         // LIN-1942: one forward transition (To Do → In Progress), seeded so the
         // write-lane E2E can drive a genuine status move through the browser.
         // Inert for detail-nonactive-binding.spec.js's Jira read test, which
