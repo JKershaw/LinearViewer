@@ -23,7 +23,7 @@ import { Router } from 'express';
 import { renderLiveConsolePage } from '../lib/render-live-console.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { buildConsoleFeed, DEFAULT_PAGE_SIZE, isLoopActive } from '../lib/live-console.js';
+import { buildConsoleFeed, DEFAULT_PAGE_SIZE, isLoopActive, snapPulseWindowMs } from '../lib/live-console.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
 import { collectAgentTokenIds, foldCredentialIndex } from '../lib/credential-state.js';
 
@@ -211,12 +211,20 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
       // tokens the working lanes carry.
       const credentialByToken = await readCredentialIndex(workspaces, loops);
 
+      // LIN-1505 Phase C: the strip's requested zoom span. Never trust the
+      // raw query value as a store-facing window — snap it to one of the
+      // fixed rungs, so the wire (and buildPulse's bucket count) carries at
+      // most four shapes. The `loops` read above already covers FEED_WINDOW_MS
+      // (24h), which exceeds the widest rung (6h), so no extra store read.
+      const pulseWindowMs = snapPulseWindowMs(req.query.pulseSpanMs);
+
       const feed = buildConsoleFeed({ statusItems: statusRead.statusItems, loops }, {
         now,
         pageSize: DEFAULT_PAGE_SIZE,
         sourceHasMore: statusRead.sourceHasMore,
         sourceTotal: statusRead.sourceTotal,
         credentialByToken,
+        pulseWindowMs,
       });
       res.json(feed);
     } catch (error) {

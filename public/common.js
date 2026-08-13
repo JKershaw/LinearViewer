@@ -67,6 +67,22 @@ window.TIMELINE_FIT_MIN_SPAN_MS = 60 * 60 * 1000; // 1h
 // TIMELINE_BAR_MIN_WIDTH_PCT (LIN-1908 Phase A).
 window.TIMELINE_BAR_MIN_WIDTH_PCT = 0.6;
 
+// Live Console pulse strip zoom (LIN-1505 Phase C) — mirrors
+// lib/live-console.js's PULSE_SPAN_RUNGS_MS/snapPulseWindowMs, same house
+// convention as the timeline mirrors above (a shared source with no window
+// mirror is exactly the split-representation wart research found on this
+// surface). Independent of the timeline's own span constants by decision —
+// the strip never pans and never shares state with the timeline's zoom.
+window.PULSE_SPAN_RUNGS_MS = [3 * 60 * 1000, 15 * 60 * 1000, 60 * 60 * 1000, 6 * 60 * 60 * 1000];
+window.snapPulseWindowMs = function snapPulseWindowMs(ms) {
+  var n = Number(ms);
+  if (!isFinite(n) || n <= 0) return window.PULSE_SPAN_RUNGS_MS[0];
+  for (var i = 0; i < window.PULSE_SPAN_RUNGS_MS.length; i++) {
+    if (n <= window.PULSE_SPAN_RUNGS_MS[i]) return window.PULSE_SPAN_RUNGS_MS[i];
+  }
+  return window.PULSE_SPAN_RUNGS_MS[window.PULSE_SPAN_RUNGS_MS.length - 1];
+};
+
 function clampTimelineWindow(startMs, endMs, nowMs, maxSpanMs) {
   var span = endMs - startMs;
   var boundEnd = nowMs;

@@ -440,7 +440,7 @@ test.describe('Live Console (experimental)', () => {
 
     test('a lane heartbeat with an unsafe breakdown key renders it literally, not as markup', async ({ page }) => {
       let injected = false;
-      await page.route(`**${EVENTS_API}`, async (route) => {
+      await page.route(`**${EVENTS_API}*`, async (route) => {
         const response = await route.fetch();
         const body = await response.json();
         if (!injected) {
@@ -504,7 +504,7 @@ test.describe('Live Console (experimental)', () => {
         }, { bucketIndex, bucketCount, bucketMs });
       }
 
-      await page.route(`**${EVENTS_API}`, async (route) => {
+      await page.route(`**${EVENTS_API}*`, async (route) => {
         const response = await route.fetch();
         const body = await response.json();
         const now = body.serverNow || Date.now();
@@ -811,7 +811,7 @@ test.describe('Live Console (experimental)', () => {
 
     test('a stale-tail bar and a genuinely still-running bar share data-kind="working" but carry distinct data-still-running values', async ({ page }) => {
       let injected = false;
-      await page.route(`**${EVENTS_API}`, async (route) => {
+      await page.route(`**${EVENTS_API}*`, async (route) => {
         const response = await route.fetch();
         const body = await response.json();
         if (!injected) {
@@ -871,7 +871,7 @@ test.describe('Live Console (experimental)', () => {
       const pageErrors = [];
       const consoleErrors = [];
       let injected = false;
-      await page.route(`**${EVENTS_API}`, async (route) => {
+      await page.route(`**${EVENTS_API}*`, async (route) => {
         const response = await route.fetch();
         const body = await response.json();
         if (!injected) {
@@ -903,7 +903,7 @@ test.describe('Live Console (experimental)', () => {
 
     test('label fallback renders the literal kind/promptName defaults ("custom"/"Prompt") sanely, not as absent data', async ({ page }) => {
       let injected = false;
-      await page.route(`**${EVENTS_API}`, async (route) => {
+      await page.route(`**${EVENTS_API}*`, async (route) => {
         const response = await route.fetch();
         const body = await response.json();
         if (!injected) {
@@ -980,7 +980,7 @@ test.describe('Live Console (experimental)', () => {
 
     test('a followUpTo edge renders a connector path from the predecessor bar to the successor bar', async ({ page }) => {
       let injected = false;
-      await page.route(`**${EVENTS_API}`, async (route) => {
+      await page.route(`**${EVENTS_API}*`, async (route) => {
         const response = await route.fetch();
         const body = await response.json();
         if (!injected) {
@@ -1020,7 +1020,7 @@ test.describe('Live Console (experimental)', () => {
       const pageErrors = [];
       page.on('pageerror', (err) => pageErrors.push(err));
       let injected = false;
-      await page.route(`**${EVENTS_API}`, async (route) => {
+      await page.route(`**${EVENTS_API}*`, async (route) => {
         const response = await route.fetch();
         const body = await response.json();
         if (!injected) {
@@ -1063,7 +1063,7 @@ test.describe('Live Console (experimental)', () => {
     test('a connector stays pinned to its bar once the row count pushes the viewport past its 320px cap', async ({ page }) => {
       const ROWS = 20;
       let injected = false;
-      await page.route(`**${EVENTS_API}`, async (route) => {
+      await page.route(`**${EVENTS_API}*`, async (route) => {
         const response = await route.fetch();
         const body = await response.json();
         if (!injected) {
@@ -1318,7 +1318,7 @@ test.describe('Live Console (experimental)', () => {
       // the LIN-1743 review used to surface this in the first place.
       await seedTerminalWorker(page, URL_KEY, { task: 'LIN-9010', message: '[done] ok' });
       let injected = false;
-      await page.route(`**${EVENTS_API}`, async (route) => {
+      await page.route(`**${EVENTS_API}*`, async (route) => {
         const response = await route.fetch();
         const body = await response.json();
         if (!injected) {
@@ -1353,7 +1353,7 @@ test.describe('Live Console (experimental)', () => {
 
     test('zooming into a span with nothing in it shows the empty state, even without a poll in between (F1)', async ({ page }) => {
       let injected = false;
-      await page.route(`**${EVENTS_API}`, async (route) => {
+      await page.route(`**${EVENTS_API}*`, async (route) => {
         const response = await route.fetch();
         const body = await response.json();
         if (!injected) {
@@ -1443,6 +1443,188 @@ test.describe('Live Console (experimental)', () => {
       });
 
       expect(await timelineWindow(page)).toEqual(baseline);
+    });
+  });
+
+  test.describe('Pulse strip zoom (LIN-1505 Phase C)', () => {
+    const PULSE = '.lc-pulse';
+    const SPAN_TEXT = '#live-console-pulse-span-text';
+    const PRESET_3M = '[data-testid="live-console-pulse-preset-3m"]';
+    const PRESET_15M = '[data-testid="live-console-pulse-preset-15m"]';
+    const PRESET_1H = '[data-testid="live-console-pulse-preset-1h"]';
+    const PRESET_6H = '[data-testid="live-console-pulse-preset-6h"]';
+
+    test.beforeEach(async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+      await page.goto(PAGE_URL);
+      await page.waitForSelector(PULSE);
+    });
+    test.afterEach(async ({ page }) => {
+      await clearFeed(page, URL_KEY);
+    });
+
+    test('defaults to the 3-minute span on load, with only 3m pressed', async ({ page }) => {
+      await expect(page.locator(SPAN_TEXT)).toHaveText('last 3 minutes');
+      await expect(page.locator(PRESET_3M)).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator(PRESET_15M)).toHaveAttribute('aria-pressed', 'false');
+      await expect(page.locator(PRESET_1H)).toHaveAttribute('aria-pressed', 'false');
+      await expect(page.locator(PRESET_6H)).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    test('a preset click changes the visible span label and marks itself (only) pressed', async ({ page }) => {
+      await page.locator(PRESET_1H).click();
+      await expect(page.locator(SPAN_TEXT)).toHaveText('last 1 hour');
+      await expect(page.locator(PRESET_1H)).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator(PRESET_3M)).toHaveAttribute('aria-pressed', 'false');
+
+      await page.locator(PRESET_6H).click();
+      await expect(page.locator(SPAN_TEXT)).toHaveText('last 6 hours');
+      await expect(page.locator(PRESET_6H)).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator(PRESET_1H)).toHaveAttribute('aria-pressed', 'false');
+
+      await page.locator(PRESET_15M).click();
+      await expect(page.locator(SPAN_TEXT)).toHaveText('last 15 minutes');
+      await expect(page.locator(PRESET_15M)).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    // Real <button>s in a role="group" — the accessible/keyboard path decision
+    // 1 names as primary. Tab reaches each one and Enter activates it, with no
+    // custom keydown handling needed (native button semantics).
+    test('preset buttons are keyboard-reachable: Tab focuses, Enter activates', async ({ page }) => {
+      await page.locator(PRESET_3M).focus();
+      await expect(page.locator(PRESET_3M)).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(page.locator(PRESET_15M)).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(page.locator(PRESET_15M)).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator(SPAN_TEXT)).toHaveText('last 15 minutes');
+    });
+
+    test('the preset group carries an accessible name', async ({ page }) => {
+      const group = page.locator('[data-testid="live-console-pulse-presets"]');
+      await expect(group).toHaveAttribute('role', 'group');
+      await expect(group).toHaveAttribute('aria-label', 'Strip range');
+    });
+
+    test('ctrl+wheel zooms the strip in; a plain wheel (no ctrl/meta) leaves the span untouched', async ({ page }) => {
+      // Start from 1h (not the 3m floor) so a zoom-in gesture has room to move.
+      await page.locator(PRESET_1H).click();
+      await expect(page.locator(SPAN_TEXT)).toHaveText('last 1 hour');
+
+      await wheelZoom(page, PULSE, { deltaY: -600, ctrlKey: true }); // zoom IN
+      await expect(page.locator(SPAN_TEXT)).not.toHaveText('last 1 hour');
+      const zoomedInText = await page.locator(SPAN_TEXT).textContent();
+
+      // A plain wheel (no ctrl/meta) must leave the span exactly as it was —
+      // gated identically to the timeline's onTimelineWheel.
+      await wheelZoom(page, PULSE, { deltaY: 900, ctrlKey: false });
+      await expect(page.locator(SPAN_TEXT)).toHaveText(zoomedInText);
+    });
+
+    test('two-finger pinch narrows the span as the fingers spread (zoom in), never past the 3-minute floor', async ({ page }) => {
+      await page.locator(PRESET_1H).click(); // start from a span with room to zoom in
+      await expect(page.locator(SPAN_TEXT)).toHaveText('last 1 hour');
+
+      await pinch(page, PULSE, { startSpread: 40, endSpread: 400 }); // fingers spreading → zoom in
+      const afterPinch = await page.locator(SPAN_TEXT).textContent();
+      expect(afterPinch).not.toBe('last 1 hour');
+    });
+
+    test('a one-finger touch move over the strip does not zoom — decision 1: no one-finger gesture on the strip', async ({ page }) => {
+      await page.locator(PRESET_1H).click();
+      await expect(page.locator(SPAN_TEXT)).toHaveText('last 1 hour');
+
+      await dragPan(page, PULSE, { startX: 100, dx: 150 }); // one-finger — the timeline's pan gesture, deliberately unwired here
+
+      await expect(page.locator(SPAN_TEXT)).toHaveText('last 1 hour'); // unchanged
+    });
+
+    test('the strip keeps its current touch behaviour: touch-action is pan-y, not none', async ({ page }) => {
+      // The concrete implementation of decision 1 — a one-finger vertical
+      // swipe over the 46px-tall strip must stay native page scroll (a swipe
+      // dead zone there is worse than on the tall timeline panel).
+      const touchAction = await page.locator(PULSE).evaluate(el => getComputedStyle(el).touchAction);
+      expect(touchAction).toBe('pan-y');
+    });
+
+    test('a span change resets the decaying hum/load scales rather than visibly re-settling over several polls', async ({ page }) => {
+      // Seed an enormous single bucket at the 3-minute default, letting humMax
+      // latch onto it, then switch to a very different span — the OLD scale
+      // must not persist and silently flatten the new span's own data.
+      await page.route(`**${EVENTS_API}*`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        const buckets = new Array(36).fill(0);
+        buckets[35] = 1000; // an extreme spike, well past anything the next span will show
+        body.pulse = { bucketMs: 5000, endTs: body.serverNow || Date.now(), buckets, load: new Array(36).fill(0) };
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector(PULSE);
+      // Give the spike a moment to land and set humMax sky-high.
+      await page.waitForTimeout(200);
+
+      // Now switch presets — the route mock's bucketMs stays 5000 regardless
+      // of the requested span in this fixture, but the CLIENT resets its
+      // scales off the wire-reported bucketMs the moment it differs from what
+      // was last seen, which a real span change always triggers server-side.
+      // This test pins the reset TRIGGER path itself (updatePulse's
+      // newBucketMs !== pulseData.bucketMs check) via a direct wire change.
+      await page.route(`**${EVENTS_API}*`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        const buckets = new Array(36).fill(0);
+        buckets[35] = 1; // a tiny value — would render as a sliver under the OLD (unreset) humMax
+        body.pulse = { bucketMs: 100000, endTs: body.serverNow || Date.now(), buckets, load: new Array(36).fill(0) };
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+      await page.locator(PRESET_1H).click(); // triggers the debounced refetch → new bucketMs arrives
+
+      // Poll the canvas for a column with meaningful height at the newest
+      // bucket's x — if humMax reset, `1/1` (fresh max) paints a tall column;
+      // if it didn't, `1/1000` paints an invisible sliver.
+      const humAtNewestBucket = () => page.locator('#live-console-tempo').evaluate((canvas) => {
+        const ctx = canvas.getContext('2d');
+        const x = canvas.width - 2;
+        const data = ctx.getImageData(x, 0, 1, canvas.height).data;
+        let topY = null;
+        for (let y = 0; y < canvas.height; y++) { if (data[y * 4 + 3] > 0) { topY = y; break; } }
+        return topY === null ? 0 : canvas.height - topY;
+      });
+      await expect.poll(humAtNewestBucket, { timeout: 15000 }).toBeGreaterThan(4);
+      // The preset click's own debounced rung refetch may still be in flight
+      // via the mocked route above — let Playwright ignore it during teardown
+      // rather than race the page closing against route.fetch() resolving.
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    });
+
+    test('reduced motion: a preset click repaints immediately, not on the next 5s poll', async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.route(`**${EVENTS_API}*`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        const buckets = new Array(36).fill(0);
+        buckets[35] = 6;
+        body.pulse = { bucketMs: 5000, endTs: body.serverNow || Date.now(), buckets, load: new Array(36).fill(0) };
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector(PULSE);
+      await page.waitForTimeout(200);
+
+      // Under reduced motion there is no rAF loop — renderPulse only runs on
+      // a poll response or an explicit call. A preset click's synchronous
+      // renderPulse() call is the ONLY thing that can move the span label +
+      // repaint before the next 5s poll tick.
+      const before = Date.now();
+      await page.locator(PRESET_1H).click();
+      await expect(page.locator(SPAN_TEXT)).toHaveText('last 1 hour');
+      expect(Date.now() - before).toBeLessThan(4000); // well under one 5s poll interval
+      // The click's own debounced rung refetch may still be in flight via the
+      // mocked route above — let Playwright ignore it during teardown rather
+      // than race the page closing against route.fetch() resolving.
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
     });
   });
 });

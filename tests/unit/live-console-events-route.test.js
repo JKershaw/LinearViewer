@@ -128,6 +128,40 @@ describe('live branch — per-workspace store truncation feeds hasMore + summary
   });
 });
 
+// LIN-1505 Phase C: the strip's requested zoom span, threaded from the query
+// string through snapPulseWindowMs into buildConsoleFeed/buildPulse. Bucket
+// count must stay fixed at every span (payload size never changes), and a
+// free-form/absent value must never reach the store-facing window unsnapped.
+describe('live branch — pulseSpanMs query threading (LIN-1505 Phase C)', () => {
+  test('an omitted pulseSpanMs keeps the unchanged 3-minute default', async () => {
+    const { app } = buildApp({ pages: { acme: { items: [], total: 0 } } });
+    const { body } = await get(app, '/workspace/acme/api/live-console/events');
+    assert.equal(body.pulse.bucketMs, 5000); // 180000 / 36 === 5000, unchanged
+    assert.equal(body.pulse.buckets.length, 36);
+  });
+
+  test('a valid rung is honoured, deriving bucketMs from the fixed 36-bucket count', async () => {
+    const { app } = buildApp({ pages: { acme: { items: [], total: 0 } } });
+    const { body } = await get(app, '/workspace/acme/api/live-console/events?pulseSpanMs=3600000'); // 1h
+    assert.equal(body.pulse.buckets.length, 36, 'bucket count is fixed at every span');
+    assert.equal(body.pulse.bucketMs, 100000); // 3600000 / 36
+  });
+
+  test('an unrecognised/free-form value snaps to the nearest rung rather than reaching the store as-is', async () => {
+    const { app } = buildApp({ pages: { acme: { items: [], total: 0 } } });
+    const { body } = await get(app, '/workspace/acme/api/live-console/events?pulseSpanMs=999999999'); // above the 6h ceiling
+    assert.equal(body.pulse.buckets.length, 36);
+    assert.equal(body.pulse.bucketMs, (6 * 60 * 60 * 1000) / 36, 'clamped to the 6h ceiling rung');
+  });
+
+  test('a junk pulseSpanMs falls back to the 3-minute default, never NaN/negative buckets', async () => {
+    const { app } = buildApp({ pages: { acme: { items: [], total: 0 } } });
+    const { body } = await get(app, '/workspace/acme/api/live-console/events?pulseSpanMs=not-a-number');
+    assert.equal(body.pulse.bucketMs, 5000);
+    assert.equal(body.pulse.buckets.length, 36);
+  });
+});
+
 describe('history branch — the before cursor is pushed down as `until` so paging advances past the cap', () => {
   test('passes until: new Date(before) (with since + the history per-workspace limit) into the store read', async () => {
     const before = Date.now() - 30_000;

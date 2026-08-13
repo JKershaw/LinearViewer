@@ -60,11 +60,26 @@
   width: 100%;
   height: 46px;
   margin: 0.1rem 0 1.1rem;
+  /* LIN-1505 Phase C: `pan-y`, NOT the timeline viewport's `none` — a
+   * one-finger vertical drag must stay native page scroll (decision: no
+   * one-finger gesture on the strip), while a two-finger sequence is still
+   * intercepted in JS via `touches.length === 2` + `preventDefault()`. */
+  touch-action: pan-y;
 }
 .lc-pulse canvas {
   display: block;
   width: 100%;
   height: 100%;
+}
+/* .lc-pulse-presets reuses .lc-timeline-presets/.lc-timeline-preset verbatim
+ * (both classes are present on the markup) — same idiom, zero new button
+ * chrome. Only the span-text label is new. */
+.lc-pulse-span-text {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-left: auto;
+  align-self: center;
 }
 
 /* ── Workspace filter chips ─────────────────────────────────────────────── */
