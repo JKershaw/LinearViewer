@@ -1317,7 +1317,9 @@ describe('JiraProvider reads (fake client)', () => {
       assert.equal(ctx.focusedChild, undefined, 'ENG-2 is Done — nothing eligible for selectFocusSubtask to pick')
     })
 
-    test('a parent with a non-terminal child attaches focusedChild via the shared selectFocusSubtask picker', async () => {
+    // Shared by the two tests below: a parent (ENG-90) with a genuinely open
+    // (non-terminal) child (ENG-91), so noDescend has something real to suppress.
+    function createOpenChildProvider() {
       const client = createFakeJiraClient({
         projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
         projectStatuses: { ENG: ENG_PROJECT_STATUSES },
@@ -1344,15 +1346,28 @@ describe('JiraProvider reads (fake client)', () => {
           },
         ],
       })
-      const p = new JiraProvider({ clientFactory: () => client, site: SITE })
+      return new JiraProvider({ clientFactory: () => client, site: SITE })
+    }
+
+    test('a parent with a non-terminal child attaches focusedChild via the shared selectFocusSubtask picker', async () => {
+      const p = createOpenChildProvider()
       const ctx = await p.fetchRecommendationContext(scope, 'ENG-90')
       assert.equal(ctx.children.length, 1)
       assert.ok(ctx.focusedChild, 'the open (non-terminal) child must be attached')
       assert.equal(ctx.focusedChild.issue.identifier, 'ENG-91')
     })
 
+    // Regression (LIN-1910 review F2): the original version of this test ran
+    // against ENG-1, whose only child (ENG-2) is already Done — the preceding
+    // "terminal child" test proves that fixture yields no focusedChild even
+    // WITHOUT noDescend, so the assertion passed whether or not the noDescend
+    // branch existed (confirmed by mutation: deleting `noDescend ||` from the
+    // implementation left this test green). ENG-90/ENG-91 has a genuinely open
+    // child, so this now actually exercises noDescend suppressing the descent
+    // that the test directly above proves would otherwise happen.
     test('noDescend frames a parent as a leaf — no focusedChild even with a live child', async () => {
-      const ctx = await provider.fetchRecommendationContext(scope, 'ENG-1', { noDescend: true })
+      const p = createOpenChildProvider()
+      const ctx = await p.fetchRecommendationContext(scope, 'ENG-90', { noDescend: true })
       assert.equal(ctx.children.length, 1, 'children are still reported')
       assert.equal(ctx.focusedChild, undefined, 'but no descent happens')
     })
