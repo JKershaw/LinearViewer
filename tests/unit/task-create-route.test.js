@@ -166,6 +166,11 @@ describe('option-list degradation (never 500 over an unavailable list)', () => {
     });
     const res = await call({ provider, query: { teamId: 'team-1' } });
     assert.strictEqual(res.statusCode, 200);
+    // LIN-2032 close-out (review finding F4): symmetric with the task-edit
+    // twin. A 200 alone would also pass if the page rendered NO state control
+    // at all — the fallback is the actual claim, so assert it.
+    assert.ok(/<input[^>]*name="stateId"/.test(res.body), 'degraded to the text input');
+    assert.ok(!/<select[^>]*name="stateId"/.test(res.body));
   });
 });
 

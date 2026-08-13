@@ -37,6 +37,7 @@ import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { jiraProvider } from '../../lib/providers/jira/index.js';
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
+import { defaultJiraSeed } from '../fixtures/jira-harness.js';
 
 const SITE = 'https://acme.atlassian.net';
 const SCOPE = { email: 'ada@acme.com', apiToken: 'tok-123', site: SITE };
@@ -927,5 +928,53 @@ describe('Jira-backed proxy GET /api/proxy/states/:teamId — a getProjectStatus
     // fake client, not a fix), flagged here rather than silently assumed away.
     assert.equal(status, 500);
     assert.equal(body.error, 'Failed to fetch states');
+  });
+});
+
+// =============================================================================
+// LIN-2032 close-out (review finding F1) — the SHARED harness enrichment is
+// itself load-bearing, and this is what makes it so.
+//
+// The two statuses LIN-2032 added to `tests/fixtures/jira-harness.js` (104
+// "Won't Do", 105 'Ready for QA') were read by NOTHING: delete both lines and
+// the whole suite — unit and e2e — stayed green. That is exactly the shape of
+// drift the LIN-2018 plan's item 3 already suffered once, so the enrichment
+// would have been free to rot back out again. The two tests below drive the
+// SHARED seed (not this file's local ENG_PROJECT_STATUSES / AMB_PROJECT_
+// STATUSES) through the real proxy routes, so removing either status fails a
+// test that names why it was there.
+// =============================================================================
+describe('the shared Jira harness keeps the statuses the ambiguity path needs (LIN-2032 F1)', () => {
+  beforeEach(() => {
+    // Re-point at the SHARED harness seed — the point of these two tests is
+    // that `defaultJiraProjectStatuses`, not a local seed, is what is pinned.
+    fake = createFakeJiraClient(defaultJiraSeed);
+    jiraProvider.configure({ client: fake, clientFactory: () => fake, site: SITE });
+  });
+
+  test('GET /states/ENG surfaces the shared harness\'s CUSTOM status name and BOTH done-category statuses', async () => {
+    const { status, body } = await call(buildApp(), 'GET', '/api/proxy/states/ENG');
+    assert.equal(status, 200);
+    const names = body.states.map(s => s.name);
+    assert.ok(
+      names.includes('Ready for QA'),
+      'the shared harness must carry a CUSTOM (non-stock) status name — a stock-only seed cannot prove the provider reads real per-project statuses rather than a fixed vocabulary (LIN-2018 plan item 3)',
+    );
+    assert.deepEqual(
+      body.states.filter(s => s.type === 'completed').map(s => s.name).sort(),
+      ['Done', "Won't Do"],
+      'the shared harness must carry TWO done-category statuses, or the ambiguous `stateId: "done"` path below is unreachable from any surface driven off this seed',
+    );
+  });
+
+  test('a stateId:"done" PATCH against the SHARED seed 422s with candidates — the enrichment is what makes it ambiguous', async () => {
+    const { status, body } = await call(buildApp(), 'PATCH', '/api/proxy/issues/ENG-1', { stateId: 'done' });
+    assert.equal(status, 422);
+    assert.match(body.error, /Ambiguous/i);
+    assert.deepEqual(body.candidates.map(c => c.name).sort(), ['Done', "Won't Do"]);
+    assert.equal(
+      (await stored('ENG-1')).fields.status.statusCategory.key, 'new',
+      'resolution failed before any transition was attempted — nothing was written',
+    );
   });
 });
