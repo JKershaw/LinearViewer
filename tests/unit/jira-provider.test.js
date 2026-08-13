@@ -42,6 +42,7 @@ import { createJiraClient } from '../../lib/providers/jira/client.js'
 import { getProvider } from '../../lib/providers/registry.js'
 import { NotImplementedError } from '../../lib/providers/interface.js'
 import { SOURCE_JIRA } from '../../lib/providers/models.js'
+import { buildForest } from '../../lib/tree.js'
 
 const SITE = 'https://acme.atlassian.net'
 
@@ -190,6 +191,53 @@ function multiTeamSeededProvider() {
           project: { id: '10002', key: 'OPS', name: 'Operations' },
           created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
           labels: [], assignee: null, parent: null,
+        },
+      },
+      {
+        id: '40002', key: 'OPS-9',
+        fields: {
+          summary: 'Ops Epic', description: null, issuetype: EPIC_ISSUETYPE,
+          status: { id: '21', name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10002', key: 'OPS', name: 'Operations' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+        },
+      },
+    ],
+  })
+  const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+  return { provider, client }
+}
+
+/**
+ * A variant of `multiTeamSeededProvider` (LIN-2011 re-review finding F3):
+ * ENG-77 lives in the ENG project but is parented to OPS-9, an epic in a
+ * DIFFERENT Jira project — a cross-project parent link, which Jira permits.
+ * A team-scoped read (`fetchProjects(scope, 'ENG')`) walks only the ENG
+ * project's issues, so OPS-9 is never itself part of the fetched batch —
+ * exactly the "referenced but out-of-batch epic" shape the fix must not
+ * silently drop.
+ */
+function crossProjectEpicSeededProvider() {
+  const client = createFakeJiraClient({
+    projects: [
+      { id: '10001', key: 'ENG', name: 'Engineering' },
+      { id: '10002', key: 'OPS', name: 'Operations' },
+    ],
+    projectStatuses: {
+      ENG: ENG_PROJECT_STATUSES,
+      OPS: [{ id: '3', name: 'Task', subtask: false, statuses: [{ id: '21', name: 'To Do', statusCategory: { key: 'new' } }] }],
+    },
+    issues: [
+      {
+        id: '50001', key: 'ENG-77',
+        fields: {
+          summary: 'Engineering story under a cross-project epic', description: null,
+          status: { id: '12', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null,
+          parent: { id: '40002', key: 'OPS-9', fields: { issuetype: EPIC_ISSUETYPE, summary: 'Ops Epic' } },
         },
       },
       {
@@ -1008,9 +1056,13 @@ describe('JiraProvider capability profile', () => {
     assert.equal(p.getCreateTaskUrl('urlKey', null), 'https://www.atlassian.com/software/jira')
   })
 
-  test('getCreateTaskUrl builds a project-scoped deep link when a site + projectId are known', () => {
+  test('getCreateTaskUrl always opens the un-scoped create dialog — never pid=<epic id> (LIN-2011 review F4)', () => {
     const p = new JiraProvider({ site: SITE })
-    assert.equal(p.getCreateTaskUrl('urlKey', '10001'), `${SITE}/secure/CreateIssue.jspa?pid=10001`)
+    // `projectId` is render.js's canonical `project.id`, which since LIN-2011
+    // is an EPIC ISSUE id, not a Jira project id — passing it through as
+    // `pid=` was a measured regression (dead link, or worse, opens the
+    // create dialog against an unrelated project sharing that numeric id).
+    assert.equal(p.getCreateTaskUrl('urlKey', '10001'), `${SITE}/secure/CreateIssue!default.jspa`)
     assert.equal(p.getCreateTaskUrl('urlKey', null), `${SITE}/secure/CreateIssue!default.jspa`)
   })
 
@@ -1108,6 +1160,33 @@ describe('JiraProvider reads (fake client)', () => {
     assert.equal(result.projects[0].id, '30001', 'the ENG epic, not the ENG Jira project (LIN-2011)')
     assert.deepEqual(result.issues.map(i => i.identifier).sort(), ['ENG-1'], 'OPS-1/OPS-9 must be absent (scoped read) and ENG-9 must be absent too (F1: the epic is not also an issue)')
     assert.equal(listAllCalls.count, 0, 'a team-scoped read must use getProject, never the full listAllProjects walk')
+  })
+
+  // LIN-2011 re-review finding F3: a cross-project epic link (Jira permits
+  // an issue's parent to live in a different project than the issue itself)
+  // meant a team-scoped read's `issues` stamped a `project` id that had no
+  // matching entry in the SAME read's `projects` array — `server.js`'s
+  // `projects.map(p => forest.get(p.id) ...)` walk then silently dropped
+  // that issue's whole forest group from the rendered dashboard. Proven here
+  // by running the provider's real output through the SAME `buildForest` +
+  // project-iteration server.js uses, not just inspecting the canonical shape.
+  test('fetchProjects(scope, teamId) synthesizes a canonical project for a cross-project epic so the issue is not silently dropped from the rendered dashboard (F3)', async () => {
+    const { provider: multi } = crossProjectEpicSeededProvider()
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+
+    const result = await multi.fetchProjects(scope, 'ENG')
+    const issue = result.issues.find(i => i.identifier === 'ENG-77')
+    assert.ok(issue, 'the cross-project-epic issue must still be fetched')
+    assert.deepEqual(issue.project, { id: '40002', name: 'Ops Epic' }, 'canonical project is unchanged — stamped straight off fields.parent')
+
+    // The regression: a `projects` entry matching that id must ALSO exist,
+    // or the issue's forest group is unreachable from the rendered trees.
+    assert.ok(result.projects.some(p => p.id === '40002'), 'a synthesized canonical project must cover the out-of-batch epic')
+
+    const forest = buildForest(result.issues)
+    const trees = result.projects.map(project => forest.get(project.id) || { roots: [] })
+    const rendered = trees.flatMap(({ roots }) => roots).map(node => node.issue.identifier)
+    assert.ok(rendered.includes('ENG-77'), 'the issue must be reachable via server.js\'s own projects.map(forest.get) walk, not just present in the canonical issues array')
   })
 
   test('fetchProjects with no teamId still walks every project (unscoped, unchanged)', async () => {
@@ -1370,6 +1449,112 @@ describe('JiraProvider — company-managed legacy "Epic Link" resolution (LIN-20
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
     const result = await provider.fetchProjects(scope)
     assert.equal(result.issues[0].project, null)
+  })
+
+  // LIN-2011 review L3: the legacy Epic Link field's VALUE was assumed to
+  // always be a bare issue-key string. A re-review measured it silently
+  // failing to resolve (no crash, but no grouping either) for an
+  // object-shaped or bare-numeric value — normalizeEpicLinkValue closes
+  // that gap for the four observed shapes, exercised here through both
+  // resolution paths (batch + single-issue).
+  describe('legacy Epic Link value normalization (LIN-2011 review L3)', () => {
+    test('bare key string (the common case) resolves — regression', async () => {
+      const client = companyManagedClient()
+      const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+      const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+      const result = await provider.fetchProjects(scope)
+      assert.deepEqual(result.issues.find(i => i.identifier === 'CMP-2').project, { id: '60001', name: 'Company Epic' })
+    })
+
+    test('bare id string (the epic\'s numeric id, not its key) resolves via epicByKey\'s id index', async () => {
+      const client = companyManagedClient([{
+        id: '60004', key: 'CMP-4',
+        fields: {
+          summary: 'Story linked by the epic\'s numeric id', description: null,
+          status: { statusCategory: { key: 'new' } },
+          project: { id: '50001', key: 'CMP', name: 'Company' },
+          created: '2026-02-04T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+          customfield_10014: '60001',
+        },
+      }])
+      const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+      const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+      const result = await provider.fetchProjects(scope)
+      assert.deepEqual(result.issues.find(i => i.identifier === 'CMP-4').project, { id: '60001', name: 'Company Epic' })
+    })
+
+    test('object shape ({key}) normalizes to the bare key — previously silent null', async () => {
+      const client = companyManagedClient([{
+        id: '60005', key: 'CMP-5',
+        fields: {
+          summary: 'Story with an object-shaped legacy epic link', description: null,
+          status: { statusCategory: { key: 'new' } },
+          project: { id: '50001', key: 'CMP', name: 'Company' },
+          created: '2026-02-05T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+          customfield_10014: { key: 'CMP-1' },
+        },
+      }])
+      const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+      const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+      const result = await provider.fetchProjects(scope)
+      assert.deepEqual(result.issues.find(i => i.identifier === 'CMP-5').project, { id: '60001', name: 'Company Epic' })
+    })
+
+    test('bare numeric value normalizes to its string form — previously silent null', async () => {
+      const client = companyManagedClient([{
+        id: '60006', key: 'CMP-6',
+        fields: {
+          summary: 'Story with a numeric legacy epic link', description: null,
+          status: { statusCategory: { key: 'new' } },
+          project: { id: '50001', key: 'CMP', name: 'Company' },
+          created: '2026-02-06T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+          customfield_10014: 60001,
+        },
+      }])
+      const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+      const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+      const result = await provider.fetchProjects(scope)
+      assert.deepEqual(result.issues.find(i => i.identifier === 'CMP-6').project, { id: '60001', name: 'Company Epic' })
+    })
+
+    test('an unsupported shape (array) degrades to project: null — never throws', async () => {
+      const client = companyManagedClient([{
+        id: '60007', key: 'CMP-7',
+        fields: {
+          summary: 'Story with an unsupported legacy epic link shape', description: null,
+          status: { statusCategory: { key: 'new' } },
+          project: { id: '50001', key: 'CMP', name: 'Company' },
+          created: '2026-02-07T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+          customfield_10014: ['CMP-1'],
+        },
+      }])
+      const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+      const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+      const result = await provider.fetchProjects(scope)
+      assert.equal(result.issues.find(i => i.identifier === 'CMP-7').project, null)
+    })
+
+    test('the single-issue fallback path (_resolveLegacyEpicContext) also normalizes an object-shaped value', async () => {
+      const client = companyManagedClient([{
+        id: '60008', key: 'CMP-8',
+        fields: {
+          summary: 'Story with an object-shaped legacy epic link', description: null,
+          status: { statusCategory: { key: 'new' } },
+          project: { id: '50001', key: 'CMP', name: 'Company' },
+          created: '2026-02-08T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+          customfield_10014: { key: 'CMP-1' },
+        },
+      }])
+      const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+      const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+      const issue = await provider.fetchIssueFields(scope, 'CMP-8')
+      assert.deepEqual(issue.project, { id: '60001', name: 'Company Epic' })
+    })
   })
 
   test('fetchIssueFields (single-issue): resolves via ONE bounded getIssue(epicKey) call, only on the no-native-parent fallback path', async () => {
