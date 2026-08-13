@@ -144,7 +144,7 @@ Authorization: Bearer YOUR_TOKEN
 
 One convention across every endpoint, so a consumer can branch on the same fields everywhere:
 
-- **Success is the HTTP status.** Any `2xx` is success; any non-`2xx` is failure. There is no partial state — a write never returns `2xx` with a falsy `success`.
+- **Success is the HTTP status.** Any `2xx` is success; any non-`2xx` is failure. A write never returns `2xx` with a falsy `success`. A non-`2xx` write MAY mean the write partially landed rather than not at all — see `PARTIAL_WRITE` below. `2xx` still always means fully landed.
 - **Reads** return the data directly: a single resource *is* the object (`GET /me`, `GET /issues/{id}`, `GET /cycles/{id}`); a collection comes under a named key (`{ "issues": [...] }`, `{ "teams": [...] }`).
 - **Writes** return `{ "success": true, ... }`. Issue/comment/relation/label writes nest the affected entity under a named key (`{ "success": true, "issue": {...} }`); other writes (dispatch, token) carry their fields alongside `"success": true`. A write that does not land is a non-`2xx` (typically `502`), never a `2xx`.
 - **Errors** are always `{ "error": "<message>", "detail"?: "<upstream detail>" }` with a non-`2xx` status. `detail` carries the provider or AI upstream's own message when there is one.
@@ -193,6 +193,26 @@ The workspace-unavailable `code`s and how to act on each:
 | `TOKEN_HAS_NO_OWNER` | `config` | `false` | **Your token, not the workspace.** It was minted without an owner (`createdBy: null`), so it can never resolve a workspace credential — even while the workspace is healthy and serving other tokens `200` in the same second. Nothing repairs a token's owner stamp in place, so neither retrying nor signing in helps, and **reconnecting the workspace will not help either**. **The token must be re-issued** from an account that has the workspace connected. Recognisable from the client side by the split it produces: workspace-scoped verbs `503` while `/instructions` and `/agent/status` keep returning `200` on the same credential. |
 
 The HTTP status stays `503` for all six — only the body distinguishes them. Callers that don't recognise `code`/`category` can keep treating any non-`2xx` as failure; the new fields are purely additive. Other subsystems' errors may adopt the same envelope over time.
+
+**`PARTIAL_WRITE`** (LIN-2012) is the second adopter. Jira's `updateIssue` is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`) return:
+
+```json
+{
+  "error": "Jira update partially applied: title landed, stateId failed — retrying is safe (both writes are idempotent)",
+  "code": "PARTIAL_WRITE",
+  "category": "upstream",
+  "retryable": true,
+  "detail": "<upstream cause, if any>",
+  "context": { "applied": ["title"], "failed": "stateId" }
+}
+```
+
+- `context.applied` — which fields from your request already landed (named in request vocabulary: `title` | `description` | `stateId`).
+- `context.failed` — what did not: `stateId` (the transition failed after the field write succeeded), or `re-read` (every write named in `context.applied` landed, but the confirmation read that follows them failed — on a description-only edit that is a single write, not two).
+- `retryable` is always `true` — both the field write and the transition are idempotent, so retrying the same request is the correct recovery. This is deliberately **not** a rollback: Jira cannot be made atomic through this API (see the `updateIssue` docs below), so the fix is honest reporting, not a compensating action.
+- The HTTP status **mirrors the upstream failure** (e.g. `429` for a rate-limited transition) rather than a fixed code, so a caller that already branches on status for backoff behaves correctly here too. When the failure carries no status of its own (a transport-level rejection or a timeout), it falls back to `500` — still non-`2xx`, so the contract holds either way.
+- Only the three endpoints listed above emit it, and only on a Jira-backed workspace: every other provider's `updateIssue` is a single write and cannot partially land.
+- **Not yet covered:** the label endpoints (`POST`/`DELETE /issues/{id}/labels/…`) are also multi-step on Jira and GitHub, so they can partially land too — but they still report a plain total failure rather than `PARTIAL_WRITE`. Tracked as LIN-2041; until it lands, treat a failed label write as "state unknown, re-read to confirm" rather than "nothing changed".
 
 ### Read Endpoints
 

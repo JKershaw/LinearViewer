@@ -35,6 +35,7 @@ import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
+import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { jiraProvider } from '../../lib/providers/jira/index.js';
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
 import { defaultJiraSeed } from '../fixtures/jira-harness.js';
@@ -417,7 +418,7 @@ afterEach(() => {
 /** The stored fake issue — the round-trip witness, read straight from the store. */
 const stored = (idOrKey) => fake.getIssue(idOrKey);
 
-function buildApp() {
+function buildApp(recordedEvents) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -426,7 +427,9 @@ function buildApp() {
         tokenId: 't1', urlKey: 'acme-jira', label: 'test', scope: 'readWrite', createdBy: 'u1',
       }),
     },
-    proxyEventStore: { recordEvent: async () => {} },
+    // LIN-2012: an optional capturing store, for the PARTIAL_WRITE audit-note
+    // assertion — mirrors tests/unit/proxy-dispatch-defaults.test.js:476.
+    proxyEventStore: { recordEvent: async (evt) => { recordedEvents?.push(evt); } },
     resolveWorkspaceAccess: async () => ({ token: SCOPE, reason: 'ok', provider: 'jira' }),
     getWorkspaceAccessToken: async () => SCOPE,
     agentStatusStore: {},
@@ -437,6 +440,41 @@ function buildApp() {
     getWorkspaceOpenRouterKey: async () => null,
     workspacePreferencesStore: {},
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
+  }));
+  return app;
+}
+
+// LIN-2012: a session-auth workspace matching this file's `SCOPE` — one Jira
+// binding whose mirrored token/scope resolve unambiguously via
+// getWorkspaceCallScope, so PATCH /workspace/:urlKey/api/issues/:issueId
+// reaches the SAME configured `fake` client as the proxy-lane tests above.
+const JIRA_WORKSPACE = {
+  urlKey: 'acme-jira',
+  provider: 'jira',
+  accessToken: SCOPE.apiToken,
+  bindings: [
+    { provider: 'jira', scope: SITE, credentials: { email: SCOPE.email, token: SCOPE.apiToken } },
+  ],
+};
+
+/** Mounts the session-auth workspace-api router against the same `fake`/jiraProvider lifecycle as buildApp(). */
+function buildWorkspaceApiApp() {
+  const app = express();
+  app.use(express.json());
+  app.use(createWorkspaceApiRoutes({
+    workspaceFromUrl: (req, _res, next) => { req.workspace = JIRA_WORKSPACE; next(); },
+    freeTierStore: {},
+    getOpenRouterSource: () => null,
+    userPreferencesStore: {},
+    workspacePreferencesStore: {},
+    customPromptsStore: {},
+    recapCacheStore: {},
+    briefCacheStore: {},
+    reportHistoryStore: {},
+    dispatchQueueStore: {},
+    agentStatusStore: {},
+    promptTraceStore: {},
+    proxyTokenStore: {},
   }));
   return app;
 }
@@ -976,5 +1014,120 @@ describe('the shared Jira harness keeps the statuses the ambiguity path needs (L
       (await stored('ENG-1')).fields.status.statusCategory.key, 'new',
       'resolution failed before any transition was attempted — nothing was written',
     );
+  });
+});
+
+// =============================================================================
+// LIN-2012 — Jira partial field+transition write reporting, through the real
+// PATCH and description-edit routes (not just the provider in isolation).
+// =============================================================================
+
+describe('Jira-backed proxy — PARTIAL_WRITE reporting (LIN-2012)', () => {
+  test('PATCH /issues/:id: a 429 mid-sequence (field PUT lands, transition fails) → 429 PARTIAL_WRITE, upstream status preserved, title actually persisted', async () => {
+    fake.doTransition = async () => {
+      const err = new Error('Jira API POST .../transitions failed: rate limited');
+      err.status = 429;
+      throw err;
+    };
+    const recordedEvents = [];
+    const { status, body } = await call(
+      buildApp(recordedEvents), 'PATCH', '/api/proxy/issues/ENG-10', { title: 'New title', stateId: 'in-progress' });
+
+    assert.equal(status, 429, JSON.stringify(body));
+    assert.equal(body.code, 'PARTIAL_WRITE');
+    assert.equal(body.category, 'upstream');
+    assert.equal(body.retryable, true);
+    assert.deepEqual(body.context.applied, ['title']);
+    assert.equal(body.context.failed, 'stateId');
+
+    // The positive proof this is not a total failure: the title write landed.
+    const issue = await stored('ENG-10');
+    assert.equal(issue.fields.summary, 'New title', 'the field write actually landed');
+    assert.equal(issue.fields.status.statusCategory.key, 'new', 'the transition did not land');
+
+    const note = recordedEvents.find(e => e.status === 429)?.note;
+    assert.equal(note, 'PARTIAL_WRITE applied=title failed=stateId');
+  });
+
+  test('PATCH /issues/:id: a failure carrying NO status (transport error / timeout) → 500 PARTIAL_WRITE, still non-2xx', async () => {
+    // LIN-2012 close-out, review ledger item 3: every other test hand-sets
+    // `err.status` on a fake, so nothing exercised the fallback. A `fetch`
+    // rejection and the client's `AbortSignal.timeout` both throw with no
+    // `.status` at all — `PartialWriteError`'s default (500) is what keeps the
+    // response non-2xx, so "2xx means fully landed" holds on this path too.
+    fake.doTransition = async () => { throw new TypeError('fetch failed'); };
+    const { status, body } = await call(
+      buildApp(), 'PATCH', '/api/proxy/issues/ENG-10', { title: 'New title', stateId: 'in-progress' });
+
+    assert.equal(status, 500, JSON.stringify(body));
+    assert.equal(body.code, 'PARTIAL_WRITE');
+    assert.equal(body.retryable, true);
+    assert.deepEqual(body.context.applied, ['title']);
+    assert.equal(body.context.failed, 'stateId');
+    assert.equal((await stored('ENG-10')).fields.summary, 'New title', 'the field write still landed');
+  });
+
+  test('POST /issues/:id/description/append: the confirmation re-read fails after the write lands → PARTIAL_WRITE, description actually persisted', async () => {
+    let getIssueCalls = 0;
+    const originalGetIssue = fake.getIssue.bind(fake);
+    fake.getIssue = async (...args) => {
+      getIssueCalls += 1;
+      // Calls 1-2 are the route's own read + the provider's pre-write read;
+      // call 3 is the post-write confirmation re-read this test fails.
+      if (getIssueCalls < 3) return originalGetIssue(...args);
+      throw new Error('connection reset');
+    };
+
+    const recordedEvents = [];
+    const { status, body } = await call(
+      buildApp(recordedEvents), 'POST', '/api/proxy/issues/ENG-10/description/append', { block: 'New findings' });
+    fake.getIssue = originalGetIssue;
+
+    assert.equal(status, 500, JSON.stringify(body));
+    assert.equal(body.code, 'PARTIAL_WRITE');
+    assert.deepEqual(body.context.applied, ['description']);
+    assert.equal(body.context.failed, 're-read');
+
+    const issue = await stored('ENG-10');
+    assert.ok(
+      JSON.stringify(issue.fields.description).includes('New findings'),
+      'the description write actually landed despite the reported failure',
+    );
+
+    const note = recordedEvents.find(e => e.status === 500)?.note;
+    assert.equal(note, 'PARTIAL_WRITE applied=description failed=re-read');
+  });
+
+  test('regression: a field-PUT-itself failure (nothing landed) still returns the pre-existing plain error shape — no PARTIAL_WRITE leak', async () => {
+    fake.updateIssue = async () => {
+      const err = new Error('Jira API PUT .../issue failed: forbidden');
+      err.status = 500;
+      throw err;
+    };
+    const { status, body } = await call(buildApp(), 'PATCH', '/api/proxy/issues/ENG-10', { title: 'New title' });
+
+    assert.equal(status, 500);
+    assert.equal(body.error, 'Failed to update issue');
+    assert.equal(body.code, undefined, 'no PARTIAL_WRITE code on a genuine total failure');
+    assert.equal((await stored('ENG-10')).fields.summary, 'Original title', 'nothing was written');
+  });
+
+  test('session-auth PATCH /workspace/:urlKey/api/issues/:issueId: the same partial-write shape, retryable true — this lane has no logEvent, so the provider console.warn is what covers it', async (t) => {
+    const warnMock = t.mock.method(console, 'warn', () => {});
+    fake.doTransition = async () => {
+      const err = new Error('Jira API POST .../transitions failed: rate limited');
+      err.status = 429;
+      throw err;
+    };
+    const { status, body } = await call(
+      buildWorkspaceApiApp(), 'PATCH', '/workspace/acme-jira/api/issues/ENG-10', { title: 'New title', stateId: 'in-progress' });
+
+    assert.equal(status, 429, JSON.stringify(body));
+    assert.equal(body.code, 'PARTIAL_WRITE');
+    assert.equal(body.retryable, true);
+    assert.deepEqual(body.context.applied, ['title']);
+    assert.equal(body.context.failed, 'stateId');
+    assert.equal((await stored('ENG-10')).fields.summary, 'New title', 'the field write actually landed on this lane too');
+    assert.equal(warnMock.mock.callCount(), 1, 'the provider-level warn is the only audit trail this lane has');
   });
 });

@@ -63,6 +63,7 @@ import {
   resolveTeamRef,
   RefResolutionError,
 } from '../lib/proxy-ref-resolver.js';
+import { PartialWriteError } from '../lib/partial-write-error.js';
 import { isTrashed } from '../lib/trashed-signal.js';
 import { validateIssueWriteFields, isValidPriority } from '../lib/issue-write-validation.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -2613,6 +2614,24 @@ ${goal}`
     return true;
   }
 
+  // Map a PartialWriteError (LIN-2012) the same way the proxy route does —
+  // same structured envelope, same non-2xx PARTIAL_WRITE code — so a caller
+  // sees identical shapes on both lanes. This route has no logEvent-equivalent
+  // audit trail today (unlike the proxy lane), so the provider-level
+  // console.warn in lib/providers/jira/index.js is what covers this lane;
+  // adding one here is a separate, out-of-scope concern.
+  function partialWriteFailed(res, err) {
+    if (!(err instanceof PartialWriteError)) return false;
+    jsonError(res, err.status || 500, err.message, {
+      code: 'PARTIAL_WRITE',
+      category: 'upstream',
+      retryable: true,
+      detail: err.cause?.message || null,
+      context: { applied: err.applied, failed: err.failed },
+    });
+    return true;
+  }
+
   /**
    * Create an issue on the workspace provider (session-auth).
    * @route POST /workspace/:urlKey/api/issues
@@ -2797,6 +2816,7 @@ ${goal}`
       return res.json({ success: true, issue: result.issue });
     } catch (err) {
       if (issueRefResolutionFailed(res, err)) return;
+      if (partialWriteFailed(res, err)) return;
       console.error('Workspace-api update issue error:', err.message);
       return jsonError(res, 500, 'Failed to update issue');
     }
