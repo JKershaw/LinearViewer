@@ -29,6 +29,9 @@ import { FEEDBACK_ENTRY_KINDS } from '../lib/dispatch-store.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
+import { isDanglingReferent, danglingReferentBody } from '../lib/dispatch-referent-guard.js';
+import { getProviderForWorkspace } from '../lib/providers/registry.js';
+import { getWorkspaceCallScope, AMBIGUOUS_CALL_SCOPE } from '../lib/workspace.js';
 import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField, applyDefaultDispatchHarness } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
@@ -125,7 +128,7 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  *   attach degrades to a no-op (attachProxyContext returns the prompt unchanged).
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null }) {
   const router = Router();
 
   // =========================================================================
@@ -397,6 +400,28 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           dispatchedBy: req.session?.accountId || null
         });
         return res.status(201).json({ success: true, cascade: true, ...result });
+      }
+
+      // Dangling-referent guard (LIN-1948, surface 2d). The session-cookie twin
+      // of the proxy-token check in routes/proxy.js — same hole, different auth
+      // lane: `issueIdentifier` is destructured straight off req.body and stored
+      // unresolved. MUST run before createDispatchItem, whose finalizePrompt
+      // mints a single-use bootstrap.
+      //
+      // Credential source differs from the proxy lane and is worth naming:
+      // `workspaceFromUrl` validates the urlKey and sets req.workspace but
+      // resolves NEITHER provider nor credential, so this route pairs
+      // getProviderForWorkspace + getWorkspaceCallScope itself. A workspace
+      // whose active binding is ambiguous yields AMBIGUOUS_CALL_SCOPE, which is
+      // not a usable credential — treated as "no credential" and skipped, the
+      // same fail-open as every other non-definitive outcome.
+      if (!isAbort && issueIdentifier) {
+        const referentProvider = injectedProvider || getProviderForWorkspace(workspace);
+        const callScope = getWorkspaceCallScope(workspace);
+        const referentToken = callScope === AMBIGUOUS_CALL_SCOPE ? null : callScope;
+        if (await isDanglingReferent({ provider: referentProvider, token: referentToken, issueIdentifier })) {
+          return res.status(422).json(danglingReferentBody(issueIdentifier));
+        }
       }
 
       // Create the dispatch item through the shared factory (LIN-1139): it

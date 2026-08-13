@@ -32,6 +32,7 @@ import {
   validateIssueWriteFields,
 } from '../lib/issue-write-validation.js';
 import { createDispatchItem, DUPLICATE_DISPATCH_CODE, BUDGET_EXHAUSTED_CODE } from '../lib/dispatch-factory.js';
+import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } from '../lib/dispatch-referent-guard.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
 // route owns no GraphQL. Provider SELECTION for the consumer read + write data
@@ -578,6 +579,13 @@ function formatDispatchWatch(item, meta = null) {
     // declared budget without guessing. null ⇒ unbounded.
     maxTasks: item.maxTasks ?? null,
     dispatchedAt: item.dispatchedAt,
+    // Attribution (LIN-1948, fix 3b): the detail/watch read is where a human
+    // asking "who dispatched this?" actually looks. Paired with the
+    // `_formatHistoryItem` fix so the queued and taken halves agree. This is
+    // the DETAIL read — `GET /api/proxy/dispatch` (list/poll) re-projects
+    // through its own explicit field allow-list, which does not include this
+    // and is deliberately left alone.
+    dispatchedBy: item.dispatchedBy || null,
     // resolvedAt is take/archive time (when the runner claimed the item), NOT
     // completion. completedAt is the real completion time, null until terminal.
     resolvedAt: item.resolvedAt || null,
@@ -1984,14 +1992,47 @@ One convention across every endpoint, so you can branch on the same fields every
       Includes input the upstream provider rejects as a caller error — the
       \`detail\` names what was wrong. Never retryable: fix the input.
 401 - Invalid, expired, or consumed token
-403 - Endpoint requires read-write token (yours is read-only)
+403 - Endpoint requires read-write token (yours is read-only). NOTE: broker-mode
+      callers (see "Local broker" below) can also see a 403 from the LOCAL BROKER,
+      which is a different service refusing before the request ever reaches Harbour.
+      Tell them apart by BODY, not status: the broker replies text/plain naming a
+      remedy; Harbour replies JSON { "error": ... }. Neither means a dead credential.
 404 - Resource not found (includes a trashed target on the task-automation endpoints)
 409 - Refusing to modify a trashed (soft-deleted) issue (write endpoints)
+422 - Request understood but refused. The body's \`code\` discriminates:
+      CAPABILITY_NOT_SUPPORTED - this workspace's provider cannot do this
+      ISSUE_NOT_FOUND          - dispatch named an \`issueIdentifier\` that resolves to
+                                 no issue; refused before the item was created, so
+                                 nothing was queued. Applies to POST /api/proxy/dispatch.
+                                 (POST /api/proxy/recommend-and-dispatch answers 404 for
+                                 the same condition — it resolves the referent in order
+                                 to READ it. The divergence is intentional.)
+                                 Identifier-less dispatches are unaffected and stay legal.
 429 - Rate limited (max 60 requests/minute)
 500 - Internal server error
 502 - Upstream write was rejected (the create/update did not land)
 503 - Workspace or AI service unavailable (the body's \`code\` discriminates WHY — see docs/proxy-integration.md)
 504 - Upstream provider request timed out or was aborted (mapped from a TimeoutError/AbortError)
+
+## Local broker (HARBOUR_LOCAL_BASE callers only)
+
+If you were told to call \`$HARBOUR_LOCAL_BASE/api/proxy/...\` with NO Authorization
+header, you are talking to a local credential-injecting broker that forwards to this
+API. The "Authorization: Bearer" requirement above does not apply to you — the broker
+adds the credential. Six responses can come from the broker itself rather than Harbour:
+
+  200          - forwarded; the body is Harbour's, byte-preserved
+  (passthrough)- any upstream status, body unchanged. A passed-through 403 is Harbour's
+                 read-scope refusal (JSON) — distinct from the broker's own 403 below.
+  403          - WRITE VERB WITHOUT OPT-IN. text/plain, and the body names the remedy:
+                 add the header \`X-Harbour-Intent: write\` and retry. GET/HEAD never
+                 need it. This is a live, working credential refusing an un-opted-in
+                 write — NOT an expired or broken token, and NOT a reason to re-auth.
+  404          - path is not proxiable (e.g. the token-mint endpoint, deliberately hidden)
+  500          - broker-internal failure
+  502          - the broker could not obtain or forward a credential
+
+Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
 
 ## Notes
 
@@ -5570,6 +5611,31 @@ One convention across every endpoint, so you can branch on the same fields every
         });
         logEvent(req, '/api/proxy/dispatch', 201);
         return res.status(201).json({ success: true, cascade: true, ...result });
+      }
+
+      // Dangling-referent guard (LIN-1948, surface 2a). MUST run before
+      // createDispatchItem: `finalizePrompt` mints a single-use bootstrap token
+      // inside the factory, so refusing afterwards would leak a minted
+      // credential and burn a dedupe-window slot for a dispatch that never
+      // existed.
+      //
+      // This route resolves no provider of its own — dispatch has never needed
+      // one, and the guard is written to keep that true: every non-definitive
+      // outcome allows (see lib/dispatch-referent-guard.js). The added
+      // resolution is diagnostic-safe; `resolveProviderAccess`'s
+      // `recordCredentialResolution` is explicitly read by nothing downstream.
+      // Skipped for aborts/cascades so a cancel can never be blocked by a
+      // dangling referent.
+      if (!isAbort && issueIdentifier) {
+        const { token: referentToken, provider: referentProvider } =
+          await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+        if (await isDanglingReferent({ provider: referentProvider, token: referentToken, issueIdentifier })) {
+          logEvent(req, '/api/proxy/dispatch', 422, `${ISSUE_NOT_FOUND_CODE} ${issueIdentifier}`);
+          return jsonError(res, 422, DANGLING_REFERENT_MESSAGE, {
+            code: ISSUE_NOT_FOUND_CODE,
+            issueIdentifier,
+          });
+        }
       }
 
       // Auto-append the proxy context (workspace API access + reporting channel) by
