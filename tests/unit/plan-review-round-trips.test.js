@@ -425,6 +425,44 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
     assert.equal(agg.scale.issuesRead, 4);
   });
 
+  test('LIN-2035 B1 regression: denominator=33, numerator=1 must NOT be sufficient (the pre-fix tautology declared this sufficient)', () => {
+    const issues = [];
+    // 1 approve.
+    issues.push(issue('b1-approve', {
+      rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
+        feedbackDone('DONE: Verdict: Approve.', '2026-08-01T00:05:00.000Z'))],
+    }));
+    // 32 request-changes, bringing denominator to 33 with numerator 1 (p1 ≈ 0.03).
+    for (let i = 0; i < 32; i++) {
+      issues.push(issue(`b1-rc-${i}`, {
+        rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
+          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-01T00:05:00.000Z'))],
+      }));
+    }
+    const agg = computePlanReviewRoundTrips(issues, { asOf: ASOF });
+    assert.equal(agg.primary.denominator, 33);
+    assert.equal(agg.primary.numerator, 1);
+    assert.equal(agg.primary.sufficient, false,
+      'd=33,n=1 (p1≈0.03) must not be declared sufficient — the plan calls for n≈741 at this p1');
+  });
+
+  test('LIN-2035 B1 regression: p1=0 at a large denominator must not falsely claim there is no denominator', () => {
+    const issues = [];
+    for (let i = 0; i < 500; i++) {
+      issues.push(issue(`b1-zero-${i}`, {
+        rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
+          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-01T00:05:00.000Z'))],
+      }));
+    }
+    const agg = computePlanReviewRoundTrips(issues, { asOf: ASOF });
+    assert.equal(agg.primary.denominator, 500);
+    assert.equal(agg.primary.numerator, 0);
+    assert.equal(agg.primary.rate, 0);
+    assert.equal(agg.primary.sufficient, false);
+    assert.doesNotMatch(agg.definition.sufficiencyFormula, /no primary denominator/,
+      'p1=0 with denominator=500 must not claim there is no denominator');
+  });
+
   test('round-trip distribution and mean', () => {
     const zero = issue('rt0', {
       rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
@@ -446,6 +484,28 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
     assert.deepEqual(agg.roundTrips.distribution, { 0: 1, 2: 1 });
     assert.equal(agg.roundTrips.mean, 1);
     assert.equal(agg.roundTrips.n, 2);
+  });
+
+  test('LIN-2035 B2 regression: roundTrips distribution is conditioned on reachedPlanReviewAny, not diluted by issues that never reached plan-review', () => {
+    // Reaches plan-review, resolves, zero round trips.
+    const reached = issue('b2-reached', {
+      rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
+        feedbackDone('DONE: Verdict: Approve.', '2026-08-01T00:05:00.000Z'))],
+    });
+    // Never dispatches a plan-review row at all — the workspace-shape bulk
+    // the real read pass showed diluting the aggregate 45× (LIN-2035 B2).
+    const neverReached = [];
+    for (let i = 0; i < 20; i++) {
+      neverReached.push(issue(`b2-never-${i}`, {
+        rows: [row('p1', 'plan', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z')],
+      }));
+    }
+    const agg = computePlanReviewRoundTrips([reached, ...neverReached], { asOf: ASOF });
+    assert.equal(agg.scale.issuesRead, 21);
+    assert.equal(agg.scale.reachedPlanReviewAny, 1);
+    assert.equal(agg.roundTrips.n, 1, 'roundTrips.n must only count issues that reached plan-review');
+    assert.deepEqual(agg.roundTrips.distribution, { 0: 1 });
+    assert.equal(agg.roundTrips.mean, 0);
   });
 
   test('gate-due / gate-honoured rates aggregate, with the MIN_DENOMINATOR floor', () => {
@@ -531,18 +591,39 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
 // ─── sufficiency floor derivation ────────────────────────────────────────────
 
 describe('derivePrimaryFloor', () => {
-  test('returns null at the boundary (p1 undefined, 0, or 1)', () => {
+  test('returns null only when there is no primary denominator at all (p1 === null)', () => {
     assert.equal(derivePrimaryFloor(null), null);
-    assert.equal(derivePrimaryFloor(0), null);
-    assert.equal(derivePrimaryFloor(1), null);
   });
 
-  test('derives a positive required N and numerator floor from a measured p1', () => {
+  test('LIN-2035 B1: p1 ∈ {0, 1} is a REAL measured proportion, not a missing denominator — returns a finite, very demanding floor, never null', () => {
+    const zero = derivePrimaryFloor(0);
+    assert.ok(zero, 'p1=0 must not resolve to null (that reads as "no denominator" when one exists)');
+    assert.ok(Number.isFinite(zero.requiredN) && zero.requiredN > 0);
+    assert.ok(Number.isFinite(zero.requiredNumerator));
+
+    const one = derivePrimaryFloor(1);
+    assert.ok(one, 'p1=1 must not resolve to null');
+    assert.ok(Number.isFinite(one.requiredN) && one.requiredN > 0);
+    assert.ok(Number.isFinite(one.requiredNumerator));
+  });
+
+  test('derives a positive required N and numerator floor from a measured p1, via a two-proportion power calc (not a fixed constant)', () => {
     const floor = derivePrimaryFloor(0.19);
     assert.ok(floor.requiredN > 0);
     assert.ok(floor.requiredNumerator > 0);
     assert.equal(floor.p1, 0.19);
     assert.ok(floor.requiredNumerator <= floor.requiredN);
+    // The plan's own worked example (LIN-1883 Plan v1 §9): 19%→38%, α=0.05,
+    // power=0.80 ⇒ n≈85 per side. Pin the derivation to that neighborhood so
+    // a regression back to a fixed constant (LIN-2035 B1) fails loudly.
+    assert.ok(floor.requiredN >= 80 && floor.requiredN <= 100,
+      `expected requiredN near the plan's n≈85, got ${floor.requiredN}`);
+  });
+
+  test('requiredN genuinely depends on p1 (not a constant like the pre-LIN-2035 formula)', () => {
+    const low = derivePrimaryFloor(0.05);
+    const high = derivePrimaryFloor(0.19);
+    assert.notEqual(low.requiredN, high.requiredN);
   });
 });
 
