@@ -87,6 +87,7 @@ import {
   RefResolutionError,
 } from '../lib/proxy-ref-resolver.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
+import { PartialWriteError } from '../lib/partial-write-error.js';
 import { badRequest, jsonError, notFound, serviceUnavailable, unauthorized, workspaceUnavailableEnvelope } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
@@ -1285,6 +1286,30 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     return true;
   }
 
+  /**
+   * Map a PartialWriteError (LIN-2012) to a non-2xx `PARTIAL_WRITE` response
+   * using the existing structured error envelope (code/category/retryable/
+   * context — see lib/errors.js's `errorEnvelope`), rather than a bespoke
+   * shape. The upstream status rides through (fallback 500) so a retryable
+   * 429 partial isn't flattened the same as a non-retryable one. `retryable`
+   * is always true here: both Jira writes are idempotent, so re-issuing the
+   * same PATCH is the correct recovery, never a rollback. Returns true when
+   * handled so callers can `if (partialWriteFailed(...)) return;` from a catch.
+   */
+  function partialWriteFailed(req, res, endpoint, err) {
+    if (!(err instanceof PartialWriteError)) return false;
+    const status = err.status || 500;
+    logEvent(req, endpoint, status, `PARTIAL_WRITE applied=${err.applied.join(',') || 'none'} failed=${err.failed}`);
+    jsonError(res, status, err.message, {
+      code: 'PARTIAL_WRITE',
+      category: 'upstream',
+      retryable: true,
+      detail: err.cause?.message || null,
+      context: { applied: err.applied, failed: err.failed },
+    });
+    return true;
+  }
+
   // =========================================================================
   // User-Facing API (Session Auth) - Token Management
   // =========================================================================
@@ -1972,8 +1997,9 @@ ${readEndpoints}${writeEndpoints}
 
 One convention across every endpoint, so you can branch on the same fields everywhere:
 
-- **Success is the HTTP status.** Any 2xx is success; any non-2xx is failure. There is no
-  partial state — a write never returns 2xx with a falsy success flag.
+- **Success is the HTTP status.** Any 2xx is success; any non-2xx is failure. A write never
+  returns 2xx with a falsy success flag. A non-2xx write MAY mean the write partially landed
+  rather than not at all — see the PARTIAL_WRITE code below. 2xx still always means fully landed.
 - **Reads** return the data directly: a single resource as the object itself
   (e.g. GET /me, GET /issues/{id}, GET /cycles/{id}), a collection under a named key
   (e.g. { "issues": [...] }, { "teams": [...] }). Nested collections (labels,
@@ -2013,6 +2039,17 @@ One convention across every endpoint, so you can branch on the same fields every
 502 - Upstream write was rejected (the create/update did not land)
 503 - Workspace or AI service unavailable (the body's \`code\` discriminates WHY — see docs/proxy-integration.md)
 504 - Upstream provider request timed out or was aborted (mapped from a TimeoutError/AbortError)
+
+PARTIAL_WRITE - A Jira-backed \`updateIssue\` call is two upstream writes (field PUT, then
+      status transition) because Jira has no multi-write transaction. When the first lands
+      and the second (or the confirmation re-read) fails, the response is this code instead
+      of a plain failure — status MIRRORS the upstream failure (e.g. 429), not a fixed code.
+      \`context.applied\` names what landed (title/description/stateId, in request vocabulary);
+      \`context.failed\` names what didn't (stateId, or re-read). \`retryable\` is always true —
+      both writes are idempotent, so re-issuing the same request is the correct recovery, not
+      a rollback. Reachable on PATCH /issues/{id}, POST /issues/{id}/description/append, and
+      POST /issues/{id}/description/replace, Jira-backed workspaces only. See
+      docs/proxy-integration.md for the full envelope shape.
 
 ## Local broker (HARBOUR_LOCAL_BASE callers only)
 
@@ -2933,6 +2970,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       res.json(issueUpdate);
     } catch (err) {
       if (refResolutionFailed(req, res, '/api/proxy/issues/:id', err)) return;
+      if (partialWriteFailed(req, res, '/api/proxy/issues/:id', err)) return;
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues/:id', status);
       console.error('Proxy update issue error:', err.message);
@@ -3005,6 +3043,11 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       // as a 422 with its reason — not a 500 telling an agent to back off and
       // retry something that can never succeed.
       if (refResolutionFailed(req, res, endpoint, err)) return;
+      // LIN-2012: this is a description-only write (no stateId), so the only
+      // partial-write shape reachable here is the confirmation re-read failing
+      // after the field PUT already landed — still must not read as a total
+      // failure.
+      if (partialWriteFailed(req, res, endpoint, err)) return;
       const status = graphqlErrorStatus(err);
       logEvent(req, endpoint, status);
       console.error('Proxy description edit (write) error:', err.message);

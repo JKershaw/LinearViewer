@@ -37,6 +37,7 @@ import {
   JIRA_ISSUE_FIELDS,
 } from '../../lib/providers/jira/index.js'
 import { RefResolutionError } from '../../lib/proxy-ref-resolver.js'
+import { PartialWriteError } from '../../lib/partial-write-error.js'
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js'
 import { createJiraClient } from '../../lib/providers/jira/client.js'
 import { getProvider } from '../../lib/providers/registry.js'
@@ -2019,6 +2020,102 @@ describe('JiraProvider.updateIssue (LIN-1886 Step 3)', () => {
 
   test('a missing issue returns null (never throws, mirrors GitHub)', async () => {
     assert.equal(await provider.updateIssue(SCOPE, 'ENG-999', { title: 'x' }), null)
+  })
+})
+
+// =============================================================================
+// updateIssue partial-write reporting (LIN-2012)
+// =============================================================================
+
+describe('JiraProvider.updateIssue — partial-write reporting (LIN-2012)', () => {
+  let provider, client
+
+  beforeEach(() => {
+    ({ provider, client } = writableSeededProvider())
+  })
+
+  test('transition fails after the field PUT succeeds → PartialWriteError{applied:[title], failed:stateId}, preserving upstream status', async (t) => {
+    const warnMock = t.mock.method(console, 'warn', () => {})
+    client.doTransition = async () => {
+      const err = new Error('Jira API POST .../transitions failed: rate limited')
+      err.status = 429
+      throw err
+    }
+    await assert.rejects(
+      () => provider.updateIssue(SCOPE, 'ENG-10', { title: 'New title', stateId: '12' }),
+      err => {
+        assert.ok(err instanceof PartialWriteError)
+        assert.deepEqual(err.applied, ['title'])
+        assert.equal(err.failed, 'stateId')
+        assert.equal(err.status, 429)
+        return true
+      }
+    )
+    // The title write actually landed — this is not a total failure.
+    assert.equal((await client.getIssue('ENG-10')).fields.summary, 'New title')
+    assert.equal(warnMock.mock.callCount(), 1)
+    assert.match(warnMock.mock.calls[0].arguments[0], /partial write.*title.*stateId/)
+  })
+
+  test('re-read fails after both writes succeed → PartialWriteError{applied:[title,stateId], failed:re-read}', async (t) => {
+    const warnMock = t.mock.method(console, 'warn', () => {})
+    const originalGetIssue = client.getIssue.bind(client)
+    let calls = 0
+    client.getIssue = async (...args) => {
+      calls += 1
+      // First call resolves the current issue (pre-write read); second is the
+      // post-write confirmation re-read that this test fails.
+      if (calls === 1) return originalGetIssue(...args)
+      throw new Error('Jira API GET .../issue failed: connection reset')
+    }
+    await assert.rejects(
+      () => provider.updateIssue(SCOPE, 'ENG-10', { title: 'New title', stateId: '12' }),
+      err => {
+        assert.ok(err instanceof PartialWriteError)
+        assert.deepEqual(err.applied, ['title', 'stateId'])
+        assert.equal(err.failed, 're-read')
+        return true
+      }
+    )
+    assert.equal((await originalGetIssue('ENG-10')).fields.summary, 'New title', 'field write landed')
+    assert.equal((await originalGetIssue('ENG-10')).fields.status.id, '12', 'transition landed')
+    assert.equal(warnMock.mock.callCount(), 1)
+  })
+
+  test('re-read fails after a field-only write (no stateId in the patch) — the description/append & /replace sub-case', async (t) => {
+    t.mock.method(console, 'warn', () => {})
+    const originalGetIssue = client.getIssue.bind(client)
+    let calls = 0
+    client.getIssue = async (...args) => {
+      calls += 1
+      if (calls === 1) return originalGetIssue(...args)
+      throw new Error('connection reset')
+    }
+    await assert.rejects(
+      () => provider.updateIssue(SCOPE, 'ENG-10', { description: 'New body' }),
+      err => {
+        assert.ok(err instanceof PartialWriteError)
+        assert.deepEqual(err.applied, ['description'])
+        assert.equal(err.failed, 're-read')
+        return true
+      }
+    )
+  })
+
+  test('the field PUT itself throws (nothing applied) → the ORIGINAL error propagates unchanged, never PartialWriteError', async (t) => {
+    const warnMock = t.mock.method(console, 'warn', () => {})
+    const originalErr = new Error('Jira API PUT .../issue failed: forbidden')
+    originalErr.status = 403
+    client.updateIssue = async () => { throw originalErr }
+    await assert.rejects(
+      () => provider.updateIssue(SCOPE, 'ENG-10', { title: 'New title', stateId: '12' }),
+      err => {
+        assert.equal(err, originalErr, 'the exact original error, not a wrapped PartialWriteError')
+        assert.ok(!(err instanceof PartialWriteError))
+        return true
+      }
+    )
+    assert.equal(warnMock.mock.callCount(), 0, 'no partial-write warning for a genuine total failure')
   })
 })
 
