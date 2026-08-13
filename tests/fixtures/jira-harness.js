@@ -46,6 +46,14 @@ const EPIC_ISSUETYPE = { id: '10000', name: 'Epic', hierarchyLevel: 1 };
 // fixed synthetic vocabulary. Every seeded issue's `status`/`_transitions.to`
 // below carries the matching real id, mirroring what real Jira REST payloads
 // always carry.
+//
+// LIN-2032: carries a CUSTOM status name ('Ready for QA') and a second
+// done-category status ("Won't Do", alongside 'Done') — mirroring
+// `tests/unit/jira-provider.test.js`'s local `ENG_PROJECT_STATUSES`, which had
+// these but this SHARED harness didn't (LIN-2018 plan item 3's fixture drift).
+// Without them here, the browser/e2e lane could never reach the ambiguous
+// `stateId: 'done'` 422 path (`docs/proxy-integration.md`) — only the unit
+// lane, driven off the local seed, could.
 export const defaultJiraProjectStatuses = {
   ENG: [
     {
@@ -54,6 +62,8 @@ export const defaultJiraProjectStatuses = {
         { id: '101', name: 'To Do', statusCategory: { key: 'new' } },
         { id: '102', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
         { id: '103', name: 'Done', statusCategory: { key: 'done' } },
+        { id: '104', name: "Won't Do", statusCategory: { key: 'done' } },
+        { id: '105', name: 'Ready for QA', statusCategory: { key: 'indeterminate' } },
       ],
     },
   ],

@@ -1671,6 +1671,29 @@ describe('JiraProvider Step 2 reads (fake client)', () => {
     assert.deepEqual(await bareProvider.states(scope, 'BARE'), [])
   })
 
+  // LIN-2032 gap 1 (LIN-2018 review ledger item 3): getProjectStatuses requires
+  // Jira's Browse Projects permission. A user lacking it gets a 403 — proves
+  // states() PROPAGATES that error rather than swallowing it to [] (unlike the
+  // no-teamId/no-seeded-statuses branches above, which are deliberate,
+  // documented degradations). Callers (routes/task-edit.js, routes/task-create.js,
+  // the GET /api/proxy/states/{key} route) are what decide whether that surfaces
+  // to a human (degraded fallback) or an agent (a loud error) — this pins the
+  // provider's half of that contract.
+  test('states() propagates a getProjectStatuses 403 (missing Browse Projects) rather than swallowing it', async () => {
+    const { provider, client } = seededProvider()
+    client.getProjectStatuses = async () => {
+      const err = new Error('Jira API GET /rest/api/3/project/ENG/statuses failed: Forbidden')
+      err.status = 403
+      throw err
+    }
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    await assert.rejects(provider.states(scope, 'ENG'), (err) => {
+      assert.equal(err.status, 403)
+      assert.match(err.message, /Forbidden/)
+      return true
+    })
+  })
+
   test('labels() returns the site-wide label vocabulary as {id, name} pairs (id = name, mirrors GitHub)', async () => {
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
     const labels = await provider.labels(scope)

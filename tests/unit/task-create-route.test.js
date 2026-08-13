@@ -22,6 +22,8 @@ import { createTaskCreateRoutes } from '../../routes/task-create.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 // Side-effect import: the shared nav resolves the legacy default provider.
 import '../../lib/providers/linear/index.js';
+import { JiraProvider } from '../../lib/providers/jira/index.js';
+import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
 
 let providerSeq = 0;
 function fakeProvider({
@@ -138,6 +140,31 @@ describe('option-list degradation (never 500 over an unavailable list)', () => {
   test('a non-array read is treated as an empty list, not a crash', async () => {
     const provider = fakeProvider({ fetchTeams: async () => null, fetchProjectsList: async () => null });
     const res = await call({ provider });
+    assert.strictEqual(res.statusCode, 200);
+  });
+
+  // LIN-2032 gap 1 (LIN-2018 review ledger item 3): mirrors the equivalent
+  // addition in tests/unit/task-edit-route.test.js — the generic 'a states()
+  // that throws' test above proves this route's OWN try/catch works for any
+  // error; this proves the REAL JiraProvider's specific 403 (missing Browse
+  // Projects permission) actually degrades through it too.
+  test('a REAL Jira getProjectStatuses 403 (missing Browse Projects) still degrades to the fallback', async () => {
+    const jiraClient = createFakeJiraClient({ projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }] });
+    jiraClient.getProjectStatuses = async () => {
+      const err = new Error('Jira API GET /rest/api/3/project/ENG/statuses failed: Forbidden — missing Browse Projects permission');
+      err.status = 403;
+      throw err;
+    };
+    // `client` (not just `clientFactory`) is set directly: this harness's
+    // `scope` is the fake provider's bare 'tok' string (mirrors Linear), not a
+    // Jira `{email,apiToken,site}` credential object, so `_clientFor` takes
+    // its boot-configured-client fallback branch, same as a real single-tenant
+    // DI setup.
+    const realJiraProvider = new JiraProvider({ client: jiraClient, clientFactory: () => jiraClient, site: 'https://acme.atlassian.net' });
+    const provider = fakeProvider({
+      states: (scope, teamId) => realJiraProvider.states(scope, teamId),
+    });
+    const res = await call({ provider, query: { teamId: 'team-1' } });
     assert.strictEqual(res.statusCode, 200);
   });
 });

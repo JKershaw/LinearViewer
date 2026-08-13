@@ -23,6 +23,8 @@ import { createTaskEditRoutes } from '../../routes/task-edit.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 // Side-effect import: the shared nav resolves the legacy default provider.
 import '../../lib/providers/linear/index.js';
+import { JiraProvider } from '../../lib/providers/jira/index.js';
+import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
 
 const ISSUE = {
   id: '11111111-2222-3333-4444-555555555555',
@@ -201,6 +203,35 @@ describe('state control degradation', () => {
   test('renders a real <select> when states are available', async () => {
     const res = await call({ provider: fakeProvider() });
     assert.ok(/<select[^>]*name="stateId"/.test(res.body));
+  });
+
+  // LIN-2032 gap 1 (LIN-2018 review ledger item 3): the generic 'a states()
+  // that throws' test above proves the route's OWN try/catch works for any
+  // error. This proves the specific case the ticket is about — a REAL
+  // JiraProvider, backed by the fake Jira client, actually throwing on a
+  // getProjectStatuses 403 (missing Browse Projects permission) — still
+  // degrades cleanly, rather than assuming Jira's error shape (`err.status`,
+  // no `.response`) happens to behave the same as a generic `Error`.
+  test('a REAL Jira getProjectStatuses 403 (missing Browse Projects) still degrades to the text-input fallback', async () => {
+    const jiraClient = createFakeJiraClient({ projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }] });
+    jiraClient.getProjectStatuses = async () => {
+      const err = new Error('Jira API GET /rest/api/3/project/ENG/statuses failed: Forbidden — missing Browse Projects permission');
+      err.status = 403;
+      throw err;
+    };
+    // `client` (not just `clientFactory`) is set directly: this harness's
+    // `scope` is the fake provider's bare 'tok' string (mirrors Linear), not a
+    // Jira `{email,apiToken,site}` credential object, so `_clientFor` takes
+    // its boot-configured-client fallback branch, same as a real single-tenant
+    // DI setup.
+    const realJiraProvider = new JiraProvider({ client: jiraClient, clientFactory: () => jiraClient, site: 'https://acme.atlassian.net' });
+    const provider = fakeProvider({
+      states: (scope, teamId) => realJiraProvider.states(scope, teamId),
+    });
+    const res = await call({ provider });
+    assert.strictEqual(res.statusCode, 200);
+    assert.ok(/<input[^>]*name="stateId"/.test(res.body), 'degraded to the text input');
+    assert.ok(!/<select[^>]*name="stateId"/.test(res.body));
   });
 });
 
