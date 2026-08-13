@@ -138,6 +138,13 @@
     container.setAttribute('data-state', state);
   }
 
+  // LIN-1016: precise match only — no status-only fallback. A bare `status
+  // === 503` would also catch the cache-not-configured and transient-upstream
+  // 503s on this same route, which must keep showing the error banner.
+  function isAiNotConfigured(err) {
+    return !!err && err.status === 503 && !!err.body && err.body.code === 'AI_NOT_CONFIGURED';
+  }
+
   function wireRefresh(container, urlKey, identifier, source) {
     const btn = container.querySelector('[data-recap-refresh]');
     if (!btn) return;
@@ -146,13 +153,21 @@
     });
   }
 
-  async function refresh(container, urlKey, identifier, source) {
+  // LIN-1016: `opts.autoOpen` scopes the AI-unconfigured fallback to the
+  // auto-open call from init()'s `missing` branch — a manual click (wireRefresh
+  // above, which never passes opts) still shows the error banner, so an
+  // explicit user action is never silently swallowed.
+  async function refresh(container, urlKey, identifier, source, opts) {
     applyState(container, renderGenerating(), 'generating');
     try {
       const data = await postRecap(urlKey, identifier, source);
       applyState(container, renderFresh(data), 'fresh');
     } catch (err) {
-      applyState(container, renderError(err && err.message), 'error');
+      if (opts && opts.autoOpen && isAiNotConfigured(err)) {
+        applyState(container, renderMissing(), 'missing');
+      } else {
+        applyState(container, renderError(err && err.message), 'error');
+      }
     }
     wireRefresh(container, urlKey, identifier, source);
   }
@@ -187,7 +202,7 @@
         // re-spend on every reopen. `refresh()` renders generating→fresh/error
         // and wires its own button, so return before the shared wireRefresh
         // below to avoid double-wiring the refresh handler.
-        await refresh(container, urlKey, identifier, source);
+        await refresh(container, urlKey, identifier, source, { autoOpen: true });
         return;
       }
     } catch (err) {

@@ -112,11 +112,11 @@ for (const S of SECTIONS) {
     assert.equal(container.getAttribute('data-state'), 'stale');
   });
 
-  test(`${S.name}: auto-generate POST error lands on error inline (no crash)`, async () => {
+  test(`${S.name}: auto-generate POST error (uncoded 500) lands on error inline (no crash)`, async () => {
     const responder = (url, method) => {
       if (method === 'POST') {
-        const err = new Error('AI not configured');
-        err.status = 503;
+        const err = new Error('Something went wrong');
+        err.status = 500;
         throw err;
       }
       return { status: 'missing' };
@@ -128,5 +128,45 @@ for (const S of SECTIONS) {
 
     assert.equal(calls.filter(c => c.method === 'POST').length, 1, 'auto-generate was attempted');
     assert.equal(container.getAttribute('data-state'), 'error', 'error rendered inline, not thrown');
+  });
+
+  test(`${S.name}: 503 AI-not-configured on auto-open lands on manual placeholder, not error`, async () => {
+    const responder = (url, method) => {
+      if (method === 'POST') {
+        const err = new Error('AI is not configured');
+        err.status = 503;
+        err.body = { code: 'AI_NOT_CONFIGURED', error: 'AI is not configured' };
+        throw err;
+      }
+      return { status: 'missing' };
+    };
+    const { section, calls } = loadSection(S.file, S.global, responder);
+
+    const container = makeContainer();
+    await section.init(container, OPTS);
+
+    assert.equal(calls.filter(c => c.method === 'POST').length, 1, 'exactly one POST, no retry loop');
+    assert.equal(container.getAttribute('data-state'), 'missing', 'falls back to the manual placeholder');
+    assert.match(container.innerHTML, /generate/, 'placeholder carries the generate button');
+    assert.doesNotMatch(container.innerHTML, S.name === 'Brief' ? /brief-error/ : /recap-error/, 'does not carry the error class');
+  });
+
+  test(`${S.name}: 503 without the AI_NOT_CONFIGURED code on auto-open still lands on error (regression guard)`, async () => {
+    const responder = (url, method) => {
+      if (method === 'POST') {
+        const err = new Error(S.name === 'Brief' ? 'Brief cache not configured' : 'Recap cache not configured');
+        err.status = 503;
+        err.body = { error: err.message };
+        throw err;
+      }
+      return { status: 'missing' };
+    };
+    const { section, calls } = loadSection(S.file, S.global, responder);
+
+    const container = makeContainer();
+    await section.init(container, OPTS);
+
+    assert.equal(calls.filter(c => c.method === 'POST').length, 1, 'auto-generate was attempted');
+    assert.equal(container.getAttribute('data-state'), 'error', 'an uncoded 503 is not misclassified as missing/unconfigured');
   });
 }
