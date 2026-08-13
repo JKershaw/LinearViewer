@@ -25,6 +25,10 @@ function makeProvider(overrides = {}) {
   const provider = {
     name: 'linear',
     supports: () => true,
+    // LIN-1557: the headless write-door accept-list the create route gates
+    // optional fields against. Full contract by default, matching this fake's
+    // "everything works" posture (mirrors real LinearProvider.apiWriteFields()).
+    apiWriteFields: () => ['title', 'description', 'teamId', 'projectId', 'stateId', 'assigneeId', 'priority', 'parentId', 'cycleId'],
     fetchTeams: async () => [{ id: TEAM_UUID, name: 'Linear Team', key: 'LIN' }],
     states: async (_t, teamId) => {
       calls.statesTeamId = teamId;

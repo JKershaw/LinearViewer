@@ -27,9 +27,15 @@ const PROVIDER_NAME = 'feedback-fake';
 function makeFakeProvider(overrides = {}) {
   const calls = { createIssue: [], uploadFile: [], fetchTeams: 0 };
   const caps = overrides.caps || { createIssue: true, uploadFile: true, fetchTeams: true };
+  // LIN-1557: the headless write contract this route gates `priority` against.
+  // Defaults to including it (matching every existing test's assumption that
+  // priority forwards); pass `apiWriteFields` to simulate a provider whose
+  // contract excludes it (e.g. GitHub).
+  const apiWriteFields = overrides.apiWriteFields || ['title', 'description', 'teamId', 'projectId', 'priority'];
   const provider = {
     name: PROVIDER_NAME,
     supports: (cap) => caps[cap] === true,
+    apiWriteFields: () => apiWriteFields,
     async fetchTeams() {
       calls.fetchTeams++;
       return overrides.teams ?? [{ id: 'team-default', name: 'Default' }];
@@ -381,12 +387,56 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(body.success, true);
   });
 
-  test('clamps an out-of-range priority to 0', async () => {
+  test('clamps an out-of-range priority to 0, which is omitted like any unset priority (LIN-1557)', async () => {
     const { provider, calls } = makeFakeProvider();
     const app = buildApp({ provider, dispatchQueueStore: capturingDispatchStore() });
     const { status } = await submit(app, 'acme', { message: 'x', priority: 99 });
     assert.strictEqual(status, 201);
-    assert.strictEqual(calls.createIssue[0].priority, 0);
+    assert.strictEqual(calls.createIssue[0].priority, undefined);
+  });
+
+  // === Priority write-contract fold (LIN-1557) ==============================
+
+  test('omits priority entirely when 0 ("No priority"), even for a provider that supports it', async () => {
+    const { provider, calls } = makeFakeProvider();
+    const app = buildApp({ provider, dispatchQueueStore: capturingDispatchStore() });
+    const { status } = await submit(app, 'acme', { message: 'no priority set' });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(calls.createIssue[0].priority, undefined);
+    assert.doesNotMatch(calls.createIssue[0].description, /Reported priority/);
+  });
+
+  test('forwards an explicit supported priority unchanged', async () => {
+    const { provider, calls } = makeFakeProvider();
+    const app = buildApp({ provider, dispatchQueueStore: capturingDispatchStore() });
+    const { status } = await submit(app, 'acme', { message: 'urgent thing', priority: 1 });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(calls.createIssue[0].priority, 1);
+    assert.doesNotMatch(calls.createIssue[0].description, /Reported priority/);
+  });
+
+  test('folds an explicit unsupported priority into the description instead of 400ing the submission', async () => {
+    // Simulates a GitHub-backed workspace: apiWriteFields() excludes 'priority'.
+    const { provider, calls } = makeFakeProvider({
+      apiWriteFields: ['title', 'description', 'projectId']
+    });
+    const app = buildApp({ provider, dispatchQueueStore: capturingDispatchStore() });
+    const { status, body } = await submit(app, 'acme', { message: 'urgent thing', priority: 1 });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(calls.createIssue[0].priority, undefined);
+    assert.match(calls.createIssue[0].description, /\*\*Reported priority:\*\* Urgent/);
+  });
+
+  test('does not fold a 0 priority for an unsupported-priority provider either', async () => {
+    const { provider, calls } = makeFakeProvider({
+      apiWriteFields: ['title', 'description', 'projectId']
+    });
+    const app = buildApp({ provider, dispatchQueueStore: capturingDispatchStore() });
+    const { status } = await submit(app, 'acme', { message: 'no priority set' });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(calls.createIssue[0].priority, undefined);
+    assert.doesNotMatch(calls.createIssue[0].description, /Reported priority/);
   });
 
   test('uploads an embedded screenshot and embeds its URL', async () => {

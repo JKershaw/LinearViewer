@@ -323,6 +323,20 @@ test.describe('Proxy API - Consumer Endpoints', () => {
     expect(text).toContain('PATCH');
   });
 
+  // LIN-1557: the runtime contract must not overpromise — an unsupported
+  // optional create field is refused (400), never silently dropped, and the
+  // update door's weaker (still-silent) guarantee must not claim otherwise.
+  test('instructions accurately describe the create/update write contract (LIN-1557)', async ({ request }) => {
+    const resp = await request.get('/api/proxy/instructions', {
+      headers: { Authorization: `Bearer ${writeToken}` }
+    });
+    const text = await resp.text();
+    expect(text).toContain('refused with 400');
+    expect(text).toContain('never silently dropped');
+    expect(text).toContain('this endpoint does NOT refuse');
+    expect(text).toContain('silently drops it on a 200');
+  });
+
   test('GET /api/proxy/me returns user info', async ({ request }) => {
     // In test mode with mock data, the Linear API won't actually be called,
     // but we verify the auth flow works. The endpoint will likely fail since

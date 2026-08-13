@@ -1807,14 +1807,15 @@ POST ${baseUrl}/api/proxy/issues
   Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "..." }
   → Create a new issue; set parentId (UUID) to create as a sub-issue. Returns 201:
   → { "success": true, "issue": { /* the SAME flat shape as GET /issues/{id} (minus children/comments/relations): id, identifier, title, description, state, labels, priority, priorityLabel, team, teamId, project, parent, cycle, estimate, dueDate, … */ } }
-  → The echo is self-verifying: it reflects the post-write state of every field the request set, so you do NOT need a follow-up GET to confirm the mutation landed.
+  → Optional fields your workspace's provider doesn't support are refused with 400, never silently dropped (GitHub-backed: no stateId/assigneeId/priority/cycleId/parentId; Local-backed: no assigneeId/cycleId). Whatever the response DOES echo is self-verifying — it reflects the post-write state of every field the request set, so you do NOT need a follow-up GET to confirm those landed.
   → teamId/stateId/projectId accept symbolic refs, not just UUIDs: teamId as a team key (e.g. LIN) or name; stateId as a keyword (done/in-progress/todo/backlog/canceled/duplicate) or state name; projectId as a project name. Ambiguous or unknown names fail with 422 (UUID is the unambiguous escape hatch).
 
 PATCH ${baseUrl}/api/proxy/issues/{issueId}
   Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "...|null" }
   → Update an existing issue; set cycleId to assign/move to a cycle; set parentId to a UUID to re-parent, or null to promote to top-level
   → stateId/projectId accept symbolic refs too: stateId as a keyword (done/in-progress/todo/backlog/canceled/duplicate) or state name (scoped to the issue's team), projectId as a project name. Ambiguous/unknown names → 422.
-  → { "success": true, "issue": { /* the SAME flat shape as GET /issues/{id} (minus children/comments/relations) — self-verifying: every mutable field (priority/priorityLabel, labels, parent, project, assignee, state, cycle, estimate, team/teamId) reflects the post-write state, so no follow-up GET is needed */ } }
+  → { "success": true, "issue": { /* the SAME flat shape as GET /issues/{id} (minus children/comments/relations) */ } }
+  → Unlike create, this endpoint does NOT refuse a field your provider can't honour — it accepts it and silently drops it on a 200 (GitHub-backed: priority/assigneeId/parentId/cycleId are dropped, only title/description/stateId take effect; Local-backed: assigneeId/cycleId are dropped). Follow up with a GET if you need certainty a given field landed.
   → Passing "description" here REPLACES the whole body. For anything other than a deliberate full rewrite, prefer the two splice endpoints below — they let you supply only the new content, so you never re-emit (and risk corrupting) the existing body.
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/description/append
@@ -2851,18 +2852,48 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
 
       const resolvedTeamId = await resolveTeamInput(provider, token, teamId);
 
+      // LIN-1557: `apiWriteFields()` — the provider's headless-door write
+      // contract, deliberately separate from `createFields()` (the UI-form
+      // descriptor) — governs every OPTIONAL field below. A field the caller
+      // sent that the provider does not honour is refused with 400 instead of
+      // being silently forwarded and discarded on a false 201. teamId/title
+      // stay required unconditionally, unchanged (LIN-1976 owns teamless-
+      // create parity separately).
+      const writableFields = provider.apiWriteFields();
+      const refuseUnwritable = (field) => {
+        logEvent(req, '/api/proxy/issues', 400);
+        badRequest.json(res, `${field} is not supported by this provider`);
+        return true;
+      };
+
       const input = { teamId: resolvedTeamId, title };
       if (description) input.description = description;
       // LIN-556: projectId / stateId accept symbolic names alongside UUIDs.
       // State is scoped to the just-resolved team so symbolic matches cannot
       // bleed across teams. assigneeId / parentId / cycleId stay UUID-only this
       // ticket (named out of scope in the LIN-556 design record).
-      if (projectId) input.projectId = await resolveProjectInput(provider, token, projectId);
-      if (stateId) input.stateId = await resolveStateInput(provider, token, resolvedTeamId, stateId);
-      if (assigneeId && UUID_REGEX.test(assigneeId)) input.assigneeId = assigneeId;
-      if (parentId && UUID_REGEX.test(parentId)) input.parentId = parentId;
-      if (cycleId && UUID_REGEX.test(cycleId)) input.cycleId = cycleId;
+      if (projectId) {
+        if (!writableFields.includes('projectId')) return refuseUnwritable('projectId');
+        input.projectId = await resolveProjectInput(provider, token, projectId);
+      }
+      if (stateId) {
+        if (!writableFields.includes('stateId')) return refuseUnwritable('stateId');
+        input.stateId = await resolveStateInput(provider, token, resolvedTeamId, stateId);
+      }
+      if (assigneeId && UUID_REGEX.test(assigneeId)) {
+        if (!writableFields.includes('assigneeId')) return refuseUnwritable('assigneeId');
+        input.assigneeId = assigneeId;
+      }
+      if (parentId && UUID_REGEX.test(parentId)) {
+        if (!writableFields.includes('parentId')) return refuseUnwritable('parentId');
+        input.parentId = parentId;
+      }
+      if (cycleId && UUID_REGEX.test(cycleId)) {
+        if (!writableFields.includes('cycleId')) return refuseUnwritable('cycleId');
+        input.cycleId = cycleId;
+      }
       if (priority !== undefined && isValidPriority(priority)) {
+        if (!writableFields.includes('priority')) return refuseUnwritable('priority');
         input.priority = priority;
       }
 
