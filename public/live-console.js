@@ -790,7 +790,7 @@
       let firstX = null, lastX = null;
       const humPts = [];
       for (let i = 0; i < b.length; i++) {
-        const tsCenter = pulseData.endTs - (b.length - 1 - i) * pulseData.bucketMs + pulseData.bucketMs / 2;
+        const tsCenter = pulseData.endTs - (b.length - 1 - i) * pulseData.bucketMs - pulseData.bucketMs / 2;
         const x = xFor(tsCenter);
         const y = base - (b[i] / humMax) * humH;
         humPts.push({ x, y });
