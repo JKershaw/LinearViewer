@@ -1491,6 +1491,21 @@ describe('requireTeamMembership (strict — GET /api/proxy/issues|labels|cycles)
     assert.throws(() => requireTeamMembership(TEAMS, 'not-a-real-team'), (err) => {
       assert.ok(err instanceof TeamNotFoundError);
       assert.equal(err.teamId, 'not-a-real-team');
+      assert.equal(err.truncated, false);
+      return true;
+    });
+  });
+
+  // LIN-2033 A2: a capped team list (e.g. Jira's fetchTeams() past the
+  // 500-project cap) must not report a refusal as plain non-existence — the
+  // thrown error must carry the array's stamped `truncated` flag through.
+  test('a truncated team list surfaces truncated:true on the thrown error', () => {
+    const truncatedTeams = [{ id: 'team-a' }, { id: 'team-b' }];
+    truncatedTeams.truncated = true;
+    assert.throws(() => requireTeamMembership(truncatedTeams, 'not-a-real-team'), (err) => {
+      assert.ok(err instanceof TeamNotFoundError);
+      assert.equal(err.teamId, 'not-a-real-team');
+      assert.equal(err.truncated, true);
       return true;
     });
   });

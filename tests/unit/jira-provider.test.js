@@ -1093,7 +1093,26 @@ describe('JiraProvider reads (fake client)', () => {
   // LIN-2018: a Jira project surfaces as a canonical team, id = project key.
   test('fetchTeams maps projects to {id, name, key}, id = project key (LIN-2018, Option 2 of the LIN-2007 ruling)', async () => {
     const teams = await provider.fetchTeams({ email: 'a@b.com', apiToken: 't', site: SITE })
-    assert.deepEqual(teams, [{ id: 'ENG', name: 'Engineering', key: 'ENG' }])
+    assert.deepEqual(Array.from(teams), [{ id: 'ENG', name: 'Engineering', key: 'ENG' }])
+    assert.equal(teams.truncated, false, 'the shared fake client never sets .truncated, so the untruncated path must coerce to false, not undefined')
+  })
+
+  // LIN-2033 F1: `listAllProjects()` stamps `truncated` as a custom property
+  // on the array; `.map()` returns a fresh array and silently drops it — the
+  // exact mechanism `fetchProjects` already guards against (see its own
+  // truncated-preservation tests below). `fetchTeams` must re-stamp it on the
+  // array it returns, since every provider's `fetchTeams()` (and every
+  // caller: matchTeamId/requireTeamMembership, resolveTeamRef,
+  // task-create.js's option-list loader, …) treats the result as a bare
+  // array — so the flag has to ride the array, not replace its shape.
+  test('fetchTeams preserves the truncated flag (LIN-2033 F1) when listAllProjects() hit its cap', async () => {
+    const cappedProjects = [{ id: '10001', key: 'ENG', name: 'Engineering' }]
+    cappedProjects.truncated = true
+    const stubClient = { listAllProjects: async () => cappedProjects }
+    const cappedProvider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
+    const teams = await cappedProvider.fetchTeams({ email: 'a@b.com', apiToken: 't', site: SITE })
+    assert.deepEqual(Array.from(teams), [{ id: 'ENG', name: 'Engineering', key: 'ENG' }], 'the .truncated flag must survive the canonical .map() mapping, not be silently dropped')
+    assert.equal(teams.truncated, true)
   })
 
   test('fetchProjects returns canonical projects + issues, stamped with SOURCE_JIRA (LIN-2011: projects are epic-derived)', async () => {

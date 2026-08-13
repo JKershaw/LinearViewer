@@ -1511,7 +1511,10 @@ GET ${baseUrl}/api/proxy/me
 
 GET ${baseUrl}/api/proxy/teams
   → List all teams
-  → { "teams": [{ "id": "...", "name": "Engineering", "key": "ENG" }] }
+  → { "teams": [{ "id": "...", "name": "Engineering", "key": "ENG" }], "truncated": false }
+  → truncated: true means the provider hit its own project/team listing cap
+    (e.g. Jira's 500-project walk) and the list above is a partial one — do
+    not read an id's absence from this list as proof it does not exist.
 
 GET ${baseUrl}/api/proxy/projects
   → List active projects
@@ -2203,7 +2206,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
 
       const teams = await provider.fetchTeams(token);
       logEvent(req, '/api/proxy/teams', 200);
-      res.json({ teams });
+      res.json({ teams, truncated: !!teams.truncated });
     } catch (err) {
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/teams', status);
@@ -2274,7 +2277,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
     } catch (err) {
       if (err instanceof TeamNotFoundError) {
         logEvent(req, '/api/proxy/issues', 404);
-        return jsonError(res, 404, `Team not found: ${err.teamId}`, { code: 'TEAM_NOT_FOUND' });
+        return jsonError(res, 404, `Team not found: ${err.teamId}`, { code: 'TEAM_NOT_FOUND', truncated: err.truncated });
       }
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/issues', status);
@@ -2412,7 +2415,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
     } catch (err) {
       if (err instanceof TeamNotFoundError) {
         logEvent(req, '/api/proxy/labels', 404);
-        return jsonError(res, 404, `Team not found: ${err.teamId}`, { code: 'TEAM_NOT_FOUND' });
+        return jsonError(res, 404, `Team not found: ${err.teamId}`, { code: 'TEAM_NOT_FOUND', truncated: err.truncated });
       }
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/labels', status);
@@ -2445,7 +2448,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
     } catch (err) {
       if (err instanceof TeamNotFoundError) {
         logEvent(req, '/api/proxy/cycles', 404);
-        return jsonError(res, 404, `Team not found: ${err.teamId}`, { code: 'TEAM_NOT_FOUND' });
+        return jsonError(res, 404, `Team not found: ${err.teamId}`, { code: 'TEAM_NOT_FOUND', truncated: err.truncated });
       }
       const status = graphqlErrorStatus(err);
       logEvent(req, '/api/proxy/cycles', status);
