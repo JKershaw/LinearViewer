@@ -241,6 +241,50 @@ test('buildPulse tolerates loops with no telemetry at all — load[] stays zeroe
   assert.equal(pulse.load.length, pulse.buckets.length);
 });
 
+// LIN-1505 Phase A: the dominant cause of the strip's jerk was `buildPulse`
+// anchoring its bucket grid to the raw response instant `now` rather than an
+// absolute, bucket-aligned instant — so the SAME fixed heartbeat re-quantised
+// into a different bucket every poll purely as a function of latency. These
+// tests pin the fix: bucket placement (and `endTs`) must depend only on which
+// bucketMs-aligned window `now` falls into, never on `now`'s exact value
+// within that window.
+test('buildPulse is latency-invariant: two calls whose `now` floors to the same bucket boundary produce byte-identical output', () => {
+  const bucketMs = 5000;
+  const windowMs = 30 * bucketMs;
+  const gridEnd = Date.parse('2026-07-19T12:00:00Z'); // exact 5s-aligned instant
+  const hbLoop = loop({
+    telemetry: { producedArtifacts: [], metrics: [
+      { toolCount: 1, timestamp: new Date(gridEnd - 3000).toISOString() },
+      { toolCount: 3, timestamp: new Date(gridEnd - 12000).toISOString() },
+    ] },
+  });
+  // Both `now` values fall inside the same [gridEnd, gridEnd + bucketMs) window
+  // — i.e. the same round-trip latency variance a real poll would see — and so
+  // must floor to the identical bucket-aligned anchor.
+  const a = buildPulse([hbLoop], { now: gridEnd, windowMs, bucketMs });
+  const b = buildPulse([hbLoop], { now: gridEnd + 1234, windowMs, bucketMs });
+  assert.deepEqual(a, b);
+});
+
+test('buildPulse shifts a beat by exactly one bucket when `now` crosses one bucketMs boundary — not a fractional/arbitrary amount', () => {
+  const bucketMs = 5000;
+  const windowMs = 30 * bucketMs;
+  const gridEnd0 = Date.parse('2026-07-19T12:00:00Z'); // exact 5s-aligned instant
+  const beatTs = gridEnd0 - 53000; // mid-bucket, well clear of any edge
+  const hbLoop = loop({
+    telemetry: { producedArtifacts: [], metrics: [
+      { toolCount: 1, timestamp: new Date(beatTs).toISOString() },
+    ] },
+  });
+  // Same 1500ms of "latency jitter" applied in both calls — only the whole
+  // bucket each `now` falls into should matter, not this offset.
+  const sameBucket = buildPulse([hbLoop], { now: gridEnd0 + 1500, windowMs, bucketMs });
+  const nextBucket = buildPulse([hbLoop], { now: gridEnd0 + bucketMs + 1500, windowMs, bucketMs });
+  const idxSame = sameBucket.buckets.findIndex(v => v > 0);
+  const idxNext = nextBucket.buckets.findIndex(v => v > 0);
+  assert.equal(idxNext, idxSame - 1, 'crossing exactly one bucket boundary must shift the beat by exactly one bucket position');
+});
+
 test('buildConsoleFeed exposes pulse + serverNow for the flowing strip', () => {
   const now = Date.parse('2026-07-19T12:00:00Z');
   const feed = buildConsoleFeed({ statusItems: [], loops: [loop()] }, { now });
