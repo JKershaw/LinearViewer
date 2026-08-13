@@ -29,6 +29,9 @@ import {
   buildPulse,
   latestHeartbeat,
   SUMMARY_MAX,
+  snapPulseWindowMs,
+  PULSE_SPAN_RUNGS_MS,
+  PULSE_BUCKET_COUNT,
 } from '../../lib/live-console.js';
 import { parseHeartbeat } from '../../lib/session-telemetry.js';
 
@@ -291,6 +294,37 @@ test('buildConsoleFeed exposes pulse + serverNow for the flowing strip', () => {
   assert.equal(feed.serverNow, now);
   assert.ok(Array.isArray(feed.pulse.buckets));
   assert.equal(feed.pulse.endTs, now);
+});
+
+// ─── LIN-1505 Phase C: strip zoom (span rungs + threading) ────────────────────
+
+test('snapPulseWindowMs snaps to the nearest rung >= the requested span', () => {
+  assert.equal(snapPulseWindowMs(0), PULSE_SPAN_RUNGS_MS[0]);            // below floor → floor
+  assert.equal(snapPulseWindowMs(-500), PULSE_SPAN_RUNGS_MS[0]);         // negative → floor
+  assert.equal(snapPulseWindowMs(undefined), PULSE_SPAN_RUNGS_MS[0]);    // missing → floor
+  assert.equal(snapPulseWindowMs('not a number'), PULSE_SPAN_RUNGS_MS[0]); // junk → floor
+  assert.equal(snapPulseWindowMs(PULSE_SPAN_RUNGS_MS[0]), PULSE_SPAN_RUNGS_MS[0]); // exact rung → itself
+  assert.equal(snapPulseWindowMs(PULSE_SPAN_RUNGS_MS[0] + 1), PULSE_SPAN_RUNGS_MS[1]); // just above → next rung up
+  assert.equal(snapPulseWindowMs(10 * 60 * 1000), PULSE_SPAN_RUNGS_MS[1]); // between rungs → next-highest
+  assert.equal(snapPulseWindowMs(PULSE_SPAN_RUNGS_MS[3]), PULSE_SPAN_RUNGS_MS[3]); // exact ceiling → itself
+  assert.equal(snapPulseWindowMs(24 * 60 * 60 * 1000), PULSE_SPAN_RUNGS_MS[3]); // above ceiling → clamped to ceiling
+});
+
+test('buildConsoleFeed threads pulseWindowMs into buildPulse, holding bucket count fixed at every span', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  for (const spanMs of PULSE_SPAN_RUNGS_MS) {
+    const feed = buildConsoleFeed({ statusItems: [], loops: [loop()] }, { now, pulseWindowMs: spanMs });
+    assert.equal(feed.pulse.buckets.length, PULSE_BUCKET_COUNT, `${spanMs}ms span must still carry ${PULSE_BUCKET_COUNT} buckets`);
+    assert.equal(feed.pulse.load.length, PULSE_BUCKET_COUNT);
+    assert.equal(feed.pulse.bucketMs, Math.round(spanMs / PULSE_BUCKET_COUNT));
+  }
+});
+
+test('buildConsoleFeed defaults pulseWindowMs to the unchanged 3-minute strip when omitted (back-compat)', () => {
+  const now = Date.parse('2026-07-19T12:00:00Z');
+  const feed = buildConsoleFeed({ statusItems: [], loops: [loop()] }, { now });
+  assert.equal(feed.pulse.bucketMs, 5000); // unchanged: 180000 / 36 === 5000
+  assert.equal(feed.pulse.buckets.length, PULSE_BUCKET_COUNT);
 });
 
 // ─── buildConsoleFeed: summary (fleet totals) ─────────────────────────────────

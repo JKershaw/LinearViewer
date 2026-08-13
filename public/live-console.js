@@ -32,7 +32,6 @@
   const MAX_HISTORY_ROWS = 300; // cap paged-in history rows
   const HISTORY_PAGE = 40;
   const TICK_MS = 30000;       // relative-time refresh cadence
-  const PULSE_WINDOW_MS = 3 * 60 * 1000; // time span the flowing strip covers (right=now)
   const TIMELINE_WINDOW_MS = 24 * 60 * 60 * 1000; // full axis bound + "24h" preset target span
   const TIMELINE_PRESET_1H_MS = 60 * 60 * 1000;   // "1h" preset target span ONLY — NOT the
                                                    // interactive zoom floor (that's the lowered
@@ -42,6 +41,8 @@
   const TIMELINE_ROW_HEIGHT = 18;
   const TIMELINE_ROW_GAP = 4;
   const TIMELINE_WHEEL_ZOOM_SPEED = 0.0025;
+  const PULSE_WHEEL_ZOOM_SPEED = 0.0025; // same tuning as TIMELINE_WHEEL_ZOOM_SPEED
+  const PULSE_RUNG_DEBOUNCE_MS = 200;
   const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Kind → glyph (colour lives in live-console.css via [data-kind]).
@@ -58,13 +59,19 @@
     dot: document.getElementById('live-console-dot'),
     status: document.getElementById('live-console-status'),
     tempo: document.getElementById('live-console-tempo'),
+    pulse: document.querySelector('.lc-pulse'),
+    pulseSpanText: document.getElementById('live-console-pulse-span-text'),
+    // Scoped by data-testid prefix, not the shared `.lc-timeline-preset` class
+    // — the pulse strip's preset buttons reuse that class for styling (LIN-1505
+    // Phase C), so a bare class selector here would pick up BOTH button groups.
+    pulsePresets: Array.from(document.querySelectorAll('[data-testid^="live-console-pulse-preset-"]')),
     chips: document.getElementById('live-console-chips'),
     timelineSection: document.getElementById('live-console-timeline-section'),
     timelineLabelText: document.getElementById('live-console-timeline-label-text'),
     timeline: document.getElementById('live-console-timeline'),
     timelineConnectors: document.getElementById('live-console-timeline-connectors'),
     timelineEmpty: document.getElementById('live-console-timeline-empty'),
-    timelinePresets: Array.from(document.querySelectorAll('.lc-timeline-preset[data-range]')),
+    timelinePresets: Array.from(document.querySelectorAll('[data-testid^="live-console-timeline-preset-"]')),
     lanes: document.getElementById('live-console-lanes'),
     lanesEmpty: document.getElementById('live-console-lanes-empty'),
     stream: document.getElementById('live-console-stream'),
@@ -100,6 +107,16 @@
   let timelineFlat = [];                // last { run, rowIndex } list, for viewport-only repaints
   let timelineConnectorEdges = [];      // last { fromId, toId } list (server-packed, LIN-1720)
   let timelineGesture = null;           // active touch gesture: { mode: 'pinch'|'pan', ... }
+  // LIN-1505 Phase C: the strip's own zoom state — module-scope and DISTINCT
+  // from timelineView/timelineGesture above (never coupled, per decision 3).
+  // The strip has no persisted {startMs,endMs} window the way the timeline
+  // does: every frame derives [effNow - pulseViewSpanMs, effNow] fresh, so
+  // there is no "re-pin to live" step — the right edge is always `now`.
+  let pulseViewSpanMs = window.PULSE_SPAN_RUNGS_MS[0];  // continuous, gesture-updated
+  let pulseServerSpanMs = pulseViewSpanMs;              // quantised, what was last REQUESTED
+  let pulseActivePreset = '3m';                         // '3m'|'15m'|'1h'|'6h'|null (custom gesture)
+  let pulseGesture = null;                              // active touch gesture on the strip
+  let pulseRungDebounceTimer = null;
   const historyIds = new Set();         // ids paged into the history region
   let lastFeed = null;                  // last successful live feed (for in-place re-filter)
   let liveOldestTs = null;              // oldest ts in the live feed (first history cursor)
@@ -376,9 +393,10 @@
   }
 
   // Human-readable span, e.g. "24 hours" / "1 hour" / "47 minutes" / "2h 15m" —
-  // used to derive the section label/aria-label/empty-state text from the
-  // ACTUAL active window (LIN-1928) rather than a literal "24 hours".
-  function describeTimelineSpan(spanMs) {
+  // shared by the timeline's window label (LIN-1928) and the pulse strip's
+  // span label (LIN-1505 Phase C, decision 3: same idiom, don't fork it) so
+  // both surfaces phrase "last N minutes/hours" identically.
+  function describeSpan(spanMs) {
     const totalMinutes = Math.max(1, Math.round(spanMs / 60000));
     if (totalMinutes < 60) return `${totalMinutes} minute${totalMinutes === 1 ? '' : 's'}`;
     const totalHours = spanMs / 3600000;
@@ -392,7 +410,7 @@
   }
 
   function updateTimelineWindowText() {
-    const label = `last ${describeTimelineSpan(timelineView.spanMs)}`;
+    const label = `last ${describeSpan(timelineView.spanMs)}`;
     if (els.timelineSection) {
       els.timelineSection.setAttribute('aria-label', label.charAt(0).toUpperCase() + label.slice(1));
     }
@@ -443,6 +461,142 @@
     if (range === '24h') return TIMELINE_WINDOW_MS;
     if (range === 'fit') return timelineFitSpanMs != null ? timelineFitSpanMs : window.TIMELINE_FIT_MIN_SPAN_MS;
     return TIMELINE_WINDOW_MS;
+  }
+
+  // ─── Pulse strip zoom (LIN-1505 Phase C) ────────────────────────────────────
+  // Reuses the SAME idiom as the timeline (preset buttons + pinch + ctrl-wheel,
+  // same ARIA pattern, same pure computeTimelineZoom math) but is entirely
+  // independent STATE — decision 3: two different time windows on one page,
+  // deliberately never coupled. Unlike the timeline, the strip never pans and
+  // has no persisted window: every frame derives [effNow - pulseViewSpanMs,
+  // effNow] fresh (renderPulse's xFor), so there is no "re-pin to live" step.
+
+  function updatePulseSpanText() {
+    if (els.pulseSpanText) els.pulseSpanText.textContent = `last ${describeSpan(pulseViewSpanMs)}`;
+  }
+
+  function updatePulsePresetPressed() {
+    els.pulsePresets.forEach(btn => {
+      btn.setAttribute('aria-pressed', String(btn.getAttribute('data-range') === pulseActivePreset));
+    });
+    updatePulseSpanText();
+  }
+
+  // A gesture/preset click changes the CONTINUOUS view span immediately, for a
+  // smooth feel (drives xFor/fade/cull every frame); the SERVER span only
+  // changes — after a short debounce — when the view span crosses to a new
+  // rung, so the wire carries at most four shapes, always. The two are
+  // deliberately not synchronised tighter: a gesture mid-zoom shows a smooth
+  // span change against slightly stale bucket data until the debounced
+  // refetch lands (decision 2, an accepted trade for the smooth feel).
+  function requestPulseRefetchIfRungChanged() {
+    const rung = window.snapPulseWindowMs(pulseViewSpanMs);
+    if (rung === pulseServerSpanMs) return;
+    pulseServerSpanMs = rung;
+    clearTimeout(pulseRungDebounceTimer);
+    pulseRungDebounceTimer = setTimeout(() => {
+      // Reuses poll()'s own in-flight guard rather than a second concurrent
+      // fetch path — if a regular poll is already in flight when this fires,
+      // the rung change rides the NEXT regular tick instead of immediately
+      // (acceptable for an ambient view; no second fetch path is added).
+      clearTimeout(pollTimer);
+      poll();
+    }, PULSE_RUNG_DEBOUNCE_MS);
+  }
+
+  function setPulsePreset(spanMs, presetName) {
+    pulseViewSpanMs = spanMs;
+    pulseGesture = null;
+    pulseActivePreset = presetName || null;
+    // Synchronous repaint regardless of REDUCED_MOTION: under reduced motion
+    // there is no rAF loop, so this is the ONLY repaint trigger a click gets
+    // — without it a reduced-motion user would see no feedback for up to 5s
+    // (the next poll). Under the continuous rAF loop this is a harmless no-op
+    // (the next frame repaints anyway).
+    renderPulse();
+    updatePulsePresetPressed();
+    requestPulseRefetchIfRungChanged();
+  }
+
+  // Zoom the strip's span. Deliberately does NOT thread a real pinch-midpoint
+  // / cursor-X into the focal calculation the way the timeline does — there is
+  // nothing to keep visually stationary, since the right edge is pinned to
+  // `now` on every frame regardless. Passing `focalX: viewportWidthPx` (ratio
+  // 1) is what encodes "no panning, right edge always now" using the SHARED
+  // zoom function rather than special-casing around it: with the focal ratio
+  // at 1, computeTimelineZoom's own math places the new window's right edge
+  // exactly at `now` with zero drift, so no separate re-pin step is needed.
+  function applyPulseZoom(deltaZoom, viewportWidthPx) {
+    const now = lastServerNow || Date.now();
+    const next = window.computeTimelineZoom({
+      startMs: now - pulseViewSpanMs,
+      endMs: now,
+      focalX: viewportWidthPx,
+      deltaZoom,
+      viewportWidthPx,
+      nowMs: now,
+      minSpanMs: window.PULSE_SPAN_RUNGS_MS[0],
+      maxSpanMs: window.PULSE_SPAN_RUNGS_MS[window.PULSE_SPAN_RUNGS_MS.length - 1],
+    });
+    pulseViewSpanMs = next.endMs - next.startMs;
+    pulseActivePreset = null;
+    renderPulse(); // see setPulsePreset's comment — the only repaint trigger under reduced motion
+    updatePulsePresetPressed();
+    requestPulseRefetchIfRungChanged();
+  }
+
+  // Desktop: ctrl/meta+wheel, gated exactly like the timeline's onTimelineWheel
+  // so a plain wheel keeps native page scroll. Mobile: two-finger pinch only —
+  // deliberately NO one-finger branch (decision 1: `.lc-pulse` keeps its
+  // current touch behaviour, a one-finger vertical swipe must still scroll the
+  // page — see the CSS `touch-action: pan-y`, the concrete implementation of
+  // that decision).
+  function onPulseWheel(e) {
+    if (!e.ctrlKey && !e.metaKey) return; // plain wheel: let the page scroll natively
+    e.preventDefault();
+    const rect = els.pulse.getBoundingClientRect();
+    applyPulseZoom(e.deltaY * PULSE_WHEEL_ZOOM_SPEED, rect.width || els.pulse.clientWidth);
+  }
+  function onPulseTouchStart(e) {
+    if (e.touches.length === 2) {
+      const rect = els.pulse.getBoundingClientRect();
+      pulseGesture = {
+        startDist: touchDistance(e.touches[0], e.touches[1]),
+        rectWidth: rect.width || els.pulse.clientWidth,
+      };
+    } else {
+      pulseGesture = null; // one-finger (or more than two): not our gesture, let it scroll
+    }
+  }
+  function onPulseTouchMove(e) {
+    if (!pulseGesture || e.touches.length !== 2) return;
+    e.preventDefault();
+    const dist = touchDistance(e.touches[0], e.touches[1]);
+    if (!(pulseGesture.startDist > 0) || !(dist > 0)) return;
+    // Fingers spreading (dist grows) → zoom IN (span shrinks); pinching
+    // together → zoom OUT — same negated log ratio as the timeline's pinch.
+    const deltaZoom = -Math.log(dist / pulseGesture.startDist);
+    applyPulseZoom(deltaZoom, pulseGesture.rectWidth);
+    pulseGesture.startDist = dist; // continuous: each move zooms from here, not from gesture start
+  }
+  function onPulseTouchEnd(e) {
+    if (e.touches.length < 2) pulseGesture = null;
+  }
+  function wirePulseGestures() {
+    if (!els.pulse) return;
+    els.pulse.addEventListener('wheel', onPulseWheel, { passive: false });
+    els.pulse.addEventListener('touchstart', onPulseTouchStart, { passive: true });
+    els.pulse.addEventListener('touchmove', onPulseTouchMove, { passive: false });
+    els.pulse.addEventListener('touchend', onPulseTouchEnd, { passive: true });
+    els.pulse.addEventListener('touchcancel', onPulseTouchEnd, { passive: true });
+    els.pulsePresets.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const range = btn.getAttribute('data-range');
+        const rungIndex = { '3m': 0, '15m': 1, '1h': 2, '6h': 3 }[range];
+        const spanMs = rungIndex != null ? window.PULSE_SPAN_RUNGS_MS[rungIndex] : window.PULSE_SPAN_RUNGS_MS[0];
+        setPulsePreset(spanMs, range);
+      });
+    });
   }
 
   // First-paint fit latch (LIN-1928): compute the default window ONCE from
@@ -747,9 +901,18 @@
 
   function updatePulse(feed) {
     const p = feed.pulse || {};
+    const newBucketMs = p.bucketMs || 5000;
+    // LIN-1505 Phase C: humMax/loadMax are slow-decay scales — changing
+    // bucketMs (i.e. the active span) changes every bucket's magnitude at
+    // once, so a zoom step must reset both rather than visibly re-settling
+    // over several polls. Keyed off the WIRE-reported bucketMs (not the
+    // client's requested rung) so a race where an in-flight old-rung
+    // response lands after a rung change still resets correctly against
+    // what actually arrived.
+    if (newBucketMs !== pulseData.bucketMs) { humMax = 1; loadMax = 1; }
     pulseData.buckets = Array.isArray(p.buckets) ? p.buckets : [];
     pulseData.load = Array.isArray(p.load) ? p.load : [];
-    pulseData.bucketMs = p.bucketMs || 5000;
+    pulseData.bucketMs = newBucketMs;
     pulseData.endTs = p.endTs || feed.serverNow || 0;
     pulseData.serverNow = feed.serverNow || pulseData.endTs || 0;
     pulseData.perf = (window.performance && performance.now) ? performance.now() : 0;
@@ -780,7 +943,7 @@
       ? pulseData.serverNow
       : pulseData.serverNow + (((window.performance && performance.now) ? performance.now() : 0) - pulseData.perf);
     if (!effNow) return;
-    const xFor = (ts) => W * (1 - (effNow - ts) / PULSE_WINDOW_MS);
+    const xFor = (ts) => W * (1 - (effNow - ts) / pulseViewSpanMs);
 
     // Heartbeat hum area — height driven ONLY by `buckets` (beat count).
     const b = pulseData.buckets;
@@ -841,14 +1004,18 @@
     ctx.beginPath(); ctx.moveTo(0, base + 0.5); ctx.lineTo(W, base + 0.5); ctx.stroke();
 
     // Event blips: a thin riser + a dot, coloured by kind, fading as they age.
-    const fadeStart = PULSE_WINDOW_MS * 0.75;
+    // Fade start + age cull follow the VIEW span (not a constant) so blips
+    // visually spread out (or compress) immediately on a zoom, ahead of the
+    // server's blip payload actually changing — the payload cap is unchanged
+    // (still the newest-60 events), this only re-scales where they're drawn.
+    const fadeStart = pulseViewSpanMs * 0.75;
     const dotY = base - humH * 0.7;
     for (const ev of pulseData.events) {
       const age = effNow - ev.ts;
-      if (age < -2000 || age > PULSE_WINDOW_MS) continue;
+      if (age < -2000 || age > pulseViewSpanMs) continue;
       let x = xFor(ev.ts);
       if (x > W) x = W;
-      const alpha = age > fadeStart ? Math.max(0, 1 - (age - fadeStart) / (PULSE_WINDOW_MS - fadeStart)) : 1;
+      const alpha = age > fadeStart ? Math.max(0, 1 - (age - fadeStart) / (pulseViewSpanMs - fadeStart)) : 1;
       const color = colorForKind(ev.kind);
       ctx.globalAlpha = alpha * 0.45;
       ctx.strokeStyle = color; ctx.lineWidth = 1.5;
@@ -1089,7 +1256,12 @@
     if (inFlight || stopped) return;
     inFlight = true;
     try {
-      const feed = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/live-console/events`, { on401: '/logout' });
+      // LIN-1505 Phase C: carry the active rung on EVERY poll, not just the
+      // triggering one — otherwise the regular 5s cadence would silently
+      // revert to the 3-min default after a debounced rung refetch (span is
+      // session-only, but that means "survives every poll", not "survives
+      // only until the next one").
+      const feed = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/live-console/events?pulseSpanMs=${pulseServerSpanMs}`, { on401: '/logout' });
       failures = 0;
       lastFeed = feed;
       applyFeed(feed, true);
@@ -1129,6 +1301,8 @@
   if (els.moreBtn) els.moreBtn.addEventListener('click', loadMore);
   buildChips();
   wireTimelineGestures();
+  wirePulseGestures();
+  updatePulseSpanText();
   renderSkeleton();
   start();
 })();

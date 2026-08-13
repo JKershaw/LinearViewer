@@ -380,11 +380,27 @@ main.lc-page[data-url-key]                    - page container
   [data-testid="live-console-banner"]         - status banner
     #live-console-dot[data-health]            - health dot (live|done|error|idle)
     #live-console-status[aria-live=polite]    - one-line fleet status / connection state
-  .lc-pulse > #live-console-tempo             - full-width flowing activity strip <canvas>: scrolls
-                                                right→left in real time (now = right edge); a soft
-                                                heartbeat "hum" area under colour-coded event blips
-                                                that drift left and fade. rAF-animated, reduced-motion
-                                                aware (static snapshot instead of scrolling)
+  .lc-pulse-section                           - flowing activity strip section (LIN-1505 Phase C: zoom controls)
+    [data-testid="live-console-pulse-presets"][role=group][aria-label="Strip range"]  - 3m/15m/1h/6h
+                                                range buttons (reuses .lc-timeline-preset styling verbatim);
+                                                3m is the always-on-load default, never data-dependent
+      [data-testid="live-console-pulse-preset-3m|15m|1h|6h"][data-range][aria-pressed]  - one per rung
+    #live-console-pulse-span-text               - visible "last N minutes/hours" label, kept in sync
+                                                with the active span (same phrasing convention as the
+                                                timeline's window label)
+    .lc-pulse > #live-console-tempo             - full-width flowing activity strip <canvas>: scrolls
+                                                right→left in real time (now = right edge, NEVER pans —
+                                                zoom only); a soft heartbeat "hum" area under colour-coded
+                                                event blips that drift left and fade. rAF-animated,
+                                                reduced-motion aware (static snapshot instead of
+                                                scrolling, but a preset/gesture still repaints immediately).
+                                                Zoom: ctrl/meta+wheel (desktop) or two-finger pinch
+                                                (touch) on `.lc-pulse` itself, gated identically to the
+                                                timeline's; deliberately NO one-finger gesture here — a
+                                                one-finger vertical swipe over the strip still scrolls the
+                                                page (`touch-action: pan-y`, unlike the timeline's `none`).
+                                                Independent of the timeline's own zoom/pan — never coupled,
+                                                never shares state or constants with it.
   [data-testid="live-console-chips"]          - workspace filter chips (hidden when <2 workspaces)
     .lc-chip[data-ws][aria-pressed]           - one toggle per workspace (.lc-chip--off when filtered out)
   .lc-timeline-section                        - swimlane timeline: recent dispatch runs as bars, default

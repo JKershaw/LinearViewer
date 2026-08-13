@@ -116,6 +116,28 @@ test('the connector overlay <svg> is a mount point inside the bars viewport, bef
   assert.ok(viewportOpen > 0 && connectorsOpen > viewportOpen, 'connector overlay must be inside, and come after the opening tag of, the bars viewport');
 });
 
+// LIN-1505 Phase C: strip-only zoom presets. Mirrors the timeline preset test
+// pattern above — a real, accessible button group + the correct initial
+// pressed state (3m is the always-3min-on-load default, unlike the timeline's
+// data-dependent `fit` latch).
+test('renderer emits the pulse strip preset buttons in an accessible group', () => {
+  const html = renderLiveConsolePage({ urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }], featureFlags: { liveConsole: true } });
+  assert.match(html, /role="group" aria-label="Strip range" data-testid="live-console-pulse-presets"/);
+  assert.match(html, /data-testid="live-console-pulse-preset-3m"/);
+  assert.match(html, /data-testid="live-console-pulse-preset-15m"/);
+  assert.match(html, /data-testid="live-console-pulse-preset-1h"/);
+  assert.match(html, /data-testid="live-console-pulse-preset-6h"/);
+  assert.match(html, /id="live-console-pulse-span-text"/);
+});
+
+test('the 3m preset — the always-on-load default — carries the initial aria-pressed="true"', () => {
+  const html = renderLiveConsolePage({ urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }], featureFlags: { liveConsole: true } });
+  assert.match(html, /data-testid="live-console-pulse-preset-3m" data-range="3m" aria-pressed="true"/);
+  assert.match(html, /data-testid="live-console-pulse-preset-15m" data-range="15m" aria-pressed="false"/);
+  assert.match(html, /data-testid="live-console-pulse-preset-1h" data-range="1h" aria-pressed="false"/);
+  assert.match(html, /data-testid="live-console-pulse-preset-6h" data-range="6h" aria-pressed="false"/);
+});
+
 test('mount order is pulse → chips → timeline → lanes → stream — no existing element moves', () => {
   const html = renderLiveConsolePage({ urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }], featureFlags: { liveConsole: true } });
   const idx = (needle) => html.indexOf(needle);
