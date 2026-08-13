@@ -409,7 +409,10 @@ body:has(.ship-page) .nav-bar {
 /* ==========================================================================
    Backlog visibility control (LIN-1208) — hide/show backlog cards.
    Same fixed-toolbar treatment as the mode control, opposite (right) edge of
-   the same top band so it never collides with it.
+   the same top band. Side-by-side only clears the mode control down to about
+   381px (the two are ~190px and ~143px wide, plus 16px gutters); below that
+   they overlap and the backlog control steals the ORIENTATION button's hit
+   area, so the narrow-width rule in the mobile block stacks them instead.
    ========================================================================== */
 
 .ship-backlog-control {
@@ -567,5 +570,24 @@ body:has(.ship-page) .nav-bar {
      disabled orientation button already signals the state. */
   .ship-mode-note {
     display: none;
+  }
+}
+
+/* Narrow phones (LIN-1208 close-out, review F1): the backlog control shares the
+   fixed top band with the mode control, and the pair only fits side by side
+   above ~381px. At 375px (iPhone SE/8/13 mini) they overlap by 5px; at 360px
+   (the most common Android width) the backlog control covers the right end of
+   the ORIENTATION button and takes its clicks. Stack it one row below the mode
+   control instead, sharing the left anchor. The offset is the control's OWN
+   height via translateY(100%) — both controls carry identical font, padding and
+   border, so the row below lands flush with no measured constant to go stale
+   (the `--ship-nav-h` lesson from LIN-1221 F2). 400px, not 381px, so the rule
+   engages with margin above the measured collision threshold. Proper mobile
+   design for this view is still LIN-270. */
+@media (max-width: 400px) {
+  .ship-backlog-control {
+    left: 16px;
+    right: auto;
+    transform: translateY(calc(100% + 6px));
   }
 }

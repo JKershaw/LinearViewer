@@ -362,6 +362,42 @@ test.describe('Ship Page', () => {
     await page.locator('#ship-backlog-toggle').click();
     await expect(page.locator('#ship-orbit .swim-box.state-backlog')).toHaveCount(0);
   });
+
+  // LIN-1208 review F1: the two fixed controls share one top band, and side by
+  // side they only clear each other above ~381px. Below that the backlog
+  // control overlapped the mode control and took the ORIENTATION button's
+  // clicks — invisible to CI, whose narrowest existing viewport is 390px. Pin
+  // both the geometry and the hit test at the two widths that regressed.
+  for (const width of [375, 360, 320]) {
+    test(`backlog and mode controls never overlap at ${width}px (F1)`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+
+      const geom = await page.evaluate(() => {
+        const modeEl = document.querySelector('.ship-mode-control');
+        const backlogEl = document.querySelector('.ship-backlog-control');
+        const mode = modeEl.getBoundingClientRect();
+        const backlog = backlogEl.getBoundingClientRect();
+        // Who actually receives a click near the right end of the mode
+        // control — the strip the backlog control used to cover.
+        const hit = document.elementFromPoint(mode.left + mode.width * 0.95, mode.top + mode.height / 2);
+        return {
+          overlaps: mode.right > backlog.left && mode.left < backlog.right &&
+                    mode.bottom > backlog.top && mode.top < backlog.bottom,
+          modeOwnsHit: !!(hit && modeEl.contains(hit)),
+          backlogOnCanvas: backlog.left >= 0 && backlog.right <= window.innerWidth
+        };
+      });
+      expect(geom.overlaps).toBe(false);
+      expect(geom.modeOwnsHit).toBe(true);
+      expect(geom.backlogOnCanvas).toBe(true);
+
+      // And the stacked control is still a working toggle at this width.
+      await page.locator('#ship-backlog-toggle').click();
+      await expect(page.locator('#ship-backlog-toggle')).toHaveAttribute('aria-pressed', 'true');
+    });
+  }
 });
 
 // LIN-1208: blocker/parent exemption + the drained-project cleanup, on a
