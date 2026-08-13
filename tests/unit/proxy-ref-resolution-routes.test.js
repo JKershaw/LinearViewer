@@ -387,3 +387,51 @@ test('GET /states/:teamId: a non-UUID team key reaches the provider (gate-free â
   assert.equal(status, 200);
   assert.equal(calls.statesTeamId, 'ENG');
 });
+
+// ---------------------------------------------------------------------------
+// LIN-2033 A2: the TEAM_NOT_FOUND refusal must disclose whether the team list
+// it was checked against was itself truncated (e.g. Jira's fetchTeams() past
+// the 500-project cap, LIN-2033 F1) â€” a rejection that confidently says "no
+// such team" while the checked list was capped is exactly the failure the
+// ticket exists to close.
+// ---------------------------------------------------------------------------
+
+function makeTruncatedTeamProvider(overrides = {}) {
+  return makeProvider({
+    fetchTeams: async () => {
+      const teams = [{ id: TEAM_UUID, name: 'Linear Team', key: 'LIN' }];
+      teams.truncated = true;
+      return teams;
+    },
+    ...overrides,
+  });
+}
+
+test('GET /issues: TEAM_NOT_FOUND discloses truncated:false against an untruncated list', async () => {
+  const { provider } = makeProvider();
+  const { status, body } = await request(buildApp(provider), `/api/proxy/issues?teamId=${UNMATCHED_TEAM_UUID}`);
+  assert.equal(status, 404);
+  assert.equal(body.truncated, false);
+});
+
+test('GET /issues: TEAM_NOT_FOUND discloses truncated:true against a capped list', async () => {
+  const { provider } = makeTruncatedTeamProvider();
+  const { status, body } = await request(buildApp(provider), `/api/proxy/issues?teamId=${UNMATCHED_TEAM_UUID}`);
+  assert.equal(status, 404);
+  assert.equal(body.code, 'TEAM_NOT_FOUND');
+  assert.equal(body.truncated, true);
+});
+
+test('GET /labels: TEAM_NOT_FOUND discloses truncated:true against a capped list', async () => {
+  const { provider } = makeTruncatedTeamProvider();
+  const { status, body } = await request(buildApp(provider), `/api/proxy/labels?teamId=${UNMATCHED_TEAM_UUID}`);
+  assert.equal(status, 404);
+  assert.equal(body.truncated, true);
+});
+
+test('GET /cycles: TEAM_NOT_FOUND discloses truncated:true against a capped list', async () => {
+  const { provider } = makeTruncatedTeamProvider();
+  const { status, body } = await request(buildApp(provider), `/api/proxy/cycles?teamId=${UNMATCHED_TEAM_UUID}`);
+  assert.equal(status, 404);
+  assert.equal(body.truncated, true);
+});
