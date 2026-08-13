@@ -752,9 +752,19 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const workspace = req.workspace
 
     const { issueId } = req.params
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource)
 
     if (!isValidIssueId(issueId)) {
       return badRequest.json(res, 'Invalid issue ID format')
+    }
+
+    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
+    // provider that never implements recommendation context (LIN-1910).
+    if (!issueProvider.supports('fetchRecommendationContext')) {
+      return jsonError(res, 422, "This workspace's provider does not support recommendations for this issue", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+      })
     }
 
     // Check if feature is enabled (except in test mode)
@@ -885,7 +895,7 @@ ${goal}`
         deadline: Date.now() + RECOMMEND_DESCENT_BUDGET_MS,
         computeOne: async (id) => {
           // Two-tier context for parent tasks; the focused child seeds the defer choice.
-          const ctx = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), id)
+          const ctx = await issueProvider.fetchRecommendationContext(issueCallScope, id)
           // AI mock (local session): synthesise the hop deterministically so the
           // SAME resolver drives the descent without an OpenRouter call (LIN-405).
           if (mockAi) return buildMockRecommendationHop(ctx)
@@ -986,11 +996,21 @@ ${goal}`
   router.get('/workspace/:urlKey/api/recommend/:issueId/stream', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
 
     // --- Pre-flight validation (regular HTTP errors) ---
 
     if (!isValidIssueId(issueId)) {
       return badRequest.json(res, 'Invalid issue ID format');
+    }
+
+    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
+    // provider that never implements recommendation context (LIN-1910).
+    if (!issueProvider.supports('fetchRecommendationContext')) {
+      return jsonError(res, 422, "This workspace's provider does not support recommendations for this issue", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+      });
     }
 
     // See the GET handler: `isTestMode` gates the DATA mock; `mockAi` fires the
@@ -1014,7 +1034,7 @@ ${goal}`
     // keeps its own 404 in the isTestMode block below.
     if (mockAi && !isTestMode) {
       try {
-        await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), issueId);
+        await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
       } catch (err) {
         if (/not found/i.test(err?.message)) {
           return notFound.json(res, 'Issue not found');
@@ -1164,8 +1184,8 @@ ${goal}`
       sendSSE(res, 'phase', { phase: 'fetching_context' });
       // Gap #1 (LIN-346): bound this fetch by the client-disconnect signal ∪ a
       // per-fetch timeout so a stalled Linear call can't silently idle the socket.
-      const context = await getProviderForWorkspace(workspace).fetchRecommendationContext(
-        getWorkspaceCallScope(workspace),
+      const context = await issueProvider.fetchRecommendationContext(
+        issueCallScope,
         issueId,
         { signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(CONTEXT_FETCH_TIMEOUT_MS)]) }
       );
@@ -1212,8 +1232,8 @@ ${goal}`
             const hop = armHopSignal({ clientSignal: abortController.signal, deadline });
             try {
               // Gap #1: bound the per-hop Linear fetch by the hop signal ∪ a per-fetch timeout.
-              const ctx = await getProviderForWorkspace(workspace).fetchRecommendationContext(
-                getWorkspaceCallScope(workspace),
+              const ctx = await issueProvider.fetchRecommendationContext(
+                issueCallScope,
                 id,
                 { signal: AbortSignal.any([hop.signal, AbortSignal.timeout(CONTEXT_FETCH_TIMEOUT_MS)]) }
               );
@@ -1538,12 +1558,21 @@ ${goal}`
   router.get('/workspace/:urlKey/api/recap/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
 
     if (!isValidIssueId(issueId)) {
       return badRequest.json(res, 'Invalid issue ID format');
     }
     if (!recapCacheStore) {
       return jsonError(res, 503, 'Recap cache not configured');
+    }
+    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
+    // provider that never implements recommendation context (LIN-1910).
+    if (!issueProvider.supports('fetchRecommendationContext')) {
+      return jsonError(res, 422, "This workspace's provider does not support recap for this issue", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+      });
     }
 
     try {
@@ -1553,7 +1582,7 @@ ${goal}`
         context = await buildMockRecapContext(issueId);
         if (!context) return notFound.json(res, 'Issue not found');
       } else {
-        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), issueId);
+        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
       }
 
       const canonicalId = context.issue?.id || issueId;
@@ -1598,12 +1627,21 @@ ${goal}`
   router.post('/workspace/:urlKey/api/recap/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
 
     if (!isValidIssueId(issueId)) {
       return badRequest.json(res, 'Invalid issue ID format');
     }
     if (!recapCacheStore) {
       return jsonError(res, 503, 'Recap cache not configured');
+    }
+    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
+    // provider that never implements recommendation context (LIN-1910).
+    if (!issueProvider.supports('fetchRecommendationContext')) {
+      return jsonError(res, 422, "This workspace's provider does not support recap for this issue", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+      });
     }
 
     // `isTestMode` (test-token) gates the DATA mock; `mockAi` additionally fires
@@ -1638,7 +1676,7 @@ ${goal}`
           return keepalive.send(404, { error: 'Issue not found' });
         }
       } else {
-        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), issueId);
+        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
       }
 
       const canonicalId = context.issue?.id || issueId;
@@ -1764,12 +1802,21 @@ ${goal}`
   router.get('/workspace/:urlKey/api/brief/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
 
     if (!isValidIssueId(issueId)) {
       return badRequest.json(res, 'Invalid issue ID format');
     }
     if (!briefCacheStore) {
       return jsonError(res, 503, 'Brief cache not configured');
+    }
+    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
+    // provider that never implements recommendation context (LIN-1910).
+    if (!issueProvider.supports('fetchRecommendationContext')) {
+      return jsonError(res, 422, "This workspace's provider does not support brief for this issue", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+      });
     }
 
     try {
@@ -1779,7 +1826,7 @@ ${goal}`
         context = await buildMockRecapContext(issueId);
         if (!context) return notFound.json(res, 'Issue not found');
       } else {
-        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), issueId);
+        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
       }
 
       const canonicalId = context.issue?.id || issueId;
@@ -1824,12 +1871,21 @@ ${goal}`
   router.post('/workspace/:urlKey/api/brief/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
 
     if (!isValidIssueId(issueId)) {
       return badRequest.json(res, 'Invalid issue ID format');
     }
     if (!briefCacheStore) {
       return jsonError(res, 503, 'Brief cache not configured');
+    }
+    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
+    // provider that never implements recommendation context (LIN-1910).
+    if (!issueProvider.supports('fetchRecommendationContext')) {
+      return jsonError(res, 422, "This workspace's provider does not support brief for this issue", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+      });
     }
 
     // See the recap POST note: `isTestMode` gates the DATA mock, `mockAi` the AI
@@ -1862,7 +1918,7 @@ ${goal}`
           return keepalive.send(404, { error: 'Issue not found' });
         }
       } else {
-        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), issueId);
+        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
       }
 
       const canonicalId = context.issue?.id || issueId;

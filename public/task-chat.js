@@ -12,6 +12,11 @@
   var data = window.__TASK_CHAT_DATA__ || {};
   var urlKey = data.urlKey || '';
   var savedChatsAvailable = data.savedChatsAvailable === true;
+  // LIN-1910: the resolved provider hint carried from the dashboard's Chat
+  // deep-link (lib/render.js chatHref), valid only while the input still
+  // holds the SAME identifier it was minted for — see send() below.
+  var prefillTask = data.defaultTask || '';
+  var prefillSource = data.defaultSource || '';
 
   var idInput = document.getElementById('task-chat-id');
   var questionInput = document.getElementById('task-chat-question');
@@ -282,10 +287,17 @@
 
     var priorHistory = chatHistory.slice(0, -1); // server re-adds the question
 
+    // LIN-1910: the source hint is only trustworthy while `taskId` is still the
+    // identifier it was minted for — the moment the user types a different id,
+    // it no longer describes the row the link was generated for, so it's
+    // dropped rather than carried along.
+    var sourceHint = (taskId === prefillTask) ? prefillSource : '';
+    var sourceQuery = sourceHint ? ('?source=' + encodeURIComponent(sourceHint)) : '';
+
     // Raw fetch carve-out: Server-Sent Events stream consumed via the reader
     // below; window.api() parses the body as JSON and would break the stream,
     // so the SSE reader keeps its own response handling.
-    fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/' + encodeURIComponent(taskId), {
+    fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/' + encodeURIComponent(taskId) + sourceQuery, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
       body: JSON.stringify({ question: question, history: priorHistory })
