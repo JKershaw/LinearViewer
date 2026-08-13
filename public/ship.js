@@ -82,8 +82,67 @@
     return false;
   }
 
-  function buildSegments(cards, heading) {
-    heading = heading || null;
+  // Walk the same blocker/parent reachability BFS that computeProximityRings
+  // uses, seeded from `shipCards` (in-progress), over the FULL unfiltered
+  // card set. Shared by computeProximityRings (ring promotion) and
+  // buildSegments (backlog exemption, LIN-1208) so the two questions —
+  // "should this be promoted to the innermost ring" and "should this backlog
+  // card be exempt from hiding" — use IDENTICAL relation semantics and cannot
+  // drift apart. buildSegments calls this over the pre-filter `cards` array
+  // specifically because a card the card-level filter removes can never be
+  // rescued by computeProximityRings' own BFS afterward (it never reaches
+  // the orbit at all). Mirror of lib/ship-layout.js computeShipReachableIds.
+  function computeShipReachableIds(allCards, shipCards) {
+    var shipIds = {};
+    for (var si = 0; si < shipCards.length; si++) shipIds[shipCards[si].id] = true;
+    var candidateById = {};
+    var allById = {};
+    for (var ai = 0; ai < allCards.length; ai++) {
+      allById[allCards[ai].id] = allCards[ai];
+      if (!shipIds[allCards[ai].id]) candidateById[allCards[ai].id] = allCards[ai];
+    }
+
+    var blockersOf = {};
+    for (var bi2 = 0; bi2 < allCards.length; bi2++) {
+      var bcard = allCards[bi2];
+      var blocks = bcard.blocksIds || [];
+      for (var b2 = 0; b2 < blocks.length; b2++) {
+        if (!blockersOf[blocks[b2]]) blockersOf[blocks[b2]] = [];
+        blockersOf[blocks[b2]].push(bcard.id);
+      }
+    }
+
+    var visited = {};
+    var queue = [];
+    for (var sid in shipIds) { visited[sid] = true; queue.push(sid); }
+    var reachable = {};
+
+    while (queue.length > 0) {
+      var id = queue.shift();
+      var blockers = blockersOf[id] || [];
+      for (var bi3 = 0; bi3 < blockers.length; bi3++) {
+        var bId = blockers[bi3];
+        if (!visited[bId] && candidateById[bId]) {
+          visited[bId] = true;
+          reachable[bId] = true;
+          queue.push(bId);
+        }
+      }
+      var asCard = allById[id];
+      if (asCard && asCard.parentId && !visited[asCard.parentId]) {
+        visited[asCard.parentId] = true;
+        if (candidateById[asCard.parentId]) reachable[asCard.parentId] = true;
+        queue.push(asCard.parentId);
+      }
+    }
+
+    return reachable;
+  }
+
+  function buildSegments(cards, config) {
+    config = config || {};
+    var heading = config.heading || null;
+    var showBacklog = config.showBacklog === true;
     var ship = [], heads = [], bugs = [], drift = [], byProject = {};
     for (var i = 0; i < cards.length; i++) {
       var c = cards[i];
@@ -99,16 +158,39 @@
       }
     }
 
-    // Skip projects whose remaining cards are entirely backlog — functionally
-    // dormant, no need to claim a port/starboard segment for them.
-    var pnames = Object.keys(byProject);
-    for (var pn = 0; pn < pnames.length; pn++) {
-      var pgroup = byProject[pnames[pn]];
-      var allBacklog = true;
-      for (var pc = 0; pc < pgroup.length; pc++) {
-        if (pgroup[pc].stateType !== 'backlog') { allBacklog = false; break; }
+    // Backlog visibility filter (LIN-1208), default hidden. A card-level,
+    // post-routing pass over every bucket. Exempts any backlog card that
+    // transitively blocks, or is an ancestor of, in-progress work, via the
+    // same reachability walk computeProximityRings uses for ring promotion
+    // (computed once, over the full unfiltered `cards`).
+    if (!showBacklog) {
+      var reachable = computeShipReachableIds(cards, ship);
+      var keepCard = function (card) {
+        return card.stateType !== 'backlog' || reachable[card.id];
+      };
+      heads = heads.filter(keepCard);
+      bugs = bugs.filter(keepCard);
+      drift = drift.filter(keepCard);
+      var fpnames = Object.keys(byProject);
+      for (var fp = 0; fp < fpnames.length; fp++) {
+        byProject[fpnames[fp]] = byProject[fpnames[fp]].filter(keepCard);
       }
-      if (allBacklog) delete byProject[pnames[pn]];
+
+      // Drained-project cleanup — a project whose cards were all backlog (and
+      // not exempt) is left with an empty group by the filter above; drop it
+      // rather than let it claim an arc with nothing to show. Checked by
+      // emptiness, not "every card is backlog" (a group can end up holding
+      // only an exempt backlog card, which must survive per the exemption).
+      // skipBacklogProjects has its own opt-out, independent of showBacklog,
+      // for this cleanup specifically (mirrors lib/ship-layout.js's config
+      // knob — previously hardcoded unconditional here).
+      var skipBacklogProjects = config.skipBacklogProjects !== false;
+      if (skipBacklogProjects) {
+        var pnames = Object.keys(byProject);
+        for (var pn = 0; pn < pnames.length; pn++) {
+          if (byProject[pnames[pn]].length === 0) delete byProject[pnames[pn]];
+        }
+      }
     }
 
     // Project-side alternation runs only over projects that produce segments
@@ -361,8 +443,8 @@
     }
   }
 
-  function runLayout(cards, geom, cardPitch, heading, cardSize) {
-    var built = buildSegments(cards, heading || null);
+  function runLayout(cards, geom, cardPitch, heading, cardSize, showBacklog) {
+    var built = buildSegments(cards, { heading: heading || null, showBacklog: showBacklog === true });
     var orbitCards = built.driftCards.slice();
     for (var s = 0; s < built.segments.length; s++) {
       orbitCards = orbitCards.concat(built.segments[s].cards);
@@ -475,37 +557,13 @@
       }
     }
 
-    var blockersOf = {};
-    for (var m = 0; m < allCards.length; m++) {
-      var card2 = allCards[m];
-      var blocks = card2.blocksIds || [];
-      for (var b = 0; b < blocks.length; b++) {
-        if (!blockersOf[blocks[b]]) blockersOf[blocks[b]] = [];
-        blockersOf[blocks[b]].push(card2.id);
-      }
-    }
-
-    var queue = (shipCards || []).map(function (sc) { return sc.id; });
-    var visited = {};
-    for (var q = 0; q < queue.length; q++) visited[queue[q]] = true;
-
-    while (queue.length > 0) {
-      var id = queue.shift();
-      var blockers = blockersOf[id] || [];
-      for (var bi = 0; bi < blockers.length; bi++) {
-        var bId = blockers[bi];
-        if (!visited[bId] && orbitById[bId]) {
-          visited[bId] = true;
-          ring[bId] = INNERMOST;
-          queue.push(bId);
-        }
-      }
-      var asCard = allById[id];
-      if (asCard && asCard.parentId && !visited[asCard.parentId]) {
-        visited[asCard.parentId] = true;
-        if (orbitById[asCard.parentId]) ring[asCard.parentId] = INNERMOST;
-        queue.push(asCard.parentId);
-      }
+    // Promotion BFS, delegated to computeShipReachableIds (LIN-1208) so this
+    // walk and buildSegments' backlog exemption walk can never drift apart —
+    // this call only ever sees `orbitCards` as candidates, same as before
+    // the extraction.
+    var reachable = computeShipReachableIds(allCards, shipCards || []);
+    for (var rid in reachable) {
+      if (orbitById[rid]) ring[rid] = INNERMOST;
     }
 
     var uf = {};
@@ -773,6 +831,30 @@
     } catch (e) { /* ignore */ }
   }
 
+  // Backlog visibility (LIN-1208), persisted alongside heading/mode in the
+  // shared ship-settings blob. Default hidden — a missing or corrupt blob
+  // falls back to `false`, same as loadMode's safe default, so a stale
+  // preference can never strand the user off the default view.
+  function loadShowBacklog() {
+    try {
+      var raw = window.localStorage.getItem('ship-settings');
+      if (!raw) return false;
+      var parsed = JSON.parse(raw);
+      return parsed && parsed.showBacklog === true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function saveShowBacklog(showBacklog) {
+    try {
+      var raw = window.localStorage.getItem('ship-settings');
+      var parsed = raw ? JSON.parse(raw) : {};
+      parsed.showBacklog = showBacklog === true;
+      window.localStorage.setItem('ship-settings', JSON.stringify(parsed));
+    } catch (e) { /* ignore */ }
+  }
+
   // Shared across render() and the toggle's angular tween: per orbit card its
   // radius (constant across modes) and the two target angles, plus the geometry
   // and segment lists needed to redraw guides/labels after a mode switch.
@@ -823,6 +905,7 @@
     var data = window.__SHIP_DATA__ || { issues: [] };
     var issues = data.issues || [];
     var heading = loadHeading();
+    var showBacklog = loadShowBacklog();
 
     // The rect's *width* is deterministic (2-wide silhouette is constant).
     // Its *height* depends on the natural rendered height of swim-box cards,
@@ -880,7 +963,7 @@
     // density. Run the layout once at a placeholder centre, measure max radius,
     // then size canvas and re-run with proper centre.
     geom.centerX = 0; geom.centerY = 0;
-    var probe = runLayout(issues, geom, CARD_PITCH, heading);
+    var probe = runLayout(issues, geom, CARD_PITCH, heading, null, showBacklog);
     var maxR = ringRadius(RING_COUNT - 1, geom);
     for (var id in probe.positions) {
       var p = probe.positions[id];
@@ -920,7 +1003,7 @@
 
     geom.centerX = canvasSize / 2;
     geom.centerY = canvasSize / 2;
-    var result = runLayout(issues, geom, CARD_PITCH, heading);
+    var result = runLayout(issues, geom, CARD_PITCH, heading, null, showBacklog);
 
     // Orientation mode (LIN-301): a parallel set of positions derived from the
     // project positions — same radius, angle swung to each task's saved bearing.
@@ -1024,6 +1107,7 @@
     drawModeGuides(mode);
     renderHeadingControl(heading, issues, geom, ship);
     renderModeControl(mode);
+    renderBacklogControl(showBacklog);
 
     if (pageEl) {
       pageEl.scrollLeft = geom.centerX * zoom - viewportW / 2;
@@ -1182,6 +1266,29 @@
       orientBtn.setAttribute('aria-pressed', mode === 'orientation' ? 'true' : 'false');
       orientBtn.classList.toggle('active', mode === 'orientation');
     }
+  }
+
+  // Backlog visibility control (LIN-1208). Fixed, outside the scaled stage,
+  // always rendered (including when the workspace has no backlog cards).
+  // Attribute-only updates — never innerHTML — so a click never rebuilds the
+  // focused button and drops focus (the reviewed defect class this codebase
+  // already tracks; see next-run.js / this file's own mode/heading controls).
+  function renderBacklogControl(showBacklog) {
+    var btn = document.getElementById('ship-backlog-toggle');
+    if (!btn) return;
+    btn.setAttribute('aria-pressed', showBacklog ? 'true' : 'false');
+    btn.classList.toggle('active', showBacklog);
+    btn.textContent = showBacklog ? 'backlog: shown' : 'backlog: hidden';
+  }
+
+  function wireBacklogControl() {
+    var btn = document.getElementById('ship-backlog-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var next = !loadShowBacklog();
+      saveShowBacklog(next);
+      render();
+    });
   }
 
   // Mode-aware reference layer: project mode keeps the project segment guides;
@@ -1559,7 +1666,7 @@
     var page = document.querySelector('.ship-page');
     if (!page) return;
     var dragging = false, startX = 0, startY = 0, startL = 0, startT = 0;
-    var IGNORE = '.swim-box, .ship-heading-control, .ship-mode-control, .ship-zoom-control, .swim-popover';
+    var IGNORE = '.swim-box, .ship-heading-control, .ship-mode-control, .ship-backlog-control, .ship-zoom-control, .swim-popover';
 
     page.addEventListener('mousedown', function (e) {
       if (e.button !== 0) return;
@@ -1725,6 +1832,7 @@
     wirePopover();
     wireHeadingControl();
     wireModeControl();
+    wireBacklogControl();
     wireZoomControl();
     wirePan();
 
@@ -1737,5 +1845,18 @@
       if (resizeTimer) window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(measureNavHeight, 150);
     });
+  }
+
+  // Test-only seam (inert in the browser, where `module` is undefined): expose the
+  // pure layout helpers so the live/mirror structural-parity test
+  // (tests/unit/ship-layout-parity.test.js) can diff this file's buildSegments /
+  // computeProximityRings / computeShipReachableIds against lib/ship-layout.js's
+  // over shared fixtures. Not part of the page's runtime contract.
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+      buildSegments: buildSegments,
+      computeProximityRings: computeProximityRings,
+      computeShipReachableIds: computeShipReachableIds
+    };
   }
 })();

@@ -144,6 +144,44 @@ export function defaultLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
 }
 
 /**
+ * Ship radial view backlog-visibility fixture (LIN-1208). `swimLocalSeed`
+ * doesn't cover the blocker/parent exemption — per LIN-1208's research, none
+ * of its four backlog cards blocks or parents anything — so this is a
+ * dedicated, minimal seed rather than an extension of the shared fixture
+ * (which many other specs and the visual baselines assert exact counts
+ * against). Shape:
+ *   - project 'Mixed': one started card (ship rect), one plain unstarted card
+ *     (always visible), one plain backlog card (hidden by default, shown when
+ *     the toggle is on), and one backlog card that BLOCKS the started card
+ *     (exempt — visible either way, still carrying `state-backlog`).
+ *   - project 'Dormant': two plain backlog cards and nothing else — dropped
+ *     entirely by default (skipBacklogProjects' empty-group cleanup) and
+ *     reappears when the toggle is on.
+ */
+export function shipBacklogLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
+  const id = (rawId) => localSeedId(urlKey, rawId);
+  return {
+    projects: [
+      { id: id('ship-proj-mixed'), name: 'Mixed', content: null, sortOrder: 1 },
+      { id: id('ship-proj-dormant'), name: 'Dormant', content: null, sortOrder: 2 },
+    ],
+    issues: [
+      { id: id('ship-wip'), identifier: 'SHIP-1', title: 'In-progress work', description: '', projectId: id('ship-proj-mixed'), sortOrder: 1, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${urlKey}/issue/${id('ship-wip')}` },
+      { id: id('ship-todo'), identifier: 'SHIP-2', title: 'Plain todo card', description: '', projectId: id('ship-proj-mixed'), sortOrder: 2, state: { name: 'Todo', type: 'unstarted' }, url: `/workspace/${urlKey}/issue/${id('ship-todo')}` },
+      { id: id('ship-plain-backlog'), identifier: 'SHIP-3', title: 'Plain backlog card', description: '', projectId: id('ship-proj-mixed'), sortOrder: 3, state: { name: 'Backlog', type: 'backlog' }, url: `/workspace/${urlKey}/issue/${id('ship-plain-backlog')}` },
+      {
+        id: id('ship-blocker-backlog'), identifier: 'SHIP-4', title: 'Backlog card blocking in-progress work', description: '',
+        projectId: id('ship-proj-mixed'), sortOrder: 4, state: { name: 'Backlog', type: 'backlog' },
+        url: `/workspace/${urlKey}/issue/${id('ship-blocker-backlog')}`,
+        relations: [{ id: 'ship-rel-blocks', type: 'blocks', relatedIssueId: id('ship-wip') }],
+      },
+      { id: id('ship-dormant-1'), identifier: 'SHIP-5', title: 'Dormant backlog card 1', description: '', projectId: id('ship-proj-dormant'), sortOrder: 5, state: { name: 'Backlog', type: 'backlog' }, url: `/workspace/${urlKey}/issue/${id('ship-dormant-1')}` },
+      { id: id('ship-dormant-2'), identifier: 'SHIP-6', title: 'Dormant backlog card 2', description: '', projectId: id('ship-proj-dormant'), sortOrder: 6, state: { name: 'Backlog', type: 'backlog' }, url: `/workspace/${urlKey}/issue/${id('ship-dormant-2')}` },
+    ],
+  };
+}
+
+/**
  * Convert a Linear-shaped fixture (`{ projects, issues }` as mock-data.js /
  * swim-sample-data.js export them) into the LocalStore seed shape:
  * `parent/project` objects flatten to `parentId/projectId`, `labels.nodes`

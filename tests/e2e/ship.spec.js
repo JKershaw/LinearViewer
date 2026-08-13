@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { swimLocalSeed } from '../fixtures/local-harness.js';
+import { swimLocalSeed, shipBacklogLocalSeed } from '../fixtures/local-harness.js';
 
 // LIN-378: the ship surface is fully modeled by the local provider, so this spec
 // rides a seeded local workspace (no `test-token` mock). The seed is the swim
@@ -316,6 +316,108 @@ test.describe('Ship Page', () => {
       }))
     );
     expect(positions2).toEqual(positions1);
+  });
+
+  // LIN-1208: backlog cards hidden from the orbit by default, with a control
+  // to show them again. swimLocalSeed carries 8 started / 7 unstarted / 4
+  // backlog cards across its 4 mixed projects (none of its backlog cards
+  // block or parent anything, so none are exempt) — the baseline this and the
+  // toggle test below assert against.
+  test('backlog cards are hidden from the orbit by default; segment labels are unaffected', async ({ page }) => {
+    await expect(page.locator('#ship-orbit .swim-box.state-backlog')).toHaveCount(0);
+    // The 4 mixed projects each keep at least one non-backlog card, so all 4
+    // segment labels still render (ship.spec.js:83's existing assertion).
+    const labels = await page.locator('.ship-sector-label').allTextContents();
+    expect(labels.sort()).toEqual([
+      'API v2',
+      'Authentication Overhaul',
+      'Dashboard Redesign',
+      'Infrastructure'
+    ]);
+    // Every unstarted card and the ship rect's started cards are unaffected.
+    await expect(page.locator('#ship-orbit .swim-box.state-unstarted')).toHaveCount(7);
+    await expect(page.locator('#ship-rect-cards .swim-box')).toHaveCount(8);
+  });
+
+  test('the backlog control toggles visibility and persists across reload', async ({ page }) => {
+    const toggle = page.locator('#ship-backlog-toggle');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(toggle).toHaveText(/hidden/i);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(toggle).toHaveText(/shown/i);
+    // Counts return to today's (pre-LIN-1208) baseline: all 4 backlog cards
+    // plus the 7 unstarted cards, 11 orbit cards from these two states alone.
+    await expect(page.locator('#ship-orbit .swim-box.state-backlog')).toHaveCount(4);
+    await expect(page.locator('#ship-orbit .swim-box.state-unstarted')).toHaveCount(7);
+
+    // Persists across reload (ship-settings localStorage, like heading/mode).
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('#ship-backlog-toggle')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#ship-orbit .swim-box.state-backlog')).toHaveCount(4);
+
+    // Toggling back off restores the default-hidden state.
+    await page.locator('#ship-backlog-toggle').click();
+    await expect(page.locator('#ship-orbit .swim-box.state-backlog')).toHaveCount(0);
+  });
+});
+
+// LIN-1208: blocker/parent exemption + the drained-project cleanup, on a
+// dedicated minimal seed — swimLocalSeed's backlog cards block/parent
+// nothing, so the exemption is untestable against it (per LIN-1208 research).
+test.describe('Ship Page — backlog visibility exemption (LIN-1208)', () => {
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(shipBacklogLocalSeed(localWorkerUrlKey), { features: { ship: true } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('a backlog card blocking in-progress work stays visible with the toggle off', async ({ page }) => {
+    // Mixed project: SHIP-2 (unstarted) + SHIP-4 (exempt backlog blocker)
+    // survive; SHIP-3 (plain backlog) is hidden. Dormant project (all
+    // plain backlog, no exemption) is dropped entirely.
+    const backlogCards = page.locator('#ship-orbit .swim-box.state-backlog');
+    await expect(backlogCards).toHaveCount(1);
+    await expect(backlogCards.first()).toContainText('SHIP-4');
+
+    const labels = await page.locator('.ship-sector-label').allTextContents();
+    expect(labels).toContain('Mixed');
+    expect(labels).not.toContain('Dormant');
+  });
+
+  test('toggling the control on restores the plain backlog card and the drained project', async ({ page }) => {
+    await page.locator('#ship-backlog-toggle').click();
+    // All 4 backlog cards (plain + exempt blocker + the 2 dormant ones) return.
+    await expect(page.locator('#ship-orbit .swim-box.state-backlog')).toHaveCount(4);
+    const labels = await page.locator('.ship-sector-label').allTextContents();
+    expect(labels).toContain('Dormant');
+  });
+});
+
+// LIN-1208: an all-backlog workspace with the filter on must render an empty
+// orbit safely — no collapsed canvas, no crash.
+test.describe('Ship Page — all-backlog workspace (LIN-1208)', () => {
+  test('renders an empty, non-degenerate orbit', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const seed = shipBacklogLocalSeed(localWorkerUrlKey);
+    // Drop everything but the plain backlog cards (no started/unstarted/exempt
+    // cards at all) so the whole orbit — and the ship rect — is empty.
+    seed.issues = seed.issues.filter(i => i.identifier === 'SHIP-3' || i.identifier === 'SHIP-5' || i.identifier === 'SHIP-6');
+    await seedLocal(seed, { features: { ship: true } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/ship`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('#ship-orbit .swim-box')).toHaveCount(0);
+    await expect(page.locator('.ship-sector-label')).toHaveCount(0);
+    // The ship rect's own empty state still renders, unrelated to the orbit.
+    await expect(page.locator('.ship-rect-empty')).toBeVisible();
+    // The canvas itself is still sized sanely (not collapsed to 0).
+    const canvasSize = await page.locator('#ship-canvas').evaluate(n => ({
+      w: n.offsetWidth, h: n.offsetHeight
+    }));
+    expect(canvasSize.w).toBeGreaterThan(100);
+    expect(canvasSize.h).toBeGreaterThan(100);
   });
 });
 

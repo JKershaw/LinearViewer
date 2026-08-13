@@ -406,6 +406,50 @@ body:has(.ship-page) .nav-bar {
 
 .ship-mode-note.hidden { display: none; }
 
+/* ==========================================================================
+   Backlog visibility control (LIN-1208) — hide/show backlog cards.
+   Same fixed-toolbar treatment as the mode control, opposite (right) edge of
+   the same top band so it never collides with it.
+   ========================================================================== */
+
+.ship-backlog-control {
+  position: fixed;
+  top: calc(var(--ship-nav-h, 56px) + 12px);
+  right: 16px;
+  z-index: 8; /* same band as the mode control */
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.ship-backlog-btn {
+  font-family: var(--font-structural);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--bg);
+  border: none;
+  padding: 5px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.ship-backlog-btn:hover {
+  color: var(--text);
+  background: var(--inset);
+}
+
+.ship-backlog-btn.active {
+  color: var(--bg);
+  background: var(--brand);
+}
+
 /* Compass rose (orientation mode) — diagonals fainter than cardinals. */
 .ship-sector-guide line.ship-compass-diagonal {
   stroke: var(--line-soft);

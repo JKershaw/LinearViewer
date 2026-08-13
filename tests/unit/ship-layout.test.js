@@ -15,6 +15,7 @@ import {
   midpointAngle,
   computePosition,
   computeProximityRings,
+  computeShipReachableIds,
   computeShipDimensions,
   shipCardOffset,
   hash32,
@@ -536,10 +537,23 @@ describe('buildSegments', () => {
       card({ id: 'b2', projectName: 'Mostly', stateType: 'backlog' }),
       card({ id: 't',  projectName: 'Mostly', stateType: 'unstarted' })
     ];
-    const { segments } = buildSegments(cards);
+    const { segments } = buildSegments(cards, { showBacklog: true });
     const seg = segments.find(s => s.id === 'project:Mostly');
     assert.ok(seg, 'project with at least one Todo card stays');
     assert.strictEqual(seg.cards.length, 3, 'all three cards remain in the segment');
+  });
+
+  test('project with one non-backlog card is kept, backlog cards hidden by default', () => {
+    const cards = [
+      card({ id: 'b1', projectName: 'Mostly', stateType: 'backlog' }),
+      card({ id: 'b2', projectName: 'Mostly', stateType: 'backlog' }),
+      card({ id: 't',  projectName: 'Mostly', stateType: 'unstarted' })
+    ];
+    const { segments } = buildSegments(cards);
+    const seg = segments.find(s => s.id === 'project:Mostly');
+    assert.ok(seg, 'project with a surviving Todo card stays');
+    assert.strictEqual(seg.cards.length, 1, 'only the non-backlog card remains by default');
+    assert.strictEqual(seg.cards[0].id, 't');
   });
 
   test('bug card in a backlog-only project still routes to aft', () => {
@@ -556,10 +570,10 @@ describe('buildSegments', () => {
     assert.ok(!segments.some(s => s.id === 'project:Dormant'));
   });
 
-  test('heading project with only backlog cards keeps its forward segment', () => {
-    // The heading is an explicit user choice — it shouldn't be filtered out
-    // even if all aligned cards are backlog. Empty / backlog-only forward arc
-    // is itself the signal.
+  test('heading project with only backlog cards keeps its forward segment, cards hidden by default', () => {
+    // The segment shell is an explicit user choice (the heading) — it shouldn't
+    // be dropped even if every aligned card is backlog and hidden. The now-empty
+    // forward arc is itself the signal.
     const cards = [
       card({ id: 'h1', projectName: 'Goal', stateType: 'backlog' }),
       card({ id: 'h2', projectName: 'Goal', stateType: 'backlog' })
@@ -569,17 +583,160 @@ describe('buildSegments', () => {
     });
     const fwd = segments.find(s => s.sector === SECTORS.FORWARD);
     assert.ok(fwd, 'forward segment should exist for the heading project');
+    assert.strictEqual(fwd.cards.length, 0, 'backlog heading cards are hidden by default');
+  });
+
+  test('heading project with only backlog cards: showBacklog true keeps the cards too', () => {
+    const cards = [
+      card({ id: 'h1', projectName: 'Goal', stateType: 'backlog' }),
+      card({ id: 'h2', projectName: 'Goal', stateType: 'backlog' })
+    ];
+    const { segments } = buildSegments(cards, {
+      heading: { kind: 'project', name: 'Goal' },
+      showBacklog: true
+    });
+    const fwd = segments.find(s => s.sector === SECTORS.FORWARD);
+    assert.ok(fwd);
     assert.strictEqual(fwd.cards.length, 2);
   });
 
-  test('skipBacklogProjects: false opts out of the filter', () => {
+  test('skipBacklogProjects: false keeps the drained project as an empty segment', () => {
+    // Under the default hidden-backlog filter, both cards are stripped from
+    // the group before this flag is consulted at all — its remaining job is
+    // the empty-group cleanup, not the card-level filter itself. Opting out
+    // leaves the (now cardless) segment in place instead of deleting it.
     const cards = [
       card({ id: 'b1', projectName: 'Dormant', stateType: 'backlog' }),
       card({ id: 'b2', projectName: 'Dormant', stateType: 'backlog' })
     ];
     const { segments } = buildSegments(cards, { skipBacklogProjects: false });
-    assert.ok(segments.some(s => s.id === 'project:Dormant'),
-      'opt-out keeps the segment');
+    const seg = segments.find(s => s.id === 'project:Dormant');
+    assert.ok(seg, 'opt-out keeps the segment');
+    assert.strictEqual(seg.cards.length, 0, 'its cards were still hidden by the default filter');
+  });
+
+  test('showBacklog: true bypasses both the card filter and the drained-project cleanup', () => {
+    const cards = [
+      card({ id: 'b1', projectName: 'Dormant', stateType: 'backlog' }),
+      card({ id: 'b2', projectName: 'Dormant', stateType: 'backlog' })
+    ];
+    const { segments } = buildSegments(cards, { showBacklog: true });
+    const seg = segments.find(s => s.id === 'project:Dormant');
+    assert.ok(seg, 'showBacklog true bypasses skipBacklogProjects too — the project reappears');
+    assert.strictEqual(seg.cards.length, 2);
+  });
+
+  test('backlog cards hidden from every bucket by default: heading, bugs, project, drift', () => {
+    const cards = [
+      card({ id: 'hd', projectName: 'Goal', stateType: 'backlog' }),
+      card({ id: 'bg', stateType: 'backlog', labels: ['bug'] }),
+      card({ id: 'pr', projectName: 'Active', stateType: 'backlog' }),
+      card({ id: 'ac', projectName: 'Active', stateType: 'unstarted' }),
+      card({ id: 'dr', stateType: 'backlog' })
+    ];
+    const { segments, driftCards } = buildSegments(cards, {
+      heading: { kind: 'project', name: 'Goal' }
+    });
+    const fwd = segments.find(s => s.sector === SECTORS.FORWARD);
+    const aft = segments.find(s => s.id === 'bugs');
+    const active = segments.find(s => s.id === 'project:Active');
+    assert.strictEqual(fwd.cards.length, 0, 'heading bucket');
+    assert.ok(!aft, 'bug bucket: the only bug card was backlog and hidden, so no BUGS segment');
+    assert.strictEqual(active.cards.length, 1, 'project bucket keeps only the non-backlog card');
+    assert.strictEqual(active.cards[0].id, 'ac');
+    assert.strictEqual(driftCards.length, 0, 'drift bucket');
+  });
+
+  test('backlog card that blocks in-progress work is exempt and stays in its bucket', () => {
+    const ship = [card({ id: 'wip', stateType: 'started' })];
+    const cards = [
+      ...ship,
+      card({ id: 'blocker', projectName: 'Active', stateType: 'backlog', blocksIds: ['wip'] }),
+      card({ id: 'other', projectName: 'Active', stateType: 'backlog' })
+    ];
+    const { segments } = buildSegments(cards);
+    const seg = segments.find(s => s.id === 'project:Active');
+    assert.ok(seg, 'project survives because the exempt card keeps the group non-empty');
+    assert.strictEqual(seg.cards.length, 1, 'only the exempt blocker survives, not the plain backlog card');
+    assert.strictEqual(seg.cards[0].id, 'blocker');
+  });
+
+  test('backlog card that parents an in-progress descendant is exempt', () => {
+    const ship = [card({ id: 'wip', stateType: 'started', parentId: 'epic' })];
+    const cards = [
+      ...ship,
+      card({ id: 'epic', projectName: 'Active', stateType: 'backlog' })
+    ];
+    const { segments } = buildSegments(cards);
+    const seg = segments.find(s => s.id === 'project:Active');
+    assert.ok(seg);
+    assert.strictEqual(seg.cards.length, 1);
+    assert.strictEqual(seg.cards[0].id, 'epic');
+  });
+
+  test('a project group left with only an exempt backlog card is not deleted by the drained-project cleanup', () => {
+    const ship = [card({ id: 'wip', stateType: 'started' })];
+    const cards = [
+      ...ship,
+      card({ id: 'onlyExempt', projectName: 'Solo', stateType: 'backlog', blocksIds: ['wip'] })
+    ];
+    const { segments } = buildSegments(cards);
+    const seg = segments.find(s => s.id === 'project:Solo');
+    assert.ok(seg, 'a project whose sole surviving card is exempt-backlog must not be swept by the every()-style check');
+    assert.strictEqual(seg.cards.length, 1);
+  });
+});
+
+// =============================================================================
+// computeShipReachableIds
+// =============================================================================
+
+describe('computeShipReachableIds', () => {
+  test('empty without any blocker/parent relation', () => {
+    const ship = [card({ id: 'wip', stateType: 'started' })];
+    const cards = [...ship, card({ id: 'idle' })];
+    const reachable = computeShipReachableIds(cards, ship);
+    assert.strictEqual(reachable.size, 0);
+  });
+
+  test('direct blocker of a ship card is reachable', () => {
+    const ship = [card({ id: 'wip', stateType: 'started' })];
+    const cards = [...ship, card({ id: 'blocker', blocksIds: ['wip'] })];
+    const reachable = computeShipReachableIds(cards, ship);
+    assert.ok(reachable.has('blocker'));
+  });
+
+  test('transitive blocker chain is fully reachable', () => {
+    const ship = [card({ id: 'wip', stateType: 'started' })];
+    const cards = [
+      ...ship,
+      card({ id: 'a', blocksIds: ['b'] }),
+      card({ id: 'b', blocksIds: ['wip'] })
+    ];
+    const reachable = computeShipReachableIds(cards, ship);
+    assert.ok(reachable.has('a'));
+    assert.ok(reachable.has('b'));
+  });
+
+  test('parent of a ship card is reachable', () => {
+    const ship = [card({ id: 'wip', stateType: 'started', parentId: 'epic' })];
+    const cards = [...ship, card({ id: 'epic' })];
+    const reachable = computeShipReachableIds(cards, ship);
+    assert.ok(reachable.has('epic'));
+  });
+
+  test('a blocker id with no matching card is ignored, not crashed on', () => {
+    const ship = [card({ id: 'wip', stateType: 'started' })];
+    const cards = [...ship, card({ id: 'ghostBlocker', blocksIds: ['does-not-exist'] })];
+    const reachable = computeShipReachableIds(cards, ship);
+    assert.strictEqual(reachable.size, 0);
+  });
+
+  test('an unrelated card is not reachable', () => {
+    const ship = [card({ id: 'wip', stateType: 'started' })];
+    const cards = [...ship, card({ id: 'unrelated' })];
+    const reachable = computeShipReachableIds(cards, ship);
+    assert.ok(!reachable.has('unrelated'));
   });
 });
 
@@ -797,6 +954,33 @@ describe('layout', () => {
     for (const card of cards) {
       assert.deepStrictEqual(a.positions.get(card.id), b.positions.get(card.id));
     }
+  });
+
+  test('backlog cards get no position by default; toggling showBacklog restores them', () => {
+    const cards = [
+      card({ id: 'a', projectName: 'P1', stateType: 'unstarted' }),
+      card({ id: 'b', projectName: 'P1', stateType: 'backlog' })
+    ];
+    const hidden = layout(cards, GEOMETRY);
+    assert.ok(hidden.positions.has('a'));
+    assert.ok(!hidden.positions.has('b'), 'hidden backlog card has no position');
+
+    const shown = layout(cards, GEOMETRY, { showBacklog: true });
+    assert.ok(shown.positions.has('a'));
+    assert.ok(shown.positions.has('b'), 'showBacklog: true restores the position');
+  });
+
+  test('an all-backlog workspace with the filter on renders an empty, non-degenerate layout', () => {
+    const cards = [
+      card({ id: 'b1', projectName: 'Solo', stateType: 'backlog' }),
+      card({ id: 'b2', stateType: 'backlog' }) // no project → drift
+    ];
+    const result = layout(cards, GEOMETRY);
+    assert.strictEqual(result.positions.size, 0, 'no orbit positions computed');
+    assert.strictEqual(result.driftCards.length, 0);
+    assert.strictEqual(result.shipCards.length, 0);
+    assert.ok(result.segments.every(s => s.cards.length === 0),
+      'no leftover segment carries a card');
   });
 });
 
