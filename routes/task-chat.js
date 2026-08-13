@@ -25,7 +25,7 @@ import { createChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-too
 import { sessionIsTerminal } from './dashboard.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
-import { getWorkspaceCallScope, isValidIssueId } from '../lib/workspace.js';
+import { getWorkspaceCallScope, resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
 
 const MAX_QUESTION_LENGTH = 2000;
@@ -200,6 +200,10 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
 
     try {
       const rawTask = typeof req.query.task === 'string' ? req.query.task.trim().slice(0, 64) : '';
+      // LIN-1910: `source` is a HINT only, tied to the identifier it was minted
+      // alongside (lib/render.js's chatHref) — the client drops it the moment
+      // the user types a different task id (see public/task-chat.js).
+      const rawSource = typeof req.query.source === 'string' ? req.query.source.trim().slice(0, 64) : '';
       const aiConfigured = isRecommendationEnabled(req.session.openRouterApiKey) || !!process.env.OPENROUTER_FREE_TIER_KEY;
       // Saved chats require a user identity (accountId). Absent only for a
       // genuinely anonymous session — local/GitHub sessions carry an accountId
@@ -207,7 +211,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       // explicit empty-state and omits the save affordance when it is (LIN-1008).
       const savedChatsAvailable = !!req.session.accountId;
       const html = renderTaskChatPage(
-        { defaultTask: rawTask, aiConfigured, savedChatsAvailable },
+        { defaultTask: rawTask, defaultSource: rawSource, aiConfigured, savedChatsAvailable },
         {
           deployInfo: getDeployInfo(),
           urlKey: workspace.urlKey,
@@ -328,6 +332,8 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
   router.post('/workspace/:urlKey/api/task-chat/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
 
     const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.taskChat !== true) {
@@ -336,6 +342,15 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
 
     if (!isValidIssueId(issueId)) {
       return res.status(400).json({ error: 'Invalid issue ID format' });
+    }
+
+    // Capability backstop — clean 404 (never a raw NotImplementedError → 502)
+    // for a provider that never implements recommendation context (LIN-1910).
+    if (!issueProvider.supports('fetchRecommendationContext')) {
+      return res.status(422).json({
+        error: "This workspace's provider does not support task chat for this issue",
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+      });
     }
 
     const { question, history } = req.body || {};
@@ -386,7 +401,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         context = buildMockTaskContext(issueId);
         if (!context) return res.status(404).json({ error: 'Issue not found' });
       } else {
-        context = await getProviderForWorkspace(workspace).fetchRecommendationContext(getWorkspaceCallScope(workspace), issueId);
+        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
         if (!context || !context.issue) return res.status(404).json({ error: 'Issue not found' });
       }
     } catch (error) {

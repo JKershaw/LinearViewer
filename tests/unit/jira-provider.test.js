@@ -1016,6 +1016,7 @@ describe('JiraProvider capability profile', () => {
     assert.equal(p.supports('fetchTeams'), true)
     assert.equal(p.supports('fetchIssueContext'), true)
     assert.equal(p.supports('fetchIssueComments'), true)
+    assert.equal(p.supports('fetchRecommendationContext'), true, 'LIN-1910 — recap/brief/recommend/task-chat')
     assert.equal(p.supports('fetchIssueFields'), true, 'backs the dashboard lazy per-issue detail load, LIN-442')
     assert.equal(p.supports('fetchProjectsList'), true, 'LIN-1886 Step 2')
     // createIssue stays deferred behind LIN-1557; everything else in the
@@ -1293,6 +1294,88 @@ describe('JiraProvider reads (fake client)', () => {
   test('fetchIssueContext throws a clean error for an unknown issue', async () => {
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
     await assert.rejects(() => provider.fetchIssueContext(scope, 'ENG-999'), /Issue not found/)
+  })
+
+  // LIN-1910: fetchRecommendationContext — mirrors localProvider's tests
+  // (tests/unit/local-provider.test.js:160-182).
+  describe('fetchRecommendationContext (LIN-1910)', () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+
+    test('a leaf task returns its context as-is, no focusedChild', async () => {
+      const ctx = await provider.fetchRecommendationContext(scope, 'ENG-2')
+      assert.equal(ctx.issue.identifier, 'ENG-2')
+      assert.equal(ctx.children.length, 0)
+      assert.equal(ctx.focusedChild, undefined)
+    })
+
+    // ENG-1's only seeded child, ENG-2, is Done (terminal) — selectFocusSubtask
+    // filters terminal children out, so this exercises the "all children
+    // terminal" branch (children still reported, but nothing to descend into).
+    test('a parent whose only child is terminal gets no focusedChild', async () => {
+      const ctx = await provider.fetchRecommendationContext(scope, 'ENG-1')
+      assert.equal(ctx.issue.identifier, 'ENG-1')
+      assert.equal(ctx.children.length, 1, 'ENG-2 is still reported as a child')
+      assert.equal(ctx.focusedChild, undefined, 'ENG-2 is Done — nothing eligible for selectFocusSubtask to pick')
+    })
+
+    // Shared by the two tests below: a parent (ENG-90) with a genuinely open
+    // (non-terminal) child (ENG-91), so noDescend has something real to suppress.
+    function createOpenChildProvider() {
+      const client = createFakeJiraClient({
+        projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+        projectStatuses: { ENG: ENG_PROJECT_STATUSES },
+        issues: [
+          {
+            id: '90001', key: 'ENG-90',
+            fields: {
+              summary: 'Parent with an open child', description: null,
+              status: { id: '12', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+              project: { id: '10001', key: 'ENG', name: 'Engineering' },
+              created: '2026-02-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+              labels: [], assignee: null, parent: null,
+            },
+          },
+          {
+            id: '90002', key: 'ENG-91',
+            fields: {
+              summary: 'Open subtask', description: null,
+              status: { id: '11', name: 'To Do', statusCategory: { key: 'new' } },
+              project: { id: '10001', key: 'ENG', name: 'Engineering' },
+              created: '2026-02-02T00:00:00.000Z', duedate: null, resolutiondate: null,
+              labels: [], assignee: null, parent: { id: '90001', key: 'ENG-90' },
+            },
+          },
+        ],
+      })
+      return new JiraProvider({ clientFactory: () => client, site: SITE })
+    }
+
+    test('a parent with a non-terminal child attaches focusedChild via the shared selectFocusSubtask picker', async () => {
+      const p = createOpenChildProvider()
+      const ctx = await p.fetchRecommendationContext(scope, 'ENG-90')
+      assert.equal(ctx.children.length, 1)
+      assert.ok(ctx.focusedChild, 'the open (non-terminal) child must be attached')
+      assert.equal(ctx.focusedChild.issue.identifier, 'ENG-91')
+    })
+
+    // Regression (LIN-1910 review F2): the original version of this test ran
+    // against ENG-1, whose only child (ENG-2) is already Done — the preceding
+    // "terminal child" test proves that fixture yields no focusedChild even
+    // WITHOUT noDescend, so the assertion passed whether or not the noDescend
+    // branch existed (confirmed by mutation: deleting `noDescend ||` from the
+    // implementation left this test green). ENG-90/ENG-91 has a genuinely open
+    // child, so this now actually exercises noDescend suppressing the descent
+    // that the test directly above proves would otherwise happen.
+    test('noDescend frames a parent as a leaf — no focusedChild even with a live child', async () => {
+      const p = createOpenChildProvider()
+      const ctx = await p.fetchRecommendationContext(scope, 'ENG-90', { noDescend: true })
+      assert.equal(ctx.children.length, 1, 'children are still reported')
+      assert.equal(ctx.focusedChild, undefined, 'but no descent happens')
+    })
+
+    test('a missing issue rejects, same as fetchIssueContext', async () => {
+      await assert.rejects(() => provider.fetchRecommendationContext(scope, 'ENG-999'), /Issue not found/)
+    })
   })
 
   test('fetchIssueComments returns [] for an issue with no comments, oldest-first when present', async () => {

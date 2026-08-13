@@ -181,6 +181,10 @@ function initAttachmentImages(content) {
 function loadLazySection(type, toggle, content) {
   const identifier = toggle.dataset.issueIdentifier
   const urlKey = toggle.dataset.urlKey
+  // LIN-1910: forward the resolved provider (stamped server-side in
+  // lib/render.js) so Brief/Recap resolve THIS issue's own binding instead of
+  // the workspace's active provider.
+  const source = toggle.dataset.source
   if (!identifier || !urlKey) return
 
   // Guard against re-init on a later expand (init is idempotent but a re-fetch
@@ -191,13 +195,13 @@ function loadLazySection(type, toggle, content) {
     const placeholder = content.querySelector('[data-brief-placeholder="1"]')
     if (placeholder && window.BriefSection) {
       placeholder.removeAttribute('data-brief-placeholder')
-      window.BriefSection.init(placeholder, { urlKey, identifier })
+      window.BriefSection.init(placeholder, { urlKey, identifier, source })
     }
   } else if (type === 'recap') {
     const placeholder = content.querySelector('[data-recap-placeholder="1"]')
     if (placeholder && window.RecapSection) {
       placeholder.removeAttribute('data-recap-placeholder')
-      window.RecapSection.init(placeholder, { urlKey, identifier })
+      window.RecapSection.init(placeholder, { urlKey, identifier, source })
     }
   } else if (type === 'sessions') {
     const placeholder = content.querySelector('[data-sessions-placeholder="1"]')
@@ -1774,11 +1778,16 @@ function initRecommendations() {
     try {
       const urlKey = recommendContainer.dataset.urlKey
       const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
+      // LIN-1910: forward the resolved provider (stamped server-side in
+      // lib/render.js) so the recommend stream resolves THIS issue's own
+      // binding instead of the workspace's active provider.
+      const source = recommendContainer.dataset.source
+      const sourceQuery = source ? `?source=${encodeURIComponent(source)}` : ''
       // Deliberately raw fetch (NOT window.api): this is an SSE stream read via
       // response.body.getReader() (readSSEStream below). api() consumes the body
       // as JSON, so streaming readers stay on raw fetch. (api() carve-out.)
       const response = await fetch(
-        `${apiPrefix}/api/recommend/${issueId}/stream`,
+        `${apiPrefix}/api/recommend/${issueId}/stream${sourceQuery}`,
         { signal: abortController.signal }
       )
 

@@ -229,3 +229,113 @@ test.describe('Edit-link → task-edit → PATCH provenance chain, foreign write
     await expect(page.locator(`.line:has-text("${newTitle}")`)).toBeAttached();
   });
 });
+
+// LIN-1910 — the acceptance witness for the four surfaces the ticket names:
+// recap / brief / recommend / task-chat on a Jira row in a MERGED
+// multi-binding workspace (local active, Jira secondary — same fixture shape
+// as LIN-1903/1904 above). A real browser click-through, not a raw
+// page.request call with a hand-built ?source= — that is what actually
+// exercises the frontend `data-source` threading (lib/render.js → app.js →
+// recap.js/brief.js/task-chat.js), not just the backend route. Every
+// assertion is POSITIVE on Jira-grounded content (never merely "not a 500"),
+// plus a negative control against the active local binding's own answer.
+test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) binding (LIN-1910)', () => {
+  // Shared seed: local active + Jira secondary (openRouterConnected so the AI
+  // surfaces render; taskChat on so the Chat deep-link renders).
+  async function seedAndGoto(page, seedLocal) {
+    await page.request.post('/test/set-jira-session', { data: { seed: defaultJiraSeed } });
+    const { dashboard } = await seedLocal(null, {
+      openRouterConnected: true,
+      features: { taskChat: true },
+      extraBindings: [
+        { provider: 'jira', scope: JIRA_SITE, credentials: { token: 'jira-api-token', email: 'ada@example.com', tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
+      ],
+    });
+    await page.goto(dashboard);
+    await page.waitForLoadState('networkidle');
+  }
+
+  test('recap and brief render Jira-grounded content for a Jira row, not the active binding\'s', async ({ page, seedLocal }) => {
+    await seedAndGoto(page, seedLocal);
+
+    // ENG-2 ("Jira task in progress") carries a description, a comment, and
+    // one open subtask (ENG-4) — enough surface for both mock builders to
+    // embed Jira-specific content, not generic filler.
+    const jiraNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task in progress")') }).first();
+    const jiraRow = jiraNode.locator('.line').first();
+    await expect(jiraRow).toBeAttached();
+    await jiraRow.click();
+    await jiraNode.locator('[data-toggle="details"]').first().click();
+
+    await jiraNode.locator('[data-toggle="brief"]').first().click();
+    const brief = jiraNode.locator('[data-content="brief"] .brief-section');
+    await expect(brief).toContainText('Jira task in progress', { timeout: 5000 });
+    await expect(brief).toContainText('ENG-4', { timeout: 5000 });
+
+    await jiraNode.locator('[data-toggle="recap"]').first().click();
+    const recap = jiraNode.locator('[data-content="recap"] .recap-section');
+    await expect(recap).toContainText('ENG-4', { timeout: 5000 });
+  });
+
+  test('AI suggest generates a Jira-grounded prompt for a Jira row, not the active binding\'s', async ({ page, seedLocal }) => {
+    await seedAndGoto(page, seedLocal);
+
+    // ENG-1 ("Jira task to do") is a genuine leaf — no children to descend
+    // into — so the mock recommendation resolves in one hop with a prompt
+    // embedding its OWN identifier.
+    const jiraNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task to do")') }).first();
+    const jiraRow = jiraNode.locator('.line').first();
+    await expect(jiraRow).toBeAttached();
+    await jiraRow.click();
+    await jiraNode.locator('[data-toggle="prompts"]').first().click();
+
+    await jiraNode.locator('.suggest-btn').click();
+    const promptText = jiraNode.locator('.recommend-prompt .prompt-text');
+    await expect(promptText).toContainText('ENG-1', { timeout: 5000 });
+  });
+
+  test('task chat, reached via the dashboard Chat deep-link, answers first-person as the Jira row', async ({ page, seedLocal }) => {
+    await seedAndGoto(page, seedLocal);
+
+    const jiraNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task to do")') }).first();
+    const jiraRow = jiraNode.locator('.line').first();
+    await expect(jiraRow).toBeAttached();
+    await jiraRow.click();
+    await jiraNode.locator('[data-toggle="details"]').first().click();
+
+    const chatLink = jiraNode.locator('[data-testid="issue-chat-link"]');
+    await expect(chatLink).toHaveAttribute('href', /\/task-chat\?task=ENG-1&source=jira$/);
+    await chatLink.click();
+    await page.waitForLoadState('networkidle');
+
+    // Pre-filled from the deep-link's ?task=&source= — the click-through
+    // acceptance witness, not a hand-typed ?source= (see public/task-chat.js's
+    // prefillTask/prefillSource hint).
+    await expect(page.locator('#task-chat-id')).toHaveValue('ENG-1');
+
+    await page.locator('#task-chat-question').fill('Where do you stand?');
+    await page.locator('#task-chat-send').click();
+
+    const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+    await expect(answer).toContainText('ENG-1', { timeout: 5000 });
+    await expect(answer).toContainText('Jira task to do');
+  });
+
+  // Negative control: the ACTIVE (local) binding's own row still resolves its
+  // own brief content — proof the fix did not make every row resolve through
+  // Jira regardless of which binding it actually belongs to.
+  test('regression control: a local-active row\'s brief is unaffected', async ({ page, seedLocal }) => {
+    await seedAndGoto(page, seedLocal);
+
+    const localNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Local parent task")') }).first();
+    const localRow = localNode.locator('.line').first();
+    await expect(localRow).toBeAttached();
+    await localRow.click();
+    await localNode.locator('[data-toggle="details"]').first().click();
+    await localNode.locator('[data-toggle="brief"]').first().click();
+
+    const brief = localNode.locator('[data-content="brief"] .brief-section');
+    await expect(brief).toContainText('Local parent task', { timeout: 5000 });
+    await expect(brief).not.toContainText('Jira task');
+  });
+});

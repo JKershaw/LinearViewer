@@ -22,18 +22,26 @@
   // LIN-421); converges onto the shared "Behavior B" formatter.
   const relativeTime = window.relativeTime;
 
-  function recapUrl(urlKey, identifier) {
-    return `/workspace/${encodeURIComponent(urlKey)}/api/recap/${encodeURIComponent(identifier)}`;
+  // LIN-1910: `source` (the resolved provider, stamped server-side in
+  // lib/render.js) forwards as `?source=` so the fetch resolves THIS issue's
+  // own binding instead of the workspace's active provider. Optional — a
+  // caller with no source (or a same-binding workspace) gets no query change.
+  function recapUrl(urlKey, identifier, source) {
+    const base = `/workspace/${encodeURIComponent(urlKey)}/api/recap/${encodeURIComponent(identifier)}`;
+    if (!source) return base;
+    const params = new URLSearchParams();
+    params.set('source', source);
+    return `${base}?${params.toString()}`;
   }
 
   // on401:false — recap errors (incl. 401) throw with .status/.body so the
   // inline renderError path shows them, rather than redirecting to /logout.
-  async function fetchRecapStatus(urlKey, identifier) {
-    return window.api(recapUrl(urlKey, identifier), { on401: false });
+  async function fetchRecapStatus(urlKey, identifier, source) {
+    return window.api(recapUrl(urlKey, identifier, source), { on401: false });
   }
 
-  async function postRecap(urlKey, identifier) {
-    return window.api(recapUrl(urlKey, identifier), { method: 'POST', on401: false });
+  async function postRecap(urlKey, identifier, source) {
+    return window.api(recapUrl(urlKey, identifier, source), { method: 'POST', on401: false });
   }
 
   function renderItems(items, { marker, markerClass }) {
@@ -130,23 +138,23 @@
     container.setAttribute('data-state', state);
   }
 
-  function wireRefresh(container, urlKey, identifier) {
+  function wireRefresh(container, urlKey, identifier, source) {
     const btn = container.querySelector('[data-recap-refresh]');
     if (!btn) return;
     btn.addEventListener('click', async () => {
-      await refresh(container, urlKey, identifier);
+      await refresh(container, urlKey, identifier, source);
     });
   }
 
-  async function refresh(container, urlKey, identifier) {
+  async function refresh(container, urlKey, identifier, source) {
     applyState(container, renderGenerating(), 'generating');
     try {
-      const data = await postRecap(urlKey, identifier);
+      const data = await postRecap(urlKey, identifier, source);
       applyState(container, renderFresh(data), 'fresh');
     } catch (err) {
       applyState(container, renderError(err && err.message), 'error');
     }
-    wireRefresh(container, urlKey, identifier);
+    wireRefresh(container, urlKey, identifier, source);
   }
 
   /**
@@ -156,14 +164,16 @@
    * @param {Object} opts
    * @param {string} opts.urlKey - Workspace url key.
    * @param {string} opts.identifier - Linear issue id (UUID) or identifier (LIN-123).
+   * @param {string} [opts.source] - Resolved provider name (LIN-1910), forwarded as `?source=`.
    */
   async function init(container, opts) {
     if (!container || !opts || !opts.urlKey || !opts.identifier) return;
     container.classList.add('recap-section');
     applyState(container, renderGenerating(), 'loading');
+    const { urlKey, identifier, source } = opts;
 
     try {
-      const data = await fetchRecapStatus(opts.urlKey, opts.identifier);
+      const data = await fetchRecapStatus(urlKey, identifier, source);
       if (data.status === 'fresh') {
         applyState(container, renderFresh(data), 'fresh');
       } else if (data.status === 'stale') {
@@ -177,13 +187,13 @@
         // re-spend on every reopen. `refresh()` renders generating→fresh/error
         // and wires its own button, so return before the shared wireRefresh
         // below to avoid double-wiring the refresh handler.
-        await refresh(container, opts.urlKey, opts.identifier);
+        await refresh(container, urlKey, identifier, source);
         return;
       }
     } catch (err) {
       applyState(container, renderError(err && err.message), 'error');
     }
-    wireRefresh(container, opts.urlKey, opts.identifier);
+    wireRefresh(container, urlKey, identifier, source);
   }
 
   window.RecapSection = { init, refresh };
