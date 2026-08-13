@@ -241,6 +241,23 @@ test.describe('Proxy API — local workspace e2e (LIN-584)', () => {
     expect(issue.priorityLabel).toBe('Urgent');
   });
 
+  // LIN-1557: the write-contract gate composed with a REAL provider's own
+  // apiWriteFields() — every other refusal test injects a hand-written array.
+  // LocalProvider omits assigneeId (lib/local-store.js writes `assignee`, never
+  // an id), so the field is refused rather than silently dropped on a false 201.
+  test('POST /issues refuses a field the real provider does not honour (LIN-1557)', async ({ request }) => {
+    const resp = await write(request, 'post', '/api/proxy/issues', {
+      teamId: ANY_UUID, title: 'Refused before create', assigneeId: ANY_UUID,
+    });
+    expect(resp.status()).toBe(400);
+    expect((await resp.json()).error).toContain('assigneeId');
+
+    // Nothing half-written: the refusal happens before createIssue is reached.
+    const list = await read(request, '/api/proxy/issues');
+    const titles = (await list.json()).issues.map(i => i.title);
+    expect(titles).not.toContain('Refused before create');
+  });
+
   test('POST /issues/:id/comments creates a comment that shows on the issue', async ({ request }) => {
     const resp = await write(request, 'post', '/api/proxy/issues/LOCAL-1/comments', { body: 'A proxy comment' });
     expect(resp.status()).toBe(201);
