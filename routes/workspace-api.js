@@ -1656,7 +1656,7 @@ ${goal}`
     const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
 
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
-      return jsonError(res, 503, 'AI recap is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
+      return jsonError(res, 503, 'AI recap is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
     }
 
     if (!mockAi && isFreeTier) {
@@ -1898,7 +1898,7 @@ ${goal}`
     const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
 
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
-      return jsonError(res, 503, 'AI brief is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
+      return jsonError(res, 503, 'AI brief is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
     }
 
     if (!mockAi && isFreeTier) {
