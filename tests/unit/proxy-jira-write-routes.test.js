@@ -1049,6 +1049,24 @@ describe('Jira-backed proxy — PARTIAL_WRITE reporting (LIN-2012)', () => {
     assert.equal(note, 'PARTIAL_WRITE applied=title failed=stateId');
   });
 
+  test('PATCH /issues/:id: a failure carrying NO status (transport error / timeout) → 500 PARTIAL_WRITE, still non-2xx', async () => {
+    // LIN-2012 close-out, review ledger item 3: every other test hand-sets
+    // `err.status` on a fake, so nothing exercised the fallback. A `fetch`
+    // rejection and the client's `AbortSignal.timeout` both throw with no
+    // `.status` at all — `PartialWriteError`'s default (500) is what keeps the
+    // response non-2xx, so "2xx means fully landed" holds on this path too.
+    fake.doTransition = async () => { throw new TypeError('fetch failed'); };
+    const { status, body } = await call(
+      buildApp(), 'PATCH', '/api/proxy/issues/ENG-10', { title: 'New title', stateId: 'in-progress' });
+
+    assert.equal(status, 500, JSON.stringify(body));
+    assert.equal(body.code, 'PARTIAL_WRITE');
+    assert.equal(body.retryable, true);
+    assert.deepEqual(body.context.applied, ['title']);
+    assert.equal(body.context.failed, 'stateId');
+    assert.equal((await stored('ENG-10')).fields.summary, 'New title', 'the field write still landed');
+  });
+
   test('POST /issues/:id/description/append: the confirmation re-read fails after the write lands → PARTIAL_WRITE, description actually persisted', async () => {
     let getIssueCalls = 0;
     const originalGetIssue = fake.getIssue.bind(fake);

@@ -194,7 +194,7 @@ The workspace-unavailable `code`s and how to act on each:
 
 The HTTP status stays `503` for all six — only the body distinguishes them. Callers that don't recognise `code`/`category` can keep treating any non-`2xx` as failure; the new fields are purely additive. Other subsystems' errors may adopt the same envelope over time.
 
-**`PARTIAL_WRITE`** (LIN-2012) is the second adopter. Jira's `updateIssue` is the one write in this API that is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`) return:
+**`PARTIAL_WRITE`** (LIN-2012) is the second adopter. Jira's `updateIssue` is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`) return:
 
 ```json
 {
@@ -208,10 +208,11 @@ The HTTP status stays `503` for all six — only the body distinguishes them. Ca
 ```
 
 - `context.applied` — which fields from your request already landed (named in request vocabulary: `title` | `description` | `stateId`).
-- `context.failed` — what did not: `stateId` (the transition failed after the field write succeeded), or `re-read` (both writes landed but the confirmation read failed).
+- `context.failed` — what did not: `stateId` (the transition failed after the field write succeeded), or `re-read` (every write named in `context.applied` landed, but the confirmation read that follows them failed — on a description-only edit that is a single write, not two).
 - `retryable` is always `true` — both the field write and the transition are idempotent, so retrying the same request is the correct recovery. This is deliberately **not** a rollback: Jira cannot be made atomic through this API (see the `updateIssue` docs below), so the fix is honest reporting, not a compensating action.
-- The HTTP status **mirrors the upstream failure** (e.g. `429` for a rate-limited transition) rather than a fixed code, so a caller that already branches on status for backoff behaves correctly here too.
-- Only reachable on a Jira-backed workspace; every other provider's `updateIssue` is a single write and cannot partially land.
+- The HTTP status **mirrors the upstream failure** (e.g. `429` for a rate-limited transition) rather than a fixed code, so a caller that already branches on status for backoff behaves correctly here too. When the failure carries no status of its own (a transport-level rejection or a timeout), it falls back to `500` — still non-`2xx`, so the contract holds either way.
+- Only the three endpoints listed above emit it, and only on a Jira-backed workspace: every other provider's `updateIssue` is a single write and cannot partially land.
+- **Not yet covered:** the label endpoints (`POST`/`DELETE /issues/{id}/labels/…`) are also multi-step on Jira and GitHub, so they can partially land too — but they still report a plain total failure rather than `PARTIAL_WRITE`. Tracked as LIN-2041; until it lands, treat a failed label write as "state unknown, re-read to confirm" rather than "nothing changed".
 
 ### Read Endpoints
 

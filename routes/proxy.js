@@ -2043,12 +2043,17 @@ One convention across every endpoint, so you can branch on the same fields every
 PARTIAL_WRITE - A Jira-backed \`updateIssue\` call is two upstream writes (field PUT, then
       status transition) because Jira has no multi-write transaction. When the first lands
       and the second (or the confirmation re-read) fails, the response is this code instead
-      of a plain failure — status MIRRORS the upstream failure (e.g. 429), not a fixed code.
-      \`context.applied\` names what landed (title/description/stateId, in request vocabulary);
-      \`context.failed\` names what didn't (stateId, or re-read). \`retryable\` is always true —
-      both writes are idempotent, so re-issuing the same request is the correct recovery, not
-      a rollback. Reachable on PATCH /issues/{id}, POST /issues/{id}/description/append, and
-      POST /issues/{id}/description/replace, Jira-backed workspaces only. See
+      of a plain failure — status MIRRORS the upstream failure (e.g. 429), not a fixed code,
+      falling back to 500 when the failure carries no status of its own (transport error or
+      timeout). \`context.applied\` names what landed (title/description/stateId, in request
+      vocabulary); \`context.failed\` names what didn't (stateId, or re-read — meaning every
+      write in \`applied\` landed but the confirmation read after them failed). \`retryable\` is
+      always true — both writes are idempotent, so re-issuing the same request is the correct
+      recovery, not a rollback. Reachable on PATCH /issues/{id}, POST
+      /issues/{id}/description/append, and POST /issues/{id}/description/replace, Jira-backed
+      workspaces only. The label endpoints are multi-step too (Jira and GitHub) and can also
+      partially land, but do NOT yet report this code (LIN-2041) — treat a failed label write
+      as "state unknown, re-read to confirm", not "nothing changed". See
       docs/proxy-integration.md for the full envelope shape.
 
 ## Local broker (HARBOUR_LOCAL_BASE callers only)
