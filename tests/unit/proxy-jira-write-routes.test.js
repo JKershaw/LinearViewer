@@ -37,6 +37,7 @@ import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { jiraProvider } from '../../lib/providers/jira/index.js';
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
+import { defaultJiraSeed } from '../fixtures/jira-harness.js';
 
 const SITE = 'https://acme.atlassian.net';
 const SCOPE = { email: 'ada@acme.com', apiToken: 'tok-123', site: SITE };
@@ -61,10 +62,33 @@ const ENG_PROJECT_STATUSES = [
   },
 ];
 
+// LIN-2032 gap 2 (LIN-2018 review ledger item 4 / review finding F3): a
+// SEPARATE project whose 'done' category carries TWO distinct statuses (Done /
+// Won't Do) — deliberately isolated from ENG above so the existing
+// 'todo'/'in-progress'/'done' UNAMBIGUOUS resolution tests stay exactly as
+// they are. Proves the route-level `stateId: 'done'` PATCH actually reaches
+// resolveStateInput -> states() -> resolveStateRef's ambiguity branch
+// end-to-end through the real PATCH route, not just at the resolver-unit
+// level (tests/unit/proxy-ref-resolver.test.js:140) or the provider level
+// (tests/unit/jira-provider.test.js).
+const AMB_PROJECT_STATUSES = [
+  {
+    id: '1', name: 'Task', subtask: false,
+    statuses: [
+      { id: '21', name: 'To Do', statusCategory: { key: 'new' } },
+      { id: '22', name: 'Done', statusCategory: { key: 'done' } },
+      { id: '23', name: "Won't Do", statusCategory: { key: 'done' } },
+    ],
+  },
+];
+
 function seed() {
   return createFakeJiraClient({
-    projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
-    projectStatuses: { ENG: ENG_PROJECT_STATUSES },
+    projects: [
+      { id: '10001', key: 'ENG', name: 'Engineering' },
+      { id: '10002', key: 'AMB', name: 'Ambiguous' },
+    ],
+    projectStatuses: { ENG: ENG_PROJECT_STATUSES, AMB: AMB_PROJECT_STATUSES },
     issues: [
       {
         id: '30001', key: 'ENG-10',
@@ -360,6 +384,17 @@ function seed() {
           _transitions: [
             { id: '31', name: 'Resolve', to: { id: '13', name: 'Done', statusCategory: { key: 'done' } }, hasScreen: true },
           ],
+        },
+      },
+      {
+        id: '30031', key: 'AMB-1', // LIN-2032 gap 2 — lives in AMB, whose 'done' category is ambiguous
+        fields: {
+          summary: 'Issue in a project with two done-category statuses',
+          description: null,
+          status: { id: '21', name: 'To Do', statusCategory: { key: 'new' } },
+          project: { id: '10002', key: 'AMB', name: 'Ambiguous' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null, _transitions: [],
         },
       },
     ],
@@ -827,5 +862,119 @@ describe('Jira-backed proxy — the LIN-2019 localId + empty-paragraph relaxatio
     assert.deepEqual(content[0], { type: 'paragraph', content: [{ type: 'text', text: 'one' }] });
     assert.deepEqual(content[1], { type: 'paragraph', content: [{ type: 'text', text: 'two' }] });
     assert.deepEqual(content[2], { type: 'paragraph', content: [{ type: 'text', text: 'A new note.' }] });
+  });
+});
+
+// =============================================================================
+// LIN-2032 gap 2 (LIN-2018 review ledger item 4 / review finding F3) — a
+// route-level assertion that a Jira `stateId: 'done'` PATCH against a project
+// with two done-category statuses actually 422s with `candidates`, rather than
+// silently resolving to the first match. Nothing before this drove a Jira
+// PATCH through resolveStateInput -> states() -> 422-with-candidates
+// end-to-end; the generic resolver ambiguity is unit-pinned
+// (tests/unit/proxy-ref-resolver.test.js:140) and jira-provider.test.js proves
+// states() itself surfaces two 'done' entries, but neither exercises this
+// proxy route.
+// =============================================================================
+describe('Jira-backed proxy PATCH /issues/:id — ambiguous stateId:"done" route-level 422 (LIN-2032 gap 2)', () => {
+  test('a project with two done-category statuses (Done / Won\'t Do) 422s stateId:"done" with candidates, never silently picking one', async () => {
+    const { status, body } = await call(buildApp(), 'PATCH', '/api/proxy/issues/AMB-1', { stateId: 'done' });
+    assert.equal(status, 422);
+    assert.match(body.error, /Ambiguous/i);
+    assert.ok(Array.isArray(body.candidates), 'candidates must ride the response so the caller can pass an id to disambiguate');
+    assert.deepEqual(body.candidates.map(c => c.name).sort(), ['Done', "Won't Do"]);
+    assert.equal(
+      (await stored('AMB-1')).fields.status.statusCategory.key, 'new',
+      'resolution failed before any transition was attempted — nothing was written',
+    );
+  });
+
+  test('the same project resolves an UNAMBIGUOUS alias (todo) normally — the seed itself is not what is ambiguous', async () => {
+    // AMB-1 already IS 'To Do' — resolveStateInput resolves 'todo' to its
+    // single unambiguous candidate, and updateIssue's D2 skip-on-unchanged-
+    // status (no transitions needed for a no-op status) lets the write
+    // through as a plain 200, proving the 422 above is specifically about
+    // 'done' being ambiguous, not the AMB seed being broken end to end.
+    const { status } = await call(buildApp(), 'PATCH', '/api/proxy/issues/AMB-1', { stateId: 'todo' });
+    assert.equal(status, 200);
+  });
+});
+
+// =============================================================================
+// LIN-2032 gap 1 (LIN-2018 review ledger item 3) — the two DIVERGENT consumers
+// of a `getProjectStatuses` 403 (missing Jira Browse Projects permission):
+// task-edit/task-create degrade to the text-input fallback (pinned against the
+// REAL JiraProvider in tests/unit/task-edit-route.test.js and
+// tests/unit/task-create-route.test.js), and this proxy route — which has no
+// such fallback — surfaces SOMETHING to the calling agent. What exactly was
+// undocumented before this; the assertion below pins the actual behaviour
+// rather than an assumed one.
+// =============================================================================
+describe('Jira-backed proxy GET /api/proxy/states/:teamId — a getProjectStatuses 403 (LIN-2032 gap 1)', () => {
+  test('a 403 (missing Browse Projects) surfaces as an error response, not a crash or a silent empty list', async () => {
+    fake.getProjectStatuses = async () => {
+      const err = new Error('Jira API GET /rest/api/3/project/ENG/statuses failed: Forbidden — missing Browse Projects permission');
+      err.status = 403;
+      throw err;
+    };
+    const { status, body } = await call(buildApp(), 'GET', '/api/proxy/states/ENG');
+    // Pinned, not assumed: Jira client errors carry `err.status` (client.js),
+    // but graphqlErrorStatus() only recognises Linear's graphql-request shape
+    // (`err.response.status` / `err.response.errors[].extensions.statusCode`) —
+    // so a Jira 403 here does not match ANY of its 401/403/404/429 branches and
+    // falls through to the generic 500, not a clean 401/403. Worth knowing for
+    // an agent calling this route against a Jira workspace; out of this
+    // ticket's scope to change (LIN-2032 is a test-coverage ticket against the
+    // fake client, not a fix), flagged here rather than silently assumed away.
+    assert.equal(status, 500);
+    assert.equal(body.error, 'Failed to fetch states');
+  });
+});
+
+// =============================================================================
+// LIN-2032 close-out (review finding F1) — the SHARED harness enrichment is
+// itself load-bearing, and this is what makes it so.
+//
+// The two statuses LIN-2032 added to `tests/fixtures/jira-harness.js` (104
+// "Won't Do", 105 'Ready for QA') were read by NOTHING: delete both lines and
+// the whole suite — unit and e2e — stayed green. That is exactly the shape of
+// drift the LIN-2018 plan's item 3 already suffered once, so the enrichment
+// would have been free to rot back out again. The two tests below drive the
+// SHARED seed (not this file's local ENG_PROJECT_STATUSES / AMB_PROJECT_
+// STATUSES) through the real proxy routes, so removing either status fails a
+// test that names why it was there.
+// =============================================================================
+describe('the shared Jira harness keeps the statuses the ambiguity path needs (LIN-2032 F1)', () => {
+  beforeEach(() => {
+    // Re-point at the SHARED harness seed — the point of these two tests is
+    // that `defaultJiraProjectStatuses`, not a local seed, is what is pinned.
+    fake = createFakeJiraClient(defaultJiraSeed);
+    jiraProvider.configure({ client: fake, clientFactory: () => fake, site: SITE });
+  });
+
+  test('GET /states/ENG surfaces the shared harness\'s CUSTOM status name and BOTH done-category statuses', async () => {
+    const { status, body } = await call(buildApp(), 'GET', '/api/proxy/states/ENG');
+    assert.equal(status, 200);
+    const names = body.states.map(s => s.name);
+    assert.ok(
+      names.includes('Ready for QA'),
+      'the shared harness must carry a CUSTOM (non-stock) status name — a stock-only seed cannot prove the provider reads real per-project statuses rather than a fixed vocabulary (LIN-2018 plan item 3)',
+    );
+    assert.deepEqual(
+      body.states.filter(s => s.type === 'completed').map(s => s.name).sort(),
+      ['Done', "Won't Do"],
+      'the shared harness must carry TWO done-category statuses, or the ambiguous `stateId: "done"` path below is unreachable from any surface driven off this seed',
+    );
+  });
+
+  test('a stateId:"done" PATCH against the SHARED seed 422s with candidates — the enrichment is what makes it ambiguous', async () => {
+    const { status, body } = await call(buildApp(), 'PATCH', '/api/proxy/issues/ENG-1', { stateId: 'done' });
+    assert.equal(status, 422);
+    assert.match(body.error, /Ambiguous/i);
+    assert.deepEqual(body.candidates.map(c => c.name).sort(), ['Done', "Won't Do"]);
+    assert.equal(
+      (await stored('ENG-1')).fields.status.statusCategory.key, 'new',
+      'resolution failed before any transition was attempted — nothing was written',
+    );
   });
 });

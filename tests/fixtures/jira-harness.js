@@ -46,6 +46,32 @@ const EPIC_ISSUETYPE = { id: '10000', name: 'Epic', hierarchyLevel: 1 };
 // fixed synthetic vocabulary. Every seeded issue's `status`/`_transitions.to`
 // below carries the matching real id, mirroring what real Jira REST payloads
 // always carry.
+//
+// LIN-2032: carries a CUSTOM status name ('Ready for QA') and a second
+// done-category status ("Won't Do", alongside 'Done') — mirroring
+// `tests/unit/jira-provider.test.js`'s local `ENG_PROJECT_STATUSES`, which had
+// these but this SHARED harness didn't (LIN-2018 plan item 3's fixture drift).
+// They make the ambiguous `stateId: 'done'` 422 path
+// (`docs/proxy-integration.md`) reachable from any lane driven off THIS seed
+// rather than only from a test's own local one.
+//
+// Scope, precisely (LIN-2032 review finding F2): that means the PROXY lane —
+// NOT the browser flow. `lib/render-task-edit.js:93` emits the state NAME as
+// the option value when ids aren't UUIDs (Jira's are '102', '103', …), so a
+// browser PATCH sends `stateId: 'Done'`, which `resolveStateRef` matches by
+// exact name and never enters the category-alias branch ambiguity lives in.
+// Do not read this comment as "e2e covers ambiguity".
+//
+// Do NOT shrink this back to stock statuses: two tests in
+// `tests/unit/proxy-jira-write-routes.test.js` ('LIN-2032 F1') drive this seed
+// through the real proxy routes and fail if either status is removed — added
+// at close-out precisely because nothing read them when they first landed.
+//
+// Second-order effect worth knowing (LIN-2032 review finding F3): 'Ready for
+// QA' is a SECOND `indeterminate` status, so against this shared seed
+// `stateId: 'in-progress'` is now ambiguous too, not just 'done'. Nothing
+// sends that alias today; a test that starts to will get a 422 with
+// candidates, and that is correct behaviour rather than a broken fixture.
 export const defaultJiraProjectStatuses = {
   ENG: [
     {
@@ -54,6 +80,8 @@ export const defaultJiraProjectStatuses = {
         { id: '101', name: 'To Do', statusCategory: { key: 'new' } },
         { id: '102', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
         { id: '103', name: 'Done', statusCategory: { key: 'done' } },
+        { id: '104', name: "Won't Do", statusCategory: { key: 'done' } },
+        { id: '105', name: 'Ready for QA', statusCategory: { key: 'indeterminate' } },
       ],
     },
   ],
