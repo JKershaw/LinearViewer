@@ -546,3 +546,47 @@ describe('createFields() capability contract (LIN-1504/LIN-1972)', () => {
     assert.strictEqual(githubProvider.createFields().includes('teamId'), false);
   });
 });
+
+// =============================================================================
+// apiWriteFields() headless write-door capability contract (LIN-1557)
+// =============================================================================
+//
+// The agent-facing proxy's create-field accept-list — deliberately separate
+// from createFields() above (the UI-form descriptor, which must stay byte-
+// identical: see the pins above). A provider's real write surface can be
+// wider than its form; this is where that extra width is declared.
+
+describe('apiWriteFields() headless write-door capability contract (LIN-1557)', () => {
+  test('base ProviderInterface default: same as createFields() (fail-closed)', () => {
+    const base = new ProviderInterface();
+    assert.deepStrictEqual(base.apiWriteFields(), base.createFields());
+    assert.deepStrictEqual(base.apiWriteFields(), ['title', 'description']);
+  });
+
+  test('Linear: createFields() plus assigneeId/parentId/cycleId (honoured by IssueCreateInput, not rendered by the form)', () => {
+    assert.deepStrictEqual(linearProvider.apiWriteFields(), [
+      'title', 'description', 'teamId', 'projectId', 'stateId', 'priority',
+      'assigneeId', 'parentId', 'cycleId',
+    ]);
+    for (const f of linearProvider.createFields()) {
+      assert.ok(linearProvider.apiWriteFields().includes(f), `apiWriteFields must be a superset, missing ${f}`);
+    }
+  });
+
+  test('Local: createFields() plus parentId (honoured by lib/local-store.js, not rendered by the form)', () => {
+    assert.deepStrictEqual(localProvider.apiWriteFields(), [
+      'title', 'description', 'projectId', 'stateId', 'priority', 'parentId',
+    ]);
+    assert.strictEqual(localProvider.apiWriteFields().includes('teamId'), false);
+  });
+
+  test('GitHub: no override — identical to createFields() (createIssue reads exactly that set)', () => {
+    assert.deepStrictEqual(githubProvider.apiWriteFields(), githubProvider.createFields());
+    assert.deepStrictEqual(githubProvider.apiWriteFields(), ['title', 'description', 'projectId']);
+  });
+
+  test('Jira and github-projects: no override — inherit the base default', () => {
+    assert.deepStrictEqual(jiraProvider.apiWriteFields(), ['title', 'description']);
+    assert.deepStrictEqual(githubProjectsProvider.apiWriteFields(), ['title', 'description']);
+  });
+});

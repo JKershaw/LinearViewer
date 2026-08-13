@@ -75,6 +75,9 @@ function makeFakeProvider() {
   const provider = {
     name: PROVIDER_NAME,
     supports: (cap) => ({ createIssue: true, uploadFile: true, fetchTeams: true }[cap] === true),
+    // LIN-1557: the feedback route's priority write-contract check consults
+    // this unconditionally.
+    apiWriteFields: () => ['title', 'description', 'teamId', 'projectId', 'priority'],
     async fetchTeams() { return [{ id: 'team-default', name: 'Default' }]; },
     async createIssue(token, input) {
       calls.createIssue.push(input);

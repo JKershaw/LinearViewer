@@ -621,6 +621,10 @@ function fakeLinearProvider() {
     name: 'linear',
     calls,
     supports(method) { calls.push({ fn: 'supports', method }); return true; },
+    // LIN-1557: the create route's optional-field gate consults this
+    // unconditionally; a full permissive contract keeps this fixture's
+    // existing "everything works" posture.
+    apiWriteFields() { return ['title', 'description', 'teamId', 'projectId', 'stateId', 'assigneeId', 'priority', 'parentId', 'cycleId']; },
     async issues() { calls.push({ fn: 'issues' }); return { nodes: [], pageInfo: {} }; },
     async createIssue(token, input) {
       calls.push({ fn: 'createIssue', token, input });
