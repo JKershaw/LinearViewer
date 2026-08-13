@@ -250,9 +250,14 @@ Response:
 {
   "teams": [
     { "id": "uuid", "name": "Engineering", "key": "ENG" }
-  ]
+  ],
+  "truncated": false
 }
 ```
+
+`truncated: true` means the provider hit its own project/team listing cap (e.g. Jira's
+500-project walk) and `teams` above is a partial list — do not read an id's absence from
+it as proof the id does not exist.
 
 #### List Projects
 
