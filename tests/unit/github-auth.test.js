@@ -45,8 +45,11 @@ describe('GitHubProvider auth primitives', () => {
     process.env.GITHUB_REDIRECT_URI = 'http://localhost:3000/auth/github/callback';
     // GitHub App config (LIN-708) — beginAuth now builds the App installation URL
     // and reads `slug` via getAppConfig(), which also requires appId/privateKey.
+    // A real PEM-shaped key (LIN-2081: getAppConfig validates PEM shape, and
+    // buildInstallUrl calls getAppConfig for `slug` even though it never uses
+    // privateKey itself).
     process.env.GITHUB_APP_ID = '12345';
-    process.env.GITHUB_APP_PRIVATE_KEY = 'test-key';
+    process.env.GITHUB_APP_PRIVATE_KEY = RSA_PEM;
     process.env.GITHUB_APP_SLUG = 'my-app';
   });
   afterEach(() => {
@@ -311,7 +314,7 @@ describe('GitHub auth routes', () => {
     process.env.GITHUB_CLIENT_ID = 'cid';
     process.env.GITHUB_CLIENT_SECRET = 'secret';
     process.env.GITHUB_APP_ID = '12345';
-    process.env.GITHUB_APP_PRIVATE_KEY = 'test-key';
+    process.env.GITHUB_APP_PRIVATE_KEY = RSA_PEM; // real PEM shape (LIN-2081) — getAppConfig validates it even on the slug-only install-URL path
     process.env.GITHUB_APP_SLUG = 'my-app';
   });
   afterEach(() => {

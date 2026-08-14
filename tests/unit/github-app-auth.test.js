@@ -54,8 +54,11 @@ describe('GitHub App auth primitives (LIN-707)', () => {
   })
 
   test('getAppConfig un-escapes a single-line PEM', () => {
-    process.env.GITHUB_APP_PRIVATE_KEY = 'line1\\nline2'
-    assert.equal(getAppConfig().privateKey, 'line1\nline2')
+    // The real-world case the escape handling exists for: a multi-line PEM
+    // squeezed onto one line via literal `\n` sequences (LIN-2081 — the
+    // fixture must be PEM-shaped so it also survives shape validation).
+    process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n/g, '\\n')
+    assert.equal(getAppConfig().privateKey, PEM)
   })
 
   test('getAppConfig throws clearly when GITHUB_APP_ID missing', () => {

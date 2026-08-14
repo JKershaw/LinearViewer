@@ -41,7 +41,7 @@ describe('GitHubProjectsProvider auth primitives', () => {
   beforeEach(() => {
     saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]));
     process.env.GITHUB_APP_ID = '12345';
-    process.env.GITHUB_APP_PRIVATE_KEY = 'test-key';
+    process.env.GITHUB_APP_PRIVATE_KEY = RSA_PEM; // real PEM shape (LIN-2081) — getAppConfig validates it even on the slug-only install-URL path
     process.env.GITHUB_APP_SLUG = 'my-app';
     // The App's OWN user-to-server OAuth credentials drive beginAuth (authorize) +
     // the re-bind code exchange (LIN-735); Projects rounds through its own callback.
@@ -261,7 +261,7 @@ describe('GitHub Projects auth routes', () => {
     process.env.GITHUB_CLIENT_ID = 'cid';
     process.env.GITHUB_CLIENT_SECRET = 'secret';
     process.env.GITHUB_APP_ID = '12345';
-    process.env.GITHUB_APP_PRIVATE_KEY = 'test-key';
+    process.env.GITHUB_APP_PRIVATE_KEY = RSA_PEM; // real PEM shape (LIN-2081) — getAppConfig validates it even on the slug-only install-URL path
     process.env.GITHUB_APP_SLUG = 'my-app';
   });
   afterEach(() => {
