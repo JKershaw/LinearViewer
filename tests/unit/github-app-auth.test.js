@@ -15,13 +15,17 @@
 import { test, describe, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import crypto from 'node:crypto'
-import { mintAppJwt, mintInstallationToken, fetchInstallation, getAppConfig, buildInstallUrl, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../../lib/providers/github/app-auth.js'
+import { mintAppJwt, mintInstallationToken, fetchInstallation, getAppConfig, buildInstallUrl, withTimeout, isGitHubConfigured, GITHUB_VIEWER_TIMEOUT_MS } from '../../lib/providers/github/app-auth.js'
 
 // One ephemeral RSA keypair for the whole suite — generated, never on disk.
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
 const PEM = privateKey.export({ type: 'pkcs1', format: 'pem' })
 
-const ENV = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG']
+// GITHUB_CLIENT_ID/SECRET are included here (not just the GITHUB_APP_* trio)
+// so every test in this file starts with ALL FIVE GITHUB_REQUIRED_ENV vars
+// present — isGitHubConfigured() assertions below then isolate purely on
+// GITHUB_APP_PRIVATE_KEY's shape, never a missing-var false negative.
+const ENV = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']
 
 function decodeSegment(seg) {
   return JSON.parse(Buffer.from(seg.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'))
@@ -48,6 +52,8 @@ describe('GitHub App auth primitives (LIN-707)', () => {
     process.env.GITHUB_APP_ID = '123456'
     process.env.GITHUB_APP_PRIVATE_KEY = PEM
     process.env.GITHUB_APP_SLUG = 'my-app'
+    process.env.GITHUB_CLIENT_ID = 'client-id'
+    process.env.GITHUB_CLIENT_SECRET = 'client-secret'
   })
   afterEach(() => {
     for (const k of ENV) {
@@ -211,6 +217,30 @@ describe('GitHub App auth primitives (LIN-707)', () => {
       assert.equal(signsOk(cfg.privateKey), true)
     })
 
+    test('accepts a tab-indented PEM body (YAML block-scalar / heredoc leak), and the normalized key actually signs (LIN-2081 review observation A)', () => {
+      // OpenSSL signs an indented body fine — confirmed independently before
+      // deciding: rejecting it would be the same "reject-what-signs"
+      // availability risk finding 2 fixed for the other whitespace variants,
+      // so it is normalized away rather than left a strict-by-omission gap.
+      const lines = PEM.split('\n')
+      const indented = lines.map((l, i) => (i > 0 && i < lines.length - 2 ? '\t' + l : l)).join('\n')
+      assert.equal(signsOk(indented), true, 'sanity: OpenSSL itself accepts a tab-indented body')
+      process.env.GITHUB_APP_PRIVATE_KEY = indented
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+      assert.equal(cfg.privateKey, PEM, 'indentation is stripped, not merely tolerated')
+    })
+
+    test('accepts a space-indented PEM body, and the normalized key actually signs (LIN-2081 review observation A)', () => {
+      const lines = PEM.split('\n')
+      const indented = lines.map((l, i) => (i > 0 && i < lines.length - 2 ? '  ' + l : l)).join('\n')
+      assert.equal(signsOk(indented), true, 'sanity: OpenSSL itself accepts a space-indented body')
+      process.env.GITHUB_APP_PRIVATE_KEY = indented
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+      assert.equal(cfg.privateKey, PEM, 'indentation is stripped, not merely tolerated')
+    })
+
     test('getAppConfig returns the byte-identical PEM when there is no stray whitespace to normalize', () => {
       // Guards against the normalization regressing to a blanket `.trim()`,
       // which would silently drop the fixture's real trailing '\n' and break
@@ -230,7 +260,7 @@ describe('GitHub App auth primitives (LIN-707)', () => {
       process.env.GITHUB_APP_PRIVATE_KEY = stripped
       assert.throws(
         () => getAppConfig(),
-        /GitHub App auth: GITHUB_APP_PRIVATE_KEY has no line breaks — the '-----BEGIN'\/'-----END' armor must sit on their own lines/
+        /GitHub App auth: GITHUB_APP_PRIVATE_KEY has no line breaks between the '-----BEGIN'\/'-----END' armor/
       )
     })
 
@@ -242,6 +272,49 @@ describe('GitHub App auth primitives (LIN-707)', () => {
         return true
       })
     })
+
+    // --- Round-2 re-review: normalizePrivateKey's trailing-whitespace collapse
+    // --- (`.replace(/\s+$/, '\n')`) re-opens finding 1 for a SIBLING input
+    // --- class the `headerEnd === -1` guard alone could not catch — newlines
+    // --- collapsed to some OTHER whitespace character, not stripped to
+    // --- nothing. The normalizer puts a single '\n' back, but only at the
+    // --- very END of the string (after the END footer), so `headerEnd` lands
+    // --- PAST `endMatch.index` — the body slice is still empty, still passes
+    // --- the alphabet check vacuously, still reaches Sign.sign's opaque
+    // --- ERR_OSSL_UNSUPPORTED. This is exactly the "shell-poisoned fragment"
+    // --- class the ticket itself names: an unquoted `export KEY=$KEY` word-
+    // --- splits and rejoins a PEM's lines on spaces.
+
+    for (const [label, collapse] of [
+      ['spaces (unquoted `export KEY=$KEY` word-splitting)', s => s.replace(/\n/g, ' ')],
+      ['a bare CR (stray `\\r`, no `\\n`)', s => s.replace(/\n/g, '\r')],
+    ]) {
+      test(`rejects newlines collapsed to ${label}, naming the defect (LIN-2081 re-review)`, () => {
+        const collapsed = collapse(PEM)
+        // Ground truth first: the raw collapsed key genuinely fails to sign —
+        // confirms this is the real bug, not a validator being overly strict.
+        assert.equal(signsOk(collapsed), false)
+        process.env.GITHUB_APP_PRIVATE_KEY = collapsed
+        assert.throws(
+          () => getAppConfig(),
+          /GitHub App auth: GITHUB_APP_PRIVATE_KEY has no line breaks between the '-----BEGIN'\/'-----END' armor/
+        )
+      })
+
+      test(`mintAppJwt never emits the raw OpenSSL decoder error for newlines collapsed to ${label}`, () => {
+        process.env.GITHUB_APP_PRIVATE_KEY = collapse(PEM)
+        assert.throws(() => mintAppJwt(), (err) => {
+          assert.match(err.message, /GITHUB_APP_PRIVATE_KEY has no line breaks between/)
+          assert.doesNotMatch(err.message, /ERR_OSSL_UNSUPPORTED|DECODER routines|unsupported/i)
+          return true
+        })
+      })
+
+      test(`isGitHubConfigured() is false for newlines collapsed to ${label}, not a false "configured"`, () => {
+        process.env.GITHUB_APP_PRIVATE_KEY = collapse(PEM)
+        assert.equal(isGitHubConfigured(), false)
+      })
+    }
   })
 
   // -------------------------------------------------------------------------
