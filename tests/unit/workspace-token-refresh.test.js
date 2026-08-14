@@ -43,10 +43,18 @@
  * A/C's `selectExpiredOwnerRow`, sibling to `selectOwnerWorkspaceToken`'s scoped
  * branch, but no UNSCOPED mode and no refreshability filter — it exists purely
  * to answer "the owner's own best live row for this urlKey, or null."
- * Block H (LIN-2097) drives `refreshOwnerCredential` again — freezing the
- * recorded expiry on a byte-identical exchange, and nulling out a refresh
- * result whose resulting expiry is not live, at the single boundary all three
- * of `doOwnerRefresh`'s success returns funnel through.
+ * Block H (LIN-2097) drives `refreshOwnerCredential` — freezing the recorded
+ * expiry on a byte-identical exchange (still true), and — per the B1 review
+ * finding on PR #1138 — proving `refreshOwnerCredential` itself stays RAW for
+ * a non-live result rather than nulling it out. Block J (LIN-2097, B1) is
+ * where that null-check actually lives now: `doRefresh`'s headless arm, one
+ * hop downstream, so a non-live result is filtered for the headless proxy
+ * caller but still reaches the two human refresh entrants (`ensureValidToken`,
+ * `handleTokenRefreshAndRetry`, both in server.js, both calling
+ * `refreshOwnerCredential` directly) exactly as it always has — those two were
+ * explicitly out of scope for LIN-2097 (research §3 L6), and nulling on the
+ * shared seam silently widened into them (a non-null->null flip there is read
+ * by server.js as "credential unrefreshable" and removes the workspace/session).
  * Block I (LIN-2097) pins the corresponding refresh-on-resolve gate wiring in
  * server.js (`resolveWorkspaceAccess`'s `!selected.token` branch) as source
  * text — the gate's own suppression behaviour is exercised directly, with a
@@ -1075,16 +1083,17 @@ describe('refreshOwnerCredential (LIN-2097, Block H — freeze + non-live bounda
     assert.equal(durable.tokenExpiresAt, NOW + FAR_FUTURE_MS);
   });
 
-  test('H2 [freeze + already-past stored expiry -> null via the boundary check, but still persisted]: a byte-identical exchange against an already-dead stored expiry resolves null, yet the rotation still landed durably', async () => {
+  test('H2 [B1: freeze + already-past stored expiry -> refreshOwnerCredential returns the RAW frozen result, not null]: the liveness null-check no longer lives on this shared seam — it moved to doRefresh\'s headless call site (see Block J) so a non-live result never reaches the two human refresh entrants (server.js\'s ensureValidToken / handleTokenRefreshAndRetry), which call refreshOwnerCredential directly and would otherwise tear the workspace down on a plain null', async () => {
     const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS } });
     const refreshAccessToken = async () => ({ access_token: 'access-SAME', refresh_token: 'R1-rotated', expires_in: 3600 });
 
     const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
 
-    assert.equal(result, null, 'a frozen-and-already-past expiry must not be served as a usable success');
+    assert.notEqual(result, null, 'refreshOwnerCredential itself must stay raw — the non-live check is not its job');
+    assert.equal(result.expiresAt, NOW + PAST_MS, 'frozen at the stored (already-past) expiry, unfiltered');
     const durable = await store.get('account-A', 'acme');
-    assert.equal(durable.refreshToken, 'R1-rotated', 'persistence survives the boundary check nulling the return — Linear rotates on use, so this must not be skipped');
-    assert.equal(durable.tokenExpiresAt, NOW + PAST_MS, 'the durable record itself still carries the frozen (past) expiry — only the RETURN is nulled');
+    assert.equal(durable.refreshToken, 'R1-rotated', 'the rotated refreshToken is still persisted unconditionally');
+    assert.equal(durable.tokenExpiresAt, NOW + PAST_MS, 'the durable record carries the frozen (past) expiry');
   });
 
   test('H3 [control, unaffected]: DIFFERENT access-token bytes take the ordinary calculateExpiresAt path — Steps 1-2 never fire on ordinary rotation', async () => {
@@ -1120,7 +1129,7 @@ describe('refreshOwnerCredential (LIN-2097, Block H — freeze + non-live bounda
     }
   });
 
-  test('H5 [F3\'s regression pin]: a CAS-loss convergence onto an already-frozen-past re-read record resolves null, even though doOwnerRefresh\'s own convergeOnStored returned a truthy object internally', async () => {
+  test('H5 [F3\'s regression pin, B1-revised]: a CAS-loss convergence onto an already-frozen-past re-read record still resolves the RAW (non-null) convergeOnStored result from refreshOwnerCredential — doRefresh\'s own boundary check (Block J) is what nulls this case out for the headless caller', async () => {
     let getCount = 0;
     const store = {
       async get() {
@@ -1135,7 +1144,79 @@ describe('refreshOwnerCredential (LIN-2097, Block H — freeze + non-live bounda
 
     const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
 
-    assert.equal(result, null, 'a race loser converging onto an already-frozen-dead row must not be served as ok — unreachable via H1-H4, which only exercise the won branch');
+    assert.notEqual(result, null, 'refreshOwnerCredential stays raw for this branch too — F3 (all three doOwnerRefresh success returns) is still structurally covered, just one hop downstream at doRefresh');
+    assert.equal(result.token, 'access-relogin');
+    assert.equal(result.expiresAt, NOW + PAST_MS);
+  });
+
+  test('H6 [M3]: freezing requires a FINITE stored expiry — a byte-identical exchange against a record with a non-numeric tokenExpiresAt falls back to a fresh calculateExpiresAt instead of freezing onto NaN/undefined', async () => {
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: undefined } });
+    const refreshAccessToken = async () => ({ access_token: 'access-SAME', refresh_token: 'R1-rotated', expires_in: 3600 });
+
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+
+    assert.notEqual(result, null);
+    assert.ok(Number.isFinite(result.expiresAt), 'must not freeze onto a non-finite stored expiry');
+    assert.ok(result.expiresAt > NOW, 'falls back to a fresh future expiry, exactly as a genuinely different credential would');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block J (LIN-2097, B1) — the liveness boundary check, relocated. Drives
+// `refreshOwnerWorkspaceToken` (doRefresh's headless entrant) to prove it DOES
+// null out a non-live frozen result, and drives `refreshOwnerCredential`
+// directly (the seam the two human entrants call) to prove it does NOT — the
+// exact split the B1 review finding demanded, so a non-live result never
+// reaches `ensureValidToken`/`handleTokenRefreshAndRetry` (server.js) and tears
+// a workspace/session down on what is, for those callers, an ordinary refresh.
+// ---------------------------------------------------------------------------
+
+describe('LIN-2097 (Block J) — the non-live liveness check lives on doRefresh only, not on the refreshOwnerCredential seam shared with the human entrants', () => {
+  beforeEach(() => {
+    _resetInflightForTests();
+  });
+
+  test('J1 [headless nulls]: refreshOwnerWorkspaceToken (doRefresh) resolves null when a byte-identical exchange freezes onto an already-past stored expiry — the exact case H2 shows refreshOwnerCredential itself no longer filters', async () => {
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS } });
+    const refreshAccessToken = async () => ({ access_token: 'access-SAME', refresh_token: 'R1-rotated', expires_in: 3600 });
+    const persistSession = async () => { throw new Error('must not be called — no session row exists for this owner'); };
+
+    const result = await refreshOwnerWorkspaceToken({ sessions: [], urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
+
+    assert.equal(result, null, 'the headless caller must not be handed a dead-but-frozen credential as a success');
+    const durable = await store.get('account-A', 'acme');
+    assert.equal(durable.refreshToken, 'R1-rotated', 'persistence still lands — the null is return-only, mirroring H2');
+  });
+
+  test('J2 [headless nulls, session-mirroring case]: when an owner session row DOES exist, a non-live frozen result is neither returned NOR mirrored into it', async () => {
+    const sessions = [
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'access-SAME', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
+    ];
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS } });
+    const refreshAccessToken = async () => ({ access_token: 'access-SAME', refresh_token: 'R1-rotated', expires_in: 3600 });
+    const persisted = [];
+    const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
+
+    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
+
+    assert.equal(result, null);
+    assert.equal(persisted.length, 0, 'a non-live result must not be mirrored into the session row either — that would cache a dead expiry as if it were live');
+  });
+
+  test('J3 [human entrant, B1 fix]: refreshOwnerCredential — the seam ensureValidToken/handleTokenRefreshAndRetry call directly — returns the raw frozen-but-past result rather than null, so a plain proactive refresh does NOT throw and tear the workspace down', async () => {
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS } });
+    const refreshAccessToken = async () => ({ access_token: 'access-SAME', refresh_token: 'R1-rotated', expires_in: 3600 });
+
+    // This mirrors server.js's ensureValidToken/handleTokenRefreshAndRetry: both
+    // call refreshOwnerCredential directly and throw a plain Error ONLY on a
+    // falsy return, which server.js's destructiveOnFailure branch then treats as
+    // grounds to remove the workspace (and, if it's the account's last, destroy
+    // the session). A non-null return here means that destructive path is never
+    // even reached for this case.
+    const refreshed = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', provider: 'linear', refreshAccessToken, store });
+    assert.notEqual(refreshed, null, 'B1: must not be null — a null here is exactly what server.js reads as "credential unrefreshable" and tears the workspace down for');
+    assert.equal(refreshed.token, 'access-SAME');
+    assert.equal(refreshed.expiresAt, NOW + PAST_MS);
   });
 });
 

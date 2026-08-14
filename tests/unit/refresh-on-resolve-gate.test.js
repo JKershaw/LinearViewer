@@ -77,4 +77,41 @@ describe('createRefreshOnResolveGate (LIN-2097)', () => {
     assert.equal(gate.shouldAttempt('account-A:acme', 'fp-1'), true);
     assert.equal(gate.shouldAttempt('account-A:acme', 'fp-1'), false, 'default cooldown still in effect one ms before it elapses');
   });
+
+  test('J10 [M1]: the map does not grow unboundedly — once enough distinct pairs have aged past cooldown, a periodic sweep reclaims them', () => {
+    const cooldownMs = 60_000;
+    const gate = createRefreshOnResolveGate({ cooldownMs, now: () => 0 });
+    // 250 distinct (scopeKey, fingerprint) pairs, all stamped at t=0 — comfortably
+    // past the 200-call sweep interval, so a sweep should have fired mid-loop.
+    for (let i = 0; i < 250; i++) {
+      gate.shouldAttempt(`account-${i}:acme`, 'fp-1', 0);
+    }
+    assert.equal(gate._sizeForTests(), 250, 'no entries elapsed cooldown yet (still t=0), so none were swept');
+
+    // A single later call, once every prior entry's cooldown has elapsed, should
+    // trigger a sweep that reclaims all 250 stale entries — the map shrinks back
+    // down to just the one pair this call itself stamps, not 251.
+    gate.shouldAttempt('account-new:acme', 'fp-1', cooldownMs + 1);
+    // The sweep only fires every SWEEP_INTERVAL_CALLS (200) calls, so drive enough
+    // additional calls (against a single, already-live pair, which never itself
+    // ages out at this clock) to cross the next interval boundary.
+    for (let i = 0; i < 200; i++) {
+      gate.shouldAttempt('account-new:acme', 'fp-1', cooldownMs + 1);
+    }
+    assert.ok(gate._sizeForTests() < 250, 'the sweep reclaimed the 250 stale entries rather than leaving them to accumulate forever');
+  });
+
+  test('J11 [M1]: a sweep never evicts an entry still inside its cooldown window', () => {
+    const cooldownMs = 60_000;
+    const gate = createRefreshOnResolveGate({ cooldownMs, now: () => 0 });
+    assert.equal(gate.shouldAttempt('account-A:acme', 'fp-live', 0), true);
+    // Drive past the sweep interval with calls that themselves stay well inside
+    // fp-live's own cooldown window.
+    for (let i = 0; i < 200; i++) {
+      gate.shouldAttempt(`account-${i}:other`, 'fp-x', 1_000);
+    }
+    // fp-live is still within its 60s cooldown at t=1000 — a sweep must not have
+    // reclaimed it.
+    assert.equal(gate.shouldAttempt('account-A:acme', 'fp-live', 1_000), false, 'still cooling — the sweep did not evict a live entry');
+  });
 });
