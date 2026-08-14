@@ -203,3 +203,100 @@ describe('LIN-901 — recommend-and-dispatch subscription is declared, not recon
     assert.equal(captured.item.queueIfBusy, true, 'explicit queueIfBusy:true is forwarded');
   });
 });
+
+// LIN-2075 — `repo` used to collapse non-string / over-length / dangerous-chars
+// into a bare 'repo is invalid', the same defect as kickoff's goal/repo (see
+// proxy-autopilot-variant.test.js). It now routes through the shared
+// validateOpaqueDispatchField helper with reportReceivedLength:true, mirroring
+// the model/harness calls a few lines below it in this same handler.
+//
+// proj-alpha (TEST-1's project) has a project-description `repo=test-repo`
+// line, so an explicit caller repo can be distinguished from the derived one
+// (LIN-537: explicit wins). proj-beta (TEST-4's project) has no repo= line, so
+// it is the fixture for "no repo at all, explicit or derived".
+describe('LIN-2075 — recommend-and-dispatch repo validation messages', () => {
+  test('a non-string repo is rejected with 400', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation', repo: 42
+    });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /repo must be a string/);
+    assert.equal(captured.item, undefined, 'nothing is dispatched on a rejected repo');
+  });
+
+  test('an over-length repo is rejected naming the cap and received length', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const repo = 'x'.repeat(1001);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation', repo
+    });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(res.body.error, 'repo exceeds maximum length of 1000 (got 1001)');
+    assert.equal(captured.item, undefined, 'nothing is dispatched on a rejected repo');
+  });
+
+  test('a repo with dangerous control characters is rejected with 400', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation', repo: 'my-org/my-repo\x00'
+    });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /repo contains invalid characters/);
+    assert.equal(captured.item, undefined, 'nothing is dispatched on a rejected repo');
+  });
+
+  test('an explicit repo is accepted and wins over the project-derived repo (LIN-537)', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation', repo: 'my-org/my-repo'
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.repo, 'my-org/my-repo');
+  });
+
+  test('repo: null is now accepted as absent (intentional relaxation) and falls back to the project-derived repo', async () => {
+    // Previously null fell through to the type check and was rejected; the
+    // shared helper treats null the same as omitted/undefined, so resolution
+    // continues to resolveDispatchRepo's caller-then-derived precedence
+    // (LIN-537), same as an omitted repo below.
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation', repo: null
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.repo, 'test-repo', 'falls back to the project-derived repo, same as omitted');
+  });
+
+  test('an omitted repo still behaves as today: falls back to the project-derived repo', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation'
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.repo, 'test-repo');
+  });
+
+  test('an omitted repo with no project-derived repo either resolves to null', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-4', kind: 'implementation'
+    });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.strictEqual(captured.item.repo, null);
+  });
+});

@@ -70,3 +70,58 @@ test('accepts an empty string (callers coerce it to null downstream)', () => {
   const result = validateOpaqueDispatchField('', 'model');
   assert.strictEqual(result, null);
 });
+
+// reportReceivedLength (LIN-2075): opt-in suffix on the length-cause message,
+// used by goal/repo call sites; default-off keeps the 16 existing call sites'
+// messages byte-identical.
+
+test('reportReceivedLength defaults off: length message is byte-identical to today', () => {
+  const long = 'a'.repeat(1001);
+  const result = validateOpaqueDispatchField(long, 'model');
+  assert.deepEqual(result, { error: 'model exceeds maximum length of 1000' });
+});
+
+test('reportReceivedLength: true appends the received length on the length cause', () => {
+  const long = 'a'.repeat(1247);
+  const result = validateOpaqueDispatchField(long, 'goal', {
+    maxLength: 1000,
+    reportReceivedLength: true,
+  });
+  assert.deepEqual(result, { error: 'goal exceeds maximum length of 1000 (got 1247)' });
+});
+
+test('reportReceivedLength: M counts UTF-16 code units, not visible characters', () => {
+  // 501 emoji is 1002 UTF-16 code units (each is a surrogate pair) — rejected
+  // at 501 visible characters, and the reported M must say 1002, not 501, or
+  // the number contradicts what a caller can count.
+  const emojiGoal = '\u{1F680}'.repeat(501);
+  assert.strictEqual(emojiGoal.length, 1002);
+  const result = validateOpaqueDispatchField(emojiGoal, 'goal', {
+    maxLength: 1000,
+    reportReceivedLength: true,
+  });
+  assert.deepEqual(result, { error: 'goal exceeds maximum length of 1000 (got 1002)' });
+});
+
+test('reportReceivedLength: true does not affect the type-cause message', () => {
+  const result = validateOpaqueDispatchField(0, 'goal', { reportReceivedLength: true });
+  assert.deepEqual(result, { error: 'goal must be a string' });
+});
+
+test('reportReceivedLength: true does not affect the dangerous-chars message', () => {
+  const result = validateOpaqueDispatchField('walk\x00the stack', 'goal', {
+    reportReceivedLength: true,
+  });
+  assert.deepEqual(result, { error: 'goal contains invalid characters' });
+});
+
+test('reportReceivedLength: true still treats undefined/null as absent (valid)', () => {
+  assert.strictEqual(
+    validateOpaqueDispatchField(undefined, 'goal', { reportReceivedLength: true }),
+    null
+  );
+  assert.strictEqual(
+    validateOpaqueDispatchField(null, 'goal', { reportReceivedLength: true }),
+    null
+  );
+});

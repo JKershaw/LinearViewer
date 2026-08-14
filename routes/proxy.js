@@ -1908,6 +1908,7 @@ POST ${baseUrl}/api/proxy/recommend-and-dispatch
   → Fused verb: runs /recommend and forwards the recommended prompt straight into a dispatch, server-side. "issueIdentifier" is required; target defaults to "cli".
   → "model" (optional) is threaded onto the dispatched item, same meaning as on POST /dispatch — the EXECUTION model the runner passes to its own CLI (OpenRouter "provider/model" convention, e.g. "anthropic/claude-opus-4.8"), opaque and forwarded blindly. Set it to route a cheaper/pricier model per task (e.g. Sonnet for implementation, Opus for review); omit to keep the consumer default. See LIN-438.
   → "harness" (optional) is threaded onto the dispatched item, same meaning as on POST /dispatch — the EXECUTION harness the runner should use (e.g. "opencode"), opaque and forwarded blindly. Combine with "model" to pick a specific OpenRouter-backed model for a non-default harness; omit to keep the consumer's own default. See LIN-1084.
+  → "repo" (optional) overrides the project's "repo=" inheritance for the dispatched item. An opaque string: max 1000 characters (UTF-16 code units), no control characters — violating either returns a 400 naming the constraint, and the received length when the length cap is the cause. Omitted or explicit "null" are both accepted as absent, so the project-derived "repo=" (or none) is used instead. See LIN-2075.
   → "sessionId" (optional) is the autopilot dispatch id driving this run; stamp it on every fan-out so the whole multi-task run reconstructs as one session. An OPAQUE string, not a UUID (LIN-1118): non-empty, max 128 chars, no control characters, "__meta__" reserved; existing UUIDs stay valid. Any target. See LIN-591.
   → The prompt body NEVER returns to you — you only get the task header. This keeps the prompt out of your context (the point of the verb); learn what was chosen from "kind"/"promptName", then watch the item via GET /dispatch/{id}.
   → "kind" is derived from the recommendation's own action signal (falling back to "custom") — no need to read the prompt to classify the task.
@@ -1921,6 +1922,8 @@ POST ${baseUrl}/api/proxy/autopilot/kickoff
   Body: { "goal": "...", "mode": "write|readonly", "variant": "standard|stepper", "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "appendProxyContext": true, "sessionId": "...", "subscription": "terminal-only|everything", "maxTasks": 50 }
   → Fused launch verb: builds the Autopilot kickoff AND dispatches it in one call — the single verb that actually STARTS a run from a goal (no need to GET the kickoff text and POST it back). The receiving session becomes the Autopilot orchestrator. All fields optional.
   → Omit "issueIdentifier" for a GENERAL run ("goal" focuses the stack walk); pass it for a SCOPED run ("autopilot until THIS task is done") — the project "repo=" is then inherited unless you pass "repo". "mode" defaults to "write" ("readonly" = investigation only).
+  → "goal" (optional, GENERAL runs only — a SCOPED run pins the goal to "issueIdentifier" and otherwise ignores this) is free text steering the stack walk. An opaque string: max 1000 characters (UTF-16 code units), no control characters — violating either returns a 400 naming the constraint, and the received length when the length cap is the cause. Omitted or explicit "null" are both accepted as absent, walking the stack under the default precedence policy. See LIN-2075.
+  → "repo" (optional) overrides the project's "repo=" inheritance for a SCOPED run. An opaque string, same validation as "goal": max 1000 characters (UTF-16 code units), no control characters, 400 on violation naming the constraint, and the received length when the length cap is the cause. Omitted or explicit "null" are both accepted as absent, so the project-derived "repo=" (or none) is used instead. See LIN-2075.
   → "variant" defaults to "standard" (the normal orchestrator). "stepper" swaps in the warm single-session, beat-stepping disposition: it decomposes the task's worker prompt into 3–6 ordered beats and drip-feeds them into ONE session over followUpTo+force, judging and challenging each beat before advancing. Orthogonal to "mode" — they compose.
   → "sessionId" + "subscription" (LIN-813/LIN-900 §6) are the coordinator up-chain edge — available to ANY autopilot contextually (a guide capability, not a launch-time variant; see the "Dispatching a child autopilot" section of the operating manual). When an autopilot acting as a coordinator dispatches a CHILD autopilot for a whole task, it passes its OWN session id as "sessionId" (the wake target) with "subscription": "everything", so when the child pauses (PENDING) or terminates its report is pushed back up to the coordinator instead of the coordinator polling. A top-level kickoff omits both (undeclared → "terminal-only"). NOTE the child's own returned "id" (its session id, for ITS sub-workers) stays distinct from the parent "sessionId" you pass in.
   → "subscription" is the §5 bubbling contract: an "everything" edge wakes the parent on EVERY event (incl. PENDING-external — each stepper beat boundary); a "terminal-only" edge (the default) wakes it only on the always-bubbling outcomes DONE/FAILED/BLOCKED. It is DECLARED on the edge (never inferred from "has a sessionId"). The stepper kickoff body instructs each beat to carry BOTH "subscription": "everything" AND "waitForFollowUps": true — the two orthogonal halves of the warm drip (LIN-845). "subscription: everything" is the up-chain wake (the worker's stop boundary, incl. [pending], wakes the orchestrator); "waitForFollowUps" is the worker-side hold (the worker parks at AWAITING_FOLLOWUP instead of finalizing). Both are needed: with the hold absent the worker finalizes after beat 1, so beat 2's followUpTo+force falls back to a cold resume via the runner's own mechanism instead of an in-session warm follow-on.
@@ -5304,17 +5307,25 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, `variant must be one of: ${AUTOPILOT_VARIANTS.join(', ')}`);
       }
-      if (goal !== undefined && (typeof goal !== 'string' || goal.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(goal))) {
+      const kickoffGoalValidationError = validateOpaqueDispatchField(goal, 'goal', {
+        maxLength: MAX_NAME_LENGTH,
+        reportReceivedLength: true,
+      });
+      if (kickoffGoalValidationError) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, 'goal is invalid');
+        return badRequest.json(res, kickoffGoalValidationError.error);
       }
       if (target !== undefined && !VALID_PROXY_DISPATCH_TARGETS.includes(target)) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}`);
       }
-      if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
+      const kickoffRepoValidationError = validateOpaqueDispatchField(repo, 'repo', {
+        maxLength: MAX_NAME_LENGTH,
+        reportReceivedLength: true,
+      });
+      if (kickoffRepoValidationError) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, 'repo is invalid');
+        return badRequest.json(res, kickoffRepoValidationError.error);
       }
       if (issueIdentifier !== undefined && !isValidIssueId(issueIdentifier)) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
@@ -5916,9 +5927,13 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
       }
-      if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
+      const recommendRepoValidationError = validateOpaqueDispatchField(repo, 'repo', {
+        maxLength: MAX_NAME_LENGTH,
+        reportReceivedLength: true,
+      });
+      if (recommendRepoValidationError) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'repo is invalid');
+        return badRequest.json(res, recommendRepoValidationError.error);
       }
       // Inherited-repo marker (LIN-1210): when true, `repo` was merely inherited
       // (e.g. an autopilot orchestrator forwarding a parent project's repo onto a
