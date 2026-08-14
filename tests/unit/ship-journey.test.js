@@ -649,4 +649,36 @@ describe('cumulative-walk placement', () => {
     assert.ok(Math.abs(distance({ x: 0, y: 0 }, byId.W2) - 1) < 1e-9);
   });
 
+  test('an out-of-vocabulary bearing holds heading steady and does not perturb subsequent valid placements (review F1)', () => {
+    // 'NORTH' is not a BEARING_TO_ANGLE key, so angle is undefined for it.
+    const result = buildWalkFixture([
+      { id: 'A', bearing: 'N' },
+      { id: 'B', bearing: 'NORTH' },
+      { id: 'C', bearing: 'E' },
+      { id: 'D', bearing: 'SE' }
+    ]);
+    const wps = result.waypoints;
+    assert.strictEqual(wps.length, 4);
+
+    for (const wp of wps) {
+      assert.ok(Number.isFinite(wp.x) && Number.isFinite(wp.y),
+        `${wp.identifier} must carry a finite placed position, not NaN/null`);
+    }
+
+    // Every step, including across the unknown bearing, stays exactly one
+    // unit apart — a single bad reading must not erase the trail behind it.
+    let prev = { x: 0, y: 0 };
+    for (const wp of wps) {
+      assert.ok(Math.abs(distance(prev, wp) - 1) < 1e-9,
+        `${wp.identifier} must be exactly one unit from the previous position`);
+      prev = wp;
+    }
+
+    // B holds A's heading steady (continues straight along N) rather than
+    // turning toward an undefined target.
+    const byId = Object.fromEntries(wps.map(wp => [wp.identifier, wp]));
+    assert.ok(Math.abs(byId.B.x - 2 * byId.A.x) < 1e-9 && Math.abs(byId.B.y - 2 * byId.A.y) < 1e-9,
+      'an unknown bearing must hold the previous heading, landing on the doubled straight-line continuation of the prior step');
+  });
+
 });
