@@ -15,16 +15,41 @@
 import { test, describe, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import crypto from 'node:crypto'
-import { mintAppJwt, mintInstallationToken, fetchInstallation, exchangeOAuthCode, getAppConfig, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../../lib/providers/github/app-auth.js'
+import { mintAppJwt, mintInstallationToken, fetchInstallation, exchangeOAuthCode, getAppConfig, buildInstallUrl, withTimeout, isGitHubConfigured, GITHUB_VIEWER_TIMEOUT_MS } from '../../lib/providers/github/app-auth.js'
 
 // One ephemeral RSA keypair for the whole suite — generated, never on disk.
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
 const PEM = privateKey.export({ type: 'pkcs1', format: 'pem' })
 
-const ENV = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG']
+// A SECOND, distinct ephemeral keypair (LIN-2081 round-5 class guard) — used
+// only to build concatenated-PEM leak cases. Being a genuinely different key
+// means a leak of PEM's bytes and a leak of PEM2's bytes are both
+// independently detectable; reusing PEM for both halves could not tell them apart.
+const { privateKey: privateKey2 } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
+const PEM2 = privateKey2.export({ type: 'pkcs1', format: 'pem' })
+
+// GITHUB_CLIENT_ID/SECRET are included here (not just the GITHUB_APP_* trio)
+// so every test in this file starts with ALL FIVE GITHUB_REQUIRED_ENV vars
+// present — isGitHubConfigured() assertions below then isolate purely on
+// GITHUB_APP_PRIVATE_KEY's shape, never a missing-var false negative.
+const ENV = ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']
 
 function decodeSegment(seg) {
   return JSON.parse(Buffer.from(seg.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'))
+}
+
+// Cross-checks a PEM string against what it will actually be used for
+// (LIN-2081 review findings 1+2): sign, then verify with the matching public
+// key. This is ground truth, independent of assertPemShape's own opinion —
+// the review's blocking findings were both missed by tests that only
+// asserted "throws"/"doesn't throw" without ever driving a real signature.
+function signsOk(pem) {
+  try {
+    const sig = crypto.createSign('RSA-SHA256').update('probe').sign(pem)
+    return crypto.createVerify('RSA-SHA256').update('probe').verify(publicKey, sig)
+  } catch {
+    return false
+  }
 }
 
 describe('GitHub App auth primitives (LIN-707)', () => {
@@ -34,6 +59,8 @@ describe('GitHub App auth primitives (LIN-707)', () => {
     process.env.GITHUB_APP_ID = '123456'
     process.env.GITHUB_APP_PRIVATE_KEY = PEM
     process.env.GITHUB_APP_SLUG = 'my-app'
+    process.env.GITHUB_CLIENT_ID = 'client-id'
+    process.env.GITHUB_CLIENT_SECRET = 'client-secret'
   })
   afterEach(() => {
     for (const k of ENV) {
@@ -54,8 +81,11 @@ describe('GitHub App auth primitives (LIN-707)', () => {
   })
 
   test('getAppConfig un-escapes a single-line PEM', () => {
-    process.env.GITHUB_APP_PRIVATE_KEY = 'line1\\nline2'
-    assert.equal(getAppConfig().privateKey, 'line1\nline2')
+    // The real-world case the escape handling exists for: a multi-line PEM
+    // squeezed onto one line via literal `\n` sequences (LIN-2081 — the
+    // fixture must be PEM-shaped so it also survives shape validation).
+    process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n/g, '\\n')
+    assert.equal(getAppConfig().privateKey, PEM)
   })
 
   test('getAppConfig throws clearly when GITHUB_APP_ID missing', () => {
@@ -71,6 +101,421 @@ describe('GitHub App auth primitives (LIN-707)', () => {
   test('getAppConfig does NOT require GITHUB_APP_SLUG', () => {
     delete process.env.GITHUB_APP_SLUG
     assert.equal(getAppConfig().slug, undefined)
+  })
+
+  // -------------------------------------------------------------------------
+  // getAppConfig() — PEM shape validation (LIN-2081)
+  //
+  // Three real-world misconfigurations from the LIN-2057 test-App setup all
+  // surfaced identically as OpenSSL's opaque `ERR_OSSL_UNSUPPORTED` deep
+  // inside Sign.sign — these pin that getAppConfig() now catches each one at
+  // config time and names the SPECIFIC defect, not just "throws".
+  // -------------------------------------------------------------------------
+
+  test('getAppConfig rejects a truncated ~12-char stub key (LIN-2081)', () => {
+    process.env.GITHUB_APP_PRIVATE_KEY = 'abcdefghijkl'
+    assert.throws(
+      () => getAppConfig(),
+      /GitHub App auth: GITHUB_APP_PRIVATE_KEY does not start with a PEM '-----BEGIN' header/
+    )
+  })
+
+  test('getAppConfig rejects a shell-poisoned fragment glued onto the front (LIN-2081)', () => {
+    // e.g. a stray path fragment left in the env var by a broken shell quoting
+    process.env.GITHUB_APP_PRIVATE_KEY = '$HOME/.ssh/' + PEM
+    assert.throws(
+      () => getAppConfig(),
+      /GitHub App auth: GITHUB_APP_PRIVATE_KEY has 11 unexpected character\(s\) before the '-----BEGIN' header/
+    )
+  })
+
+  test('getAppConfig rejects a stray zsh %% glued onto the END armor (LIN-2081)', () => {
+    // zsh appends a bare `%` to output with no trailing newline when a value
+    // gets pasted/echoed into an env file — exactly the LIN-2057 defect.
+    process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, '') + '%'
+    assert.throws(
+      () => getAppConfig(),
+      /GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '%'/
+    )
+  })
+
+  test('getAppConfig rejects an implausibly short key even with valid-looking armor (LIN-2081)', () => {
+    process.env.GITHUB_APP_PRIVATE_KEY = '-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----\n'
+    assert.throws(
+      () => getAppConfig(),
+      /GitHub App auth: GITHUB_APP_PRIVATE_KEY is too short to be a real PEM key \(\d+ chars, expected 1000\+\)/
+    )
+  })
+
+  test('getAppConfig rejects a body character outside the PEM alphabet, naming the line (LIN-2081)', () => {
+    const lines = PEM.split('\n')
+    lines[2] = lines[2].slice(0, 4) + '!' + lines[2].slice(4) // corrupt a body line, not the headers
+    process.env.GITHUB_APP_PRIVATE_KEY = lines.join('\n')
+    assert.throws(
+      () => getAppConfig(),
+      /GitHub App auth: GITHUB_APP_PRIVATE_KEY contains invalid characters outside the PEM alphabet on line 3: /
+    )
+  })
+
+  test('getAppConfig rejects a body character outside the PEM alphabet, naming the character and column but NEVER the key material (LIN-2081 ledger item 2)', () => {
+    const originalLine = PEM.split('\n')[2] // the real, uncorrupted body line
+    const lines = PEM.split('\n')
+    const corruptLine = originalLine.slice(0, 4) + '!' + originalLine.slice(4) // corrupt a body line, not the headers
+    lines[2] = corruptLine
+    process.env.GITHUB_APP_PRIVATE_KEY = lines.join('\n')
+    let message
+    try {
+      getAppConfig()
+      assert.fail('expected getAppConfig to throw')
+    } catch (err) {
+      message = err.message
+    }
+    // Positive: names the offending character and its 1-indexed column.
+    assert.match(message, /'!' at column 5/)
+    // Negative and load-bearing: must NOT contain the offending line, nor any
+    // run of the key's own real body bytes — this is the exact defect the
+    // round-4 review found (the old message interpolated bodyLines[badLineIndex]
+    // wholesale, leaking 64 real chars of the configured private key into
+    // application logs). Checked as sliding 12-char chunks of the REAL,
+    // uncorrupted body line rather than a generic base64-charset regex,
+    // because an ordinary English word (e.g. "alphabet", "characters") is
+    // itself a valid base64-alphabet run and would false-positive a
+    // charset-only check.
+    assert.ok(!message.includes(corruptLine), 'message must not echo the offending line')
+    for (let i = 0; i + 12 <= originalLine.length; i++) {
+      const chunk = originalLine.slice(i, i + 12)
+      assert.ok(!message.includes(chunk), `message must not contain key material chunk: ${chunk}`)
+    }
+  })
+
+  test('getAppConfig accepts a real, valid PEM cleanly (no throw)', () => {
+    assert.doesNotThrow(() => getAppConfig())
+  })
+
+  // -------------------------------------------------------------------------
+  // getAppConfig() — PEM-shape validator fix pass (LIN-2081 review findings
+  // 1+2). The original 7 tests above all used ONE canonical LF fixture, which
+  // is exactly why CI was green while the validator was wrong in both
+  // directions: it let a newline-stripped key sail through to the ORIGINAL
+  // ERR_OSSL_UNSUPPORTED bug (finding 1), and it hard-rejected several key
+  // formats OpenSSL happily signs (finding 2). Every "should be accepted" row
+  // below is cross-checked against a real crypto.createSign(...).sign() round
+  // trip via signsOk(), not just "getAppConfig doesn't throw" — and every
+  // "should be rejected" row asserts the SPECIFIC defect message, not just
+  // "throws".
+  // -------------------------------------------------------------------------
+
+  describe('PEM shape validator matrix (LIN-2081 fix pass)', () => {
+    test('sanity: signsOk() itself agrees the canonical fixture signs, and a garbage string does not', () => {
+      assert.equal(signsOk(PEM), true)
+      assert.equal(signsOk('not a key'), false)
+    })
+
+    // --- Finding 2: four working formats must be ACCEPTED, and the value ---
+    // --- getAppConfig() returns must be provably signable, not just non-throwing.
+
+    test('accepts CRLF line endings, and the normalized key actually signs', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n/g, '\r\n')
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+    })
+
+    test('accepts an extra trailing blank line, and the normalized key actually signs', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM + '\n' // PEM already ends with one '\n'
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+    })
+
+    test('accepts a trailing space after the END footer (with a final newline), and the normalized key actually signs', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, ' \n')
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+    })
+
+    test('accepts a trailing space after the END footer (no final newline), and the normalized key actually signs', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, '') + ' '
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+    })
+
+    test('accepts a leading blank line, and the normalized key actually signs', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = '\n' + PEM
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+    })
+
+    test('accepts leading whitespace (no blank line) — raw OpenSSL rejects it unnormalized, but getAppConfig strips it and the result signs', () => {
+      // Empirically, `'   ' + PEM` does NOT sign raw (OpenSSL requires
+      // '-----BEGIN' to start its own line) — but getAppConfig's leading-
+      // whitespace strip removes it before the key is ever used, so the
+      // NORMALIZED value must sign even though the raw input would not have.
+      process.env.GITHUB_APP_PRIVATE_KEY = '   ' + PEM
+      assert.equal(signsOk(process.env.GITHUB_APP_PRIVATE_KEY), false, 'raw input should NOT sign — confirms normalization is doing real work')
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+    })
+
+    test('accepts a tab-indented PEM body (YAML block-scalar / heredoc leak), and the normalized key actually signs (LIN-2081 review observation A)', () => {
+      // OpenSSL signs an indented body fine — confirmed independently before
+      // deciding: rejecting it would be the same "reject-what-signs"
+      // availability risk finding 2 fixed for the other whitespace variants,
+      // so it is normalized away rather than left a strict-by-omission gap.
+      const lines = PEM.split('\n')
+      const indented = lines.map((l, i) => (i > 0 && i < lines.length - 2 ? '\t' + l : l)).join('\n')
+      assert.equal(signsOk(indented), true, 'sanity: OpenSSL itself accepts a tab-indented body')
+      process.env.GITHUB_APP_PRIVATE_KEY = indented
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+      assert.equal(cfg.privateKey, PEM, 'indentation is stripped, not merely tolerated')
+    })
+
+    test('accepts a space-indented PEM body, and the normalized key actually signs (LIN-2081 review observation A)', () => {
+      const lines = PEM.split('\n')
+      const indented = lines.map((l, i) => (i > 0 && i < lines.length - 2 ? '  ' + l : l)).join('\n')
+      assert.equal(signsOk(indented), true, 'sanity: OpenSSL itself accepts a space-indented body')
+      process.env.GITHUB_APP_PRIVATE_KEY = indented
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+      assert.equal(cfg.privateKey, PEM, 'indentation is stripped, not merely tolerated')
+    })
+
+    test('getAppConfig returns the byte-identical PEM when there is no stray whitespace to normalize', () => {
+      // Guards against the normalization regressing to a blanket `.trim()`,
+      // which would silently drop the fixture's real trailing '\n' and break
+      // the exact-equality assertions in the tests above this describe block.
+      assert.equal(getAppConfig().privateKey, PEM)
+    })
+
+    test('accepts a body line with trailing whitespace, and the normalized key actually signs (LIN-2081 round-3 fix)', () => {
+      // The blocking finding from the round-3 re-review: normalizePrivateKey
+      // stripped LEADING per-line whitespace but not TRAILING, so a body line
+      // ending in a space survived normalization and then failed
+      // PEM_ARMOR_LINE. Same decision as observation A's indented-body fix,
+      // applied to the other end of the line.
+      const lines = PEM.split('\n')
+      const withTrailingSpace = lines.map((l, i) => (i > 0 && i < lines.length - 2 ? l + ' ' : l)).join('\n')
+      assert.equal(signsOk(withTrailingSpace), true, 'sanity: OpenSSL itself accepts a body line with trailing whitespace')
+      process.env.GITHUB_APP_PRIVATE_KEY = withTrailingSpace
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+      assert.equal(cfg.privateKey, PEM, 'trailing whitespace is stripped, not merely tolerated')
+    })
+
+    // --- Finding 1: a fully newline-stripped key must be REJECTED, naming ---
+    // --- the defect — and never allowed to reach Sign.sign's opaque error.
+
+    test('rejects a PEM with all line breaks stripped, naming the defect (LIN-2081 finding 1)', () => {
+      const stripped = PEM.replace(/\n/g, '')
+      // Ground truth: confirm this is the real bug — the raw stripped key
+      // DOES fail to sign, with OpenSSL's opaque decoder error, so a
+      // validator that let it through would reproduce the original defect.
+      assert.equal(signsOk(stripped), false)
+      process.env.GITHUB_APP_PRIVATE_KEY = stripped
+      assert.throws(
+        () => getAppConfig(),
+        /GitHub App auth: GITHUB_APP_PRIVATE_KEY has no line breaks between the '-----BEGIN'\/'-----END' armor/
+      )
+    })
+
+    test('mintAppJwt surfaces the no-line-breaks config error for a stripped key, never the raw OpenSSL decoder error', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n/g, '')
+      assert.throws(() => mintAppJwt(), (err) => {
+        assert.match(err.message, /GITHUB_APP_PRIVATE_KEY has no line breaks/)
+        assert.doesNotMatch(err.message, /ERR_OSSL_UNSUPPORTED|DECODER routines|unsupported/i)
+        return true
+      })
+    })
+
+    // --- Round-2 re-review: normalizePrivateKey's trailing-whitespace collapse
+    // --- (`.replace(/\s+$/, '\n')`) re-opens finding 1 for a SIBLING input
+    // --- class the `headerEnd === -1` guard alone could not catch — newlines
+    // --- collapsed to some OTHER whitespace character, not stripped to
+    // --- nothing. The normalizer puts a single '\n' back, but only at the
+    // --- very END of the string (after the END footer), so `headerEnd` lands
+    // --- PAST `endMatch.index` — the body slice is still empty, still passes
+    // --- the alphabet check vacuously, still reaches Sign.sign's opaque
+    // --- ERR_OSSL_UNSUPPORTED. This is exactly the "shell-poisoned fragment"
+    // --- class the ticket itself names: an unquoted `export KEY=$KEY` word-
+    // --- splits and rejoins a PEM's lines on spaces.
+
+    for (const [label, collapse] of [
+      ['spaces (unquoted `export KEY=$KEY` word-splitting)', s => s.replace(/\n/g, ' ')],
+      ['a bare CR (stray `\\r`, no `\\n`)', s => s.replace(/\n/g, '\r')],
+    ]) {
+      test(`rejects newlines collapsed to ${label}, naming the defect (LIN-2081 re-review)`, () => {
+        const collapsed = collapse(PEM)
+        // Ground truth first: the raw collapsed key genuinely fails to sign —
+        // confirms this is the real bug, not a validator being overly strict.
+        assert.equal(signsOk(collapsed), false)
+        process.env.GITHUB_APP_PRIVATE_KEY = collapsed
+        assert.throws(
+          () => getAppConfig(),
+          /GitHub App auth: GITHUB_APP_PRIVATE_KEY has no line breaks between the '-----BEGIN'\/'-----END' armor/
+        )
+      })
+
+      test(`mintAppJwt never emits the raw OpenSSL decoder error for newlines collapsed to ${label}`, () => {
+        process.env.GITHUB_APP_PRIVATE_KEY = collapse(PEM)
+        assert.throws(() => mintAppJwt(), (err) => {
+          assert.match(err.message, /GITHUB_APP_PRIVATE_KEY has no line breaks between/)
+          assert.doesNotMatch(err.message, /ERR_OSSL_UNSUPPORTED|DECODER routines|unsupported/i)
+          return true
+        })
+      })
+
+      test(`isGitHubConfigured() is false for newlines collapsed to ${label}, not a false "configured"`, () => {
+        process.env.GITHUB_APP_PRIVATE_KEY = collapse(PEM)
+        assert.equal(isGitHubConfigured(), false)
+      })
+    }
+
+    // --- The named "no key material" empty-body guard (`:179`, beat 3 item 2)
+    // --- had no test — CI did not exercise the one part of the validator that
+    // --- exists to catch a future degenerate body slice from rotting into
+    // --- dead code (LIN-2081 round-3 re-review, non-blocking observation A).
+    // --- Pinned via the two inputs the review reached it with: newlines
+    // --- collapsed to spaces WITH a single real LF surviving right before the
+    // --- END footer (so headerEnd lands exactly at endMatch.index, an empty
+    // --- slice, distinct from the "no line breaks at all" class above), and
+    // --- an armor-only PEM padded past PEM_MIN_LENGTH with no real body.
+
+    test('rejects newlines collapsed to spaces with a single real LF surviving before the END footer, naming the empty-body defect', () => {
+      const collapsed = PEM.replace(/\n/g, ' ').replace(/ (-----END)/, '\n$1')
+      assert.equal(signsOk(collapsed), false, 'sanity: the raw collapsed key genuinely fails to sign')
+      process.env.GITHUB_APP_PRIVATE_KEY = collapsed
+      assert.throws(
+        () => getAppConfig(),
+        /GitHub App auth: GITHUB_APP_PRIVATE_KEY has no key material between the '-----BEGIN'\/'-----END' armor lines/
+      )
+    })
+
+    test('rejects an armor-only PEM padded past the length floor with no real body, naming the empty-body defect', () => {
+      const armorOnlyPadded = '-----BEGIN RSA PRIVATE KEY-----' + 'A'.repeat(1000) + '\n-----END RSA PRIVATE KEY-----\n'
+      assert.ok(armorOnlyPadded.length > 1000, 'sanity: padded past the 1000-char length floor')
+      assert.equal(signsOk(armorOnlyPadded), false, 'sanity: this is not a real key')
+      process.env.GITHUB_APP_PRIVATE_KEY = armorOnlyPadded
+      assert.throws(
+        () => getAppConfig(),
+        /GitHub App auth: GITHUB_APP_PRIVATE_KEY has no key material between the '-----BEGIN'\/'-----END' armor lines/
+      )
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // getAppConfig() — no thrown message ever leaks key material (LIN-2081
+  // round-5 review). Round 4's redaction fix at the invalid-alphabet throw
+  // was correct, but a SIBLING throw in the same function (the stray-suffix
+  // message) still echoed an entire concatenated second PEM verbatim — a
+  // per-instance review missed it twice. This block is the class guard the
+  // ticket asked for: one table of malformed values, each driven through
+  // getAppConfig(), every thrown message scanned for ANY run of the source
+  // keys' own base64 body material. It must fail if a future throw is added
+  // that interpolates key-derived content — proven below by reverting the
+  // fix and confirming these tests catch it (see the class-guard-catches-a-
+  // reintroduced-leak test).
+  // -------------------------------------------------------------------------
+
+  describe('PEM error messages never leak key material (LIN-2081 round-5 class guard)', () => {
+    // Any run of real key bytes this long surviving into a thrown message
+    // counts as a leak. Chosen with margin over PEM_LEAK_PREVIEW_MAX (12 in
+    // app-auth.js) so an intentionally bounded preview can never itself trip
+    // this check — the guard is for UNBOUNDED echoes, not the accepted
+    // small-preview case.
+    const LEAK_RUN_LEN = 20
+
+    // Every overlapping LEAK_RUN_LEN-char window of `pem`'s own base64 body
+    // lines (armor headers/footer excluded — they're public literal text,
+    // not secret, and would false-positive since our own messages legitimately
+    // say '-----BEGIN').
+    function bodyChunksOf(pem) {
+      const lines = pem.split('\n')
+      const bodyLines = lines.slice(1, -2) // drop the BEGIN header, and the END footer + trailing blank
+      const chunks = []
+      for (const line of bodyLines) {
+        for (let i = 0; i + LEAK_RUN_LEN <= line.length; i++) chunks.push(line.slice(i, i + LEAK_RUN_LEN))
+      }
+      return chunks
+    }
+    const SECRET_CHUNKS = [...bodyChunksOf(PEM), ...bodyChunksOf(PEM2)]
+
+    function corruptedLine(pem, replacement) {
+      const lines = pem.split('\n')
+      lines[2] = replacement
+      return lines.join('\n')
+    }
+
+    // Derived from the two real generated keys above — every shape a prior
+    // review round found reaching a distinct throw in assertPemShape.
+    const CASES = [
+      ['two concatenated PEMs (round-5 finding 1)', PEM + PEM2],
+      ['a stray-character suffix (LIN-2057 case)', PEM.replace(/\n$/, '') + '%'],
+      ['a stray-character prefix (LIN-2057 case)', '$HOME/.ssh/' + PEM],
+      ['a corrupt body line (single bad char)', corruptedLine(PEM, PEM.split('\n')[2].slice(0, 4) + '!' + PEM.split('\n')[2].slice(4))],
+      ['a 300-char corrupt body line (round-5 finding 3)', corruptedLine(PEM, '!'.repeat(300))],
+      ['newlines collapsed to spaces', PEM.replace(/\n/g, ' ')],
+      ['newlines stripped entirely', PEM.replace(/\n/g, '')],
+      ['newlines collapsed to spaces with a single real LF surviving before END (empty-body class)', PEM.replace(/\n/g, ' ').replace(/ (-----END)/, '\n$1')],
+    ]
+
+    for (const [label, value] of CASES) {
+      test(`getAppConfig's thrown message contains no run of key material — ${label}`, () => {
+        process.env.GITHUB_APP_PRIVATE_KEY = value
+        let message = null
+        try {
+          getAppConfig()
+        } catch (err) {
+          message = err.message
+        }
+        assert.ok(message, `expected "${label}" to be rejected by getAppConfig`)
+        for (const chunk of SECRET_CHUNKS) {
+          assert.ok(!message.includes(chunk), `message leaked key material for case "${label}" (chunk "${chunk}")\nfull message: ${message}`)
+        }
+      })
+    }
+
+    test('the concatenated-PEM case is bounded and names the shape rather than echoing content', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM + PEM2
+      assert.throws(() => getAppConfig(), (err) => {
+        assert.match(err.message, /a second '-----BEGIN' block \(\d+ chars\)/)
+        assert.ok(err.message.length < 200, `message should stay short, was ${err.message.length} chars: ${err.message}`)
+        return true
+      })
+    })
+
+    test('a long run of invalid-alphabet characters is capped, not echoed in full (round-5 finding 3)', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = corruptedLine(PEM, '!'.repeat(300))
+      assert.throws(() => getAppConfig(), (err) => {
+        assert.match(err.message, /\(\+\d+ more\)/)
+        assert.ok(err.message.length < 500, `message should stay bounded, was ${err.message.length} chars`)
+        return true
+      })
+    })
+
+    // The five pre-existing assertions pinning the exact LIN-2057 '%' message
+    // (this file + github-auth.test.js + github-projects-auth.test.js) must
+    // stay byte-identical — the fix only widens the LONG-suffix path.
+    test('the short LIN-2057 stray-% message is untouched (byte-identical)', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, '') + '%'
+      assert.throws(
+        () => getAppConfig(),
+        /GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '%'$/
+      )
+    })
+
+    // Proves this suite is a real guard, not decoration: reverting the
+    // stray-suffix fix to its old unbounded form makes the concatenated-PEM
+    // case above fail. Exercised inline by re-simulating the OLD behavior
+    // directly (rather than mutating source), so the test both documents and
+    // pins the property without needing to touch the implementation file.
+    test('class guard sanity: the OLD unbounded interpolation would have failed this suite', () => {
+      const value = PEM + PEM2
+      const lines = value.split('\n')
+      const endMatch = value.match(/-----END [A-Z0-9 ]*KEY-----/)
+      const trailing = value.slice(endMatch.index + endMatch[0].length)
+      const oldMessage = `GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '${trailing}'`
+      const leaked = SECRET_CHUNKS.some(chunk => oldMessage.includes(chunk))
+      assert.ok(leaked, 'sanity check failed: the pre-fix message shape should have leaked key material')
+    })
   })
 
   // -------------------------------------------------------------------------
@@ -117,6 +562,33 @@ describe('GitHub App auth primitives (LIN-707)', () => {
   test('mintAppJwt throws when app config is missing', () => {
     delete process.env.GITHUB_APP_ID
     assert.throws(() => mintAppJwt(), /GITHUB_APP_ID/)
+  })
+
+  test('mintAppJwt surfaces the getAppConfig PEM-shape error and never reaches Sign.sign (LIN-2081)', () => {
+    // The original bug: a malformed key used to sail past getAppConfig and
+    // blow up inside Sign.sign with OpenSSL's opaque ERR_OSSL_UNSUPPORTED /
+    // "DECODER routines" decoder error, with no hint the key was the problem.
+    // This pins that the config-time check now catches it first.
+    process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, '') + '%'
+    assert.throws(() => mintAppJwt(), (err) => {
+      assert.match(err.message, /GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '%'/)
+      assert.doesNotMatch(err.message, /ERR_OSSL_UNSUPPORTED|DECODER routines|unsupported/i)
+      return true
+    })
+  })
+
+  test('buildInstallUrl surfaces the SAME getAppConfig PEM-shape error on a malformed key, even though it never signs anything with it (LIN-2081 review finding 5)', () => {
+    // The review's own point: buildInstallUrl() calls getAppConfig() purely to
+    // read `slug`, but getAppConfig() validates the FULL key shape
+    // unconditionally — so a malformed key breaks the install-URL path too,
+    // not just signing. Pin that it fails with the SAME named-defect config
+    // error (never a raw OpenSSL error, since nothing here ever calls Sign.sign).
+    process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, '') + '%'
+    assert.throws(() => buildInstallUrl({ state: 'nonce-123' }), (err) => {
+      assert.match(err.message, /GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '%'/)
+      assert.doesNotMatch(err.message, /ERR_OSSL_UNSUPPORTED|DECODER routines|unsupported/i)
+      return true
+    })
   })
 
   // -------------------------------------------------------------------------

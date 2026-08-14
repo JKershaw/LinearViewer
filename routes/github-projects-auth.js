@@ -30,7 +30,7 @@ import crypto from 'crypto'
 import { Router } from 'express'
 import { renderErrorPage, renderGitHubProjectSelectPage } from '../lib/render-pages.js'
 import { githubErrorDiagnostic } from '../lib/errors.js'
-import { getMissingGitHubConfig, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../lib/providers/github/app-auth.js'
+import { getMissingGitHubConfig, getGitHubConfigProblems, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../lib/providers/github/app-auth.js'
 import { establishAccount } from '../lib/account-session.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 import {
@@ -79,11 +79,19 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider, account
   // The complete config gate (LIN-761) — byte-symmetric with routes/github-auth.js:
   // validate the FULL env set the shared App flow consumes, not just GITHUB_APP_*,
   // so a partial config returns a clean 503 rather than hanging in beginAuth.
+  //
+  // Byte-symmetric wording split with routes/github-auth.js (LIN-2081 finding 4):
+  // getMissingGitHubConfig()'s narrower "what's unset" message for the common
+  // case, a distinct clause for a shape-invalid-but-present GITHUB_APP_PRIVATE_KEY
+  // so the page never claims it as "missing" when it's actually set.
   function notConfigured(res) {
     const missing = getMissingGitHubConfig()
+    const detail = missing.length > 0
+      ? `Missing environment variables: ${missing.join(', ')}.`
+      : 'GITHUB_APP_PRIVATE_KEY is set but is not a valid PEM key.'
     return res.status(503).send(renderErrorPage(
       'GitHub App Not Configured',
-      `GitHub Projects is not available. Missing environment variables: ${missing.join(', ')}. See .env.example for setup instructions.`
+      `GitHub Projects is not available. ${detail} See .env.example for setup instructions.`
     ))
   }
 
@@ -93,7 +101,7 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider, account
    * the GitHub account container). It lives in the session, never in `state`.
    */
   router.get('/auth/github-projects', async (req, res) => {
-    if (getMissingGitHubConfig().length > 0) return notConfigured(res)
+    if (getGitHubConfigProblems().length > 0) return notConfigured(res)
     if (sessionStore?.cleanup) await sessionStore.cleanup()
 
     const mode = req.query.mode === 'add-source' ? 'add-source' : 'new'
@@ -133,7 +141,7 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider, account
    * `state` stays an opaque CSRF nonce; intent is read from the session.
    */
   router.get('/auth/github-projects/callback', async (req, res) => {
-    if (getMissingGitHubConfig().length > 0) return notConfigured(res)
+    if (getGitHubConfigProblems().length > 0) return notConfigured(res)
 
     const { installation_id: installationId, setup_action: setupAction, code, state, error } = req.query
 
@@ -204,8 +212,21 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider, account
       // Projects (read) permission; they return with a fresh `installation_id` and
       // flow through the install branch below. Reuse the CSRF nonce so the
       // post-install callback still passes the state guard (LIN-735).
+      //
+      // Throw-safe (LIN-2081 review finding 3), byte-symmetric with
+      // routes/github-auth.js: beginInstall() calls getAppConfig() for `slug`,
+      // which validates GITHUB_APP_PRIVATE_KEY's shape unconditionally even
+      // though this call never signs with it. Unguarded, a throw here would hang
+      // the request (LIN-761 root cause A) rather than surface a clean 503.
       if (!reboundable.length) {
-        return res.redirect(provider.beginInstall({ state: req.session.oauthState }))
+        let installUrl
+        try {
+          installUrl = provider.beginInstall({ state: req.session.oauthState })
+        } catch (err) {
+          console.error('GitHub Projects beginInstall error:', err)
+          return notConfigured(res)
+        }
+        return res.redirect(installUrl)
       }
 
       // Stash a board->installationId map (NOT the user token): the link step

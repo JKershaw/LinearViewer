@@ -41,7 +41,7 @@ describe('GitHubProjectsProvider auth primitives', () => {
   beforeEach(() => {
     saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]));
     process.env.GITHUB_APP_ID = '12345';
-    process.env.GITHUB_APP_PRIVATE_KEY = 'test-key';
+    process.env.GITHUB_APP_PRIVATE_KEY = RSA_PEM; // real PEM shape (LIN-2081) — getAppConfig validates it even on the slug-only install-URL path
     process.env.GITHUB_APP_SLUG = 'my-app';
     // The App's OWN user-to-server OAuth credentials drive beginAuth (authorize) +
     // the re-bind code exchange (LIN-735); Projects rounds through its own callback.
@@ -261,7 +261,7 @@ describe('GitHub Projects auth routes', () => {
     process.env.GITHUB_CLIENT_ID = 'cid';
     process.env.GITHUB_CLIENT_SECRET = 'secret';
     process.env.GITHUB_APP_ID = '12345';
-    process.env.GITHUB_APP_PRIVATE_KEY = 'test-key';
+    process.env.GITHUB_APP_PRIVATE_KEY = RSA_PEM; // real PEM shape (LIN-2081) — getAppConfig validates it even on the slug-only install-URL path
     process.env.GITHUB_APP_SLUG = 'my-app';
   });
   afterEach(() => {
@@ -302,6 +302,20 @@ describe('GitHub Projects auth routes', () => {
     await handler({ query: {}, session: makeSession() }, res);
     assert.equal(res.statusCode, 503);
     assert.match(res.body, /GitHub App Not Configured/);
+  });
+
+  // LIN-2081 review finding 4 — byte-symmetric with github-auth.js: the front
+  // gate now uses the WIDER predicate (getGitHubConfigProblems), so a
+  // shape-invalid-but-present key 503s at the very first gate.
+  test('GET /auth/github-projects 503s when GITHUB_APP_PRIVATE_KEY is set but not a valid PEM (LIN-2081 finding 4)', async () => {
+    process.env.GITHUB_APP_PRIVATE_KEY = 'not-a-pem';
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github-projects');
+    const res = makeRes();
+    await handler({ query: {}, session: makeSession() }, res);
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /GitHub App Not Configured/);
+    assert.match(res.body, /GITHUB_APP_PRIVATE_KEY is set but is not a valid PEM key/);
   });
 
   // LIN-761 — partial config (App vars present, GITHUB_CLIENT_ID absent) returns a
@@ -428,6 +442,29 @@ describe('GitHub Projects auth routes', () => {
     await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
     assert.equal(res.redirectedTo, 'https://github.com/apps/my-app/installations/new?state=real');
     assert.equal(session.githubProjectsPending, undefined, 'no rebind pending stashed when there is nothing to pick');
+  });
+
+  test('GET callback (re-bind) responds with a clean 503 instead of hanging when beginInstall throws on a malformed key (LIN-2081 review finding 3)', async () => {
+    // Byte-symmetric with the github-auth.js test of the same name: beginInstall()
+    // throws (as the REAL buildInstallUrl() does when GITHUB_APP_PRIVATE_KEY is
+    // shape-invalid, since it calls getAppConfig() unconditionally for `slug`).
+    // Before finding 3's fix this call site was UNGUARDED inside an async Express
+    // handler, so the throw would hang the request with NO response rather than
+    // surface this clean 503.
+    const provider = {
+      ...fakeProvider(),
+      listReboundableBoards: async () => [],
+      beginInstall: () => { throw new Error("GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '%'") },
+    };
+    const router = createGitHubProjectsAuthRoutes({ provider, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github-projects/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } });
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+    assert.equal(res.statusCode, 503, 'must respond, not hang');
+    assert.match(res.body, /GitHub App Not Configured/);
+    assert.match(res.body, /GITHUB_APP_PRIVATE_KEY is set but is not a valid PEM key/);
+    assert.equal(res.redirectedTo, null, 'must not redirect to a broken install URL');
   });
 
   test('GET callback (re-bind) surfaces a clean 400 when the code exchange fails (LIN-735)', async () => {
