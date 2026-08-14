@@ -2033,15 +2033,15 @@ function clearWorkspaceIssuesMemo() {
 // here; behaviour is byte-identical to the former inline functions.
 const _workspaceTitleResolver = createWorkspaceTitleResolver({
   sessionsCollection,
-  fetchWorkspaceIssues,
-  tokenRefreshBufferMs: TOKEN_REFRESH_BUFFER_MS
+  fetchWorkspaceIssues
 });
 
 // Hoisted wrapper so the materializer wiring earlier in source order can reference
 // `resolveWorkspaceTitles` (invoked only at write time, long after this const is
-// assigned during module init).
-function resolveWorkspaceTitles(urlKey) {
-  return _workspaceTitleResolver.resolveWorkspaceTitles(urlKey);
+// assigned during module init). `ownerAccountId` (LIN-1986) is a thin passthrough —
+// the materializer derives it from data already in scope at its own call site.
+function resolveWorkspaceTitles(urlKey, ownerAccountId) {
+  return _workspaceTitleResolver.resolveWorkspaceTitles(urlKey, ownerAccountId);
 }
 
 // getWorkspaceOpenRouterKey: thin server-env wrapper around the extracted resolver

@@ -350,15 +350,40 @@ test('precompute hook is opt-in — disabled by default and clearable with a non
 // existing title-less sessions falls out of re-materialization for free.
 
 // Seed a session whose loops carry NO issueTitle (the defect condition).
+// `dispatchedBy` (LIN-1986) is the owner-derivation seam `_deriveOwnerCandidates`
+// reads — set here so the enrichment tests below reach the (now owner-scoped)
+// resolver at all.
 function seedTitlelessFixture({ historyCollection, statusCollection }) {
   historyCollection._docs.push({
     _id: 'A1', urlKey: URL_KEY, prompt: 'p', promptName: 'autopilot', kind: 'autopilot',
     issueId: 'id-LIN-701', issueIdentifier: 'LIN-701', issueTitle: null, issueUrl: null,
-    dispatchedAt: new Date(min(0)), sessionId: null, status: 'resolved',
+    dispatchedAt: new Date(min(0)), dispatchedBy: 'account-A', sessionId: null, status: 'resolved',
     resolvedAt: new Date(min(1)), feedback: [{ message: '[done] shipped', url: null, urlLabel: null, timestamp: new Date(min(1)) }],
     historyExpiresAt: new Date(min(0) + 30 * 24 * 60 * 60 * 1000)
   });
   status(statusCollection, { id: 'AS-a1', taskIdentifier: 'LIN-701', tsMs: min(0) + 30 * 1000 });
+}
+
+// Two loops in the SAME session, dispatched by two distinct owners — drives the
+// candidate-ordering behaviour in `_enrichTitles` (LIN-1986 plan-review Finding
+// A): the anchor (account-A) is dispatched first, so it is tried first.
+function seedMultiOwnerTitlelessFixture({ historyCollection, statusCollection }) {
+  historyCollection._docs.push({
+    _id: 'A1', urlKey: URL_KEY, prompt: 'p', promptName: 'autopilot', kind: 'autopilot',
+    issueId: 'id-LIN-701', issueIdentifier: 'LIN-701', issueTitle: null, issueUrl: null,
+    dispatchedAt: new Date(min(0)), dispatchedBy: 'account-A', sessionId: null, status: 'resolved',
+    resolvedAt: new Date(min(1)), feedback: [{ message: '[done] shipped', url: null, urlLabel: null, timestamp: new Date(min(1)) }],
+    historyExpiresAt: new Date(min(0) + 30 * 24 * 60 * 60 * 1000)
+  });
+  historyCollection._docs.push({
+    _id: 'W1', urlKey: URL_KEY, prompt: 'p', promptName: 'implementation', kind: 'implementation',
+    issueId: 'id-LIN-702', issueIdentifier: 'LIN-702', issueTitle: null, issueUrl: null,
+    dispatchedAt: new Date(min(2)), dispatchedBy: 'account-B', sessionId: 'A1', status: 'resolved',
+    resolvedAt: new Date(min(3)), feedback: [{ message: '[done] shipped', url: null, urlLabel: null, timestamp: new Date(min(3)) }],
+    historyExpiresAt: new Date(min(2) + 30 * 24 * 60 * 60 * 1000)
+  });
+  status(statusCollection, { id: 'AS-a1', taskIdentifier: 'LIN-701', tsMs: min(0) + 30 * 1000 });
+  status(statusCollection, { id: 'AS-w1', taskIdentifier: 'LIN-702', tsMs: min(2) + 30 * 1000 });
 }
 
 test('LIN-962: title-less loops resolve a real title from the injected title source', async () => {
@@ -373,7 +398,7 @@ test('LIN-962: title-less loops resolve a real title from the injected title sou
   const calls = [];
   const materializer = createObservationMaterializer({
     dispatchStore, agentStatusStore, observationSessionsStore,
-    resolveWorkspaceTitles: async (urlKey) => { calls.push(urlKey); return { 'LIN-701': 'Fix the login bug' }; }
+    resolveWorkspaceTitles: async (urlKey, ownerAccountId) => { calls.push([urlKey, ownerAccountId]); return { 'LIN-701': 'Fix the login bug' }; }
   });
 
   seedTitlelessFixture({ historyCollection, statusCollection });
@@ -383,7 +408,73 @@ test('LIN-962: title-less loops resolve a real title from the injected title sou
   const s = sessions.find(x => x.sessionId === 'A1');
   assert.ok(s, 'session materialized');
   assert.equal(s.loops[0].issueTitle, 'Fix the login bug', 'real title resolved onto the title-less loop');
-  assert.deepEqual(calls, [URL_KEY], 'title source consulted with the workspace urlKey');
+  assert.deepEqual(calls, [[URL_KEY, 'account-A']], 'title source consulted with the workspace urlKey and the loop\'s dispatchedBy owner (LIN-1986)');
+});
+
+test('LIN-1986: no derivable owner (every candidate loop\'s dispatchedBy is null) ⇒ resolver never consulted, loops stay identifier-only', async () => {
+  const queueCollection = createMockCollection();
+  const historyCollection = createMockCollection();
+  const statusCollection = createMockCollection();
+  const observationCollection = createMockCollection();
+  const dispatchStore = new DispatchQueueStore({ collection: queueCollection, historyCollection });
+  const agentStatusStore = new AgentStatusStore({ collection: statusCollection });
+  const observationSessionsStore = new ObservationSessionsStore({ collection: observationCollection });
+
+  let consulted = 0;
+  const materializer = createObservationMaterializer({
+    dispatchStore, agentStatusStore, observationSessionsStore,
+    resolveWorkspaceTitles: async () => { consulted++; return { 'LIN-701': 'Fix the login bug' }; }
+  });
+
+  // seedTitlelessFixture with dispatchedBy stripped back to null — the
+  // pre-LIN-1948/agent-status-only-derived case, the bounded LIN-2099 residual.
+  historyCollection._docs.push({
+    _id: 'A1', urlKey: URL_KEY, prompt: 'p', promptName: 'autopilot', kind: 'autopilot',
+    issueId: 'id-LIN-701', issueIdentifier: 'LIN-701', issueTitle: null, issueUrl: null,
+    dispatchedAt: new Date(min(0)), dispatchedBy: null, sessionId: null, status: 'resolved',
+    resolvedAt: new Date(min(1)), feedback: [{ message: '[done] shipped', url: null, urlLabel: null, timestamp: new Date(min(1)) }],
+    historyExpiresAt: new Date(min(0) + 30 * 24 * 60 * 60 * 1000)
+  });
+  status(statusCollection, { id: 'AS-a1', taskIdentifier: 'LIN-701', tsMs: min(0) + 30 * 1000 });
+
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'A1' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  assert.equal(consulted, 0, 'no owner derivable ⇒ resolver skipped, not called owner-blind');
+  assert.equal(sessions.find(x => x.sessionId === 'A1').loops[0].issueTitle, null, 'degrades to identifier-only, never worse');
+});
+
+test('LIN-1986: multi-owner batch tries candidates in order, advancing past one that resolves empty (plan-review Finding A)', async () => {
+  const queueCollection = createMockCollection();
+  const historyCollection = createMockCollection();
+  const statusCollection = createMockCollection();
+  const observationCollection = createMockCollection();
+  const dispatchStore = new DispatchQueueStore({ collection: queueCollection, historyCollection });
+  const agentStatusStore = new AgentStatusStore({ collection: statusCollection });
+  const observationSessionsStore = new ObservationSessionsStore({ collection: observationCollection });
+
+  const attempted = [];
+  const materializer = createObservationMaterializer({
+    dispatchStore, agentStatusStore, observationSessionsStore,
+    resolveWorkspaceTitles: async (urlKey, ownerAccountId) => {
+      attempted.push(ownerAccountId);
+      // account-A is a legitimate dispatcher on this urlKey but has no live
+      // session/token right now (selectOwnerWorkspaceRow -> null -> {}); the
+      // materializer must not stop there just because account-A is non-null.
+      if (ownerAccountId === 'account-A') return {};
+      return { 'LIN-701': 'Fix the login bug', 'LIN-702': 'Ship the dashboard' };
+    }
+  });
+
+  seedMultiOwnerTitlelessFixture({ historyCollection, statusCollection });
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'A1' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const s = sessions.find(x => x.sessionId === 'A1');
+  assert.deepEqual(attempted, ['account-A', 'account-B'], 'the anchor\'s owner (dispatched first) is tried first; the worker\'s owner is tried only because it resolved empty');
+  const titleFor = id => s.loops.find(l => l.issueIdentifier === id).issueTitle;
+  assert.equal(titleFor('LIN-701'), 'Fix the login bug');
+  assert.equal(titleFor('LIN-702'), 'Ship the dashboard');
 });
 
 test('LIN-962: a Map title source is supported too', async () => {
