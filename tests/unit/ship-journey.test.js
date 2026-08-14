@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { deriveJourney } from '../../lib/ship-journey.js';
+import { deriveJourney, MAX_TURN_DEGREES } from '../../lib/ship-journey.js';
 import { ORIENTATION_CANDIDATE_CAP } from '../../lib/prompts/roadmap-orientation-template.js';
 
 // =============================================================================
@@ -512,6 +512,141 @@ describe('deriveJourney', () => {
         `${label} input must derive the same journey as oldest-first input`
       );
     }
+  });
+
+});
+
+// =============================================================================
+// cumulative-walk placement (LIN-2065 / LIN-1675 P5)
+// =============================================================================
+
+/**
+ * Build a deriveJourney fixture from an ordered list of bearings — one
+ * completed waypoint per bearing, ascending completedAt (one day apart), all
+ * scored in a single report. `completedAt: null` produces a non-placeable
+ * (completed but never-dated) waypoint, per the local-provider case P3
+ * already handles.
+ */
+function buildWalkFixture(entries) {
+  const orientation = entries.map((e, i) => ({
+    identifier: e.id || `WP-${i}`,
+    bearing: e.bearing,
+    reason: '',
+    archived: false
+  }));
+  const report = createReport({ generatedAt: '2026-01-01T00:00:00Z', orientation });
+  const issues = entries.map((e, i) => createIssue({
+    identifier: e.id || `WP-${i}`,
+    state: { name: 'Done', type: 'completed' },
+    completedAt: e.completedAt !== undefined ? e.completedAt : `2026-02-${String(i + 1).padStart(2, '0')}T00:00:00Z`
+  }));
+  return deriveJourney({ reports: [report], issues });
+}
+
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+describe('cumulative-walk placement', () => {
+
+  test('consecutive placed waypoints are exactly one unit apart', () => {
+    const result = buildWalkFixture([
+      { bearing: 'N' }, { bearing: 'E' }, { bearing: 'S' }, { bearing: 'W' }, { bearing: 'NE' }, { bearing: 'SW' }
+    ]);
+    const wps = result.waypoints;
+    assert.strictEqual(wps.length, 6);
+
+    let prev = { x: 0, y: 0 }; // the berth
+    for (const wp of wps) {
+      assert.ok(typeof wp.x === 'number' && typeof wp.y === 'number', `${wp.identifier} must carry x/y`);
+      assert.ok(Math.abs(distance(prev, wp) - 1) < 1e-9, `${wp.identifier} must be exactly one unit from the previous position`);
+      prev = wp;
+    }
+  });
+
+  test('a same-bearing run renders as an exact straight drift (heading never turns away from its own bearing)', () => {
+    const result = buildWalkFixture(Array.from({ length: 8 }, () => ({ bearing: 'E' })));
+    result.waypoints.forEach((wp, i) => {
+      assert.ok(Math.abs(wp.x - (i + 1)) < 1e-9, `waypoint ${i} x should be ${i + 1}`);
+      assert.ok(Math.abs(wp.y) < 1e-9, `waypoint ${i} y should stay 0`);
+    });
+  });
+
+  test('a direct N→S reversal takes multiple steps as a bounded-turn arc, never a one-step flip', () => {
+    const result = buildWalkFixture([
+      { bearing: 'N' }, { bearing: 'N' },
+      { bearing: 'S' }, { bearing: 'S' }, { bearing: 'S' }, { bearing: 'S' }, { bearing: 'S' }, { bearing: 'S' }
+    ]);
+    const wps = result.waypoints;
+
+    // Recover each step's heading from its displacement (unit-length steps,
+    // same cos/sin convention as BEARING_TO_ANGLE).
+    const points = [{ x: 0, y: 0 }, ...wps];
+    const headings = [];
+    for (let i = 1; i < points.length; i++) {
+      const dx = points[i].x - points[i - 1].x;
+      const dy = points[i].y - points[i - 1].y;
+      let deg = (Math.atan2(dy, dx) * 180) / Math.PI;
+      if (deg < 0) deg += 360;
+      headings.push(deg);
+    }
+
+    // Every step's turn is bounded by MAX_TURN_DEGREES.
+    for (let i = 1; i < headings.length; i++) {
+      let delta = ((headings[i] - headings[i - 1] + 540) % 360) - 180;
+      assert.ok(Math.abs(delta) <= MAX_TURN_DEGREES + 1e-9,
+        `step ${i} turned ${delta}°, exceeding MAX_TURN_DEGREES (${MAX_TURN_DEGREES}°)`);
+    }
+
+    // The reversal is not a one-step flip: right after the first 'S'
+    // waypoint, heading has not yet reached south (90°).
+    assert.ok(Math.abs(headings[1] - 270) < 1e-9, 'heading starts at N (270°) across the same-bearing run');
+    assert.ok(Math.abs(headings[2] - 90) > 1e-9, 'heading must not snap straight from N to S in one step');
+
+    // The tail converges to — and stays at — due south: a straight drift
+    // after the turn-in arc (pin the converged tail, not the first steps).
+    assert.ok(Math.abs(headings[headings.length - 1] - 90) < 1e-9, 'heading must converge to S (90°) by the run\'s tail');
+    assert.ok(Math.abs(headings[headings.length - 2] - 90) < 1e-9, 'the converged tail must hold steady, not oscillate');
+  });
+
+  test('the walk runs over the placeable projection only — a never-dated waypoint is excluded and does not perturb spacing', () => {
+    const result = buildWalkFixture([
+      { id: 'A', bearing: 'N', completedAt: '2026-01-01T00:00:00Z' },
+      { id: 'B', bearing: 'E', completedAt: null },
+      { id: 'C', bearing: 'S', completedAt: '2026-01-02T00:00:00Z' }
+    ]);
+
+    const byId = Object.fromEntries(result.waypoints.map(wp => [wp.identifier, wp]));
+    assert.strictEqual(result.waypoints.length, 3, 'the never-dated waypoint is still present in the unfiltered list');
+    assert.ok(!('x' in byId.B) && !('y' in byId.B), 'a non-placeable waypoint carries no x/y');
+
+    // A is the sole placeable predecessor of C — the walk skips B entirely,
+    // so C's position is exactly one bounded-turn step from A's, not from a
+    // (nonexistent) intermediate step at B's bearing.
+    assert.ok(Math.abs(distance({ x: 0, y: 0 }, byId.A) - 1) < 1e-9);
+    assert.ok(Math.abs(distance(byId.A, byId.C) - 1) < 1e-9);
+  });
+
+  test('a north-star segment break resets both heading and position to a fresh berth', () => {
+    const reports = [
+      createReport({ generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation: [{ identifier: 'W1', bearing: 'N', reason: '', archived: false }] }),
+      createReport({ generatedAt: '2026-01-05T00:00:00Z', northStar: 'Ship B', orientation: [{ identifier: 'W2', bearing: 'S', reason: '', archived: false }] })
+    ];
+    const issues = [
+      createIssue({ identifier: 'W1', state: { name: 'Done', type: 'completed' }, completedAt: '2026-01-02T00:00:00Z' }),
+      createIssue({ identifier: 'W2', state: { name: 'Done', type: 'completed' }, completedAt: '2026-01-10T00:00:00Z' })
+    ];
+
+    const result = deriveJourney({ reports, issues });
+    assert.strictEqual(result.starChanges.length, 1, 'sanity: a star change is present between W1 and W2');
+
+    const byId = Object.fromEntries(result.waypoints.map(wp => [wp.identifier, wp]));
+    // W2 opens a fresh segment: heading = its own bearing (S, 90°) directly,
+    // position measured from the origin — not a bounded-turn step from W1's
+    // accumulated position/heading.
+    assert.ok(Math.abs(byId.W2.x - 0) < 1e-9, 'a fresh berth starts at x=0');
+    assert.ok(Math.abs(byId.W2.y - 1) < 1e-9, 'a fresh berth steps one unit along its own bearing (S), not a clamped turn from W1');
+    assert.ok(Math.abs(distance({ x: 0, y: 0 }, byId.W2) - 1) < 1e-9);
   });
 
 });
