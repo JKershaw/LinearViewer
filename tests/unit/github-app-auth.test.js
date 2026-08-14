@@ -21,6 +21,13 @@ import { mintAppJwt, mintInstallationToken, fetchInstallation, exchangeOAuthCode
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
 const PEM = privateKey.export({ type: 'pkcs1', format: 'pem' })
 
+// A SECOND, distinct ephemeral keypair (LIN-2081 round-5 class guard) — used
+// only to build concatenated-PEM leak cases. Being a genuinely different key
+// means a leak of PEM's bytes and a leak of PEM2's bytes are both
+// independently detectable; reusing PEM for both halves could not tell them apart.
+const { privateKey: privateKey2 } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
+const PEM2 = privateKey2.export({ type: 'pkcs1', format: 'pem' })
+
 // GITHUB_CLIENT_ID/SECRET are included here (not just the GITHUB_APP_* trio)
 // so every test in this file starts with ALL FIVE GITHUB_REQUIRED_ENV vars
 // present — isGitHubConfigured() assertions below then isolate purely on
@@ -391,6 +398,123 @@ describe('GitHub App auth primitives (LIN-707)', () => {
         () => getAppConfig(),
         /GitHub App auth: GITHUB_APP_PRIVATE_KEY has no key material between the '-----BEGIN'\/'-----END' armor lines/
       )
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // getAppConfig() — no thrown message ever leaks key material (LIN-2081
+  // round-5 review). Round 4's redaction fix at the invalid-alphabet throw
+  // was correct, but a SIBLING throw in the same function (the stray-suffix
+  // message) still echoed an entire concatenated second PEM verbatim — a
+  // per-instance review missed it twice. This block is the class guard the
+  // ticket asked for: one table of malformed values, each driven through
+  // getAppConfig(), every thrown message scanned for ANY run of the source
+  // keys' own base64 body material. It must fail if a future throw is added
+  // that interpolates key-derived content — proven below by reverting the
+  // fix and confirming these tests catch it (see the class-guard-catches-a-
+  // reintroduced-leak test).
+  // -------------------------------------------------------------------------
+
+  describe('PEM error messages never leak key material (LIN-2081 round-5 class guard)', () => {
+    // Any run of real key bytes this long surviving into a thrown message
+    // counts as a leak. Chosen with margin over PEM_LEAK_PREVIEW_MAX (12 in
+    // app-auth.js) so an intentionally bounded preview can never itself trip
+    // this check — the guard is for UNBOUNDED echoes, not the accepted
+    // small-preview case.
+    const LEAK_RUN_LEN = 20
+
+    // Every overlapping LEAK_RUN_LEN-char window of `pem`'s own base64 body
+    // lines (armor headers/footer excluded — they're public literal text,
+    // not secret, and would false-positive since our own messages legitimately
+    // say '-----BEGIN').
+    function bodyChunksOf(pem) {
+      const lines = pem.split('\n')
+      const bodyLines = lines.slice(1, -2) // drop the BEGIN header, and the END footer + trailing blank
+      const chunks = []
+      for (const line of bodyLines) {
+        for (let i = 0; i + LEAK_RUN_LEN <= line.length; i++) chunks.push(line.slice(i, i + LEAK_RUN_LEN))
+      }
+      return chunks
+    }
+    const SECRET_CHUNKS = [...bodyChunksOf(PEM), ...bodyChunksOf(PEM2)]
+
+    function corruptedLine(pem, replacement) {
+      const lines = pem.split('\n')
+      lines[2] = replacement
+      return lines.join('\n')
+    }
+
+    // Derived from the two real generated keys above — every shape a prior
+    // review round found reaching a distinct throw in assertPemShape.
+    const CASES = [
+      ['two concatenated PEMs (round-5 finding 1)', PEM + PEM2],
+      ['a stray-character suffix (LIN-2057 case)', PEM.replace(/\n$/, '') + '%'],
+      ['a stray-character prefix (LIN-2057 case)', '$HOME/.ssh/' + PEM],
+      ['a corrupt body line (single bad char)', corruptedLine(PEM, PEM.split('\n')[2].slice(0, 4) + '!' + PEM.split('\n')[2].slice(4))],
+      ['a 300-char corrupt body line (round-5 finding 3)', corruptedLine(PEM, '!'.repeat(300))],
+      ['newlines collapsed to spaces', PEM.replace(/\n/g, ' ')],
+      ['newlines stripped entirely', PEM.replace(/\n/g, '')],
+      ['newlines collapsed to spaces with a single real LF surviving before END (empty-body class)', PEM.replace(/\n/g, ' ').replace(/ (-----END)/, '\n$1')],
+    ]
+
+    for (const [label, value] of CASES) {
+      test(`getAppConfig's thrown message contains no run of key material — ${label}`, () => {
+        process.env.GITHUB_APP_PRIVATE_KEY = value
+        let message = null
+        try {
+          getAppConfig()
+        } catch (err) {
+          message = err.message
+        }
+        assert.ok(message, `expected "${label}" to be rejected by getAppConfig`)
+        for (const chunk of SECRET_CHUNKS) {
+          assert.ok(!message.includes(chunk), `message leaked key material for case "${label}" (chunk "${chunk}")\nfull message: ${message}`)
+        }
+      })
+    }
+
+    test('the concatenated-PEM case is bounded and names the shape rather than echoing content', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM + PEM2
+      assert.throws(() => getAppConfig(), (err) => {
+        assert.match(err.message, /a second '-----BEGIN' block \(\d+ chars\)/)
+        assert.ok(err.message.length < 200, `message should stay short, was ${err.message.length} chars: ${err.message}`)
+        return true
+      })
+    })
+
+    test('a long run of invalid-alphabet characters is capped, not echoed in full (round-5 finding 3)', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = corruptedLine(PEM, '!'.repeat(300))
+      assert.throws(() => getAppConfig(), (err) => {
+        assert.match(err.message, /\(\+\d+ more\)/)
+        assert.ok(err.message.length < 500, `message should stay bounded, was ${err.message.length} chars`)
+        return true
+      })
+    })
+
+    // The five pre-existing assertions pinning the exact LIN-2057 '%' message
+    // (this file + github-auth.test.js + github-projects-auth.test.js) must
+    // stay byte-identical — the fix only widens the LONG-suffix path.
+    test('the short LIN-2057 stray-% message is untouched (byte-identical)', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, '') + '%'
+      assert.throws(
+        () => getAppConfig(),
+        /GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '%'$/
+      )
+    })
+
+    // Proves this suite is a real guard, not decoration: reverting the
+    // stray-suffix fix to its old unbounded form makes the concatenated-PEM
+    // case above fail. Exercised inline by re-simulating the OLD behavior
+    // directly (rather than mutating source), so the test both documents and
+    // pins the property without needing to touch the implementation file.
+    test('class guard sanity: the OLD unbounded interpolation would have failed this suite', () => {
+      const value = PEM + PEM2
+      const lines = value.split('\n')
+      const endMatch = value.match(/-----END [A-Z0-9 ]*KEY-----/)
+      const trailing = value.slice(endMatch.index + endMatch[0].length)
+      const oldMessage = `GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '${trailing}'`
+      const leaked = SECRET_CHUNKS.some(chunk => oldMessage.includes(chunk))
+      assert.ok(leaked, 'sanity check failed: the pre-fix message shape should have leaked key material')
     })
   })
 
