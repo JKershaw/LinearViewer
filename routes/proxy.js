@@ -44,14 +44,7 @@ import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } f
 // capability gate (provider.supports -> 422) is now a real runtime path, not
 // only a test-injected one. The lib/linear.js shim stays the frozen back-compat
 // surface for the dashboard fetchers only.
-//
-// The compute/task-automation fetchers (fetchProjects/fetchIssueContext/
-// fetchRecommendationContext) remain statically Linear-bound: they feed the
-// LLM-driven stack/recommend/recap/brief/prompt endpoints, not the read data
-// path, and are out of scope for the per-workspace selection work (LIN-581).
-import {
-  fetchProjects, fetchIssueContext, fetchRecommendationContext,
-} from '../lib/providers/linear/index.js';
+import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
@@ -153,7 +146,7 @@ async function getTestMockData() {
  * mode. In live mode fetchIssueContext throws on a missing issue; callers map
  * that to a 404.
  */
-async function resolvePromptIssueContext(accessToken, identifier, isTestMode) {
+async function resolvePromptIssueContext(provider, accessToken, identifier, isTestMode) {
   if (isTestMode) {
     const mockData = await getTestMockData();
     const mockIssue = mockData.issues.find(i =>
@@ -189,7 +182,7 @@ async function resolvePromptIssueContext(accessToken, identifier, isTestMode) {
       })
     };
   }
-  return await withTimeout(fetchIssueContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
+  return await withTimeout(provider.fetchIssueContext(accessToken, identifier), GRAPHQL_TIMEOUT_MS);
 }
 
 /**
@@ -3654,6 +3647,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/stack', reason);
       }
+      if (denyIfUnsupported(provider, 'fetchProjects', req, res, '/api/proxy/stack')) return;
 
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 50);
 
@@ -3698,6 +3692,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/prompt', reason);
       }
+      if (denyIfUnsupported(provider, 'fetchIssueContext', req, res, '/api/proxy/prompt')) return;
 
       const { identifier, templateKey } = req.params;
 
@@ -3715,7 +3710,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
 
       // Fetch issue context (use mock data in test mode)
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
-      const ctx = await resolvePromptIssueContext(accessToken, identifier, isTestMode);
+      const ctx = await resolvePromptIssueContext(provider, accessToken, identifier, isTestMode);
       if (!ctx) {
         logEvent(req, '/api/proxy/prompt', 404);
         return notFound.json(res, 'Issue not found');
@@ -3967,6 +3962,13 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/recommend', reason);
       }
+      // Two capability-gated fetchers can serve this route: the kind-override
+      // branch below reaches fetchIssueContext (via resolvePromptIssueContext),
+      // the default descent reaches fetchRecommendationContext (via
+      // computeRecommendation, which has no req/res of its own — LIN-2044
+      // review Note A — so its gate lives here at the resolution point instead).
+      if (denyIfUnsupported(provider, 'fetchIssueContext', req, res, '/api/proxy/recommend')) return;
+      if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/recommend')) return;
 
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
 
@@ -4049,7 +4051,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
           // `{}` for provider.ui keeps Linear output byte-identical to /prompt.
           let ctx;
           try {
-            ctx = await resolvePromptIssueContext(accessToken, identifier, isTestMode);
+            ctx = await resolvePromptIssueContext(provider, accessToken, identifier, isTestMode);
           } catch (err) {
             if (err.message?.includes('not found')) {
               keepalive.stop();
@@ -4547,6 +4549,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/recap', reason);
       }
+      if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/recap')) return;
       if (!recapCacheStore) {
         logEvent(req, '/api/proxy/recap', 503);
         return jsonError(res, 503, 'Recap cache not configured');
@@ -4699,6 +4702,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/recap', reason);
       }
+      if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/recap')) return;
       if (!recapCacheStore) {
         logEvent(req, '/api/proxy/recap', 503);
         return jsonError(res, 503, 'Recap cache not configured');
@@ -4836,6 +4840,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/brief', reason);
       }
+      if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/brief')) return;
       if (!briefCacheStore) {
         logEvent(req, '/api/proxy/brief', 503);
         return jsonError(res, 503, 'Brief cache not configured');
@@ -4987,6 +4992,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/brief', reason);
       }
+      if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/brief')) return;
       if (!briefCacheStore) {
         logEvent(req, '/api/proxy/brief', 503);
         return jsonError(res, 503, 'Brief cache not configured');
@@ -5395,10 +5401,11 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         if (!accessToken) {
           return workspaceUnavailable(req, res, '/api/proxy/autopilot/kickoff', reason);
         }
+        if (denyIfUnsupported(provider, 'fetchIssueContext', req, res, '/api/proxy/autopilot/kickoff')) return;
         const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
         let ctx;
         try {
-          ctx = await resolvePromptIssueContext(accessToken, issueIdentifier, isTestMode);
+          ctx = await resolvePromptIssueContext(provider, accessToken, issueIdentifier, isTestMode);
         } catch (err) {
           if (err.message?.includes('not found')) {
             logEvent(req, '/api/proxy/autopilot/kickoff', 404);
@@ -5973,6 +5980,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/recommend-and-dispatch', reason);
       }
+      // Two capability-gated fetchers can serve this route — see the matching
+      // comment on GET /recommend above.
+      if (denyIfUnsupported(provider, 'fetchIssueContext', req, res, '/api/proxy/recommend-and-dispatch')) return;
+      if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/recommend-and-dispatch')) return;
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
 
       // ── Verb-override path (LIN-573) ──────────────────────────────────────
@@ -5987,7 +5998,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (kind !== undefined) {
         let ctx;
         try {
-          ctx = await resolvePromptIssueContext(accessToken, issueIdentifier, isTestMode);
+          ctx = await resolvePromptIssueContext(provider, accessToken, issueIdentifier, isTestMode);
         } catch (err) {
           if (err.message?.includes('not found')) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 404);
