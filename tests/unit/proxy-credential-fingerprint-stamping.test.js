@@ -73,25 +73,37 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     assert.deepEqual(missingReq, [], `every resolveProviderAccess(...) call must end in ", req)" so the chokepoint can stamp — offenders: ${JSON.stringify(missingReq)}`);
   });
 
-  test('each of the 9 direct resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy) call sites is immediately followed by a req.resolvedCredentialFingerprint stamp, before the next statement', () => {
-    const pattern = /const \{ token: accessToken, reason, credentialFingerprint \} = await resolveWorkspaceAccess\(req\.proxyUrlKey, req\.proxyCreatedBy\);\s*\n\s*(?:\/\/[^\n]*\n\s*)*req\.resolvedCredentialFingerprint = credentialFingerprint \?\? null;/g;
+  test('each of the 9 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites destructures `provider` (LIN-2044) — the manual per-site stamp is gone because resolveProviderAccess now stamps internally, proven by the chokepoint test above', () => {
+    // Pre-LIN-2044 this pinned a DIFFERENT shape: a raw resolveWorkspaceAccess(...)
+    // call destructuring `credentialFingerprint`, immediately followed by a manual
+    // `req.resolvedCredentialFingerprint = credentialFingerprint ?? null;` line.
+    // LIN-2044 routed all 9 of these sites onto resolveProviderAccess (passing `req`
+    // as the third arg so ITS internal stamp, already pinned above, lands on this
+    // request) and deleted the now-redundant manual stamp line at each site.
+    const pattern = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req\);/g;
     const matches = PROXY_SRC.match(pattern) || [];
     assert.equal(
       matches.length,
       9,
-      `expected 9 direct resolveWorkspaceAccess(...) call sites each immediately followed by the stamp line, found ${matches.length}. ` +
-      'A count below 9 means a site\'s stamp is missing, mis-ordered, or its destructure no longer requests credentialFingerprint; ' +
-      'a count above 9 means a NEW 10th direct site was added — update this pin\'s expected count only after also updating LIN-1980\'s stamping (and the "10" count pinned in workspace-accesstoken-linear-egress-census.test.js).'
+      `expected 9 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites in this exact shape, found ${matches.length}. ` +
+      'A count below 9 means a site reverted to the pre-LIN-2044 raw resolveWorkspaceAccess(...) + manual-stamp shape ' +
+      '(losing both provider resolution and, if `req` is not threaded through, the request-scoped stamp); ' +
+      'a count above 9 means a NEW 10th direct site was added — update this pin\'s expected count only after also ' +
+      'updating the "expected exactly 1" resolveWorkspaceAccess( count pinned in workspace-accesstoken-linear-egress-census.test.js.'
     );
   });
 
-  test('the stamp precedes every early !accessToken / !token return in the same handler, not just textually follows the resolve call', () => {
-    // Belt-and-braces on the ordering claim itself (not just adjacency): split
-    // each of the 9 direct-site handler bodies at their `if (!accessToken)`
-    // guard and assert the stamp is on the EARLIER side.
+  test('each of the 9 direct sites checks !accessToken immediately after the resolveProviderAccess(...) call, with nothing but the LIN-1980 comment between them — no logic can act on a request whose provider resolution failed before the guard has a chance to reject it', () => {
+    // Belt-and-braces on the ordering claim itself (not just presence): since
+    // resolveProviderAccess's own internal stamp (pinned above) completes before
+    // the `await` on its call site returns, the meaningful residual risk is a
+    // stray statement sneaking in BETWEEN the resolve call and its !accessToken
+    // guard that reads/uses accessToken (or anything else) before the guard can
+    // reject an unresolved credential — so assert nothing but the LIN-1980
+    // comment sits in that gap, for each of the 9 direct sites.
     const resolveIdx = [];
     let cursor = 0;
-    const needle = 'const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);';
+    const needle = 'const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);';
     while (true) {
       const idx = PROXY_SRC.indexOf(needle, cursor);
       if (idx === -1) break;
@@ -103,14 +115,15 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     for (const idx of resolveIdx) {
       // Bounded by the NEXT resolve site (or EOF) rather than a fixed char
       // count, so a comment of any length between the resolve call and its
-      // guard can't produce a false "stamp not found".
+      // guard can't produce a false "guard not found".
       const nextResolveIdx = resolveIdx.find(other => other > idx) ?? PROXY_SRC.length;
-      const window = PROXY_SRC.slice(idx, Math.min(idx + 800, nextResolveIdx));
-      const stampIdx = window.indexOf('req.resolvedCredentialFingerprint = credentialFingerprint');
+      const window = PROXY_SRC.slice(idx, Math.min(idx + 400, nextResolveIdx));
       const guardIdx = window.indexOf('if (!accessToken)');
-      assert.ok(stampIdx >= 0, `no stamp found before the next resolve site (offset ${idx})`);
-      assert.ok(guardIdx >= 0, `no !accessToken guard found before the next resolve site (offset ${idx})`);
-      assert.ok(stampIdx < guardIdx, `stamp must precede the !accessToken early return (offset ${idx})`);
+      assert.ok(guardIdx >= 0, `no !accessToken guard found shortly after the resolve site (offset ${idx})`);
+      const between = window.slice(needle.length, guardIdx);
+      const strippedOfComments = between.replace(/\/\/[^\n]*/g, '').trim();
+      assert.equal(strippedOfComments, '',
+        `unexpected non-comment code between the resolve call and its !accessToken guard (offset ${idx}): ${JSON.stringify(between)}`);
     }
   });
 
