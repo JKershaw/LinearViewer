@@ -127,6 +127,69 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
     await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(2);
   });
 
+  // LIN-2065 production-scale extent pin: the prior in-viewport case above
+  // exercises only 3 waypoints, well under where clipping actually begins
+  // (n ≈ 85 under the old absolute-polar placement, radius = 12 + index*8,
+  // which pins computeFitZoom at its 0.15 minZoom floor once the trail
+  // outgrows the viewport at that floor). This drives a real production-scale
+  // trail (130 waypoints, cycling all 8 bearings so the heading-inertia walk
+  // turns repeatedly) through the same geometry containment check.
+  test('a production-scale trail (130 waypoints, cycling bearings) stays fully contained in the map viewport', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const urlKey = localWorkerUrlKey;
+    const id = (rawId) => localSeedId(urlKey, rawId);
+    const WAYPOINT_COUNT = 130;
+    const CYCLE = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+
+    const issues = [];
+    const orientation = [];
+    for (let i = 0; i < WAYPOINT_COUNT; i++) {
+      const identifier = `LOCAL-${i + 1}`;
+      const month = i < 27 ? '01' : i < 54 ? '02' : i < 81 ? '03' : i < 108 ? '04' : '05';
+      const day = String((i % 27) + 1).padStart(2, '0');
+      const completedAt = `2026-${month}-${day}T00:00:00Z`;
+      issues.push({
+        id: id(`sj-issue-${i + 1}`), identifier, title: `Waypoint ${i + 1}`, description: '',
+        projectId: id('sj-proj-1'), sortOrder: i + 1, state: { name: 'Done', type: 'completed' },
+        completedAt, url: `/workspace/${urlKey}/issue/${id(`sj-issue-${i + 1}`)}`,
+      });
+      orientation.push({ identifier, bearing: CYCLE[i % CYCLE.length], reason: 'r', archived: false });
+    }
+
+    await seedLocal({
+      projects: [{ id: id('sj-proj-1'), name: 'Journey Project', content: '', sortOrder: 1 }],
+      issues,
+    }, { features: { shipJourney: true } });
+    await seedReports(page, urlKey, [
+      { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+    ]);
+    // This test seeds a materially different-sized issue set than the specs
+    // above it — bypass fetchWorkspaceIssues's 30s memo (server.js) so the
+    // dashboard-scale trail isn't read from another test's stale cache.
+    await page.request.get('/test/clear-workspace-issues-memo');
+
+    await page.goto(`/workspace/${urlKey}/ship-journey`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(WAYPOINT_COUNT);
+
+    const geometry = await page.evaluate(() => {
+      const svg = document.getElementById('ship-journey-map');
+      const svgRect = svg.getBoundingClientRect();
+      return Array.from(document.querySelectorAll('[data-testid="ship-journey-waypoint"]')).map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          insideX: r.left >= svgRect.left - 0.5 && r.right <= svgRect.right + 0.5,
+          insideY: r.top >= svgRect.top - 0.5 && r.bottom <= svgRect.bottom + 0.5,
+        };
+      });
+    });
+    expect(geometry).toHaveLength(WAYPOINT_COUNT);
+    for (const point of geometry) {
+      expect(point.insideX).toBe(true);
+      expect(point.insideY).toBe(true);
+    }
+  });
+
   test('redirects to settings when the flag is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(journeySeed(localWorkerUrlKey), { features: { shipJourney: false } });
     await page.goto(`/workspace/${localWorkerUrlKey}/ship-journey`);

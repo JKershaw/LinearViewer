@@ -583,7 +583,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo }))
 }
 
 // =============================================================================
@@ -2014,6 +2014,16 @@ async function fetchWorkspaceIssues(workspace) {
   const result = issues || [];
   if (memoKey) _workspaceIssuesMemo.set(memoKey, { issues: result, cachedAt: Date.now() });
   return result;
+}
+
+// Test-only reset for the memo above (LIN-2065): every local-provider E2E
+// session shares one hardcoded `workspace.id` (routes/test.js's LOCAL_WS_UUID),
+// so a spec that reseeds a materially different issue set within the 30s TTL
+// of a prior local-provider fetch would otherwise read stale data. Cleared
+// via /test/clear-workspace-issues-memo (routes/test.js) — the same
+// explicit-reset pattern the other `/test/clear-*` routes already use.
+function clearWorkspaceIssuesMemo() {
+  _workspaceIssuesMemo.clear();
 }
 
 // LIN-962: the off-session title-resolution glue (session scan → latest-expiring-
