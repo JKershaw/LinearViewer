@@ -119,7 +119,7 @@ test('two or more waypoints render the coverage figure, controls, and map mount'
   const html = renderShipJourneyPage(twoWaypointJourney(), baseOptions());
   assert.ok(!html.includes('data-testid="ship-journey-empty"'));
   assert.match(html, /data-testid="ship-journey-coverage"/);
-  assert.match(html, /100% coverage — 2 of 2 completed tasks charted, across the last 3 retained runs\./);
+  assert.match(html, /2 of 2 completed tasks charted — 100% coverage, across the last 3 retained runs\./);
   assert.match(html, /data-testid="ship-journey-controls"/);
   assert.match(html, /data-testid="ship-journey-play"/);
   assert.match(html, /data-testid="ship-journey-step-back"/);
@@ -160,8 +160,8 @@ test('a waypoint with no completedAt is skipped from the trail and the coverage 
 
 // LIN-1970 defect 1 regression: feed deriveJourney's REAL output (not a
 // hand-built coverage fixture) through the renderer. This is exactly the
-// shape that produced the self-contradictory "150% coverage — 2 of 2
-// completed tasks charted" — 3 retained runs, one candidate's issue never
+// shape that produced the self-contradictory "2 of 2 completed tasks
+// charted — 150% coverage" — 3 retained runs, one candidate's issue never
 // got a completedAt set (reachable on the local provider), so deriveJourney
 // yields 3 unfiltered waypoints over 2 completions (coverage.ratio === 1.5),
 // while the renderer must display the FILTERED (placeable) count in both the
@@ -187,15 +187,15 @@ test('a real deriveJourney output with a null-completedAt candidate renders an i
   assert.equal(journey.coverage.ratio, 1.5);
 
   const html = renderShipJourneyPage(journey, baseOptions());
-  const match = html.match(/(\d+)% coverage — (\d+) of (\d+) completed/);
-  assert.ok(match, 'coverage figure renders a percentage sentence');
-  const [, pct, numerator, denominator] = match;
+  const match = html.match(/(\d+) of (\d+) completed task[^—]* — (\d+)% coverage/);
+  assert.ok(match, 'coverage figure renders a task-first percentage sentence');
+  const [, numerator, denominator, pct] = match;
   assert.equal(numerator, '2', 'numerator is the placeable (filtered) count');
   assert.equal(denominator, '2');
   assert.equal(pct, '100', 'percentage derives from the filtered numerator, not coverage.ratio');
 });
 
-test('embeds the filtered waypoint + starChanges data for client-side playback', () => {
+test('embeds the filtered waypoint + starChanges data for client-side playback, with no bearingHistogram (LIN-2069: no client consumer)', () => {
   const journey = twoWaypointJourney({
     starChanges: [{ from: 'a', to: 'b', at: '2026-01-01T12:00:00Z' }],
   });
@@ -204,6 +204,7 @@ test('embeds the filtered waypoint + starChanges data for client-side playback',
   assert.match(html, /"identifier":"LIN-1"/);
   assert.match(html, /"identifier":"LIN-2"/);
   assert.match(html, /"from":"a","to":"b"/);
+  assert.ok(!html.includes('bearingHistogram'), 'the embedded payload no longer carries a bearingHistogram key');
 });
 
 test('loads its own scoped assets in the correct script order (common.js before ship-journey.js)', () => {
