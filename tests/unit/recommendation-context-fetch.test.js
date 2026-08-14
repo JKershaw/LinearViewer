@@ -265,15 +265,22 @@ describe('recommendation context fetch stops fighting the keepalive', () => {
       'the tight GRAPHQL_TIMEOUT_MS cap on fetchRecommendationContext must be gone');
   });
 
-  test('context fetch is abortable (signal threaded) under the backstop budget', () => {
+  test('context fetch is abortable (signal threaded) under the backstop budget, via the resolved provider (LIN-2044)', () => {
     // The recommend site additionally threads `noDescend` (LIN-365) into the options
     // bag; the abortable backstop contract still holds, so allow that optional arg.
+    // LIN-2044 re-pointed the callee from the bare Linear-bound fetchRecommendationContext
+    // onto provider.fetchRecommendationContext (the request's own resolved provider) at
+    // all 5 sites; { signal, noDescend } is still passed uniformly to every provider —
+    // LIN-2044 Step 5 accepts that non-Linear providers don't all honor `signal` (a
+    // pre-existing, now-reachable gap named in that step, not something this shape
+    // test asserts on), while the caller-visible 504-on-timeout behavior is unchanged
+    // for every provider regardless.
     const calls = proxySource.match(
-      /fetchWithTimeout\(\s*\(signal\)\s*=>\s*fetchRecommendationContext\(accessToken,\s*identifier,\s*\{\s*signal(?:,\s*noDescend)?\s*\}\),\s*CONTEXT_FETCH_TIMEOUT_MS\)/g
+      /fetchWithTimeout\(\s*\(signal\)\s*=>\s*provider\.fetchRecommendationContext\(accessToken,\s*identifier,\s*\{\s*signal(?:,\s*noDescend)?\s*\}\),\s*CONTEXT_FETCH_TIMEOUT_MS\)/g
     ) || [];
-    // recommend + recap + brief (x2) + status = 5 sites
+    // recommend + recap (x2) + brief (x2) = 5 sites
     assert.strictEqual(calls.length, 5,
-      `all 5 recommendation-context fetches must use the abortable backstop helper (found ${calls.length})`);
+      `all 5 recommendation-context fetches must call provider.fetchRecommendationContext via the abortable backstop helper (found ${calls.length})`);
   });
 
   test('fetchWithTimeout aborts the request and clears its timer', () => {
