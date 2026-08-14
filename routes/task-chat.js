@@ -24,8 +24,7 @@ import { streamChat, streamChatWithTools, isToolCapableModel, isRecommendationEn
 import { createChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
 import { sessionIsTerminal } from './dashboard.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
-import { getProviderForWorkspace } from '../lib/providers/registry.js';
-import { getWorkspaceCallScope, resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
+import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
 
 const MAX_QUESTION_LENGTH = 2000;
@@ -344,7 +343,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       return res.status(400).json({ error: 'Invalid issue ID format' });
     }
 
-    // Capability backstop — clean 404 (never a raw NotImplementedError → 502)
+    // Capability backstop — clean 422 (never a raw NotImplementedError → 502)
     // for a provider that never implements recommendation context (LIN-1910).
     if (!issueProvider.supports('fetchRecommendationContext')) {
       return res.status(422).json({
@@ -456,13 +455,24 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       };
 
       if (isToolCapableModel(selectedModel)) {
-        // Tool-capable model: offer the read-only, workspace-scoped catalog so a
-        // turn can look up related tasks. The whole loop is ONE turn — the single
-        // free-tier tryUse above still covers it; we add no per-hop quota call.
-        const provider = getProviderForWorkspace(workspace);
+        // Tool-capable model: offer the read-only tool catalog, bound to the
+        // SAME row binding (issueProvider/issueCallScope, resolved above at
+        // :336) the context fetch used above — not the workspace-active
+        // binding — so a lookup tool the model calls mid-turn resolves the
+        // same source the answer is already grounded in (LIN-2047). One
+        // consequence: get_stack (lib/chat-tools.js) is workspace-wide by
+        // nature, not row-scoped, and the catalog takes a single provider/
+        // scope pair for every tool — so this also re-points get_stack's
+        // "current workspace" digest at the row's binding rather than the
+        // active one. That's the same active-vs-row inconsistency this ticket
+        // removes everywhere else, now surfacing on the one tool the catalog
+        // can't scope separately without touching lib/chat-tools.js, which is
+        // outside this ticket's ownership boundary. The whole loop is ONE
+        // turn — the single free-tier tryUse above still covers it; we add no
+        // per-hop quota call.
         const { tools, executeTool } = createChatToolCatalog({
-          provider,
-          scope: getWorkspaceCallScope(workspace),
+          provider: issueProvider,
+          scope: issueCallScope,
           recapCacheStore,
           briefCacheStore,
           urlKey: workspace.urlKey,

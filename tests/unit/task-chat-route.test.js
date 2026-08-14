@@ -70,6 +70,48 @@ describe('task-chat route tool-calling wiring (LIN-990)', () => {
     assert.strictEqual((ROUTE_SRC.match(/selectedModel\s*=/g) || []).length, 1);
     assert.match(ROUTE_SRC, /const\s+selectedModel\s*=/);
   });
+
+  test('createChatToolCatalog is bound to the row\'s resolved binding, not the workspace-active one (LIN-2047)', () => {
+    // LIN-1910 threaded resolveIssueBinding into the context fetch but left the
+    // tool catalog on the workspace-active provider/scope, so a mid-turn lookup
+    // tool for a foreign-source row (e.g. a Jira row in a merged workspace)
+    // resolved the WRONG binding — `Task <id> not found`, or worse, a different
+    // issue's content presented as this task's. This pins the fix: the catalog
+    // construction site must be given `issueProvider`/`issueCallScope` (the same
+    // pair resolveIssueBinding produced above, already used by the context
+    // fetch), never `getProviderForWorkspace(workspace)` /
+    // `getWorkspaceCallScope(workspace)`.
+    //
+    // Live-invocation arg capture (spying on createChatToolCatalog) isn't
+    // available here without opting the whole unit suite into Node's
+    // `--experimental-test-module-mocks` flag (mock.module is undefined
+    // without it, and no test in this repo currently uses it) — so, matching
+    // this file's own established idiom for pinning route wiring facts
+    // cheaply and without a network call (see the tool-calling wiring
+    // tests above), this asserts against the call site's source text
+    // instead. It still fails loud on a revert: reverting the two changed
+    // lines restores `provider,` / `scope: getWorkspaceCallScope(workspace)`,
+    // which trips every assertion below.
+    const start = ROUTE_SRC.indexOf('createChatToolCatalog({');
+    assert.ok(start > 0, 'expected the createChatToolCatalog call site to exist');
+    const end = ROUTE_SRC.indexOf('});', start);
+    assert.ok(end > start, 'expected the createChatToolCatalog call to close with `});`');
+    const callSrc = ROUTE_SRC.slice(start, end);
+
+    assert.match(callSrc, /provider:\s*issueProvider\s*,/,
+      'createChatToolCatalog must receive the row\'s resolved provider (issueProvider), not the workspace-active one');
+    assert.match(callSrc, /scope:\s*issueCallScope\s*,/,
+      'createChatToolCatalog must receive the row\'s resolved scope (issueCallScope), not the workspace-active one');
+    assert.doesNotMatch(callSrc, /getProviderForWorkspace/,
+      'the catalog call must not fall back to the workspace-active provider');
+    assert.doesNotMatch(callSrc, /getWorkspaceCallScope/,
+      'the catalog call must not fall back to the workspace-active scope');
+  });
+
+  test('getProviderForWorkspace / getWorkspaceCallScope are no longer used in this file (their one call site was the catalog construction)', () => {
+    assert.doesNotMatch(ROUTE_SRC, /getProviderForWorkspace/);
+    assert.doesNotMatch(ROUTE_SRC, /getWorkspaceCallScope/);
+  });
 });
 
 describe('task-chat saved-chats wiring (LIN-1008)', () => {
