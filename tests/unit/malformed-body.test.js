@@ -82,8 +82,8 @@ describe('malformed body reaches the client as 400, not 500 (LIN-1158)', () => {
     });
 
     await new Promise((resolve) => {
-      server = app.listen(0, () => {
-        base = `http://localhost:${server.address().port}`;
+      server = app.listen(0, '127.0.0.1', () => {
+        base = `http://127.0.0.1:${server.address().port}`;
         resolve();
       });
     });

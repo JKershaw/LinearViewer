@@ -657,7 +657,7 @@ function buildApp({ resolveWorkspaceAccess, provider }) {
 }
 
 async function requestJson(app, path, { method = 'GET', token, body } = {}) {
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   const { port } = server.address();
   try {

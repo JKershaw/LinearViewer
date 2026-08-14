@@ -74,7 +74,7 @@ function buildApp(provider) {
 // Submit feedback through the real route and return the description the route
 // asked the provider to persist (i.e. the body that becomes the ticket).
 async function submitAndCaptureBody(app, calls, payload) {
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(r => server.once('listening', r));
   const { port } = server.address();
   try {

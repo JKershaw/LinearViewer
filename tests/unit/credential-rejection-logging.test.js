@@ -84,7 +84,7 @@ async function requestCapturingWarnings(app, path) {
   console.warn = (...args) => {
     if (args[0] === '[credential-rejected]') captured.push(JSON.parse(args[1]));
   };
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   try {
     await new Promise(resolve => server.once('listening', resolve));
     const res = await fetch(`http://127.0.0.1:${server.address().port}${path}`, {
@@ -185,7 +185,7 @@ test('never logs credential bytes, in either stage', async () => {
     const app = buildApp({
       resolveWorkspaceAccess: async () => ({ token: secret, reason: 'ok', provider: 'linear', source: 'cache', expiresAt: Date.now() + 1000 }),
     });
-    const server = app.listen(0);
+    const server = app.listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
     await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/issues/${ISSUE_UUID}`, {
       headers: { Authorization: 'Bearer agent-token' },
@@ -206,7 +206,7 @@ test('never logs credential bytes, in either stage', async () => {
 test('a provider-rejected credential is marked suspect via the shared registry', async () => {
   const registry = fakeRejectedCredentialRegistry();
   const app = buildApp({ rejectedCredentialRegistry: registry });
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/issues/${ISSUE_UUID}`, {
     headers: { Authorization: 'Bearer agent-token' },
@@ -227,7 +227,7 @@ test('a rejected CALLER token (no workspace credential ever resolved) does not m
   // is no workspace credential fingerprint to mark in the first place.
   const registry = fakeRejectedCredentialRegistry();
   const app = buildApp({ validateToken: async () => null, rejectedCredentialRegistry: registry });
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/issues/${ISSUE_UUID}`, {
     headers: { Authorization: 'Bearer agent-token' },
@@ -243,7 +243,7 @@ test('a successful request never marks anything suspect', async () => {
     issueDetail: async () => ({ id: ISSUE_UUID, identifier: 'LIN-1', title: 'ok', state: { name: 'Todo', type: 'unstarted' } }),
     rejectedCredentialRegistry: registry,
   });
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/issues/${ISSUE_UUID}`, {
     headers: { Authorization: 'Bearer agent-token' },

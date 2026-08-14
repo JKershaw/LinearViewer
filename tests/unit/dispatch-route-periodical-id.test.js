@@ -29,7 +29,7 @@ const KNOWN_ID = 'documentation-review';
 const UNKNOWN_ID = 'not-a-real-template';
 
 async function call(app, method, path, body, headers = {}) {
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   const { port } = server.address();
   try {

@@ -172,7 +172,7 @@ function mockStreamResponse(pieces) {
 const CANNED_REPLY = '## Reasoning\n**Assessment:**\n- Preparation: ✓ Complete - ready\n- Blockers: ✓ None - none\n- Ready: ✓ Yes - ready\n→ **implement**\n**Next:** Ship it.\n## Prompt\nDo the thing in Linear.';
 
 async function getJson(app, path) {
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(r => server.once('listening', r));
   const { port } = server.address();
   try {
@@ -184,7 +184,7 @@ async function getJson(app, path) {
 }
 
 async function streamRecommend(app, urlKey, issueId, query = '') {
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(r => server.once('listening', r));
   const { port } = server.address();
   try {

@@ -131,7 +131,7 @@ function buildApp(context) {
 
 // Drive the SSE route and drain the body so the handler runs to completion.
 async function streamRecommend(app, urlKey, issueId) {
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(r => server.once('listening', r));
   const { port } = server.address();
   try {
