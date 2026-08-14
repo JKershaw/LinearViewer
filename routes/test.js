@@ -45,7 +45,7 @@ import { establishAccount } from '../lib/account-session.js';
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -992,6 +992,15 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
+  })
+
+  // Clear server.js's fetchWorkspaceIssues memo (LIN-2065): every local-provider
+  // test session shares one hardcoded workspace id, so a spec reseeding a
+  // materially different issue set within the 30s TTL of a prior local-provider
+  // fetch needs an explicit reset to avoid reading stale data.
+  router.get('/test/clear-workspace-issues-memo', (req, res) => {
+    if (clearWorkspaceIssuesMemo) clearWorkspaceIssuesMemo();
+    res.send('ok');
   })
 
   // ---------------------------------------------------------------------------

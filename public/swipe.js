@@ -699,7 +699,8 @@ function handleAccordionClick(e) {
       if (issue && urlKey) {
         window.RecapSection.init(placeholder, {
           urlKey,
-          identifier: issue.identifier || issue.id
+          identifier: issue.identifier || issue.id,
+          source: issue.source
         });
       }
     }
@@ -713,7 +714,8 @@ function handleAccordionClick(e) {
       if (issue && urlKey) {
         window.BriefSection.init(placeholder, {
           urlKey,
-          identifier: issue.identifier || issue.id
+          identifier: issue.identifier || issue.id,
+          source: issue.source
         });
       }
     }

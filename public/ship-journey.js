@@ -1,14 +1,18 @@
 /**
- * Ship Journey client (experimental, LIN-1675 P3).
+ * Ship Journey client (experimental, LIN-1675 P3/P5).
  *
  * Plays back `window.__SHIP_JOURNEY_DATA__.waypoints` (ascending by
  * completedAt, already filtered server-side to placeable waypoints) as a
- * spiralling trail — each waypoint's bearing sets its angle
+ * cumulative walk — each waypoint's `x`/`y` is derived server-side
+ * (lib/ship-journey.js's `derivePositions`) via a heading-inertia model: the
+ * ship's heading turns toward each waypoint's bearing angle
  * (lib/ship-layout.js's BEARING_TO_ANGLE convention: canvas-degree, bow toward
- * the north star at 270°) and its position in the sequence sets its radius, so
- * the trail grows outward over time. A north-star change breaks the trail
- * into a new segment (no connecting line across the change) and marks the
- * first waypoint of the new segment with a ★.
+ * the north star at 270°) by a bounded per-step turn rather than snapping to
+ * it, then advances one unit along the resulting heading, so a direct
+ * reversal arcs over several steps instead of flipping across the ship's own
+ * wake. A north-star change breaks the trail into a new segment (no
+ * connecting line across the change, heading and position reset to a fresh
+ * berth) and marks the first waypoint of the new segment with a ★.
  *
  * Auto-fit (LIN-1682's window.computeFitZoom, common.js) recomputes on every
  * frame from the bounding box of the currently REVEALED points, so the view
@@ -27,16 +31,11 @@
   if (!waypoints.length) return;
 
   var SVG_NS = 'http://www.w3.org/2000/svg';
-  var BASE_RADIUS = 12;
-  var RADIUS_STEP = 8;
   var MARKER_PAD = 6; // bounding-box padding for the marker's own radius
 
-  function toXY(wp, index) {
-    var radius = BASE_RADIUS + index * RADIUS_STEP;
-    var rad = ((wp.angle || 0) * Math.PI) / 180;
-    return { x: radius * Math.cos(rad), y: radius * Math.sin(rad) };
-  }
-  var points = waypoints.map(toXY);
+  // x/y are derived server-side (lib/ship-journey.js's derivePositions) —
+  // read directly rather than re-deriving placement client-side.
+  var points = waypoints.map(function (wp) { return { x: wp.x, y: wp.y }; });
 
   // breakBefore[i] = the starChange that fell between waypoint i-1 and i's
   // completedAt, or null. Computed once — the underlying data never changes
@@ -89,10 +88,10 @@
     });
 
     // computeFitZoom only sizes content to the viewport — it does not centre
-    // it. The trail spirals outward from the SVG origin, and the revealed
-    // bounding box is not centred on the origin (e.g. every waypoint on the
-    // same bearing), so scaling about the origin alone pushes the outermost
-    // points outside viewBox="-100 -100 200 200". Pair the scale with a
+    // it. The walk starts at the origin but is not centred on it (e.g. every
+    // waypoint on the same bearing drifts off to one side), so scaling about
+    // the origin alone pushes the outermost points outside
+    // viewBox="-100 -100 200 200". Pair the scale with a
     // translate that maps the bounding-box centre to the viewBox centre (0,0)
     // — same pattern as public/ship.js:1493's translate(...) scale(...), just
     // in SVG's user-space units instead of CSS pixels (LIN-1970 defect 2).

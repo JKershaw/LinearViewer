@@ -15,7 +15,7 @@
 import { test, describe, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import crypto from 'node:crypto'
-import { mintAppJwt, mintInstallationToken, fetchInstallation, getAppConfig, buildInstallUrl, withTimeout, isGitHubConfigured, GITHUB_VIEWER_TIMEOUT_MS } from '../../lib/providers/github/app-auth.js'
+import { mintAppJwt, mintInstallationToken, fetchInstallation, exchangeOAuthCode, getAppConfig, buildInstallUrl, withTimeout, isGitHubConfigured, GITHUB_VIEWER_TIMEOUT_MS } from '../../lib/providers/github/app-auth.js'
 
 // One ephemeral RSA keypair for the whole suite — generated, never on disk.
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
@@ -505,6 +505,63 @@ describe('GitHub App auth primitives (LIN-707)', () => {
   test('fetchInstallation requires an installationId', async () => {
     await assert.rejects(() => fetchInstallation('', { fetchImpl: async () => ({}) }), /installationId is required/)
     await assert.rejects(() => fetchInstallation(null, { fetchImpl: async () => ({}) }), /installationId is required/)
+  })
+})
+
+// -------------------------------------------------------------------------
+// exchangeOAuthCode() (LIN-2080) — the code exchange must mirror
+// buildAuthorizeUrl's redirect_uri guard: OMIT the param entirely when
+// unset. `redirect_uri: redirectUri || process.env.GITHUB_REDIRECT_URI`
+// inside a `new URLSearchParams({...})` literal stringifies a missing value
+// to the LITERAL text "undefined", which GitHub rejects as a mismatch.
+// -------------------------------------------------------------------------
+describe('exchangeOAuthCode (LIN-2080)', () => {
+  const ENV = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_REDIRECT_URI']
+  let saved
+  beforeEach(() => {
+    saved = Object.fromEntries(ENV.map(k => [k, process.env[k]]))
+    process.env.GITHUB_CLIENT_ID = 'client-123'
+    process.env.GITHUB_CLIENT_SECRET = 'secret-abc'
+    delete process.env.GITHUB_REDIRECT_URI
+  })
+  afterEach(() => {
+    for (const k of ENV) {
+      if (saved[k] === undefined) delete process.env[k]
+      else process.env[k] = saved[k]
+    }
+  })
+
+  function fakeFetch(captured) {
+    return async (url, init) => {
+      captured.url = url
+      captured.init = init
+      return { ok: true, status: 200, json: async () => ({ access_token: 'gho_abc' }) }
+    }
+  }
+
+  test('omits redirect_uri entirely when neither opts.redirectUri nor GITHUB_REDIRECT_URI is set', async () => {
+    const captured = {}
+    const result = await exchangeOAuthCode('a-code', { fetchImpl: fakeFetch(captured) })
+
+    assert.equal(result.access_token, 'gho_abc')
+    assert.equal(
+      captured.init.body.has('redirect_uri'),
+      false,
+      `redirect_uri must be OMITTED when unset, not stringified — got "${captured.init.body.get('redirect_uri')}"`,
+    )
+  })
+
+  test('includes the exact redirect_uri when passed as opts.redirectUri', async () => {
+    const captured = {}
+    await exchangeOAuthCode('a-code', { redirectUri: 'https://example.com/cb', fetchImpl: fakeFetch(captured) })
+    assert.equal(captured.init.body.get('redirect_uri'), 'https://example.com/cb')
+  })
+
+  test('includes the exact redirect_uri from the GITHUB_REDIRECT_URI env fallback', async () => {
+    process.env.GITHUB_REDIRECT_URI = 'https://example.com/env-cb'
+    const captured = {}
+    await exchangeOAuthCode('a-code', { fetchImpl: fakeFetch(captured) })
+    assert.equal(captured.init.body.get('redirect_uri'), 'https://example.com/env-cb')
   })
 })
 
