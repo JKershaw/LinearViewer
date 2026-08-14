@@ -326,7 +326,11 @@ describe('LIN-1887 — the seam’s failure contract is unchanged by the paramet
       ownerAccountId: 'acct-1', urlKey: 'acme', provider: 'jira', store,
       refreshAccessToken: async () => {
         // A concurrent winner rotated the record while we were in flight.
-        collection.docs.set('acct-1::acme::jira', { _id: 'acct-1::acme::jira', accountId: 'acct-1', urlKey: 'acme', provider: 'jira', token: 'winner-access', refreshToken: 'R1' });
+        // LIN-2097: the winner's row must carry a LIVE tokenExpiresAt — the
+        // shared refreshOwnerCredential boundary now nulls out any converged
+        // result whose expiry isn't in the future, and this test's own point
+        // is the convergence itself, not that boundary check.
+        collection.docs.set('acct-1::acme::jira', { _id: 'acct-1::acme::jira', accountId: 'acct-1', urlKey: 'acme', provider: 'jira', token: 'winner-access', refreshToken: 'R1', tokenExpiresAt: Date.now() + 3600_000 });
         throw new TokenRefreshError('invalid_grant', 'EXPIRED');
       },
     });

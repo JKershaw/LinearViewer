@@ -433,9 +433,17 @@ describe('resolveWorkspaceAccess wiring (LIN-1506, Block F — witness C, source
     const callIdx = body.indexOf('refreshOwnerWorkspaceToken(');
     assert.ok(callIdx >= 0, 'expected a refreshOwnerWorkspaceToken( call inside resolveWorkspaceAccess');
 
-    const ifLine = body.slice(0, callIdx).split('\n').reverse().find(l => l.trim().startsWith('if ('));
-    assert.ok(ifLine, 'expected an `if (...)` guarding the refreshOwnerWorkspaceToken( call');
-    assert.match(ifLine, /ownerAccountId !== UNSCOPED/, 'the durable-refresh attempt must stay gated on a real (non-UNSCOPED) owner — an owner-blind caller must never trigger a durable-store read/write on anyone\'s behalf');
+    // LIN-2097 nested a second `if (...)` (the refresh-on-resolve gate) between
+    // the pre-existing UNSCOPED guard and this call, so the NEAREST preceding
+    // `if (` is no longer necessarily the UNSCOPED one — it may be the gate's.
+    // The UNSCOPED guard must still be one of the two nearest enclosing ifs
+    // (tightly attached, not merely present somewhere earlier in the function).
+    const nearIfLines = body.slice(0, callIdx).split('\n').reverse().filter(l => l.trim().startsWith('if (')).slice(0, 2);
+    assert.ok(nearIfLines.length > 0, 'expected at least one `if (...)` guarding the refreshOwnerWorkspaceToken( call');
+    assert.ok(
+      nearIfLines.some(l => /ownerAccountId !== UNSCOPED/.test(l)),
+      'the durable-refresh attempt must stay gated on a real (non-UNSCOPED) owner — an owner-blind caller must never trigger a durable-store read/write on anyone\'s behalf'
+    );
   });
 
   test('LIN-1891 (witness — text and position, not behaviour): every token-bearing return and cache write carries `scope`', () => {
