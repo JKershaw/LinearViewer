@@ -27,6 +27,20 @@ function decodeSegment(seg) {
   return JSON.parse(Buffer.from(seg.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'))
 }
 
+// Cross-checks a PEM string against what it will actually be used for
+// (LIN-2081 review findings 1+2): sign, then verify with the matching public
+// key. This is ground truth, independent of assertPemShape's own opinion —
+// the review's blocking findings were both missed by tests that only
+// asserted "throws"/"doesn't throw" without ever driving a real signature.
+function signsOk(pem) {
+  try {
+    const sig = crypto.createSign('RSA-SHA256').update('probe').sign(pem)
+    return crypto.createVerify('RSA-SHA256').update('probe').verify(publicKey, sig)
+  } catch {
+    return false
+  }
+}
+
 describe('GitHub App auth primitives (LIN-707)', () => {
   let saved
   beforeEach(() => {
@@ -132,6 +146,102 @@ describe('GitHub App auth primitives (LIN-707)', () => {
 
   test('getAppConfig accepts a real, valid PEM cleanly (no throw)', () => {
     assert.doesNotThrow(() => getAppConfig())
+  })
+
+  // -------------------------------------------------------------------------
+  // getAppConfig() — PEM-shape validator fix pass (LIN-2081 review findings
+  // 1+2). The original 7 tests above all used ONE canonical LF fixture, which
+  // is exactly why CI was green while the validator was wrong in both
+  // directions: it let a newline-stripped key sail through to the ORIGINAL
+  // ERR_OSSL_UNSUPPORTED bug (finding 1), and it hard-rejected several key
+  // formats OpenSSL happily signs (finding 2). Every "should be accepted" row
+  // below is cross-checked against a real crypto.createSign(...).sign() round
+  // trip via signsOk(), not just "getAppConfig doesn't throw" — and every
+  // "should be rejected" row asserts the SPECIFIC defect message, not just
+  // "throws".
+  // -------------------------------------------------------------------------
+
+  describe('PEM shape validator matrix (LIN-2081 fix pass)', () => {
+    test('sanity: signsOk() itself agrees the canonical fixture signs, and a garbage string does not', () => {
+      assert.equal(signsOk(PEM), true)
+      assert.equal(signsOk('not a key'), false)
+    })
+
+    // --- Finding 2: four working formats must be ACCEPTED, and the value ---
+    // --- getAppConfig() returns must be provably signable, not just non-throwing.
+
+    test('accepts CRLF line endings, and the normalized key actually signs', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n/g, '\r\n')
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+    })
+
+    test('accepts an extra trailing blank line, and the normalized key actually signs', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM + '\n' // PEM already ends with one '\n'
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+    })
+
+    test('accepts a trailing space after the END footer (with a final newline), and the normalized key actually signs', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, ' \n')
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+    })
+
+    test('accepts a trailing space after the END footer (no final newline), and the normalized key actually signs', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, '') + ' '
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+    })
+
+    test('accepts a leading blank line, and the normalized key actually signs', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = '\n' + PEM
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+    })
+
+    test('accepts leading whitespace (no blank line) — raw OpenSSL rejects it unnormalized, but getAppConfig strips it and the result signs', () => {
+      // Empirically, `'   ' + PEM` does NOT sign raw (OpenSSL requires
+      // '-----BEGIN' to start its own line) — but getAppConfig's leading-
+      // whitespace strip removes it before the key is ever used, so the
+      // NORMALIZED value must sign even though the raw input would not have.
+      process.env.GITHUB_APP_PRIVATE_KEY = '   ' + PEM
+      assert.equal(signsOk(process.env.GITHUB_APP_PRIVATE_KEY), false, 'raw input should NOT sign — confirms normalization is doing real work')
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+    })
+
+    test('getAppConfig returns the byte-identical PEM when there is no stray whitespace to normalize', () => {
+      // Guards against the normalization regressing to a blanket `.trim()`,
+      // which would silently drop the fixture's real trailing '\n' and break
+      // the exact-equality assertions in the tests above this describe block.
+      assert.equal(getAppConfig().privateKey, PEM)
+    })
+
+    // --- Finding 1: a fully newline-stripped key must be REJECTED, naming ---
+    // --- the defect — and never allowed to reach Sign.sign's opaque error.
+
+    test('rejects a PEM with all line breaks stripped, naming the defect (LIN-2081 finding 1)', () => {
+      const stripped = PEM.replace(/\n/g, '')
+      // Ground truth: confirm this is the real bug — the raw stripped key
+      // DOES fail to sign, with OpenSSL's opaque decoder error, so a
+      // validator that let it through would reproduce the original defect.
+      assert.equal(signsOk(stripped), false)
+      process.env.GITHUB_APP_PRIVATE_KEY = stripped
+      assert.throws(
+        () => getAppConfig(),
+        /GitHub App auth: GITHUB_APP_PRIVATE_KEY has no line breaks — the '-----BEGIN'\/'-----END' armor must sit on their own lines/
+      )
+    })
+
+    test('mintAppJwt surfaces the no-line-breaks config error for a stripped key, never the raw OpenSSL decoder error', () => {
+      process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n/g, '')
+      assert.throws(() => mintAppJwt(), (err) => {
+        assert.match(err.message, /GITHUB_APP_PRIVATE_KEY has no line breaks/)
+        assert.doesNotMatch(err.message, /ERR_OSSL_UNSUPPORTED|DECODER routines|unsupported/i)
+        return true
+      })
+    })
   })
 
   // -------------------------------------------------------------------------
