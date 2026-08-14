@@ -174,6 +174,27 @@ describe('buildWakeFollowUp — loop-guard / null cases', () => {
     assert.equal(buildWakeFollowUp(makeChild(), [{ message: 'started' }, { message: '[working] still going' }]), null);
     assert.equal(buildWakeFollowUp(makeChild(), []), null);
   });
+
+  test('an abort row (abort===true) → null even with a stamped sessionId (LIN-2078)', () => {
+    // The abort item itself carries sessionId unconditionally (per the kickoff's
+    // "stamp every dispatch" instruction), so without the guard this would mint
+    // a redundant, content-free wake alongside the LIN-1471 child-row wake.
+    const abortRow = makeChild({ abort: true });
+    assert.equal(buildWakeFollowUp(abortRow, [{ message: '[aborted] cancelled by operator' }]), null);
+  });
+
+  test('an abort row rejected with [failed] (target already gone) ALSO → null — proves the guard is row-keyed, not marker-keyed (LIN-2078)', () => {
+    // When an abort's target session is already gone, the runner posts
+    // [failed], not [aborted]. A marker-keyed guard (checking for the literal
+    // "[aborted]" text) would miss this case; the row-keyed `abort === true`
+    // check catches it regardless of which terminal marker lands.
+    const abortRow = makeChild({ abort: true });
+    assert.equal(buildWakeFollowUp(abortRow, [{ message: '[failed] no live session to resume' }]), null);
+    // Sanity: the identical marker on a NON-abort row still bubbles normally —
+    // proving the exclusion is keyed on `abort`, not on the `[failed]` text.
+    assert.ok(buildWakeFollowUp(makeChild({ abort: false }), [{ message: '[failed] no live session to resume' }]),
+      'a plain (non-abort) child that failed still wakes its parent');
+  });
 });
 
 // ── EFFECT: the addFeedback seam ──────────────────────────────────────────────
@@ -727,5 +748,89 @@ describe('addFeedback wake — LIN-1357 per-(edge, producing item) terminal witn
     assert.ok(edgeDoc.terminalWakeItems.includes(beat1Id), 'records beat 1 as a producing item');
     assert.ok(edgeDoc.terminalWakeItems.includes(beat2Id), 'records beat 2 as a producing item');
     assert.equal(edgeDoc.terminalWakeItems.length, 2, 'exactly the two distinct producing items, no duplicates');
+  });
+});
+
+describe('addFeedback wake — LIN-2078 abort-row exclusion', () => {
+  // Mirrors the real incident topology: a single abort produces TWO terminal
+  // posts — one on the abort item itself (routes/proxy.js:5818 /
+  // routes/dispatch.js:540 stamp sessionId on it unconditionally), one on the
+  // aborted child's OWN row (LIN-1471, added to close a separate wake hole).
+  // Both are sessioned to the same parent and both post a terminal marker for
+  // the same logical event, so — pre-fix — each independently wins the
+  // per-(edge, producing-item) CAS and mints its own wake, duplicating the
+  // legitimate LIN-1471 child-row wake with a content-free one built from the
+  // abort row's own (mostly-empty) data.
+  test('an abort + its aborted child both posting terminal feedback mints exactly ONE wake, and it is the CHILD row, not the abort row', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const PARENT = 'parent-S1';
+
+    // The item being aborted — the LIN-1471 child row.
+    const child = await store.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42',
+      sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(child._id, URL_KEY, 'token-child');
+
+    // The abort item itself, sessioned to the same parent.
+    const abortItem = await store.addItem(URL_KEY, {
+      abort: true, abortTo: child._id, sessionId: PARENT, subscription: 'everything', target: 'cli'
+    });
+    await store.takeItem(abortItem._id, URL_KEY, 'token-abort');
+
+    // Both rows post a terminal notice for the same abort event — the LIN-2078
+    // defect topology: two producing rows, each independently eligible to mint
+    // a wake absent the guard.
+    await store.addFeedback(abortItem._id, URL_KEY, { message: '[aborted] cancelled by operator' }, 'token-abort');
+    await store.addFeedback(child._id, URL_KEY, { message: '[aborted] cancelled by operator' }, 'token-child');
+    await drain();
+
+    const wakes = wakeItems(collection, historyCollection).filter(w => w.followUpTo === PARENT);
+    assert.equal(wakes.length, 1,
+      'exactly one wake mints — a test only asserting "one wake exists" would pass with the WRONG wake surviving, which is precisely the bug');
+    assert.equal(wakes[0].producingItemId, child._id,
+      "the surviving wake's producing row (LIN-1698 durable witness field) is the child's _id, not the abort row's");
+  });
+
+  test('order-independent: the abort row posting AFTER the child row still yields exactly one (child-produced) wake', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const PARENT = 'parent-S1';
+
+    const child = await store.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42',
+      sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(child._id, URL_KEY, 'token-child');
+
+    const abortItem = await store.addItem(URL_KEY, {
+      abort: true, abortTo: child._id, sessionId: PARENT, subscription: 'everything', target: 'cli'
+    });
+    await store.takeItem(abortItem._id, URL_KEY, 'token-abort');
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[aborted] cancelled by operator' }, 'token-child');
+    await store.addFeedback(abortItem._id, URL_KEY, { message: '[aborted] cancelled by operator' }, 'token-abort');
+    await drain();
+
+    const wakes = wakeItems(collection, historyCollection).filter(w => w.followUpTo === PARENT);
+    assert.equal(wakes.length, 1, 'still exactly one wake regardless of which row posts first');
+    assert.equal(wakes[0].producingItemId, child._id, "the surviving wake is still the child's");
+  });
+
+  test('the abort-rejection [failed] variant (target already gone) also produces ZERO wakes from the abort row', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const PARENT = 'parent-S1';
+
+    // No child row exists here — the target is already gone, which is exactly
+    // why the runner rejects the abort with [failed] instead of [aborted].
+    const abortItem = await store.addItem(URL_KEY, {
+      abort: true, abortTo: 'some-vanished-id', sessionId: PARENT, subscription: 'everything', target: 'cli'
+    });
+    await store.takeItem(abortItem._id, URL_KEY, 'token-abort');
+
+    await store.addFeedback(abortItem._id, URL_KEY, { message: '[failed] no live session to resume' }, 'token-abort');
+    await drain();
+
+    const wakes = wakeItems(collection, historyCollection).filter(w => w.followUpTo === PARENT);
+    assert.equal(wakes.length, 0, 'the gone-target abort-rejection produces no wake — this silence is intentional, not a bug (plan-review Note A)');
   });
 });
