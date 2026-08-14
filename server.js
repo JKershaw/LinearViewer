@@ -29,6 +29,7 @@ import { refreshOwnerWorkspaceToken, refreshOwnerCredential } from './lib/worksp
 import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
 import { CREDENTIAL_SOURCES, fingerprintCredential } from './lib/credential-diagnostics.js'
 import { createRejectedCredentialRegistry } from './lib/rejected-credentials.js'
+import { createRefreshOnResolveGate } from './lib/refresh-on-resolve-gate.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
@@ -1729,6 +1730,14 @@ const workspaceTokenCache = createWorkspaceTokenCache({ ttlMs: TOKEN_CACHE_TTL_M
 // refresh. One shared instance so a mark made on the proxy lane is visible to
 // the very next resolve — see createProxyRoutes's `rejectedCredentialRegistry` wiring.
 const rejectedCredentialRegistry = createRejectedCredentialRegistry();
+// LIN-2097: bounds the refresh-on-resolve branch's OAuth-exchange attempt rate
+// once a frozen-expiry dead credential ages past the refresh buffer — see
+// lib/refresh-on-resolve-gate.js's module doc for why this is a SEPARATE,
+// unconditional cooldown rather than reuse of rejectedCredentialRegistry's
+// isSuspect/shouldAttemptRefresh (that mark's TTL is shorter than how long a
+// durably-dead credential can sit here, and this gate must keep applying after
+// it ages out).
+const refreshOnResolveGate = createRefreshOnResolveGate();
 // LIN-1980 close-out, ledger item 2: the registry is per-process, so a mark made
 // on one instance never reaches another and recovery latency scales with the
 // instance count. Nothing in the repo records that count (no deploy manifest;
@@ -1863,28 +1872,41 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     // refresh, or the refresh itself failing) falls straight through to the
     // untouched classification below — never a 500, never cached.
     if (!selected.token && ownerAccountId !== UNSCOPED) {
-      try {
-        const refreshed = await refreshOwnerWorkspaceToken({
-          sessions,
-          urlKey,
-          ownerAccountId,
-          refreshAccessToken,
-          persistSession: persistSessionRow,
-          resolveProvider: getProviderForWorkspace,
-          // LIN-1887 Step 8: without this the headless durable arm is
-          // Linear-only, so a Jira-OAuth workspace's proxy token simply stops
-          // resolving between refreshes once the MAX_SAFE_INTEGER sentinel is
-          // retired. Same map both human dispatches read, so a provider cannot
-          // be refreshable in a browser and not on this lane.
-          resolveExchange: refreshExchangeFor,
-          store: ownerCredentialStore
-        });
-        if (refreshed) {
-          workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider, scope: refreshed.scope });
-          return { token: refreshed.token, reason: 'ok', provider: refreshed.provider, scope: refreshed.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: refreshed.expiresAt, credentialFingerprint: fingerprintCredential(refreshed.scope ?? refreshed.token) };
+      // LIN-2097: the durable record's own `token` is what identifies the
+      // credential this branch is about to (re-)spend — NOT its `scope`
+      // (for Linear, the durable record's `scope` is the Linear ORG id, an
+      // opaque string that happens to also satisfy fingerprintCredential's
+      // string branch, so fingerprinting it would silently hash the wrong
+      // value and never match the fingerprint any other call site computes
+      // for this same credential). A missing/tokenless record leaves
+      // staleFingerprint null, and the gate always attempts in that case —
+      // nothing durable to bound repeated exchanges against.
+      const staleRecord = await ownerCredentialStore.get(ownerAccountId, urlKey, selected.provider);
+      const staleFingerprint = staleRecord?.token ? fingerprintCredential(staleRecord.token) : null;
+      if (refreshOnResolveGate.shouldAttempt(`${ownerAccountId}:${urlKey}`, staleFingerprint)) {
+        try {
+          const refreshed = await refreshOwnerWorkspaceToken({
+            sessions,
+            urlKey,
+            ownerAccountId,
+            refreshAccessToken,
+            persistSession: persistSessionRow,
+            resolveProvider: getProviderForWorkspace,
+            // LIN-1887 Step 8: without this the headless durable arm is
+            // Linear-only, so a Jira-OAuth workspace's proxy token simply stops
+            // resolving between refreshes once the MAX_SAFE_INTEGER sentinel is
+            // retired. Same map both human dispatches read, so a provider cannot
+            // be refreshable in a browser and not on this lane.
+            resolveExchange: refreshExchangeFor,
+            store: ownerCredentialStore
+          });
+          if (refreshed) {
+            workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider, scope: refreshed.scope });
+            return { token: refreshed.token, reason: 'ok', provider: refreshed.provider, scope: refreshed.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: refreshed.expiresAt, credentialFingerprint: fingerprintCredential(refreshed.scope ?? refreshed.token) };
+          }
+        } catch (err) {
+          console.error(`Token refresh-on-resolve failed for workspace ${urlKey}:`, err);
         }
-      } catch (err) {
-        console.error(`Token refresh-on-resolve failed for workspace ${urlKey}:`, err);
       }
     }
 

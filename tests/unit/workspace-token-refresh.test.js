@@ -43,6 +43,14 @@
  * A/C's `selectExpiredOwnerRow`, sibling to `selectOwnerWorkspaceToken`'s scoped
  * branch, but no UNSCOPED mode and no refreshability filter — it exists purely
  * to answer "the owner's own best live row for this urlKey, or null."
+ * Block H (LIN-2097) drives `refreshOwnerCredential` again — freezing the
+ * recorded expiry on a byte-identical exchange, and nulling out a refresh
+ * result whose resulting expiry is not live, at the single boundary all three
+ * of `doOwnerRefresh`'s success returns funnel through.
+ * Block I (LIN-2097) pins the corresponding refresh-on-resolve gate wiring in
+ * server.js (`resolveWorkspaceAccess`'s `!selected.token` branch) as source
+ * text — the gate's own suppression behaviour is exercised directly, with a
+ * real clock and real state, in tests/unit/refresh-on-resolve-gate.test.js.
  *
  * Run with: node --test tests/unit/workspace-token-refresh.test.js
  */
@@ -1035,5 +1043,135 @@ describe('selectOwnerWorkspaceRow (LIN-1986, Block G — pure selector)', () => 
     const result = selectOwnerWorkspaceToken(sessions, 'acme', 'account-A');
     assert.equal(result.token, 'live');
     assert.equal(result.reason, 'ok');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block H (LIN-2097) — freeze expiry on a byte-identical exchange, and null
+// out a refresh result whose resulting expiry is not (comfortably) live.
+//
+// Driven directly at `refreshOwnerCredential`, the same seam Block F drives —
+// server.js is not import-safe in a unit test (see Block E/F's docstrings).
+// ---------------------------------------------------------------------------
+
+describe('refreshOwnerCredential (LIN-2097, Block H — freeze + non-live boundary)', () => {
+  beforeEach(() => {
+    _resetInflightForTests();
+  });
+
+  test('H1 [freeze, still-future stored expiry]: a byte-identical exchange keeps the STORED expiry, not a fresh calculateExpiresAt one, and still rotates refreshToken', async () => {
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: NOW + FAR_FUTURE_MS } });
+    const refreshAccessToken = async (refreshToken) => {
+      assert.equal(refreshToken, 'R0');
+      return { access_token: 'access-SAME', refresh_token: 'R1-rotated', expires_in: 3600 };
+    };
+
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+
+    assert.equal(result.expiresAt, NOW + FAR_FUTURE_MS, 'frozen at the stored expiry, not a fresh now+3600s');
+    assert.equal(result.refreshToken, 'R1-rotated');
+    const durable = await store.get('account-A', 'acme');
+    assert.equal(durable.refreshToken, 'R1-rotated', 'the rotated refreshToken is still persisted unconditionally');
+    assert.equal(durable.tokenExpiresAt, NOW + FAR_FUTURE_MS);
+  });
+
+  test('H2 [freeze + already-past stored expiry -> null via the boundary check, but still persisted]: a byte-identical exchange against an already-dead stored expiry resolves null, yet the rotation still landed durably', async () => {
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS } });
+    const refreshAccessToken = async () => ({ access_token: 'access-SAME', refresh_token: 'R1-rotated', expires_in: 3600 });
+
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+
+    assert.equal(result, null, 'a frozen-and-already-past expiry must not be served as a usable success');
+    const durable = await store.get('account-A', 'acme');
+    assert.equal(durable.refreshToken, 'R1-rotated', 'persistence survives the boundary check nulling the return — Linear rotates on use, so this must not be skipped');
+    assert.equal(durable.tokenExpiresAt, NOW + PAST_MS, 'the durable record itself still carries the frozen (past) expiry — only the RETURN is nulled');
+  });
+
+  test('H3 [control, unaffected]: DIFFERENT access-token bytes take the ordinary calculateExpiresAt path — Steps 1-2 never fire on ordinary rotation', async () => {
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-OLD', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS } });
+    const refreshAccessToken = async () => ({ access_token: 'access-NEW', refresh_token: 'R1', expires_in: 3600 });
+
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+
+    assert.notEqual(result, null);
+    assert.equal(result.token, 'access-NEW');
+    assert.ok(result.expiresAt > NOW, 'a genuinely rotated credential gets a fresh future expiry, not the old stored one');
+    assert.notEqual(result.expiresAt, NOW + PAST_MS);
+  });
+
+  test('H4 [regression pin — the production signature]: N repeated forced refreshes returning the SAME bytes against a live stored expiry must yield IDENTICAL, non-null expiry every round — not N distinct advancing values', async () => {
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: NOW + FAR_FUTURE_MS } });
+    let refreshCount = 0;
+    const refreshAccessToken = async (refreshToken) => {
+      refreshCount++;
+      return { access_token: 'access-SAME', refresh_token: `R${refreshCount}-rotated`, expires_in: 3600 };
+    };
+
+    const results = [];
+    for (let i = 0; i < 5; i++) {
+      _resetInflightForTests();
+      results.push(await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store }));
+    }
+
+    assert.equal(refreshCount, 5);
+    for (const result of results) {
+      assert.notEqual(result, null);
+      assert.equal(result.expiresAt, NOW + FAR_FUTURE_MS, 'frozen — not vacuously null, and not monotonically increasing across rounds');
+    }
+  });
+
+  test('H5 [F3\'s regression pin]: a CAS-loss convergence onto an already-frozen-past re-read record resolves null, even though doOwnerRefresh\'s own convergeOnStored returned a truthy object internally', async () => {
+    let getCount = 0;
+    const store = {
+      async get() {
+        getCount++;
+        return getCount === 1
+          ? { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS }
+          : { provider: 'linear', scope: 'org-1', token: 'access-relogin', refreshToken: 'R_relogin', tokenExpiresAt: NOW + PAST_MS };
+      },
+      async putIfRefreshToken() { return false; }, // CAS miss — the record was replaced under us
+    };
+    const refreshAccessToken = async () => ({ access_token: 'access-R_loser', refresh_token: 'R_loser', expires_in: 3600 });
+
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+
+    assert.equal(result, null, 'a race loser converging onto an already-frozen-dead row must not be served as ok — unreachable via H1-H4, which only exercise the won branch');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block I (LIN-2097, source-text pin) — server.js is not import-safe in a
+// unit test (see Block E's docstring), so the :1865 gate wiring is pinned as
+// source text; its actual suppression BEHAVIOUR is proven directly against
+// the real module in tests/unit/refresh-on-resolve-gate.test.js.
+// ---------------------------------------------------------------------------
+
+describe('resolveWorkspaceAccess refresh-on-resolve gate (LIN-2097, Block I — source-text pin)', () => {
+  test("I1: the refresh-on-resolve block fingerprints the stale durable record's TOKEN, not its scope (the Linear org id) — and gates the exchange through refreshOnResolveGate", () => {
+    const startIdx = SERVER_SRC.indexOf('if (!selected.token && ownerAccountId !== UNSCOPED) {');
+    assert.notEqual(startIdx, -1, 'expected to find the refresh-on-resolve block in server.js');
+    const endIdx = SERVER_SRC.indexOf('\n    }', startIdx);
+    const blockSlice = SERVER_SRC.slice(startIdx, endIdx);
+
+    assert.match(blockSlice, /ownerCredentialStore\.get\(ownerAccountId, urlKey, selected\.provider\)/, 'expected a durable point-read for the stale record');
+    assert.match(blockSlice, /fingerprintCredential\(staleRecord\.token\)/, 'must fingerprint staleRecord.token');
+    assert.doesNotMatch(blockSlice, /fingerprintCredential\(staleRecord\.scope/, 'must NOT fingerprint staleRecord.scope — for Linear that is the org id, not the credential');
+    assert.match(blockSlice, /refreshOnResolveGate\.shouldAttempt\(/, 'expected the new gate to guard the exchange attempt');
+  });
+
+  test('I2: the gate is unconditional — NOT additionally gated on rejectedCredentialRegistry.isSuspect (that mark\'s TTL is shorter than how long this branch must keep applying)', () => {
+    const startIdx = SERVER_SRC.indexOf('if (!selected.token && ownerAccountId !== UNSCOPED) {');
+    const endIdx = SERVER_SRC.indexOf('\n    }', startIdx);
+    const blockSlice = SERVER_SRC.slice(startIdx, endIdx);
+    assert.doesNotMatch(blockSlice, /rejectedCredentialRegistry\.isSuspect/, 'this branch must not require isSuspect to still be true');
+  });
+
+  test("I3: the new gate uses its OWN scopeKey/state — attemptSuspectCredentialRefresh's own cooldown gate (:1954-ish) is untouched, still calling shouldAttemptRefresh with its pre-existing scopeKey shape", () => {
+    assert.match(SERVER_SRC, /rejectedCredentialRegistry\.shouldAttemptRefresh\(fingerprint, `\$\{ownerAccountId\}:\$\{urlKey\}`\)/, "attemptSuspectCredentialRefresh's own gate must still be present, unmodified");
+  });
+
+  test('I4: refreshOnResolveGate is constructed once at module scope via createRefreshOnResolveGate, mirroring rejectedCredentialRegistry\'s own single-shared-instance pattern', () => {
+    assert.match(SERVER_SRC, /const refreshOnResolveGate = createRefreshOnResolveGate\(\)/);
+    assert.match(SERVER_SRC, /import \{ createRefreshOnResolveGate \} from '\.\/lib\/refresh-on-resolve-gate\.js'/);
   });
 });
