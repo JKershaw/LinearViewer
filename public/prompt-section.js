@@ -260,7 +260,13 @@
           // SSE carve-out: window.api() parses the body as JSON, but this is a
           // streamed text/event-stream consumed by handleStreamingResponse via a
           // ReadableStream reader — it must stay on raw fetch().
-          const response = await fetch(`${apiPrefix}/api/recommend/${issueId}/stream`, { signal: ac.signal });
+          // LIN-2046: thread source (via URLSearchParams, matching common.js's
+          // fetchAutopilotKickoff convention) so a merged multi-binding swipe row
+          // resolves recommend against its OWN binding, not the active one.
+          const params = new URLSearchParams();
+          if (issue.source) params.set('source', issue.source);
+          const query = params.toString() ? `?${params.toString()}` : '';
+          const response = await fetch(`${apiPrefix}/api/recommend/${issueId}/stream${query}`, { signal: ac.signal });
           if (!response.ok) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.error || 'Failed to load prompt');
