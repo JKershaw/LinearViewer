@@ -150,6 +150,37 @@ describe('GitHub App auth primitives (LIN-707)', () => {
     )
   })
 
+  test('getAppConfig rejects a body character outside the PEM alphabet, naming the character and column but NEVER the key material (LIN-2081 ledger item 2)', () => {
+    const originalLine = PEM.split('\n')[2] // the real, uncorrupted body line
+    const lines = PEM.split('\n')
+    const corruptLine = originalLine.slice(0, 4) + '!' + originalLine.slice(4) // corrupt a body line, not the headers
+    lines[2] = corruptLine
+    process.env.GITHUB_APP_PRIVATE_KEY = lines.join('\n')
+    let message
+    try {
+      getAppConfig()
+      assert.fail('expected getAppConfig to throw')
+    } catch (err) {
+      message = err.message
+    }
+    // Positive: names the offending character and its 1-indexed column.
+    assert.match(message, /'!' at column 5/)
+    // Negative and load-bearing: must NOT contain the offending line, nor any
+    // run of the key's own real body bytes — this is the exact defect the
+    // round-4 review found (the old message interpolated bodyLines[badLineIndex]
+    // wholesale, leaking 64 real chars of the configured private key into
+    // application logs). Checked as sliding 12-char chunks of the REAL,
+    // uncorrupted body line rather than a generic base64-charset regex,
+    // because an ordinary English word (e.g. "alphabet", "characters") is
+    // itself a valid base64-alphabet run and would false-positive a
+    // charset-only check.
+    assert.ok(!message.includes(corruptLine), 'message must not echo the offending line')
+    for (let i = 0; i + 12 <= originalLine.length; i++) {
+      const chunk = originalLine.slice(i, i + 12)
+      assert.ok(!message.includes(chunk), `message must not contain key material chunk: ${chunk}`)
+    }
+  })
+
   test('getAppConfig accepts a real, valid PEM cleanly (no throw)', () => {
     assert.doesNotThrow(() => getAppConfig())
   })
