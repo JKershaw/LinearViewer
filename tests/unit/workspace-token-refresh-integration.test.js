@@ -82,7 +82,7 @@ beforeEach(async () => {
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => tokenServerBehavior(req, res, body));
   });
-  await new Promise(resolve => tokenServer.listen(0, resolve));
+  await new Promise(resolve => tokenServer.listen(0, '127.0.0.1', resolve));
   const { port } = tokenServer.address();
   tokenUrl = `http://127.0.0.1:${port}/oauth/token`;
 });

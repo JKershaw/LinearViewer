@@ -99,7 +99,7 @@ function buildApp({ token = 'ws-token', reason = 'ok', provider, scope = 'readWr
 }
 
 async function postAttachment(app, body, { issueId = ISSUE_ID, headers } = {}) {
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   const { port } = server.address();
   try {

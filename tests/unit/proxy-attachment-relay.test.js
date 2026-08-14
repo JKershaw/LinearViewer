@@ -81,7 +81,7 @@ function buildApp({ token = 'ws-linear-token', reason = 'ok', provider, provider
 
 // Call the relay over HTTP. Returns { status, contentType, bodyText, bodyBuf }.
 async function getAttachment(app, handle) {
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   const { port } = server.address();
   try {
@@ -105,7 +105,7 @@ async function getAttachment(app, handle) {
 // response headers (lower-cased) so header-level assertions are possible.
 async function fetchRaw(app, handle, upstreamHandler) {
   stubUpstream(upstreamHandler);
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   const { port } = server.address();
   try {

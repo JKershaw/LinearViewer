@@ -125,7 +125,7 @@ function buildApp({ provider, resolveWorkspaceAccess } = {}) {
 async function call(app, method, path) {
   const realSetTimeout = global.setTimeout;
   global.setTimeout = (...args) => realSetTimeout(...args).unref?.();
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   const { port } = server.address();
   try {

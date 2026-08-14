@@ -283,6 +283,10 @@ E2E specs live in `tests/e2e/` (Playwright) with unit tests in `tests/unit/` (`n
 
 **Parallel-aware caller discipline.** A spec's workspace `urlKey` is one value with three consumers — the session endpoint, the `/workspace/${urlKey}/…` navigation URLs, and the teardown/seed query params — so always drive navigation off the `urlKey` a session helper returns, never a hard-coded literal. `createSession`/`seedLocalWorkspace` return the key for this reason. Parallel execution itself (`workers > 1`) is **not** enabled yet: it needs per-worker `urlKey` isolation threaded server-side and is owned by **LIN-625**. Do not raise `workers` in `playwright.config.js` without that isolation — the historical flakiness came from shared server-side store partition keys, not Playwright context sharing.
 
+## Unit Testing Pattern (LIN-2023)
+
+Test servers in `tests/unit` bind `127.0.0.1` explicitly (`app.listen(0, '127.0.0.1')`), never hostless — and are addressed the way they were bound (`http://127.0.0.1:${port}`, never `localhost`). A hostless `listen(0)` binds IPv6 dual-stack and can silently coexist with an unrelated IPv4-only process already holding that port number (LIN-2023) — see `tests/unit/test-server-listen-bind.test.js` for the enforcement.
+
 ## Authentication
 
 ### Linear OAuth 2.0

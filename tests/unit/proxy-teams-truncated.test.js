@@ -58,7 +58,7 @@ function buildApp(provider) {
 }
 
 async function call(app, path) {
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(r => server.once('listening', r));
   const { port } = server.address();
   try {

@@ -480,7 +480,7 @@ function buildWorkspaceApiApp() {
 }
 
 async function call(app, method, path, body) {
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(r => server.once('listening', r));
   const { port } = server.address();
   try {

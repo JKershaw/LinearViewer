@@ -107,7 +107,7 @@ let server;
 let baseUrl;
 
 before(async () => {
-  await new Promise(resolve => { server = rootApp.listen(0, resolve); });
+  await new Promise(resolve => { server = rootApp.listen(0, '127.0.0.1', resolve); });
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
 after(async () => {

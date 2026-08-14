@@ -54,8 +54,8 @@ describe('async error forwarding (LIN-609)', () => {
     });
 
     await new Promise((resolve) => {
-      server = app.listen(0, () => {
-        base = `http://localhost:${server.address().port}`;
+      server = app.listen(0, '127.0.0.1', () => {
+        base = `http://127.0.0.1:${server.address().port}`;
         resolve();
       });
     });
@@ -124,10 +124,10 @@ describe('installAsyncErrorForwarding is idempotent', () => {
     });
 
     const server = await new Promise((resolve) => {
-      const s = app.listen(0, () => resolve(s));
+      const s = app.listen(0, '127.0.0.1', () => resolve(s));
     });
     try {
-      const res = await fetch(`http://localhost:${server.address().port}/x`);
+      const res = await fetch(`http://127.0.0.1:${server.address().port}/x`);
       assert.equal(res.status, 500);
       await new Promise((r) => setTimeout(r, 50)); // let any stray forward land
       assert.equal(calls, 1);

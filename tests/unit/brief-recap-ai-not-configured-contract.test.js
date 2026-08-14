@@ -93,7 +93,7 @@ function buildApp(stores = {}) {
 }
 
 async function post(app, path) {
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   const { port } = server.address();
   try {
@@ -171,7 +171,7 @@ function makeContainer() {
 
 /** Run `fn(origin)` against a live server on an ephemeral port. */
 async function withServer(app, fn) {
-  const server = app.listen(0);
+  const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   try {
     return await fn(`http://127.0.0.1:${server.address().port}`);
