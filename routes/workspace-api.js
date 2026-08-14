@@ -905,7 +905,7 @@ ${goal}`
             // Forward `attachments` (LIN-777) so the meta-prompt surfaces the
             // worker-facing ## Attachments section on this LLM recommendation hop.
             { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild, attachments: ctx.attachments },
-            { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: getProviderForWorkspace(workspace)?.ui || null,
+            { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: issueProvider.ui || null,
               callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: ctx.issue.identifier } }
           )
           return {
@@ -1256,7 +1256,7 @@ ${goal}`
                 // Forward `attachments` (LIN-777) so the streamed meta-prompt surfaces
                 // the worker-facing ## Attachments section on each descent hop.
                 { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild, attachments: ctx.attachments },
-                { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: getProviderForWorkspace(workspace)?.ui || null, signal: hop.signal,
+                { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: issueProvider.ui || null, signal: hop.signal,
                   callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: ctx.issue.identifier } },
                 (type, data) => {
                   if (closed) return;
@@ -1345,7 +1345,7 @@ ${goal}`
             apiKey: apiKeyToUse,
             model: selectedModel,
             featureFlags: getFeatureFlags(req.session),
-            providerUi: getProviderForWorkspace(workspace)?.ui || null,
+            providerUi: issueProvider.ui || null,
             signal: abortController.signal,
             callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: issue.identifier }
           },
