@@ -77,6 +77,64 @@ describe('GitHub App auth primitives (LIN-707)', () => {
   })
 
   // -------------------------------------------------------------------------
+  // getAppConfig() — PEM shape validation (LIN-2081)
+  //
+  // Three real-world misconfigurations from the LIN-2057 test-App setup all
+  // surfaced identically as OpenSSL's opaque `ERR_OSSL_UNSUPPORTED` deep
+  // inside Sign.sign — these pin that getAppConfig() now catches each one at
+  // config time and names the SPECIFIC defect, not just "throws".
+  // -------------------------------------------------------------------------
+
+  test('getAppConfig rejects a truncated ~12-char stub key (LIN-2081)', () => {
+    process.env.GITHUB_APP_PRIVATE_KEY = 'abcdefghijkl'
+    assert.throws(
+      () => getAppConfig(),
+      /GitHub App auth: GITHUB_APP_PRIVATE_KEY does not start with a PEM '-----BEGIN' header/
+    )
+  })
+
+  test('getAppConfig rejects a shell-poisoned fragment glued onto the front (LIN-2081)', () => {
+    // e.g. a stray path fragment left in the env var by a broken shell quoting
+    process.env.GITHUB_APP_PRIVATE_KEY = '$HOME/.ssh/' + PEM
+    assert.throws(
+      () => getAppConfig(),
+      /GitHub App auth: GITHUB_APP_PRIVATE_KEY has 11 unexpected character\(s\) before the '-----BEGIN' header/
+    )
+  })
+
+  test('getAppConfig rejects a stray zsh %% glued onto the END armor (LIN-2081)', () => {
+    // zsh appends a bare `%` to output with no trailing newline when a value
+    // gets pasted/echoed into an env file — exactly the LIN-2057 defect.
+    process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, '') + '%'
+    assert.throws(
+      () => getAppConfig(),
+      /GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '%'/
+    )
+  })
+
+  test('getAppConfig rejects an implausibly short key even with valid-looking armor (LIN-2081)', () => {
+    process.env.GITHUB_APP_PRIVATE_KEY = '-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----\n'
+    assert.throws(
+      () => getAppConfig(),
+      /GitHub App auth: GITHUB_APP_PRIVATE_KEY is too short to be a real PEM key \(\d+ chars, expected 1000\+\)/
+    )
+  })
+
+  test('getAppConfig rejects a body character outside the PEM alphabet, naming the line (LIN-2081)', () => {
+    const lines = PEM.split('\n')
+    lines[2] = lines[2].slice(0, 4) + '!' + lines[2].slice(4) // corrupt a body line, not the headers
+    process.env.GITHUB_APP_PRIVATE_KEY = lines.join('\n')
+    assert.throws(
+      () => getAppConfig(),
+      /GitHub App auth: GITHUB_APP_PRIVATE_KEY contains invalid characters outside the PEM alphabet on line 3: /
+    )
+  })
+
+  test('getAppConfig accepts a real, valid PEM cleanly (no throw)', () => {
+    assert.doesNotThrow(() => getAppConfig())
+  })
+
+  // -------------------------------------------------------------------------
   // mintAppJwt()
   // -------------------------------------------------------------------------
 
@@ -120,6 +178,19 @@ describe('GitHub App auth primitives (LIN-707)', () => {
   test('mintAppJwt throws when app config is missing', () => {
     delete process.env.GITHUB_APP_ID
     assert.throws(() => mintAppJwt(), /GITHUB_APP_ID/)
+  })
+
+  test('mintAppJwt surfaces the getAppConfig PEM-shape error and never reaches Sign.sign (LIN-2081)', () => {
+    // The original bug: a malformed key used to sail past getAppConfig and
+    // blow up inside Sign.sign with OpenSSL's opaque ERR_OSSL_UNSUPPORTED /
+    // "DECODER routines" decoder error, with no hint the key was the problem.
+    // This pins that the config-time check now catches it first.
+    process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, '') + '%'
+    assert.throws(() => mintAppJwt(), (err) => {
+      assert.match(err.message, /GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '%'/)
+      assert.doesNotMatch(err.message, /ERR_OSSL_UNSUPPORTED|DECODER routines|unsupported/i)
+      return true
+    })
   })
 
   // -------------------------------------------------------------------------
