@@ -3647,11 +3647,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
    */
   router.get('/api/proxy/stack', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
-      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/stack', reason);
       }
@@ -3666,7 +3665,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         projects = [...mockData.projects];
         issues = [...mockData.issues];
       } else {
-        ({ projects, issues } = await withTimeout(fetchProjects(accessToken), MULTI_REQUEST_TIMEOUT_MS));
+        ({ projects, issues } = await withTimeout(provider.fetchProjects(accessToken), MULTI_REQUEST_TIMEOUT_MS));
       }
 
       // Project the sorted stack via the shared pure pipeline (lib/task-stack.js),
@@ -3692,11 +3691,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
    */
   router.get(['/api/proxy/issues/:identifier/prompt/:templateKey', '/api/proxy/prompt/:identifier/:templateKey'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
-      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/prompt', reason);
       }
@@ -3802,7 +3800,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
    * with recommendErrorResponse(). `sessionApiKey` may be passed in to avoid a
    * second key lookup when the caller already resolved it for its precheck.
    */
-  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, isTestMode, sessionApiKey, deadline, noDescend = false }) {
+  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, provider, isTestMode, sessionApiKey, deadline, noDescend = false }) {
     if (sessionApiKey === undefined) {
       sessionApiKey = await getWorkspaceOpenRouterKey(urlKey, createdBy);
     }
@@ -3878,7 +3876,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
     // Live path. Fetch issue context with two-tier support for parent tasks,
     // then the AI recommendation. Uses a longer timeout since this makes a
     // Linear API call + an OpenRouter LLM call.
-    const context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal, noDescend }), CONTEXT_FETCH_TIMEOUT_MS);
+    const context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal, noDescend }), CONTEXT_FETCH_TIMEOUT_MS);
     const { issue, parent, siblings, project, children, comments, focusedChild, attachments } = context;
 
     // Resolve the effective key (free-tier when no session/env key) so both
@@ -3962,11 +3960,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
    */
   router.get(['/api/proxy/issues/:identifier/recommend', '/api/proxy/recommend/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
-      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/recommend', reason);
       }
@@ -4097,6 +4094,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
               createdBy: req.proxyCreatedBy,
               identifier: id,
               accessToken,
+              provider,
               isTestMode,
               sessionApiKey,
               deadline: recommendDeadline,
@@ -4542,11 +4540,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
    */
   router.get(['/api/proxy/issues/:identifier/recap', '/api/proxy/recap/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
-      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/recap', reason);
       }
@@ -4577,7 +4574,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
             return keepalive.send(404, { error: 'Issue not found' });
           }
         } else {
-          context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
+          context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
         }
 
         const canonicalId = context.issue?.id || identifier;
@@ -4695,11 +4692,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
    */
   router.post('/api/proxy/recap/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
-      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/recap', reason);
       }
@@ -4751,7 +4747,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
             return keepalive.send(404, { error: 'Issue not found' });
           }
         } else {
-          context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
+          context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
         }
 
         const canonicalId = context.issue?.id || identifier;
@@ -4833,11 +4829,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
    */
   router.get(['/api/proxy/issues/:identifier/brief', '/api/proxy/brief/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
-      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/brief', reason);
       }
@@ -4868,7 +4863,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
             return keepalive.send(404, { error: 'Issue not found' });
           }
         } else {
-          context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
+          context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
         }
 
         const canonicalId = context.issue?.id || identifier;
@@ -4985,11 +4980,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
    */
   router.post('/api/proxy/brief/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
-      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/brief', reason);
       }
@@ -5040,7 +5034,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
             return keepalive.send(404, { error: 'Issue not found' });
           }
         } else {
-          context = await fetchWithTimeout((signal) => fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
+          context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
         }
 
         const canonicalId = context.issue?.id || identifier;
@@ -5394,11 +5388,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       let issue = null;
       let resolvedRepo = repo || null;
       if (issueIdentifier) {
-        const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+        const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
         // LIN-1980: stamp before any other logic (incl. the !accessToken early
         // return below) so the fingerprint is present even when this request
         // later 401s from a shared credential another site marked suspect.
-        req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
         if (!accessToken) {
           return workspaceUnavailable(req, res, '/api/proxy/autopilot/kickoff', reason);
         }
@@ -5973,11 +5966,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       const subscriptionResolved = subscription ?? DEFAULT_SUBSCRIPTION;
 
       // Recommendation preconditions — identical to GET /recommend.
-      const { token: accessToken, reason, credentialFingerprint } = await resolveWorkspaceAccess(req.proxyUrlKey, req.proxyCreatedBy);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
-      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       if (!accessToken) {
         return workspaceUnavailable(req, res, '/api/proxy/recommend-and-dispatch', reason);
       }
@@ -6158,6 +6150,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
             createdBy: req.proxyCreatedBy,
             identifier: id,
             accessToken,
+            provider,
             isTestMode,
             sessionApiKey,
             deadline: recommendDeadline,
