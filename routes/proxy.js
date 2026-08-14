@@ -5304,17 +5304,25 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, `variant must be one of: ${AUTOPILOT_VARIANTS.join(', ')}`);
       }
-      if (goal !== undefined && (typeof goal !== 'string' || goal.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(goal))) {
+      const kickoffGoalValidationError = validateOpaqueDispatchField(goal, 'goal', {
+        maxLength: MAX_NAME_LENGTH,
+        reportReceivedLength: true,
+      });
+      if (kickoffGoalValidationError) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, 'goal is invalid');
+        return badRequest.json(res, kickoffGoalValidationError.error);
       }
       if (target !== undefined && !VALID_PROXY_DISPATCH_TARGETS.includes(target)) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}`);
       }
-      if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
+      const kickoffRepoValidationError = validateOpaqueDispatchField(repo, 'repo', {
+        maxLength: MAX_NAME_LENGTH,
+        reportReceivedLength: true,
+      });
+      if (kickoffRepoValidationError) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, 'repo is invalid');
+        return badRequest.json(res, kickoffRepoValidationError.error);
       }
       if (issueIdentifier !== undefined && !isValidIssueId(issueIdentifier)) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
@@ -5916,9 +5924,13 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
       }
-      if (repo !== undefined && (typeof repo !== 'string' || repo.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(repo))) {
+      const recommendRepoValidationError = validateOpaqueDispatchField(repo, 'repo', {
+        maxLength: MAX_NAME_LENGTH,
+        reportReceivedLength: true,
+      });
+      if (recommendRepoValidationError) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'repo is invalid');
+        return badRequest.json(res, recommendRepoValidationError.error);
       }
       // Inherited-repo marker (LIN-1210): when true, `repo` was merely inherited
       // (e.g. an autopilot orchestrator forwarding a parent project's repo onto a
