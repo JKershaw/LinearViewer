@@ -1117,12 +1117,12 @@ Requires a `readWrite` scoped token. Builds the kickoff **and dispatches it** in
 
 | Body field | Default | Description |
 |------------|---------|-------------|
-| `goal` | _(none)_ | Free-text focus for a **general** run. Ignored when `issueIdentifier` is set. Opaque string (max 1000 chars, UTF-16 code units; no control characters) — violating either is a 400 naming the constraint and the received length. `null`/omitted are both accepted as absent. See LIN-2075. |
+| `goal` | _(none)_ | Free-text focus for a **general** run. Ignored when `issueIdentifier` is set. Opaque string (max 1000 chars, UTF-16 code units; no control characters) — violating either is a 400 naming the constraint, and the received length when the length cap is the cause. `null`/omitted are both accepted as absent. See LIN-2075. |
 | `mode` | `write` | `write` (implementation/review + evidence-gated merge) or `readonly` (investigation only). |
 | `variant` | `standard` | `standard` (normal orchestrator) or `stepper` (warm beat-stepping disposition — see [Stepper variant](./autopilot-kickoff.md#stepper-variant)). Orthogonal to `mode`. An unknown value is a 400. |
 | `issueIdentifier` | _(none)_ | Present ⇒ **scoped** run ("autopilot until THIS task is done"); the issue title is named in the goal line and the project `repo=` is inherited. Absent ⇒ general stack-walk run. |
 | `target` | `cli` | Dispatch target (`cli`/`web`/`dash`; `local`/Harbour OS is not available to proxy consumers). |
-| `repo` | _(resolved)_ | Target repo. For a scoped run, defaults to the project's `repo=`; an explicit value wins. Opaque string (max 1000 chars, UTF-16 code units; no control characters) — violating either is a 400 naming the constraint and the received length. `null`/omitted are both accepted as absent, falling back to the project-derived `repo=`. See LIN-2075. |
+| `repo` | _(resolved)_ | Target repo. For a scoped run, defaults to the project's `repo=`; an explicit value wins. Opaque string (max 1000 chars, UTF-16 code units; no control characters) — violating either is a 400 naming the constraint, and the received length when the length cap is the cause. `null`/omitted are both accepted as absent, falling back to the project-derived `repo=`. See LIN-2075. |
 | `appendProxyContext` | `true` | Append the Linear-access + token + reporting block so the run inherits proxy access. |
 | `maxTasks` | _(none)_ | Optional integer ≥ 1 — a **scope** bound, not a cost control: this run covers up to that many **distinct** tasks, enforced server-side (see below). Omit for an unbounded run (today's behavior, byte-identical). See LIN-1751. |
 
@@ -1638,7 +1638,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 |-------|------|----------|-------------|
 | `issueIdentifier` | string | Yes | The issue to recommend a next step for (UUID or `LIN-123`) |
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour OS is **not** available to proxy consumers |
-| `repo` | string | No | Optional repository hint. Opaque string (max 1000 chars, UTF-16 code units; no control characters) — violating either is a 400 naming the constraint and the received length. `null`/omitted are both accepted as absent, falling back to the project-derived `repo=`. See LIN-2075. |
+| `repo` | string | No | Optional repository hint. Opaque string (max 1000 chars, UTF-16 code units; no control characters) — violating either is a 400 naming the constraint, and the received length when the length cap is the cause. `null`/omitted are both accepted as absent, falling back to the project-derived `repo=`. See LIN-2075. |
 | `repoInherited` | bool | No | Default `false`. Marks `repo` as **inherited** (forwarded from a parent context) rather than user-explicit. When `true`, a cross-project descent's child repo — or the named node's own project `repo=` on a `kind` override — wins over the inherited `repo`; a repo-less child still falls back to it. Leave it off (or `false`) for a deliberately chosen repo, which keeps winning (see below) |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block so the worker inherits workspace access via this proxy |
 | `noDescend` | bool | No | Default `false`. When `true`, recommend and dispatch the **named issue's own** next step and never descend into an open child (see below) |
