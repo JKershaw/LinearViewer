@@ -36,6 +36,13 @@
  * the same level of testability the codebase already uses for that file's own
  * glue (see also tests/unit/workspace-token-refresh-integration.test.js's
  * docstring, which makes the identical call for resolveWorkspaceAccess).
+ * Block G (LIN-1986) drives the pure sibling selector `selectOwnerWorkspaceRow`
+ * (lib/workspace-token-resolver.js) directly — the owner-scoped, live,
+ * max-expiry **row** selector that replaced `workspace-title-resolver.js`'s own
+ * owner-blind scan-and-pick. Same owner-gate/liveness/tie-break shape as Block
+ * A/C's `selectExpiredOwnerRow`, sibling to `selectOwnerWorkspaceToken`'s scoped
+ * branch, but no UNSCOPED mode and no refreshability filter — it exists purely
+ * to answer "the owner's own best live row for this urlKey, or null."
  *
  * Run with: node --test tests/unit/workspace-token-refresh.test.js
  */
@@ -46,7 +53,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { selectExpiredOwnerRow, selectOwnerWorkspaceToken } from '../../lib/workspace-token-resolver.js';
+import { selectExpiredOwnerRow, selectOwnerWorkspaceToken, selectOwnerWorkspaceRow } from '../../lib/workspace-token-resolver.js';
 import { refreshOwnerWorkspaceToken, refreshOwnerCredential, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
 import { REFRESH_STRATEGY, refreshStrategyFor } from '../../lib/refresh-strategy.js';
@@ -956,5 +963,77 @@ describe('refreshOwnerCredential (LIN-1546, Block F — race-safe rotation)', ()
     const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
     assert.equal(result, null);
     assert.equal(refreshCalled, false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block G — pure sibling selector `selectOwnerWorkspaceRow`
+// ---------------------------------------------------------------------------
+
+describe('selectOwnerWorkspaceRow (LIN-1986, Block G — pure selector)', () => {
+  test('G1: owner has a live row for this urlKey -> returns the workspace row', () => {
+    const sessions = [
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'live', expiresAt: NOW + FAR_FUTURE_MS, provider: 'linear' }),
+    ];
+    const ws = selectOwnerWorkspaceRow(sessions, 'acme', 'account-A');
+    assert.equal(ws.accessToken, 'live');
+    assert.equal(ws.urlKey, 'acme');
+    assert.equal(ws.provider, 'linear');
+  });
+
+  test('G2: owner has only an EXPIRED row -> null (a live row is required, not merely a matching one)', () => {
+    const sessions = [
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'stale', expiresAt: NOW + PAST_MS }),
+    ];
+    assert.equal(selectOwnerWorkspaceRow(sessions, 'acme', 'account-A'), null);
+  });
+
+  test('G3: no session for this owner/urlKey at all -> null', () => {
+    const sessions = [
+      sessionRow('sid-1', 'account-B', 'acme', { accessToken: 'live', expiresAt: NOW + FAR_FUTURE_MS }),
+    ];
+    assert.equal(selectOwnerWorkspaceRow(sessions, 'acme', 'account-A'), null);
+  });
+
+  test('G4: null/empty owner -> null, never scans owner-blind (no UNSCOPED mode here, unlike selectOwnerWorkspaceToken)', () => {
+    const sessions = [
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'live', expiresAt: NOW + FAR_FUTURE_MS }),
+    ];
+    assert.equal(selectOwnerWorkspaceRow(sessions, 'acme', null), null);
+    assert.equal(selectOwnerWorkspaceRow(sessions, 'acme', undefined), null);
+  });
+
+  test('G5: among the owner\'s own multiple live rows, picks the latest-expiring (plain max-expiry, no provider comparison)', () => {
+    const sessions = [
+      sessionRow('sid-older', 'account-A', 'acme', { accessToken: 'older-live', expiresAt: NOW + FAR_FUTURE_MS, provider: 'jira' }),
+      sessionRow('sid-newer', 'account-A', 'acme', { accessToken: 'newer-live', expiresAt: NOW + FURTHER_FUTURE_MS, provider: 'linear' }),
+    ];
+    const ws = selectOwnerWorkspaceRow(sessions, 'acme', 'account-A');
+    assert.equal(ws.accessToken, 'newer-live', 'later expiry wins even though it is a DIFFERENT provider than the shorter-lived row — deliberate: F1 deleted the provider-matching heuristic rather than repairing it');
+  });
+
+  test('G6: only scans the owner\'s OWN sessions — another account\'s live row never wins (the LIN-1986 cross-account exposure this selector closes)', () => {
+    const sessions = [
+      sessionRow('sid-B', 'account-B', 'acme', { accessToken: 'other-owner-live', expiresAt: NOW + FURTHER_FUTURE_MS }),
+      sessionRow('sid-A', 'account-A', 'acme', { accessToken: 'owner-live', expiresAt: NOW + FAR_FUTURE_MS }),
+    ];
+    const ws = selectOwnerWorkspaceRow(sessions, 'acme', 'account-A');
+    assert.equal(ws.accessToken, 'owner-live');
+  });
+
+  test('G7: a row within the refresh buffer (not yet expired, but not far enough out) is not usable -> null', () => {
+    const sessions = [
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'about-to-expire', expiresAt: NOW + 60_000 }), // < 5min buffer
+    ];
+    assert.equal(selectOwnerWorkspaceRow(sessions, 'acme', 'account-A'), null);
+  });
+
+  test('G8: selectOwnerWorkspaceToken itself is untouched by this addition (still returns a token, not a row, for the same fixture)', () => {
+    const sessions = [
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'live', expiresAt: NOW + FAR_FUTURE_MS }),
+    ];
+    const result = selectOwnerWorkspaceToken(sessions, 'acme', 'account-A');
+    assert.equal(result.token, 'live');
+    assert.equal(result.reason, 'ok');
   });
 });
