@@ -26,9 +26,15 @@
  * rather than a bare magic number:
  *   - LIN-1899 (this ticket) guards the audit route + the image proxy, adds the
  *     shared `isActiveProviderLinear` predicate, and lands this census.
- *   - LIN-1912 owns the remaining NINE accessor-fed consumers (7 in
- *     routes/proxy.js's agent/compute lane, 2 in routes/dashboard.js), reusing
- *     the same predicate against the resolved provider name.
+ *   - LIN-1912 originally owned the remaining NINE accessor-fed consumers (7 in
+ *     routes/proxy.js's agent/compute lane, 2 in routes/dashboard.js). LIN-2044
+ *     discharged routes/proxy.js's share: its 9 compute-lane sites no longer
+ *     read the raw Linear-bound mirror at all — they resolve the workspace's
+ *     ACTIVE provider via resolveProviderAccess and call that provider's own
+ *     method, so a Jira-active workspace's recap/brief/recommend/prompt/stack
+ *     calls now hit Jira, not api.linear.app. routes/dashboard.js's 2 sites
+ *     remain LIN-1912's, unguarded, reusing the same predicate against the
+ *     resolved provider name when picked up.
  *
  * Run with: node --test tests/unit/workspace-accesstoken-linear-egress-census.test.js
  */
@@ -60,9 +66,11 @@ function count(source, pattern) {
 //   3. routes/workspace-api.js           image-proxy fetch    → guarded by LIN-1899
 //   4. routes/proxy.js                   attachment relay     → guarded by LIN-1891
 //
-// (1) is fed by the audit route (guarded here); (2) is fed by LIN-1912's nine
-// accessor sites; (3) and (4) are raw fetches to Linear ASSET hosts, each
-// gated by its own host allowlist, which is what the second sub-count anchors on.
+// (1) is fed by the audit route (guarded here); (2) is fed by routes/dashboard.js's
+// 2 remaining accessor sites (LIN-1912) — routes/proxy.js's 9 were discharged by
+// LIN-2044's provider-routing fix, so they no longer feed this mechanism at all;
+// (3) and (4) are raw fetches to Linear ASSET hosts, each gated by its own host
+// allowlist, which is what the second sub-count anchors on.
 //
 // DELIBERATELY EXCLUDED, and why: the two OAuth token endpoints
 // (lib/token-refresh.js:77, lib/providers/linear/index.js:2218) also talk to
@@ -188,27 +196,32 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     );
   });
 
-  test('the 9 accessor-fed consumers owned by LIN-1912 are still 9 (not yet guarded)', () => {
-    // Pinned as a HANDOVER, not as a pass/fail on this ticket's fix: these
-    // sites still send the mirror to Linear for a non-Linear active binding.
-    // `:724` is the one provider-aware resolve (LIN-1891), hence the -1.
+  test('routes/proxy.js\'s 9 accessor-fed consumers are now discharged (LIN-2044); routes/dashboard.js\'s 2 remain LIN-1912\'s, not yet guarded', () => {
+    // Pinned as a HANDOVER UPDATE: LIN-2044 routed every one of routes/proxy.js's
+    // former 9 raw resolveWorkspaceAccess( sites through resolveProviderAccess,
+    // which resolves the workspace's ACTIVE provider and hands its call sites
+    // that provider's own client — never a hardcoded Linear one. The only
+    // resolveWorkspaceAccess( call left in the file is resolveProviderAccess's
+    // own internal read, so the count below is now 1, not 10.
     const proxyResolves = count(read('routes/proxy.js'), /resolveWorkspaceAccess\(/g);
     const dashboardReads = count(read('routes/dashboard.js'), /getWorkspaceAccessToken\(/g);
 
     assert.equal(
-      proxyResolves - 1,
-      9,
-      `Found ${proxyResolves} resolveWorkspaceAccess( sites in routes/proxy.js (expected 10: 1 provider-aware ` +
-      '+ 9 raw-token). Those 9 are LIN-1912\'s scope — each hands the mirror to createLinearClient. If this ' +
-      'count DROPPED because LIN-1912 landed, update it here; if it GREW, the new site inherits the same ' +
-      'disclosure defect and needs the same guard.'
+      proxyResolves,
+      1,
+      `Found ${proxyResolves} resolveWorkspaceAccess( sites in routes/proxy.js (expected exactly 1: ` +
+      'resolveProviderAccess\'s own internal call). LIN-2044 discharged the other 9 by routing them through ' +
+      'resolveProviderAccess instead. A count above 1 means a NEW raw resolveWorkspaceAccess( site was added, ' +
+      'reintroducing the same disclosure defect LIN-1899 named — it needs the same provider-routing fix, not a ' +
+      'guard. A count of 0 means resolveProviderAccess itself was restructured and this pin needs re-grounding.'
     );
     assert.equal(
       dashboardReads,
       2,
       `Found ${dashboardReads} getWorkspaceAccessToken( sites in routes/dashboard.js (expected 2, both ` +
-      'LIN-1912\'s). routes/dashboard.js:829 fires on a POLL with no user action, making it the most ' +
-      'reachable member of this class — more so than the audit route this ticket was filed for.'
+      'LIN-1912\'s, unaffected by LIN-2044 — that ticket scoped routes/proxy.js only). routes/dashboard.js:829 ' +
+      'fires on a POLL with no user action, making it the most reachable member of this class — more so than ' +
+      'the audit route this ticket was filed for.'
     );
   });
 });
