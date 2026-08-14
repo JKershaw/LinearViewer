@@ -23,7 +23,7 @@ import { Router } from 'express'
 import { getProvider } from '../lib/providers/registry.js'
 import { renderErrorPage, renderGitHubRepoSelectPage } from '../lib/render-pages.js'
 import { githubErrorDiagnostic } from '../lib/errors.js'
-import { getMissingGitHubConfig, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../lib/providers/github/app-auth.js'
+import { getMissingGitHubConfig, getGitHubConfigProblems, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../lib/providers/github/app-auth.js'
 import { establishAccount } from '../lib/account-session.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 import {
@@ -79,11 +79,20 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
   // config — App vars present but GITHUB_CLIENT_ID unset — used to sail past the old
   // App-only guard and then throw deep in beginAuth, hanging the request; the
   // complete gate returns a clean 503 up front instead (root cause B).
+  //
+  // The message keeps getMissingGitHubConfig()'s narrower "what's unset" wording
+  // for that common case; a shape-invalid-but-present GITHUB_APP_PRIVATE_KEY
+  // (LIN-2081 review finding 4 — getGitHubConfigProblems() reports it, but never
+  // as an unset var, since it IS set) gets its own clause instead of a confusing
+  // empty "Missing environment variables: ." message.
   function notConfigured(res) {
     const missing = getMissingGitHubConfig()
+    const detail = missing.length > 0
+      ? `Missing environment variables: ${missing.join(', ')}.`
+      : 'GITHUB_APP_PRIVATE_KEY is set but is not a valid PEM key.'
     return res.status(503).send(renderErrorPage(
       'GitHub App Not Configured',
-      `GitHub login is not available. Missing environment variables: ${missing.join(', ')}. See .env.example for setup instructions.`
+      `GitHub login is not available. ${detail} See .env.example for setup instructions.`
     ))
   }
 
@@ -94,7 +103,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
    * session, never in `state`.
    */
   router.get('/auth/github', async (req, res) => {
-    if (getMissingGitHubConfig().length > 0) return notConfigured(res)
+    if (getGitHubConfigProblems().length > 0) return notConfigured(res)
     if (sessionStore?.cleanup) await sessionStore.cleanup()
 
     const mode = req.query.mode === 'add-source' ? 'add-source' : 'new'
@@ -145,7 +154,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
    * session (`githubPending`) until the user picks a repo (POST .../link).
    */
   router.get('/auth/github/callback', async (req, res) => {
-    if (getMissingGitHubConfig().length > 0) return notConfigured(res)
+    if (getGitHubConfigProblems().length > 0) return notConfigured(res)
 
     // Two inbound shapes (LIN-735): the user-to-server OAuth round-trip returns a
     // `code` (no `installation_id`) — the default entry now that beginAuth is the
@@ -228,8 +237,22 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
       // to install + pick repos; they return with a fresh `installation_id` and flow
       // through the install branch below. Reuse the existing CSRF nonce so that
       // post-install callback still passes the state guard (LIN-735).
+      //
+      // Throw-safe (LIN-2081 review finding 3), same beginAuth precedent as above:
+      // beginInstall() calls getAppConfig() for `slug`, which — since this ticket —
+      // validates GITHUB_APP_PRIVATE_KEY's shape unconditionally even though this
+      // call never signs with it. This handler is async and outside Express's
+      // middleware chain (LIN-761 root cause A), so an unguarded throw here would
+      // hang the request with no response rather than surface a clean 503.
       if (!reboundable.length) {
-        return res.redirect(provider.beginInstall({ state: req.session.oauthState }))
+        let installUrl
+        try {
+          installUrl = provider.beginInstall({ state: req.session.oauthState })
+        } catch (err) {
+          console.error('GitHub beginInstall error:', err)
+          return notConfigured(res)
+        }
+        return res.redirect(installUrl)
       }
 
       // Stash a repo->installationId map (NOT the user token, NOT a per-repo

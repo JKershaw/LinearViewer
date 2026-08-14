@@ -15,7 +15,7 @@
 import { test, describe, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import crypto from 'node:crypto'
-import { mintAppJwt, mintInstallationToken, fetchInstallation, getAppConfig, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../../lib/providers/github/app-auth.js'
+import { mintAppJwt, mintInstallationToken, fetchInstallation, getAppConfig, buildInstallUrl, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../../lib/providers/github/app-auth.js'
 
 // One ephemeral RSA keypair for the whole suite — generated, never on disk.
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
@@ -297,6 +297,20 @@ describe('GitHub App auth primitives (LIN-707)', () => {
     // This pins that the config-time check now catches it first.
     process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, '') + '%'
     assert.throws(() => mintAppJwt(), (err) => {
+      assert.match(err.message, /GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '%'/)
+      assert.doesNotMatch(err.message, /ERR_OSSL_UNSUPPORTED|DECODER routines|unsupported/i)
+      return true
+    })
+  })
+
+  test('buildInstallUrl surfaces the SAME getAppConfig PEM-shape error on a malformed key, even though it never signs anything with it (LIN-2081 review finding 5)', () => {
+    // The review's own point: buildInstallUrl() calls getAppConfig() purely to
+    // read `slug`, but getAppConfig() validates the FULL key shape
+    // unconditionally — so a malformed key breaks the install-URL path too,
+    // not just signing. Pin that it fails with the SAME named-defect config
+    // error (never a raw OpenSSL error, since nothing here ever calls Sign.sign).
+    process.env.GITHUB_APP_PRIVATE_KEY = PEM.replace(/\n$/, '') + '%'
+    assert.throws(() => buildInstallUrl({ state: 'nonce-123' }), (err) => {
       assert.match(err.message, /GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '%'/)
       assert.doesNotMatch(err.message, /ERR_OSSL_UNSUPPORTED|DECODER routines|unsupported/i)
       return true

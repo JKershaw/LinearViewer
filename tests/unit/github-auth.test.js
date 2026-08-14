@@ -22,7 +22,7 @@ import { AuthExchangeError } from '../../lib/providers/interface.js';
 import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
 import { createFakeGitHubClient } from '../../lib/providers/github/fake-client.js';
 import { githubErrorDiagnostic } from '../../lib/errors.js';
-import { getMissingGitHubConfig, isGitHubConfigured } from '../../lib/providers/github/app-auth.js';
+import { getMissingGitHubConfig, getGitHubConfigProblems, isGitHubConfigured } from '../../lib/providers/github/app-auth.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 
@@ -43,11 +43,13 @@ describe('GitHubProvider auth primitives', () => {
     process.env.GITHUB_CLIENT_ID = 'cid';
     process.env.GITHUB_CLIENT_SECRET = 'secret';
     process.env.GITHUB_REDIRECT_URI = 'http://localhost:3000/auth/github/callback';
-    // GitHub App config (LIN-708) — beginAuth now builds the App installation URL
-    // and reads `slug` via getAppConfig(), which also requires appId/privateKey.
-    // A real PEM-shaped key (LIN-2081: getAppConfig validates PEM shape, and
-    // buildInstallUrl calls getAppConfig for `slug` even though it never uses
-    // privateKey itself).
+    // GitHub App config (LIN-708). beginAuth ITSELF no longer reads getAppConfig()
+    // (LIN-735 turned it into a pure OAuth-authorize-URL builder off CLIENT_ID
+    // alone), so this fixture is belt-and-braces for the beginAuth tests below,
+    // not load-bearing for them. It IS load-bearing for beginInstall() (LIN-2081
+    // review finding 5) and completeInstallation() further down this suite — both
+    // call getAppConfig() for `slug`, which validates the FULL PEM shape
+    // unconditionally, so the key must be real and PEM-shaped, never a placeholder.
     process.env.GITHUB_APP_ID = '12345';
     process.env.GITHUB_APP_PRIVATE_KEY = RSA_PEM;
     process.env.GITHUB_APP_SLUG = 'my-app';
@@ -197,7 +199,7 @@ describe('GitHubProvider auth primitives', () => {
 // so those three consumers can never drift (root cause C).
 // ---------------------------------------------------------------------------
 
-describe('getMissingGitHubConfig / isGitHubConfigured (LIN-761)', () => {
+describe('getMissingGitHubConfig / getGitHubConfigProblems / isGitHubConfigured (LIN-761; PEM-shape-aware since LIN-2081 finding 4)', () => {
   const ALL = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG'];
   // GITHUB_REDIRECT_URI is optional — it must NOT gate configuration.
   const SAVE = [...ALL, 'GITHUB_REDIRECT_URI'];
@@ -205,6 +207,11 @@ describe('getMissingGitHubConfig / isGitHubConfigured (LIN-761)', () => {
   beforeEach(() => {
     saved = Object.fromEntries(SAVE.map(k => [k, process.env[k]]));
     for (const k of ALL) process.env[k] = 'set';
+    // GITHUB_APP_PRIVATE_KEY is the one var isGitHubConfigured() now shape-checks
+    // (LIN-2081 finding 4), so — unlike its bare-presence siblings above — it
+    // needs a real PEM, not the 'set' placeholder, or the "reports configured"
+    // case below would report false for the wrong reason.
+    process.env.GITHUB_APP_PRIVATE_KEY = RSA_PEM;
     delete process.env.GITHUB_REDIRECT_URI;
   });
   afterEach(() => {
@@ -230,6 +237,34 @@ describe('getMissingGitHubConfig / isGitHubConfigured (LIN-761)', () => {
     delete process.env.GITHUB_APP_SLUG;
     assert.deepEqual(getMissingGitHubConfig(), ['GITHUB_APP_SLUG']);
     assert.equal(isGitHubConfigured(), false);
+  });
+
+  // -------------------------------------------------------------------------
+  // LIN-2081 review finding 4 — a PRESENT-but-malformed GITHUB_APP_PRIVATE_KEY
+  // must not report "configured": getAppConfig() rejects it unconditionally
+  // (including on paths, like the install-URL build, that never sign with
+  // it), so promising the flow can complete is the exact LIN-761 root-cause-C
+  // drift this predicate exists to prevent.
+  // -------------------------------------------------------------------------
+
+  test('a shape-invalid GITHUB_APP_PRIVATE_KEY is NOT configured, even though nothing is literally unset', () => {
+    process.env.GITHUB_APP_PRIVATE_KEY = 'not-a-pem';
+    // getMissingGitHubConfig() keeps its narrower "what's unset" contract — the
+    // var IS set, so it reports nothing missing. isGitHubConfigured() is the
+    // wider predicate that must still catch this.
+    assert.deepEqual(getMissingGitHubConfig(), []);
+    assert.equal(isGitHubConfigured(), false);
+  });
+
+  test('getGitHubConfigProblems() names the shape defect distinctly from a missing var', () => {
+    process.env.GITHUB_APP_PRIVATE_KEY = 'not-a-pem';
+    assert.deepEqual(getGitHubConfigProblems(), ['GITHUB_APP_PRIVATE_KEY is set but is not a valid PEM key']);
+  });
+
+  test('a missing var takes precedence over a shape check that would be meaningless without it', () => {
+    process.env.GITHUB_APP_PRIVATE_KEY = 'not-a-pem';
+    delete process.env.GITHUB_APP_SLUG;
+    assert.deepEqual(getGitHubConfigProblems(), ['GITHUB_APP_SLUG']);
   });
 });
 
@@ -356,6 +391,21 @@ describe('GitHub auth routes', () => {
     await handler({ query: {}, session: makeSession() }, res);
     assert.equal(res.statusCode, 503);
     assert.match(res.body, /GitHub App Not Configured/);
+  });
+
+  // LIN-2081 review finding 4 — the front gate now uses the WIDER predicate
+  // (getGitHubConfigProblems), so a shape-invalid-but-present key 503s here at
+  // the very first gate, never letting the request start down a flow that
+  // cannot complete.
+  test('GET /auth/github 503s when GITHUB_APP_PRIVATE_KEY is set but not a valid PEM (LIN-2081 finding 4)', async () => {
+    process.env.GITHUB_APP_PRIVATE_KEY = 'not-a-pem';
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github');
+    const res = makeRes();
+    await handler({ query: {}, session: makeSession() }, res);
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /GitHub App Not Configured/);
+    assert.match(res.body, /GITHUB_APP_PRIVATE_KEY is set but is not a valid PEM key/);
   });
 
   // LIN-761 — partial config (App vars present, OAuth CLIENT_ID absent) used to
@@ -547,6 +597,31 @@ describe('GitHub auth routes', () => {
     await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
     assert.equal(res.redirectedTo, 'https://github.com/apps/my-app/installations/new?state=real');
     assert.equal(session.githubPending, undefined, 'no rebind pending stashed when there is nothing to pick');
+  });
+
+  test('GET callback (re-bind) responds with a clean 503 instead of hanging when beginInstall throws on a malformed key (LIN-2081 review finding 3)', async () => {
+    // Same no-installations branch as the test above, but beginInstall() now
+    // throws (as the REAL buildInstallUrl() does when GITHUB_APP_PRIVATE_KEY is
+    // shape-invalid, since it calls getAppConfig() unconditionally for `slug`).
+    // Before finding 3's fix, this call site was UNGUARDED inside an async
+    // Express handler — Express 4 does not route an async throw to error
+    // middleware, so the request would hang with NO response at all (the exact
+    // LIN-761 root-cause-A failure this file documents beginAuth against
+    // elsewhere) rather than surface this clean 503.
+    const provider = {
+      ...fakeProvider(),
+      listReboundableRepos: async () => [],
+      beginInstall: () => { throw new Error("GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '%'") },
+    };
+    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+    assert.equal(res.statusCode, 503, 'must respond, not hang');
+    assert.match(res.body, /GitHub App Not Configured/);
+    assert.match(res.body, /GITHUB_APP_PRIVATE_KEY is set but is not a valid PEM key/);
+    assert.equal(res.redirectedTo, null, 'must not redirect to a broken install URL');
   });
 
   test('POST link (re-bind, new) mints the installation token for the chosen repo and writes the LIN-711 binding (LIN-728)', async () => {
