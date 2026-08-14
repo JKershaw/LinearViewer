@@ -32,8 +32,9 @@ const URL_KEY = 'test-workspace';
  * `createToken` overrides the bootstrap mint (default: a working mint like
  * production) so a test can exercise the LIN-1175 fail-closed path.
  */
-function buildApp({ createToken } = {}) {
+function buildApp({ createToken, recordEvent } = {}) {
   const added = [];
+  const events = [];
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -45,7 +46,9 @@ function buildApp({ createToken } = {}) {
         tokenId: 't1', urlKey: URL_KEY, label: 'test', scope: 'readWrite', createdBy: 'u1',
       }),
     },
-    proxyEventStore: { recordEvent: async () => {} },
+    proxyEventStore: {
+      recordEvent: recordEvent || (async event => { events.push(event); }),
+    },
     resolveWorkspaceAccess: async () => ({ token: null, reason: 'not_connected' }),
     getWorkspaceAccessToken: async () => null,
     agentStatusStore: {},
@@ -72,7 +75,7 @@ function buildApp({ createToken } = {}) {
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
   }));
-  return { app, added };
+  return { app, added, events };
 }
 
 async function request(app, path, { method = 'GET', body } = {}) {
@@ -367,6 +370,174 @@ test('POST kickoff (LIN-1138): harness validation rejects non-string, over-lengt
   });
   assert.equal(r3.status, 400);
   assert.match(r3.body.error, /harness contains invalid characters/);
+});
+
+// ── LIN-2075 — goal/repo validation messages on kickoff ──────────────────────
+// `goal` and `repo` used to collapse non-string / over-length / dangerous-chars
+// into a bare 'goal is invalid' / 'repo is invalid'. They now route through the
+// same validateOpaqueDispatchField helper as model/harness above, with
+// reportReceivedLength:true so the over-length message also names the received
+// length (in UTF-16 code units).
+
+test('POST kickoff (LIN-2075): a non-string goal is rejected with 400', async () => {
+  const { app, added } = buildApp();
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { goal: 42 },
+  });
+  assert.equal(status, 400);
+  assert.match(body.error, /goal must be a string/);
+  assert.equal(added.length, 0);
+});
+
+test('POST kickoff (LIN-2075): an over-length goal is rejected naming the cap and received length', async () => {
+  const { app, added, events } = buildApp();
+  const goal = 'x'.repeat(1247);
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { goal },
+  });
+  assert.equal(status, 400);
+  assert.equal(body.error, 'goal exceeds maximum length of 1000 (got 1247)');
+  assert.equal(added.length, 0);
+  // the reject-branch logEvent(req, '/api/proxy/autopilot/kickoff', 400) call
+  // must survive the swap onto the shared helper — this is the regression the
+  // swap most plausibly breaks silently.
+  assert.ok(
+    events.some(e => e.endpoint === '/api/proxy/autopilot/kickoff' && e.status === 400),
+    `expected a 400 event for the kickoff endpoint, got ${JSON.stringify(events)}`
+  );
+});
+
+test('POST kickoff (LIN-2075): the received length counts UTF-16 code units, not visible characters', async () => {
+  // 501 x 🚀 is 1002 UTF-16 code units (each emoji is a surrogate pair) —
+  // rejected at 501 visible characters, and the reported length must say
+  // 1002, or the number contradicts what a caller can count.
+  const { app, added } = buildApp();
+  const goal = '\u{1F680}'.repeat(501);
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { goal },
+  });
+  assert.equal(status, 400);
+  assert.equal(body.error, 'goal exceeds maximum length of 1000 (got 1002)');
+  assert.equal(added.length, 0);
+});
+
+test('POST kickoff (LIN-2075): a goal with dangerous control characters is rejected with 400', async () => {
+  const { app, added } = buildApp();
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { goal: 'walk the stack\x00' },
+  });
+  assert.equal(status, 400);
+  assert.match(body.error, /goal contains invalid characters/);
+  assert.equal(added.length, 0);
+});
+
+test('POST kickoff (LIN-2075): a valid goal is accepted and threaded into the prompt', async () => {
+  const { app, added } = buildApp();
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { goal: 'walk the stack' },
+  });
+  assert.equal(status, 201);
+  assert.equal(added.length, 1);
+  assert.match(added[0].doc.prompt, /\*\*Goal from the human:\*\* walk the stack/);
+});
+
+test('POST kickoff (LIN-2075): goal: null is now accepted as absent (intentional relaxation)', async () => {
+  // Previously null fell through to the type check and was rejected; the
+  // shared helper treats null the same as omitted/undefined. This pins the
+  // ticket's one intended behaviour change — it must fail if reverted.
+  const { app, added } = buildApp();
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { goal: null },
+  });
+  assert.equal(status, 201);
+  assert.equal(added.length, 1);
+  // The fallback line an omitted goal also produces, per
+  // lib/prompts/autopilot-kickoff.js — proves goal:null took the "absent" branch.
+  assert.match(added[0].doc.prompt, /\*\*Goal from the human:\*\* none this run/);
+});
+
+test('POST kickoff (LIN-2075): an omitted goal still behaves as today (general run, no goal line)', async () => {
+  const { app, added } = buildApp();
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: {},
+  });
+  assert.equal(status, 201);
+  assert.equal(added.length, 1);
+  assert.match(added[0].doc.prompt, /\*\*Goal from the human:\*\* none this run/);
+});
+
+test('POST kickoff (LIN-2075): a non-string repo is rejected with 400', async () => {
+  const { app, added } = buildApp();
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { repo: 42 },
+  });
+  assert.equal(status, 400);
+  assert.match(body.error, /repo must be a string/);
+  assert.equal(added.length, 0);
+});
+
+test('POST kickoff (LIN-2075): an over-length repo is rejected naming the cap and received length', async () => {
+  const { app, added } = buildApp();
+  const repo = 'x'.repeat(1001);
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { repo },
+  });
+  assert.equal(status, 400);
+  assert.equal(body.error, 'repo exceeds maximum length of 1000 (got 1001)');
+  assert.equal(added.length, 0);
+});
+
+test('POST kickoff (LIN-2075): a repo with dangerous control characters is rejected with 400', async () => {
+  const { app, added } = buildApp();
+  const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { repo: 'my-org/my-repo\x00' },
+  });
+  assert.equal(status, 400);
+  assert.match(body.error, /repo contains invalid characters/);
+  assert.equal(added.length, 0);
+});
+
+test('POST kickoff (LIN-2075): a valid repo is accepted and threaded onto the dispatch item', async () => {
+  const { app, added } = buildApp();
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { repo: 'my-org/my-repo' },
+  });
+  assert.equal(status, 201);
+  assert.equal(added.length, 1);
+  assert.equal(added[0].doc.repo, 'my-org/my-repo');
+});
+
+test('POST kickoff (LIN-2075): repo: null is now accepted as absent (intentional relaxation)', async () => {
+  const { app, added } = buildApp();
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: { repo: null },
+  });
+  assert.equal(status, 201);
+  assert.equal(added.length, 1);
+  assert.strictEqual(added[0].doc.repo, null);
+});
+
+test('POST kickoff (LIN-2075): an omitted repo still behaves as today (no repo on the dispatch item)', async () => {
+  const { app, added } = buildApp();
+  const { status } = await request(app, '/api/proxy/autopilot/kickoff', {
+    method: 'POST',
+    body: {},
+  });
+  assert.equal(status, 201);
+  assert.equal(added.length, 1);
+  assert.strictEqual(added[0].doc.repo, null);
 });
 
 // LIN-1175 — a claude-code autopilot kickoff (the DEFAULT harness) must FAIL
