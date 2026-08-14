@@ -248,6 +248,21 @@ describe('GitHub App auth primitives (LIN-707)', () => {
       assert.equal(getAppConfig().privateKey, PEM)
     })
 
+    test('accepts a body line with trailing whitespace, and the normalized key actually signs (LIN-2081 round-3 fix)', () => {
+      // The blocking finding from the round-3 re-review: normalizePrivateKey
+      // stripped LEADING per-line whitespace but not TRAILING, so a body line
+      // ending in a space survived normalization and then failed
+      // PEM_ARMOR_LINE. Same decision as observation A's indented-body fix,
+      // applied to the other end of the line.
+      const lines = PEM.split('\n')
+      const withTrailingSpace = lines.map((l, i) => (i > 0 && i < lines.length - 2 ? l + ' ' : l)).join('\n')
+      assert.equal(signsOk(withTrailingSpace), true, 'sanity: OpenSSL itself accepts a body line with trailing whitespace')
+      process.env.GITHUB_APP_PRIVATE_KEY = withTrailingSpace
+      const cfg = getAppConfig()
+      assert.equal(signsOk(cfg.privateKey), true)
+      assert.equal(cfg.privateKey, PEM, 'trailing whitespace is stripped, not merely tolerated')
+    })
+
     // --- Finding 1: a fully newline-stripped key must be REJECTED, naming ---
     // --- the defect — and never allowed to reach Sign.sign's opaque error.
 
@@ -315,6 +330,37 @@ describe('GitHub App auth primitives (LIN-707)', () => {
         assert.equal(isGitHubConfigured(), false)
       })
     }
+
+    // --- The named "no key material" empty-body guard (`:179`, beat 3 item 2)
+    // --- had no test — CI did not exercise the one part of the validator that
+    // --- exists to catch a future degenerate body slice from rotting into
+    // --- dead code (LIN-2081 round-3 re-review, non-blocking observation A).
+    // --- Pinned via the two inputs the review reached it with: newlines
+    // --- collapsed to spaces WITH a single real LF surviving right before the
+    // --- END footer (so headerEnd lands exactly at endMatch.index, an empty
+    // --- slice, distinct from the "no line breaks at all" class above), and
+    // --- an armor-only PEM padded past PEM_MIN_LENGTH with no real body.
+
+    test('rejects newlines collapsed to spaces with a single real LF surviving before the END footer, naming the empty-body defect', () => {
+      const collapsed = PEM.replace(/\n/g, ' ').replace(/ (-----END)/, '\n$1')
+      assert.equal(signsOk(collapsed), false, 'sanity: the raw collapsed key genuinely fails to sign')
+      process.env.GITHUB_APP_PRIVATE_KEY = collapsed
+      assert.throws(
+        () => getAppConfig(),
+        /GitHub App auth: GITHUB_APP_PRIVATE_KEY has no key material between the '-----BEGIN'\/'-----END' armor lines/
+      )
+    })
+
+    test('rejects an armor-only PEM padded past the length floor with no real body, naming the empty-body defect', () => {
+      const armorOnlyPadded = '-----BEGIN RSA PRIVATE KEY-----' + 'A'.repeat(1000) + '\n-----END RSA PRIVATE KEY-----\n'
+      assert.ok(armorOnlyPadded.length > 1000, 'sanity: padded past the 1000-char length floor')
+      assert.equal(signsOk(armorOnlyPadded), false, 'sanity: this is not a real key')
+      process.env.GITHUB_APP_PRIVATE_KEY = armorOnlyPadded
+      assert.throws(
+        () => getAppConfig(),
+        /GitHub App auth: GITHUB_APP_PRIVATE_KEY has no key material between the '-----BEGIN'\/'-----END' armor lines/
+      )
+    })
   })
 
   // -------------------------------------------------------------------------
