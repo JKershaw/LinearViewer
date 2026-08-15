@@ -57,7 +57,7 @@ a fraction of what a session that must search reads.
 | The live transcripts | The same 160 usage-bearing sessions, **still present on the dispatcher machine** — verified 160/160 readable at their recorded paths, so all measurement here reads the live files and the tarball serves as the frozen capture | `~/.claude/projects/` |
 | LIN-2112's measurement bundle | Per-session aggregates (`sessions.json`, 160 rows), analyzer, reports | `~/harbour-transcript-archives/lin-2112-measurement/` |
 | Landed ground truth | The commits those legs produced, and their own regression suites | `LinearViewer` at `4f328ba5` |
-| Pricing | `lib/model-pricing.js` at HEAD — same table as LIN-2112, so figures are commensurable | `LinearViewer/lib/model-pricing.js:77-86` |
+| Pricing | `lib/model-pricing.js` at `4f328ba5` — same table as LIN-2112, so figures are commensurable | `LinearViewer/lib/model-pricing.js:77-86` |
 
 New tooling for this study lives beside the LIN-2112 bundle (`~/harbour-transcript-archives/lin-2115-measurement/`); it is not repo-tracked, for the same reason LIN-2112's was not.
 
@@ -109,7 +109,7 @@ Every layer, how it is represented today, the source, and what this study does t
 | Carried-context measurement | `cacheRead = Σ_turns context(t)` — the cost identity | LIN-1236 program / LIN-1591 ("orchestrator poll loops re-read their whole context per beat — 15% of token spend, measured", 73 sessions) | Same identity; §7's compaction pricing is the same `T × cacheWrite + T × cacheRead × (N−i)` model as LIN-2112 §5 |
 | Outcome verification | Landed commit + its own regression suite; `docs/prompt-change-validation.md` §5 is the house convention for measuring a prompt-side change | `LinearViewer/docs/prompt-change-validation.md:65-104` | §5's design rules adopted: prompt is the only variable; don't pre-solve the evidence; real gold case; test more than one model; be price-conscious. **One rule not met: "run k× replications" — k=3 on the decisive cell only, k=1 elsewhere.** Disclosed in §9. |
 | Distillation / handoff procedure | Already exists **between** legs: the dispatch prompt is a distillate a plan leg wrote for an implementation leg; `brief`/`recap` are LLM distillates of a ticket | `simple-dispatcher/dispatcher.js:953`; proxy `/brief/{id}`, `/recap/{id}` | §4.1 measures the existing between-leg distillate directly rather than inventing a new format |
-| Re-run cost accounting | `total_cost_usd` per headless run; `lib/model-pricing.js` for transcript-side pricing | `claude -p --output-format json`; `lib/model-pricing.js:78-86` | Both reported; §8 |
+| Re-run cost accounting | `total_cost_usd` per headless run; `lib/model-pricing.js` for transcript-side pricing | `claude -p --output-format json`; `lib/model-pricing.js:77-86` | Both reported; §8 |
 | Report conventions | `docs/reviews/` sibling: scope, method, findings, ranked candidates with a non-summing caveat, risks/limits, follow-ups, provenance | `intra-session-efficiency-review-2026-08-14.md` structure | Followed, including the "these rows do not sum" discipline |
 | Named downstream consumers | long-tail bounding (run review §8 / LIN-2112 F7), LIN-2114 harness contract, LIN-1085 tiering evals | `capacity-test-run-review-2026-08-14.md:221-237`, LIN-2114, LIN-1085 | §9 addresses each by name with a bounded recommendation |
 
@@ -635,9 +635,11 @@ LIN-2114's own argument. Three contract requirements this study's evidence suppo
    figures are exact from the API's own usage accounting.
 10. **The tooling inlines a third copy of the pricing table** (§3.1) — a standing limitation of the
     on-machine bundle, not an in-repo drift risk.
-11. **The `[1m]` cache-write understatement (LIN-2112 F3, +18.2%) is unfixed** and applies to the
-    transcript-side figures here exactly as it did there; the probe costs are the runner's own
-    first-party figures and are unaffected.
+11. **The `[1m]` cache-write understatement (LIN-2112 F3, +18.2%) was unfixed at the time of
+    measurement** and applies to the transcript-side figures here exactly as it did there; the probe
+    costs are the runner's own first-party figures and are unaffected. LIN-2113 (`8bb039bb`, #1142)
+    has since landed that fix on `main`, after this study's measurement head `aef734af` — it does not
+    move any figure above, which reads a pre-fix rate copy inlined in the bundle's own tooling.
 
 ---
 
@@ -674,19 +676,22 @@ Not filed, deliberately:
   `8b97b13f6fead86a9208a714c58ca1c0d3eae19c239c7482d12b7fc6f4eee044` — **re-hashed this session and
   matching both LIN-2112's record and the ticket's own citation**; the 160 usage-bearing transcripts
   verified still present and readable at their recorded `~/.claude/projects/` paths.
-- Staleness check (per the ticket's own re-grounding instruction): `git log` since the ticket's
-  creation (2026-08-15T10:18:26Z) over `docs/reviews/`, `lib/model-pricing.js`, `lib/dispatch-wake.js`,
-  `lib/dispatch-store.js`, `lib/ship-journey.js`, `routes/workspace-api.js` in Harbour and the whole
-  of simple-dispatcher returns **no commits** — every code reference this study relies on is
-  unchanged since the ticket was written, and all of it was read at HEAD rather than from the ticket
-  prose.
+- Staleness check (per the ticket's own re-grounding instruction), **as of this study's measurement
+  head `aef734af` (2026-08-15T15:44Z)**: `git log` since the ticket's creation (2026-08-15T10:18:26Z)
+  over `docs/reviews/`, `lib/model-pricing.js`, `lib/dispatch-wake.js`, `lib/dispatch-store.js`,
+  `lib/ship-journey.js`, `routes/workspace-api.js` in Harbour and the whole of simple-dispatcher
+  returned **no commits** — every code reference this study relies on was unchanged since the ticket
+  was written, and all of it was read at that commit rather than from the ticket prose. One commit has
+  landed on `main` since: `8bb039bb` (LIN-2113, 15:45Z) touches `lib/model-pricing.js`, which is why
+  every citation of that file above is anchored to `4f328ba5` rather than to a moving HEAD. No figure
+  in this study changes.
 - LIN-2112 measurement bundle reused for classification and per-session aggregates:
   `~/harbour-transcript-archives/lin-2112-measurement/sessions.json`.
 - This study's tooling, distillates, per-probe run records, produced diffs and verifier outputs:
   `~/harbour-transcript-archives/lin-2115-measurement/` (dispatcher machine, not repo-tracked).
 - Ground truth commits, all in `LinearViewer`: `d0274c4a` (LIN-2078), `04acdb20` (LIN-2045),
   `c4a22a32` (LIN-2065); bases `04acdb20`, `cdfa77dd`, `3d92408a`.
-- Pricing: `LinearViewer/lib/model-pricing.js:78-86` at HEAD `4f328ba5`.
+- Pricing: `LinearViewer/lib/model-pricing.js:77-86` at HEAD `4f328ba5`.
 - Siblings this joins to: [`intra-session-efficiency-review-2026-08-14.md`](intra-session-efficiency-review-2026-08-14.md)
   (LIN-2112) and [`capacity-test-run-review-2026-08-14.md`](capacity-test-run-review-2026-08-14.md)
   (LIN-2087).
