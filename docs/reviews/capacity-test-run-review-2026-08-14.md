@@ -325,3 +325,34 @@ disclosed inline; none withheld:
   (`4c75040a`), checkpoint series (`44c7cf5a`, tz-fix `2bb4fd7f`), exhaustion-week
   signature (`c4d7013d`).
 - LIN-2047's close-out disposition (the P6 asterisk): recorded on LIN-2047 and LIN-2111.
+
+---
+
+## Addendum (2026-08-15) — ranked solution tasks and the intra-session follow-on
+
+Post-review, the solution tasks named in §8–9 were ranked by estimated savings against
+this run's $1,070 API-rate day (full table pinned as the LIN-2087 ranking coda):
+
+| # | Solution | Owner(s) | Est. savings / full-width day |
+|---|---|---|---:|
+| 1 | Orchestrator tier → Sonnet | model-tiering, gated on rung-2 evals | ~$150 (14%) |
+| 2 | Leg-level tiering via evals | LIN-2059 → 1747 → 1627 | ~$120–240 (#1+#2 combined: ~25–36%) |
+| 3 | Stall/zombie bookkeeping | LIN-1594 + LIN-2079 | ~$50–100 + outcome protection; cheapest to land |
+| 4 | Wake-chatter / beat alignment | same | ~$10–60 (do as part of #3) |
+| 5 | Credential-path follow-ups | LIN-2099–2101, 2109 | incident insurance, not $/day |
+| 6 | Opencode offload | LIN-1125/1193/1146/1087 | $0 — a capacity *purchase* (~9 pts/day freed for ~$30–100 cash); price against #7 after #1–#2 land |
+| 7 | Plan-tier upgrade | — | baseline: points for cash, zero engineering |
+
+Recommended sequence: #3 now → #2 (the gate on #1) → then price #6 vs #7 against the
+post-tiering cap.
+
+**The intra-session gap now has an owner: LIN-2112.** The structural analysis above found
+the between-leg choreography fairly lean (B3 10.4%, B4 4.8%) — so the remaining large
+savings pool, if it exists, is *inside* the legs: per-turn context composition, re-read
+ratios, tool-call efficiency, the orchestrator's consultation ratio on its 3–18M-token
+turns, and output discipline. Queue-level `[usage]` deltas cannot see any of that; it
+needs transcript-level analysis. LIN-2112 runs that study over **this run's own
+transcripts** — captured while still on the dispatcher machine — precisely because this
+day's between-leg economics are fully characterised here, making the intra-session
+findings joinable to known per-leg costs. Its baselines also feed the rung-2 evals
+(#2 above), which need per-leg-kind numbers regardless.
