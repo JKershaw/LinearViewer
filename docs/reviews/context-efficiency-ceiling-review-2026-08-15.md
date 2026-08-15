@@ -57,7 +57,7 @@ a fraction of what a session that must search reads.
 | The live transcripts | The same 160 usage-bearing sessions, **still present on the dispatcher machine** — verified 160/160 readable at their recorded paths, so all measurement here reads the live files and the tarball serves as the frozen capture | `~/.claude/projects/` |
 | LIN-2112's measurement bundle | Per-session aggregates (`sessions.json`, 160 rows), analyzer, reports | `~/harbour-transcript-archives/lin-2112-measurement/` |
 | Landed ground truth | The commits those legs produced, and their own regression suites | `LinearViewer` at `4f328ba5` |
-| Pricing | `lib/model-pricing.js` at HEAD — same table as LIN-2112, so figures are commensurable | `LinearViewer/lib/model-pricing.js:78-86` |
+| Pricing | `lib/model-pricing.js` at HEAD — same table as LIN-2112, so figures are commensurable | `LinearViewer/lib/model-pricing.js:77-86` |
 
 New tooling for this study lives beside the LIN-2112 bundle (`~/harbour-transcript-archives/lin-2115-measurement/`); it is not repo-tracked, for the same reason LIN-2112's was not.
 
@@ -184,6 +184,9 @@ context:
 | autopilot | 2 | 234 | 234 | 245,065 | 1,047× |
 | observer/custom | 1 | 254 | 254 | 360,645 | 1,420× |
 
+Singletons omitted from the table (scoping n=1, 87.7×; triage n=1, 102.3×; design n=1, 181.1×;
+blocked n=1, 100.3×) — 4 legs, 120+4 = 124.
+
 The right-hand column is **not** the efficiency ceiling — a leg must read code the prompt does not
 contain, so the denominator is not C\*. It is the ratio of *derived working state* to *stated task*,
 and it says the specification is a rounding error against the exploration residue. The two
@@ -287,19 +290,22 @@ median window 193,326.
 | R1b — R1 + 3 clauses closing the identified gaps | 760 | haiku-4.5 | **14/18 — FAIL** |
 
 The three R1 failures were identical across tiers, which is the informative part: **this was not a
-model ceiling, it was a specification gap.** The failing assertions pin (a) that the first step of a
-segment snaps heading directly to its bearing rather than turning into it, (b) that a segment break
-berths at the origin, and (c) that a non-placeable waypoint carries no `x`/`y` **key at all**. None
-was stated in R1; two of the three are representation contracts rather than behaviour (§2.3), so the
-verifier here is over-strict relative to "equivalent deliverable".
+model ceiling, it was a specification gap.** The failing assertions pin (a) that a direct N→S
+reversal must take multiple bounded-turn steps and never snap heading straight across in one flip,
+(b) that a segment break resets both heading and position to a fresh berth (starting at `x=0`), and
+(c) that a non-placeable waypoint carries no `x`/`y` **key at all**. None was stated in R1; two of
+the three are representation contracts rather than behaviour (§2.3), so the verifier here is
+over-strict relative to "equivalent deliverable".
 
-R1b added exactly those three clauses (+165 tokens). It closed two of them — the reversal-arc and
-segment-break assertions passed — but broke two others that R1 had passed (one-unit spacing, and the
-out-of-vocabulary bearing), landing at 14/18. **The bisection did not converge within the spend cap.**
-The honest reading is not "C\* is between 595 and 760 tokens" but rather: for an algorithm-shaped
-change with a representation-pinning suite, adding specification prose is not monotone — a longer
-distillate produced a *different* wrong implementation, not a closer one. C\* for this task is
-**above 760 tokens of specification** and was not located.
+R1b added exactly those three clauses (+165 tokens). It closed exactly **one** of them — the
+segment-break assertion passed — while the reversal-arc and placeable-projection assertions R1 had
+already failed **stayed failing**, and two assertions R1 had passed newly broke (one-unit spacing,
+and the out-of-vocabulary bearing): 1 closed, 2 still failing, 2 newly broken, landing at **14/18**
+(down from 15/18). **The bisection did not converge within the spend cap — it moved backward.** The
+honest reading is not "C\* is between 595 and 760 tokens" but rather: for an algorithm-shaped change
+with a representation-pinning suite, adding specification prose is not monotone — a longer distillate
+produced a *different* wrong implementation, not a closer one. C\* for this task is **above 760
+tokens of specification** and was not located.
 
 **This is the study's clearest negative result, and it bounds the compaction claim.** Localized
 changes (LIN-2078, LIN-2045) compact to a few hundred tokens with a verified outcome. An
@@ -430,8 +436,12 @@ What the probes establish, and what they do not. Nothing below is claimed beyond
 
 **CP0 — the end of the bootstrap segment.** Every hook-substrate leg opens with a "Summarise this
 project briefly" turn before the real task arrives. Measured across the **148** legs with an
-identifiable bootstrap segment: **$76.79 of $1,369.87 (5.6% of the day)**, median 8 turns, leaving a
-median **11k–21k tokens** resident that then rides every remaining turn of the leg.
+identifiable bootstrap segment: **$76.79 of those 148 legs' own $1,369.87 subtotal (5.6%)**, median 8
+turns, leaving a median **11k–21k tokens** resident that then rides every remaining turn of the leg.
+$1,369.87 is *not* the day total — it is the subtotal of only the legs a bootstrap segment could be
+identified in. Against LIN-2112's whole-session day total ($1,398.19, the basis its own candidate
+percentages use), the same $76.79 is **5.5% of the day** — the figure §9.1 rec 5 compares against
+LIN-2112's candidates for commensurability.
 
 | leg kind | n | med bootstrap turns | med bootstrap $ | bootstrap share of kind | med residual ctx |
 |---|--:|--:|--:|--:|--:|
@@ -443,6 +453,12 @@ median **11k–21k tokens** resident that then rides every remaining turn of the
 | research | 15 | 8 | $0.58 | 5.0% | 21,208 |
 | autopilot | 13 | 10 | $0.60 | 3.7% | 19,133 |
 | observer/custom | 6 | 14 | $0.81 | 1.3% | 19,314 |
+
+Singletons/small-n rows omitted from the table (scoping n=1 $0.62, 31.1%; triage n=1 $0.48, 31.3%;
+design n=1 $0.36, 7.3%; blocked n=2 $0.77 combined, 19.9%; bug n=2 $2.25 combined, 7.1% — $4.48
+combined) — 7 legs, 141+7 = 148. Note that scoping and triage carry the **two highest** bootstrap
+shares of any kind measured (31.1%, 31.3%), ahead of every row in the table above; they are omitted
+here only because n=1 makes the median unstable, not because the effect is small.
 
 The evidence that this is *safe* to discard is direct, and it is the study's best-supported safety
 claim: **all twelve** task-executing probes in §4–§5 ran with **no** bootstrap segment at all, and
@@ -543,7 +559,9 @@ the runner's own and do not.
    the legs whose output is hardest to check. Whatever the design, it needs a verifier at the re-seed
    boundary — which for implementation legs the repo already has, in the leg's own test suite.
 5. **Do not sum these with LIN-2112's §5 candidates.** Same tokens, different slice. The bootstrap
-   figure (5.6%) overlaps candidate 2 (preamble diet) and candidate 1 (long tail).
+   figure (5.5% of LIN-2112's whole-session day total, the same $1,398.19 basis its own candidates
+   use — 5.6% against these 148 legs' own subtotal, see §7.1) overlaps candidate 2 (preamble diet)
+   and candidate 1 (long tail).
 
 ### 9.2 For LIN-2114's harness contract (observation-type sessions → a simpler cloud harness)
 
@@ -601,25 +619,25 @@ LIN-2114's own argument. Three contract requirements this study's evidence suppo
    de-leak was manual — strip the docstring, strip the test named after the defect — and there is no
    automated check that a reconstructed pre-state does not contain its own solution. Any future run
    of this instrument needs one.
-2. **Ĉ is an upper bound on C\*, so every ceiling is a floor.** Stated in §6 and repeated here
+4. **Ĉ is an upper bound on C\*, so every ceiling is a floor.** Stated in §6 and repeated here
    because it is the easiest thing to misread in the other direction.
-3. **The probes shrank context, turns and tier simultaneously.** The 12–45× cost ratios are not
+5. **The probes shrank context, turns and tier simultaneously.** The 12–45× cost ratios are not
    attributable to compaction alone. §6.1 and §7 separate what can be separated.
-4. **The probe distillates were authored with hindsight, by design.** That is what "hindsight-minimal"
+6. **The probe distillates were authored with hindsight, by design.** That is what "hindsight-minimal"
    means, but it means the ladder measures *sufficiency*, never whether a real session could have
    produced the distillate at that checkpoint unaided.
-5. **Verifier scope.** The landed suites verify production behaviour, not the whole deliverable
+7. **Verifier scope.** The landed suites verify production behaviour, not the whole deliverable
    (§2.3). LIN-2065's suite is additionally over-strict.
-6. **Non-implementation leg kinds have no C\* measurement at all.** §6's table says "not measured"
+8. **Non-implementation leg kinds have no C\* measurement at all.** §6's table says "not measured"
    rather than extrapolating, and that is the largest gap in this deliverable against the ticket's
    "per leg kind" ask.
-7. **Bytes/4 token estimates** are used for distillate and dispatch-prompt sizes; window and cost
+9. **Bytes/4 token estimates** are used for distillate and dispatch-prompt sizes; window and cost
    figures are exact from the API's own usage accounting.
-8. **The tooling inlines a third copy of the pricing table** (§3.1) — a standing limitation of the
-   on-machine bundle, not an in-repo drift risk.
-9. **The `[1m]` cache-write understatement (LIN-2112 F3, +18.2%) is unfixed** and applies to the
-   transcript-side figures here exactly as it did there; the probe costs are the runner's own
-   first-party figures and are unaffected.
+10. **The tooling inlines a third copy of the pricing table** (§3.1) — a standing limitation of the
+    on-machine bundle, not an in-repo drift risk.
+11. **The `[1m]` cache-write understatement (LIN-2112 F3, +18.2%) is unfixed** and applies to the
+    transcript-side figures here exactly as it did there; the probe costs are the runner's own
+    first-party figures and are unaffected.
 
 ---
 
