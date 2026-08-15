@@ -120,7 +120,10 @@ async function main() {
   if (!TOKEN) { console.error('PROXY_TOKEN required'); process.exit(1); }
 
   log('Fetching dispatch records across statuses…');
-  const statuses = ['done', 'failed', 'aborted', 'taken', 'queued'];
+  // 'blocked' (LIN-2079) is a DERIVED lifecycle status: a row parked on a human
+  // reports it INSTEAD of 'taken', so without this read it drops out of the
+  // corpus silently rather than failing loudly.
+  const statuses = ['done', 'failed', 'aborted', 'taken', 'blocked', 'queued'];
   const items = new Map();
   for (const st of statuses) {
     const { items: rows = [] } = await proxy(`/dispatch?status=${st}&limit=250`);

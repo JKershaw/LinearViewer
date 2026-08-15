@@ -10,7 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { findTerminalFeedback, deriveTerminalStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort } from '../../lib/dispatch-terminal.js';
+import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort } from '../../lib/dispatch-terminal.js';
 
 describe('deriveTerminalStatus', () => {
   test('null when feedback is missing or not an array', () => {
@@ -221,5 +221,71 @@ describe('findWakeEvent', () => {
       findWakeEvent([{ message: '[failed] first attempt' }, last]),
       { entry: last, marker: 'done' }
     );
+  });
+});
+
+/**
+ * LIN-2079 S1 — `blocked` as a first-class READ-TIME lifecycle status.
+ *
+ * A row whose runner posted `[blocked]` (alive, parked on a human) has no
+ * terminal marker, so it fell back to stored `taken` — indistinguishable on the
+ * wire from a live run and from a hard-stop tombstone. This derives it instead.
+ * Terminal-first is the load-bearing ordering: it is what stops an earlier
+ * `[blocked]` from overriding a later genuine terminal (and, at the call sites,
+ * from rewinding `completedAt`). `[pending]` is deliberately NOT mapped — it is
+ * a pause with its own AWAITING_EXTERNAL → FAILED failsafe on the consumer.
+ */
+describe('deriveLifecycleStatus (LIN-2079)', () => {
+  test('null when feedback is missing, not an array, or carries no marker', () => {
+    assert.equal(deriveLifecycleStatus(undefined), null);
+    assert.equal(deriveLifecycleStatus(null), null);
+    assert.equal(deriveLifecycleStatus('nope'), null);
+    assert.equal(deriveLifecycleStatus([]), null);
+    assert.equal(deriveLifecycleStatus([{ message: '[working] still going' }]), null);
+  });
+
+  test('a [blocked]-only lineage derives "blocked"', () => {
+    assert.equal(deriveLifecycleStatus([{ message: '[blocked] needs a human decision' }]), 'blocked');
+  });
+
+  test('case-insensitive and whitespace-tolerant, same as the terminal scan', () => {
+    assert.equal(deriveLifecycleStatus([{ message: '  [BLOCKED] waiting on John' }]), 'blocked');
+  });
+
+  test('still returns the terminal status when one exists', () => {
+    assert.equal(deriveLifecycleStatus([{ message: '[done] finished' }]), 'done');
+    assert.equal(deriveLifecycleStatus([{ message: '[failed] tests red' }]), 'failed');
+    assert.equal(deriveLifecycleStatus([{ message: '[aborted] cancelled' }]), 'aborted');
+    assert.equal(deriveLifecycleStatus([{ message: '[skipped] human-continued session' }]), 'skipped');
+  });
+
+  // ORDERING, both directions. The second case is the one that breaks the
+  // moment anyone refactors this to check wake events before terminals.
+  test('terminal wins over blocked in BOTH orderings', () => {
+    assert.equal(deriveLifecycleStatus([
+      { message: '[blocked] waiting on creds', timestamp: '2026-08-15T10:00:00.000Z' },
+      { message: '[done] unblocked and finished', timestamp: '2026-08-15T11:00:00.000Z' }
+    ]), 'done', 'a later terminal must win');
+    assert.equal(deriveLifecycleStatus([
+      { message: '[done] finished', timestamp: '2026-08-15T10:00:00.000Z' },
+      { message: '[blocked] re-blocked afterwards', timestamp: '2026-08-15T11:00:00.000Z' }
+    ]), 'done', 'terminal-first: a LATER [blocked] does not un-finish a done run');
+  });
+
+  test('[pending] is deliberately NOT mapped — it stays null, exactly as today', () => {
+    assert.equal(deriveLifecycleStatus([{ message: '[pending] my part is done, the task is not' }]), null);
+  });
+
+  test('the LAST wake event decides: an earlier [blocked] followed by [pending] is not blocked', () => {
+    assert.equal(deriveLifecycleStatus([
+      { message: '[blocked] stuck' },
+      { message: '[pending] resumed and paused at a boundary' }
+    ]), null);
+  });
+
+  test('never stamps a completion time — deriveCompletedAt stays blind to [blocked]', () => {
+    const feedback = [{ message: '[blocked] parked', timestamp: '2026-08-15T10:00:00.000Z' }];
+    assert.equal(deriveLifecycleStatus(feedback), 'blocked');
+    assert.equal(deriveCompletedAt(feedback), null, 'a parked run has not completed');
   });
 });

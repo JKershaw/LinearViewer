@@ -190,6 +190,29 @@ describe('computeIssueRoundTrips — R0 eligibility (extraction-first, state-sec
     assert.equal(result.diagnostics.noGenuineAttempt, 0);
   });
 
+  // LIN-2079 S5. This module consumes the DERIVED status of the proxy list
+  // endpoint (see its header + scripts/plan-review-round-trips.mjs, which copies
+  // `status: item.status` straight off those items). Once `blocked` is derived
+  // there, a plan-review row correctly parked on a human stops reporting `taken`
+  // — and without 'blocked' in IN_FLIGHT_STATUSES it matches neither closed set,
+  // falls through to the structural tier, and is silently scored as a SETTLED
+  // attempt. Behaviour-preserving by construction: it keeps such a row censored
+  // exactly the way it is censored today.
+  test('blocked row (parked on a human) is right-censored like taken, NOT scored as a settled attempt', () => {
+    const iss = issue('blocked', {
+      rows: [row('r1', 'plan-review', 'blocked', '2026-08-09T10:00:00.000Z', null)],
+    });
+    const result = computeIssueRoundTrips(iss, { asOf: ASOF });
+    assert.equal(result.R0.rightCensored, true, 'a parked row is still in flight, not resolved');
+    assert.equal(result.R0.resolved, false);
+    assert.equal(result.R0.tier, null, 'must NOT fall through to the structural tier');
+    assert.equal(result.diagnostics.noGenuineAttempt, 0);
+
+    const agg = computePlanReviewRoundTrips([iss], { asOf: ASOF });
+    assert.equal(agg.diagnostics.rightCensoredFirstPass, 1);
+    assert.equal(agg.primary.denominator, 0, 'right-censored rows stay out of the primary denominator');
+  });
+
   test('done row with no next row and no resolvable text falls to tier C, which is null with no next row → reachedButUnresolvedFirstPass', () => {
     const iss = issue('unresolved', {
       rows: [row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z')],

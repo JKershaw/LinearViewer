@@ -1720,6 +1720,7 @@ Notes:
 - Re-polling an already-terminal item with `?wait` returns immediately (no hold), with `reason: "terminal"` and `waitedMs: 0` — re-verifying a finished item is free.
 - `?wait=0` / absent / invalid values are the plain immediate short-poll (fully backwards-compatible) — and omit `reason`/`waitedMs` entirely (those fields appear only when `?wait>0`).
 - `status` is **reported, not adjudicated**: a `done` means the runner's session ended, not that the work is correct (a worker can background a long command, exit, and post `done` early). Treat `done` as "go look" — cross-check the `[evidence]` URLs, and if unsatisfied, dispatch fresh work. The long-poll never locks anything in.
+- **`blocked` is a NON-TERMINAL status (LIN-2079).** A runner that posts a `[blocked]` marker is *alive and waiting on a human*, so the row reports `status: "blocked"` instead of `taken`. It is deliberately **not** in the terminal set: keep polling, and a `?wait=` long poll holds the full window rather than short-circuiting with `reason: "terminal"`. A later `[done]`/`[failed]`/`[aborted]` still wins — an earlier `[blocked]` never rewinds `completedAt`, and unlike terminals (which are last-wins across the lineage) `blocked` is only reported while the lineage carries no terminal at all. Two namespace traps worth knowing: `kind` independently takes the value `"blocked"` (an unrelated field on the same item), and the wake/stop-boundary vocabulary elsewhere calls `blocked` a *terminal outcome* for a step — the wire `status` here is explicitly not one.
 
 **`feedback` (and the derived `status`/`completedAt`) are lineage-wide, not just this row's own (LIN-1461/LIN-1480).** If this dispatch was repointed to a follow-up (`followUpTo`), the returned `feedback` merges this row's own entries with every other row in the same dispatch chain — so watching by the ORIGINAL id keeps seeing progress even after a repoint, instead of freezing at the point of repoint. Only a row that actually ran (`taken`) joins a lineage this way; a `queued` row (including a freshly-dispatched follow-up not yet picked up) reports its own values only.
 
@@ -1728,7 +1729,7 @@ Notes:
 ```json
 {
   "id": "uuid",
-  "status": "queued|taken|done|failed|aborted",
+  "status": "queued|taken|done|failed|blocked|aborted",
   "promptName": "...",
   "issueIdentifier": "LIN-42",
   "issueUrl": "...",
@@ -1785,10 +1786,12 @@ Returns only **this** item's prompt. For a session resumed via follow-ups, walk 
 #### List Dispatches
 
 ```
-GET /api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
+GET /api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|blocked|aborted}&limit={n}
 ```
 
-All query params optional. Merges the live queue and recent history, newest first — use it to resolve an item's `id` when you only know the issue. `status` is the same derived terminal status as the watch endpoint, so it is a valid filter value.
+All query params optional. Merges the live queue and recent history, newest first — use it to resolve an item's `id` when you only know the issue. `status` is the same derived status as the watch endpoint, so it is a valid filter value.
+
+**Filter semantics (LIN-2079):** the filter runs on the **derived** status, so `status=taken` no longer returns rows that derive to `blocked` — query `status=blocked` for those. `total` follows the same filter. This is deliberate: it is what separates rows still being worked from rows parked waiting on a human. An unfiltered list returns the same rows as before; only the reported `status` string changes for the affected rows.
 
 ```json
 { "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "dispatchedAt": "...", "resolvedAt": "...", "completedAt": "...", "feedbackCount": 10 } ], "total": 1, "truncated": false }

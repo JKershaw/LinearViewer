@@ -14,7 +14,7 @@
  *
  * Coverage: the plain dispatch list returns only the ~100 most-recent rows AND
  * projects away `sessionId`. To widen, this fetches every lifecycle status
- * (taken/done/failed/aborted/queued), unions + dedupes, then fetches each item's
+ * (taken/blocked/done/failed/aborted/queued), unions + dedupes, then fetches each item's
  * DETAIL (which carries `sessionId` + the full heartbeat `feedback[]`). Detail
  * fetches are rate-limited (proxy cap: 60/min) and cached to disk, so the first
  * run pays ~once and re-runs are instant.
@@ -47,7 +47,12 @@ const BUCKET_LABEL = {
   after: 'AFTER the diff   (confirm & paperwork)',
   orchestration: 'ORCHESTRATION    (autopilot/wake/custom)',
 };
-const STATUSES = ['taken', 'done', 'failed', 'aborted', 'queued'];
+// 'blocked' (LIN-2079) is a DERIVED lifecycle status: a row parked on a human
+// reports it INSTEAD of 'taken', so it must be fetched explicitly or the corpus
+// loses those rows silently — and the header's "every lifecycle status" claim
+// above would quietly stop being true. NOTE: it is deliberately NOT added to the
+// `terminal` set below — a blocked run is alive, not finished.
+const STATUSES = ['taken', 'blocked', 'done', 'failed', 'aborted', 'queued'];
 
 // ─── args ─────────────────────────────────────────────────────────────────
 function parseArgs(argv) {

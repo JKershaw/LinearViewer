@@ -173,7 +173,7 @@ Content-Type: application/json
 
 **Constraints:**
 - Only the token that took the item can post feedback (strict ownership)
-- Only items with `status: 'taken'` accept feedback
+- Only items with `status: 'taken'` accept feedback — that is the **stored** status. A row that reports `status: "blocked"` on the proxy wire (LIN-2079, a derived read-time status) is still stored `taken` and still accepts feedback
 - Rate limited to 100 requests per minute per IP
 
 **Success Response (200):**
