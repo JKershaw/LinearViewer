@@ -1,6 +1,6 @@
 # Intra-Session Efficiency Review — 2026-08-14
 
-**Scope.** The between-leg complement to this. The [capacity-test run
+**Scope.** The intra-session complement to the between-leg capacity-test run review. The [capacity-test run
 review](capacity-test-run-review-2026-08-14.md) (merged `454490c8`; ledger **LIN-2087**)
 measured the 2026-08-14 fleet-capacity-test day's *between-leg* structure — coordination vs.
 work-product, redundant process, rework — from dispatch-queue `[usage]` snapshots, and found it
@@ -113,10 +113,11 @@ scored PARTIAL on B1-dominates-B2 grounds alone.
 **This rescoring is a recommendation for LIN-2087's own owner to adopt, not an edit made here** —
 see §6 and the companion comment posted on LIN-2087 (§8).
 
-Cross-checks on session identity, independent of the dollar reconciliation: the run review's
-"176-minute plan-review" and "144-minute research leg" appear here as plan-review max **172.8m**
-and research max **147.8m**; its "~272M cumulative cache-read" deepest orchestrator appears as the
-observer session at **316.6M whole-session** cache-read.
+Cross-checks on session identity, independent of the dollar reconciliation: the LIN-2112 ticket's
+own framing of the run — a "176-minute plan-review" and a "144-minute research leg" — appears here
+as plan-review max **172.8m** and research max **147.8m**; the run review's own "~272M cumulative
+cache-read" deepest orchestrator appears as the observer session at **316.6M whole-session**
+cache-read.
 
 ## 4. Findings
 
