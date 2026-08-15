@@ -444,11 +444,15 @@ median **11k–21k tokens** resident that then rides every remaining turn of the
 | autopilot | 13 | 10 | $0.60 | 3.7% | 19,133 |
 | observer/custom | 6 | 14 | $0.81 | 1.3% | 19,314 |
 
-The evidence that this is *safe* to discard is direct: every probe in §4–§5 ran with **no** bootstrap
-segment at all and passed its verifier. The bootstrap's stated purpose — orientation — was not
-load-bearing for any measured outcome. Note the asymmetry: it is only 2.8% of an implementation leg
-but **15%** of the short review/plan-review/close-out kinds, where it is a fixed cost against a small
-job.
+The evidence that this is *safe* to discard is direct, and it is the study's best-supported safety
+claim: **all twelve** task-executing probes in §4–§5 ran with **no** bootstrap segment at all, and
+every one of the eight on a localized change passed its verifier (LIN-2078 across four context rungs,
+two tiers and three replications; LIN-2045 first time, byte-identically). The four that failed
+(LIN-2065, §5.2) failed on *specification* content, not on missing project orientation — the same
+three assertions failed at both tiers, and adding orientation was never what the failing rungs
+lacked. The bootstrap's stated purpose — orientation — was not load-bearing for any measured outcome.
+Note the asymmetry: it is only 2.8% of an implementation leg but **15%** of the short
+review/plan-review/close-out kinds, where it is a fixed cost against a small job.
 
 **CP2 — the moment search concludes.** §4.3 prices the difference at 2.2×. A session that distils to
 its located sites and intended change at that moment, and drops the exploration residue, is provably
