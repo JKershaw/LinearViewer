@@ -304,6 +304,17 @@ describe('parseUsage (LIN-1425)', () => {
     );
   });
 
+  test('LIN-2113: cacheCreation1hInputTokens passes through USAGE_NUMBER_FIELDS like the other number fields', () => {
+    const feedback = [{ message: usageMessage({ cacheCreation1hInputTokens: 90210 }), kind: 'usage' }];
+    const usage = parseUsage(feedback);
+    assert.strictEqual(usage.cacheCreation1hInputTokens, 90210);
+  });
+
+  test('LIN-2113: an absent cacheCreation1hInputTokens does not add the key at all', () => {
+    const usage = parseUsage([{ message: usageMessage(), kind: 'usage' }]);
+    assert.strictEqual('cacheCreation1hInputTokens' in usage, false);
+  });
+
   test('cumulative snapshot semantics: the LAST kind:"usage" entry wins, never summed', () => {
     const feedback = [
       { message: usageMessage({ inputTokens: 100, outputTokens: 200 }), kind: 'usage' },

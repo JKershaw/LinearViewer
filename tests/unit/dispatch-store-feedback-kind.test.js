@@ -89,7 +89,7 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
     const store = makeStore();
     const item = await takenItem(store);
     const rootItemId = '11111111-2222-3333-4444-555555555555';
-    const message = '[usage] {"schema":1,"harness":"claude-code","model":"claude-opus-4-8","inputTokens":5529,"outputTokens":25811,"cacheCreationInputTokens":145449,"cacheReadInputTokens":4588835,"costUsd":null}';
+    const message = '[usage] {"schema":1,"harness":"claude-code","model":"claude-opus-4-8","inputTokens":5529,"outputTokens":25811,"cacheCreationInputTokens":145449,"cacheCreation1hInputTokens":144502,"cacheReadInputTokens":4588835,"costUsd":null}';
 
     const res = await store.addFeedback(
       item._id,

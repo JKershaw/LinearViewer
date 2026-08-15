@@ -88,7 +88,7 @@ describe('LIN-1475 — watch endpoint kind exposure', () => {
     const created = await dispatchQueueStore.addItem('acme', { prompt: 'do the thing' });
     await dispatchQueueStore.takeItem(created._id, 'acme');
     const rootItemId = '11111111-2222-3333-4444-555555555555';
-    const usageMessage = '[usage] {"schema":1,"harness":"claude-code","model":"claude-opus-4-8","inputTokens":1,"outputTokens":2,"cacheCreationInputTokens":3,"cacheReadInputTokens":4,"costUsd":null}';
+    const usageMessage = '[usage] {"schema":1,"harness":"claude-code","model":"claude-opus-4-8","inputTokens":1,"outputTokens":2,"cacheCreationInputTokens":3,"cacheCreation1hInputTokens":2,"cacheReadInputTokens":4,"costUsd":null}';
     await dispatchQueueStore.addFeedback(created._id, 'acme', { message: usageMessage, kind: 'usage', rootItemId }, null);
 
     const watchRes = await call(app, 'get', `/api/proxy/dispatch/${created._id}`);

@@ -76,6 +76,104 @@ describe('computeUsageCostUsd — arithmetic (LIN-1495)', () => {
   });
 });
 
+describe('computeUsageCostUsd — 1h cache-write split (LIN-2113)', () => {
+  test('splits cacheCreationInputTokens across cacheWrite1h and cacheWrite by the 1h partition marker', () => {
+    const usage = {
+      ...WORKER_USAGE,
+      cacheCreation1hInputTokens: 80_000, // of the 89_849 total; remainder is 5m
+    };
+    // anthropic/claude-opus-5: prompt 5.00, completion 25.00, cacheWrite 6.25,
+    // cacheWrite1h 10.00, cacheRead 0.50 — all USD per 1M tokens.
+    const expected = (
+      40 * 5.00
+      + 12_435 * 25.00
+      + 80_000 * 10.00           // 1h portion at cacheWrite1h
+      + (89_849 - 80_000) * 6.25 // remainder at cacheWrite (5m)
+      + 1_090_513 * 0.50
+    ) / 1e6;
+    assert.strictEqual(computeUsageCostUsd(usage), expected);
+  });
+
+  test('absent cacheCreation1hInputTokens prices byte-identically to pre-LIN-2113 behavior', () => {
+    assert.strictEqual(computeUsageCostUsd(WORKER_USAGE), computeUsageCostUsd({ ...WORKER_USAGE }));
+    // WORKER_USAGE itself never carries the field — this is the historical/OpenCode shape.
+    assert.strictEqual('cacheCreation1hInputTokens' in WORKER_USAGE, false);
+    const expected = (
+      40 * 5.00
+      + 12_435 * 25.00
+      + 89_849 * 6.25 // entire total at the 5m rate, as before this field existed
+      + 1_090_513 * 0.50
+    ) / 1e6;
+    assert.strictEqual(computeUsageCostUsd(WORKER_USAGE), expected);
+  });
+
+  test('a 1h count exceeding the total clamps rather than going negative on the cacheWrite remainder', () => {
+    const usage = {
+      model: 'claude-opus-5',
+      outputTokens: 1, // keep tokenTotal non-zero regardless of the cache split
+      cacheCreationInputTokens: 100,
+      cacheCreation1hInputTokens: 1_000_000, // wildly exceeds the total
+    };
+    const expected = (1 * 25.00 + 100 * 10.00) / 1e6; // entire total clamped to the 1h rate
+    assert.strictEqual(computeUsageCostUsd(usage), expected);
+  });
+
+  test('cacheCreation1hInputTokens on a model with no cacheWrite1h rate ⇒ null, never a silent fallback', () => {
+    // Every non-anthropic/claude-* row (gpt-5.6-sol included) has no cacheWrite1h.
+    assert.strictEqual(computeUsageCostUsd({
+      model: 'openai/gpt-5.6-sol',
+      outputTokens: 1,
+      cacheCreationInputTokens: 100,
+      cacheCreation1hInputTokens: 10,
+    }), null);
+  });
+
+  test('a present-but-zero 1h count on a non-Anthropic row does NOT require cacheWrite1h (load-bearing: present ≠ non-zero)', () => {
+    const cost = computeUsageCostUsd({
+      model: 'openai/gpt-5.6-sol',
+      outputTokens: 1,
+      cacheCreationInputTokens: 100,
+      cacheCreation1hInputTokens: 0,
+    });
+    assert.strictEqual(cost, (1 * 30.00 + 100 * 6.25) / 1e6);
+  });
+
+  for (const [label, oneHour] of [
+    ['negative', -1],
+    ['NaN', NaN],
+    ['Infinity', Infinity],
+  ]) {
+    test(`cacheCreation1hInputTokens ${label} ⇒ null for the whole usage`, () => {
+      assert.strictEqual(computeUsageCostUsd({ ...WORKER_USAGE, cacheCreation1hInputTokens: oneHour }), null);
+    });
+  }
+
+  test('1h present and valid but the total is absent ⇒ null (N1: prevents min(1h, undefined) → NaN)', () => {
+    const usage = {
+      model: 'claude-opus-5',
+      outputTokens: 1,
+      cacheCreation1hInputTokens: 10,
+      // cacheCreationInputTokens deliberately omitted — a corrupt payload
+    };
+    assert.strictEqual(computeUsageCostUsd(usage), null);
+  });
+
+  for (const [label, total] of [
+    ['non-finite', NaN],
+    ['negative', -1],
+  ]) {
+    test(`1h present and valid but the total is ${label} ⇒ null`, () => {
+      const usage = {
+        model: 'claude-opus-5',
+        outputTokens: 1,
+        cacheCreationInputTokens: total,
+        cacheCreation1hInputTokens: 10,
+      };
+      assert.strictEqual(computeUsageCostUsd(usage), null);
+    });
+  }
+});
+
 describe('computeUsageCostUsd — null contract (LIN-1086 / LIN-1495)', () => {
   const nullCases = [
     ['no usage object', undefined],
@@ -164,7 +262,7 @@ describe('rate table shape (LIN-1495)', () => {
       assert.strictEqual(typeof rate.prompt, 'number', `${id} prompt rate is a number`);
       assert.strictEqual(typeof rate.completion, 'number', `${id} completion rate is a number`);
       assert.ok(rate.prompt >= 0 && rate.completion >= 0, `${id} rates are non-negative`);
-      for (const tier of ['cacheRead', 'cacheWrite']) {
+      for (const tier of ['cacheRead', 'cacheWrite', 'cacheWrite1h']) {
         if (rate[tier] !== undefined) {
           assert.ok(Number.isFinite(rate[tier]) && rate[tier] >= 0, `${id} ${tier} rate is well-formed`);
         }
@@ -172,11 +270,29 @@ describe('rate table shape (LIN-1495)', () => {
     }
   });
 
-  test('every anthropic/claude-* row carries both cache tiers — they are the point of this table', () => {
+  test('every anthropic/claude-* row carries all three cache tiers — they are the point of this table', () => {
     for (const [id, rate] of Object.entries(MODEL_PRICING)) {
       if (!id.startsWith('anthropic/claude-')) continue;
       assert.ok(Number.isFinite(rate.cacheRead), `${id} must price cache reads`);
-      assert.ok(Number.isFinite(rate.cacheWrite), `${id} must price cache writes`);
+      assert.ok(Number.isFinite(rate.cacheWrite), `${id} must price cache writes (5m)`);
+      assert.ok(Number.isFinite(rate.cacheWrite1h), `${id} must price cache writes (1h, LIN-2113)`);
+    }
+  });
+
+  test('cacheWrite1h (LIN-2113) is present ONLY on the 6 anthropic/claude-* rows, at exactly 2x prompt', () => {
+    // Verified live against https://openrouter.ai/api/v1/models on 2026-08-15: all six
+    // anthropic/claude-* rows publish input_cache_write_1h at exactly prompt x 2;
+    // openai/gpt-5.6-sol carries input_cache_write but no 1h key, and the other three
+    // OpenAI rows carry neither.
+    const anthropicRows = Object.keys(MODEL_PRICING).filter(id => id.startsWith('anthropic/claude-'));
+    assert.strictEqual(anthropicRows.length, 6, 'expected exactly 6 anthropic/claude-* rows');
+    for (const id of anthropicRows) {
+      const rate = MODEL_PRICING[id];
+      assert.strictEqual(rate.cacheWrite1h, rate.prompt * 2, `${id} cacheWrite1h must be prompt x 2`);
+    }
+    for (const [id, rate] of Object.entries(MODEL_PRICING)) {
+      if (id.startsWith('anthropic/claude-')) continue;
+      assert.strictEqual(rate.cacheWrite1h, undefined, `${id} must NOT carry cacheWrite1h`);
     }
   });
 
