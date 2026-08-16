@@ -20,6 +20,7 @@ import session from 'express-session'
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { ensureIndexes } from './lib/db-indexes.js'
+import { Scheduler } from './lib/scheduler.js'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
@@ -224,6 +225,15 @@ const db = dbClient.db('linear-viewer')
 // deploy mechanism (no migration framework). Best-effort per index, so a failed
 // build can never wedge startup. Must run after connect and before app.listen.
 await ensureIndexes(db)
+
+// Leader-safe scheduler substrate (LIN-2128). `scheduler-locks` is a pure
+// composite-`_id`-lookup collection (see lib/db-indexes.js's excluded-
+// collections convention), so it gets no INDEX_SPECS entry above. No job is
+// registered here — LIN-2114 P1-3 (LIN-2131) is this scheduler's first real
+// consumer and owns the sweep's `run` callback; construction, and arming the
+// timers of whatever gets registered, are this ticket's whole scope.
+const scheduler = new Scheduler({ collection: db.collection('scheduler-locks') })
+
 const sessionsCollection = db.collection('sessions')
 const userPreferencesCollection = db.collection('user-preferences')
 
@@ -3376,6 +3386,12 @@ let cleanupTimer
 const server = app.listen(PORT, () => {
   console.log(`Harbour running at http://localhost:${PORT}`)
 
+  // Arm the scheduler's timers here, not in the top-level boot block: /health
+  // can't be reached and a deploy healthcheck can't pass until app.listen has
+  // actually opened, so starting earlier would let a tick begin acquiring and
+  // running before the process is reachable at all (LIN-2128, plan-review F4).
+  scheduler.start()
+
   // Start periodic cleanup of expired items (every hour)
   const CLEANUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
   cleanupTimer = setInterval(async () => {
@@ -3456,12 +3472,27 @@ const FORCE_EXIT_TIMEOUT_MS = 65_000
 function gracefulShutdown(signal) {
   console.log(`${signal} received, shutting down gracefully`)
 
+  // Timer teardown moves ahead of the drain (LIN-2128, plan §7). Clearing
+  // these inside server.close()'s callback — as cleanupTimer alone used to —
+  // only fires once the drain completes, up to FORCE_EXIT_TIMEOUT_MS below,
+  // because the app deliberately holds some connections open that long (see
+  // the comment above). scheduler.stop() living there would keep it ticking
+  // through exactly the deploy-rollover overlap window this ticket exists to
+  // close, so both it and cleanupTimer's teardown run synchronously here,
+  // before server.close() — cleanupTimer is a genuine beneficiary of the
+  // same fix, not a bystander paying an unrelated cost, since its own hourly
+  // cleanup work currently races dbClient.close() in that same callback.
+  // Neither `clearInterval` nor `scheduler.stop()` can cut off work already
+  // in flight — only future fires — so a tick or cleanup cycle mid-run at
+  // shutdown time still completes on its own.
+  scheduler.stop()
+  if (cleanupTimer) clearInterval(cleanupTimer)
+
   // Idle keep-alive sockets would otherwise hold server.close() open until
   // keepAliveTimeout; only supported on Node >= 18.2, so optionally chained.
   server.closeIdleConnections?.()
 
   server.close(async () => {
-    if (cleanupTimer) clearInterval(cleanupTimer)
     try {
       await dbClient.close()
     } catch (err) {
