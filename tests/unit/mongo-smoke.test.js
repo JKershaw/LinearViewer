@@ -750,6 +750,101 @@ describe(
     });
 
     // -----------------------------------------------------------------------
+    // LIN-2079 (PR #1145 review ledger item 2): the `listHistory({status,
+    // silentSince})` predicate on the engine production actually runs.
+    //
+    // The predicate shipped asserted only against MangoDB 0.1.2. Two of its
+    // three load-bearing properties are ENGINE semantics that a mock proves
+    // nothing about, and both were named in review as unpinned:
+    //   (1) `$nor: [{'feedback.timestamp': {$gte: cutoff}}]` — dotted-path
+    //       ARRAY traversal. The inner predicate matches a doc when ANY element
+    //       matches, so `$nor` must exclude a row holding one old beat AND one
+    //       fresh beat. Get this wrong and a live lineage reads as a tombstone.
+    //   (2) an empty/absent `feedback` array has no element at or after any
+    //       cutoff, so it must be SELECTED — that is the silent hard-stop
+    //       zombie the ticket is named after.
+    //   (3) BSON type fidelity: `feedback[].timestamp` must round-trip as a
+    //       real Date, or `$gte: Date` compares across BSON types and silently
+    //       over-selects. Written through the production write path here
+    //       (`addItem` -> `takeItem` -> `addFeedback`), never hand-inserted.
+    // `$nor` is the repo's first use of that operator, which is why the plan
+    // demanded engine verification. Ten lines, as the review costed it.
+    // -----------------------------------------------------------------------
+    test('listHistory({status, silentSince}) selects silent rows and excludes live lineages on real MongoDB (LIN-2079)', async () => {
+      const store = freshDispatchStore('silence-predicate');
+      const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+      const claim = async (prompt) => {
+        const item = await store.addItem('acme', { prompt, kind: 'implementation', issueIdentifier: 'LIN-2079' });
+        await store.takeItem(item._id, 'acme', 'token-a');
+        return item._id;
+      };
+
+      // Four claimed rows. `zombie` never posts anything; `oldBeat` and
+      // `liveMixed` post before the cutoff; `live` and `liveMixed` post after.
+      const zombie = await claim('hard-stopped, never reported');
+      const oldBeat = await claim('reported once, then went silent');
+      const live = await claim('reporting now');
+      const liveMixed = await claim('reported before AND after the cutoff');
+
+      await store.addFeedback(oldBeat, 'acme', { message: '[working] one beat, long ago' }, 'token-a');
+      await store.addFeedback(liveMixed, 'acme', { message: '[working] an early beat' }, 'token-a');
+
+      await tick();
+      const cutoff = new Date();
+      await tick();
+
+      await store.addFeedback(live, 'acme', { message: '[working] still going' }, 'token-a');
+      await store.addFeedback(liveMixed, 'acme', { message: '[working] and still going' }, 'token-a');
+
+      // A silent row that is NOT `taken` — proves the status clause discriminates
+      // independently. Hand-inserted deliberately: only its status matters, and
+      // no store API archives straight to `cancelled` without a claim.
+      await store.historyCollection.insertOne({
+        _id: randomUUID(), urlKey: 'acme', status: 'cancelled',
+        dispatchedAt: new Date(), resolvedAt: new Date(), feedback: []
+      });
+
+      // (3) type fidelity, asserted on a fresh read back OUT of real MongoDB.
+      const storedLive = await store.historyCollection.findOne({ _id: live });
+      assert.ok(
+        storedLive.feedback[0].timestamp instanceof Date,
+        'feedback[].timestamp must round-trip as a BSON date, or $gte compares across types'
+      );
+
+      const silent = await store.listHistory('acme', { status: 'taken', silentSince: cutoff, limit: 50 });
+      const ids = silent.items.map((i) => i.id).sort();
+
+      assert.deepStrictEqual(
+        ids,
+        [zombie, oldBeat].sort(),
+        'exactly the never-reported row and the gone-silent row are selected on real MongoDB'
+      );
+      // `total` is a separate countDocuments over the SAME query, so this is
+      // what proves both clauses executed in the ENGINE rather than as a JS
+      // filter over an already-materialised page.
+      assert.strictEqual(silent.total, 2, 'total reflects the predicate, so it was pushed into the query');
+
+      // (1) the discriminating case, stated as its own assertion so a failure
+      // names the property rather than just a set mismatch.
+      assert.ok(
+        !ids.includes(liveMixed),
+        'a row holding one PRE-cutoff and one POST-cutoff beat is live: $nor array traversal must exclude it'
+      );
+      assert.ok(!ids.includes(live), 'a row beating after the cutoff is live');
+
+      // The status clause: the cancelled row is silent by every measure and is
+      // still excluded, and dropping `silentSince` widens to all three taken rows
+      // — so silence, not status, is what narrowed the set above.
+      const allTaken = await store.listHistory('acme', { status: 'taken', limit: 50 });
+      assert.strictEqual(allTaken.total, 4, 'status alone returns every claimed row, including the live ones');
+      assert.ok(
+        allTaken.items.every((i) => i.id !== undefined) && !allTaken.items.some((i) => i.status === 'cancelled'),
+        'the cancelled row never appears under status=taken, though it is silent'
+      );
+    });
+
+    // -----------------------------------------------------------------------
     // LIN-1546: OwnerCredentialStore.putIfRefreshToken optimistic CAS on REAL
     // MongoDB. The owner-credential unit suite proves this on MangoDB; this
     // pins the load-bearing MangoDB-vs-Mongo-divergent behaviours on the engine
