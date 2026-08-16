@@ -344,6 +344,16 @@ describe('observer-state-store', () => {
   // ---------------------------------------------------------------------
 
   // OS10
+  // Retargeted post-LIN-2129-review-F1 (beat 2): this test originally forced
+  // *`updatedAt`* stale to trigger eviction, because cleanup() used to key on
+  // it. That was encoding the bug the review found (F1) — updatedAt is a
+  // last-*changed* stamp nothing refreshes on a no-op tick, so keying
+  // eviction on it deletes a live, diagnosis-unchanged instance. cleanup()
+  // now keys on the separate `lastSeenAt` liveness stamp (see the module
+  // header's "Liveness vs. change" section), so this test now forces THAT
+  // field stale instead. The property under test — "cleanup() evicts idle
+  // instances, preserves active ones" — is unchanged and still true; only the
+  // mechanism for simulating "idle" was wrong.
   test('cleanup() evicts only instances idle past RETENTION_IDLE_MS, preserving active ones', async () => {
     const store = freshStore();
     const staleKey = `inst-stale-${randomUUID()}`;
@@ -356,10 +366,10 @@ describe('observer-state-store', () => {
     assert.ok(await store.readCurrent(staleKey));
     assert.ok(await store.readCurrent(freshKey));
 
-    // Force the stale instance's updatedAt to just past the retention
+    // Force the stale instance's lastSeenAt to just past the retention
     // window; the fresh one stays untouched.
     const pastCutoff = new Date(Date.now() - RETENTION_IDLE_MS - 1000);
-    await store.collection.updateOne({ _id: staleKey }, { $set: { updatedAt: pastCutoff } });
+    await store.collection.updateOne({ _id: staleKey }, { $set: { lastSeenAt: pastCutoff } });
 
     const removed = await store.cleanup();
     assert.strictEqual(removed, 1, 'exactly the one stale instance must be removed');
@@ -421,6 +431,170 @@ describe('observer-state-store', () => {
             'if this ever reads 1+N, MangoDB\'s concurrency model changed and this negative control needs re-examination, not deletion'
         );
       }
+    );
+  });
+
+  // ---------------------------------------------------------------------
+  // 9. LIN-2129 review discharge — the four properties the mutations proved
+  // unpinned (F3/F7), plus the two regression/characterization tests for the
+  // defects this fix pass exists to close (F1, F5).
+  // ---------------------------------------------------------------------
+
+  // OS12 (ledger item 1a, F7). Mutation to defeat: remove `updatedAt: now`
+  // from advance()'s $set — verified red, then reverted; see beat-2 report.
+  test('advance() strictly increases updatedAt on a genuine transition (F7)', async () => {
+    const store = freshStore();
+    const key = `inst-${randomUUID()}`;
+    const seeded = await store.ensureSeeded(key, { phase: 'idle' });
+    const seededUpdatedAt = seeded.updatedAt;
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    const ok = await store.advance(key, 1, { phase: 'working' });
+    assert.strictEqual(ok, true);
+
+    const current = await store.readCurrent(key);
+    assert.ok(
+      current.updatedAt.getTime() > seededUpdatedAt.getTime(),
+      'a genuine advance must strictly increase updatedAt'
+    );
+  });
+
+  // OS13 (ledger item 2, F3). Mutation to defeat: hashState() using
+  // JSON.stringify(state) instead of stableStringify(canonicalizeForHash(state))
+  // — verified red, then reverted; see beat-2 report.
+  test('duplicate-state dedup is key-order independent: same content with a different key insertion order is still a no-op (F3)', async () => {
+    const store = freshStore();
+    const key = `inst-${randomUUID()}`;
+    await store.ensureSeeded(key, { a: 1, b: 2 });
+    await store.advance(key, 1, { a: 1, b: 2, c: 3 }); // rev 2
+
+    // Byte-different-but-semantically-identical: same keys/values, reversed
+    // insertion order — a naive JSON.stringify-based hash treats this as a
+    // DIFFERENT state and wrongly consumes a rev/ledger slot.
+    const reordered = { c: 3, b: 2, a: 1 };
+    const dup = await store.advance(key, 2, reordered);
+    assert.strictEqual(dup, true, 'a key-order-only difference must still classify as a duplicate no-op');
+
+    const current = await store.readCurrent(key);
+    assert.strictEqual(current.rev, 2, 'rev must not advance for a key-order-only "different" payload');
+    assert.strictEqual(current.ledger.length, 1, 'the ledger must not grow for a key-order-only "different" payload');
+  });
+
+  // OS14 (ledger item 3, F3). Mutation to defeat: `{...meta, rev, at}` ->
+  // `{rev, at, ...meta}` in advance()'s ledger $push — verified red, then
+  // reverted; see beat-2 report.
+  test('transitionMeta cannot overwrite the ledger entry\'s own rev/at control fields (F3)', async () => {
+    const store = freshStore();
+    const key = `inst-${randomUUID()}`;
+    await store.ensureSeeded(key, { phase: 'idle' });
+
+    const forgedMeta = { rev: 999, at: new Date('1999-01-01T00:00:00Z'), source: 'sweep' };
+    const ok = await store.advance(key, 1, { phase: 'working' }, forgedMeta);
+    assert.strictEqual(ok, true);
+
+    const current = await store.readCurrent(key);
+    assert.strictEqual(current.rev, 2, 'the document rev must be the store\'s own value');
+    const entry = current.ledger[0];
+    assert.strictEqual(entry.rev, 2, 'the ledger entry\'s rev must be the store\'s own value, not the forged meta');
+    assert.notStrictEqual(entry.at.getFullYear(), 1999, 'the ledger entry\'s at must be the store\'s own timestamp, not the forged meta');
+    assert.strictEqual(entry.source, 'sweep', 'non-control meta fields must still ride through');
+  });
+
+  // OS15 (ledger item 4, F3). Mutation to defeat: advance()'s catch block
+  // returning `false` instead of `null` — verified red, then reverted; see
+  // beat-2 report.
+  test('advance() distinguishes a backend error (null) from a lost race (false) in one test (F3)', async () => {
+    const store = freshStore();
+    const key = `inst-${randomUUID()}`;
+    await store.ensureSeeded(key, { phase: 'idle' });
+
+    // Lost race: a genuinely stale witness, healthy backend, no error.
+    await store.advance(key, 1, { phase: 'working' }); // winner, rev now 2
+    const lostRace = await store.advance(key, 1, { phase: 'late' });
+    assert.strictEqual(lostRace, false, 'a stale witness on a healthy backend must be false, not null');
+
+    // Backend error: updateOne throws.
+    const throwingCollection = {
+      updateOne: async () => { throw new Error('simulated backend outage'); },
+      findOne: (...args) => store.collection.findOne(...args),
+      deleteMany: (...args) => store.collection.deleteMany(...args)
+    };
+    const brokenStore = new ObserverStateStore({ collection: throwingCollection });
+    const backendError = await brokenStore.advance(key, 2, { phase: 'irrelevant' });
+    assert.strictEqual(backendError, null, 'a thrown backend error must be null, distinguishable from a lost race\'s false');
+  });
+
+  // OS16 (ledger item 5, F1) — the regression test for the defect this fix
+  // pass exists to close. Verified red against the pre-beat-1 code (cleanup()
+  // keyed on updatedAt) and against ensureSeeded() not refreshing lastSeenAt;
+  // see beat-2 report.
+  test('a live instance whose diagnosis never changes survives cleanup() past the retention cutoff, as long as it keeps being ticked (F1 regression test)', async () => {
+    const store = freshStore();
+    const key = `inst-${randomUUID()}`;
+    await store.ensureSeeded(key, { phase: 'steady' });
+
+    // Simulate a diagnosis that genuinely hasn't changed in a long time: its
+    // last real transition (and creation) really was 31 days ago — AND force
+    // lastSeenAt stale too, so this test cannot pass on residual freshness
+    // from the initial seed above; only a REAL later refresh can save it.
+    const longAgo = new Date(Date.now() - RETENTION_IDLE_MS - 1000);
+    await store.collection.updateOne(
+      { _id: key },
+      { $set: { updatedAt: longAgo, createdAt: longAgo, lastSeenAt: longAgo } }
+    );
+
+    // The sweep keeps ticking it every cycle even though the diagnosis is
+    // unchanged — exactly what ensureSeeded() is documented as safe to call
+    // every tick for. This call must refresh lastSeenAt back to "now".
+    await store.ensureSeeded(key, { phase: 'steady' });
+
+    const removed = await store.cleanup();
+    assert.strictEqual(removed, 0, 'an actively-ticked instance must never be evicted, no matter how old its last genuine change is');
+    assert.ok(await store.readCurrent(key), 'the instance must still be present after cleanup()');
+  });
+
+  // OS17 (ledger item 6, F5) — characterizes the documented residual, it
+  // does not assert it is closed. Beat 1 deliberately chose to DOCUMENT F5
+  // rather than add a structural guard (out of this fix pass's "small,
+  // local fixes" scope; see the module header's "Generations and rev"
+  // section) — F1's fix closes the reset window for every LIVE instance but
+  // does not eliminate it for a genuinely decommissioned one. Verified this
+  // is the actual, reproducible behavior of the current implementation
+  // (see beat-2 report) — it is accepted, not a bug this pass leaves in
+  // silently. If this test ever fails, either the residual has been
+  // structurally closed (update the module header to match) or the
+  // documentation's accuracy has regressed.
+  test('F5 residual: a witness held across a genuine cleanup()+re-seed CAN still advance the new generation (documented, not eliminated)', async () => {
+    const store = freshStore();
+    const key = `inst-${randomUUID()}`;
+    const seeded = await store.ensureSeeded(key, { phase: 'idle' });
+    const staleWitness = seeded.rev; // 1
+
+    // Genuinely decommissioned: no further ensureSeeded ticks at all for the
+    // full retention window (unlike OS16, nothing keeps lastSeenAt fresh).
+    const pastCutoff = new Date(Date.now() - RETENTION_IDLE_MS - 1000);
+    await store.collection.updateOne({ _id: key }, { $set: { lastSeenAt: pastCutoff } });
+    const removed = await store.cleanup();
+    assert.strictEqual(removed, 1, 'the genuinely idle instance must actually be evicted for this to be the scenario F5 describes');
+
+    // A new generation begins.
+    const reseeded = await store.ensureSeeded(key, { phase: 'fresh-generation' });
+    assert.strictEqual(reseeded.rev, 1, 'a re-seed after eviction starts a brand-new generation at rev 1');
+
+    // The old writer, still holding its pre-deletion witness, fires its CAS.
+    const result = await store.advance(key, staleWitness, { phase: 'stale-writer-payload' });
+    assert.strictEqual(
+      result,
+      true,
+      'the documented residual: rev alone cannot distinguish this from a legitimate advance within the new generation'
+    );
+
+    const finalDoc = await store.readCurrent(key);
+    assert.strictEqual(
+      finalDoc.state.phase,
+      'stale-writer-payload',
+      'the stale writer\'s payload silently overwrote the fresh generation — this is the residual, not a new bug'
     );
   });
 });
