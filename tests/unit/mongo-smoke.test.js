@@ -27,6 +27,7 @@ import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
+import { ObserverStateStore } from '../../lib/observer-state-store.js';
 import { LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 import { establishAccount } from '../../lib/account-session.js';
 
@@ -884,6 +885,51 @@ describe(
       // Exactly one record exists throughout — no CAS ever forked a duplicate.
       const all = await store.collection.find({ accountId, urlKey }).toArray();
       assert.strictEqual(all.length, 1);
+    });
+
+    // -----------------------------------------------------------------------
+    // LIN-2129: ObserverStateStore.advance() CAS on REAL MongoDB. The full unit
+    // suite (tests/unit/observer-state-store.test.js) proves the CAS mechanics
+    // and the three-way matchedCount===0 disambiguation on a real MangoDB
+    // tmpdir; that file's own negative control proves a naive read-modify-write
+    // loses concurrent writes even there. This pins the one property only a
+    // real, multi-connection engine can answer: does the stale-writer-loses
+    // outcome hold under GENUINE interleaving (not MangoDB's in-process mutex),
+    // and does an N-way race still land on exactly one winner.
+    // -----------------------------------------------------------------------
+    test('ObserverStateStore.advance: stale writer loses and the winner\'s document is intact on real MongoDB', async () => {
+      const store = new ObserverStateStore({ collection: freshCollection('observer-state') });
+      const key = randomUUID();
+      await store.ensureSeeded(key, { phase: 'idle' });
+
+      const won = await store.advance(key, 1, { phase: 'winner' }, { source: 'writer-A' });
+      assert.strictEqual(won, true);
+
+      const lost = await store.advance(key, 1, { phase: 'loser' }, { source: 'writer-B' });
+      assert.strictEqual(lost, false, 'a stale-witness CAS must miss on real MongoDB');
+
+      const current = await store.readCurrent(key);
+      assert.strictEqual(current.rev, 2);
+      assert.deepStrictEqual(current.state, { phase: 'winner' }, 'the winner\'s payload must be untouched by the loser');
+      assert.strictEqual(current.ledger.length, 1);
+      assert.strictEqual(current.ledger[0].source, 'writer-A');
+    });
+
+    test('ObserverStateStore.advance: N-way concurrent race lands exactly one winner on real MongoDB', async () => {
+      const store = new ObserverStateStore({ collection: freshCollection('observer-state') });
+      const key = randomUUID();
+      await store.ensureSeeded(key, { phase: 'idle' });
+
+      const results = await Promise.all(
+        Array.from({ length: CONCURRENCY }, (_, i) => store.advance(key, 1, { phase: `racer-${i}` }))
+      );
+
+      const winners = results.filter((r) => r === true);
+      assert.strictEqual(winners.length, 1, `exactly one of ${CONCURRENCY} concurrent advance() calls must win on real MongoDB`);
+
+      const current = await store.readCurrent(key);
+      assert.strictEqual(current.rev, 2, 'rev must land at expectedRev + 1, never expectedRev + N, under real concurrent writers');
+      assert.strictEqual(current.ledger.length, 1);
     });
   }
 );

@@ -52,6 +52,7 @@ import { AccountStore } from './lib/account-store.js'
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
+import { ObserverStateStore } from './lib/observer-state-store.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
@@ -509,6 +510,14 @@ const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWor
 // collection.
 const ownerCredentialsCollection = db.collection('owner-credentials')
 const ownerCredentialStore = new OwnerCredentialStore({ collection: ownerCredentialsCollection })
+
+// Durable observer-instance state (LIN-2129, P1-2 of the LIN-2114 observer-harness
+// epic). One current, versioned state document per observer instance, advanced by
+// a monotonic-rev compare-and-set (shaped on ownerCredentialStore's CAS above) —
+// concurrent sweeps can never silently clobber each other's diagnosis. Written by
+// the sweep (LIN-2131, P1-3); this store owns only identity/versioning/retention.
+const observerStateCollection = db.collection('observer-state')
+const observerStateStore = new ObserverStateStore({ collection: observerStateCollection })
 
 // =============================================================================
 // Process-level safety net (LIN-608)
@@ -3434,6 +3443,14 @@ const server = app.listen(PORT, () => {
       }
     } catch (err) {
       console.error('Harbour feedback token cleanup error:', err)
+    }
+    try {
+      const removedCount = await observerStateStore.cleanup()
+      if (removedCount > 0) {
+        console.log(`Observer state cleanup: removed ${removedCount} decommissioned instance(s)`)
+      }
+    } catch (err) {
+      console.error('Observer state cleanup error:', err)
     }
   }, CLEANUP_INTERVAL_MS)
 })
