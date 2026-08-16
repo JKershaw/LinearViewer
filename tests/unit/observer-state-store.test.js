@@ -597,4 +597,63 @@ describe('observer-state-store', () => {
       'the stale writer\'s payload silently overwrote the fresh generation — this is the residual, not a new bug'
     );
   });
+
+  // ---------------------------------------------------------------------
+  // 10. Re-review discharge (delta `330d449a...e8b7e6b3`) — item A (F2 guard
+  // pinned) and item B (advance() alone keeps a live instance out of
+  // cleanup()'s reach). Both verified red under their named mutation, then
+  // reverted; see the beat report.
+  // ---------------------------------------------------------------------
+
+  // OS18 (item A). Mutation to defeat: hashState() falling back to
+  // `stableStringify(state)` directly (i.e. deleting the canonicalizeForHash
+  // pre-pass) — verified red, then reverted; see the beat report.
+  test('a Date-only state change genuinely advances — rev and ledger both move, not classified a dedup no-op (item A / F2 guard)', async () => {
+    const store = freshStore();
+    const key = `inst-${randomUUID()}`;
+    const first = new Date('2020-01-01T00:00:00Z');
+    await store.ensureSeeded(key, { lastSeen: first });
+
+    const second = new Date('2020-06-15T12:00:00Z');
+    const ok = await store.advance(key, 1, { lastSeen: second });
+    assert.strictEqual(ok, true);
+
+    const current = await store.readCurrent(key);
+    assert.strictEqual(current.rev, 2, 'a Date-only change must genuinely advance rev, never be silently classified a duplicate');
+    assert.strictEqual(current.ledger.length, 1, 'a Date-only change must append a ledger entry');
+    assert.deepStrictEqual(current.state, { lastSeen: second }, 'the new Date must actually be stored');
+  });
+
+  // OS19 (item B) — the regression test for the re-review's item B. Verified
+  // red against the pre-fix code (advance()'s $set had no lastSeenAt); see
+  // the beat report.
+  test('an instance kept alive by advance() alone — no repeat ensureSeeded() calls — survives cleanup() (item B)', async () => {
+    const store = freshStore();
+    const key = `inst-${randomUUID()}`;
+    await store.ensureSeeded(key, { tick: 0 });
+
+    // Simulate a sweep that reads first and seeds only when absent: after
+    // this point the instance is driven ONLY through advance(), with a
+    // genuine transition every tick — the exact caller shape the re-review
+    // named. Force every timestamp stale first so the test cannot pass on
+    // residual freshness from the seed above.
+    const longAgo = new Date(Date.now() - RETENTION_IDLE_MS - 1000);
+    await store.collection.updateOne(
+      { _id: key },
+      { $set: { updatedAt: longAgo, createdAt: longAgo, lastSeenAt: longAgo } }
+    );
+
+    const ok = await store.advance(key, 1, { tick: 1 });
+    assert.strictEqual(ok, true);
+
+    const afterAdvance = await store.readCurrent(key);
+    assert.ok(
+      afterAdvance.lastSeenAt.getTime() > longAgo.getTime(),
+      'a genuine advance() transition must refresh lastSeenAt on its own, with no ensureSeeded() call'
+    );
+
+    const removed = await store.cleanup();
+    assert.strictEqual(removed, 0, 'an actively-transitioning instance driven by advance() alone must never be evicted');
+    assert.ok(await store.readCurrent(key), 'the instance must still be present after cleanup()');
+  });
 });
