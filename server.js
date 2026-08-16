@@ -54,6 +54,7 @@ import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
+import { sweepOneWorkspace, resolveRosterFromSessions } from './lib/observer-sweep.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
@@ -528,6 +529,43 @@ const ownerCredentialStore = new OwnerCredentialStore({ collection: ownerCredent
 // the sweep (LIN-2131, P1-3); this store owns only identity/versioning/retention.
 const observerStateCollection = db.collection('observer-state')
 const observerStateStore = new ObserverStateStore({ collection: observerStateCollection })
+
+// Deterministic observer sweep (LIN-2131, P1-3): this scheduler's first real
+// consumer (see the `scheduler` construction comment above). `register()` alone
+// arms nothing — `scheduler.start()` below (in the `app.listen` callback) is
+// the only place ticks begin firing; this call is the whole production delta.
+//
+// Measured basis (research, HEAD 608230b7, one-workspace-per-tick round-robin
+// against the live workspace's real fleet): 1.13s typical / 3.1s worst-case
+// tick. `leaseMs: 30_000` gives 9.7x headroom over that worst case while
+// staying comfortably under `intervalMs` — discharges LIN-2128's gate A.
+//
+// `Scheduler.register`'s `run` receives nothing (lib/scheduler.js:88) — no
+// `now`, no lock — so this closure resolves its own `now` and roster index.
+// Both `intervalMs` constants below MUST stay the same value: the round-robin
+// index (`now / OBSERVER_SWEEP_INTERVAL_MS`) has to agree with the tick period
+// itself, or two ticks inside one interval could select different workspaces
+// and defeat the store's dedup no-op.
+const OBSERVER_SWEEP_INTERVAL_MS = 60_000
+const OBSERVER_SWEEP_LEASE_MS = 30_000
+scheduler.register({
+  name: 'observer-sweep',
+  intervalMs: OBSERVER_SWEEP_INTERVAL_MS,
+  leaseMs: OBSERVER_SWEEP_LEASE_MS,
+  run: async () => {
+    const now = Date.now()
+    // Fail soft: a query error yields an empty roster (skip this tick), never
+    // a thrown job failure. Interim roster source (LIN-2131 plan, Follow-ups
+    // item 3) — no durable, queryable workspace registry exists yet; a
+    // workspace worked entirely by dispatched agents with no browser session
+    // is invisible here. Known gap, ruled non-blocking, filed separately.
+    const sessions = await sessionsCollection.find({}).toArray().catch(() => [])
+    const roster = resolveRosterFromSessions(sessions)
+    if (!roster.length) return
+    const urlKey = roster[Math.floor(now / OBSERVER_SWEEP_INTERVAL_MS) % roster.length]
+    await sweepOneWorkspace(urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, observerStateStore, now })
+  }
+})
 
 // =============================================================================
 // Process-level safety net (LIN-608)
