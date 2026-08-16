@@ -10,13 +10,21 @@
  *
  * Backend split:
  *  - MangoDB (real, tmpdir-backed, always runs): (a)'s MangoDB half, (c), (d),
- *    (e), (f), (g), and the LIN-2131 idempotency-contract test (h). Fast,
+ *    (e), (f), (g), (i), and the LIN-2131 idempotency-contract test (h). Fast,
  *    no external service, exercises the module's own logic.
  *  - Real MongoDB (`MONGODB_TEST_URI`, CI-provided, hard-fail-not-skip in CI
  *    per the `tests/unit/mongo-smoke.test.js` convention): (a)'s real-Mongo
- *    half and (b), the cross-process race — this ticket's headline
- *    acceptance criterion, and the only test in this file that a MangoDB
- *    run cannot stand in for.
+ *    half, (i)'s real-Mongo half, and (b), the cross-process race — this
+ *    ticket's headline acceptance criterion, and the only test in this file
+ *    that a MangoDB run cannot stand in for.
+ *
+ *  (i) is F-A/F-D's own regression test — register() called twice against
+ *  the SAME collection (a second boot), on both backends, since that is
+ *  exactly where the two backends diverge: a bare `insertOne` throws
+ *  `E11000` on real Mongo's unique `_id` index but silently duplicates on
+ *  MangoDB, which has none. Every other test above seeds a fresh collection
+ *  exactly once, so a second-boot defect is invisible to them by
+ *  construction — the review's F-D finding.
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -260,6 +268,57 @@ describe('scheduler (MangoDB)', () => {
     assert.doesNotThrow(() => scheduler.stop());
   });
 
+  // --- (i) F-D: register()'s own seeding lifecycle across a second boot ----
+  // Every other test above calls freshCollection(), so no test ever runs
+  // register() against pre-existing collection state — a second-boot defect
+  // is invisible to them by construction (the review's F-D finding). This is
+  // the missing level: register() called twice against the SAME collection.
+
+  test(
+    '(i) F-D: register() called twice against the same collection (a second boot) seeds ' +
+      'exactly one lock document, on MangoDB — the shape that measured 2-docs-vs-1 before the ' +
+      'F-A fix, since a bare insertOne cannot throw 11000 here (no _id index on this backend)',
+    async () => {
+      const collection = freshCollection();
+      const schedulerBootOne = new Scheduler({ collection, logger: silentLogger });
+      const schedulerBootTwo = new Scheduler({ collection, logger: silentLogger });
+
+      await schedulerBootOne.register({ name: 'reboot', intervalMs: 60_000, leaseMs: 10_000, run: async () => {} });
+      await schedulerBootTwo.register({ name: 'reboot', intervalMs: 60_000, leaseMs: 10_000, run: async () => {} });
+
+      const docs = await collection.find({}).toArray();
+      assert.strictEqual(docs.length, 1, 'a second register() against the same collection must not append a duplicate lock document');
+    }
+  );
+
+  test(
+    '(i) F-D: a second register() (a second boot) must not reset an already-held lease',
+    async () => {
+      const collection = freshCollection();
+      const schedulerBootOne = new Scheduler({ collection, logger: silentLogger });
+      await schedulerBootOne.register({ name: 'held', intervalMs: 60_000, leaseMs: 10_000, run: async () => {} });
+
+      // Simulate the job currently holding its lease, as a live job would
+      // mid-interval — the seed write must never clobber this.
+      const job = schedulerBootOne.jobs.get('held');
+      await schedulerBootOne._tick(job);
+      const held = await collection.findOne({ _id: 'tick:held' });
+      assert.ok(held.lockedUntil > 0, 'precondition: the lease must be genuinely held before the second register()');
+
+      const schedulerBootTwo = new Scheduler({ collection, logger: silentLogger });
+      await schedulerBootTwo.register({ name: 'held', intervalMs: 60_000, leaseMs: 10_000, run: async () => {} });
+
+      const afterReboot = await collection.findOne({ _id: 'tick:held' });
+      assert.deepStrictEqual(
+        afterReboot,
+        held,
+        'a second register() must leave an already-held lease completely untouched'
+      );
+      const docs = await collection.find({}).toArray();
+      assert.strictEqual(docs.length, 1, 'a second register() against a held lease must not create a stray duplicate document beside it');
+    }
+  );
+
   // --- (g) side-effect boundaries ------------------------------------------
 
   test(
@@ -447,6 +506,54 @@ describe(
         assert.strictEqual(runs, 1, 'exactly one of 50 concurrent callers should win');
         const docs = await collection.find({}).toArray();
         assert.strictEqual(docs.length, 1, 'no duplicate lock document under concurrency');
+      }
+    );
+
+    // --- (i) F-D: register()'s own seeding lifecycle, real-Mongo half ---
+    // Ledger item 1 is explicit: a single-backend test does not discharge
+    // it, since the backends diverge exactly here (E11000 fires on real
+    // Mongo's unique _id index; MangoDB has none). This is the control that
+    // proves production was never at risk from F-A.
+
+    test(
+      '(i) F-D: register() called twice against the same collection (a second boot) seeds ' +
+        'exactly one lock document, on real MongoDB',
+      async () => {
+        const collection = freshCollection('scheduler-locks');
+        const schedulerBootOne = new Scheduler({ collection, logger: silentLogger });
+        const schedulerBootTwo = new Scheduler({ collection, logger: silentLogger });
+
+        await schedulerBootOne.register({ name: 'reboot', intervalMs: 60_000, leaseMs: 10_000, run: async () => {} });
+        await schedulerBootTwo.register({ name: 'reboot', intervalMs: 60_000, leaseMs: 10_000, run: async () => {} });
+
+        const docs = await collection.find({}).toArray();
+        assert.strictEqual(docs.length, 1, 'a second register() against the same collection must not append a duplicate lock document');
+      }
+    );
+
+    test(
+      '(i) F-D: a second register() (a second boot) must not reset an already-held lease, on real MongoDB',
+      async () => {
+        const collection = freshCollection('scheduler-locks');
+        const schedulerBootOne = new Scheduler({ collection, logger: silentLogger });
+        await schedulerBootOne.register({ name: 'held', intervalMs: 60_000, leaseMs: 10_000, run: async () => {} });
+
+        const job = schedulerBootOne.jobs.get('held');
+        await schedulerBootOne._tick(job);
+        const held = await collection.findOne({ _id: 'tick:held' });
+        assert.ok(held.lockedUntil > 0, 'precondition: the lease must be genuinely held before the second register()');
+
+        const schedulerBootTwo = new Scheduler({ collection, logger: silentLogger });
+        await schedulerBootTwo.register({ name: 'held', intervalMs: 60_000, leaseMs: 10_000, run: async () => {} });
+
+        const afterReboot = await collection.findOne({ _id: 'tick:held' });
+        assert.deepStrictEqual(
+          afterReboot,
+          held,
+          'a second register() must leave an already-held lease completely untouched'
+        );
+        const docs = await collection.find({}).toArray();
+        assert.strictEqual(docs.length, 1, 'a second register() against a held lease must not create a stray duplicate document beside it');
       }
     );
 
