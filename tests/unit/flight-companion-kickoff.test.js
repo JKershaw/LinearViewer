@@ -49,6 +49,15 @@ describe('buildFlightCompanionKickoff', () => {
     const text = buildFlightCompanionKickoff({ baseUrl: BASE_URL });
     // The proxy-native monitor substrate (Constraint A).
     assert.ok(text.includes(`${PROXY}/dispatch?status=taken`));
+    // LIN-2079 (PR #1146 review ledger A7): since `blocked` became a derived
+    // wire status, `?status=taken` no longer returns runs parked on a human —
+    // so the companion needs a SECOND labelled call or it goes blind to them.
+    // This is the one doc surface of the six that already had a prompt-contract
+    // guard; it simply was not extended when the sibling call landed. Without
+    // this line a future prompt edit can drop the instruction with no test
+    // failing, which is exactly what the `?status=taken` assertion above exists
+    // to prevent for its own half.
+    assert.ok(text.includes(`${PROXY}/dispatch?status=blocked`));
     assert.ok(text.includes(`${PROXY}/dispatch/{id}`));
     assert.ok(text.includes('feedback[]'));
     assert.ok(text.includes('[working]'));
