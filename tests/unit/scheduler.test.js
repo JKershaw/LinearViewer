@@ -9,14 +9,25 @@
  * cross-process test (b) proves genuine cross-process exclusivity.
  *
  * Backend split:
- *  - MangoDB (real, tmpdir-backed, always runs): (a)'s MangoDB half, (c), (d),
- *    (e), (f), (g), (i), (j), (k), and the LIN-2131 idempotency-contract test
- *    (h). Fast, no external service, exercises the module's own logic.
+ *  - MangoDB (real, tmpdir-backed, always runs): (a)'s MangoDB half, (c)'s
+ *    MangoDB half, (d), (e), (f), (g), (i), (j), (k), and the LIN-2131
+ *    idempotency-contract test (h). Fast, no external service, exercises the
+ *    module's own logic.
  *  - Real MongoDB (`MONGODB_TEST_URI`, CI-provided, hard-fail-not-skip in CI
  *    per the `tests/unit/mongo-smoke.test.js` convention): (a)'s real-Mongo
- *    half, (i)'s real-Mongo half, and (b), the cross-process race — this
- *    ticket's headline acceptance criterion, and the only test in this file
- *    that a MangoDB run cannot stand in for.
+ *    half, (i)'s real-Mongo half, (c)'s real-Mongo half, and (b), the
+ *    cross-process race — this ticket's headline acceptance criterion, and
+ *    the only test in this file that a MangoDB run cannot stand in for.
+ *
+ *  A note on what the two halves of a paired test are each worth, since it
+ *  is easy to misread a green run (re-review `e0bbeaa4`, ledger items 5-6):
+ *  (i)'s real-Mongo half is a CONTROL, not a regression detector — it cannot
+ *  fail against the pre-fix `insertOne` seed, because real Mongo's unique
+ *  `_id` throws E11000 there and `register()`'s own catch absorbs it. That
+ *  is precisely why production was never at risk from F-A, and it means
+ *  regression protection for the seed shape is MangoDB-only (correctly, the
+ *  defect was too). (c) is the opposite case: its real-Mongo half genuinely
+ *  discriminates, since the cadence rests on mongod's own `$lte` match.
  *
  *  (i) is F-A/F-D's own regression test — register() called twice against
  *  the SAME collection (a second boot), on both backends, since that is
@@ -687,6 +698,72 @@ describe(
         );
         const docs = await collection.find({}).toArray();
         assert.strictEqual(docs.length, 1, 'a second register() against a held lease must not create a stray duplicate document beside it');
+      }
+    );
+
+    // --- (c) real-Mongo half: the cadence arithmetic against mongod's own
+    // `$lte` predicate. Close-out ledger item 5 (re-review `e0bbeaa4`): the
+    // extend-on-success *write and predicate* already had real-mongod
+    // evidence, but test (c)'s multi-period, phase-offset cadence ran on
+    // MangoDB alone, so the once-per-interval arithmetic was never exercised
+    // against the production backend's server-side conditional match. Low
+    // risk — the arithmetic is backend-independent — but the harness already
+    // exists here, so leaving it unproven was a choice rather than a cost.
+
+    test(
+      '(c) real-Mongo half: extend-on-success delivers at most one execution per interval ' +
+        'against mongod\'s own $lte predicate, not just MangoDB\'s in-process match — two ' +
+        'instances at a 5s phase offset, intervalMs=60s, leaseMs=10s, over 3 periods ' +
+        '(a release-on-success design executes 6 times here, not 3)',
+      async () => {
+        const collection = freshCollection('scheduler-locks');
+        await collection.insertOne({ _id: 'tick:sweep', lockedUntil: 0 });
+
+        let now = 0;
+        const clock = () => now;
+        let runs = 0;
+        const job = {
+          name: 'sweep',
+          lockId: 'tick:sweep',
+          intervalMs: 60_000,
+          leaseMs: 10_000,
+          run: async () => {
+            runs++;
+          }
+        };
+        const schedulerA = new Scheduler({ collection, now: clock, logger: silentLogger });
+        const schedulerB = new Scheduler({ collection, now: clock, logger: silentLogger });
+
+        const tickPlan = [
+          [0, schedulerA],
+          [5_000, schedulerB],
+          [60_000, schedulerA],
+          [65_000, schedulerB],
+          [120_000, schedulerA],
+          [125_000, schedulerB]
+        ];
+        for (const [t, scheduler] of tickPlan) {
+          now = t;
+          await scheduler._tick(job);
+        }
+
+        assert.strictEqual(
+          runs,
+          3,
+          'three periods must yield at most 3 executions (once per interval), not 6 — proven here against real mongod rather than only MangoDB'
+        );
+
+        // Pin the extend value itself, not just the run count: the last
+        // winning tick was A at t=120_000, so a correct extend-on-success
+        // leaves acquireTime + intervalMs. A release-on-success design would
+        // read back `now` (or 0), and an extend-to-leaseMs bug 130_000 —
+        // this is what makes the assertion above discriminate on mongod.
+        const doc = await collection.findOne({ _id: 'tick:sweep' });
+        assert.strictEqual(
+          doc.lockedUntil,
+          180_000,
+          'the final lease must read acquireTime (120_000) + intervalMs (60_000), not + leaseMs and not released to now'
+        );
       }
     );
 
