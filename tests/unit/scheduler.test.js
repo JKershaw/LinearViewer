@@ -10,8 +10,8 @@
  *
  * Backend split:
  *  - MangoDB (real, tmpdir-backed, always runs): (a)'s MangoDB half, (c), (d),
- *    (e), (f), (g), (i), and the LIN-2131 idempotency-contract test (h). Fast,
- *    no external service, exercises the module's own logic.
+ *    (e), (f), (g), (i), (j), (k), and the LIN-2131 idempotency-contract test
+ *    (h). Fast, no external service, exercises the module's own logic.
  *  - Real MongoDB (`MONGODB_TEST_URI`, CI-provided, hard-fail-not-skip in CI
  *    per the `tests/unit/mongo-smoke.test.js` convention): (a)'s real-Mongo
  *    half, (i)'s real-Mongo half, and (b), the cross-process race — this
@@ -40,6 +40,42 @@ import { Scheduler } from '../../lib/scheduler.js';
 
 const silentLogger = { warn: () => {} };
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Wrap a real collection so ONE named method throws `error` on its first
+ * call, then behaves normally on every call after (including retries of
+ * that same method) — every other method passes straight through
+ * unmodified. Used to exercise `_tick`'s own throw-containment paths (F-C)
+ * against a real collection's data, rather than a fully hand-rolled fake.
+ */
+function failOnce(realCollection, methodName, error) {
+  let thrown = false;
+  return {
+    async insertOne(...args) {
+      return realCollection.insertOne(...args);
+    },
+    async findOneAndUpdate(...args) {
+      if (methodName === 'findOneAndUpdate' && !thrown) {
+        thrown = true;
+        throw error;
+      }
+      return realCollection.findOneAndUpdate(...args);
+    },
+    async updateOne(...args) {
+      if (methodName === 'updateOne' && !thrown) {
+        thrown = true;
+        throw error;
+      }
+      return realCollection.updateOne(...args);
+    },
+    async findOne(...args) {
+      return realCollection.findOne(...args);
+    },
+    find(...args) {
+      return realCollection.find(...args);
+    }
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────
 // MangoDB-backed: same-process logic, fast, no external service required.
@@ -245,6 +281,103 @@ describe('scheduler (MangoDB)', () => {
       assert.ok(
         warnings.some((w) => w.includes('run failed')),
         'the throw must be logged via the injected logger, not swallowed silently'
+      );
+    }
+  );
+
+  // --- (j)/(k) F-C: the two non-run() throw paths inside _tick's own try/catches ---
+  // (e) above only exercises a throwing job.run(). _tick has two OTHER throw
+  // sites sharing the same containment discipline — the acquire's own catch,
+  // and (F5's named scenario) the extend-on-success write failing because the
+  // DB client already closed mid-shutdown. Neither had an assertion before.
+
+  test(
+    '(j) F-C: the acquire itself throwing is caught, logged distinctly as "acquire failed", ' +
+      'run() is never called, the lock document is untouched, and the NEXT tick recovers normally',
+    async () => {
+      const collection = freshCollection();
+      await collection.insertOne({ _id: 'tick:acquirefail', lockedUntil: 0 });
+      const warnings = [];
+      const failingCollection = failOnce(collection, 'findOneAndUpdate', new Error('connection reset'));
+      const scheduler = new Scheduler({
+        collection: failingCollection,
+        now: () => 0,
+        logger: { warn: (msg) => warnings.push(msg) }
+      });
+
+      let runs = 0;
+      const job = {
+        name: 'acquirefail',
+        lockId: 'tick:acquirefail',
+        intervalMs: 60_000,
+        leaseMs: 10_000,
+        run: async () => {
+          runs++;
+        }
+      };
+
+      await scheduler._tick(job);
+
+      assert.strictEqual(runs, 0, 'run() must never be called when the acquire itself throws');
+      assert.ok(
+        warnings.some((w) => w.includes('acquire failed') && w.includes('connection reset')),
+        'the acquire throw must be logged distinctly as an acquire failure, not conflated with a run failure'
+      );
+
+      const docAfterFailure = await collection.findOne({ _id: 'tick:acquirefail' });
+      assert.strictEqual(
+        docAfterFailure.lockedUntil,
+        0,
+        'a failed acquire must not have mutated the lock document at all — no partial write'
+      );
+
+      await scheduler._tick(job); // failOnce only fails the first call; this one hits the real collection
+      assert.strictEqual(runs, 1, 'once the transient acquire failure clears, the next tick must acquire and run normally');
+    }
+  );
+
+  test(
+    '(k) F-C: the extend-on-success write throwing (F5\'s named shutdown scenario — the DB client ' +
+      'already closed mid-write) is caught and logged through run\'s own try/catch, never crashes, ' +
+      'and leaves lockedUntil exactly where the acquire wrote it so the lease self-heals on leaseMs',
+    async () => {
+      const collection = freshCollection();
+      await collection.insertOne({ _id: 'tick:extendfail', lockedUntil: 0 });
+      const warnings = [];
+      const failingCollection = failOnce(collection, 'updateOne', new Error('client is closed'));
+      const scheduler = new Scheduler({
+        collection: failingCollection,
+        now: () => 0,
+        logger: { warn: (msg) => warnings.push(msg) }
+      });
+
+      let runs = 0;
+      const job = {
+        name: 'extendfail',
+        lockId: 'tick:extendfail',
+        intervalMs: 60_000,
+        leaseMs: 10_000,
+        run: async () => {
+          runs++;
+        }
+      };
+
+      await assert.doesNotReject(
+        () => scheduler._tick(job),
+        'a throwing extend-on-success write must never surface as an unhandled rejection'
+      );
+
+      assert.strictEqual(runs, 1, 'run() itself must have completed successfully before the extend write failed');
+      assert.ok(
+        warnings.some((w) => w.includes('run failed') && w.includes('client is closed')),
+        'the extend write shares run\'s own catch and is logged through the same "run failed" path — deliberate, per F5, not a bug to fix'
+      );
+
+      const doc = await collection.findOne({ _id: 'tick:extendfail' });
+      assert.strictEqual(
+        doc.lockedUntil,
+        10_000, // acquireTime (0) + leaseMs (10_000) — never advanced to acquireTime + intervalMs
+        'when the extend write fails, lockedUntil must stay exactly where the acquire wrote it, so the next acquire attempt past leaseMs self-heals rather than staying stranded'
       );
     }
   );
