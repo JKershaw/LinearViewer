@@ -20,6 +20,10 @@
  *   D. Negative capability — a Proxy read-only allowlist over every injected
  *      store, paired with a static import assertion and guardNetwork().
  *   E. Roster derivation.
+ *   F. Production wiring — `createObserverSweepRun`, the scheduler `run`
+ *      closure lifted out of server.js so the roster read, its fail-soft, the
+ *      round-robin and the deps object are reachable at all (close-out ledger
+ *      item 6), plus the `deps.now` guard (item 9).
  *
  * Note 1 (plan-review, non-blocking): `loopLastActivityMs(loop) === 0` is
  * unreachable through this sweep's own read path — `_buildLoops` skips any
@@ -47,7 +51,8 @@ import {
   classifyLoop,
   buildSweepPayload,
   sweepOneWorkspace,
-  resolveRosterFromSessions
+  resolveRosterFromSessions,
+  createObserverSweepRun
 } from '../../lib/observer-sweep.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
@@ -581,6 +586,125 @@ describe('observer-sweep: negative capability — no automated-intervention path
       ['./live-console.js', './loop-supersede.js', './pipeline-loops.js'].sort(),
       'a new import here (e.g. a direct dispatch-store/agent-status-store import bypassing the injected deps seam, in EITHER statement form) must be caught by this assertion'
     );
+  });
+});
+
+// ─── F. Production wiring — the scheduler `run` closure ────────────────────
+
+describe('observer-sweep: createObserverSweepRun — the production tick closure (LIN-2131 close-out, ledger item 6)', () => {
+  // This closure previously lived inline in server.js's scheduler.register(...)
+  // call and had NO coverage of any kind: the sessionsCollection read, its
+  // fail-soft, resolveRosterFromSessions, the round-robin index and the deps
+  // object were all unreachable, so a green suite was compatible with the
+  // production wiring never producing a correct sweep. Extracted, it is a
+  // plain function these tests can drive.
+  const INTERVAL_MS = 60_000;
+
+  function sessionsCollectionOf(rows) {
+    return { find: () => ({ toArray: async () => rows }) };
+  }
+  function failingSessionsCollection(err = new Error('backend down')) {
+    return { find: () => ({ toArray: () => Promise.reject(err) }) };
+  }
+  function recordingRun(sessionsCollection, { now, intervalMs = INTERVAL_MS } = {}) {
+    const calls = [];
+    const run = createObserverSweepRun({
+      sessionsCollection,
+      dispatchStore: { id: 'dispatchStore' },
+      agentStatusStore: { id: 'agentStatusStore' },
+      observerStateStore: { id: 'observerStateStore' },
+      intervalMs,
+      now,
+      sweep: async (urlKey, deps) => { calls.push({ urlKey, deps }); }
+    });
+    return { run, calls };
+  }
+
+  const threeWorkspaces = [
+    { session: JSON.stringify({ workspaces: [{ urlKey: 'ws-c' }, { urlKey: 'ws-a' }] }) },
+    { session: JSON.stringify({ workspaces: [{ urlKey: 'ws-b' }] }) }
+  ];
+
+  test('round-robin: one workspace per tick, walking the SORTED roster as the clock advances', async () => {
+    const selected = [];
+    for (let tick = 0; tick < 6; tick++) {
+      const now = tick * INTERVAL_MS;
+      const { run, calls } = recordingRun(sessionsCollectionOf(threeWorkspaces), { now: () => now });
+      await run();
+      assert.strictEqual(calls.length, 1, 'exactly one workspace is swept per tick');
+      selected.push(calls[0].urlKey);
+    }
+    // Roster is sorted (resolveRosterFromSessions), so the walk is stable
+    // against find({}) scan-order noise rather than merely "some rotation".
+    assert.deepStrictEqual(selected, ['ws-a', 'ws-b', 'ws-c', 'ws-a', 'ws-b', 'ws-c']);
+  });
+
+  test('two ticks landing inside ONE interval select the same workspace — the property the store dedup depends on', async () => {
+    const base = 7 * INTERVAL_MS;
+    const early = recordingRun(sessionsCollectionOf(threeWorkspaces), { now: () => base + 1 });
+    const late = recordingRun(sessionsCollectionOf(threeWorkspaces), { now: () => base + INTERVAL_MS - 1 });
+    await early.run();
+    await late.run();
+    assert.strictEqual(
+      early.calls[0].urlKey,
+      late.calls[0].urlKey,
+      'the index must be derived from the SAME intervalMs the job is registered with, or two ticks in one interval would sweep different workspaces and each write a genuine transition'
+    );
+  });
+
+  test('the tick threads ONE clock value into both the selection and the sweep deps', async () => {
+    const now = 12 * INTERVAL_MS + 4321;
+    const { run, calls } = recordingRun(sessionsCollectionOf(threeWorkspaces), { now: () => now });
+    await run();
+    assert.deepStrictEqual(calls[0].deps, {
+      dispatchStore: { id: 'dispatchStore' },
+      agentStatusStore: { id: 'agentStatusStore' },
+      observerStateStore: { id: 'observerStateStore' },
+      now
+    }, 'the deps object handed to sweepOneWorkspace is exactly the three injected stores plus the tick clock');
+  });
+
+  test('fail-soft: a rejecting roster read skips the tick — never a thrown job failure, never a sweep on a blank roster', async () => {
+    const { run, calls } = recordingRun(failingSessionsCollection(), { now: () => 0 });
+    await assert.doesNotReject(run, 'a roster read failure must not surface as a failed scheduler job');
+    assert.strictEqual(calls.length, 0, 'no workspace may be swept when the roster read failed');
+  });
+
+  test('an empty roster (no sessions, or sessions carrying no workspaces) sweeps nothing and does not divide by zero', async () => {
+    for (const rows of [[], [{ session: JSON.stringify({ workspaces: [] }) }], [{ session: '{not valid json' }]]) {
+      const { run, calls } = recordingRun(sessionsCollectionOf(rows), { now: () => 5 * INTERVAL_MS });
+      await assert.doesNotReject(run);
+      assert.strictEqual(calls.length, 0);
+    }
+  });
+
+  test('a misconfigured intervalMs is refused at construction, not silently turned into a NaN index', () => {
+    for (const bad of [0, -1, undefined, NaN, '60000']) {
+      assert.throws(
+        () => createObserverSweepRun({ sessionsCollection: sessionsCollectionOf([]), intervalMs: bad }),
+        /positive intervalMs/
+      );
+    }
+  });
+
+  test('ledger 9 — sweepOneWorkspace REFUSES a missing/non-finite deps.now instead of silently classifying every active loop unknown', async () => {
+    const storeCalls = [];
+    const observerStateStore = {
+      readCurrent: async () => { storeCalls.push('readCurrent'); return null; },
+      ensureSeeded: async () => { storeCalls.push('ensureSeeded'); return { rev: 1 }; },
+      advance: async () => { storeCalls.push('advance'); return true; }
+    };
+    for (const bad of [undefined, null, NaN, '1700000000000']) {
+      await assert.rejects(
+        () => sweepOneWorkspace('ws', { dispatchStore: {}, agentStatusStore: {}, observerStateStore, now: bad }),
+        /deps\.now \(epoch ms\) is required/,
+        `deps.now = ${String(bad)} must throw`
+      );
+    }
+    // The guard runs BEFORE any I/O, so a bad call writes nothing at all —
+    // the point is not merely to fail, it is to never persist a wrong
+    // diagnosis as if it were a real observation.
+    assert.deepStrictEqual(storeCalls, [], 'no read, no seed and above all no advance may happen on a refused tick');
   });
 });
 
