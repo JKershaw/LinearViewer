@@ -8,6 +8,11 @@
  *   A. Classification — fixture-driven via __internal._buildLoops with real
  *      marker text (precedent: tests/unit/pipeline-loops.test.js:816), never
  *      hand-built Loop literals.
+ *   B. Payload contract — the same fixtures driven through the PRODUCTION
+ *      entry point `buildSweepPayload` rather than `classifyLoop` with a
+ *      hand-computed set, so successor exclusion, `attention` membership and
+ *      `attention` ordering are asserted on the path F3 actually protects
+ *      (review ledger items 1, 3, 4).
  *   C. Idempotency — a REAL MangoDB tmpdir (precedent:
  *      tests/unit/observer-state-store.test.js:19-32), never
  *      tests/fixtures/mock-collection.js: its own header confirms it lacks
@@ -231,6 +236,113 @@ describe('observer-sweep: classification (LIN-2131)', () => {
   });
 });
 
+// ─── B. Payload contract (buildSweepPayload, the production entry point) ───
+
+describe('observer-sweep: payload contract (LIN-2131)', () => {
+  // Every test here drives `buildSweepPayload` rather than `classifyLoop` with
+  // a hand-computed `superseded` set. That distinction is the whole point:
+  // review ledger item 1 established empirically that replacing
+  // `computeSupersededLoopIds(loops)` with `new Set()` inside
+  // `buildSweepPayload` survived the entire suite, because the only exclusion
+  // coverage called `classifyLoop` directly and so never exercised the
+  // production path F3 exists to protect.
+
+  test('ledger 1 — buildSweepPayload itself applies successor exclusion: a blocked row with a CROSS-ISSUE follow-up leaves lanes.blocked and attention', () => {
+    // Fresh dispatch (5 min before NOW) so that, once excluded from blocked,
+    // the row falls to `working` rather than `silent` — `silent` is itself an
+    // attention lane, which would leave the row listed and mask the exclusion.
+    const original = historyItem({
+      id: 'x2', issueIdentifier: 'LIN-411', dispatchedAt: '2026-04-11T11:55:00.000Z',
+      feedback: [{ message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' }]
+    });
+    const followUp = historyItem({
+      id: 'y2', issueIdentifier: 'LIN-412', followUpTo: 'x2',
+      feedback: [{ message: '[done] resumed and finished', timestamp: '2026-04-11T11:58:00.000Z' }]
+    });
+    const loops = _buildLoops({ historyItems: [original, followUp], now: NOW, lean: true });
+    const loopX = loops.find((l) => l.loopId === 'x2');
+    assert.ok(loopX, 'sanity: x2 must be present in the workspace-wide read');
+
+    // Control: absent exclusion this row IS blocked, so the assertions below
+    // are discriminating rather than vacuously true of the fixture.
+    assert.strictEqual(
+      classifyLoop(loopX, { superseded: new Set(), now: NOW_MS, staleMs: STALE_MS }),
+      'blocked',
+      'control: with no exclusion applied, x2 reads blocked'
+    );
+
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(payload.lanes.blocked, 0, 'buildSweepPayload must compute and apply the exclusion itself, not merely accept one');
+    assert.strictEqual(payload.lanes.working, 1, 'excluded from blocked, x2 falls through to its own (fresh) activity signal');
+    assert.strictEqual(payload.lanes.terminal, 1, 'the [done] follow-up y2');
+    assert.ok(!payload.attention.some((row) => row.loopId === 'x2'), 'an answered row must never be surfaced as waiting on a human');
+    assert.deepStrictEqual(payload.attention, [], 'nothing in this fixture is waiting on anyone');
+  });
+
+  test('ledger 4 — successor exclusion covers the AGENT-STATUS channel too: an agentState "waiting" row with a dispatched successor is excluded', () => {
+    // The sibling of the test above on the other blocked channel (plan step 5
+    // named this case explicitly). The union runs first and exclusion once
+    // after it, so this is right by construction — but only an assertion makes
+    // that structural claim a checked one.
+    const original = historyItem({ id: 'a1', issueIdentifier: 'LIN-421' }); // no feedback at all
+    const followUp = historyItem({
+      id: 'b1', issueIdentifier: 'LIN-422', followUpTo: 'a1',
+      feedback: [{ message: '[done] resumed and finished', timestamp: '2026-04-11T11:30:00.000Z' }]
+    });
+    const agentStatuses = [
+      agentStatusEntry({ dispatchId: 'a1', taskIdentifier: 'LIN-421', status: 'blocked', timestamp: '2026-04-11T11:02:00.000Z' })
+    ];
+    const loops = _buildLoops({ historyItems: [original, followUp], agentStatusEntries: agentStatuses, now: NOW, lean: true });
+    const loopA = loops.find((l) => l.loopId === 'a1');
+    assert.strictEqual(loopA.wakeMarker, null, 'no feedback marker was ever posted — the agent-status channel alone carries the signal');
+    assert.strictEqual(loopA.agentState, 'waiting');
+    assert.strictEqual(
+      classifyLoop(loopA, { superseded: new Set(), now: NOW_MS, staleMs: STALE_MS }),
+      'blocked',
+      'control: with no exclusion applied, the agent-status-blocked row reads blocked'
+    );
+
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(payload.lanes.blocked, 0, 'exclusion must apply to the agent-status channel exactly as it does to the feedback-marker one');
+    assert.strictEqual(payload.lanes.unknown, 1, 'an excluded waiting row is not active (agentState "waiting"), so it falls to unknown');
+    assert.ok(!payload.attention.some((row) => row.loopId === 'a1'), 'an answered row must never be surfaced as waiting on a human');
+  });
+
+  test('ledger 3 — attention is deterministically sorted, from a fixture whose insertion order is NOT already sorted', () => {
+    const rows = [
+      historyItem({
+        id: 'zz-blocked', issueIdentifier: 'LIN-431', dispatchedAt: '2026-04-11T11:50:00.000Z',
+        feedback: [{ message: '[blocked] one', timestamp: '2026-04-11T11:51:00.000Z' }]
+      }),
+      historyItem({
+        id: 'aa-blocked', issueIdentifier: 'LIN-432', dispatchedAt: '2026-04-11T11:40:00.000Z',
+        feedback: [{ message: '[blocked] two', timestamp: '2026-04-11T11:41:00.000Z' }]
+      }),
+      historyItem({
+        id: 'mm-blocked', issueIdentifier: 'LIN-433', dispatchedAt: '2026-04-11T11:45:00.000Z',
+        feedback: [{ message: '[blocked] three', timestamp: '2026-04-11T11:46:00.000Z' }]
+      })
+    ];
+    const loops = _buildLoops({ historyItems: rows, now: NOW, lean: true });
+    const readOrder = loops.map((l) => l.loopId);
+    const sortedOrder = [...readOrder].sort();
+    // Load-bearing guard: the original coverage passed with the sort line
+    // deleted precisely because its fixture arrived pre-sorted. If a future
+    // change to _buildLoops' ordering makes this fixture sorted too, this
+    // assertion fails loudly instead of quietly re-opening the hole.
+    assert.notDeepStrictEqual(readOrder, sortedOrder, 'fixture must reach buildSweepPayload UNSORTED, or it cannot detect a missing sort');
+
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(payload.attention.length, 3, 'all three blocked rows are waiting on a human');
+    assert.deepStrictEqual(
+      payload.attention,
+      [...payload.attention].sort((a, b) => (a.loopId < b.loopId ? -1 : a.loopId > b.loopId ? 1 : 0)),
+      'attention must equal its own sorted copy — stableStringify preserves array order, so an unsorted array hashes differently tick to tick'
+    );
+    assert.deepStrictEqual(payload.attention.map((r) => r.loopId), sortedOrder, 'sorted ascending by loopId');
+  });
+});
+
 // ─── C. Idempotency (real MangoDB tmpdir) ─────────────────────────────────
 
 describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 ledger item B)', () => {
@@ -261,7 +373,7 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
     return { dispatchStore, agentStatusStore, observerStateStore };
   }
 
-  test('firing the sweep twice over identical input converges — same rev, no ledger growth, attention self-sorted', async () => {
+  test('firing the sweep repeatedly over identical input converges — same rev, no ledger growth, attention self-sorted, including a tick taken at a LATER clock', async () => {
     const { dispatchStore, agentStatusStore, observerStateStore } = freshStores();
     const urlKey = `ws-idem-${randomUUID()}`;
 
@@ -298,6 +410,22 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
     assert.strictEqual(doc2.rev, doc1.rev, 'a duplicate tick over identical input must not advance rev');
     assert.strictEqual(doc2.ledger.length, doc1.ledger.length, 'a duplicate tick must not grow the ledger');
     assert.deepStrictEqual(doc2.state, doc1.state, 'the stored document must be byte-identical across duplicate ticks');
+
+    // Ledger item 2: the two ticks above share one `now`, so they cannot see a
+    // payload field derived from the CLOCK rather than from the fleet — adding
+    // `sweptAt: new Date(now).toISOString()` to buildSweepPayload's return
+    // survived them. Fire a third tick with the clock advanced by ADVANCE_MS
+    // (5 min — the fixture's activity is ~`now`, so every row stays ~5 min
+    // old against a 1h staleness threshold, far from the boundary and
+    // therefore classified identically). Same fleet, later clock, same
+    // document: that is the actual no-per-tick-varying-field contract.
+    const ADVANCE_MS = 5 * 60 * 1000;
+    assert.ok(ADVANCE_MS * 2 < DEFAULT_LANE_STALE_MS, 'sanity: the advance must stay well clear of the staleness boundary');
+    await sweepOneWorkspace(urlKey, { ...deps, now: now + ADVANCE_MS });
+    const doc3 = await observerStateStore.readCurrent(instanceKey);
+    assert.strictEqual(doc3.rev, doc1.rev, 'an ADVANCING clock over identical fleet state must not advance rev — no payload field may vary per tick');
+    assert.strictEqual(doc3.ledger.length, doc1.ledger.length, 'a later-clock tick must not grow the ledger');
+    assert.deepStrictEqual(doc3.state, doc1.state, 'the stored document must be byte-identical across ticks taken at DIFFERENT times');
   });
 
   test('interleaved/duplicate ticks (MangoDB gives no cross-process exclusivity — the sweep is the safety net)', async () => {
@@ -432,19 +560,26 @@ describe('observer-sweep: negative capability — no automated-intervention path
     assert.deepStrictEqual(countsAfter, countsBefore, 'no dispatch write and no agent-status write occurred during the guarded sweep');
   });
 
-  test('static import assertion: lib/observer-sweep.js imports only pure, read-only modules', () => {
+  test('static import assertion: lib/observer-sweep.js imports only pure, read-only modules — including SIDE-EFFECT-ONLY imports', () => {
     // Honest limitation (stated, not hidden): this only sees calls reachable
     // through the injected dispatchStore/agentStatusStore/observerStateStore
     // seams above, plus what the module itself statically imports. It does
     // NOT cover a dynamic `await import(...)`, which neither this assertion
-    // nor the Proxy allowlist above can see.
+    // nor the Proxy allowlist above can see. That blind spot is disclosed and
+    // remains open.
+    //
+    // Ledger item 5: a bare `import './dispatch-store.js';` — a side-effect-only
+    // import, with no `from` clause — WAS a second, undisclosed evasion: the
+    // earlier `from`-anchored pattern simply did not match it, so such an
+    // import passed the whole suite. The `from` clause is now optional, so both
+    // statement forms are collected.
     const modulePath = fileURLToPath(new URL('../../lib/observer-sweep.js', import.meta.url));
     const src = readFileSync(modulePath, 'utf8');
-    const specifiers = [...src.matchAll(/^import\s+[^;]*?from\s+['"](.+?)['"]\s*;?\s*$/gm)].map((m) => m[1]);
+    const specifiers = [...src.matchAll(/^import\s+(?:[^;]*?from\s+)?['"](.+?)['"]\s*;?\s*$/gm)].map((m) => m[1]);
     assert.deepStrictEqual(
       specifiers.sort(),
       ['./live-console.js', './loop-supersede.js', './pipeline-loops.js'].sort(),
-      'a new import here (e.g. a direct dispatch-store/agent-status-store import bypassing the injected deps seam) must be caught by this assertion'
+      'a new import here (e.g. a direct dispatch-store/agent-status-store import bypassing the injected deps seam, in EITHER statement form) must be caught by this assertion'
     );
   });
 });
