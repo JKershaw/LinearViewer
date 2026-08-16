@@ -54,6 +54,7 @@ import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
+import { createObserverSweepRun } from './lib/observer-sweep.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
@@ -528,6 +529,55 @@ const ownerCredentialStore = new OwnerCredentialStore({ collection: ownerCredent
 // the sweep (LIN-2131, P1-3); this store owns only identity/versioning/retention.
 const observerStateCollection = db.collection('observer-state')
 const observerStateStore = new ObserverStateStore({ collection: observerStateCollection })
+
+// Deterministic observer sweep (LIN-2131, P1-3): this scheduler's first real
+// consumer (see the `scheduler` construction comment above). `register()` alone
+// arms nothing — `scheduler.start()` below (in the `app.listen` callback) is
+// the only place ticks begin firing; this call is the whole production delta.
+//
+// Measured basis (research, HEAD 608230b7, one-workspace-per-tick round-robin
+// against the live workspace's real fleet): 1.13s typical / 3.1s worst-case
+// tick. `leaseMs: 30_000` gives 9.7x headroom over that worst case while
+// staying comfortably under `intervalMs` — discharges LIN-2128's gate A.
+//
+// `Scheduler.register`'s `run` receives nothing (lib/scheduler.js:88) — no
+// `now`, no lock — so this closure resolves its own `now` and roster index.
+// Both `intervalMs` constants below MUST stay the same value: the round-robin
+// index (`now / OBSERVER_SWEEP_INTERVAL_MS`) has to agree with the tick period
+// itself, or two ticks inside one interval could select different workspaces
+// and defeat the store's dedup no-op.
+const OBSERVER_SWEEP_INTERVAL_MS = 60_000
+const OBSERVER_SWEEP_LEASE_MS = 30_000
+// The tick body itself lives in lib/observer-sweep.js (`createObserverSweepRun`)
+// rather than as an anonymous closure here, so the roster read, its fail-soft,
+// the round-robin selection and the deps object are reachable by unit tests —
+// close-out ledger item 6, which observed that every green check was otherwise
+// compatible with this closure never producing a correct sweep.
+scheduler.register({
+  name: 'observer-sweep',
+  intervalMs: OBSERVER_SWEEP_INTERVAL_MS,
+  leaseMs: OBSERVER_SWEEP_LEASE_MS,
+  run: createObserverSweepRun({
+    sessionsCollection,
+    dispatchStore: dispatchQueueStore,
+    agentStatusStore,
+    observerStateStore,
+    intervalMs: OBSERVER_SWEEP_INTERVAL_MS
+  })
+// `register()` is async and its seed write can fail; close-out ledger item 7.
+// The job is added to the scheduler's map BEFORE that write is awaited
+// (lib/scheduler.js:106), so on a rejection `start()` still arms a timer whose
+// non-upsert CAS can never match the missing lock document — the sweep then
+// never runs, for the life of the process, having thrown only an unhandled
+// rejection at boot. Unhandled, that is a generic LIN-608 net line; this
+// explicit catch is a purpose-written one that names the consequence, so the
+// silent-never-runs state is diagnosable from the logs rather than inferred.
+// Deliberately NOT `await`ed: this is an observability job, and a failed seed
+// write must not abort the whole server's boot. This is the substrate's first
+// caller, so the shape sets the precedent.
+}).catch((err) => {
+  console.error(`[observer-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
+})
 
 // =============================================================================
 // Process-level safety net (LIN-608)
