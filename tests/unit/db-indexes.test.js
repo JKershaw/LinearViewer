@@ -25,7 +25,11 @@ const EXCLUDED_COLLECTIONS = [
   'recap-cache',
   'run-summary-cache',
   'session-summary-cache',
-  'brief-cache'
+  'brief-cache',
+  // scheduler-locks (LIN-2128): the plan relies on THIS test staying red until
+  // the exclusion lands, not on manual review, to catch a future contributor
+  // adding an INDEX_SPECS entry here (plan-review F2; PR #1149 review F-B).
+  'scheduler-locks'
 ];
 
 // MangoDB serialises an index key into a name; compare by key spec instead.
