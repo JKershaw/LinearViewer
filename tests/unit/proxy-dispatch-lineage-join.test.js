@@ -840,3 +840,148 @@ describe('LIN-1494 — dispatch-list response: honest `total` + `truncated` from
     assert.equal(body.truncated, true);
   });
 });
+
+/**
+ * LIN-2079 S3/S8 — `blocked` as a derived status on the LIST endpoint, and the
+ * filter-semantics change that rides the same single assignment.
+ *
+ * The one assignment at the `resolved` map is read three times: the reported
+ * `status` field, the `?status=` FILTER, and `total` (which follows
+ * `filtered.length`). Deriving `blocked` there is therefore a wire-behaviour
+ * change, not a field rename: `?status=taken` stops returning rows parked on a
+ * human, and `?status=blocked` starts returning exactly those. That is the
+ * ticket's own "listing filter that separates live items from tombstones" ask,
+ * and these cases pin it in both directions rather than leaving it implicit.
+ */
+describe('LIN-2079 — derived `blocked` on the list endpoint (FIX-PROVING)', () => {
+  const blockedEntry = (at = T2, rootItemId = 'root-b') => ({
+    message: '[blocked] needs a human decision on the schema', rootItemId, timestamp: at
+  });
+
+  test('B1 — a [blocked]-only row: absent from ?status=taken, returned by ?status=blocked, reported as blocked unfiltered', async () => {
+    const parked = row({ id: 'parked-1', rootItemId: 'root-b', feedback: [blockedEntry()] });
+    const running = row({ id: 'running-1', rootItemId: 'root-r', feedback: [{ message: '[working] still going', rootItemId: 'root-r', timestamp: T1 }] });
+    const { app } = buildApp({ history: [parked, running] });
+
+    const unfiltered = await get(app, '/api/proxy/dispatch');
+    assert.equal(unfiltered.body.items.find(i => i.id === 'parked-1').status, 'blocked',
+      'the reported field derives blocked instead of falling back to stored taken');
+    assert.equal(unfiltered.body.items.find(i => i.id === 'running-1').status, 'taken',
+      'a genuinely running row is untouched');
+    assert.equal(unfiltered.body.items.length, 2, 'unfiltered returns the SAME rows as before — only the status string moved');
+
+    const taken = await get(app, '/api/proxy/dispatch?status=taken');
+    assert.ok(!taken.body.items.find(i => i.id === 'parked-1'), 'a parked row no longer pollutes the taken listing');
+    assert.ok(taken.body.items.find(i => i.id === 'running-1'), 'the live row is still there');
+    assert.equal(taken.body.total, 1, 'total tracks filtered.length on a ?status= read');
+
+    const blocked = await get(app, '/api/proxy/dispatch?status=blocked');
+    assert.deepEqual(blocked.body.items.map(i => i.id), ['parked-1'], '?status=blocked is queryable and returns exactly the parked rows');
+    assert.equal(blocked.body.total, 1, 'total tracks filtered.length here too');
+  });
+
+  test('B2 — a blocked row reports completedAt: null (a parked run has not completed)', async () => {
+    const parked = row({ id: 'parked-1', rootItemId: 'root-b', feedback: [blockedEntry()] });
+    const { app } = buildApp({ history: [parked] });
+
+    const { body } = await get(app, '/api/proxy/dispatch');
+    const item = body.items.find(i => i.id === 'parked-1');
+    assert.equal(item.status, 'blocked');
+    assert.equal(item.completedAt, null, 'blocked must never stamp a completion time');
+    assert.equal(item.feedbackCount, 1);
+  });
+
+  test('B3 — ORDERING: a later lineage [done] beats an earlier [blocked] (no un-finishing, no completedAt rewind)', async () => {
+    const root = row({ id: 'root-1', rootItemId: 'root-1', feedback: [
+      { message: '[blocked] waiting on a decision', rootItemId: 'root-1', timestamp: T1 }
+    ] });
+    const child = row({ id: 'child-1', rootItemId: 'root-1', followUpTo: 'root-1', feedback: [
+      { message: '[done] unblocked and finished', rootItemId: 'root-1', timestamp: T2 }
+    ] });
+    const { app } = buildApp({ history: [root, child] });
+
+    const { body } = await get(app, '/api/proxy/dispatch');
+    const item = body.items.find(i => i.id === 'root-1');
+    assert.equal(item.status, 'done', 'the later terminal wins — terminal-first, never wake-first');
+    assert.equal(item.completedAt, T2, 'completedAt is the [done] timestamp, not rewound or nulled');
+
+    const blocked = await get(app, '/api/proxy/dispatch?status=blocked');
+    assert.equal(blocked.body.items.length, 0, 'a finished lineage is not routed into ?status=blocked');
+  });
+
+  test('B4 — sibling-blocked propagation: a follow-up\'s [blocked] back-propagates onto its predecessor (same precedent as [done])', async () => {
+    const root = row({ id: 'root-1', rootItemId: 'root-1', feedback: [
+      { message: 'own beat', rootItemId: 'root-1', timestamp: T1 }
+    ] });
+    const child = row({ id: 'child-1', rootItemId: 'root-1', followUpTo: 'root-1', feedback: [blockedEntry(T2, 'root-1')] });
+    const { app } = buildApp({ history: [root, child] });
+
+    const { body } = await get(app, '/api/proxy/dispatch');
+    assert.equal(body.items.find(i => i.id === 'root-1').status, 'blocked',
+      'status is lineage-wide: the lineage IS parked, so the predecessor reports it too');
+    assert.equal(body.items.find(i => i.id === 'child-1').status, 'blocked');
+
+    const taken = await get(app, '/api/proxy/dispatch?status=taken');
+    assert.equal(taken.body.items.length, 0, 'neither row pollutes the taken listing while the lineage is parked');
+  });
+
+  test('B5 — forward-only guard holds for [blocked] too: a sibling\'s earlier [blocked] must not mislabel a later row', async () => {
+    const DISPATCH_LATE = '2026-06-22T12:00:00.000Z';
+    const parked = row({ id: 'parked-1', rootItemId: 'root-1', dispatchedAt: T1, feedback: [blockedEntry(T2, 'root-1')] });
+    const laterRow = row({
+      id: 'later-1', rootItemId: 'root-1', followUpTo: 'parked-1',
+      dispatchedAt: DISPATCH_LATE, // AFTER the sibling's [blocked]
+      feedback: []
+    });
+    const { app } = buildApp({ history: [parked, laterRow] });
+
+    const { body } = await get(app, '/api/proxy/dispatch');
+    assert.equal(body.items.find(i => i.id === 'later-1').status, 'taken',
+      'a row dispatched after the [blocked] landed is running — it must not inherit it');
+    assert.equal(body.items.find(i => i.id === 'parked-1').status, 'blocked', 'the parked row itself is unaffected');
+  });
+
+  test('B6 — kind:"blocked" and status:"blocked" are independent fields (namespace collision, both directions)', async () => {
+    // `item.kind` legitimately takes the value 'blocked' (lib/completion-signals.js)
+    // — same string, unrelated field. Neither may leak into the other.
+    const finishedBlockedKind = row({
+      id: 'kind-1', kind: 'blocked', rootItemId: 'root-k',
+      feedback: [{ message: '[done] the blocked-kind prompt itself finished', rootItemId: 'root-k', timestamp: T2 }]
+    });
+    const parkedCustomKind = row({ id: 'kind-2', kind: 'implementation', rootItemId: 'root-b', feedback: [blockedEntry()] });
+    const { app } = buildApp({ history: [finishedBlockedKind, parkedCustomKind] });
+
+    const { body } = await get(app, '/api/proxy/dispatch');
+    const byKind = body.items.find(i => i.id === 'kind-1');
+    assert.equal(byKind.kind, 'blocked');
+    assert.equal(byKind.status, 'done', 'kind:"blocked" must not make the STATUS blocked');
+    const byStatus = body.items.find(i => i.id === 'kind-2');
+    assert.equal(byStatus.status, 'blocked');
+    assert.equal(byStatus.kind, 'implementation', 'status:"blocked" must not rewrite the KIND');
+
+    const blocked = await get(app, '/api/proxy/dispatch?status=blocked');
+    assert.deepEqual(blocked.body.items.map(i => i.id), ['kind-2'], 'the filter routes on status, never on kind');
+  });
+
+  test('B7 — [pending] is NOT blocked: a paused row still reports taken (the split is preserved end to end)', async () => {
+    const paused = row({ id: 'paused-1', rootItemId: 'root-p', feedback: [
+      { message: '[pending] my part is done, the task is not', rootItemId: 'root-p', timestamp: T2 }
+    ] });
+    const { app } = buildApp({ history: [paused] });
+
+    const { body } = await get(app, '/api/proxy/dispatch');
+    assert.equal(body.items.find(i => i.id === 'paused-1').status, 'taken');
+
+    const taken = await get(app, '/api/proxy/dispatch?status=taken');
+    assert.equal(taken.body.items.length, 1, 'a [pending] row stays in the taken listing — it has its own failsafe');
+  });
+
+  test('B8 — only a row that RAN joins a lineage: a queued row is never reported blocked', async () => {
+    const queuedRow = { ...row({ id: 'q-1', rootItemId: 'root-b' }), status: 'queued' };
+    const parked = row({ id: 'parked-1', rootItemId: 'root-b', feedback: [blockedEntry()] });
+    const { app } = buildApp({ queued: [queuedRow], history: [parked] });
+
+    const { body } = await get(app, '/api/proxy/dispatch');
+    assert.equal(body.items.find(i => i.id === 'q-1').status, 'queued', 'a never-run row keeps its own stored status');
+  });
+});

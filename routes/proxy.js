@@ -16,7 +16,7 @@ import { Router, json } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createDedupeCache, createGenerationTracker, dedupeKey } from '../lib/proxy-dedupe.js';
 import { describeCredentialResolution } from '../lib/credential-diagnostics.js';
-import { deriveTerminalStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
+import { deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload } from '../lib/dispatch-validation.js';
@@ -550,7 +550,14 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // window, nothing new); `waitedMs` is how long the handler actually held. Omitted
 // on the plain short-poll (no `?wait`) so that path stays byte-identical.
 function formatDispatchWatch(item, meta = null) {
-  const terminalStatus = deriveTerminalStatus(item.feedback);
+  // LIN-2079: the REPORTED status is the lifecycle one (terminal, else `blocked`
+  // when the lineage is parked on a human). `item.feedback` is already
+  // lineage-merged by getItemStatus({includeGroupFeedback:true}).
+  // This is the ONLY call site here that moves: `alreadyTerminal`, the long-poll
+  // baseline and `dispatchWatchChanged` all deliberately keep calling
+  // `deriveTerminalStatus`, because a `blocked` item is NOT terminal and must
+  // keep holding the long poll rather than short-circuiting it.
+  const terminalStatus = deriveLifecycleStatus(item.feedback);
   const body = {
     id: item.id,
     status: terminalStatus || item.status,
@@ -1934,15 +1941,17 @@ POST ${baseUrl}/api/proxy/autopilot/kickoff
   → "maxTasks" (optional integer >= 1) is a SCOPE bound, not a cost control: this run covers up to that many DISTINCT tasks. Stored on the run and enforced at the dispatch seam — the run's own returned "id" is the "sessionId" every worker dispatch must carry (per the kickoff prose) for the bound to apply. Omit for an unbounded run (today's behavior, byte-identical). See LIN-1751.
   → BUDGET GUARD — once a budgeted run's worker dispatches have touched "maxTasks" distinct tasks (by "issueIdentifier"), the first fresh worker dispatch for a NEW (would-be 51st) task is refused 409: { "error": "...", "code": "BUDGET_EXHAUSTED", "count": 50, "maxTasks": 50, "sessionId": "<the run's id>" }. This is an orderly, expected finish, not a failure or an instrument breakage — wind down any other in-flight work and report where the run stands. NEVER refused: a dispatch that continues a task already inside the budget (its review, its close-out, a corrective followUpTo beat), a "followUpTo" beat, an "abort", or a dispatch carrying no "issueIdentifier". Unlike the duplicate guard, "force": true does NOT bypass this — a budget any caller could wave through would be advisory, not a bound. Match on "code" — 409 alone is ambiguous, other refusals use it too. NOTE the enforcement key is "sessionId" itself: it is optional, caller-supplied, and format-validated only (not tied to any real dispatch), so this bound holds only for a cooperating orchestrator that follows the kickoff prose's instruction to stamp its own "sessionId" on every worker dispatch — a dispatch under a budgeted run with no "sessionId" is admitted, not refused, the same as an unresolvable run. Also note the concurrency caveat: there is no atomic reserve-then-insert, so the bound is "at most maxTasks distinct tasks, modulo in-flight concurrency," not a transactional cap. See LIN-1751.
 
-GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|aborted}&limit={n}
+GET ${baseUrl}/api/proxy/dispatch?issueIdentifier={LIN-42}&status={queued|taken|done|failed|blocked|aborted}&limit={n}
   → List your dispatch items (live queue + recent history), newest first. All query params optional. Use this to find an item's id when you only know the issue.
-  → { "items": [{ "id": "...", "status": "queued|taken|done|failed|aborted", "kind": "implementation", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
+  → FILTER SEMANTICS: "status" filters on the DERIVED status, so "status=taken" no longer returns rows that derive to "blocked" (a runner alive and parked on a human) — query "status=blocked" for those. "total" follows the same filter. This is deliberate: it is what separates rows still being worked from rows waiting on you.
+  → { "items": [{ "id": "...", "status": "queued|taken|done|failed|blocked|aborted", "kind": "implementation", "issueIdentifier": "...", "feedbackCount": 1, ... }], "total": N }
   → "feedbackCount", "status" and "completedAt" are lineage-wide (LIN-1470): if this item was repointed to a follow-up dispatch, they reflect the WHOLE lineage's feedback (this row's own plus every row it was repointed to), not just this row's own stored entries — so a repointed row keeps accumulating "feedbackCount" and reaches a terminal "status"/"completedAt" once its follow-up finishes, instead of freezing at the point of repoint. This holds even under "?issueIdentifier=" scoping and even if a follow-up in the lineage was filed under a DIFFERENT issue than the row you're looking at — the lineage is keyed on the dispatch chain, not on the issue, so a scoped list can show a row as complete via a sibling that itself never appears in that same scoped list. Only a row that actually ran ("taken") joins a lineage this way; a still-"queued", "cancelled", or "expired" row always reports its own feedbackCount/status/completedAt (queued: 0/"queued"/null; cancelled/expired: their own — possibly empty — feedback only) regardless of what a same-lineage predecessor already did. The merge is also forward-only (review F7): a "taken" row only inherits a sibling entry timestamped at or after ITS OWN dispatchedAt, so a still-running follow-up dispatched after its parent already finished keeps reporting its own values rather than the parent's earlier terminal — a row is never reported complete before it was itself dispatched. Because "status" is derived last-wins over the merged, timestamp-sorted lineage, it is NOT one-way: a row that already reached "done" can later report "failed"/"aborted" if a LATER lineage sibling fails — the field reflects the lineage's current outcome, not merely the first terminal it ever reached.
 
 GET ${baseUrl}/api/proxy/dispatch/{id}
   → Watch a dispatched item: whether it is still queued or has been taken by the runner, plus any feedback posted back. Poll this after dispatching.
-  → { "id": "...", "status": "queued|taken|done|failed|aborted", "kind": "implementation", "feedback": [{ "message": "...", "url": "...", "timestamp": "..." }], ... }
-  → status is terminal (done/failed/aborted) once the runner posts a "[done]"/"[failed]"/"[aborted]" feedback marker; until then it is queued or taken. Poll until status is terminal.
+  → { "id": "...", "status": "queued|taken|done|failed|blocked|aborted", "kind": "implementation", "feedback": [{ "message": "...", "url": "...", "timestamp": "..." }], ... }
+  → status is terminal (done/failed/aborted) once the runner posts a "[done]"/"[failed]"/"[aborted]" feedback marker; until then it is queued, taken or blocked. Poll until status is terminal.
+  → "blocked" means the runner is ALIVE and waiting on a human (it posted a "[blocked]" marker). It is NOT terminal — keep polling; a "?wait=" long poll holds rather than short-circuiting, and a later "[done]"/"[failed]"/"[aborted]" still wins (an earlier "[blocked]" never rewinds completedAt). Two namespace traps: "kind" independently takes the value "blocked" (an unrelated field on the same item), and the wake/stop-boundary vocabulary elsewhere speaks of "blocked" as a TERMINAL outcome for a step — the wire "status" here is explicitly not terminal. Unlike terminals, which are last-wins over the lineage, "blocked" is only reported while NO terminal exists anywhere in the lineage.
   → completedAt is the real completion time (timestamp of the terminal marker), null until terminal. resolvedAt is take/archive time (lands seconds after dispatch) — do NOT read it as completion.
   → Feedback is free-form text — read it (e.g. the final recap) for the detail; status gives you the terminal signal without parsing prose.
 
@@ -6470,7 +6479,11 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       const abortedTargets = harvestAbortedTargets(merged);
 
       // Resolve each item's effective status once (terminal marker → done/failed/
-      // aborted, else the lifecycle status) so filtering and the response agree.
+      // aborted, else `blocked` when the lineage is parked on a human, else the
+      // STORED status) so filtering and the response agree. LIN-2079: this one
+      // assignment feeds the reported field, the `?status=` FILTER and `total`,
+      // so deriving `blocked` here is a wire-behaviour change by design —
+      // `?status=taken` no longer returns parked rows, `?status=blocked` does.
       // LIN-1470: the lineage merge runs BEFORE abort attribution — ordering is
       // load-bearing, since `feedbackWithHarvestedAbort`'s F1 guard only lets an
       // abort win when it is strictly later than the existing terminal, so it
@@ -6497,7 +6510,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         const siblingRows = anchor ? (siblingsByAnchor.get(anchor) || []).filter(s => s.id !== i.id) : [];
         const lineageFeedback = joinsLineage ? mergeLineageFeedback(i.feedback, siblingRows, anchor, i.dispatchedAt) : (i.feedback || []);
         const terminalFeedback = feedbackWithHarvestedAbort(lineageFeedback, abortedTargets.get(i.id));
-        return { ...i, _lineageFeedback: lineageFeedback, _terminalFeedback: terminalFeedback, status: deriveTerminalStatus(terminalFeedback) || i.status };
+        return { ...i, _lineageFeedback: lineageFeedback, _terminalFeedback: terminalFeedback, status: deriveLifecycleStatus(terminalFeedback) || i.status };
       });
 
       // `status` is derived from feedback (not stored), so it stays a JS filter;

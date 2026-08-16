@@ -326,3 +326,96 @@ describe('LIN-1480 — :id watch seam lineage merge is forward-only', () => {
     assert.equal(listRow.completedAt, null);
   });
 });
+
+/**
+ * LIN-2079 S2/S8 — `blocked` on the WATCH endpoint (`GET /api/proxy/dispatch/:id`).
+ *
+ * Exactly ONE of the four terminal-derivation call sites in this region moves:
+ * `formatDispatchWatch`'s reported `status`. The other three — the
+ * `alreadyTerminal` short-circuit, the long-poll baseline, and
+ * `dispatchWatchChanged`'s comparator — must keep deriving TERMINAL status, so a
+ * parked row still polls as non-terminal. Swapping those too would make a
+ * `[blocked]` item short-circuit the long poll with `reason: "terminal"`,
+ * silently breaking the documented "poll until status is terminal" contract for
+ * exactly the case this ticket exists to name. Case W2 is the guard on that.
+ */
+describe('LIN-2079 — derived `blocked` on the :id watch seam', () => {
+  test('W1 (fix-proving): a [blocked] row reports status "blocked", not the stored "taken"', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const a = await dispatchTaken(store, { prompt: 'needs a decision' });
+    await store.addFeedback(a._id, URLKEY,
+      { message: '[blocked] needs a human decision on the schema', rootItemId: a._id }, TOKEN);
+
+    const res = await call(app, `/api/proxy/dispatch/${a._id}`);
+
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.status, 'blocked', 'the runner is alive and parked on a human — say so');
+    assert.equal(res.body.completedAt, null, 'blocked is NOT a completion');
+  });
+
+  test('W2 (guard, must never regress): a blocked row still holds the full ?wait window — it is not terminal', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const a = await dispatchTaken(store, { prompt: 'needs a decision' });
+    await store.addFeedback(a._id, URLKEY,
+      { message: '[blocked] waiting on John', rootItemId: a._id }, TOKEN);
+
+    const res = await call(app, `/api/proxy/dispatch/${a._id}?wait=1`);
+
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.status, 'blocked', 'reported status still derives blocked');
+    assert.notEqual(res.body.reason, 'terminal',
+      'MUST NOT short-circuit as terminal — alreadyTerminal stays on deriveTerminalStatus');
+    assert.notEqual(res.body.waitedMs, 0, 'the long poll must actually hold');
+    assert.ok(res.elapsedMs > 500, `expected a near-1s hold, took ${res.elapsedMs}ms`);
+  });
+
+  test('W3 (ordering): a later [done] after an earlier [blocked] reports done, with completedAt at the [done]', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const a = await dispatchTaken(store, { prompt: 'blocked then unblocked' });
+    await store.addFeedback(a._id, URLKEY,
+      { message: '[blocked] waiting on creds', rootItemId: a._id }, TOKEN);
+    await tick();
+    await store.addFeedback(a._id, URLKEY,
+      { message: '[done] unblocked and finished', rootItemId: a._id }, TOKEN);
+
+    const doc = await store.historyCollection.findOne({ _id: a._id, urlKey: URLKEY });
+    const doneAt = doc.feedback.find(f => f.message.startsWith('[done]')).timestamp;
+
+    const res = await call(app, `/api/proxy/dispatch/${a._id}`);
+
+    assert.equal(res.body.status, 'done', 'terminal-first: the genuine terminal wins');
+    assert.equal(Date.parse(res.body.completedAt),
+      Date.parse(doneAt.toISOString ? doneAt.toISOString() : doneAt),
+      'completedAt is the [done] timestamp — never rewound to the [blocked]');
+
+    // …and it short-circuits the long poll again, because it IS terminal now.
+    const waited = await call(app, `/api/proxy/dispatch/${a._id}?wait=1`);
+    assert.equal(waited.body.reason, 'terminal');
+    assert.equal(waited.body.waitedMs, 0);
+  });
+
+  test('W4 (cross-surface): list and :id agree that the same parked row is blocked', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const a = await dispatchTaken(store, { prompt: 'needs a decision' });
+    await store.addFeedback(a._id, URLKEY,
+      { message: '[blocked] parked on a human', rootItemId: a._id }, TOKEN);
+
+    const [listRes, idRes] = await Promise.all([
+      call(app, '/api/proxy/dispatch'),
+      call(app, `/api/proxy/dispatch/${a._id}`)
+    ]);
+
+    const listRow = listRes.body.items.find(i => i.id === a._id);
+    assert.ok(listRow, 'the parked row must still appear in an unfiltered list');
+    assert.equal(listRow.status, idRes.body.status, 'the two surfaces must not diverge');
+    assert.equal(listRow.status, 'blocked');
+  });
+});

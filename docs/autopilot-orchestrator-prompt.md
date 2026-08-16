@@ -91,7 +91,10 @@ conditions), not a fallback.
 shell loop, don't name the variable `status`: zsh reserves it as a read-only alias for `$?` and
 the assignment aborts. Use `dispatch_status`, or run the loop under `bash`.) Use heartbeats for
 liveness: a `[working]` beat = alive; a long silence past the heartbeat cadence with no
-terminal status = **stalled** → flag, consider re-dispatch or help. Do **not** treat the
+terminal status = **stalled** → flag, consider re-dispatch or help. One exception, and it
+looks exactly like that shape: `status: "blocked"` is a distinct, **expected non-terminal**
+state (the session is alive and parked on a human) — do **not** read it as stalled and do
+**not** re-dispatch it; surface it so the human can unblock it. Do **not** treat the
 recap text as the completion signal. Two cautions from live runs: a heartbeat that reads
 `[stalled?] … (last tool: Bash)` with no new tool calls is usually **one long-running command
 in flight** (a test suite), not a dead session — confirm before re-dispatching. And a terminal
