@@ -73,7 +73,6 @@ import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { isAuthError, clientErrorStatus, clientErrorMessage, serviceUnavailable } from './lib/errors.js'
 import { renderLandingPage } from './lib/render-landing.js'
-import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
 import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, normalizeProvider, matchTeamId, isPersistableTeamRef } from './lib/workspace.js'
@@ -1180,7 +1179,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
   return new Promise((resolve) => {
     session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      const html = renderLandingPage({ deployInfo, githubEnabled: isGitHubConfigured(), jiraEnabled: isJiraOAuthConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY });
+      const html = renderLandingPage({ deployInfo, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY });
       res.send(html);
       resolve();
     });
@@ -1485,7 +1484,7 @@ app.get('/', (req, res) => {
   const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
 
   // Unauthenticated users see the bespoke Harbour showcase landing (LIN-980).
-  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: isGitHubConfigured(), jiraEnabled: isJiraOAuthConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY })
+  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY })
   res.send(html)
 })
 
@@ -2696,8 +2695,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     // Gate the GitHub add affordance on the SAME shared predicate the /auth/github
     // route guard and landing hero use (LIN-761), so the settings page never offers
     // an add that would 503/hang on a server where GitHub isn't fully configured.
-    githubEnabled: isGitHubConfigured(),
-    jiraOAuthEnabled: isJiraOAuthConfigured()
+    githubEnabled: getProvider('github').entryCta.isConfigured(),
+    jiraOAuthEnabled: getProvider('jira').entryCta.isConfigured()
   });
   res.send(html);
 });
