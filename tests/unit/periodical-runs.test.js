@@ -636,7 +636,7 @@ describe('foldPeriodicalRuns — projection coverage', () => {
     // fails loudly here rather than silently arriving as `undefined` in
     // production — the exact silent-drop class both plan reviews caught for
     // followUpTo/abort.
-    const fieldsTheFoldReads = ['periodicalId', 'promptName', 'dispatchedAt', 'status', 'followUpTo', 'abort'];
+    const fieldsTheFoldReads = ['periodicalId', 'promptName', 'dispatchedAt', 'status', 'followUpTo', 'abort', 'repo'];
     for (const field of fieldsTheFoldReads) {
       assert.equal(PERIODICAL_PROJECTION[field], 1, `PERIODICAL_PROJECTION is missing '${field}'`);
     }

@@ -860,20 +860,20 @@ decide for itself whether a periodical is due.
       "daysSince": 10,
       "repos": [
         {
-          "repo": "repo-a",
-          "label": "repo-a",
-          "isDefault": false,
-          "state": "due",
-          "lastDispatchedAt": "2026-07-24T10:00:00Z",
-          "daysSince": 10
-        },
-        {
           "repo": null,
           "label": "none",
           "isDefault": true,
           "state": "never",
           "lastDispatchedAt": null,
           "daysSince": null
+        },
+        {
+          "repo": "repo-a",
+          "label": "repo-a",
+          "isDefault": false,
+          "state": "due",
+          "lastDispatchedAt": "2026-07-24T10:00:00Z",
+          "daysSince": 10
         }
       ]
     }
