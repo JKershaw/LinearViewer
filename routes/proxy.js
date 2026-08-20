@@ -69,6 +69,7 @@ import { attachProxyContext, shouldUseMcpTokenField, provisionBootstrapToken } f
 import { BOOTSTRAP_TOKEN_TTL_SECONDS, WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
+import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId, requireTeamMembership, TeamNotFoundError } from '../lib/workspace.js';
 import {
@@ -1791,7 +1792,11 @@ GET ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — de
 
 GET ${baseUrl}/api/proxy/autopilot/manual
   → Autopilot operating manual / handbook (plain text, not JSON) — the disposition
-    behind the loop. Composed inline into the kickoff; fetch here to re-read a part.`;
+    behind the loop. Composed inline into the kickoff; fetch here to re-read a part.
+
+GET ${baseUrl}/api/proxy/passage-runner/prompt
+  → Passage Runner kickoff prompt (plain text, not JSON) — the pasteable body
+    of docs/passage-runner-prompt.md. Fetch here to re-read a part mid-run.`;
 
     const writeEndpoints = scope === 'readWrite' ? `
 
@@ -5569,6 +5574,16 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
   router.get('/api/proxy/autopilot/manual', proxyLimiter, authenticateProxyToken, async (req, res) => {
     logEvent(req, '/api/proxy/autopilot/manual', 200);
     res.type('text/plain').send(buildAutopilotManual());
+  });
+
+  /**
+   * GET /api/proxy/passage-runner/prompt
+   * Returns the Passage Runner kickoff prompt (docs/passage-runner-prompt.md,
+   * preamble stripped) as plain text — for re-reading a part mid-run.
+   */
+  router.get('/api/proxy/passage-runner/prompt', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    logEvent(req, '/api/proxy/passage-runner/prompt', 200);
+    res.type('text/plain').send(buildPassageRunnerKickoff());
   });
 
   // ===========================================================================

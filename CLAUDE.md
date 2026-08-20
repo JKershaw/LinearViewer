@@ -37,7 +37,7 @@ routes/
   openrouter-auth.js   OpenRouter OAuth PKCE routes
   workspace.js         Workspace management routes
   dispatch.js          Dispatch queue API (user + consumer endpoints)
-  proxy.js             Linear API proxy (token auth, read/write endpoints, cycles, labels, task automation)
+  proxy.js             Linear API proxy (token auth, read/write endpoints, cycles, labels, task automation, passage-runner kickoff prompt)
   collective.js        Collective experiment (experimental): page, multi-workspace dispatch fan-out, Yap state/say proxy (LIN-450)
   dashboard.js         Autopilot Observation page (first-class, LIN-595): /observation page + sessionId-grouped sessions feed + merged cross-workspace Loop feed, on-demand run-/session-summary, session-context, lazy Linear hydration (LIN-509). /dashboard 302s to /observation; data endpoints keep their /api/dashboard/* paths. Also the dedicated per-session page GET /observation/session/:sessionId (LIN-1003): server-rendered snapshot via the NON-lean getSessionsForWorkspace read (the lean point-read drops feedback[]) + a cache-only brief/recap join over distinct loop.issueId UUIDs, rendered by lib/render-session.js; 404s an unknown/cross-workspace sessionId
   workspace-api.js     Workspace API routes (prompts, recommendations, audit, comments, images)
@@ -120,6 +120,7 @@ lib/
     collective-participant.js  Collective discussion participant prompt (experimental, LIN-450)
     task-chat-template.js    Task-chat conversational prompt (experimental, taskChat)
     passage-planner-kickoff.js  Passage Planner kickoff prompt source (experimental, passagePlanner flag, LIN-1849): serves docs/passage-planner-prompt.md at HEAD, preamble stripped (cut at the file's one `^---$` divider), cached; mirrors autopilot-manual.js's readFileSync-from-docs/ + fallback-not-cached pattern; no baseUrl templating (every endpoint reference in the doc is relative)
+    passage-runner-kickoff.js  Passage Runner kickoff prompt source (LIN-1812/LIN-2162, generator + route lift of the design artifact docs/passage-runner-prompt.md): serves the doc at HEAD, preamble stripped (cut at the file's one `^---$` divider), cached; mirrors passage-planner-kickoff.js's readFileSync-from-docs/ + fallback-not-cached pattern; no baseUrl templating (every endpoint reference in the doc is relative); served via `GET /api/proxy/passage-runner/prompt` (routes/proxy.js), no feature flag
     roadmap-*.js             Roadmap narrative-pipeline templates (orientation,
                              trajectory, north-star, product, gap, narrative, digest, chat)
   recap.js             Task recap prompt + response handling
