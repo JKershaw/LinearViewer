@@ -1768,12 +1768,15 @@ GET ${baseUrl}/api/proxy/north-star
 
 GET ${baseUrl}/api/proxy/periodicals
   → Per-template periodical run state, derived from the live dispatch queue +
-    history (LIN-1827/LIN-1829). Computes no trigger and dispatches nothing —
-    this is evidence only.
+    history (LIN-1827/LIN-1829), now split per repo (LIN-1932). Computes no
+    trigger and dispatches nothing — this is evidence only.
   → { "periodicals": [{ "id": "documentation-review", "title": "Documentation Review",
         "mode": "corrective" | "advisory", "cadence": "weekly",
         "state": "due" | "recent" | "never" | "unknown",
-        "lastDispatchedAt": "2026-07-24T10:00:00Z" | null, "daysSince": 10 | null }] }
+        "lastDispatchedAt": "2026-07-24T10:00:00Z" | null, "daysSince": 10 | null,
+        "repos": [{ "repo": "repo-a" | null, "label": "repo-a" | "none",
+          "isDefault": false | true, "state": "due" | "recent" | "never" | "unknown",
+          "lastDispatchedAt": "2026-07-24T10:00:00Z" | null, "daysSince": 10 | null }] }] }
   → "state": "recent" means a live queue row OR a history run inside its cadence
     window; "due" means the cadence has elapsed since the last run; "never" means
     NO EVIDENCE IN THE FULL RETAINED HISTORY WINDOW — not "ever ran". The window
@@ -1784,6 +1787,21 @@ GET ${baseUrl}/api/proxy/periodicals
     produced by any deployment today (both default to 30 days). "mode"/"cadence"
     are carried through from the matched template, never re-joined, so they can
     never disagree with the value the "due"/"recent" boundary itself used.
+  → "repos" is a per-(template, repo) breakdown, ALWAYS present (never omitted,
+    never "[]") — a template with no run evidence at all still gets a single
+    synthesized default-lane entry. Each lane entry carries exactly the six
+    keys shown above — "runs" is deliberately withheld per lane, same as the
+    top-level withholding above, not a new decision. "repo": null is the
+    DEFAULT lane (not "all repos", never discarded) — Harbour has no name for
+    the runner's own working directory when no repo was stamped, so "label"
+    reads "none" for it and the repo's own name otherwise. The default lane,
+    when present, sorts first; other repos follow in first-observed order.
+    The top-level "state"/"lastDispatchedAt"/"daysSince" fields above stay
+    repo-ignorant — an aggregate across every lane, e.g. "recent" if ANY lane
+    has a live queue row — so existing consumers reading only the top level
+    see unchanged behaviour. Only OBSERVED lanes appear (rows this endpoint has
+    actually seen) — an unstamped repo that has never run is not enumerated as
+    an empty lane; this route makes zero provider/project calls, unchanged.
 
 GET ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — deprecated)
   → Recent agent status entries
@@ -4540,7 +4558,24 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
           cadence: r.cadence,
           state: r.state,
           lastDispatchedAt: r.lastDispatchedAt === null ? null : new Date(r.lastDispatchedAt).toISOString(),
-          daysSince: r.daysSince
+          daysSince: r.daysSince,
+          // Per-repo lanes (LIN-1932), additive: always emitted, never `[]`
+          // (the fold synthesizes a single default lane even with zero
+          // evidence). `runs` is deliberately withheld per lane, mirroring
+          // this route's existing top-level withholding above — not a new
+          // precedent. `label` is computed here, not in the fold: the fold
+          // stays network-free, and this route makes zero provider calls,
+          // so it cannot resolve a repo's display name via knownWorkspaceRepos
+          // — 'none' reuses that helper's own default-lane label string for
+          // vocabulary consistency without importing it.
+          repos: r.repos.map(lane => ({
+            repo: lane.repo,
+            label: lane.repo === null ? 'none' : lane.repo,
+            isDefault: lane.isDefault,
+            state: lane.state,
+            lastDispatchedAt: lane.lastDispatchedAt === null ? null : new Date(lane.lastDispatchedAt).toISOString(),
+            daysSince: lane.daysSince
+          }))
         }))
       });
     } catch (err) {

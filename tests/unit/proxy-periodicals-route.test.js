@@ -160,11 +160,61 @@ describe('GET /api/proxy/periodicals', () => {
     assert.ok(item, 'template result present');
     assert.deepEqual(
       Object.keys(item).sort(),
-      ['cadence', 'daysSince', 'id', 'lastDispatchedAt', 'mode', 'state', 'title'].sort()
+      ['cadence', 'daysSince', 'id', 'lastDispatchedAt', 'mode', 'repos', 'state', 'title'].sort()
     );
     assert.equal(item.id, TEMPLATE.id);
     assert.equal('periodicalId' in item, false);
     assert.equal('runs' in item, false);
+  });
+
+  // LIN-1932 B5, part 2 (§7): a `repos[]` lane entry's own key set. Without
+  // this, a lane silently missing `isDefault` or leaking `runs` would pass
+  // every other test in the plan.
+  test('each `repos[]` lane entry carries EXACTLY {repo, label, isDefault, state, lastDispatchedAt, daysSince} — no `runs`', async () => {
+    const { app } = buildApp({ history: { acme: [historyRow()] } });
+    const { body } = await get(app);
+    const item = findTemplateResult(body);
+    assert.ok(Array.isArray(item.repos) && item.repos.length > 0, 'expected at least one lane');
+    assert.deepEqual(
+      Object.keys(item.repos[0]).sort(),
+      ['daysSince', 'isDefault', 'label', 'lastDispatchedAt', 'repo', 'state'].sort()
+    );
+    assert.equal('runs' in item.repos[0], false);
+  });
+
+  // LIN-1932 B5, part 1 (§3): the aggregation witness. Two archived `taken`
+  // rows for one template — repo-a (older, aged past cadence) and the
+  // default lane (newer, within cadence) — no live queue rows. Proves
+  // top-level `lastDispatchedAt`/`state` aggregate over ALL lanes rather
+  // than mirroring any single one (including repo-a, which would plausibly
+  // sort first) — the divergent top-level `state: 'recent'` vs. repo-a's
+  // own `due` is the load-bearing assertion a weaker additive-shape-only
+  // test would not catch. (`runs`'s SUM aggregation is not asserted here:
+  // `runs` is never on the wire at all, per the key-set test above and
+  // LIN-1829's original top-level withholding — its sum property is a
+  // fold-internal invariant, already exercised by beat 2's B1/B2 fixtures.)
+  test('top-level lastDispatchedAt/state aggregate across lanes (MAX / any-lane), and state can diverge from any single lane\'s own state', async () => {
+    const { app } = buildApp({
+      history: {
+        acme: [
+          historyRow({ repo: 'repo-a', dispatchedAt: daysAgo(10) }), // older, aged past weekly cadence -> due
+          historyRow({ repo: null, dispatchedAt: daysAgo(1) })       // newer, within weekly cadence -> recent
+        ]
+      }
+    });
+    const { body } = await get(app);
+    const item = findTemplateResult(body);
+
+    const repoALane = item.repos.find(l => l.repo === 'repo-a');
+    const defaultLane = item.repos.find(l => l.isDefault);
+    assert.ok(repoALane, 'expected a repo-a lane');
+    assert.ok(defaultLane, 'expected a default lane');
+    assert.equal(repoALane.state, 'due');
+    assert.equal(defaultLane.state, 'recent');
+
+    assert.equal(item.state, 'recent', 'top-level state must reflect the aggregated (max) lastDispatchedAt, not repo-a\'s own due');
+    assert.equal(item.lastDispatchedAt, new Date(daysAgo(1)).toISOString(), 'top-level lastDispatchedAt must be the MAX across lanes');
+    assert.equal(item.daysSince, 1);
   });
 
   test('publishes exactly one entry per registry template, even with zero evidence', async () => {

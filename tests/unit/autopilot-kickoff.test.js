@@ -276,18 +276,27 @@ describe('buildAutopilotKickoff (general / stack-walk)', () => {
 
   test('states the three-level precedence order: goal -> overdue periodical -> stack', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
-    assert.ok(text.includes('an explicit goal from the human, else **(2)** a\nperiodical reading `due`, else **(3)** the top of the stack'));
+    assert.ok(text.includes('an explicit goal from the human, else **(2)** a\nperiodical reading `due` (a lane reading `due`, if the template has more than one), else\n**(3)** the top of the stack'));
   });
 
   test('states the explicit supersedes clause resolving G3, closing with the "not a judgment call" phrase', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
     assert.ok(text.includes('This supersedes the Orient step\'s two-level order'));
-    assert.ok(text.includes('still a policy, not a judgment\ncall, so don\'t improvise it'));
+    assert.ok(text.includes('still a policy, not a judgment call, so don\'t improvise it'));
   });
 
   test('glosses `never` as bounded ("no evidence in the full retained window"), not "ever ran"', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
-    assert.ok(text.includes('no evidence in the full\nretained history window, not "ever ran"'));
+    assert.ok(text.includes('no evidence in the full retained\nhistory window, not "ever ran"'));
+  });
+
+  // LIN-1932: the periodicals pointer now surfaces per-repo lanes, since the
+  // top-level state alone can no longer tell an operator WHICH repo is
+  // overdue on a multi-repo workspace.
+  test('the periodicals pointer names the per-repo `repos[]` breakdown, not just the per-template state', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(text.includes('per-repo `repos[]` breakdown'));
+    assert.ok(text.includes('WHICH repo is overdue'));
   });
 });
 

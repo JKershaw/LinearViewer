@@ -62,18 +62,19 @@ const URL_KEY = 'acme';
 
 // ── Fixture factories ───────────────────────────────────────────────────────
 
-/** Mirrors a PERIODICALS registry entry (lib/periodicals.js's PeriodicalTemplate typedef, :83-90). */
+/** Mirrors a PERIODICALS registry entry (lib/periodicals.js's PeriodicalTemplate typedef, :93-104). */
 function template(over = {}) {
   return {
     id: 'documentation-review',
     title: 'Documentation Review',
     mode: 'corrective',
     cadence: 'weekly',
+    scope: 'repo',
     ...over
   };
 }
 
-/** Mirrors `_formatItem`'s output (lib/dispatch-store.js:1756) as read under PERIODICAL_PROJECTION — a queue row carries no `status` field at all. */
+/** Mirrors `_formatItem`'s output (lib/dispatch-store.js:1826) as read under PERIODICAL_PROJECTION — a queue row carries no `status` field at all. */
 function queueRow(over = {}) {
   return {
     kind: 'custom',
@@ -85,7 +86,7 @@ function queueRow(over = {}) {
   };
 }
 
-/** Mirrors `_formatHistoryItem`'s output (lib/dispatch-store.js:1240) as read under PERIODICAL_PROJECTION. */
+/** Mirrors `_formatHistoryItem`'s output (lib/dispatch-store.js:1301) as read under PERIODICAL_PROJECTION. */
 function historyRow(over = {}) {
   return {
     kind: 'custom',
@@ -387,6 +388,54 @@ describe('foldPeriodicalRuns — queue precedence', () => {
   });
 });
 
+// ── Per-repo lanes (LIN-1932 beat 2: B4, B7) ────────────────────────────────
+
+describe('foldPeriodicalRuns — per-repo lanes (LIN-1932)', () => {
+  test('B4: a live queue row for repo-a does not mark repo-b recent — rule 1 is per-lane, not per-template', () => {
+    // Direct mutant-killer for `hasRecentQueueRow.set(template.id, true)`
+    // (unconditional per template) surviving unchanged: that shape would
+    // mark repo-b recent too, even though repo-b has no queue row of its
+    // own and its own history is aged past cadence.
+    const t = template({ cadence: 'weekly' });
+    const rows = {
+      queueRows: [queueRow({ periodicalId: t.id, repo: 'repo-a' })],
+      historyRows: [historyRow({ periodicalId: t.id, repo: 'repo-b', status: 'taken', dispatchedAt: new Date(NOW - WEEK_MS - DAY_MS).toISOString() })]
+    };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+    const repoALane = result.repos.find(l => l.repo === 'repo-a');
+    const repoBLane = result.repos.find(l => l.repo === 'repo-b');
+    assert.ok(repoALane, 'expected a repo-a lane');
+    assert.ok(repoBLane, 'expected a repo-b lane');
+    assert.equal(repoALane.state, 'recent');
+    assert.equal(repoBLane.state, 'due');
+  });
+
+  test('B7: a history row aged out of the effective horizon leaves no inner lane Map — top-level AND lane read null/never/null, never -Infinity/due', () => {
+    // The empty-inner-Map hazard (plan-review f1ef4ad9 blocking finding): an
+    // inner Map created but left empty would send Math.max() an empty
+    // argument list (-Infinity), flipping state to 'due' and, at the wire
+    // boundary, throwing RangeError on `new Date(-Infinity).toISOString()`.
+    // The invariant (getOrCreate only at first write, after the horizon
+    // guard) means this template's inner Maps are never created at all.
+    const t = template();
+    const rows = {
+      historyRows: [historyRow({ periodicalId: t.id, dispatchedAt: new Date(NOW - 40 * DAY_MS).toISOString() })]
+    };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, horizonMs: HISTORY_TTL_MS, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.lastDispatchedAt, null);
+    assert.equal(result.state, 'never');
+    assert.equal(result.daysSince, null);
+    // Same guard, pinned at the per-lane emit path too — not exercised by
+    // the pre-existing top-level-only backstop at :443, since that test
+    // predates the `repos` field.
+    assert.equal(result.repos.length, 1);
+    assert.equal(result.repos[0].isDefault, true);
+    assert.equal(result.repos[0].state, 'never');
+    assert.equal(result.repos[0].lastDispatchedAt, null);
+    assert.equal(result.repos[0].daysSince, null);
+  });
+});
+
 // ── Retention boundary (never vs unknown) ──────────────────────────────────
 
 describe('foldPeriodicalRuns — retention boundary', () => {
@@ -587,7 +636,7 @@ describe('foldPeriodicalRuns — projection coverage', () => {
     // fails loudly here rather than silently arriving as `undefined` in
     // production — the exact silent-drop class both plan reviews caught for
     // followUpTo/abort.
-    const fieldsTheFoldReads = ['periodicalId', 'promptName', 'dispatchedAt', 'status', 'followUpTo', 'abort'];
+    const fieldsTheFoldReads = ['periodicalId', 'promptName', 'dispatchedAt', 'status', 'followUpTo', 'abort', 'repo'];
     for (const field of fieldsTheFoldReads) {
       assert.equal(PERIODICAL_PROJECTION[field], 1, `PERIODICAL_PROJECTION is missing '${field}'`);
     }
@@ -706,6 +755,152 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     assert.equal(row.status, 'taken');
   });
 
+  // LIN-1932 beat 1, B3: falsification probe. Originally written against a
+  // PERIODICAL_PROJECTION missing `repo: 1` — the deliberately-incomplete
+  // projection this bug was about (no separate constant needed, since the
+  // production projection itself was missing the field). Proved the silent
+  // drop was real against the store's actual read path, and that it was
+  // projection-shaped, not a broken store: periodicalId/status (fields the
+  // projection already granted) kept reading correctly on the same row.
+  // Now pins the fix: PERIODICAL_PROJECTION carries `repo: 1` (beat 2), so
+  // a repo-stamped row reads back correctly instead of silently dropping.
+  test('LIN-1932 B3: a repo-stamped row reads back repo: null under PERIODICAL_PROJECTION (repo not yet projected), while periodicalId/status still read correctly', async () => {
+    const store = freshStore();
+    const created = await store.addItem(URL_KEY, {
+      prompt: 'run the review',
+      promptName: 'Documentation Review',
+      kind: 'custom',
+      periodicalId: 'documentation-review',
+      repo: 'repo-a'
+    });
+    await store.takeItem(created._id, URL_KEY, 'token-a');
+
+    const { items } = await store.listHistory(URL_KEY, { projection: PERIODICAL_PROJECTION });
+    assert.equal(items.length, 1);
+    const [row] = items;
+    // This pins the fix: PERIODICAL_PROJECTION now carries `repo: 1` (beat 2),
+    // so a genuinely repo-stamped row reads back 'repo-a' instead of the
+    // pre-fix silent drop to `repo: null`.
+    assert.equal(row.repo, 'repo-a');
+    assert.equal(row.periodicalId, 'documentation-review');
+    assert.equal(row.status, 'taken');
+  });
+
+  // LIN-1932 beat 1, B1: history-lane split. Two archived `taken` rows for
+  // ONE template — repo-a and the default (null) lane — both in-window.
+  // Read with a projection that DOES include repo (repo: 1 added on top of
+  // PERIODICAL_PROJECTION) so this test exercises the FOLD's re-key, not the
+  // projection gap B3 already covers on its own. Asserts two DISTINCT lanes,
+  // runs: 1 each — not merely "a repo-a lane exists" (the plan is explicit
+  // that a fold which duplicated every row onto every lane would also pass
+  // that weaker assertion).
+  test('LIN-1932 B1: two taken rows (repo-a, default) for one template split into two lanes, runs: 1 each — not one merged lane', async () => {
+    const store = freshStore();
+    const repoProjection = { ...PERIODICAL_PROJECTION, repo: 1 };
+    const t = template({ id: 'documentation-review', title: 'Documentation Review' });
+
+    const repoARow = await store.addItem(URL_KEY, {
+      prompt: 'run the review',
+      promptName: t.title,
+      kind: 'custom',
+      periodicalId: t.id,
+      repo: 'repo-a'
+    });
+    await store.takeItem(repoARow._id, URL_KEY, 'token-a');
+
+    // A small real delay, not a fabricated timestamp (mirrors the true-max
+    // round-trip test below): addItem always stamps dispatchedAt from the
+    // clock, so this only guarantees the default row lands strictly later,
+    // making it the unambiguous max for the top-level assertion below.
+    await new Promise(resolve => setTimeout(resolve, 5));
+
+    const defaultRow = await store.addItem(URL_KEY, {
+      prompt: 'run the review',
+      promptName: t.title,
+      kind: 'custom',
+      periodicalId: t.id,
+      repo: null
+    });
+    await store.takeItem(defaultRow._id, URL_KEY, 'token-b');
+    assert.ok(defaultRow.dispatchedAt.getTime() > repoARow.dispatchedAt.getTime(), 'test setup sanity: defaultRow must be strictly later than repoARow');
+
+    const { items: historyRows } = await store.listHistory(URL_KEY, { projection: repoProjection });
+    assert.equal(historyRows.length, 2);
+
+    const [result] = foldPeriodicalRuns([t], { historyRows }, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+
+    // Pins the fold's re-key (beat 2): the two rows split into distinct
+    // `repos` lanes for repo-a and the default (null) lane, rather than
+    // collapsing into a single top-level `runs: 2` keyed on template.id
+    // alone.
+    assert.ok(Array.isArray(result.repos), 'foldPeriodicalRuns must return a `repos` lane array per template');
+    assert.equal(result.repos.length, 2, 'expected exactly two lanes: repo-a and the default null lane');
+    const repoALane = result.repos.find(l => l.repo === 'repo-a');
+    const defaultLane = result.repos.find(l => l.repo === null);
+    assert.ok(repoALane, 'expected a repo-a lane');
+    assert.ok(defaultLane, 'expected a default (null) lane');
+    assert.equal(repoALane.runs, 1);
+    assert.equal(defaultLane.runs, 1);
+
+    // §3 aggregation properties (beat 4 corrective): every OTHER `runs`
+    // assertion in this file sits on a single-lane fixture, where a sum is
+    // indistinguishable from "return the first/only lane's count" — this is
+    // the one two-lane fixture that can actually catch a mis-implementation
+    // like `laneRuns.get(firstLane)` surviving in place of a real reduce.
+    assert.equal(result.runs, 2, 'top-level runs must be the SUM across lanes (1 + 1), not either lane\'s own count');
+    assert.equal(result.lastDispatchedAt, defaultRow.dispatchedAt.getTime(), 'top-level lastDispatchedAt must be the MAX across lanes (the later default-lane row), not repo-a\'s earlier one');
+  });
+
+  test('LIN-1932 B2: a live queue row for repo-a and an aged taken row for repo-b — repo-a reads recent, repo-b reads due, and no default lane is spuriously marked recent', async () => {
+    const store = freshStore();
+    const t = template({ id: 'documentation-review', title: 'Documentation Review', cadence: 'weekly' });
+
+    // Live queue row for repo-a — never archived, so it stays on the queue
+    // (the "in-flight run against repo A" the ticket's queue-half bug describes).
+    await store.addItem(URL_KEY, {
+      prompt: 'run the review',
+      promptName: t.title,
+      kind: 'custom',
+      periodicalId: t.id,
+      repo: 'repo-a'
+    });
+
+    // Archived taken row for repo-b, aged past the weekly cadence.
+    const repoBRow = await store.addItem(URL_KEY, {
+      prompt: 'run the review',
+      promptName: t.title,
+      kind: 'custom',
+      periodicalId: t.id,
+      repo: 'repo-b'
+    });
+    await store.takeItem(repoBRow._id, URL_KEY, 'token-b');
+
+    const queueRows = await store.listItems(URL_KEY, { projection: PERIODICAL_PROJECTION });
+    const { items: historyRows } = await store.listHistory(URL_KEY, { projection: PERIODICAL_PROJECTION });
+    assert.equal(queueRows.length, 1);
+    assert.equal(historyRows.length, 1);
+
+    // Inject `now` one cadence period + a day past repo-b's real dispatchedAt.
+    const fakeNow = repoBRow.dispatchedAt.getTime() + WEEK_MS + DAY_MS;
+
+    const [result] = foldPeriodicalRuns([t], { queueRows, historyRows }, { now: fakeNow, historyTtlMs: HISTORY_TTL_MS });
+
+    const repoALane = result.repos.find(l => l.repo === 'repo-a');
+    const repoBLane = result.repos.find(l => l.repo === 'repo-b');
+    const defaultLane = result.repos.find(l => l.isDefault);
+
+    assert.ok(repoALane, 'expected a repo-a lane');
+    assert.ok(repoBLane, 'expected a repo-b lane');
+    assert.equal(repoALane.state, 'recent');
+    assert.equal(repoBLane.state, 'due');
+    // The load-bearing assertion: neither row was stamped repo: null, so no
+    // default lane should appear at all. Pre-fix, an unprojected queue row
+    // silently read repo: null and put the in-flight run on the DEFAULT
+    // lane instead of repo-a's own — exactly the direction that points at
+    // re-dispatching a run already underway.
+    assert.equal(defaultLane, undefined, 'no row here was stamped repo: null — a default lane appearing at all would mean the projection or fold miscategorized a repo-stamped row');
+  });
+
   test('PERIODICAL_PROJECTION survives a real queue-row round trip too (no status field — queue docs carry none)', async () => {
     const store = freshStore();
     const created = await store.addItem(URL_KEY, {
@@ -743,13 +938,13 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
   // is exactly why it is not used here.
   test('lastDispatchedAt is the true max over a real archive round trip, even when the OLDER row is archived (and so read back) first', async () => {
     const store = freshStore();
-    const template = { id: 'documentation-review', title: 'Documentation Review', mode: 'corrective', cadence: 'weekly' };
+    const t = template({ id: 'documentation-review', title: 'Documentation Review' });
 
     const older = await store.addItem(URL_KEY, {
       prompt: 'run the review',
-      promptName: template.title,
+      promptName: t.title,
       kind: 'custom',
-      periodicalId: template.id
+      periodicalId: t.id
     });
     // A small real delay, not a fabricated timestamp: addItem always stamps
     // `dispatchedAt` from the clock, so this only guarantees the two calls
@@ -757,9 +952,9 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     await new Promise(resolve => setTimeout(resolve, 5));
     const newer = await store.addItem(URL_KEY, {
       prompt: 'run the review',
-      promptName: template.title,
+      promptName: t.title,
       kind: 'custom',
-      periodicalId: template.id
+      periodicalId: t.id
     });
     assert.ok(newer.dispatchedAt.getTime() > older.dispatchedAt.getTime(), 'test setup sanity: newer must be strictly later than older');
 
@@ -771,7 +966,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     assert.equal(historyRows.length, 2);
     assert.equal(historyRows[0].dispatchedAt, older.dispatchedAt.toISOString(), 'sanity: archive order put the non-max row first in the read');
 
-    const [result] = foldPeriodicalRuns([template], { historyRows }, {
+    const [result] = foldPeriodicalRuns([t], { historyRows }, {
       now: newer.dispatchedAt.getTime() + 1000,
       historyTtlMs: store.historyTtl * 1000
     });

@@ -180,7 +180,12 @@ first act tells Autopilot to fetch `GET /api/proxy/periodicals` itself, ahead of
 digest, rather than embedding a computed cadence line in the prompt body. The three-level
 precedence above is exactly what shipped, stated explicitly in that same first-act text and
 declared to supersede the guide's own (unconditional, two-level) Orient-step wording for a
-general run.
+general run. **LIN-1932** split that state per repo — each template's response entry also
+carries a `repos[]` breakdown (one lane per observed repo, plus a default lane), so a
+multi-repo workspace no longer has one repo's run silently satisfy the cadence for every
+other repo. The top-level state stays an aggregate across a template's lanes, so "a
+periodical reading `due`" above means any lane reading `due` once a template has more than
+one.
 
 This sits right on invariant 1: "what's worth doing next" is normative-adjacent, so the
 precedence must be a **human-authored policy the autopilot executes**, not a judgment it
@@ -340,14 +345,17 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
   full body in context. Baking that same projection into the kickoff at dispatch is the
   remaining (now-trivial) step. See [`autopilot-kickoff.md`](./autopilot-kickoff.md).
 - **C. Periodicals cadence.** ✅ **shipped (LIN-1827/LIN-1829, sub-tickets of LIN-373 Approach
-  C).** The snapshot needs "code review last ran 14d ago" — shipped as **derived, never
-  persisted**: `foldPeriodicalRuns()` (`lib/periodical-runs.js`) is a pure fold over the live
-  dispatch **queue + history**, joined to the registry on a mint-time `periodicalId`, producing
-  each template's `due`/`recent`/`never`/`unknown` state. No separate cadence store, and no
-  derivation from `foreman/status` history, git log, or a periodical-tagged Linear search —
-  those were the pre-implementation guess; the actual source is the dispatch queue/history rows
-  Harbour already persists for every dispatch. That fold is published two ways: a consumer-proxy
-  reader via `GET /api/proxy/periodicals`, and a pointer in the kickoff's general-mode first act
+  C; per-repo lanes added by LIN-1932).** The snapshot needs "code review last ran 14d ago" —
+  shipped as **derived, never persisted**: `foldPeriodicalRuns()` (`lib/periodical-runs.js`) is
+  a pure fold over the live dispatch **queue + history**, joined to the registry on a mint-time
+  `periodicalId`, producing each template's `due`/`recent`/`never`/`unknown` state — now keyed
+  per `(periodicalId, repo)` lane, so a run against one repo no longer silently marks every
+  other repo's lane `recent` too; the top-level state stays an aggregate across a template's
+  lanes, unchanged in shape. No separate cadence store, and no derivation from `foreman/status`
+  history, git log, or a periodical-tagged Linear search — those were the pre-implementation
+  guess; the actual source is the dispatch queue/history rows Harbour already persists for every
+  dispatch. That fold (lanes included) is published two ways: a consumer-proxy reader via
+  `GET /api/proxy/periodicals`, and a pointer in the kickoff's general-mode first act
   (`lib/prompts/autopilot-kickoff.js`) that Autopilot fetches live as its own first orient
   action, ahead of the stack digest — full three-level precedence (goal → overdue periodical →
   top of stack), not the two-level goal-or-stack order the kickoff shipped with initially. The
