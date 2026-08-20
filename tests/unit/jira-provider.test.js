@@ -50,13 +50,6 @@ import { buildForest } from '../../lib/tree.js'
 
 const SITE = 'https://acme.atlassian.net'
 
-// LIN-2155: the tiered fetch's done tier is windowed to the last
-// DONE_RECENT_WINDOW_DAYS (7) days — a fixture standing in for "a real
-// completed issue that should still be fetched" needs a resolutiondate
-// within that window, computed relative to test run time rather than a
-// fixed historical literal that ages out of the window as time passes.
-const RECENT_RESOLUTION_DATE = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-
 // LIN-2018: ENG's real per-project statuses, seeded across TWO issue types on
 // purpose — 'Task' and 'Bug' each repeat status id '11' ('To Do') and '13'
 // ('Done'), so a dedup-by-id bug (vs. a correct implementation) is
@@ -129,7 +122,7 @@ function seededProvider() {
           project: { id: '10001', key: 'ENG', name: 'Engineering' },
           created: '2026-01-03T00:00:00.000Z',
           duedate: null,
-          resolutiondate: RECENT_RESOLUTION_DATE,
+          resolutiondate: '2026-01-04T00:00:00.000Z',
           labels: [],
           assignee: null,
           // Native one-level subtask parent — ENG-1 is a STORY, not an epic
@@ -1162,7 +1155,7 @@ describe('JiraProvider reads (fake client)', () => {
 
     const child = result.issues.find(i => i.identifier === 'ENG-2')
     assert.equal(child.state.type, 'completed')
-    assert.equal(child.completedAt, RECENT_RESOLUTION_DATE)
+    assert.equal(child.completedAt, '2026-01-04T00:00:00.000Z')
     // ENG-2's parent (ENG-1) is a story, not an epic — regression: the native
     // subtask mapping stays byte-identical, unaffected by LIN-2011.
     assert.deepEqual(child.parent, { id: '20001', identifier: 'ENG-1' })
@@ -1682,6 +1675,69 @@ describe('JiraProvider — tiered fetch (LIN-2155)', () => {
       assert.equal(result.truncated, true, `a truncated tier behind clause "${targetClause}" must still surface truncated: true`)
     }
   })
+
+  // LIN-2158 regression guard (a) — behavioural. The done tier used to be
+  // windowed to `resolutiondate >= -7d`, which silently excluded (1) Done
+  // issues resolved more than 7 days ago and (2) Done-category issues with
+  // no resolutiondate at all (status category and resolution are
+  // independent in Jira). Both classes must now be fetched. The ancient
+  // date is a FIXED literal, not `Date.now()`-relative — a relative date
+  // would silently re-acquire the exact drift this ticket exists to undo.
+  test('LIN-2158: an ancient-fixed-date Done issue and a null-resolutiondate Done issue are both fetched, truncated: false', async () => {
+    const client = createFakeJiraClient({
+      projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+      issues: [
+        {
+          id: '1', key: 'ENG-1',
+          fields: {
+            summary: 'Ancient done issue', description: null,
+            status: { statusCategory: { key: 'done' } },
+            project: { id: '10001', key: 'ENG', name: 'Engineering' },
+            created: '2020-01-01T00:00:00.000Z', duedate: null, resolutiondate: '2020-01-01T00:00:00.000Z',
+            labels: [], assignee: null, parent: null,
+          },
+        },
+        {
+          id: '2', key: 'ENG-2',
+          fields: {
+            summary: 'Done with no resolution date', description: null,
+            status: { statusCategory: { key: 'done' } },
+            project: { id: '10001', key: 'ENG', name: 'Engineering' },
+            created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+            labels: [], assignee: null, parent: null,
+          },
+        },
+      ],
+    })
+    const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+    const result = await provider.fetchProjects(scope)
+    const ancient = result.issues.find(i => i.identifier === 'ENG-1')
+    const nullResolution = result.issues.find(i => i.identifier === 'ENG-2')
+    assert.ok(ancient, 'a Done issue resolved years ago must still be fetched — the window that used to exclude it is gone')
+    assert.equal(ancient.state.type, 'completed')
+    assert.ok(nullResolution, 'a Done-category issue with no resolutiondate at all must be fetched — no predicate can exclude it')
+    assert.equal(nullResolution.state.type, 'completed')
+    assert.equal(result.truncated, false)
+  })
+
+  // LIN-2158 regression guard (b) — structural. (a) alone doesn't prove
+  // *why* it passes; (b) alone would pass a window re-added under a
+  // different field/mechanism. Both are required together.
+  test('LIN-2158: the done tier\'s emitted JQL carries no resolutiondate clause', async () => {
+    let doneJql = null
+    const stubClient = {
+      listAllProjects: async () => [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+      searchAllIssues: async jql => {
+        if (jql.includes('statusCategory = "Done"')) doneJql = jql
+        const empty = []; empty.truncated = false; return empty
+      },
+      listFields: async () => [],
+    }
+    const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
+    await provider.fetchProjects(scope)
+    assert.ok(doneJql, 'the done tier must have been queried')
+    assert.ok(!doneJql.includes('resolutiondate'), `done tier JQL must carry no resolutiondate clause, got: ${doneJql}`)
+  })
 })
 
 describe('fake-client.js — LIN-2155 JQL clause coverage', () => {
@@ -1693,7 +1749,7 @@ describe('fake-client.js — LIN-2155 JQL clause coverage', () => {
         { id: '2', key: 'ENG-2', fields: { project: { key: 'ENG' }, status: { statusCategory: { key: 'new' } }, updated: '2026-01-10T00:00:00.000Z', resolutiondate: null } },
         { id: '3', key: 'ENG-3', fields: { project: { key: 'ENG' }, status: { statusCategory: { key: 'new' } }, updated: '2026-01-01T00:00:00.000Z', resolutiondate: null } },
         { id: '4', key: 'ENG-4', fields: { project: { key: 'ENG' }, issuetype: EPIC_ISSUETYPE, status: { statusCategory: { key: 'done' } }, resolutiondate: null } },
-        { id: '5', key: 'ENG-5', fields: { project: { key: 'ENG' }, status: { statusCategory: { key: 'done' } }, resolutiondate: RECENT_RESOLUTION_DATE } },
+        { id: '5', key: 'ENG-5', fields: { project: { key: 'ENG' }, status: { statusCategory: { key: 'done' } } } },
         { id: '6', key: 'ENG-6', fields: { project: { key: 'ENG' }, status: { statusCategory: { key: 'done' } }, resolutiondate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() } },
       ],
     })
@@ -1707,11 +1763,6 @@ describe('fake-client.js — LIN-2155 JQL clause coverage', () => {
   test('issuetype = Epic matches only the epic issue', async () => {
     const out = await tieredClient().searchAllIssues('project in ("ENG") AND issuetype = Epic ORDER BY key ASC')
     assert.deepEqual(out.map(i => i.key), ['ENG-4'])
-  })
-
-  test('resolutiondate >= -7d matches only the recently-resolved done issue', async () => {
-    const out = await tieredClient().searchAllIssues('project in ("ENG") AND statusCategory = "Done" AND resolutiondate >= -7d ORDER BY key ASC')
-    assert.deepEqual(out.map(i => i.key), ['ENG-5'])
   })
 
   test('ORDER BY updated DESC, key ASC sorts newest-touched first', async () => {
