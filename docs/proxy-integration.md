@@ -863,9 +863,9 @@ decide for itself whether a periodical is due.
           "repo": null,
           "label": "none",
           "isDefault": true,
-          "state": "never",
-          "lastDispatchedAt": null,
-          "daysSince": null
+          "state": "due",
+          "lastDispatchedAt": "2026-07-10T10:00:00Z",
+          "daysSince": 24
         },
         {
           "repo": "repo-a",
@@ -909,7 +909,14 @@ decide for itself whether a periodical is due.
   (`null` means "whatever working directory the runner used" — it is a real, distinct lane,
   never "all repos" and never discarded). `"label"` is `"none"` for the default lane and the
   repo name otherwise. `"isDefault"` marks that lane. The default lane, when present, sorts
-  first; other repos follow in first-observed order. Each lane's own `"state"`/
+  first; other repos follow in first-observed order. The default lane is only present when
+  the endpoint has observed evidence for it — a run with no `repo` stamped. A template with
+  only repo-stamped evidence (every observed run named a repo) has **no** default lane at
+  all; `repos` above shows one because the example workspace also has an unstamped run in
+  the window. The one exception is the zero-evidence case: a template with no evidence for
+  any repo still gets a single synthesized default-lane entry (`state: "never"`, see below)
+  rather than an empty array — that lane never coexists with a real evidence-bearing lane in
+  the same response. Each lane's own `"state"`/
   `"lastDispatchedAt"`/`"daysSince"` follow exactly the same rules described above, evaluated
   against that lane's own evidence only. Only **observed** repos are enumerated — a repo that
   has never had a periodical dispatched against it is not listed as an empty lane (this

@@ -755,13 +755,15 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     assert.equal(row.status, 'taken');
   });
 
-  // LIN-1932 beat 1, B3: falsification probe. PERIODICAL_PROJECTION at HEAD
-  // does not yet include `repo: 1` — this is the deliberately-incomplete
-  // projection for THIS bug (no separate constant needed, since the
-  // production projection itself is what's missing the field). Proves the
-  // silent drop is real against the store's actual read path, and that it
-  // is projection-shaped, not a broken store: periodicalId/status (fields
-  // the projection DOES grant) keep reading correctly on the same row.
+  // LIN-1932 beat 1, B3: falsification probe. Originally written against a
+  // PERIODICAL_PROJECTION missing `repo: 1` — the deliberately-incomplete
+  // projection this bug was about (no separate constant needed, since the
+  // production projection itself was missing the field). Proved the silent
+  // drop was real against the store's actual read path, and that it was
+  // projection-shaped, not a broken store: periodicalId/status (fields the
+  // projection already granted) kept reading correctly on the same row.
+  // Now pins the fix: PERIODICAL_PROJECTION carries `repo: 1` (beat 2), so
+  // a repo-stamped row reads back correctly instead of silently dropping.
   test('LIN-1932 B3: a repo-stamped row reads back repo: null under PERIODICAL_PROJECTION (repo not yet projected), while periodicalId/status still read correctly', async () => {
     const store = freshStore();
     const created = await store.addItem(URL_KEY, {
@@ -776,9 +778,9 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     const { items } = await store.listHistory(URL_KEY, { projection: PERIODICAL_PROJECTION });
     assert.equal(items.length, 1);
     const [row] = items;
-    // This is the bug: PERIODICAL_PROJECTION at HEAD has no `repo: 1`, so a
-    // genuinely repo-stamped row silently reads back `repo: null` instead of
-    // 'repo-a'. Must fail until beat 2 adds `repo: 1` to the projection.
+    // This pins the fix: PERIODICAL_PROJECTION now carries `repo: 1` (beat 2),
+    // so a genuinely repo-stamped row reads back 'repo-a' instead of the
+    // pre-fix silent drop to `repo: null`.
     assert.equal(row.repo, 'repo-a');
     assert.equal(row.periodicalId, 'documentation-review');
     assert.equal(row.status, 'taken');
@@ -827,10 +829,10 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
 
     const [result] = foldPeriodicalRuns([t], { historyRows }, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
 
-    // Today (pre-re-key) the fold has no `repos` lane array at all — both
-    // rows key on template.id alone and collapse into the single top-level
-    // `runs: 2`. This must fail until beat 2 re-keys the fold's
-    // accumulators onto (periodicalId, repo).
+    // Pins the fold's re-key (beat 2): the two rows split into distinct
+    // `repos` lanes for repo-a and the default (null) lane, rather than
+    // collapsing into a single top-level `runs: 2` keyed on template.id
+    // alone.
     assert.ok(Array.isArray(result.repos), 'foldPeriodicalRuns must return a `repos` lane array per template');
     assert.equal(result.repos.length, 2, 'expected exactly two lanes: repo-a and the default null lane');
     const repoALane = result.repos.find(l => l.repo === 'repo-a');
