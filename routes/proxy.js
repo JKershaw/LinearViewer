@@ -4540,7 +4540,24 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
           cadence: r.cadence,
           state: r.state,
           lastDispatchedAt: r.lastDispatchedAt === null ? null : new Date(r.lastDispatchedAt).toISOString(),
-          daysSince: r.daysSince
+          daysSince: r.daysSince,
+          // Per-repo lanes (LIN-1932), additive: always emitted, never `[]`
+          // (the fold synthesizes a single default lane even with zero
+          // evidence). `runs` is deliberately withheld per lane, mirroring
+          // this route's existing top-level withholding above — not a new
+          // precedent. `label` is computed here, not in the fold: the fold
+          // stays network-free, and this route makes zero provider calls,
+          // so it cannot resolve a repo's display name via knownWorkspaceRepos
+          // — 'none' reuses that helper's own default-lane label string for
+          // vocabulary consistency without importing it.
+          repos: r.repos.map(lane => ({
+            repo: lane.repo,
+            label: lane.repo === null ? 'none' : lane.repo,
+            isDefault: lane.isDefault,
+            state: lane.state,
+            lastDispatchedAt: lane.lastDispatchedAt === null ? null : new Date(lane.lastDispatchedAt).toISOString(),
+            daysSince: lane.daysSince
+          }))
         }))
       });
     } catch (err) {
