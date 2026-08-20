@@ -5,18 +5,20 @@
 > ratified **legs**, produced by a [Passage Planner](./passage-planner-prompt.md) session) into
 > dispatched work. It is deliberately thin: most of what it needs already exists as the
 > issue-scoped autopilot kickoff ("autopilot until THIS task is done") pointed at the passage
-> task, whose own description *is* the plan. This document is a design artifact today, hand-run
-> and copy-pasted — there is no generator, route, or page yet, and no new dispatch kind.
-> *(Tracking: `LIN-1812`, sibling of the Passage Planner under the `LIN-1809` umbrella.)*
+> task, whose own description *is* the plan. It is a design artifact today, hand-run and
+> copy-pasted; a generator ([`passage-runner-kickoff.js`](../lib/prompts/passage-runner-kickoff.js))
+> and endpoint (`GET /api/proxy/passage-runner/prompt`, served from
+> [`routes/proxy.js`](../routes/proxy.js)) now serve this file — there is still no new dispatch
+> kind. *(Tracking: `LIN-1812`, sibling of the Passage Planner under the `LIN-1809` umbrella.)*
 >
-> **v0 is doc-only, by design.** The Passage Planner prompt shipped two doc-only revisions
-> (`LIN-1841` v0, `LIN-1850` v0.1) before its generator + route + page landed together in one
-> commit (`LIN-1849`), once the doc's content had stabilized against real use. This document
-> follows the same order: prove the prompt text against a real flown voyage first: a
-> `lib/prompts/` generator and its consumer route/page are a later, separate session, not this
-> one. Shipping a generator now, with no route/page consumer yet, would leave it importable only
-> by its own test — an inert file with no real caller — so it stays deferred until a consumer is
-> ready to land beside it in the same commit, exactly as the planner's did.
+> **This revision lands the deferred code surface.** `LIN-1812` shipped this document doc-only,
+> deferring its generator until a consumer was ready to land beside it in the same commit — the
+> same order the Passage Planner followed (two doc-only revisions, `LIN-1841` v0 and `LIN-1850`
+> v0.1, before generator + route + page landed together in `LIN-1849`). Proving prompt text
+> against a real flown voyage, not just against the served endpoint, still comes first for
+> content that hasn't had that flight yet — `LIN-2157`'s five findings, surfaced on the
+> acceptance voyage (`LIN-1869`), are body-prose fixes landing on their own schedule, separate
+> from this commit.
 >
 > **Source-of-truth contract inherited from the planner's v0.2 amendment.** A passage task's
 > `### Leg:` blocks are its own description's authoritative structure for a leg's five
@@ -35,8 +37,10 @@
 > **This document is the design artifact; a later `lib/prompts/` lift is the graduation path**,
 > the same way [`buildPassagePlannerKickoff()`](../lib/prompts/passage-planner-kickoff.js) reads
 > `docs/passage-planner-prompt.md` at HEAD via `readFileSync`, cut at the first `^---$` divider
-> below. A future `buildPassageRunnerKickoff()` would read this file the same way, at HEAD, with
-> no hand-sync step — but that generator does not exist yet (see above).
+> below. The generator that now exists —
+> [`buildPassageRunnerKickoff()`](../lib/prompts/passage-runner-kickoff.js) — reads this file the
+> same way, at HEAD, with no hand-sync step: the served prompt is always this file's current
+> body.
 
 ---
 
@@ -59,10 +63,11 @@ hierarchy, in order, hard rule:
    `related` relations only — never `blocks`/`blocked-by` (those assert ordering, not
    membership). Relations carry no label, so the leg↔anchor *mapping* lives only in the
    description text above; a relation alone never tells you which leg it belongs to.
-3. **`GET /north-star`.** Branch on the four-way `state` enum (`fresh | stale | absent |
-   unscored`) — never null-check beside it. Treat divergence between the passage's original
-   framing and a fresher north-star read as information to surface, not disobedience to correct
-   for silently.
+3. **`GET /north-star`.** It has no top-level `state` — two sibling four-way enums,
+   `reading.state` and `roadmap.state`, each always one of `fresh | stale | absent |
+   unscored`. Branch on each state, never null-check beside it. Treat divergence between the
+   passage's original framing and a fresher north-star read as information to surface, not
+   disobedience to correct for silently.
 4. **Comments — the voyage log.** The durable record of every plan revision, leg wind-down, and
    material deviation since the passage was ratified. Read it before assuming today is the
    passage's first flown cycle.
@@ -153,9 +158,13 @@ make each hand-back answerable without the human scrolling back for context.
 ## Step 7 — Wind down, and land
 
 Honor each leg's own named `Wind down if` triggers as a valid, early, *good* stopping point — cite
-the trigger text **verbatim from the leg block**, never a paraphrase. Treat a `409
-BUDGET_EXHAUSTED` on a leg-child dispatch as an orderly finish, never an error — wind down any
-other in-flight work and report where the voyage stands.
+the trigger text **verbatim from the leg block**, never a paraphrase. A leg-child dispatch's `409`
+is not one condition: `BUDGET_EXHAUSTED`, `DUPLICATE_DISPATCH`, and the trashed-issue refusal all
+share the status, so branch on the response's `code`, never on the status alone. Treat a `409
+BUDGET_EXHAUSTED` as an orderly finish, never an error — wind down any other in-flight work and
+report where the voyage stands. Treat a `409 DUPLICATE_DISPATCH` the way the proxy's own guidance
+does: adopt the refusal's `id` and watch that live dispatch instead of treating it as a failure or
+re-dispatching.
 
 On making port (or on winding down), post a **landing report** as a comment on the passage task,
 covering:

@@ -1156,6 +1156,14 @@ GET /api/proxy/autopilot/manual
 
 Returns the **Autopilot operating manual** (the "handbook") as **plain text** (`text/plain`) — the portable senior-lead disposition that sits beside the kickoff's mechanics. The kickoff composes this same text inline, so this endpoint is for re-reading a part mid-run (and for humans or other consumers). `read`-scope is sufficient.
 
+#### Passage Runner Prompt
+
+```
+GET /api/proxy/passage-runner/prompt
+```
+
+Returns the **Passage Runner kickoff prompt** as **plain text** (`text/plain`) — the pasteable body of `docs/passage-runner-prompt.md` (preamble stripped). This is the same text a fresh Passage Runner session starts from; fetch here to re-read a part mid-run. `read`-scope is sufficient.
+
 ### Write Endpoints
 
 All write endpoints require a `readWrite` scoped token. Read-only tokens receive `403`.

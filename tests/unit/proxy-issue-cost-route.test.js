@@ -14,6 +14,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes, LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
+import { LlmCallLogStore } from '../../lib/llm-call-log.js';
 
 const T1 = '2026-08-01T10:00:00.000Z';
 
@@ -229,13 +230,21 @@ describe('GET /api/proxy/issues/:identifier/cost — store wiring', () => {
 
 describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
   test('end-to-end: worker + app costs joined, fully priced', async () => {
-    const llmCallLogStore = {
-      summarizeByIssue: async (urlKey, identifier) => {
-        assert.equal(urlKey, 'acme');
-        assert.equal(identifier, 'LIN-42');
-        return { calls: 2, costUsd: 0.05, unpricedCalls: 0, byFeature: [{ feature: 'recommend', calls: 2, costUsd: 0.05 }] };
-      },
-      ttl: 30 * 24 * 60 * 60
+    // Value pin: a real LlmCallLogStore built at its real default (no injected
+    // ttl) must actually carry .ttl === 30 days — not a hand-rolled object that
+    // hardcodes the very number this test asserts. summarizeByIssue is stubbed
+    // because a bare construction leaves this.collection undefined.
+    const llmCallLogStore = new LlmCallLogStore();
+    // Falsy-default guard: routes/proxy.js falls back to `|| 30 * 24 * 60 *
+    // 60` when store.ttl is falsy (e.g. 0), which would silently restore
+    // days: 30 and keep the value pin below green even if the real default
+    // were changed to a falsy value. Pin the real default's ttl directly so
+    // that drift goes red too.
+    assert.equal(llmCallLogStore.ttl, 30 * 24 * 60 * 60);
+    llmCallLogStore.summarizeByIssue = async (urlKey, identifier) => {
+      assert.equal(urlKey, 'acme');
+      assert.equal(identifier, 'LIN-42');
+      return { calls: 2, costUsd: 0.05, unpricedCalls: 0, byFeature: [{ feature: 'recommend', calls: 2, costUsd: 0.05 }] };
     };
     const { app } = buildApp({ history: [row()], llmCallLogStore });
     const { status, body } = await get(app, '/api/proxy/issues/LIN-42/cost');
@@ -253,6 +262,16 @@ describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
     assert.equal(body.appCalls.costUsd, 0.05);
     assert.equal(body.window.days, 30);
     assert.ok(body.window.appCallsSince);
+
+    // Wiring pin: window.days must come from store.ttl, not a hardcoded 30 —
+    // a real default store alone can't prove this (its .ttl IS 30, same as the
+    // route's own fallback literal), so this uses a SECOND store built with a
+    // deliberately non-default ttl.
+    const wiringStore = new LlmCallLogStore({ ttl: 90 * 24 * 60 * 60 });
+    wiringStore.summarizeByIssue = async () => ({ calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] });
+    const { app: wiringApp } = buildApp({ history: [row()], llmCallLogStore: wiringStore });
+    const { body: wiringBody } = await get(wiringApp, '/api/proxy/issues/LIN-42/cost');
+    assert.equal(wiringBody.window.days, 90);
   });
 
   test('missing llmCallLogStore degrades to an empty app-call summary, never a 500', async () => {
