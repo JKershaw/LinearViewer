@@ -63,13 +63,8 @@ import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
-import { getProvider, getProviderForWorkspace, getAllProviders } from './lib/providers/registry.js'
+import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } from './lib/providers/index.js' // barrel: owns the five self-registering provider imports (LIN-2010)
 import { NotImplementedError } from './lib/providers/interface.js'
-import './lib/providers/linear/index.js' // side effect: self-registers the Linear provider into the registry
-import { localProvider } from './lib/providers/local/index.js' // side effect: self-registers the Local provider; store injected below
-import './lib/providers/github/index.js' // side effect: self-registers the GitHub provider so its OAuth router mounts (LIN-541)
-import './lib/providers/github-projects/index.js' // side effect: self-registers the GitHub Projects v2 provider (LIN-560)
-import './lib/providers/jira/index.js' // side effect: self-registers the Jira provider so its API-token auth router mounts (LIN-1885 Phase 1)
 import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID } from './lib/tree.js'
 import { isHiddenState } from './lib/providers/state-map.js'
@@ -78,7 +73,6 @@ import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { isAuthError, clientErrorStatus, clientErrorMessage, serviceUnavailable } from './lib/errors.js'
 import { renderLandingPage } from './lib/render-landing.js'
-import { isGitHubConfigured } from './lib/providers/github/app-auth.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
 import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, normalizeProvider, matchTeamId, isPersistableTeamRef } from './lib/workspace.js'
@@ -946,6 +940,9 @@ app.use((req, res, next) => {
 // Providers that don't implement getAuthRouter (the base throws
 // NotImplementedError) are skipped — so today, with only Linear providing one,
 // this mounts exactly the Linear OAuth router as before (behaviour-identical).
+// LIN-2010: the barrel moved `local` from 2nd to last in registration order;
+// inert here — `local` implements no getAuthRouter (skipped via NotImplementedError)
+// and the relative order of `github`/`github-projects`/`jira` (the three that do) is unchanged.
 for (const provider of getAllProviders()) {
   let authRouter
   try {
@@ -1182,7 +1179,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
   return new Promise((resolve) => {
     session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      const html = renderLandingPage({ deployInfo, githubEnabled: isGitHubConfigured(), jiraEnabled: isJiraOAuthConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY });
+      const html = renderLandingPage({ deployInfo, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY });
       res.send(html);
       resolve();
     });
@@ -1487,7 +1484,7 @@ app.get('/', (req, res) => {
   const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
 
   // Unauthenticated users see the bespoke Harbour showcase landing (LIN-980).
-  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: isGitHubConfigured(), jiraEnabled: isJiraOAuthConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY })
+  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY })
   res.send(html)
 })
 
@@ -2698,8 +2695,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     // Gate the GitHub add affordance on the SAME shared predicate the /auth/github
     // route guard and landing hero use (LIN-761), so the settings page never offers
     // an add that would 503/hang on a server where GitHub isn't fully configured.
-    githubEnabled: isGitHubConfigured(),
-    jiraOAuthEnabled: isJiraOAuthConfigured()
+    githubEnabled: getProvider('github').entryCta.isConfigured(),
+    jiraOAuthEnabled: getProvider('jira').entryCta.isConfigured()
   });
   res.send(html);
 });

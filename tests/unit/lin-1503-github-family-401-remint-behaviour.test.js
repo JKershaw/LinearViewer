@@ -176,14 +176,15 @@ async function runGitHubFamilyBranch({
     evictWorkspaceToken: () => {},
     getDeployInfo: () => ({}),
     renderLandingPage: () => '<landing/>',
-    isGitHubConfigured: () => true,
-    // LIN-1890: this harness evals REAL server.js source, so every free
+    // LIN-2010: this harness evals REAL server.js source, so every free
     // identifier that source references must be declared here. The landing
-    // render inside handleWorkspaceRemoval now gates a Jira CTA on this
-    // predicate; without the binding the slice throws ReferenceError mid-removal
-    // and the preservation assertions fail for a reason unrelated to what they
-    // test.
-    isJiraOAuthConfigured: () => true,
+    // render inside handleWorkspaceRemoval now reads GitHub/Jira configured-ness
+    // through the provider registry (`getProvider(name).entryCta.isConfigured()`)
+    // rather than the standalone isGitHubConfigured()/isJiraOAuthConfigured()
+    // predicates this stub used to fake directly; without this binding the slice
+    // throws ReferenceError mid-removal and the preservation assertions fail for
+    // a reason unrelated to what they test.
+    getProvider: () => ({ entryCta: { isConfigured: () => true } }),
     process: { env: {} },
     console: { log() {}, error() {} }
   });
