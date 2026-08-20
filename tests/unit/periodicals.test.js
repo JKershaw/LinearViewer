@@ -18,7 +18,7 @@ describe('periodicals registry', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
-    // id -> [title, mode]. The code-surface / supply-chain / interface /
+    // id -> [title, mode, scope]. The code-surface / supply-chain / interface /
     // performance / data / onboarding reviews are 'corrective' (they mint
     // fix-tasks); the Stability Review (LIN-453), the Recent Headwinds report
     // (LIN-542), and Integration & Surface Maturity (LIN-1336) are the three
@@ -28,30 +28,35 @@ describe('periodicals registry', () => {
     // advisory tail: each mints fix-tasks for objective breakage only. The
     // Performance / Scale Review (LIN-1038) is corrective at the measured-symptom
     // altitude; the Data & Fetch Architecture review (LIN-1039) is corrective at
-    // the static-cause altitude behind it.
+    // the static-cause altitude behind it. `scope` (LIN-1934) is classified from
+    // each prompt's own grounding evidence, independent of `mode`: Recent Headwinds
+    // is the sole 'workspace' entry (it reads this workspace's own tracker/roadmap/
+    // delivery history); every other entry, including the other two advisory ones
+    // (Stability Review, Integration & Surface Maturity), is 'repo'.
     const expected = {
-      'documentation-review': ['Documentation Review', 'corrective'],
-      'test-coverage-gap': ['Test Coverage Gap Review', 'corrective'],
-      'security-review': ['Security Review', 'corrective'],
-      'api-quality': ['API Quality Review', 'corrective'],
-      'code-quality': ['Code Quality Review', 'corrective'],
-      'drift-coherence': ['Drift & Coherence Review', 'corrective'],
-      'comprehension-debt': ['Comprehension-Debt Review', 'corrective'],
-      'stability-review': ['Stability Review', 'advisory'],
-      'dependency-supply-chain': ['Dependency & Supply-Chain Review', 'corrective'],
-      'recent-headwinds': ['Recent Headwinds', 'advisory'],
-      'design-review': ['Design & Interface Review', 'corrective'],
-      'performance-scale': ['Performance / Scale Review', 'corrective'],
-      'data-fetch-architecture': ['Data & Fetch Architecture', 'corrective'],
-      'integration-surface-maturity': ['Integration & Surface Maturity', 'advisory'],
-      'onboarding-journey': ['Onboarding & Cold-Start Review', 'corrective']
+      'documentation-review': ['Documentation Review', 'corrective', 'repo'],
+      'test-coverage-gap': ['Test Coverage Gap Review', 'corrective', 'repo'],
+      'security-review': ['Security Review', 'corrective', 'repo'],
+      'api-quality': ['API Quality Review', 'corrective', 'repo'],
+      'code-quality': ['Code Quality Review', 'corrective', 'repo'],
+      'drift-coherence': ['Drift & Coherence Review', 'corrective', 'repo'],
+      'comprehension-debt': ['Comprehension-Debt Review', 'corrective', 'repo'],
+      'stability-review': ['Stability Review', 'advisory', 'repo'],
+      'dependency-supply-chain': ['Dependency & Supply-Chain Review', 'corrective', 'repo'],
+      'recent-headwinds': ['Recent Headwinds', 'advisory', 'workspace'],
+      'design-review': ['Design & Interface Review', 'corrective', 'repo'],
+      'performance-scale': ['Performance / Scale Review', 'corrective', 'repo'],
+      'data-fetch-architecture': ['Data & Fetch Architecture', 'corrective', 'repo'],
+      'integration-surface-maturity': ['Integration & Surface Maturity', 'advisory', 'repo'],
+      'onboarding-journey': ['Onboarding & Cold-Start Review', 'corrective', 'repo']
     };
 
-    for (const [id, [title, mode]] of Object.entries(expected)) {
+    for (const [id, [title, mode, scope]] of Object.entries(expected)) {
       const t = byId[id];
       assert.ok(t, `has ${id} entry`);
       assert.strictEqual(t.title, title);
       assert.strictEqual(t.mode, mode);
+      assert.strictEqual(t.scope, scope);
       assert.strictEqual(typeof t.generatePrompt, 'function');
     }
   });
@@ -64,12 +69,13 @@ describe('periodicals registry', () => {
     assert.ok(!ids.has('prompt-injection-review'), 'prompt-injection-review folded into security-review');
   });
 
-  test('every template carries the full shape, incl. mode/cadence', () => {
+  test('every template carries the full shape, incl. mode/scope/cadence', () => {
     for (const t of PERIODICALS) {
       assert.ok(typeof t.id === 'string' && t.id.length > 0);
       assert.ok(typeof t.title === 'string' && t.title.length > 0);
       assert.ok(['corrective', 'advisory'].includes(t.mode));
-      // Carried even though nothing consumes it yet.
+      assert.ok(['repo', 'workspace'].includes(t.scope));
+      // Consumed by foldPeriodicalRuns and republished at GET /api/proxy/periodicals.
       assert.ok('cadence' in t);
       assert.strictEqual(typeof t.generatePrompt, 'function');
     }
