@@ -63,13 +63,8 @@ import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
-import { getProvider, getProviderForWorkspace, getAllProviders } from './lib/providers/registry.js'
+import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } from './lib/providers/index.js' // barrel: owns the five self-registering provider imports (LIN-2010)
 import { NotImplementedError } from './lib/providers/interface.js'
-import './lib/providers/linear/index.js' // side effect: self-registers the Linear provider into the registry
-import { localProvider } from './lib/providers/local/index.js' // side effect: self-registers the Local provider; store injected below
-import './lib/providers/github/index.js' // side effect: self-registers the GitHub provider so its OAuth router mounts (LIN-541)
-import './lib/providers/github-projects/index.js' // side effect: self-registers the GitHub Projects v2 provider (LIN-560)
-import './lib/providers/jira/index.js' // side effect: self-registers the Jira provider so its API-token auth router mounts (LIN-1885 Phase 1)
 import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID } from './lib/tree.js'
 import { isHiddenState } from './lib/providers/state-map.js'
@@ -946,6 +941,9 @@ app.use((req, res, next) => {
 // Providers that don't implement getAuthRouter (the base throws
 // NotImplementedError) are skipped — so today, with only Linear providing one,
 // this mounts exactly the Linear OAuth router as before (behaviour-identical).
+// LIN-2010: the barrel moved `local` from 2nd to last in registration order;
+// inert here — `local` implements no getAuthRouter (skipped via NotImplementedError)
+// and the relative order of `github`/`github-projects`/`jira` (the three that do) is unchanged.
 for (const provider of getAllProviders()) {
   let authRouter
   try {
