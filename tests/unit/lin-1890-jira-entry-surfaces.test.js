@@ -20,20 +20,45 @@
  */
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 
 import { renderLandingHero } from '../../lib/components/landing-hero.js';
 import { renderLandingPage } from '../../lib/render-landing.js';
 import { renderNavBar } from '../../lib/components/navbar.js';
 import { renderLoginPage } from '../../lib/render-pages.js';
+import { renderSettingsPage } from '../../lib/render-settings.js';
+import { isGitHubConfigured } from '../../lib/providers/github/app-auth.js';
 
-const ENV_KEYS = ['JIRA_CLIENT_ID', 'JIRA_CLIENT_SECRET', 'JIRA_REDIRECT_URI'];
+const JIRA_ENV_KEYS = ['JIRA_CLIENT_ID', 'JIRA_CLIENT_SECRET', 'JIRA_REDIRECT_URI'];
+// LIN-2010 step 9: the five GITHUB_* vars isGitHubConfigured() needs
+// (GITHUB_REQUIRED_ENV, lib/providers/github/app-auth.js) — extended into the
+// same save/restore ENV_KEYS list below so a GitHub case in this file can
+// never leak env into a later Jira case or another test file.
+const GITHUB_ENV_KEYS = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG'];
+const ENV_KEYS = [...JIRA_ENV_KEYS, ...GITHUB_ENV_KEYS];
 let saved;
 const configureJira = () => {
   process.env.JIRA_CLIENT_ID = 'client-id-1';
   process.env.JIRA_CLIENT_SECRET = 'secret-1';
   process.env.JIRA_REDIRECT_URI = 'https://harbour.example/auth/jira/oauth/callback';
 };
-const unconfigureJira = () => { for (const k of ENV_KEYS) delete process.env[k]; };
+const unconfigureJira = () => { for (const k of JIRA_ENV_KEYS) delete process.env[k]; };
+
+// A genuinely PEM-shaped ephemeral key (never written to disk) so the
+// "configured" GitHub case exercises the real `assertPemShape` pass branch,
+// not just an unset var — mirroring tests/unit/github-app-auth.test.js's own
+// fixture rather than re-deriving PEM validity rules here.
+const { privateKey: VALID_GITHUB_PEM } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+const VALID_GITHUB_PEM_STR = VALID_GITHUB_PEM.export({ type: 'pkcs1', format: 'pem' });
+
+const configureGithub = ({ privateKey = VALID_GITHUB_PEM_STR } = {}) => {
+  process.env.GITHUB_CLIENT_ID = 'gh-client-id-1';
+  process.env.GITHUB_CLIENT_SECRET = 'gh-secret-1';
+  process.env.GITHUB_APP_ID = '123456';
+  process.env.GITHUB_APP_PRIVATE_KEY = privateKey;
+  process.env.GITHUB_APP_SLUG = 'harbour-test';
+};
+const unconfigureGithub = () => { for (const k of GITHUB_ENV_KEYS) delete process.env[k]; };
 
 beforeEach(() => { saved = Object.fromEntries(ENV_KEYS.map(k => [k, process.env[k]])); });
 afterEach(() => { for (const k of ENV_KEYS) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } });
@@ -162,5 +187,125 @@ describe('LIN-1890 E5 — renderLoginPage (dead in production, consistency only)
     assert.ok(html.includes('href="/auth/linear"'));
     assert.ok(html.includes('data-testid="login-github"'));
     assert.ok(html.includes('local-workspace-cta'));
+  });
+});
+
+// =============================================================================
+// LIN-2010 step 9 — GitHub two-sided gating coverage
+// =============================================================================
+//
+// Mirrors the Jira E3/E4/E5 pattern above, for GitHub, at the render layer.
+// Acceptance #4 narrowed the GitHub CTA gate from "one env var present" to
+// `isGitHubConfigured()` — all five GITHUB_* vars present AND a structurally
+// PEM-valid private key (LIN-2081) — and nothing at the render layer proved
+// the narrowing before this file. The three surfaces resolve the predicate
+// differently (LIN-1890 E4 / LIN-2010 N1): navbar.js calls the registry
+// directly (no threading path), while landing-hero.js and renderLoginPage
+// take a `githubEnabled` boolean — renderLoginPage's DEFAULT parameter now
+// reads the predicate (N1), so its zero-arg call exercises the live path.
+
+const GITHUB_ENTRY_HREF = '/auth/github';
+
+describe('LIN-2010 step 9 — the landing hero (mirrors Jira E3)', () => {
+  test('offers the GitHub CTA when GitHub is configured', () => {
+    configureGithub();
+    const html = renderLandingHero({ githubEnabled: isGitHubConfigured() });
+    assert.ok(html.includes(`href="${GITHUB_ENTRY_HREF}"`));
+    assert.ok(html.includes('data-testid="landing-cta-github"'));
+    assert.match(html, /Continue with GitHub/);
+  });
+
+  test('omits it entirely when unconfigured — never a dead link into a 503', () => {
+    unconfigureGithub();
+    const html = renderLandingHero({ githubEnabled: isGitHubConfigured() });
+    assert.ok(!html.includes('/auth/github'), 'no GitHub link of any shape');
+    assert.ok(!html.includes('landing-cta-github'));
+  });
+});
+
+describe('LIN-2010 step 9 — the landing nav bar (mirrors Jira E4)', () => {
+  test('offers the GitHub CTA when configured, reading the provider predicate directly', () => {
+    configureGithub();
+    const html = renderNavBar({ isLanding: true });
+    assert.ok(html.includes(`href="${GITHUB_ENTRY_HREF}"`));
+    assert.ok(html.includes('data-testid="nav-login-github"'));
+  });
+
+  test('omits it when unconfigured — the honest-degradation half of the gate', () => {
+    unconfigureGithub();
+    const html = renderNavBar({ isLanding: true });
+    assert.ok(!html.includes('/auth/github'));
+    assert.ok(!html.includes('nav-login-github'));
+  });
+
+  test('a partial config (one var only) must not render the CTA', () => {
+    unconfigureGithub();
+    process.env.GITHUB_CLIENT_ID = 'gh-client-id-1';
+    assert.ok(!renderNavBar({ isLanding: true }).includes('/auth/github'),
+      'a half-configured server must not promise a GitHub sign-in');
+  });
+});
+
+describe('LIN-2010 step 9 — renderLoginPage (mirrors Jira E5; N1: default param reads the predicate)', () => {
+  test('offers the GitHub CTA when configured', () => {
+    configureGithub();
+    const html = renderLoginPage();
+    assert.ok(html.includes(`href="${GITHUB_ENTRY_HREF}"`));
+    assert.ok(html.includes('data-testid="login-github"'));
+  });
+
+  test('omits it when unconfigured', () => {
+    unconfigureGithub();
+    assert.ok(!renderLoginPage().includes('/auth/github'));
+  });
+});
+
+describe('LIN-2010 step 9 (F2) — present-but-malformed GITHUB_APP_PRIVATE_KEY', () => {
+  // All five GITHUB_* vars present (so the "missing var" branch cannot fire),
+  // but the key itself is non-empty and NOT PEM-shaped — the half of the
+  // tightened gate acceptance #4 promises that nothing at the render layer
+  // exercised before this. `isGitHubConfigured()` must read false, and the
+  // CTA must be absent on all three surfaces, exactly as if the var were unset.
+  test('the CTA is absent on the hero, navbar, and login — all three surfaces', () => {
+    configureGithub({ privateKey: 'not-a-real-key' });
+    assert.equal(isGitHubConfigured(), false, 'sanity: a malformed key must not read as configured');
+
+    const heroHtml = renderLandingHero({ githubEnabled: isGitHubConfigured() });
+    assert.ok(!heroHtml.includes('/auth/github'), 'hero: no GitHub link of any shape');
+    assert.ok(!heroHtml.includes('landing-cta-github'));
+
+    const navHtml = renderNavBar({ isLanding: true });
+    assert.ok(!navHtml.includes('/auth/github'), 'navbar: no GitHub link of any shape');
+    assert.ok(!navHtml.includes('nav-login-github'));
+
+    const loginHtml = renderLoginPage();
+    assert.ok(!loginHtml.includes('/auth/github'), 'login: no GitHub link of any shape');
+    assert.ok(!loginHtml.includes('login-github'));
+  });
+});
+
+describe('LIN-2010 step 9 — Settings add-row gate (F1, unit-level proof ahead of e2e)', () => {
+  // renderSettingsPage's `githubEnabled` stays a THREADED parameter (LIN-2010
+  // beat 3's step-5 correction) — server.js resolves it from the registry via
+  // `getProvider('github').entryCta.isConfigured()` at the composition root, so
+  // exercising the real unconfigured path here means passing that same value in,
+  // not relying on the render function to read process.env for us.
+  const settingsHtml = (githubEnabled) => renderSettingsPage('Acme', { urlKey: 'acme', workspaces: [], currentModel: 'x', availableModels: [], githubEnabled });
+
+  test('local never appears in the add-row set', () => {
+    assert.ok(!settingsHtml(true).includes('data-testid="settings-provider-add-local"'));
+  });
+
+  test('an unconfigured server blocks BOTH github and github-projects rows — exact class/copy tests/e2e/settings-providers.spec.js pins', () => {
+    unconfigureGithub();
+    const html = settingsHtml(isGitHubConfigured());
+
+    const githubRowMatch = html.match(/<div class="line provider-add-blocked" data-testid="settings-provider-add-github"[^]*?<\/div>/);
+    assert.ok(githubRowMatch, 'expected a blocked github row');
+    assert.match(githubRowMatch[0], /not configured on this server/);
+
+    const projectsRowMatch = html.match(/<div class="line provider-add-blocked" data-testid="settings-provider-add-github-projects"[^]*?<\/div>/);
+    assert.ok(projectsRowMatch, 'expected a blocked github-projects row');
+    assert.match(projectsRowMatch[0], /not configured on this server/);
   });
 });
