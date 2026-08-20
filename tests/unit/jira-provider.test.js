@@ -35,6 +35,9 @@ import {
   adfHasUnrenderableContent,
   isEpicParent,
   JIRA_ISSUE_FIELDS,
+  CANONICAL_TYPE_TO_JIRA_STATUS_CATEGORY,
+  jiraReachableTierOrder,
+  JiraInProgressCapExceededError,
 } from '../../lib/providers/jira/index.js'
 import { RefResolutionError } from '../../lib/proxy-ref-resolver.js'
 import { PartialWriteError } from '../../lib/partial-write-error.js'
@@ -1221,8 +1224,17 @@ describe('JiraProvider reads (fake client)', () => {
     assert.deepEqual(result.issues.map(i => i.identifier).sort(), ['ENG-1', 'OPS-1'])
   })
 
-  test('fetchProjects(scope, teamId) preserves the truncated flag (LIN-2006) on the SCOPED branch too', async () => {
-    const cappedIssues = [{
+  // LIN-2155: `_epicsForProjects` now issues UP TO FOUR distinct JQL calls
+  // (in-progress, to-do, done, epics) rather than one — a stub that ignores
+  // the `jql` argument and returns the same capped array unconditionally
+  // would (a) make the in-progress tier see `.truncated: true` and throw
+  // `JiraInProgressCapExceededError` (D7: an in-progress cap hit is
+  // failure-level, not ordinary truncation) instead of exercising the
+  // LOWER-tier truncation path this test means to cover, and (b) collapse
+  // the four tiers' worth of "different JQL, different fixture" down to one
+  // coincidentally-passing assertion. Routes explicitly by JQL instead.
+  test('fetchProjects(scope, teamId) preserves the truncated flag (LIN-2006) on the SCOPED branch too — a LOWER tier (to-do) hitting its cap', async () => {
+    const cappedTodoIssues = [{
       id: '1', key: 'ENG-1',
       fields: {
         summary: 'x', description: null, status: { statusCategory: { key: 'new' } },
@@ -1230,16 +1242,22 @@ describe('JiraProvider reads (fake client)', () => {
         created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null, labels: [], assignee: null, parent: null,
       },
     }]
-    cappedIssues.truncated = true
+    cappedTodoIssues.truncated = true
     const stubClient = {
       getProject: async () => ({ id: '10001', key: 'ENG', name: 'Engineering' }),
-      searchAllIssues: async () => cappedIssues,
+      searchAllIssues: async jql => {
+        if (jql.includes('statusCategory = "To Do"')) return cappedTodoIssues
+        const empty = []
+        empty.truncated = false
+        return empty
+      },
       listFields: async () => [],
     }
     const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
     const result = await provider.fetchProjects(scope, 'ENG')
-    assert.equal(result.truncated, true)
+    assert.equal(result.truncated, true, 'a lower-tier (to-do) cap hit sets truncated: true, D7\'s "render partial" case')
+    assert.equal(result.issues.length, 1, 'the in-progress guarantee still succeeded — the to-do issue rendered, not discarded')
   })
 
   test('fetchProjects reports truncated: false by default (LIN-2006)', async () => {
@@ -1248,11 +1266,16 @@ describe('JiraProvider reads (fake client)', () => {
     assert.equal(result.truncated, false, 'the shared fake client never sets .truncated, so the untruncated path must coerce to false, not undefined')
   })
 
+  // LIN-2155: routes by JQL (see the SCOPED-branch test above for why an
+  // unconditional stub would false-pass this via the in-progress tier's
+  // fail-whole path instead of the lower-tier truncation path it means to
+  // cover) — this variant hits the cap on the unscoped (listAllProjects)
+  // branch, mirroring the pre-LIN-2155 test's coverage of that branch.
   test('fetchProjects surfaces truncated: true when the client hit its search cap (LIN-2006)', async () => {
     // A dedicated stub, not the shared fake client (which never sets .truncated) —
     // mirrors the shape client.js's real searchAllIssues produces on a capped walk:
     // an array with a `.truncated` property attached.
-    const cappedIssues = [
+    const cappedTodoIssues = [
       {
         id: '20001',
         key: 'ENG-1',
@@ -1270,10 +1293,15 @@ describe('JiraProvider reads (fake client)', () => {
         },
       },
     ]
-    cappedIssues.truncated = true
+    cappedTodoIssues.truncated = true
     const stubClient = {
       listAllProjects: async () => [{ id: '10001', key: 'ENG', name: 'Engineering' }],
-      searchAllIssues: async () => cappedIssues,
+      searchAllIssues: async jql => {
+        if (jql.includes('statusCategory = "To Do"')) return cappedTodoIssues
+        const empty = []
+        empty.truncated = false
+        return empty
+      },
       listFields: async () => [],
     }
     const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
@@ -1428,6 +1456,334 @@ describe('JiraProvider reads (fake client)', () => {
     assert.equal(projects.length, 1)
     assert.equal(projects[0].id, '30001')
     assert.equal(projects[0].url, `${SITE}/browse/ENG-9`)
+  })
+})
+
+// =============================================================================
+// LIN-2155 — tiered Jira fetch (in-progress guaranteed, to-do/done/epics
+// budgeted), the inverse status mapping that drives it, and the fake
+// client's matching JQL-clause coverage
+// =============================================================================
+
+describe('CANONICAL_TYPE_TO_JIRA_STATUS_CATEGORY / jiraReachableTierOrder (LIN-2155)', () => {
+  test('the inverse map carries exactly the three types Jira can reach', () => {
+    assert.deepEqual(CANONICAL_TYPE_TO_JIRA_STATUS_CATEGORY, {
+      started: 'In Progress',
+      unstarted: 'To Do',
+      completed: 'Done',
+    })
+  })
+
+  test('jiraReachableTierOrder() returns the canonical STATE_ORDER-driven sequence, filtered to Jira-reachable types', () => {
+    assert.deepEqual(jiraReachableTierOrder(), ['started', 'unstarted', 'completed'])
+  })
+})
+
+describe('JiraProvider — tiered fetch (LIN-2155)', () => {
+  const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+
+  // The research's own repro, rebuilt against the real _epicsForProjects
+  // path (via fetchProjects) with a JQL-routing fake client: a 3,000-issue
+  // project where the 40 in-progress issues carry the NEWEST keys — exactly
+  // the shape that starved the old `ORDER BY key ASC` capped walk (0 of 40
+  // fetched). This is the ticket's own named acceptance test.
+  test('reproduction: a 3,000-issue project with 40 in-progress issues fetches all 40 (0 → 40), not the oldest 500 by key', async () => {
+    const projectRef = { id: '10001', key: 'BIG', name: 'Big Project' }
+    const issues = []
+    for (let i = 1; i <= 2960; i++) {
+      issues.push({
+        id: String(1000 + i),
+        key: `BIG-${i}`,
+        fields: {
+          summary: `Backlog item ${i}`, description: null,
+          status: { statusCategory: { key: 'new' } },
+          project: projectRef,
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+        },
+      })
+    }
+    for (let i = 1; i <= 40; i++) {
+      const n = 2960 + i
+      issues.push({
+        id: String(1000 + n),
+        key: `BIG-${n}`,
+        fields: {
+          summary: `In progress ${i}`, description: null,
+          status: { statusCategory: { key: 'indeterminate' } },
+          project: projectRef,
+          created: '2026-08-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+        },
+      })
+    }
+    const client = createFakeJiraClient({ projects: [projectRef], issues })
+    const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+
+    const result = await provider.fetchProjects(scope)
+    const inProgressFetched = result.issues.filter(i => i.state.type === 'started')
+    assert.equal(inProgressFetched.length, 40, 'every in-progress issue is fetched at any project size — the LIN-2155 guarantee')
+    assert.equal(result.truncated, true, 'the to-do tier still hits its own budget cap on a project this size — by design, not a regression')
+  })
+
+  // Tier overlap is real, not hypothetical: an epic whose own status is
+  // In Progress matches both the in-progress tier's JQL and the epics
+  // tier's `issuetype = Epic` JQL. If dedupe-by-id failed, the epic would
+  // appear twice in the merged batch and double-render as two project
+  // headers.
+  test('dedup across tiers: an epic whose own status is In Progress is fetched by both the in-progress and epics tiers but surfaces once', async () => {
+    const client = createFakeJiraClient({
+      projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+      issues: [
+        {
+          id: '90001', key: 'ENG-90',
+          fields: {
+            summary: 'An epic that is itself in progress', description: null,
+            issuetype: EPIC_ISSUETYPE,
+            status: { statusCategory: { key: 'indeterminate' } },
+            project: { id: '10001', key: 'ENG', name: 'Engineering' },
+            created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+            labels: [], assignee: null, parent: null,
+          },
+        },
+      ],
+    })
+    const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+    const result = await provider.fetchProjects(scope)
+    assert.equal(result.projects.length, 1, 'the epic surfaces exactly once as a canonical project header, not once per tier that fetched it')
+    assert.equal(result.projects[0].id, '90001')
+    assert.equal(result.issues.length, 0, 'an epic is excluded from canonical issues (F1) regardless of how many tiers fetched it')
+  })
+
+  // D7 partial-failure semantics.
+  test('D7: an in-progress tier failure (throw) rejects the whole render, never partial', async () => {
+    const stubClient = {
+      listAllProjects: async () => [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+      searchAllIssues: async jql => {
+        if (jql.includes('statusCategory = "In Progress"')) throw new Error('in-progress tier boom')
+        const empty = []; empty.truncated = false; return empty
+      },
+      listFields: async () => [],
+    }
+    const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
+    await assert.rejects(() => provider.fetchProjects(scope), /in-progress tier boom/)
+  })
+
+  test('D7: an in-progress tier hitting its own safety cap is failure-level, not ordinary truncation', async () => {
+    const cappedInProgress = [{
+      id: '1', key: 'ENG-1',
+      fields: {
+        summary: 'x', description: null, status: { statusCategory: { key: 'indeterminate' } },
+        project: { id: '10001', key: 'ENG', name: 'Engineering' },
+        created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null, labels: [], assignee: null, parent: null,
+      },
+    }]
+    cappedInProgress.truncated = true
+    const stubClient = {
+      listAllProjects: async () => [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+      searchAllIssues: async jql => {
+        if (jql.includes('statusCategory = "In Progress"')) return cappedInProgress
+        const empty = []; empty.truncated = false; return empty
+      },
+      listFields: async () => [],
+    }
+    const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
+    await assert.rejects(() => provider.fetchProjects(scope), JiraInProgressCapExceededError)
+  })
+
+  for (const [tierLabel, categoryClause] of [['to-do', 'statusCategory = "To Do"'], ['done', 'statusCategory = "Done"']]) {
+    test(`D7: a ${tierLabel} tier failure renders partial data with truncated: true, keeping the good in-progress result`, async () => {
+      const inProgressIssues = [{
+        id: '20001', key: 'ENG-1',
+        fields: {
+          summary: 'In progress', description: null,
+          status: { statusCategory: { key: 'indeterminate' } },
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+          labels: [], assignee: null, parent: null,
+        },
+      }]
+      inProgressIssues.truncated = false
+      const stubClient = {
+        listAllProjects: async () => [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+        searchAllIssues: async jql => {
+          if (jql.includes('statusCategory = "In Progress"')) return inProgressIssues
+          if (jql.includes(categoryClause)) throw new Error(`${tierLabel} tier boom`)
+          const empty = []; empty.truncated = false; return empty
+        },
+        listFields: async () => [],
+      }
+      const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
+      const result = await provider.fetchProjects(scope)
+      assert.equal(result.truncated, true, `a ${tierLabel} tier failure must not discard the good in-progress result — it must set truncated instead`)
+      assert.equal(result.issues.length, 1, 'the in-progress issue still renders')
+      assert.equal(result.issues[0].identifier, 'ENG-1')
+    })
+  }
+
+  // Cross-cutting consequence of D7 (named in the plan, not silently
+  // assumed): project-header derivation depends on the epics tier arriving
+  // — when it fails, headers regress to whatever epics rode the OTHER
+  // tiers (partial, not absent), never to nothing.
+  test('D7: an epics-tier failure renders partial — an epic also reachable via another tier still produces its project header', async () => {
+    const inProgressEpic = [{
+      id: '90001', key: 'ENG-90',
+      fields: {
+        summary: 'In-progress epic', description: null, issuetype: EPIC_ISSUETYPE,
+        status: { statusCategory: { key: 'indeterminate' } },
+        project: { id: '10001', key: 'ENG', name: 'Engineering' },
+        created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+        labels: [], assignee: null, parent: null,
+      },
+    }]
+    inProgressEpic.truncated = false
+    const stubClient = {
+      listAllProjects: async () => [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+      searchAllIssues: async jql => {
+        if (jql.includes('statusCategory = "In Progress"')) return inProgressEpic
+        if (jql.includes('issuetype = Epic')) throw new Error('epics tier boom')
+        const empty = []; empty.truncated = false; return empty
+      },
+      listFields: async () => [],
+    }
+    const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
+    const result = await provider.fetchProjects(scope)
+    assert.equal(result.truncated, true, 'the epics-tier failure sets truncated: true (D7 partial render)')
+    assert.equal(result.projects.length, 1, 'the in-progress epic still derives its project header even though the dedicated epics pass failed')
+    assert.equal(result.projects[0].id, '90001')
+  })
+
+  // Mirrors the existing LIN-2006/LIN-2033 `truncated`-preservation pattern
+  // (see the fetchTeams/fetchProjects tests above): `.truncated` is a custom
+  // array property that `.filter()`/`.map()` silently drop on a fresh array
+  // — this pins that the OR reads every raw tier BEFORE any such
+  // transformation, regardless of WHICH tier carried the flag.
+  test('truncated is a boolean OR across every raw tier array, not just the first one checked', async () => {
+    for (const targetClause of ['statusCategory = "Done"', 'issuetype = Epic']) {
+      const cappedIssues = []
+      cappedIssues.truncated = true
+      const stubClient = {
+        listAllProjects: async () => [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+        searchAllIssues: async jql => {
+          if (jql.includes(targetClause)) return cappedIssues
+          const empty = []; empty.truncated = false; return empty
+        },
+        listFields: async () => [],
+      }
+      const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
+      const result = await provider.fetchProjects(scope)
+      assert.equal(result.truncated, true, `a truncated tier behind clause "${targetClause}" must still surface truncated: true`)
+    }
+  })
+
+  // LIN-2158 regression guard (a) — behavioural. The done tier used to be
+  // windowed to `resolutiondate >= -7d`, which silently excluded (1) Done
+  // issues resolved more than 7 days ago and (2) Done-category issues with
+  // no resolutiondate at all (status category and resolution are
+  // independent in Jira). Both classes must now be fetched. The ancient
+  // date is a FIXED literal, not `Date.now()`-relative — a relative date
+  // would silently re-acquire the exact drift this ticket exists to undo.
+  test('LIN-2158: an ancient-fixed-date Done issue and a null-resolutiondate Done issue are both fetched, truncated: false', async () => {
+    const client = createFakeJiraClient({
+      projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+      issues: [
+        {
+          id: '1', key: 'ENG-1',
+          fields: {
+            summary: 'Ancient done issue', description: null,
+            status: { statusCategory: { key: 'done' } },
+            project: { id: '10001', key: 'ENG', name: 'Engineering' },
+            created: '2020-01-01T00:00:00.000Z', duedate: null, resolutiondate: '2020-01-01T00:00:00.000Z',
+            labels: [], assignee: null, parent: null,
+          },
+        },
+        {
+          id: '2', key: 'ENG-2',
+          fields: {
+            summary: 'Done with no resolution date', description: null,
+            status: { statusCategory: { key: 'done' } },
+            project: { id: '10001', key: 'ENG', name: 'Engineering' },
+            created: '2026-01-01T00:00:00.000Z', duedate: null, resolutiondate: null,
+            labels: [], assignee: null, parent: null,
+          },
+        },
+      ],
+    })
+    const provider = new JiraProvider({ clientFactory: () => client, site: SITE })
+    const result = await provider.fetchProjects(scope)
+    const ancient = result.issues.find(i => i.identifier === 'ENG-1')
+    const nullResolution = result.issues.find(i => i.identifier === 'ENG-2')
+    assert.ok(ancient, 'a Done issue resolved years ago must still be fetched — the window that used to exclude it is gone')
+    assert.equal(ancient.state.type, 'completed')
+    assert.ok(nullResolution, 'a Done-category issue with no resolutiondate at all must be fetched — no predicate can exclude it')
+    assert.equal(nullResolution.state.type, 'completed')
+    assert.equal(result.truncated, false)
+  })
+
+  // LIN-2158 regression guard (b) — structural. (a) alone doesn't prove
+  // *why* it passes; (b) alone would pass a window re-added under a
+  // different field/mechanism. Both are required together.
+  test('LIN-2158: the done tier\'s emitted JQL carries no resolutiondate clause', async () => {
+    let doneJql = null
+    const stubClient = {
+      listAllProjects: async () => [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+      searchAllIssues: async jql => {
+        if (jql.includes('statusCategory = "Done"')) doneJql = jql
+        const empty = []; empty.truncated = false; return empty
+      },
+      listFields: async () => [],
+    }
+    const provider = new JiraProvider({ clientFactory: () => stubClient, site: SITE })
+    await provider.fetchProjects(scope)
+    assert.ok(doneJql, 'the done tier must have been queried')
+    assert.ok(!doneJql.includes('resolutiondate'), `done tier JQL must carry no resolutiondate clause, got: ${doneJql}`)
+  })
+})
+
+describe('fake-client.js — LIN-2155 JQL clause coverage', () => {
+  function tieredClient() {
+    return createFakeJiraClient({
+      projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+      issues: [
+        { id: '1', key: 'ENG-1', fields: { project: { key: 'ENG' }, status: { statusCategory: { key: 'indeterminate' } }, updated: '2026-01-05T00:00:00.000Z', resolutiondate: null } },
+        { id: '2', key: 'ENG-2', fields: { project: { key: 'ENG' }, status: { statusCategory: { key: 'new' } }, updated: '2026-01-10T00:00:00.000Z', resolutiondate: null } },
+        { id: '3', key: 'ENG-3', fields: { project: { key: 'ENG' }, status: { statusCategory: { key: 'new' } }, updated: '2026-01-01T00:00:00.000Z', resolutiondate: null } },
+        { id: '4', key: 'ENG-4', fields: { project: { key: 'ENG' }, issuetype: EPIC_ISSUETYPE, status: { statusCategory: { key: 'done' } }, resolutiondate: null } },
+        { id: '5', key: 'ENG-5', fields: { project: { key: 'ENG' }, status: { statusCategory: { key: 'done' } } } },
+        { id: '6', key: 'ENG-6', fields: { project: { key: 'ENG' }, status: { statusCategory: { key: 'done' } }, resolutiondate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() } },
+      ],
+    })
+  }
+
+  test('statusCategory = "In Progress" matches only the indeterminate-category issue', async () => {
+    const out = await tieredClient().searchAllIssues('project in ("ENG") AND statusCategory = "In Progress" ORDER BY key ASC')
+    assert.deepEqual(out.map(i => i.key), ['ENG-1'])
+  })
+
+  test('issuetype = Epic matches only the epic issue', async () => {
+    const out = await tieredClient().searchAllIssues('project in ("ENG") AND issuetype = Epic ORDER BY key ASC')
+    assert.deepEqual(out.map(i => i.key), ['ENG-4'])
+  })
+
+  test('ORDER BY updated DESC, key ASC sorts newest-touched first', async () => {
+    const out = await tieredClient().searchAllIssues('project in ("ENG") AND statusCategory = "To Do" ORDER BY updated DESC, key ASC')
+    assert.deepEqual(out.map(i => i.key), ['ENG-2', 'ENG-3'])
+  })
+
+  test('a cap truncates and stamps .truncated; an omitted cap returns every match unbounded', async () => {
+    const capped = await tieredClient().searchAllIssues('project in ("ENG") AND statusCategory = "To Do" ORDER BY key ASC', { cap: 1 })
+    assert.equal(capped.length, 1)
+    assert.equal(capped.truncated, true)
+    const uncapped = await tieredClient().searchAllIssues('project in ("ENG") AND statusCategory = "To Do" ORDER BY key ASC')
+    assert.equal(uncapped.length, 2)
+    assert.equal(uncapped.truncated, false)
+  })
+
+  test('an unrecognized JQL clause throws rather than silently matching everything (LIN-2050)', async () => {
+    await assert.rejects(
+      () => tieredClient().searchAllIssues('project in ("ENG") AND priority = "High" ORDER BY key ASC'),
+      /unrecognized JQL clause/,
+    )
   })
 })
 
@@ -2461,6 +2817,40 @@ describe('createJiraClient serial pagination', () => {
     assert.ok(all.length <= 5, `capped at 5 issues, got ${all.length}`)
     assert.equal(all.length, 5)
     assert.equal(all.truncated, true, 'stopping on the cap, not the natural end (more pages remained), must be signalled')
+  })
+
+  // LIN-2155: the measurement oracle for per-tier coverage.
+  test('searchApproximateCount POSTs to /search/approximate-count with the jql and returns .count, round-tripping through request()', async () => {
+    const calls = []
+    const fetchImpl = async (url, opts) => {
+      calls.push({ url, body: JSON.parse(opts.body) })
+      return { status: 200, ok: true, headers: { get: () => null }, text: async () => JSON.stringify({ count: 42 }) }
+    }
+    const client = createJiraClient({ email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl })
+    const count = await client.searchApproximateCount('project = "ENG" AND statusCategory = "In Progress"')
+    assert.equal(calls.length, 1)
+    assert.ok(calls[0].url.endsWith('/rest/api/3/search/approximate-count'))
+    assert.equal(calls[0].body.jql, 'project = "ENG" AND statusCategory = "In Progress"')
+    assert.equal(count, 42)
+  })
+
+  test('searchApproximateCount inherits the shared 429/Retry-After retry — no second backoff path', async () => {
+    let attempt = 0
+    const fetchImpl = async () => {
+      attempt += 1
+      if (attempt === 1) return { status: 429, ok: false, headers: { get: h => (h === 'Retry-After' ? '0' : null) } }
+      return { status: 200, ok: true, headers: { get: () => null }, text: async () => JSON.stringify({ count: 7 }) }
+    }
+    const client = createJiraClient({ email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl, sleepImpl: async () => {} })
+    const count = await client.searchApproximateCount('project = "ENG"')
+    assert.equal(attempt, 2, 'retried exactly once through the shared 429 handling')
+    assert.equal(count, 7)
+  })
+
+  test('searchApproximateCount returns null when the response carries no count', async () => {
+    const fetchImpl = async () => ({ status: 200, ok: true, headers: { get: () => null }, text: async () => JSON.stringify({}) })
+    const client = createJiraClient({ email: 'a@b.com', apiToken: 'tok', site: SITE, fetchImpl })
+    assert.equal(await client.searchApproximateCount('project = "ENG"'), null)
   })
 })
 
