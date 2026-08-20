@@ -124,14 +124,20 @@ describe('assertion 3: DUPLICATE_DISPATCH named consistently across the three so
     assert.match(factorySource, /DUPLICATE_DISPATCH_CODE\s*=\s*'DUPLICATE_DISPATCH'/);
   });
 
-  // The runner doc's Step 7 names the same code.
-  test('docs/passage-runner-prompt.md names DUPLICATE_DISPATCH', () => {
-    assert.match(docsSource, /\bDUPLICATE_DISPATCH\b/);
+  // The runner doc's Step 7 names the same code. Exact-count, not existence:
+  // a bare `match` stays green if 1 of the doc's 2 mentions is renamed away
+  // (existence-check blind spot, same class as assertion 5 below).
+  test('docs/passage-runner-prompt.md names DUPLICATE_DISPATCH in exactly 2 places', () => {
+    const occurrences = (docsSource.match(/\bDUPLICATE_DISPATCH\b/g) || []).length;
+    assert.strictEqual(occurrences, 2, 'docs/passage-runner-prompt.md DUPLICATE_DISPATCH mention count drifted');
   });
 
-  // The consumer integration guide names the same code.
-  test('docs/proxy-integration.md names DUPLICATE_DISPATCH', () => {
-    assert.match(integrationSource, /\bDUPLICATE_DISPATCH\b/);
+  // The consumer integration guide names the same code. Exact-count for the
+  // same reason: a bare `match` stays green if 1 of the doc's 4 mentions is
+  // renamed away.
+  test('docs/proxy-integration.md names DUPLICATE_DISPATCH in exactly 4 places', () => {
+    const occurrences = (integrationSource.match(/\bDUPLICATE_DISPATCH\b/g) || []).length;
+    assert.strictEqual(occurrences, 4, 'docs/proxy-integration.md DUPLICATE_DISPATCH mention count drifted');
   });
 });
 
@@ -152,20 +158,37 @@ describe('assertion 4: north-star reading.state/roadmap.state match the handler 
 });
 
 describe('assertion 5: /dispatch status enum — prose<->prose only (known limit, see comment)', () => {
-  // This is a coupling check between two prose copies, not a code-side pin:
-  // it fails loud if the two docs disagree with each other, but it does NOT
-  // catch a code-side derivation change to the enum (exactly what 7c6d811d
-  // was, adding `blocked`) unless that change also reaches a prose copy. The
-  // runner doc has no status enum of its own — its blocks/blocked-by
+  // This is a coupling check between two prose copies, not a code-side pin.
+  // Each source's occurrence count is pinned exactly (not an existence
+  // check), so it fails loud if a single copy drops a value OR if the two
+  // docs disagree with each other — dropping/diverging even one of the
+  // five real copies (3 in routes/proxy.js, 2 in docs/proxy-integration.md)
+  // goes red. It still does NOT catch a code-side derivation change to the
+  // enum (exactly what 7c6d811d was, adding `blocked`) unless that change
+  // also reaches a prose copy — that limit is real and stays undisclosed
+  // only in the sense that no code-side pin exists at all, which is honest.
+  // The runner doc has no status enum of its own — its blocks/blocked-by
   // vocabulary is an unrelated sense and is not a source for this assertion.
   const STATUS_ENUM = 'queued|taken|done|failed|blocked|aborted';
 
-  test('routes/proxy.js prose states the enum', () => {
-    assert.ok(proxySource.includes(STATUS_ENUM), 'routes/proxy.js prose enum drifted');
+  function occurrenceCount(source, needle) {
+    return source.split(needle).length - 1;
+  }
+
+  test('routes/proxy.js prose states the enum in exactly 3 places', () => {
+    assert.strictEqual(
+      occurrenceCount(proxySource, STATUS_ENUM),
+      3,
+      'routes/proxy.js prose enum copy count drifted — a copy was added, dropped, or diverged'
+    );
   });
 
-  test('docs/proxy-integration.md prose states the same enum', () => {
-    assert.ok(integrationSource.includes(STATUS_ENUM), 'docs/proxy-integration.md prose enum drifted');
+  test('docs/proxy-integration.md prose states the same enum in exactly 2 places', () => {
+    assert.strictEqual(
+      occurrenceCount(integrationSource, STATUS_ENUM),
+      2,
+      'docs/proxy-integration.md prose enum copy count drifted — a copy was added, dropped, or diverged'
+    );
   });
 });
 

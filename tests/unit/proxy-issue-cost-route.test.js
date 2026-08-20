@@ -235,6 +235,12 @@ describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
     // hardcodes the very number this test asserts. summarizeByIssue is stubbed
     // because a bare construction leaves this.collection undefined.
     const llmCallLogStore = new LlmCallLogStore();
+    // Falsy-default guard: routes/proxy.js falls back to `|| 30 * 24 * 60 *
+    // 60` when store.ttl is falsy (e.g. 0), which would silently restore
+    // days: 30 and keep the value pin below green even if the real default
+    // were changed to a falsy value. Pin the real default's ttl directly so
+    // that drift goes red too.
+    assert.equal(llmCallLogStore.ttl, 30 * 24 * 60 * 60);
     llmCallLogStore.summarizeByIssue = async (urlKey, identifier) => {
       assert.equal(urlKey, 'acme');
       assert.equal(identifier, 'LIN-42');
