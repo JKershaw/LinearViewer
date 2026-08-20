@@ -387,6 +387,54 @@ describe('foldPeriodicalRuns — queue precedence', () => {
   });
 });
 
+// ── Per-repo lanes (LIN-1932 beat 2: B4, B7) ────────────────────────────────
+
+describe('foldPeriodicalRuns — per-repo lanes (LIN-1932)', () => {
+  test('B4: a live queue row for repo-a does not mark repo-b recent — rule 1 is per-lane, not per-template', () => {
+    // Direct mutant-killer for `hasRecentQueueRow.set(template.id, true)`
+    // (unconditional per template) surviving unchanged: that shape would
+    // mark repo-b recent too, even though repo-b has no queue row of its
+    // own and its own history is aged past cadence.
+    const t = template({ cadence: 'weekly' });
+    const rows = {
+      queueRows: [queueRow({ periodicalId: t.id, repo: 'repo-a' })],
+      historyRows: [historyRow({ periodicalId: t.id, repo: 'repo-b', status: 'taken', dispatchedAt: new Date(NOW - WEEK_MS - DAY_MS).toISOString() })]
+    };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+    const repoALane = result.repos.find(l => l.repo === 'repo-a');
+    const repoBLane = result.repos.find(l => l.repo === 'repo-b');
+    assert.ok(repoALane, 'expected a repo-a lane');
+    assert.ok(repoBLane, 'expected a repo-b lane');
+    assert.equal(repoALane.state, 'recent');
+    assert.equal(repoBLane.state, 'due');
+  });
+
+  test('B7: a history row aged out of the effective horizon leaves no inner lane Map — top-level AND lane read null/never/null, never -Infinity/due', () => {
+    // The empty-inner-Map hazard (plan-review f1ef4ad9 blocking finding): an
+    // inner Map created but left empty would send Math.max() an empty
+    // argument list (-Infinity), flipping state to 'due' and, at the wire
+    // boundary, throwing RangeError on `new Date(-Infinity).toISOString()`.
+    // The invariant (getOrCreate only at first write, after the horizon
+    // guard) means this template's inner Maps are never created at all.
+    const t = template();
+    const rows = {
+      historyRows: [historyRow({ periodicalId: t.id, dispatchedAt: new Date(NOW - 40 * DAY_MS).toISOString() })]
+    };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, horizonMs: HISTORY_TTL_MS, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.lastDispatchedAt, null);
+    assert.equal(result.state, 'never');
+    assert.equal(result.daysSince, null);
+    // Same guard, pinned at the per-lane emit path too — not exercised by
+    // the pre-existing top-level-only backstop at :443, since that test
+    // predates the `repos` field.
+    assert.equal(result.repos.length, 1);
+    assert.equal(result.repos[0].isDefault, true);
+    assert.equal(result.repos[0].state, 'never');
+    assert.equal(result.repos[0].lastDispatchedAt, null);
+    assert.equal(result.repos[0].daysSince, null);
+  });
+});
+
 // ── Retention boundary (never vs unknown) ──────────────────────────────────
 
 describe('foldPeriodicalRuns — retention boundary', () => {
@@ -775,7 +823,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     // rows key on template.id alone and collapse into the single top-level
     // `runs: 2`. This must fail until beat 2 re-keys the fold's
     // accumulators onto (periodicalId, repo).
-    assert.ok(Array.isArray(result.repos), 'foldPeriodicalRuns must return a `repos` lane array per template (not implemented yet)');
+    assert.ok(Array.isArray(result.repos), 'foldPeriodicalRuns must return a `repos` lane array per template');
     assert.equal(result.repos.length, 2, 'expected exactly two lanes: repo-a and the default null lane');
     const repoALane = result.repos.find(l => l.repo === 'repo-a');
     const defaultLane = result.repos.find(l => l.repo === null);
@@ -783,6 +831,56 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     assert.ok(defaultLane, 'expected a default (null) lane');
     assert.equal(repoALane.runs, 1);
     assert.equal(defaultLane.runs, 1);
+  });
+
+  test('LIN-1932 B2: a live queue row for repo-a and an aged taken row for repo-b — repo-a reads recent, repo-b reads due, and no default lane is spuriously marked recent', async () => {
+    const store = freshStore();
+    const t = template({ id: 'documentation-review', title: 'Documentation Review', cadence: 'weekly' });
+
+    // Live queue row for repo-a — never archived, so it stays on the queue
+    // (the "in-flight run against repo A" the ticket's queue-half bug describes).
+    await store.addItem(URL_KEY, {
+      prompt: 'run the review',
+      promptName: t.title,
+      kind: 'custom',
+      periodicalId: t.id,
+      repo: 'repo-a'
+    });
+
+    // Archived taken row for repo-b, aged past the weekly cadence.
+    const repoBRow = await store.addItem(URL_KEY, {
+      prompt: 'run the review',
+      promptName: t.title,
+      kind: 'custom',
+      periodicalId: t.id,
+      repo: 'repo-b'
+    });
+    await store.takeItem(repoBRow._id, URL_KEY, 'token-b');
+
+    const queueRows = await store.listItems(URL_KEY, { projection: PERIODICAL_PROJECTION });
+    const { items: historyRows } = await store.listHistory(URL_KEY, { projection: PERIODICAL_PROJECTION });
+    assert.equal(queueRows.length, 1);
+    assert.equal(historyRows.length, 1);
+
+    // Inject `now` one cadence period + a day past repo-b's real dispatchedAt.
+    const fakeNow = repoBRow.dispatchedAt.getTime() + WEEK_MS + DAY_MS;
+
+    const [result] = foldPeriodicalRuns([t], { queueRows, historyRows }, { now: fakeNow, historyTtlMs: HISTORY_TTL_MS });
+
+    const repoALane = result.repos.find(l => l.repo === 'repo-a');
+    const repoBLane = result.repos.find(l => l.repo === 'repo-b');
+    const defaultLane = result.repos.find(l => l.isDefault);
+
+    assert.ok(repoALane, 'expected a repo-a lane');
+    assert.ok(repoBLane, 'expected a repo-b lane');
+    assert.equal(repoALane.state, 'recent');
+    assert.equal(repoBLane.state, 'due');
+    // The load-bearing assertion: neither row was stamped repo: null, so no
+    // default lane should appear at all. Pre-fix, an unprojected queue row
+    // silently read repo: null and put the in-flight run on the DEFAULT
+    // lane instead of repo-a's own — exactly the direction that points at
+    // re-dispatching a run already underway.
+    assert.equal(defaultLane, undefined, 'no row here was stamped repo: null — a default lane appearing at all would mean the projection or fold miscategorized a repo-stamped row');
   });
 
   test('PERIODICAL_PROJECTION survives a real queue-row round trip too (no status field — queue docs carry none)', async () => {
