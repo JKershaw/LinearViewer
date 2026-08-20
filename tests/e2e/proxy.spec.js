@@ -2911,6 +2911,11 @@ test.describe('Proxy API - Periodicals (real-server wiring, LIN-1829)', () => {
   test('mint -> take -> read-back: a real periodical dispatch reads `recent`, not `never`', async ({ request }) => {
     // Mint with kind + periodicalId set explicitly — exactly how the real
     // Periodicals group dispatch works (never derived from promptName).
+    // `repo: 'repo-a'` (LIN-1932) is the one non-fabricated per-repo-lane
+    // witness available to this ticket: every unit-level fixture writes
+    // `repo` directly into the store, a path no production caller uses for
+    // a periodical yet (LIN-1933 owns the write side) — this is the only
+    // assertion that goes through the real HTTP mint path end to end.
     const enqueue = await request.post('/api/proxy/dispatch', {
       headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
       data: {
@@ -2918,6 +2923,7 @@ test.describe('Proxy API - Periodicals (real-server wiring, LIN-1829)', () => {
         promptName: 'Documentation Review',
         kind: 'periodical',
         periodicalId: PERIODICAL_ID,
+        repo: 'repo-a',
         target: 'cli'
       }
     });
@@ -2952,6 +2958,13 @@ test.describe('Proxy API - Periodicals (real-server wiring, LIN-1829)', () => {
     // Carried through from the matched registry template, never re-joined.
     expect(item.mode).toBe('corrective');
     expect(item.cadence).toBe('weekly');
+    // LIN-1932: the repo-stamped dispatch above must show up as its own
+    // `repo-a` lane — proof, through the real HTTP mint/take/read path
+    // (not a synthetic store write), that PERIODICAL_PROJECTION actually
+    // carries `repo` and the fold actually re-keys on it in production.
+    const repoALane = item.repos.find(r => r.repo === 'repo-a');
+    expect(repoALane).toBeTruthy();
+    expect(repoALane.state).toBe('recent');
   });
 
   test('workspace isolation: workspace A never reflects workspace B\'s periodical dispatch', async ({ page, request, secondWorkerUrlKey }) => {
