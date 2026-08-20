@@ -99,6 +99,15 @@ and a fresh session is dispatched into the same wall.
      lib/periodical-runs.js) — no separate store. The three-level precedence — (1) explicit
      goal, else (2) a periodical reading `due`, else (3) top of stack — is real and live.
 
+     LIN-1932 split that state per repo: each template's response entry also carries a
+     `repos[]` array (one lane per observed repo, plus a default `repo: null` lane), each
+     with its own due/recent/never/unknown state — a template can read `due` for repo A while
+     reading `recent` for repo B. The top-level `due`/`recent`/`never`/`unknown` field stays an
+     aggregate across all of a template's lanes (unchanged shape, so an existing caller
+     reading only the top level sees the same behaviour); "a periodical reading `due`" in the
+     precedence above now means *any lane* of that template reading `due` when more than one
+     lane exists.
+
      It was deliberately NOT added to the Orient list above. It lives instead as an explicit
      supersedes clause in the kickoff's general-mode first-act text
      (lib/prompts/autopilot-kickoff.js, the `firstAct` else-branch), fetched and applied before

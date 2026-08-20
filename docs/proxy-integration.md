@@ -841,11 +841,11 @@ endpoint's copy is the best-effort cross-device mirror of it.
 GET /api/proxy/periodicals
 ```
 
-Returns per-template **periodical run state** — what ran, when, and how recently — derived
-from the live dispatch queue plus history (LIN-1827/LIN-1829). Pure read: no Linear fetch,
-no LLM call, read scope is sufficient. This endpoint computes **no trigger and dispatches
-nothing** — it is evidence only, for a consumer that wants to decide for itself whether a
-periodical is due.
+Returns per-template **periodical run state** — what ran, when, and how recently, now split
+per repo (LIN-1932) — derived from the live dispatch queue plus history (LIN-1827/LIN-1829).
+Pure read: no Linear fetch, no LLM call, read scope is sufficient. This endpoint computes
+**no trigger and dispatches nothing** — it is evidence only, for a consumer that wants to
+decide for itself whether a periodical is due.
 
 ```json
 {
@@ -857,7 +857,25 @@ periodical is due.
       "cadence": "weekly",
       "state": "due",
       "lastDispatchedAt": "2026-07-24T10:00:00Z",
-      "daysSince": 10
+      "daysSince": 10,
+      "repos": [
+        {
+          "repo": "repo-a",
+          "label": "repo-a",
+          "isDefault": false,
+          "state": "due",
+          "lastDispatchedAt": "2026-07-24T10:00:00Z",
+          "daysSince": 10
+        },
+        {
+          "repo": null,
+          "label": "none",
+          "isDefault": true,
+          "state": "never",
+          "lastDispatchedAt": null,
+          "daysSince": null
+        }
+      ]
     }
   ]
 }
@@ -868,24 +886,40 @@ periodical is due.
 - **`mode`**/**`cadence`** are **carried through from the matched template** by the fold
   itself, never re-joined against the registry here — so this endpoint can never publish a
   `cadence` that disagrees with the one its own `due`/`recent` boundary actually used.
-- **`state`** is one of four values: `"recent"` — a live (queued, not yet resolved) dispatch
-  for this template, OR a `taken` history run inside its cadence window; `"due"` — the
-  cadence has elapsed since the last run; `"never"` — **no evidence in the full retained
-  history window**, which is a *bounded* claim, not "ever ran" — a workspace that only
-  recently started dispatching periodicals, or whose history retention is shorter than the
-  read horizon, reads `"never"` the same as one that has genuinely never run this template;
-  `"unknown"` — the read horizon is narrower than the store's retention window, so absence
-  isn't conclusive. `"unknown"` is **not produced by any deployment today** (both the read
-  horizon and the store's retention default to 30 days, so they're always equal) — it
+- **`state`** (top-level) is one of four values: `"recent"` — a live (queued, not yet
+  resolved) dispatch for this template, OR a `taken` history run inside its cadence window;
+  `"due"` — the cadence has elapsed since the last run; `"never"` — **no evidence in the
+  full retained history window**, which is a *bounded* claim, not "ever ran" — a workspace
+  that only recently started dispatching periodicals, or whose history retention is shorter
+  than the read horizon, reads `"never"` the same as one that has genuinely never run this
+  template; `"unknown"` — the read horizon is narrower than the store's retention window, so
+  absence isn't conclusive. `"unknown"` is **not produced by any deployment today** (both the
+  read horizon and the store's retention default to 30 days, so they're always equal) — it
   becomes reachable only if a future caller narrows the horizon below the store's retention,
   or an operator configures a longer retention than the fixed 30-day horizon this route uses.
-- **`lastDispatchedAt`** is the most recent matched **history** run's timestamp (ISO-8601),
-  `null` when there is none in the window. A live queued run does not update it — it only
-  drives `state: "recent"`.
-- **`daysSince`** is the floored day count since `lastDispatchedAt`, `null` when it is.
-- **`runs`** (a raw count of matched history runs) is **not published** by this endpoint —
-  it has no declared consumer today; add it if/when one needs it rather than reshaping a
-  field already in the wild.
+- **`lastDispatchedAt`** (top-level) is the most recent matched **history** run's timestamp
+  (ISO-8601), `null` when there is none in the window. A live queued run does not update it —
+  it only drives `state: "recent"`.
+- **`daysSince`** (top-level) is the floored day count since `lastDispatchedAt`, `null` when
+  it is.
+- **`repos`** is a per-repo breakdown of the same four fields, one entry per repo this
+  endpoint has actually observed evidence for. **Always present, never omitted, never
+  `[]`** — a template with zero evidence at all still gets one synthesized default-lane
+  entry. `"repo"` is the exact stored repo string, or `null` for the **default lane**
+  (`null` means "whatever working directory the runner used" — it is a real, distinct lane,
+  never "all repos" and never discarded). `"label"` is `"none"` for the default lane and the
+  repo name otherwise. `"isDefault"` marks that lane. The default lane, when present, sorts
+  first; other repos follow in first-observed order. Each lane's own `"state"`/
+  `"lastDispatchedAt"`/`"daysSince"` follow exactly the same rules described above, evaluated
+  against that lane's own evidence only. Only **observed** repos are enumerated — a repo that
+  has never had a periodical dispatched against it is not listed as an empty lane (this
+  endpoint still makes zero provider/project calls, unchanged). The top-level fields above
+  remain **repo-ignorant**, aggregated across every lane (e.g. top-level `"recent"` if *any*
+  lane has a live queue row), so an existing consumer reading only the top-level fields sees
+  unchanged behaviour.
+- **`runs`** (a raw count of matched history runs) is **not published** by this endpoint, at
+  either the top level or per lane — it has no declared consumer today; add it if/when one
+  needs it rather than reshaping a field already in the wild.
 - **503** when dispatch is not configured on this deployment.
 
 ### Task Automation Endpoints

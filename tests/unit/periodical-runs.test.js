@@ -62,18 +62,19 @@ const URL_KEY = 'acme';
 
 // ── Fixture factories ───────────────────────────────────────────────────────
 
-/** Mirrors a PERIODICALS registry entry (lib/periodicals.js's PeriodicalTemplate typedef, :83-90). */
+/** Mirrors a PERIODICALS registry entry (lib/periodicals.js's PeriodicalTemplate typedef, :93-104). */
 function template(over = {}) {
   return {
     id: 'documentation-review',
     title: 'Documentation Review',
     mode: 'corrective',
     cadence: 'weekly',
+    scope: 'repo',
     ...over
   };
 }
 
-/** Mirrors `_formatItem`'s output (lib/dispatch-store.js:1756) as read under PERIODICAL_PROJECTION — a queue row carries no `status` field at all. */
+/** Mirrors `_formatItem`'s output (lib/dispatch-store.js:1826) as read under PERIODICAL_PROJECTION — a queue row carries no `status` field at all. */
 function queueRow(over = {}) {
   return {
     kind: 'custom',
@@ -85,7 +86,7 @@ function queueRow(over = {}) {
   };
 }
 
-/** Mirrors `_formatHistoryItem`'s output (lib/dispatch-store.js:1240) as read under PERIODICAL_PROJECTION. */
+/** Mirrors `_formatHistoryItem`'s output (lib/dispatch-store.js:1301) as read under PERIODICAL_PROJECTION. */
 function historyRow(over = {}) {
   return {
     kind: 'custom',
@@ -805,6 +806,12 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     });
     await store.takeItem(repoARow._id, URL_KEY, 'token-a');
 
+    // A small real delay, not a fabricated timestamp (mirrors the true-max
+    // round-trip test below): addItem always stamps dispatchedAt from the
+    // clock, so this only guarantees the default row lands strictly later,
+    // making it the unambiguous max for the top-level assertion below.
+    await new Promise(resolve => setTimeout(resolve, 5));
+
     const defaultRow = await store.addItem(URL_KEY, {
       prompt: 'run the review',
       promptName: t.title,
@@ -813,6 +820,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
       repo: null
     });
     await store.takeItem(defaultRow._id, URL_KEY, 'token-b');
+    assert.ok(defaultRow.dispatchedAt.getTime() > repoARow.dispatchedAt.getTime(), 'test setup sanity: defaultRow must be strictly later than repoARow');
 
     const { items: historyRows } = await store.listHistory(URL_KEY, { projection: repoProjection });
     assert.equal(historyRows.length, 2);
@@ -831,6 +839,14 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     assert.ok(defaultLane, 'expected a default (null) lane');
     assert.equal(repoALane.runs, 1);
     assert.equal(defaultLane.runs, 1);
+
+    // §3 aggregation properties (beat 4 corrective): every OTHER `runs`
+    // assertion in this file sits on a single-lane fixture, where a sum is
+    // indistinguishable from "return the first/only lane's count" — this is
+    // the one two-lane fixture that can actually catch a mis-implementation
+    // like `laneRuns.get(firstLane)` surviving in place of a real reduce.
+    assert.equal(result.runs, 2, 'top-level runs must be the SUM across lanes (1 + 1), not either lane\'s own count');
+    assert.equal(result.lastDispatchedAt, defaultRow.dispatchedAt.getTime(), 'top-level lastDispatchedAt must be the MAX across lanes (the later default-lane row), not repo-a\'s earlier one');
   });
 
   test('LIN-1932 B2: a live queue row for repo-a and an aged taken row for repo-b — repo-a reads recent, repo-b reads due, and no default lane is spuriously marked recent', async () => {
@@ -920,13 +936,13 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
   // is exactly why it is not used here.
   test('lastDispatchedAt is the true max over a real archive round trip, even when the OLDER row is archived (and so read back) first', async () => {
     const store = freshStore();
-    const template = { id: 'documentation-review', title: 'Documentation Review', mode: 'corrective', cadence: 'weekly' };
+    const t = template({ id: 'documentation-review', title: 'Documentation Review' });
 
     const older = await store.addItem(URL_KEY, {
       prompt: 'run the review',
-      promptName: template.title,
+      promptName: t.title,
       kind: 'custom',
-      periodicalId: template.id
+      periodicalId: t.id
     });
     // A small real delay, not a fabricated timestamp: addItem always stamps
     // `dispatchedAt` from the clock, so this only guarantees the two calls
@@ -934,9 +950,9 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     await new Promise(resolve => setTimeout(resolve, 5));
     const newer = await store.addItem(URL_KEY, {
       prompt: 'run the review',
-      promptName: template.title,
+      promptName: t.title,
       kind: 'custom',
-      periodicalId: template.id
+      periodicalId: t.id
     });
     assert.ok(newer.dispatchedAt.getTime() > older.dispatchedAt.getTime(), 'test setup sanity: newer must be strictly later than older');
 
@@ -948,7 +964,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     assert.equal(historyRows.length, 2);
     assert.equal(historyRows[0].dispatchedAt, older.dispatchedAt.toISOString(), 'sanity: archive order put the non-max row first in the read');
 
-    const [result] = foldPeriodicalRuns([template], { historyRows }, {
+    const [result] = foldPeriodicalRuns([t], { historyRows }, {
       now: newer.dispatchedAt.getTime() + 1000,
       historyTtlMs: store.historyTtl * 1000
     });
