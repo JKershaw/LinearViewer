@@ -706,6 +706,85 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     assert.equal(row.status, 'taken');
   });
 
+  // LIN-1932 beat 1, B3: falsification probe. PERIODICAL_PROJECTION at HEAD
+  // does not yet include `repo: 1` — this is the deliberately-incomplete
+  // projection for THIS bug (no separate constant needed, since the
+  // production projection itself is what's missing the field). Proves the
+  // silent drop is real against the store's actual read path, and that it
+  // is projection-shaped, not a broken store: periodicalId/status (fields
+  // the projection DOES grant) keep reading correctly on the same row.
+  test('LIN-1932 B3: a repo-stamped row reads back repo: null under PERIODICAL_PROJECTION (repo not yet projected), while periodicalId/status still read correctly', async () => {
+    const store = freshStore();
+    const created = await store.addItem(URL_KEY, {
+      prompt: 'run the review',
+      promptName: 'Documentation Review',
+      kind: 'custom',
+      periodicalId: 'documentation-review',
+      repo: 'repo-a'
+    });
+    await store.takeItem(created._id, URL_KEY, 'token-a');
+
+    const { items } = await store.listHistory(URL_KEY, { projection: PERIODICAL_PROJECTION });
+    assert.equal(items.length, 1);
+    const [row] = items;
+    // This is the bug: PERIODICAL_PROJECTION at HEAD has no `repo: 1`, so a
+    // genuinely repo-stamped row silently reads back `repo: null` instead of
+    // 'repo-a'. Must fail until beat 2 adds `repo: 1` to the projection.
+    assert.equal(row.repo, 'repo-a');
+    assert.equal(row.periodicalId, 'documentation-review');
+    assert.equal(row.status, 'taken');
+  });
+
+  // LIN-1932 beat 1, B1: history-lane split. Two archived `taken` rows for
+  // ONE template — repo-a and the default (null) lane — both in-window.
+  // Read with a projection that DOES include repo (repo: 1 added on top of
+  // PERIODICAL_PROJECTION) so this test exercises the FOLD's re-key, not the
+  // projection gap B3 already covers on its own. Asserts two DISTINCT lanes,
+  // runs: 1 each — not merely "a repo-a lane exists" (the plan is explicit
+  // that a fold which duplicated every row onto every lane would also pass
+  // that weaker assertion).
+  test('LIN-1932 B1: two taken rows (repo-a, default) for one template split into two lanes, runs: 1 each — not one merged lane', async () => {
+    const store = freshStore();
+    const repoProjection = { ...PERIODICAL_PROJECTION, repo: 1 };
+    const t = template({ id: 'documentation-review', title: 'Documentation Review' });
+
+    const repoARow = await store.addItem(URL_KEY, {
+      prompt: 'run the review',
+      promptName: t.title,
+      kind: 'custom',
+      periodicalId: t.id,
+      repo: 'repo-a'
+    });
+    await store.takeItem(repoARow._id, URL_KEY, 'token-a');
+
+    const defaultRow = await store.addItem(URL_KEY, {
+      prompt: 'run the review',
+      promptName: t.title,
+      kind: 'custom',
+      periodicalId: t.id,
+      repo: null
+    });
+    await store.takeItem(defaultRow._id, URL_KEY, 'token-b');
+
+    const { items: historyRows } = await store.listHistory(URL_KEY, { projection: repoProjection });
+    assert.equal(historyRows.length, 2);
+
+    const [result] = foldPeriodicalRuns([t], { historyRows }, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+
+    // Today (pre-re-key) the fold has no `repos` lane array at all — both
+    // rows key on template.id alone and collapse into the single top-level
+    // `runs: 2`. This must fail until beat 2 re-keys the fold's
+    // accumulators onto (periodicalId, repo).
+    assert.ok(Array.isArray(result.repos), 'foldPeriodicalRuns must return a `repos` lane array per template (not implemented yet)');
+    assert.equal(result.repos.length, 2, 'expected exactly two lanes: repo-a and the default null lane');
+    const repoALane = result.repos.find(l => l.repo === 'repo-a');
+    const defaultLane = result.repos.find(l => l.repo === null);
+    assert.ok(repoALane, 'expected a repo-a lane');
+    assert.ok(defaultLane, 'expected a default (null) lane');
+    assert.equal(repoALane.runs, 1);
+    assert.equal(defaultLane.runs, 1);
+  });
+
   test('PERIODICAL_PROJECTION survives a real queue-row round trip too (no status field — queue docs carry none)', async () => {
     const store = freshStore();
     const created = await store.addItem(URL_KEY, {
