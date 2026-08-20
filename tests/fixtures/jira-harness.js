@@ -28,6 +28,13 @@ export function jiraDashboardUrl(urlKey = JIRA_WORKSPACE_URL_KEY) {
 /** Jira's own epic-level `issuetype` marker (LIN-2011) — `hierarchyLevel: 1`. */
 const EPIC_ISSUETYPE = { id: '10000', name: 'Epic', hierarchyLevel: 1 };
 
+// LIN-2155: the tiered fetch's done tier is windowed to the last 7 days —
+// ENG-3 ("Jira task shipped") stands in for "a real completed issue that
+// should still render", so its resolutiondate must stay within that window
+// (computed relative to test run time), not a fixed historical literal that
+// ages out of the window as time passes.
+const RECENT_RESOLUTION_DATE = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+
 /**
  * Canonical seed for a Jira Cloud site, in the REST v3 shape createFakeJiraClient
  * expects (the fake returns it close to verbatim, so the provider's mapping runs
@@ -163,7 +170,7 @@ export const defaultJiraSeed = {
         description: null,
         status: { id: '103', name: 'Done', statusCategory: { key: 'done' } },
         project: { id: '10001', key: 'ENG', name: 'Engineering' },
-        created: '2026-01-03T00:00:00.000Z', duedate: null, resolutiondate: '2026-01-05T00:00:00.000Z',
+        created: '2026-01-03T00:00:00.000Z', duedate: null, resolutiondate: RECENT_RESOLUTION_DATE,
         labels: [], assignee: null, parent: null,
       },
     },
