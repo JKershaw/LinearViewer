@@ -12,12 +12,29 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getAllProviders } from '../../lib/providers/index.js';
+import { getAllProviders, getProvider } from '../../lib/providers/index.js';
 
 describe('LIN-2010 provider identity registry — barrel guard', () => {
   test('the barrel registers exactly the five known providers', () => {
     const names = getAllProviders().map((p) => p.name).sort();
     assert.deepEqual(names, ['github', 'github-projects', 'jira', 'linear', 'local']);
     assert.equal(getAllProviders().length, 5);
+  });
+});
+
+describe('LIN-2010 provider identity registry — step-3 declarations (beat 2)', () => {
+  test('github and github-projects share the identical addProvider.configPredicate reference (F1)', () => {
+    const github = getProvider('github');
+    const githubProjects = getProvider('github-projects');
+    assert.equal(typeof github.addProvider.configPredicate, 'function');
+    assert.equal(github.addProvider.configPredicate, githubProjects.addProvider.configPredicate);
+  });
+
+  test('local declares no addProvider — its onboarding door is POST /workspace/new, not /providers/add', () => {
+    assert.equal(getProvider('local').addProvider, null);
+  });
+
+  test('github-projects declares no entryCta — a declared absence, not derived from capability', () => {
+    assert.equal(getProvider('github-projects').entryCta, null);
   });
 });
