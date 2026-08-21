@@ -18,6 +18,8 @@ import {
   parseModel,
   parseUsage,
   parseResources,
+  parseDecision,
+  parseDecisions,
   deriveRuntime,
   buildRunTelemetry,
   buildSessionTelemetry,
@@ -576,6 +578,242 @@ describe('parseResources (LIN-1789)', () => {
   test('an entry with no kind at all is tolerated, never matched', () => {
     const feedback = [{ message: resourcesMessage() }];
     assert.equal(parseResources(feedback), null);
+  });
+});
+
+describe('parseDecision (LIN-2181)', () => {
+  const decisionMessage = (overrides = {}) =>
+    `[decision] ${JSON.stringify({
+      decision_id: 'd-1',
+      question: 'Proceed with the migration?',
+      options: [
+        { id: 'yes', label: 'Proceed' },
+        { id: 'no', label: 'Hold', cost: 2 },
+      ],
+      recommended: 'yes',
+      free_text: true,
+      if_unanswered: { disposition: 'a', note: 'default to hold' },
+      ...overrides,
+    })}`;
+
+  test('parses a well-formed decision payload, whitelisting exactly the known fields', () => {
+    const decision = parseDecision(decisionMessage());
+    assert.deepEqual(decision, {
+      decision_id: 'd-1',
+      question: 'Proceed with the migration?',
+      options: [
+        { id: 'yes', label: 'Proceed' },
+        { id: 'no', label: 'Hold', cost: 2 },
+      ],
+      recommended: 'yes',
+      free_text: true,
+      if_unanswered: { disposition: 'a', note: 'default to hold' },
+    });
+  });
+
+  test('malformed JSON returns null, never throws', () => {
+    assert.doesNotThrow(() => parseDecision('[decision] {"decision_id":"d-1", not-json'));
+    assert.equal(parseDecision('[decision] {"decision_id":"d-1", not-json'), null);
+  });
+
+  test('a non-string message is tolerated', () => {
+    assert.doesNotThrow(() => parseDecision(undefined));
+    assert.equal(parseDecision(undefined), null);
+  });
+
+  test('no "{" in the message returns null', () => {
+    assert.equal(parseDecision('[decision] no payload here'), null);
+  });
+
+  test('a non-object (array) payload is rejected', () => {
+    assert.equal(parseDecision('[decision] [1,2,3]'), null);
+  });
+
+  test('unknown top-level keys are dropped, not carried through', () => {
+    const message = `[decision] ${JSON.stringify({ decision_id: 'd-1', bogus_field: 'nope' })}`;
+    const decision = parseDecision(message);
+    assert.deepEqual(decision, { decision_id: 'd-1' });
+    assert.ok(!('bogus_field' in decision));
+  });
+
+  test('missing decision_id drops the WHOLE entry', () => {
+    const message = `[decision] ${JSON.stringify({ question: 'no id here' })}`;
+    assert.equal(parseDecision(message), null);
+  });
+
+  test('a non-string decision_id is treated as missing', () => {
+    const message = `[decision] ${JSON.stringify({ decision_id: 42 })}`;
+    assert.equal(parseDecision(message), null);
+  });
+
+  test('recommended not present in options[].id drops only the FIELD, keeping the entry', () => {
+    const message = decisionMessage({ recommended: 'not-an-option' });
+    const decision = parseDecision(message);
+    assert.ok(decision);
+    assert.equal(decision.decision_id, 'd-1');
+    assert.ok(!('recommended' in decision));
+  });
+
+  test('recommended is dropped when there are no options at all to validate against', () => {
+    const message = `[decision] ${JSON.stringify({ decision_id: 'd-1', recommended: 'yes' })}`;
+    const decision = parseDecision(message);
+    assert.ok(!('recommended' in decision));
+  });
+
+  test('options[] is bounded to a small cap (10)', () => {
+    const options = Array.from({ length: 25 }, (_, i) => ({ id: `opt-${i}`, label: `Option ${i}` }));
+    const message = `[decision] ${JSON.stringify({ decision_id: 'd-1', options })}`;
+    const decision = parseDecision(message);
+    assert.equal(decision.options.length, 10);
+  });
+
+  test('a malformed option (missing id/label, wrong shape) is skipped, not the whole array', () => {
+    const message = `[decision] ${JSON.stringify({
+      decision_id: 'd-1',
+      options: [{ id: 'yes', label: 'Proceed' }, { id: 'no' }, 'not-an-object', { label: 'no id' }],
+    })}`;
+    const decision = parseDecision(message);
+    assert.deepEqual(decision.options, [{ id: 'yes', label: 'Proceed' }]);
+  });
+
+  test('an empty options array yields no options field', () => {
+    const message = `[decision] ${JSON.stringify({ decision_id: 'd-1', options: [] })}`;
+    const decision = parseDecision(message);
+    assert.ok(!('options' in decision));
+  });
+
+  test('a non-boolean free_text is dropped', () => {
+    const message = `[decision] ${JSON.stringify({ decision_id: 'd-1', free_text: 'yes' })}`;
+    const decision = parseDecision(message);
+    assert.ok(!('free_text' in decision));
+  });
+
+  test('if_unanswered stays opaque — unknown-to-us keys pass through with no enum validation', () => {
+    const message = `[decision] ${JSON.stringify({
+      decision_id: 'd-1',
+      if_unanswered: { disposition: 'not-a-real-enum-value', anything: 'goes' },
+    })}`;
+    const decision = parseDecision(message);
+    assert.deepEqual(decision.if_unanswered, { disposition: 'not-a-real-enum-value', anything: 'goes' });
+  });
+
+  test('a non-object if_unanswered (array or scalar) is dropped', () => {
+    const arrayMessage = `[decision] ${JSON.stringify({ decision_id: 'd-1', if_unanswered: [1, 2] })}`;
+    assert.ok(!('if_unanswered' in parseDecision(arrayMessage)));
+    const scalarMessage = `[decision] ${JSON.stringify({ decision_id: 'd-1', if_unanswered: 'stop' })}`;
+    assert.ok(!('if_unanswered' in parseDecision(scalarMessage)));
+  });
+});
+
+describe('parseDecisions (LIN-2181)', () => {
+  test('omitted (empty array) when no kind:"decision" entry exists', () => {
+    assert.deepEqual(parseDecisions([]), []);
+    assert.deepEqual(parseDecisions([{ message: '[decision] {"decision_id":"d-1"}', kind: 'assistant-text' }]), []);
+  });
+
+  test('a non-array feedback input is tolerated', () => {
+    assert.doesNotThrow(() => parseDecisions(undefined));
+    assert.deepEqual(parseDecisions(undefined), []);
+  });
+
+  test('scans only kind:"decision" entries, ignoring everything else', () => {
+    const feedback = [
+      { message: '[usage] {"model":"x"}', kind: 'usage' },
+      { message: '[decision] {"decision_id":"d-1","question":"go?"}', kind: 'decision' },
+      { message: '[heartbeat] [working] 1 tools/1s', kind: 'heartbeat' },
+    ];
+    const decisions = parseDecisions(feedback);
+    assert.equal(decisions.length, 1);
+    assert.equal(decisions[0].decision_id, 'd-1');
+  });
+
+  test('a malformed decision entry is skipped, never throws, never breaks a sibling entry', () => {
+    const feedback = [
+      { message: '[decision] {"decision_id":"d-1"}', kind: 'decision' },
+      { message: '[decision] {"decision_id":"d-2", not-json', kind: 'decision' },
+    ];
+    assert.doesNotThrow(() => parseDecisions(feedback));
+    const decisions = parseDecisions(feedback);
+    assert.deepEqual(decisions.map((d) => d.decision_id), ['d-1']);
+  });
+
+  test('dedupes by decision_id with LAST-wins semantics across two entries sharing an id', () => {
+    const feedback = [
+      { message: '[decision] {"decision_id":"d-1","question":"first ask"}', kind: 'decision' },
+      { message: '[decision] {"decision_id":"d-1","question":"re-answered"}', kind: 'decision' },
+    ];
+    const decisions = parseDecisions(feedback);
+    assert.equal(decisions.length, 1);
+    assert.equal(decisions[0].question, 're-answered');
+  });
+
+  test('distinct decision_ids each survive as their own entry', () => {
+    const feedback = [
+      { message: '[decision] {"decision_id":"d-1"}', kind: 'decision' },
+      { message: '[decision] {"decision_id":"d-2"}', kind: 'decision' },
+    ];
+    const decisions = parseDecisions(feedback);
+    assert.deepEqual(decisions.map((d) => d.decision_id).sort(), ['d-1', 'd-2']);
+  });
+});
+
+describe('decision parsing does not disturb sibling feedback-kind handling (LIN-2181)', () => {
+  const mixedFeedback = [
+    { message: '[working] 3 tools/12s', kind: 'heartbeat' },
+    {
+      message: `[usage] ${JSON.stringify({ harness: 'claude-code', model: 'claude-opus-4-8', inputTokens: 10, outputTokens: 20 })}`,
+      kind: 'usage',
+    },
+    {
+      message: `[resources] ${JSON.stringify({ peakRssBytes: 12345 })}`,
+      kind: 'resources',
+    },
+    { message: '[decision] {"decision_id":"d-1","question":"proceed?"}', kind: 'decision' },
+    { message: '[evidence] https://example.com/report · 2 mentions', kind: 'evidence' },
+  ];
+
+  test('parseUsage still finds the usage entry, unaffected by the decision entry in the same feedback array', () => {
+    const usage = parseUsage(mixedFeedback);
+    assert.ok(usage);
+    assert.equal(usage.model, 'claude-opus-4-8');
+  });
+
+  test('parseResources still finds the resources entry, unaffected by the decision entry', () => {
+    const resources = parseResources(mixedFeedback);
+    assert.deepEqual(resources, { peakRssBytes: 12345 });
+  });
+
+  test('parseHeartbeats still finds the heartbeat, unaffected by the decision entry', () => {
+    const heartbeats = parseHeartbeats(mixedFeedback);
+    assert.equal(heartbeats.length, 1);
+    assert.equal(heartbeats[0].toolCount, 3);
+  });
+
+  test('parseEvidenceArtifacts still finds the evidence entry, unaffected by the decision entry', () => {
+    const artifacts = parseEvidenceArtifacts(mixedFeedback);
+    assert.equal(artifacts.length, 1);
+    assert.equal(artifacts[0].url, 'https://example.com/report');
+  });
+
+  test('parseDecisions finds exactly the one decision entry in the same mixed feedback array', () => {
+    const decisions = parseDecisions(mixedFeedback);
+    assert.equal(decisions.length, 1);
+    assert.equal(decisions[0].decision_id, 'd-1');
+  });
+
+  test('a decision-kinded entry whose message looks like a usage/resources payload is not picked up by those parsers', () => {
+    const feedback = [
+      { message: `[decision] ${JSON.stringify({ decision_id: 'd-1', inputTokens: 999 })}`, kind: 'decision' },
+    ];
+    assert.equal(parseUsage(feedback), null);
+    assert.equal(parseResources(feedback), null);
+  });
+
+  test('buildRunTelemetry composite output is unaffected by a decision entry (Phase 1 stays inert — no decisions field attached yet)', () => {
+    const telemetry = buildRunTelemetry({ dispatchedAt: '2026-06-22T10:00:00.000Z', feedback: mixedFeedback });
+    assert.ok(!('decisions' in telemetry));
+    assert.equal(telemetry.usage.model, 'claude-opus-4-8');
+    assert.deepEqual(telemetry.resources, { peakRssBytes: 12345 });
   });
 });
 

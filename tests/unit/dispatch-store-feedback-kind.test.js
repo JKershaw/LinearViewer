@@ -133,6 +133,27 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
     assert.equal(doc.feedback[0].message, message);
   });
 
+  test('LIN-2181: kind:"decision" survives the queue→history archive projection when read back formatted (not just the raw stored doc)', async () => {
+    // _formatFeedbackEntries (the projection listHistory's _formatHistoryItem
+    // uses) is value-agnostic — `if (f.kind) entry.kind = f.kind` — but the
+    // LIN-2180 test above only ever asserted the RAW historyCollection doc.
+    // This drives the item through takeItem (archives queue → history) and
+    // addFeedback, then reads it back via the same formatted path a consumer
+    // would (listHistory), pinning that 'decision' survives that hop AS SUCH.
+    const store = makeStore();
+    const item = await takenItem(store);
+    const rootItemId = '11111111-2222-3333-4444-555555555555';
+    const message = '[decision] {"decision_id":"d-1","question":"proceed?"}';
+
+    await store.addFeedback(item._id, URL_KEY, { message, kind: 'decision', rootItemId }, 'token-a');
+
+    const { items } = await store.listHistory(URL_KEY);
+    const formatted = items.find((i) => i._id === item._id || i.id === item._id);
+    assert.ok(formatted, 'archived item should be readable via listHistory');
+    assert.equal(formatted.feedback[0].kind, 'decision');
+    assert.equal(formatted.feedback[0].message, message);
+  });
+
   test('LIN-1427: a kind:"refusal" feedback entry posted at a [blocked] finalize boundary persists as given', async () => {
     const store = makeStore();
     const item = await takenItem(store);
