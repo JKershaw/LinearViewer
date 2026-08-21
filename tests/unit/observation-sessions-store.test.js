@@ -93,7 +93,7 @@ test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it reb
 
   // The pin tracks the CURRENT version (LIN-1789 moved it 6 → 7); a lingering v3
   // archive doc from before LIN-1487 must still miss on both reads.
-  assert.equal(BUILDER_VERSION, 8, 'this bump-specific pin tracks the current version');
+  assert.equal(BUILDER_VERSION, 9, 'this bump-specific pin tracks the current version');
   const doc = collection._docs.find(d => d.type === 'session');
   doc.builderVersion = 3;
 

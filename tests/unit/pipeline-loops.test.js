@@ -18,8 +18,18 @@ import {
   getSessionsForWorkspace,
   __internal
 } from '../../lib/pipeline-loops.js';
+import { parseDecisions } from '../../lib/session-telemetry.js';
 
-const { _toDate, _deriveAgentState, _deriveStage, _matchAgentStatusToLoop, _buildLoops, LOOKBACK_MS } = __internal;
+const {
+  _toDate,
+  _deriveAgentState,
+  _deriveStage,
+  _matchAgentStatusToLoop,
+  _buildLoops,
+  LOOKBACK_MS,
+  _findLastDecision,
+  correlateDecisionCase
+} = __internal;
 
 // ─── Test fixture helpers ────────────────────────────────────────────────────
 
@@ -958,4 +968,269 @@ describe('lean read projection (LIN-623)', () => {
     assert.strictEqual(sessions[0].completedAt, completedTs,
       'derived terminal time survives the projected lean read');
   });
+});
+
+// ── LIN-2182 (H3): decision/decisionCase derivation ────────────────────────────
+// `decision` is the most-recent parseable `kind:'decision'` entry in a loop's
+// post-harvest feedback (backward scan, not `parseDecisions().at(-1)`);
+// `decisionCase` is the maximal contiguous run of `kind:'assistant-text'`
+// entries immediately preceding it. Both are always present (lean and
+// non-lean) — `null`/`[]` when absent, never `undefined`.
+
+function decisionMessage(payload) {
+  return `[decision] ${JSON.stringify(payload)}`;
+}
+
+function decisionEntry(payload, timestamp) {
+  return { kind: 'decision', message: decisionMessage(payload), timestamp };
+}
+
+function textEntry(text, timestamp) {
+  return { kind: 'assistant-text', message: text, timestamp };
+}
+
+const FULL_DECISION_PAYLOAD = {
+  decision_id: 'd-1',
+  question: 'Proceed with the migration?',
+  options: [
+    { id: 'yes', label: 'Proceed' },
+    { id: 'no', label: 'Hold', cost: 2 }
+  ],
+  recommended: 'yes',
+  free_text: true,
+  if_unanswered: { disposition: 'a', note: 'default to hold' }
+};
+
+describe('correlateDecisionCase (LIN-2182 / H3, pure helper)', () => {
+  test('an assistant-text × N run immediately before the index yields exactly those N messages, in order', () => {
+    const feedback = [textEntry('A'), textEntry('B'), textEntry('C'), decisionEntry(FULL_DECISION_PAYLOAD)];
+    assert.deepStrictEqual(correlateDecisionCase(feedback, 3), ['A', 'B', 'C']);
+  });
+
+  test('an interruption (evidence/tool) between the text run and the decision truncates — text before the break is excluded', () => {
+    const feedback = [
+      textEntry('A'),
+      textEntry('B'),
+      { kind: 'evidence', message: '[evidence] PR opened' },
+      textEntry('C'),
+      decisionEntry(FULL_DECISION_PAYLOAD)
+    ];
+    assert.deepStrictEqual(correlateDecisionCase(feedback, 4), ['C']);
+  });
+
+  test('any unexpected kind in the gap truncates, not just evidence/tool — no enumerated blocklist', () => {
+    const feedback = [
+      textEntry('A'),
+      { kind: 'heartbeat', message: '[working] 2 tools/5s' },
+      textEntry('B'),
+      decisionEntry(FULL_DECISION_PAYLOAD)
+    ];
+    assert.deepStrictEqual(correlateDecisionCase(feedback, 3), ['B']);
+  });
+
+  test('a break immediately before the decision degrades to []', () => {
+    const feedback = [textEntry('A'), textEntry('B'), { kind: 'tool', message: 'Bash' }, decisionEntry(FULL_DECISION_PAYLOAD)];
+    assert.deepStrictEqual(correlateDecisionCase(feedback, 3), []);
+  });
+
+  test('the decision as the very first entry yields []', () => {
+    const feedback = [decisionEntry(FULL_DECISION_PAYLOAD)];
+    assert.deepStrictEqual(correlateDecisionCase(feedback, 0), []);
+  });
+
+  test('non-array feedback and a non-integer index are tolerated, never throw', () => {
+    assert.deepStrictEqual(correlateDecisionCase(undefined, 3), []);
+    assert.deepStrictEqual(correlateDecisionCase([], -1), []);
+    assert.deepStrictEqual(correlateDecisionCase([textEntry('A')], null), []);
+  });
+});
+
+describe('_findLastDecision (LIN-2182 / H3, backward scan)', () => {
+  test('a malformed decision entry (unparseable message) is skipped, scanning backwards to an earlier parseable one', () => {
+    const feedback = [
+      decisionEntry({ decision_id: 'd-1' }),
+      { kind: 'decision', message: '[decision] {"decision_id":"d-2", not-json' }
+    ];
+    const { decision, decisionEntryIndex } = _findLastDecision(feedback);
+    assert.strictEqual(decision.decision_id, 'd-1');
+    assert.strictEqual(decisionEntryIndex, 0);
+  });
+
+  test('a decision-shaped message on a non-decision kind is ignored entirely', () => {
+    const feedback = [textEntry(decisionMessage({ decision_id: 'd-1' }))];
+    assert.deepStrictEqual(_findLastDecision(feedback), { decision: null, decisionEntryIndex: -1 });
+  });
+
+  test('repeated decision_ids: returns the CHRONOLOGICALLY LAST entry, unlike parseDecisions().at(-1)', () => {
+    // The exact research repro: d-1 first ask, d-2, then a re-ask of d-1 that is
+    // chronologically last. parseDecisions() dedupes into a Map — last-wins
+    // VALUE but first-appearance POSITION — so .at(-1) returns d-2, which is
+    // wrong. The backward scan must return d-1's re-ask.
+    const feedback = [
+      decisionEntry({ decision_id: 'd-1', question: 'first ask' }, 't1'),
+      decisionEntry({ decision_id: 'd-2', question: 'second ask' }, 't2'),
+      decisionEntry({ decision_id: 'd-1', question: 're-ask of d-1 — chronologically last' }, 't3')
+    ];
+
+    // Prove the trap is real: .at(-1) on parseDecisions gives the WRONG entry.
+    const wrongViaAtMinusOne = parseDecisions(feedback).at(-1);
+    assert.strictEqual(wrongViaAtMinusOne.decision_id, 'd-2', 'sanity: this IS the trap the plan rejected');
+
+    const { decision, decisionEntryIndex } = _findLastDecision(feedback);
+    assert.strictEqual(decision.decision_id, 'd-1');
+    assert.strictEqual(decision.question, 're-ask of d-1 — chronologically last');
+    assert.strictEqual(decisionEntryIndex, 2);
+  });
+
+  test('no decision entries at all yields { decision: null, decisionEntryIndex: -1 }', () => {
+    assert.deepStrictEqual(_findLastDecision([textEntry('A'), { kind: 'status', message: '[done]' }]), {
+      decision: null,
+      decisionEntryIndex: -1
+    });
+  });
+});
+
+describe('_buildLoops: decision/decisionCase derivation end-to-end (LIN-2182 / H3)', () => {
+  test('producer envelope round-trip: a real S2-shaped [decision] message parses through to the loop, whitelisted fields only', () => {
+    const feedback = [textEntry('weighing the options', 't1'), decisionEntry(FULL_DECISION_PAYLOAD, 't2')];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.deepStrictEqual(loop.decision, FULL_DECISION_PAYLOAD);
+    assert.deepStrictEqual(loop.decisionCase, ['weighing the options']);
+  });
+
+  test('producer-gap pin (row 17, routed to LIN-2187): S2s own wire fixture with no decision_id derives decision: null', () => {
+    // Real shipped producer output (test/decision-emission.test.js in simple-dispatcher):
+    // schema-shaped `options[{id,label}]` + `decision_id` is NOT yet emitted, so every
+    // real message parses to null today. H3 ships inert until LIN-2187 lands.
+    const feedback = [
+      textEntry('should we escalate?', 't1'),
+      { kind: 'decision', message: '[decision] {"kind":"escalate","options":["A","B"]}', timestamp: 't2' }
+    ];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.strictEqual(loop.decision, null);
+    assert.deepStrictEqual(loop.decisionCase, []);
+  });
+
+  test('relay OFF (always ≥1 assistant-text): decisionCase carries the turn text', () => {
+    // ASSISTANT_TEXT_RELAY OFF always posts at least one assistant-text (postTurnText,
+    // including a synthetic EMPTY_RECAP_MARKER for an empty turn) — never a silent
+    // omission (LIN-1291). This is the case where decisionCase is populated.
+    const feedback = [textEntry('(no new output this turn)', 't1'), decisionEntry(FULL_DECISION_PAYLOAD, 't2')];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.deepStrictEqual(loop.decisionCase, ['(no new output this turn)']);
+  });
+
+  test('relay ON, empty delta (can post ZERO assistant-text): decisionCase degrades to [] — this is the degraded-not-OFF case', () => {
+    // ASSISTANT_TEXT_RELAY ON can post nothing when the position-keyed dedup finds no
+    // new blocks (postAssistantTextDelta's `if (!blocks.length) return;`). The ticket's
+    // intuitive framing has this backwards — the empty case belongs to ON, not OFF.
+    const feedback = [decisionEntry(FULL_DECISION_PAYLOAD, 't1'), { kind: 'status', message: '[blocked]', timestamp: 't2' }];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.strictEqual(loop.decision.decision_id, 'd-1');
+    assert.deepStrictEqual(loop.decisionCase, []);
+  });
+
+  test('lean/non-lean parity: decision and decisionCase are identical, and present on the lean loop even though feedback is []', () => {
+    const feedback = [textEntry('A', 't1'), textEntry('B', 't2'), decisionEntry(FULL_DECISION_PAYLOAD, 't3')];
+    const hist = historyItem({ feedback });
+    const full = _buildLoops({ historyItems: [hist], now: NOW })[0];
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true })[0];
+    assert.deepStrictEqual(lean.decision, full.decision);
+    assert.deepStrictEqual(lean.decisionCase, full.decisionCase);
+    assert.deepStrictEqual(lean.decisionCase, ['A', 'B']);
+    assert.deepStrictEqual(lean.feedback, [], 'lean loop still drops raw feedback');
+  });
+
+  test('empty shapes: no decision anywhere yields decision: null and decisionCase: [], never undefined', () => {
+    const feedback = [textEntry('A', 't1'), { kind: 'status', message: '[done]', timestamp: 't2' }];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.strictEqual(loop.decision, null);
+    assert.deepStrictEqual(loop.decisionCase, []);
+    assert.ok('decision' in loop && 'decisionCase' in loop, 'both keys must be present, not omitted');
+
+    const lean = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW, lean: true })[0];
+    assert.strictEqual(lean.decision, null);
+    assert.deepStrictEqual(lean.decisionCase, []);
+    assert.ok('decision' in lean && 'decisionCase' in lean, 'lean loop must carry both keys too, per !== undefined discriminators');
+  });
+
+  // ── Table-driven matrix: homogeneous feedback[]-kind fixtures ──────────────
+  const MATRIX = [
+    {
+      name: 'blocked, short turn: one assistant-text then decision',
+      feedback: [textEntry('turn text', 't1'), decisionEntry({ decision_id: 'd-1' }, 't2'), { kind: 'status', message: '[blocked]', timestamp: 't3' }],
+      decision: { decision_id: 'd-1' },
+      decisionCase: ['turn text']
+    },
+    {
+      name: 'chunked turn: two assistant-text entries then decision',
+      feedback: [
+        textEntry('(recap 1/2) first half', 't1'),
+        textEntry('(recap 2/2) second half', 't2'),
+        decisionEntry({ decision_id: 'd-1' }, 't3'),
+        { kind: 'status', message: '[blocked]', timestamp: 't4' }
+      ],
+      decision: { decision_id: 'd-1' },
+      decisionCase: ['(recap 1/2) first half', '(recap 2/2) second half']
+    },
+    {
+      name: 'multi-block delta: three assistant-text entries then decision',
+      feedback: [textEntry('A', 't1'), textEntry('B', 't2'), textEntry('C', 't3'), decisionEntry({ decision_id: 'd-1' }, 't4')],
+      decision: { decision_id: 'd-1' },
+      decisionCase: ['A', 'B', 'C']
+    },
+    {
+      name: 'complete run with evidence + tool after the decision — those do not affect decisionCase',
+      feedback: [
+        textEntry('A', 't1'),
+        decisionEntry({ decision_id: 'd-1' }, 't2'),
+        { kind: 'evidence', message: '[evidence] PR', timestamp: 't3' },
+        { kind: 'status', message: '[done]', timestamp: 't4' }
+      ],
+      decision: { decision_id: 'd-1' },
+      decisionCase: ['A']
+    },
+    {
+      name: 'decision is first entry',
+      feedback: [decisionEntry({ decision_id: 'd-1' }, 't1'), { kind: 'status', message: '[blocked]', timestamp: 't2' }],
+      decision: { decision_id: 'd-1' },
+      decisionCase: []
+    },
+    {
+      name: 'no decision at all',
+      feedback: [textEntry('A', 't1'), { kind: 'status', message: '[done]', timestamp: 't2' }],
+      decision: null,
+      decisionCase: []
+    },
+    {
+      name: 'two decisions, distinct ids — takes the later one and its own preceding run',
+      feedback: [
+        textEntry('A', 't1'),
+        decisionEntry({ decision_id: 'd-1' }, 't2'),
+        textEntry('B', 't3'),
+        decisionEntry({ decision_id: 'd-2' }, 't4'),
+        { kind: 'status', message: '[blocked]', timestamp: 't5' }
+      ],
+      decision: { decision_id: 'd-2' },
+      decisionCase: ['B']
+    },
+    {
+      name: 'a live heartbeat race (concurrent reaper writer) breaks the run',
+      feedback: [textEntry('A', 't1'), { kind: 'heartbeat', message: '[working] 1 tools/1s', timestamp: 't2' }, decisionEntry({ decision_id: 'd-1' }, 't3')],
+      decision: { decision_id: 'd-1' },
+      decisionCase: []
+    }
+  ];
+
+  for (const row of MATRIX) {
+    test(`matrix: ${row.name}`, () => {
+      const hist = historyItem({ feedback: row.feedback });
+      const full = _buildLoops({ historyItems: [hist], now: NOW })[0];
+      const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true })[0];
+      for (const [label, loop] of [['default', full], ['lean', lean]]) {
+        assert.deepStrictEqual(loop.decision, row.decision, `${label}: decision`);
+        assert.deepStrictEqual(loop.decisionCase, row.decisionCase, `${label}: decisionCase`);
+      }
+    });
+  }
 });

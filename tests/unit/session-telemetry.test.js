@@ -817,6 +817,80 @@ describe('decision parsing does not disturb sibling feedback-kind handling (LIN-
   });
 });
 
+describe('parseHeartbeats — decision-prose collision (LIN-2182)', () => {
+  // Reproduced live during LIN-2182 research: decision `question`/`options[].label`
+  // prose can incidentally match HEARTBEAT_HINT (e.g. a batching question phrased as
+  // "N tools in ..."), minting a phantom heartbeat metric from human prose that was
+  // never a heartbeat. `parseHeartbeats` must exclude `kind === 'decision'` entries.
+  test('a decision question phrased as "N tools in ..." mints no phantom heartbeat', () => {
+    const feedback = [
+      {
+        kind: 'decision',
+        message: `[decision] ${JSON.stringify({
+          decision_id: 'd-1',
+          question: 'batch 3 tools in one turn, or keep them serial?',
+        })}`,
+      },
+    ];
+    assert.deepEqual(parseHeartbeats(feedback), []);
+  });
+
+  test('a decision option label phrased as "N tools in ..." mints no phantom heartbeat', () => {
+    const feedback = [
+      {
+        kind: 'decision',
+        message: `[decision] ${JSON.stringify({
+          decision_id: 'd-1',
+          question: 'how should we proceed?',
+          options: [{ id: 'parallel', label: 'run 5 tools in parallel' }],
+        })}`,
+      },
+    ];
+    assert.deepEqual(parseHeartbeats(feedback), []);
+  });
+
+  test('the phantom is confirmed reachable via buildRunTelemetry().metrics — pinned empty', () => {
+    const feedback = [
+      {
+        kind: 'decision',
+        message: `[decision] ${JSON.stringify({
+          decision_id: 'd-1',
+          question: 'batch 3 tools in one turn, or keep them serial?',
+        })}`,
+      },
+    ];
+    const telemetry = buildRunTelemetry({ feedback });
+    assert.deepEqual(telemetry.metrics, []);
+  });
+
+  test('a real heartbeat in the same feedback array still parses — the exclusion is scoped to kind:"decision" only', () => {
+    const feedback = [
+      { kind: 'heartbeat', message: '[working] 6 tools in 32s: Bash×6 · 6 total' },
+      {
+        kind: 'decision',
+        message: `[decision] ${JSON.stringify({ decision_id: 'd-1', question: 'batch 3 tools in one turn?' })}`,
+      },
+    ];
+    const metrics = parseHeartbeats(feedback);
+    assert.equal(metrics.length, 1);
+    assert.equal(metrics[0].toolCount, 6);
+  });
+
+  test('untagged legacy rows (no kind at all) still parse — the exclusion is negative, not a positive allow-list', () => {
+    const feedback = [{ message: '[working] 3 tools/12s' }];
+    const metrics = parseHeartbeats(feedback);
+    assert.equal(metrics.length, 1);
+    assert.equal(metrics[0].toolCount, 3);
+  });
+
+  test('kind:"status" beats still parse — the exclusion does not require kind:"heartbeat"', () => {
+    const feedback = [{ kind: 'status', message: '[working] 4 tools/10s' }];
+    const metrics = parseHeartbeats(feedback);
+    assert.equal(metrics.length, 1);
+    assert.equal(metrics[0].toolCount, 4);
+  });
+});
+
 describe('deriveRuntime', () => {
   test('runtime from dispatchedAt → completedAt, with [done] duration as cross-check', () => {
     const feedback = [{ message: '[done] Task completed in 55s' }];
