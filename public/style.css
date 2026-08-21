@@ -1660,7 +1660,11 @@ a.wordmark:hover {
      (96px) under-shoots, leaving auto-scrolled/anchored/focused controls ~26px
      tucked under the header (a partial mobile regression of the LIN-984 clearance
      that `scroll-margin-top: var(--nav-sticky-h)` provides). Bump the token here
-     so mobile clearance ≥ the real 122px header; the desktop value is untouched. */
+     so mobile clearance ≥ the real 122px header; the desktop value is untouched.
+     LIN-2179: the mobile strip below is now a non-wrapping row at every width, so
+     122px is a TRUE bound rather than a margin that depended on the strip staying
+     unwrapped — 124px was previously under-declared against a wrapped 168px header
+     whenever the `⋯ more` toggle spilled onto its own row. */
   :root {
     --nav-sticky-h: 7.75rem;  /* 124px ≥ measured 122px mobile header */
   }
@@ -1717,26 +1721,62 @@ a.wordmark:hover {
     display: none;
   }
 
-  /* Mobile-390 view tab strip (LIN-1058). Density fix: keep the first-class four
-     (+ any hoisted active view) inline; collapse the flag-gated/power-user views
-     behind the in-flow `⋯ more` expander. Comfortable 44px tap targets on every
-     link and the toggle. The expander opens as an IN-FLOW card BELOW the strip
-     (flex-wrap lets it drop to its own row) — it displaces content down, never
-     floats over it, and there is no backdrop (LIN-984 safe by construction). */
+  /* Mobile-390 view tab strip (LIN-1058, revised LIN-2179). Density fix: keep the
+     first-class four (+ any hoisted active view) inline; collapse the
+     flag-gated/power-user views behind the in-flow `⋯ more` expander. Comfortable
+     44px tap targets on every link and the toggle. The CLOSED strip inherits the
+     base non-wrapping row (`flex-wrap: nowrap; overflow-x: auto`, beat 4 above) so
+     it can never wrap itself onto a second row — only the OPENED expander card is
+     allowed to wrap (below), dropping to its own row exactly like the desktop
+     `.nav-views--collapsed.nav-views--open` pattern. The expander is still an
+     IN-FLOW card BELOW the strip — it displaces content down, never floats over
+     it, and there is no backdrop (LIN-984 safe by construction). */
   .nav-views {
-    flex-wrap: wrap;      /* let the opened `⋯ more` card drop to its own row */
-    overflow-x: visible;  /* wrap replaces the desktop horizontal-scroll fallback */
-    gap: 0.25ch 1.5ch;
+    gap: 0.25ch 1ch;
     align-items: center;
+    scroll-padding-inline-end: 3ch;  /* clears the pinned toggle's own footprint */
   }
 
-  /* 44px comfortable tap targets; revealing the toggle (overrides its desktop
-     display:none) and collapsing the overflow group (overrides display:contents). */
+  /* Restore wrap only while the card is open, so the full-width overflow group
+     drops to its own row below the strip (mirrors `.nav-views--collapsed.nav-views--open`
+     at desktop, style.css:560). `setOpen()` in common.js already toggles this class
+     on both viewports — no JS change needed for this rule. */
+  .nav-views--open {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  /* 44px comfortable tap-target HEIGHT on every link and the toggle. The toggle's
+     WIDTH shrinks below (glyph-only) — this is a horizontal-only compaction, the
+     height contract is unchanged. */
   .nav-view,
   .nav-more-toggle {
     min-height: 44px;
     display: inline-flex;
     align-items: center;
+  }
+
+  /* Toggle: pinned to the trailing edge only once the strip runs out of slack
+     (no `margin-left: auto` — it sits beside the last tab until then), glyph-only
+     via the visually-hidden label below. An opaque background keeps scrolled-under
+     tabs from showing through the pinned control. */
+  .nav-more-toggle {
+    position: sticky;
+    right: 0;
+    background: var(--bg);
+  }
+
+  /* Visually hide the toggle's "more" word on mobile ONLY — never `display:none`,
+     which would strip it from the accessible-name computation. The glyph `⋯` stays
+     visible text; "more" stays in the accessible-name tree (toggle reads "⋯ more"
+     on both viewports) but is clipped from view, shrinking the toggle to ~11px wide. */
+  .nav-more-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .nav-views-overflow {
@@ -1860,12 +1900,6 @@ a.wordmark:hover {
 
   .nav-value {
     max-width: 10ch;
-  }
-
-  /* View switcher stays a single scrolling row at 390px (LIN-978) — tighter
-     gaps, never a multi-line wrap. */
-  .nav-views {
-    gap: 1.25ch;
   }
 }
 

@@ -111,7 +111,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `#team-options` - team dropdown panel
 - `[data-team="{id}"]` - team filter option (use "all" for all teams)
 - `.nav-views` - header-level cross-view switcher row (LIN-978); single scrolling row at the top of every workspace page
-- `[data-testid="nav-view-{name}"]` - a view-switcher link by its visible text (e.g. `observation`, `swipe`, `swim`, `settings`, and the flag-gated `roadmap`/`dispatch`/`proxy`); the active view renders as a `<strong class="nav-view-current">` instead of an `<a>`. First-class views always show; power-user views only with their per-user flag; experimental views are never here (Settings-only)
+- `[data-testid="nav-view-{name}"]` - a view-switcher link by its visible text (e.g. `observation`, `swipe`, `swim`, `settings`, and the flag-gated `roadmap`/`dispatch`/`proxy`); the active view renders as a `<strong class="nav-view-current">` instead of an `<a>`. First-class views always show; power-user views only with their per-user flag; experimental views appear in the `⋯ more` overflow group when their own flag is on (same gated-inclusion policy as power-user views, not Settings-only)
 
 ### Footer Selectors
 - `.page-footer` - footer container

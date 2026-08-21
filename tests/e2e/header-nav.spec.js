@@ -341,28 +341,132 @@ test.describe('Sticky header pin + clearance (LIN-1068)', () => {
     expect(settle.top, 'control must not be tucked under the pinned header').toBeGreaterThanOrEqual(settle.navBottom - 1);
     expect(settle.clickable, 'pinned header must not click-intercept the control').toBe(true);
   });
+});
 
-  test('mobile --nav-sticky-h clearance is at least the measured header height (branch-a guard)', async ({ page, localWorkerUrlKey }) => {
-    await page.setViewportSize({ width: 390, height: 700 });
+// LIN-2179: widened coverage for the mobile scrolling-strip fix — the pre-fix
+// clearance guard pinned a single 390×700/no-flags fixture, the one combination
+// where nothing ever wrapped, which is why the 168px-wrapped-header regression
+// shipped unnoticed. This sweeps widths × active view with every experimental +
+// power-user flag on, against a fixed workspace name throughout (per the LIN-2179
+// design's explicit instruction not to take on the workspace-name axis — the
+// projects-page `.nav-primary-row` wrap stays a separate, unproven, out-of-scope
+// condition).
+test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
+  const ALL_EXPERIMENTAL_FLAGS = {
+    roadmap: true, dispatch: true, proxy: true,
+    collective: true, taskChat: true, ship: true, nextRun: true,
+    flightCompanion: true, passagePlanner: true, shipBiscuit: true,
+    liveConsole: true, shipJourney: true
+  };
+  const MOBILE_SWEEP_WIDTHS = [360, 390, 412, 430];
+  // A first-class view (never hoisted — already primary, so it exercises the
+  // baseline five-inline-plus-toggle case), the shortest flag-gated label (`ship`,
+  // 4 chars — the one view that did NOT wrap pre-fix) and the longest flag-gated
+  // label (`passage-planner` — the worst-case hoisted-label width).
+  const MOBILE_SWEEP_VIEWS = [
+    { pagePath: 'swim', activeKey: 'swim' },
+    { pagePath: 'ship', activeKey: 'ship' },
+    { pagePath: 'passage-planner', activeKey: 'passage-planner' }
+  ];
+
+  test.beforeEach(async ({ seedLocal }) => {
+    await seedLocal(swimLocalSeed, { features: ALL_EXPERIMENTAL_FLAGS });
+  });
+
+  for (const width of MOBILE_SWEEP_WIDTHS) {
+    test(`mobile --nav-sticky-h clearance is at least the measured header height at ${width}px (branch-a guard)`, async ({ page, localWorkerUrlKey }) => {
+      await page.setViewportSize({ width, height: 700 });
+      await page.goto(`/workspace/${localWorkerUrlKey}/passage-planner`);
+      await page.waitForLoadState('networkidle');
+
+      const { clearancePx, headerPx } = await page.evaluate(() => {
+        const nav = document.querySelector('.nav-bar');
+        // Resolve --nav-sticky-h to px via a throwaway probe sized by the token
+        // (inherited from :root), instead of hardcoding 122/124 — the guard tracks
+        // real header growth. This is exactly the value that feeds the pinned
+        // header's scroll-margin-top clearance.
+        const probe = document.createElement('div');
+        probe.style.height = 'var(--nav-sticky-h)';
+        probe.style.position = 'absolute';
+        probe.style.visibility = 'hidden';
+        document.body.appendChild(probe);
+        const clearancePx = probe.getBoundingClientRect().height;
+        probe.remove();
+        return { clearancePx, headerPx: nav.offsetHeight };
+      });
+      expect(clearancePx).toBeGreaterThan(0); // token actually resolves
+      expect(clearancePx).toBeGreaterThanOrEqual(headerPx);
+    });
+
+    for (const { pagePath, activeKey } of MOBILE_SWEEP_VIEWS) {
+      test(`view strip is a single non-wrapping row with the active tab reachable at ${width}px (${activeKey})`, async ({ page, localWorkerUrlKey }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto(`/workspace/${localWorkerUrlKey}/${pagePath}`);
+        await page.waitForLoadState('networkidle');
+
+        // One row: every primary child of `.nav-views` shares a single top offset.
+        // The closed strip inherits the base non-wrapping row (LIN-2179) so it can
+        // no longer wrap onto a second row at any width, for any hoisted label.
+        const primaryTops = await page.locator('.nav-views > [data-testid^="nav-view-"]').evaluateAll(els =>
+          els.map(el => el.getBoundingClientRect().top)
+        );
+        expect(primaryTops.length).toBeGreaterThan(0);
+        expect(Math.max(...primaryTops) - Math.min(...primaryTops)).toBeLessThan(4);
+
+        // Active tab reachable: fully inside the strip's visible box and clear of
+        // the pinned toggle's own footprint (the scroll-into-view guard, LIN-2179
+        // delta 4 — the scrolling row must never hide the active tab).
+        const result = await page.evaluate(() => {
+          const strip = document.querySelector('.nav-views');
+          const active = document.querySelector('.nav-view-current');
+          const toggle = document.querySelector('.nav-more-toggle');
+          if (!strip || !active) return null;
+          const stripRect = strip.getBoundingClientRect();
+          const activeRect = active.getBoundingClientRect();
+          const toggleVisible = toggle && getComputedStyle(toggle).display !== 'none';
+          const toggleRect = toggleVisible ? toggle.getBoundingClientRect() : null;
+          const insideStrip = activeRect.left >= stripRect.left - 1 && activeRect.right <= stripRect.right + 1;
+          const clearOfToggle = !toggleRect || activeRect.right <= toggleRect.left + 1 || activeRect.left >= toggleRect.right - 1;
+          return { insideStrip, clearOfToggle };
+        });
+        expect(result, 'expected an active tab to be present').not.toBeNull();
+        expect(result.insideStrip, 'active tab must be fully inside the visible strip').toBe(true);
+        expect(result.clearOfToggle, 'active tab must not sit under the pinned toggle').toBe(true);
+      });
+    }
+
+    test(`every nav view target is a comfortable 44px tap target (height, not width) at ${width}px`, async ({ page, localWorkerUrlKey }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`/workspace/${localWorkerUrlKey}/passage-planner`);
+      await page.waitForLoadState('networkidle');
+
+      // Height is the tap-target contract; the toggle's WIDTH shrinks to a bare
+      // glyph on mobile (LIN-2179) — a horizontal-only compaction, so width is
+      // deliberately NOT asserted here.
+      const heights = await page.locator('.nav-views > [data-testid^="nav-view-"], .nav-more-toggle').evaluateAll(els =>
+        els.map(el => el.getBoundingClientRect().height)
+      );
+      expect(heights.length).toBeGreaterThan(0);
+      for (const h of heights) expect(h).toBeGreaterThanOrEqual(44);
+    });
+  }
+
+  test('toggle accessible name still contains "more" while the label is visually hidden (LIN-2179)', async ({ page, localWorkerUrlKey }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    const { clearancePx, headerPx } = await page.evaluate(() => {
-      const nav = document.querySelector('.nav-bar');
-      // Resolve --nav-sticky-h to px via a throwaway probe sized by the token
-      // (inherited from :root), instead of hardcoding 122/124 — the guard tracks
-      // real header growth. This is exactly the value that feeds the pinned
-      // header's scroll-margin-top clearance.
-      const probe = document.createElement('div');
-      probe.style.height = 'var(--nav-sticky-h)';
-      probe.style.position = 'absolute';
-      probe.style.visibility = 'hidden';
-      document.body.appendChild(probe);
-      const clearancePx = probe.getBoundingClientRect().height;
-      probe.remove();
-      return { clearancePx, headerPx: nav.offsetHeight };
+    const toggle = page.locator('[data-testid="nav-more-toggle"]');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAccessibleName(/more/);
+
+    // Visually clipped, not removed — the `⋯` glyph is a bare ~11px-wide target
+    // but "more" stays in the accessible-name tree (distinguishes this from
+    // `display:none`, which would have stripped it from the computed name above).
+    const clipped = await page.locator('.nav-more-label').evaluate(el => {
+      const cs = getComputedStyle(el);
+      return cs.position === 'absolute' && cs.width === '1px' && cs.height === '1px';
     });
-    expect(clearancePx).toBeGreaterThan(0); // token actually resolves
-    expect(clearancePx).toBeGreaterThanOrEqual(headerPx);
+    expect(clipped).toBe(true);
   });
 });

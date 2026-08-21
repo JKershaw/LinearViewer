@@ -1685,9 +1685,18 @@ function setupNavViewsOverflow(navBar) {
     moveAllToOverflow()
 
     // Mobile: the media query owns the collapse entirely — leave the full group in
-    // the container and don't mark the desktop-managed state.
+    // the container and don't mark the desktop-managed state. The strip can still
+    // horizontally overflow (the hoisted active label plus the pinned toggle may
+    // not all fit at once, LIN-2179) — scroll the active tab into view so the
+    // scrolling row never hides it. This only ever moves `scrollLeft`, never
+    // `clientWidth`, so the width-only remeasure guard below stays the sole
+    // re-layout trigger and no open/close-driven feedback loop is introduced.
     if (mobileMq.matches) {
       strip.classList.remove('nav-views--collapsed')
+      if (strip.scrollWidth > strip.clientWidth) {
+        const activeTab = strip.querySelector('.nav-view-current')
+        if (activeTab) activeTab.scrollIntoView({ inline: 'end', block: 'nearest' })
+      }
       return
     }
 
