@@ -109,6 +109,30 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
     assert.ok(FEEDBACK_ENTRY_KINDS.includes('refusal'));
   });
 
+  test('LIN-2180: "decision" is a recognized FEEDBACK_ENTRY_KINDS member', () => {
+    assert.ok(FEEDBACK_ENTRY_KINDS.includes('decision'));
+  });
+
+  test('LIN-2180: a kind:"decision" feedback entry persists as given', async () => {
+    const store = makeStore();
+    const item = await takenItem(store);
+    const rootItemId = '11111111-2222-3333-4444-555555555555';
+    const message = '[decision] escalation ruling: proceed';
+
+    const res = await store.addFeedback(
+      item._id,
+      URL_KEY,
+      { message, kind: 'decision', rootItemId },
+      'token-a'
+    );
+
+    assert.ok(res && res.success);
+    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    assert.equal(doc.feedback[0].kind, 'decision');
+    assert.equal(doc.feedback[0].rootItemId, rootItemId);
+    assert.equal(doc.feedback[0].message, message);
+  });
+
   test('LIN-1427: a kind:"refusal" feedback entry posted at a [blocked] finalize boundary persists as given', async () => {
     const store = makeStore();
     const item = await takenItem(store);
