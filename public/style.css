@@ -1734,7 +1734,7 @@ a.wordmark:hover {
   .nav-views {
     gap: 0.25ch 1ch;
     align-items: center;
-    scroll-padding-inline-end: 3ch;  /* clears the pinned toggle's own footprint */
+    scroll-padding-inline-end: calc(24px + 1ch);  /* clears the pinned toggle's own min-width + gap (LIN-2189 F1) */
   }
 
   /* Restore wrap only while the card is open, so the full-width overflow group
@@ -1759,17 +1759,25 @@ a.wordmark:hover {
   /* Toggle: pinned to the trailing edge only once the strip runs out of slack
      (no `margin-left: auto` — it sits beside the last tab until then), glyph-only
      via the visually-hidden label below. An opaque background keeps scrolled-under
-     tabs from showing through the pinned control. */
+     tabs from showing through the pinned control. `min-width: 24px` gives the
+     disclosure control a real horizontal footprint even though its visible content
+     is just the `⋯` glyph — without it the box collapses to the glyph's own
+     rendered width (measured as low as ~7px), which fails WCAG 2.2 SC 2.5.8 Target
+     Size (Minimum) (LIN-2189 F1). `justify-content: center` keeps the glyph
+     centered in the wider box. */
   .nav-more-toggle {
     position: sticky;
     right: 0;
     background: var(--bg);
+    min-width: 24px;
+    justify-content: center;
   }
 
   /* Visually hide the toggle's "more" word on mobile ONLY — never `display:none`,
      which would strip it from the accessible-name computation. The glyph `⋯` stays
      visible text; "more" stays in the accessible-name tree (toggle reads "⋯ more"
-     on both viewports) but is clipped from view, shrinking the toggle to ~11px wide. */
+     on both viewports) but is clipped from view, shrinking the toggle's VISIBLE
+     content to the glyph alone (its box stays ≥24px wide via `min-width` above). */
   .nav-more-label {
     position: absolute;
     width: 1px;

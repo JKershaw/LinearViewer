@@ -404,10 +404,14 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
         await page.goto(`/workspace/${localWorkerUrlKey}/${pagePath}`);
         await page.waitForLoadState('networkidle');
 
-        // One row: every primary child of `.nav-views` shares a single top offset.
-        // The closed strip inherits the base non-wrapping row (LIN-2179) so it can
-        // no longer wrap onto a second row at any width, for any hoisted label.
-        const primaryTops = await page.locator('.nav-views > [data-testid^="nav-view-"]').evaluateAll(els =>
+        // One row: every primary child of `.nav-views` shares a single top offset —
+        // INCLUDING the `⋯ more` toggle itself (LIN-2189 F3): the toggle's own wrap
+        // was the reported defect, and a guard that only checks the links passes
+        // vacuously on the exact two-row layout the user reported (the links alone
+        // always shared row 1; only the toggle dropped to row 2). The closed strip
+        // inherits the base non-wrapping row (LIN-2179) so it can no longer wrap
+        // onto a second row at any width, for any hoisted label.
+        const primaryTops = await page.locator('.nav-views > [data-testid^="nav-view-"], .nav-views > [data-testid="nav-more-toggle"]').evaluateAll(els =>
           els.map(el => el.getBoundingClientRect().top)
         );
         expect(primaryTops.length).toBeGreaterThan(0);
@@ -433,21 +437,64 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
         expect(result.insideStrip, 'active tab must be fully inside the visible strip').toBe(true);
         expect(result.clearOfToggle, 'active tab must not sit under the pinned toggle').toBe(true);
       });
+
+      test(`keyboard focus traversal keeps every focused mobile nav tab visible within the strip at ${width}px (${activeKey}) (LIN-2189 F2)`, async ({ page, localWorkerUrlKey }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto(`/workspace/${localWorkerUrlKey}/${pagePath}`);
+        await page.waitForLoadState('networkidle');
+
+        // Focus every primary tab (and the toggle) in strip order, exactly as `Tab`
+        // traversal would, and check each stays fully inside the strip's visible
+        // box the moment it is focused. Pre-fix this could not happen on mobile
+        // (`overflow-x: visible` + wrap clipped nothing horizontally); the strip's
+        // new `overflow-x: auto` can leave leading tabs scrolled out of view, and
+        // real `Tab` traversal alone does not scroll them back (LIN-2189 F2) — the
+        // `focusin` handler in common.js is what restores that guarantee.
+        const results = await page.evaluate(() => {
+          const strip = document.querySelector('.nav-views');
+          // Only genuine `Tab` stops: the active tab renders as a non-link
+          // `<strong>` (by design, LIN-978) and is never itself a focus target,
+          // so it's excluded here via `tabIndex` rather than the testid pattern.
+          const targets = Array.from(strip.querySelectorAll(':scope > [data-testid^="nav-view-"], :scope > [data-testid="nav-more-toggle"]'))
+            .filter(t => t.tabIndex >= 0);
+          return targets.map(t => {
+            t.focus();
+            const stripRect = strip.getBoundingClientRect();
+            const rect = t.getBoundingClientRect();
+            return {
+              testid: t.getAttribute('data-testid'),
+              focused: document.activeElement === t,
+              insideStrip: rect.left >= stripRect.left - 1 && rect.right <= stripRect.right + 1
+            };
+          });
+        });
+        expect(results.length).toBeGreaterThan(0);
+        for (const r of results) {
+          expect(r.focused, `${r.testid} must actually receive focus for this check to be meaningful`).toBe(true);
+          expect(r.insideStrip, `focused ${r.testid} must stay inside the visible strip`).toBe(true);
+        }
+      });
     }
 
-    test(`every nav view target is a comfortable 44px tap target (height, not width) at ${width}px`, async ({ page, localWorkerUrlKey }) => {
+    test(`every nav view target is a comfortable 44px tap target, and the toggle keeps a real width, at ${width}px (LIN-2189 F1)`, async ({ page, localWorkerUrlKey }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto(`/workspace/${localWorkerUrlKey}/passage-planner`);
       await page.waitForLoadState('networkidle');
 
-      // Height is the tap-target contract; the toggle's WIDTH shrinks to a bare
-      // glyph on mobile (LIN-2179) — a horizontal-only compaction, so width is
-      // deliberately NOT asserted here.
+      // Height is the tap-target contract for every inline link and the toggle —
+      // the toggle's visible CONTENT shrinks to a bare glyph on mobile (LIN-2179),
+      // a horizontal-only compaction, so width is not asserted here for the links.
       const heights = await page.locator('.nav-views > [data-testid^="nav-view-"], .nav-more-toggle').evaluateAll(els =>
         els.map(el => el.getBoundingClientRect().height)
       );
       expect(heights.length).toBeGreaterThan(0);
       for (const h of heights) expect(h).toBeGreaterThanOrEqual(44);
+
+      // The toggle's BOX still needs a real horizontal footprint though: collapsing
+      // it to the bare glyph's own rendered width (measured as low as ~7px pre-fix)
+      // fails WCAG 2.2 SC 2.5.8 Target Size (Minimum), 24×24 CSS px (LIN-2189 F1).
+      const toggleWidth = await page.locator('[data-testid="nav-more-toggle"]').evaluate(el => el.getBoundingClientRect().width);
+      expect(toggleWidth).toBeGreaterThanOrEqual(24);
     });
   }
 
