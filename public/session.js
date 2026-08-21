@@ -25,46 +25,77 @@
     window.ChatUI.appendMessage(thread, { who: 'you', self: true, text: text, testId: 'session-reply-you' });
   }
 
-  // ── Shared reply helper (raw fetch, same pattern as the original global box) ──
-  function sendReply(opts, btn, textarea, feedback, thread) {
+  // ── Durable comment write (LIN-2154) ──────────────────────────────────────
+  // POST /workspace/:urlKey/api/comments/:issueId — the session-auth twin of
+  // the agent-lane comment route. Resolves to {ok, status, data}, never
+  // rejects on a non-2xx (the caller decides how to surface that).
+  function postComment(urlKey, issueId, prompt) {
+    return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/comments/' + encodeURIComponent(issueId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ body: prompt })
+    }).then(function (resp) {
+      return resp.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: resp.ok, status: resp.status, data: data };
+      });
+    });
+  }
+
+  // The existing dispatch follow-up call, unchanged wire shape — lifted out of
+  // sendReply so both Save-and-continue and its delivery-retry affordance can
+  // call it. Resolves to {ok, status, data}, same contract as postComment.
+  function postDispatch(opts, prompt) {
+    var body = { prompt: prompt, followUpTo: opts.followUpTo, target: opts.target };
+    if (opts.force) body.force = true;
+    return fetch('/workspace/' + encodeURIComponent(opts.urlKey) + '/api/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(body)
+    }).then(function (resp) {
+      return resp.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: resp.ok, status: resp.status, data: data };
+      });
+    });
+  }
+
+  function errorFromResult(result) {
+    return new Error((result.data && result.data.error) || ('HTTP ' + result.status));
+  }
+
+  // ── Save (comment-only) ───────────────────────────────────────────────────
+  function sendSave(opts, btn, textarea, feedback, thread) {
     var prompt = (textarea.value || '').trim();
     if (!prompt) {
       feedback.textContent = 'enter a reply';
       feedback.className = 'sess-reply-feedback error';
       return;
     }
+    // LIN-2154 OQ5: a comment-only save against a session-level waiting signal
+    // can quietly leave the session parked with no delivered answer — session
+    // granularity, not per-run (see renderInlineReplyBox's own note).
+    if (opts.sessionWaiting) {
+      var proceed = window.confirm('This session has a reply still waiting — save this comment without continuing?');
+      if (!proceed) return;
+    }
     var original = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'sending…';
+    btn.textContent = 'saving…';
     feedback.textContent = '';
     feedback.className = 'sess-reply-feedback';
 
-    var body = { prompt: prompt, followUpTo: opts.followUpTo, target: opts.target };
-    if (opts.force) body.force = true;
-
-    fetch('/workspace/' + encodeURIComponent(opts.urlKey) + '/api/dispatch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify(body)
-    })
-      .then(function (resp) {
-        if (resp.ok) return resp.json().catch(function () { return {}; });
-        return resp.json().catch(function () { return {}; }).then(function (d) {
-          throw new Error((d && d.error) || ('HTTP ' + resp.status));
-        });
-      })
-      .then(function () {
+    postComment(opts.urlKey, opts.issueId, prompt)
+      .then(function (result) {
+        if (!result.ok) throw errorFromResult(result);
         appendYouBubble(thread, prompt);
         textarea.value = '';
-        feedback.textContent = opts.force
-          ? 'reply queued — if the session has ended you\'ll see "no live session to resume" in the transcript on reload'
-          : 'reply queued — reload to see the session continue';
+        feedback.textContent = 'recorded on the task';
         feedback.className = 'sess-reply-feedback';
-        btn.textContent = 'queued \u2713';
+        btn.textContent = 'saved ✓';
       })
       .catch(function (e) {
-        feedback.textContent = 'reply failed: ' + e.message;
+        feedback.textContent = 'save failed: ' + e.message;
         feedback.className = 'sess-reply-feedback error';
         btn.textContent = 'failed';
       })
@@ -76,6 +107,114 @@
           }
         }, 1800);
       });
+  }
+
+  // ── Save and continue (comment write, then the existing dispatch follow-up) ──
+  // Structural partial-failure handling (LIN-2154 OQ4), all client-side:
+  //   1. comment write fails            -> show the error; dispatch never attempted
+  //   2. comment ok, dispatch fails     -> "recorded, could not deliver" + retry-delivery
+  //   3. comment ok, dispatch enqueues  -> today's queued copy + recorded confirmation
+  // An issueless run (opts.issueless) skips the comment call entirely and keeps
+  // the pre-existing dispatch-only behavior byte-for-byte.
+  function sendReply(opts, btn, textarea, feedback, thread) {
+    var prompt = (textarea.value || '').trim();
+    if (!prompt) {
+      feedback.textContent = 'enter a reply';
+      feedback.className = 'sess-reply-feedback error';
+      return;
+    }
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'sending…';
+    feedback.innerHTML = '';
+    feedback.className = 'sess-reply-feedback';
+
+    function queuedCopy(recorded) {
+      var base = opts.force
+        ? 'reply queued — if the session has ended you\'ll see "no live session to resume" in the transcript on reload'
+        : 'reply queued — reload to see the session continue';
+      return recorded ? base + ' Recorded on the task.' : base;
+    }
+
+    function onDispatchOk() {
+      appendYouBubble(thread, prompt);
+      textarea.value = '';
+      feedback.textContent = queuedCopy(!opts.issueless);
+      feedback.className = 'sess-reply-feedback';
+      btn.textContent = 'queued ✓';
+    }
+
+    function onDispatchFailed(e) {
+      feedback.textContent = 'reply failed: ' + e.message;
+      feedback.className = 'sess-reply-feedback error';
+      btn.textContent = 'failed';
+    }
+
+    function restoreButton() {
+      setTimeout(function () {
+        if (btn.isConnected) {
+          btn.textContent = original;
+          btn.disabled = false;
+        }
+      }, 1800);
+    }
+
+    // Comment already recorded, but the dispatch enqueue failed synchronously
+    // (400/409/429/503 -- dispatchQueueLimiter is live, so a retry burst can
+    // legitimately hit 429): surface a structural partial failure with a
+    // retry affordance that re-fires ONLY the dispatch call -- the comment is
+    // never resent (harmless via dedupe if it were).
+    function onPartialFailure(dispatchErr) {
+      appendYouBubble(thread, prompt);
+      textarea.value = '';
+      feedback.textContent = 'Recorded on the task. Could not deliver to the session: ' + dispatchErr.message + '. ';
+      feedback.className = 'sess-reply-feedback error';
+      var retryBtn = document.createElement('button');
+      retryBtn.type = 'button';
+      retryBtn.className = 'sess-reply-retry-delivery';
+      retryBtn.textContent = 'Retry delivery';
+      retryBtn.addEventListener('click', function () {
+        retryBtn.disabled = true;
+        feedback.textContent = 'retrying delivery…';
+        feedback.className = 'sess-reply-feedback';
+        postDispatch(opts, prompt).then(function (result) {
+          if (!result.ok) throw errorFromResult(result);
+          feedback.textContent = queuedCopy(true);
+          feedback.className = 'sess-reply-feedback';
+        }).catch(function (e2) {
+          feedback.textContent = 'Still could not deliver: ' + e2.message + '. ';
+          feedback.className = 'sess-reply-feedback error';
+          feedback.appendChild(retryBtn);
+          retryBtn.disabled = false;
+        });
+      });
+      feedback.appendChild(retryBtn);
+      btn.textContent = original;
+      btn.disabled = false;
+    }
+
+    function doDispatch() {
+      return postDispatch(opts, prompt).then(function (result) {
+        if (!result.ok) throw errorFromResult(result);
+      });
+    }
+
+    var chain = opts.issueless
+      ? doDispatch().then(onDispatchOk)
+      : postComment(opts.urlKey, opts.issueId, prompt).then(function (commentResult) {
+          if (!commentResult.ok) throw errorFromResult(commentResult);
+          return doDispatch().then(onDispatchOk).catch(function (dispatchErr) {
+            onPartialFailure(dispatchErr);
+            throw { handledPartialFailure: true };
+          });
+        });
+
+    chain
+      .catch(function (e) {
+        if (e && e.handledPartialFailure) return;
+        onDispatchFailed(e);
+      })
+      .then(restoreButton);
   }
 
   // ── Per-run expand/collapse toggle (LIN-1133; LIN-1163 whole-card click) ───
@@ -163,9 +302,21 @@
       (function (box) {
         var textarea = box.querySelector('.sess-inline-reply-input');
         var btn = box.querySelector('.sess-reply-send');
+        var saveBtn = box.querySelector('.sess-reply-save');
         var feedback = box.querySelector('.sess-reply-feedback');
         var thread = box.querySelector('[data-testid="session-inline-reply-thread"]');
         if (!textarea || !btn) return;
+
+        // LIN-2154: issueless gate, keyed on data-issue-identifier (matching
+        // renderRun's own "(no task)" definition, lib/render-session.js) — an
+        // issueless run has nothing to durably record a comment against. Save
+        // is hidden; Save-and-continue (the `btn` below) degrades to the
+        // pre-existing dispatch-only behavior. The write target prefers the
+        // real issueId when the loop carries one, falling back to the human
+        // identifier (both accepted by the comment route's isValidIssueId).
+        var issueIdentifier = box.dataset.issueIdentifier || '';
+        var issueless = !issueIdentifier;
+        var issueId = box.dataset.issueId || issueIdentifier;
 
         var opts = {
           urlKey: box.dataset.urlKey,
@@ -174,8 +325,22 @@
           // Force when this run is terminal OR the session is paused-on-human/waiting
           // (LIN-1252). `data-terminal` is the run's own status; `data-session-waiting`
           // is the session-level waiting signal (keyed session-wide, not per-run).
-          force: box.dataset.terminal === 'true' || box.dataset.sessionWaiting === 'true'
+          force: box.dataset.terminal === 'true' || box.dataset.sessionWaiting === 'true',
+          sessionWaiting: box.dataset.sessionWaiting === 'true',
+          issueId: issueId,
+          issueless: issueless
         };
+
+        if (saveBtn) {
+          if (issueless) {
+            saveBtn.hidden = true;
+          } else {
+            saveBtn.addEventListener('click', function (e) {
+              e.preventDefault();
+              sendSave(opts, saveBtn, textarea, feedback, thread);
+            });
+          }
+        }
 
         btn.addEventListener('click', function (e) {
           e.preventDefault();

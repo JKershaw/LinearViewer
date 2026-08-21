@@ -1032,3 +1032,62 @@ describe('render-session: credential state (LIN-1588)', () => {
     assert.equal(withIndex, without);
   });
 });
+
+// =============================================================================
+// LIN-2154: the durable-comment write's identity attributes + no `data-source`.
+//
+// A genuinely issueless dispatch item (no `issueIdentifier` at all) is dropped
+// as "malformed" by `_buildLoops` (lib/pipeline-loops.js:246/:267) before it
+// ever reaches session reconstruction, so it can never reach this renderer
+// through the real end-to-end pipeline — an e2e fixture for it is impossible.
+// This is the server-side half of the LIN-2154 issueless gate: the renderer's
+// contract (an empty `data-issue-identifier` when the loop carries none), unit-
+// tested directly against a hand-built loop, matching this file's existing
+// pattern for shapes the live pipeline cannot itself produce.
+// =============================================================================
+describe('render-session: durable-comment identity attributes (LIN-2154)', () => {
+  test('data-issue-id / data-issue-identifier are read off the loop, and data-source is never emitted', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true });
+    assert.match(html, /data-testid="session-inline-reply"[^>]*data-issue-id="uuid-900"/);
+    assert.match(html, /data-testid="session-inline-reply"[^>]*data-issue-identifier="LIN-900"/);
+    // Deleted, not softened (Step 3 of the plan) — a prior revision threaded
+    // loop.source (the dispatch collection) as if it were provider provenance.
+    assert.ok(!html.includes('data-source='), 'no data-source attribute anywhere on the page');
+  });
+
+  test('issueless gate: a loop with no issueIdentifier emits an empty data-issue-identifier (Save hidden client-side)', () => {
+    const session = fixtureSession({
+      loops: [{
+        loopId: 'loop-standalone', issueIdentifier: null, issueId: null,
+        iteration: 1, kind: 'implementation', dispatchedAt: '2026-07-04T10:00:00.000Z',
+        terminalStatus: null, feedback: [], telemetry: null
+      }]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], canReply: true });
+    assert.match(html, /data-testid="session-inline-reply"[^>]*data-issue-id=""/);
+    assert.match(html, /data-testid="session-inline-reply"[^>]*data-issue-identifier=""/);
+    // The "(no task)" badge (renderRun's own issueless definition) is the same
+    // field — both readings must agree on this loop.
+    assert.match(html, /sess-run-ident sess-muted/);
+  });
+
+  test('a loop carrying issueIdentifier but no issueId still gets a non-empty data-issue-identifier (the e2e fixtures\' own shape)', () => {
+    const session = fixtureSession({
+      loops: [{
+        loopId: 'loop-fixture', issueIdentifier: 'LIN-1005', issueId: null,
+        iteration: 1, kind: 'implementation', dispatchedAt: '2026-07-04T10:00:00.000Z',
+        terminalStatus: null, feedback: [], telemetry: null
+      }]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], canReply: true });
+    assert.match(html, /data-testid="session-inline-reply"[^>]*data-issue-id=""/);
+    assert.match(html, /data-testid="session-inline-reply"[^>]*data-issue-identifier="LIN-1005"/);
+  });
+
+  test('Save and Save-and-continue buttons both render, with distinct testids', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true });
+    assert.match(html, /data-testid="session-inline-reply-save"/);
+    assert.match(html, /data-testid="session-inline-reply-send"/);
+    assert.match(html, /class="action-btn sess-reply-save"/);
+  });
+});
