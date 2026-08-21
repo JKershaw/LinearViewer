@@ -1668,6 +1668,19 @@ function setupNavViewsOverflow(navBar) {
     setOpen(toggle.getAttribute('aria-expanded') !== 'true')
   })
 
+  // Keep a keyboard-focused tab clear of the strip's own horizontal scrolling
+  // (LIN-2189 F2). On mobile the strip is `overflow-x: auto` and delta 4 above
+  // may leave it scrolled toward the pinned toggle, so a `Tab` traversal that
+  // lands on a leading link can sit clipped outside the visible box with nothing
+  // to bring it back — this is the fix. `inline: 'nearest'` moves `scrollLeft`
+  // only when the focused element isn't already fully visible, and respects the
+  // strip's own `scroll-padding-inline-end` so a focused tab never tucks behind
+  // the pinned toggle either. No-op on desktop, where the strip never overflows.
+  strip.addEventListener('focusin', (e) => {
+    const target = e.target.closest('.nav-view, .nav-more-toggle')
+    if (target) target.scrollIntoView({ inline: 'nearest', block: 'nearest' })
+  })
+
   function moveAllToOverflow() {
     for (const item of collapsible) {
       if (item.parentElement !== overflow) overflow.appendChild(item)
@@ -1685,9 +1698,20 @@ function setupNavViewsOverflow(navBar) {
     moveAllToOverflow()
 
     // Mobile: the media query owns the collapse entirely — leave the full group in
-    // the container and don't mark the desktop-managed state.
+    // the container and don't mark the desktop-managed state. The strip can still
+    // horizontally overflow (the hoisted active label plus the pinned toggle may
+    // not all fit at once, LIN-2179) — scroll the active tab into view so the
+    // scrolling row never hides it. This step (and the focusin handler above) only
+    // ever WRITE `scrollLeft` — reading `strip.clientWidth` below is just the
+    // overflow check, not a write — so the width-only remeasure guard below stays
+    // the sole re-layout trigger and no open/close-driven feedback loop is
+    // introduced.
     if (mobileMq.matches) {
       strip.classList.remove('nav-views--collapsed')
+      if (strip.scrollWidth > strip.clientWidth) {
+        const activeTab = strip.querySelector('.nav-view-current')
+        if (activeTab) activeTab.scrollIntoView({ inline: 'end', block: 'nearest' })
+      }
       return
     }
 

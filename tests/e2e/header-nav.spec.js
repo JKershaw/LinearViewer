@@ -341,28 +341,179 @@ test.describe('Sticky header pin + clearance (LIN-1068)', () => {
     expect(settle.top, 'control must not be tucked under the pinned header').toBeGreaterThanOrEqual(settle.navBottom - 1);
     expect(settle.clickable, 'pinned header must not click-intercept the control').toBe(true);
   });
+});
 
-  test('mobile --nav-sticky-h clearance is at least the measured header height (branch-a guard)', async ({ page, localWorkerUrlKey }) => {
-    await page.setViewportSize({ width: 390, height: 700 });
+// LIN-2179: widened coverage for the mobile scrolling-strip fix — the pre-fix
+// clearance guard pinned a single 390×700/no-flags fixture, the one combination
+// where nothing ever wrapped, which is why the 168px-wrapped-header regression
+// shipped unnoticed. This sweeps widths × active view with every experimental +
+// power-user flag on, against a fixed workspace name throughout (per the LIN-2179
+// design's explicit instruction not to take on the workspace-name axis — the
+// projects-page `.nav-primary-row` wrap stays a separate, unproven, out-of-scope
+// condition).
+test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
+  const ALL_EXPERIMENTAL_FLAGS = {
+    roadmap: true, dispatch: true, proxy: true,
+    collective: true, taskChat: true, ship: true, nextRun: true,
+    flightCompanion: true, passagePlanner: true, shipBiscuit: true,
+    liveConsole: true, shipJourney: true
+  };
+  const MOBILE_SWEEP_WIDTHS = [360, 390, 412, 430];
+  // A first-class view (never hoisted — already primary, so it exercises the
+  // baseline five-inline-plus-toggle case), the shortest flag-gated label (`ship`,
+  // 4 chars — the one view that did NOT wrap pre-fix) and the longest flag-gated
+  // label (`passage-planner` — the worst-case hoisted-label width).
+  const MOBILE_SWEEP_VIEWS = [
+    { pagePath: 'swim', activeKey: 'swim' },
+    { pagePath: 'ship', activeKey: 'ship' },
+    { pagePath: 'passage-planner', activeKey: 'passage-planner' }
+  ];
+
+  test.beforeEach(async ({ seedLocal }) => {
+    await seedLocal(swimLocalSeed, { features: ALL_EXPERIMENTAL_FLAGS });
+  });
+
+  for (const width of MOBILE_SWEEP_WIDTHS) {
+    test(`mobile --nav-sticky-h clearance is at least the measured header height at ${width}px (branch-a guard)`, async ({ page, localWorkerUrlKey }) => {
+      await page.setViewportSize({ width, height: 700 });
+      await page.goto(`/workspace/${localWorkerUrlKey}/passage-planner`);
+      await page.waitForLoadState('networkidle');
+
+      const { clearancePx, headerPx } = await page.evaluate(() => {
+        const nav = document.querySelector('.nav-bar');
+        // Resolve --nav-sticky-h to px via a throwaway probe sized by the token
+        // (inherited from :root), instead of hardcoding 122/124 — the guard tracks
+        // real header growth. This is exactly the value that feeds the pinned
+        // header's scroll-margin-top clearance.
+        const probe = document.createElement('div');
+        probe.style.height = 'var(--nav-sticky-h)';
+        probe.style.position = 'absolute';
+        probe.style.visibility = 'hidden';
+        document.body.appendChild(probe);
+        const clearancePx = probe.getBoundingClientRect().height;
+        probe.remove();
+        return { clearancePx, headerPx: nav.offsetHeight };
+      });
+      expect(clearancePx).toBeGreaterThan(0); // token actually resolves
+      expect(clearancePx).toBeGreaterThanOrEqual(headerPx);
+    });
+
+    for (const { pagePath, activeKey } of MOBILE_SWEEP_VIEWS) {
+      test(`view strip is a single non-wrapping row with the active tab reachable at ${width}px (${activeKey})`, async ({ page, localWorkerUrlKey }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto(`/workspace/${localWorkerUrlKey}/${pagePath}`);
+        await page.waitForLoadState('networkidle');
+
+        // One row: every primary child of `.nav-views` shares a single top offset —
+        // INCLUDING the `⋯ more` toggle itself (LIN-2189 F3): the toggle's own wrap
+        // was the reported defect, and a guard that only checks the links passes
+        // vacuously on the exact two-row layout the user reported (the links alone
+        // always shared row 1; only the toggle dropped to row 2). The closed strip
+        // inherits the base non-wrapping row (LIN-2179) so it can no longer wrap
+        // onto a second row at any width, for any hoisted label.
+        const primaryTops = await page.locator('.nav-views > [data-testid^="nav-view-"], .nav-views > [data-testid="nav-more-toggle"]').evaluateAll(els =>
+          els.map(el => el.getBoundingClientRect().top)
+        );
+        expect(primaryTops.length).toBeGreaterThan(0);
+        expect(Math.max(...primaryTops) - Math.min(...primaryTops)).toBeLessThan(4);
+
+        // Active tab reachable: fully inside the strip's visible box and clear of
+        // the pinned toggle's own footprint (the scroll-into-view guard, LIN-2179
+        // delta 4 — the scrolling row must never hide the active tab).
+        const result = await page.evaluate(() => {
+          const strip = document.querySelector('.nav-views');
+          const active = document.querySelector('.nav-view-current');
+          const toggle = document.querySelector('.nav-more-toggle');
+          if (!strip || !active) return null;
+          const stripRect = strip.getBoundingClientRect();
+          const activeRect = active.getBoundingClientRect();
+          const toggleVisible = toggle && getComputedStyle(toggle).display !== 'none';
+          const toggleRect = toggleVisible ? toggle.getBoundingClientRect() : null;
+          const insideStrip = activeRect.left >= stripRect.left - 1 && activeRect.right <= stripRect.right + 1;
+          const clearOfToggle = !toggleRect || activeRect.right <= toggleRect.left + 1 || activeRect.left >= toggleRect.right - 1;
+          return { insideStrip, clearOfToggle };
+        });
+        expect(result, 'expected an active tab to be present').not.toBeNull();
+        expect(result.insideStrip, 'active tab must be fully inside the visible strip').toBe(true);
+        expect(result.clearOfToggle, 'active tab must not sit under the pinned toggle').toBe(true);
+      });
+
+      test(`keyboard focus traversal keeps every focused mobile nav tab visible within the strip at ${width}px (${activeKey}) (LIN-2189 F2)`, async ({ page, localWorkerUrlKey }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto(`/workspace/${localWorkerUrlKey}/${pagePath}`);
+        await page.waitForLoadState('networkidle');
+
+        // Focus every primary tab (and the toggle) in strip order, exactly as `Tab`
+        // traversal would, and check each stays fully inside the strip's visible
+        // box the moment it is focused. Pre-fix this could not happen on mobile
+        // (`overflow-x: visible` + wrap clipped nothing horizontally); the strip's
+        // new `overflow-x: auto` can leave leading tabs scrolled out of view, and
+        // real `Tab` traversal alone does not scroll them back (LIN-2189 F2) — the
+        // `focusin` handler in common.js is what restores that guarantee.
+        const results = await page.evaluate(() => {
+          const strip = document.querySelector('.nav-views');
+          // Only genuine `Tab` stops: the active tab renders as a non-link
+          // `<strong>` (by design, LIN-978) and is never itself a focus target,
+          // so it's excluded here via `tabIndex` rather than the testid pattern.
+          const targets = Array.from(strip.querySelectorAll(':scope > [data-testid^="nav-view-"], :scope > [data-testid="nav-more-toggle"]'))
+            .filter(t => t.tabIndex >= 0);
+          return targets.map(t => {
+            t.focus();
+            const stripRect = strip.getBoundingClientRect();
+            const rect = t.getBoundingClientRect();
+            return {
+              testid: t.getAttribute('data-testid'),
+              focused: document.activeElement === t,
+              insideStrip: rect.left >= stripRect.left - 1 && rect.right <= stripRect.right + 1
+            };
+          });
+        });
+        expect(results.length).toBeGreaterThan(0);
+        for (const r of results) {
+          expect(r.focused, `${r.testid} must actually receive focus for this check to be meaningful`).toBe(true);
+          expect(r.insideStrip, `focused ${r.testid} must stay inside the visible strip`).toBe(true);
+        }
+      });
+    }
+
+    test(`every nav view target is a comfortable 44px tap target, and the toggle keeps a real width, at ${width}px (LIN-2189 F1)`, async ({ page, localWorkerUrlKey }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`/workspace/${localWorkerUrlKey}/passage-planner`);
+      await page.waitForLoadState('networkidle');
+
+      // Height is the tap-target contract for every inline link and the toggle —
+      // the toggle's visible CONTENT shrinks to a bare glyph on mobile (LIN-2179),
+      // a horizontal-only compaction, so width is not asserted here for the links.
+      const heights = await page.locator('.nav-views > [data-testid^="nav-view-"], .nav-more-toggle').evaluateAll(els =>
+        els.map(el => el.getBoundingClientRect().height)
+      );
+      expect(heights.length).toBeGreaterThan(0);
+      for (const h of heights) expect(h).toBeGreaterThanOrEqual(44);
+
+      // The toggle's BOX still needs a real horizontal footprint though: collapsing
+      // it to the bare glyph's own rendered width (measured as low as ~7px pre-fix)
+      // fails WCAG 2.2 SC 2.5.8 Target Size (Minimum), 24×24 CSS px (LIN-2189 F1).
+      const toggleWidth = await page.locator('[data-testid="nav-more-toggle"]').evaluate(el => el.getBoundingClientRect().width);
+      expect(toggleWidth).toBeGreaterThanOrEqual(24);
+    });
+  }
+
+  test('toggle accessible name still contains "more" while the label is visually hidden (LIN-2179)', async ({ page, localWorkerUrlKey }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    const { clearancePx, headerPx } = await page.evaluate(() => {
-      const nav = document.querySelector('.nav-bar');
-      // Resolve --nav-sticky-h to px via a throwaway probe sized by the token
-      // (inherited from :root), instead of hardcoding 122/124 — the guard tracks
-      // real header growth. This is exactly the value that feeds the pinned
-      // header's scroll-margin-top clearance.
-      const probe = document.createElement('div');
-      probe.style.height = 'var(--nav-sticky-h)';
-      probe.style.position = 'absolute';
-      probe.style.visibility = 'hidden';
-      document.body.appendChild(probe);
-      const clearancePx = probe.getBoundingClientRect().height;
-      probe.remove();
-      return { clearancePx, headerPx: nav.offsetHeight };
+    const toggle = page.locator('[data-testid="nav-more-toggle"]');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAccessibleName(/more/);
+
+    // Visually clipped, not removed — the `⋯` glyph is a bare ~11px-wide target
+    // but "more" stays in the accessible-name tree (distinguishes this from
+    // `display:none`, which would have stripped it from the computed name above).
+    const clipped = await page.locator('.nav-more-label').evaluate(el => {
+      const cs = getComputedStyle(el);
+      return cs.position === 'absolute' && cs.width === '1px' && cs.height === '1px';
     });
-    expect(clearancePx).toBeGreaterThan(0); // token actually resolves
-    expect(clearancePx).toBeGreaterThanOrEqual(headerPx);
+    expect(clipped).toBe(true);
   });
 });
