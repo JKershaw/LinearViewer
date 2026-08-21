@@ -18,7 +18,54 @@ import {
   MAX_PRIORITY,
   isValidPriority,
   validateIssueWriteFields,
+  validateCommentBody,
 } from '../../lib/issue-write-validation.js';
+
+// =============================================================================
+// validateCommentBody (LIN-2154) — the shared presence/type/dangerous-chars
+// check consumed by all three comment-write call sites (routes/proxy.js's
+// create + update comment routes, both required) and the attachment relay's
+// optional caption (required: false). Length stays a call-site concern, so it
+// is deliberately NOT exercised here.
+// =============================================================================
+describe('validateCommentBody', () => {
+  test('required (default): missing/non-string body is rejected', () => {
+    assert.deepStrictEqual(validateCommentBody(undefined), { valid: false, error: 'body is required' });
+    assert.deepStrictEqual(validateCommentBody(''), { valid: false, error: 'body is required' });
+    assert.deepStrictEqual(validateCommentBody(null), { valid: false, error: 'body is required' });
+    assert.deepStrictEqual(validateCommentBody(42), { valid: false, error: 'body is required' });
+  });
+
+  test('required: a valid string body passes', () => {
+    assert.deepStrictEqual(validateCommentBody('hello'), { valid: true });
+  });
+
+  test('required: false — undefined is accepted (the relay\'s optional caption)', () => {
+    assert.deepStrictEqual(validateCommentBody(undefined, { required: false }), { valid: true });
+  });
+
+  test('required: false — a non-string, non-undefined body is still rejected', () => {
+    assert.deepStrictEqual(
+      validateCommentBody(42, { required: false }),
+      { valid: false, error: 'body must be a string' },
+    );
+  });
+
+  test('either mode: a string body with a dangerous control character is rejected', () => {
+    assert.deepStrictEqual(validateCommentBody('bad\x00body'), { valid: false, error: 'body contains invalid characters' });
+    assert.deepStrictEqual(
+      validateCommentBody('bad\x1Fbody', { required: false }),
+      { valid: false, error: 'body contains invalid characters' },
+    );
+  });
+
+  test('presence/type wins over dangerous-chars — a non-string body never reaches the regex check', () => {
+    // 42 is neither required-missing-message-worthy under required:false NOR a
+    // string DANGEROUS_CHARS_REGEX.test() could run against; asserts the
+    // function returns the type error, not a thrown TypeError.
+    assert.deepStrictEqual(validateCommentBody(42, { required: false }), { valid: false, error: 'body must be a string' });
+  });
+});
 
 describe('issue-write-validation: exported constants', () => {
   test('length caps match the documented values', () => {

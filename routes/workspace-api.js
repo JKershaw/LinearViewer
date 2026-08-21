@@ -65,8 +65,13 @@ import {
 } from '../lib/proxy-ref-resolver.js';
 import { PartialWriteError } from '../lib/partial-write-error.js';
 import { isTrashed } from '../lib/trashed-signal.js';
-import { validateIssueWriteFields, isValidPriority } from '../lib/issue-write-validation.js';
+import { validateIssueWriteFields, isValidPriority, validateCommentBody, MAX_COMMENT_LENGTH } from '../lib/issue-write-validation.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+// LIN-2154: the session-auth (human-lane) comment write shares the agent-lane's
+// dedupe cache instances (routes/proxy.js) rather than a fresh pair that would
+// miss workspace-wide generation bumps, and its key-building primitive.
+import { dedupeKey } from '../lib/proxy-dedupe.js';
+import { commentDedupe, commentDedupeGenerations } from './proxy.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { isTerminalState, isBlocked } from '../lib/tree.js';
 import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
@@ -1415,6 +1420,113 @@ ${goal}`
   })
 
   /**
+   * Add a human comment to an issue (LIN-2154) — the session-auth twin of the
+   * agent-lane `POST /api/proxy/issues/:issueId/comments` (routes/proxy.js).
+   * The durable sink for a "save"/"save and continue" ruling response from the
+   * session reply box: the operator's answer lands as a comment on the task,
+   * independent of (and, from the client, sequenced before) the existing
+   * follow-up dispatch.
+   *
+   * V1 tenancy note: `resolveIssueBinding(workspace, req.query.source)` below
+   * is the same defensive shape the paired GET above and the issues PATCH
+   * already use. The reply-box client sends no `?source=` (removed — see
+   * public/session.js), so on a workspace holding more than one binding of
+   * the same provider this resolves to the workspace's ACTIVE binding, which
+   * may not be the one the displayed issue actually lives in. Accepted as a
+   * named V1 limitation; LIN-2188 owns closing that gap.
+   *
+   * @route POST /workspace/:urlKey/api/comments/:issueId
+   * Body: { body: string }
+   * @returns 201 { success: true, comment } | 200 { success: true, comment, deduped: true }
+   */
+  router.post('/workspace/:urlKey/api/comments/:issueId', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
+    const { provider, callScope: token } = resolveIssueBinding(workspace, requestedSource)
+
+    if (!provider.supports('createComment')) {
+      return jsonError(res, 422, "This workspace's provider does not support commenting on issues", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'createComment', provider: provider.name,
+      })
+    }
+
+    const { issueId } = req.params
+    if (!isValidIssueId(issueId)) {
+      return badRequest.json(res, 'Invalid issue ID format')
+    }
+
+    const { body } = req.body || {}
+    const bodyValidation = validateCommentBody(body, { required: true })
+    if (!bodyValidation.valid) {
+      return badRequest.json(res, bodyValidation.error)
+    }
+    if (body.length > MAX_COMMENT_LENGTH) {
+      return badRequest.json(res, `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`)
+    }
+
+    try {
+      // test-token/testMockData branch (matches the codebase-wide `isTestMode`
+      // convention, e.g. fetchWorkspaceIssues above): a `/test/set-session`
+      // workspace carries no real provider binding, so the session-page e2e
+      // coupling specs (tests/e2e/session-page.spec.js) need a write double
+      // here rather than a live Linear GraphQL call — including no real
+      // `issueWriteGuard` to check trashed-ness against, so this mode skips
+      // that step entirely. Real (local/Linear-bound) workspaces are
+      // unaffected and keep the full guard below.
+      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
+
+      if (!isTestMode) {
+        // Two-step trashed guard (LIN-1559): the capability check above cannot
+        // speak for this route-internal read, so a provider that implements
+        // createComment but not issueWriteGuard gets a clean 422, not a 500.
+        if (typeof provider.issueWriteGuard !== 'function') {
+          return jsonError(res, 422, "This workspace's provider does not support commenting on issues", {
+            code: 'CAPABILITY_NOT_SUPPORTED', capability: 'issueWriteGuard', provider: provider.name,
+          })
+        }
+        const guard = await provider.issueWriteGuard(token, issueId)
+        if (isTrashed(guard)) {
+          return jsonError(res, 409, 'Issue is trashed; refusing to comment on a deleted issue')
+        }
+      }
+
+      // Dedupe key is salted with a stable 'human-comment' discriminator so this
+      // lane's digest stream can never collide with the agent lane's own
+      // 4-argument call (routes/proxy.js) — see the comment there. Keyed on the
+      // RAW, pre-attribution operator text (not the final attributed body,
+      // composed below): an identical resubmission must hit the same cache
+      // entry even though attribution makes the two *written* bodies diverge.
+      const key = dedupeKey(workspace.urlKey, issueId, body, commentDedupeGenerations.current(workspace.urlKey), 'human-comment')
+      const prior = commentDedupe.get(key)
+      if (prior) {
+        return res.status(200).json({ ...prior, deduped: true })
+      }
+
+      // Attribution (OQ2): a static fallback line, not a `provider.fetchViewer`
+      // round-trip — see the plan's Attribution note for why. Reversible,
+      // revisit as its own follow-up if the fallback proves unsatisfying.
+      const attributedBody = `${body}\n\n— Ruling recorded via Harbour`
+
+      // Deliberately identifier-agnostic in test mode — it echoes whichever
+      // :issueId the caller sent, so every spec's own seeded issueIdentifier
+      // is accepted, not one hardcoded fixture.
+      const commentCreate = isTestMode
+        ? { success: true, comment: { id: `test-comment-${key}`, body: attributedBody, createdAt: new Date().toISOString(), user: { name: 'Harbour' } } }
+        : normalizeCommentWrite(await provider.createComment(token, issueId, attributedBody))
+
+      if (!commentCreate.success || !commentCreate.comment) {
+        return jsonError(res, 502, 'Comment was not created', { detail: commentCreate || null })
+      }
+
+      commentDedupe.set(key, commentCreate)
+      return res.status(201).json(commentCreate)
+    } catch (err) {
+      console.error('Workspace-api create comment error:', err.message)
+      return jsonError(res, 500, 'Failed to create comment')
+    }
+  })
+
+  /**
    * Render one issue's detail block for the lazy dashboard (LIN-442).
    *
    * The authenticated homepage now ships only collapsed lines; `renderNode`
@@ -2641,6 +2753,14 @@ ${goal}`
   function normalizeIssueWrite(result) {
     if (result && typeof result === 'object' && 'success' in result) return result;
     return { success: !!result, issue: result ?? null };
+  }
+
+  // Same normalization, keyed 'comment' instead of 'issue' (LIN-2154) — the
+  // session-auth comment route's provider.createComment() result can be
+  // Linear's `{success, comment}` envelope or a bare comment entity (Local).
+  function normalizeCommentWrite(result) {
+    if (result && typeof result === 'object' && 'success' in result) return result;
+    return { success: !!result, comment: result ?? null };
   }
 
   // Input-side symbolic-ref resolution, mirroring the proxy write path

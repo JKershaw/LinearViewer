@@ -30,6 +30,7 @@ import {
   DANGEROUS_CHARS_REGEX,
   isValidPriority,
   validateIssueWriteFields,
+  validateCommentBody,
 } from '../lib/issue-write-validation.js';
 import { createDispatchItem, DUPLICATE_DISPATCH_CODE, BUDGET_EXHAUSTED_CODE } from '../lib/dispatch-factory.js';
 import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } from '../lib/dispatch-referent-guard.js';
@@ -305,7 +306,11 @@ function buildMockBriefFromContext(context) {
 // identical (workspace + issue + body) create arriving within the window
 // collapses to the first comment instead of minting a duplicate, so a
 // consumer that retries after a lost response gets the original back.
-const commentDedupe = createDedupeCache();
+//
+// Exported (LIN-2154) so the session-auth human-lane comment route
+// (routes/workspace-api.js) shares this SAME cache instance rather than a
+// fresh one that would miss workspace-wide generation bumps below.
+export const commentDedupe = createDedupeCache();
 
 /**
  * Per-workspace generation tag for comment dedupe invalidation (LIN-1160,
@@ -341,8 +346,12 @@ const commentDedupe = createDedupeCache();
  * logging fingerprint: falling back to the pre-bump value would resurrect a
  * dedupe entry a bump was meant to kill, so this tracker must never evict in
  * practice.
+ *
+ * Exported (LIN-2154) alongside `commentDedupe` above for the same reason —
+ * the human-lane route folds `commentDedupeGenerations.current(urlKey)` into
+ * its own dedupe key so a delete/edit from either lane invalidates both.
  */
-const commentDedupeGenerations = createGenerationTracker();
+export const commentDedupeGenerations = createGenerationTracker();
 
 // Rate limiters
 // Note: proxyLimiter is applied before authenticateProxyToken on consumer
@@ -3192,17 +3201,20 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       }
 
       const { body } = req.body;
-      if (!body || typeof body !== 'string') {
-        logEvent(req, '/api/proxy/issues/comments', 400);
-        return badRequest.json(res, 'body is required');
+      // LIN-2154: presence/type/dangerous-chars via the shared validator FIRST,
+      // then the retained length check — a named, cosmetic exception for a
+      // doubly-invalid (over-length AND dangerous-chars) body, which now
+      // reports the dangerous-chars message instead of the length one.
+      const bodyValidation = validateCommentBody(body, { required: true });
+      if (!bodyValidation.valid) {
+        if (bodyValidation.error === 'body is required') {
+          logEvent(req, '/api/proxy/issues/comments', 400);
+        }
+        return badRequest.json(res, bodyValidation.error);
       }
 
       if (body.length > MAX_COMMENT_LENGTH) {
         return badRequest.json(res, `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`);
-      }
-
-      if (DANGEROUS_CHARS_REGEX.test(body)) {
-        return badRequest.json(res, 'body contains invalid characters');
       }
 
       if (await refuseIfTrashed(provider, token, issueId, req, res, '/api/proxy/issues/comments')) return;
@@ -3212,6 +3224,13 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       // The generation tag (LIN-1160/LIN-2005) folds in so a delete/edit
       // anywhere in this workspace invalidates every prior dedupe entry in it
       // (see commentDedupeGenerations above).
+      //
+      // LIN-2154: this stays a 4-argument call. Padding it to 5 (to match the
+      // human lane's salted call in routes/workspace-api.js) would change ITS
+      // OWN digest stream shape relative to every entry it has ever produced,
+      // silently invalidating this lane's live dedupe window — a same-lane
+      // regression, not a cross-lane collision risk (dedupeKey's length-prefix
+      // scheme is the whole collision guarantee between distinct streams).
       const key = dedupeKey(req.proxyUrlKey, issueId, body, commentDedupeGenerations.current(req.proxyUrlKey));
       const prior = commentDedupe.get(key);
       if (prior) {
@@ -3301,15 +3320,17 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       }
 
       const { body } = req.body;
-      if (!body || typeof body !== 'string') {
-        logEvent(req, '/api/proxy/issues/comments', 400);
-        return badRequest.json(res, 'body is required');
+      // LIN-2154: same validator-first, length-second order as the create route
+      // above (and the same named doubly-invalid-body exception).
+      const bodyValidation = validateCommentBody(body, { required: true });
+      if (!bodyValidation.valid) {
+        if (bodyValidation.error === 'body is required') {
+          logEvent(req, '/api/proxy/issues/comments', 400);
+        }
+        return badRequest.json(res, bodyValidation.error);
       }
       if (body.length > MAX_COMMENT_LENGTH) {
         return badRequest.json(res, `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`);
-      }
-      if (DANGEROUS_CHARS_REGEX.test(body)) {
-        return badRequest.json(res, 'body contains invalid characters');
       }
 
       const commentUpdate = normalizeWritePayload(await provider.updateComment(token, commentId, body), 'comment');
@@ -3382,13 +3403,13 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         return badRequest.json(res, 'Invalid issue ID format');
       }
 
-      if (body !== undefined && typeof body !== 'string') {
+      // LIN-2154: shared validator (optional body — the relay's caption is
+      // never required). Its native order (type-check then dangerous-chars,
+      // both before the length/budget math below) is unchanged by the move.
+      const bodyValidation = validateCommentBody(body, { required: false });
+      if (!bodyValidation.valid) {
         logEvent(req, endpoint, 400);
-        return badRequest.json(res, 'body must be a string');
-      }
-      if (typeof body === 'string' && DANGEROUS_CHARS_REGEX.test(body)) {
-        logEvent(req, endpoint, 400);
-        return badRequest.json(res, 'body contains invalid characters');
+        return badRequest.json(res, bodyValidation.error);
       }
 
       if (!image) {

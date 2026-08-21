@@ -463,6 +463,155 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     expect(resp.status()).toBe(201);
   });
 
+  test('Save writes a durable comment only — no dispatch follow-up is sent (LIN-2154)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedWarmSession(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const run = await expandRun(page, 'Warm worker');
+    const box = run.locator('[data-testid="session-inline-reply"]');
+    const saveBtn = box.locator('[data-testid="session-inline-reply-save"]');
+    await expect(saveBtn).toBeVisible();
+
+    let dispatchFired = false;
+    page.on('request', (r) => {
+      if (r.url().includes('/api/dispatch') && r.method() === 'POST') dispatchFired = true;
+    });
+
+    const [request] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
+      (async () => {
+        await box.locator('textarea').fill('recording this decision');
+        await saveBtn.click();
+      })()
+    ]);
+    expect(request.url()).toContain('/api/comments/LIN-1252');
+    expect(request.postDataJSON().body).toBe('recording this decision');
+    const resp = await request.response();
+    expect(resp.status()).toBe(201);
+
+    await expect(box.locator('.sess-reply-feedback')).toContainText('recorded on the task');
+    expect(dispatchFired).toBe(false);
+  });
+
+  test('Save against a waiting session confirms before recording (LIN-2154 OQ5)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedBlockedSession(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const run = await expandRun(page, 'Waiting worker');
+    const box = run.locator('[data-testid="session-inline-reply"]');
+    await expect(box).toHaveAttribute('data-session-waiting', 'true');
+    const saveBtn = box.locator('[data-testid="session-inline-reply-save"]');
+
+    let dialogText = null;
+    page.once('dialog', async (dialog) => {
+      dialogText = dialog.message();
+      await dialog.dismiss();
+    });
+    await box.locator('textarea').fill('a decision, not delivered');
+    await saveBtn.click();
+    await page.waitForTimeout(200);
+    expect(dialogText).toContain('waiting');
+
+    // Dismissing the confirm means no comment was recorded.
+    await expect(box.locator('.sess-reply-feedback')).not.toContainText('recorded on the task');
+  });
+
+  test('Save and continue: a synchronous dispatch failure surfaces a structural partial-failure with a working retry (LIN-2154 OQ4)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedWarmSession(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const run = await expandRun(page, 'Warm worker');
+    const box = run.locator('[data-testid="session-inline-reply"]');
+
+    // Fail the dispatch call once (simulating a synchronous 429/503) while
+    // leaving the comment route untouched — the comment must still land.
+    let dispatchAttempts = 0;
+    await page.route('**/api/dispatch', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      dispatchAttempts += 1;
+      if (dispatchAttempts === 1) {
+        return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'queue temporarily unavailable' }) });
+      }
+      return route.continue();
+    });
+
+    await box.locator('textarea').fill('please continue, if you can');
+    await box.locator('[data-testid="session-inline-reply-send"]').click();
+
+    const feedback = box.locator('.sess-reply-feedback');
+    await expect(feedback).toContainText('Recorded on the task');
+    await expect(feedback).toContainText('Could not deliver');
+    const retryBtn = box.locator('.sess-reply-retry-delivery');
+    await expect(retryBtn).toBeVisible();
+
+    // The comment landed even though delivery failed — no comment call is
+    // reissued on retry, only the dispatch call.
+    await expect(box.locator('[data-testid="session-reply-you"]')).toHaveCount(1);
+
+    const [request] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
+      retryBtn.click()
+    ]);
+    expect(dispatchAttempts).toBe(2);
+    const resp = await request.response();
+    expect(resp.status()).toBe(201);
+    await expect(feedback).toContainText('reply queued');
+    await expect(feedback).toContainText('Recorded on the task');
+  });
+
+  test('Save and continue: a comment write failure blocks the dispatch entirely (LIN-2154 OQ4)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedWarmSession(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const run = await expandRun(page, 'Warm worker');
+    const box = run.locator('[data-testid="session-inline-reply"]');
+
+    let dispatchFired = false;
+    await page.route('**/api/comments/**', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Comment was not created' }) });
+    });
+    page.on('request', (r) => {
+      if (r.url().includes('/api/dispatch') && r.method() === 'POST') dispatchFired = true;
+    });
+
+    await box.locator('textarea').fill('this will not land');
+    await box.locator('[data-testid="session-inline-reply-send"]').click();
+
+    await expect(box.locator('.sess-reply-feedback')).toContainText('reply failed');
+    await page.waitForTimeout(300);
+    expect(dispatchFired).toBe(false);
+  });
+
+  // A genuinely issueless run (no issueIdentifier on the dispatch item at all)
+  // cannot be produced through this end-to-end path: `_buildLoops`
+  // (lib/pipeline-loops.js:246/:267) unconditionally drops any live or history
+  // dispatch item with no `issueIdentifier` as "malformed" before it ever
+  // reaches session reconstruction, so it can never render as a `session-run`
+  // here. The server-side half of the issueless gate (renderInlineReplyBox
+  // emitting an empty `data-issue-identifier`) is covered at the unit level
+  // instead — tests/unit/render-session.test.js, "issueless gate (LIN-2154)".
+
   test('an unknown sessionId 404s with a not-found body', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);

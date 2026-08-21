@@ -492,6 +492,17 @@
   background: color-mix(in srgb, var(--green) 22%, transparent);
 }
 .sess-reply-send:disabled { opacity: 0.5; cursor: default; }
+/* Save-only button (LIN-2154): same shape as .sess-reply-send, muted/slate
+   rather than green — a comment-only save is the lower-commitment action. */
+.sess-reply-save {
+  color: var(--slate);
+  background: color-mix(in srgb, var(--slate) 12%, transparent);
+}
+.sess-reply-save:hover {
+  background: color-mix(in srgb, var(--slate) 22%, transparent);
+}
+.sess-reply-save:disabled { opacity: 0.5; cursor: default; }
+.sess-reply-save[hidden] { display: none; }
 .sess-reply-note {
   margin: 0.5rem 0 0;
   font-family: var(--font-content);
