@@ -389,7 +389,7 @@
    off the bold amber `.obs-summary-waiting` label they inherit from by
    default — the excerpt is supporting detail, not the headline. */
 .obs-summary-decision-excerpt { font-weight: 400; color: var(--muted); }
-.obs-summary-decision-options { font-weight: 400; color: var(--muted); white-space: nowrap; }
+.obs-summary-decision-options { font-weight: 400; color: var(--muted); }
 /* Most-recent run kind beside "working…" (LIN-631). */
 .obs-summary-kind {
   font-size: 0.72rem;
