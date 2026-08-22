@@ -290,6 +290,31 @@ describe('render-session: waiting banner (LIN-1005)', () => {
     assert.match(html, /Part two of the case \(recap 2\/3\)/);
     assert.match(html, /Part three of the case \(recap 3\/3\)/);
   });
+
+  // LIN-2184 (H5, beat 5): the ticket's V1-boundary acceptance test. A
+  // completion-path decision is accepted (H1), parsed (H2), and derived (H3)
+  // onto the loop, but H5 must NOT render it on either surface until LIN-1728
+  // supplies a waiting-independent predicate — the SAME `!waiting` gate that
+  // already guards the plain waitingMessage above also guards the decision
+  // (beat 3 never widened the gate, only what renders inside it). This
+  // fixture mirrors a terminal/non-waiting session (`waiting: false`) that
+  // still carries a decision/decisionCase — proving H4's ledger rule that the
+  // PAYLOAD rides ungated does not leak into the RENDER, which stays gated.
+  test('LIN-2184 V1 boundary: a completion-path decision on a non-waiting (terminal) session renders NEITHER the banner NOR any decision markup', () => {
+    const decision = { decision_id: 'd-3', question: 'Ship it?', options: [{ id: 'yes', label: 'Yes' }] };
+    const decisionCase = ['The migration completed cleanly.'];
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: false, waitingMessage: null, decision, decisionCase },
+      {}
+    );
+    assert.ok(!html.includes('data-testid="session-waiting-banner"'), 'no banner at all when the session is not waiting');
+    assert.ok(!html.includes('data-testid="session-waiting-decision"'), 'no decision wrapper');
+    assert.ok(!html.includes('data-testid="session-waiting-decision-case"'), 'no case markup');
+    assert.ok(!html.includes('data-testid="session-waiting-decision-case-chunk"'), 'no case chunk markup');
+    assert.ok(!html.includes('data-testid="session-waiting-decision-options"'), 'no options markup');
+    assert.ok(!html.includes('The migration completed cleanly.'), 'the case text itself must not leak into the page anywhere');
+    assert.ok(!html.includes('Ship it?'), 'the question text itself must not leak into the page anywhere');
+  });
 });
 
 describe('render-session: telemetry + model omission', () => {

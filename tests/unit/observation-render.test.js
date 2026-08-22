@@ -220,4 +220,27 @@ test.describe('renderSummaryLine / excerptDecisionCase — waiting card decision
     assert.ok(!html.includes('<img src=x onerror=alert(1)>'));
     assert.match(html, /&lt;script&gt;/);
   });
+
+  // LIN-2184 (H5, beat 5): the ticket's V1-boundary acceptance test, feed-card
+  // half (the banner half lives in render-session.test.js). A completion-path
+  // decision on a non-waiting (terminal) session must render on NEITHER
+  // surface — this asserts the feed card side. `renderSummaryLine`'s decision
+  // summary only runs inside the SAME `if (s.waiting)` branch that already
+  // guards the plain "waiting on you" line, so a non-waiting session never
+  // reaches that code at all — proving beat 4 did not widen the gate.
+  test('LIN-2184 V1 boundary: a completion-path decision on a non-waiting (terminal) session renders NEITHER "waiting on you" NOR any decision markup', () => {
+    const s = waitingSession({
+      waiting: false,
+      terminal: true,
+      waitingMessage: null,
+      decision: { decision_id: 'd-3', question: 'Ship it?', options: [{ id: 'yes', label: 'Yes' }] },
+      decisionCase: ['The migration completed cleanly.']
+    });
+    const html = renderSummaryLine(s);
+    assert.ok(!html.includes('obs-summary-waiting'), 'no "waiting on you" line at all when the session is not waiting');
+    assert.ok(!html.includes('obs-summary-decision-excerpt'), 'no excerpt markup');
+    assert.ok(!html.includes('obs-summary-decision-options'), 'no options markup');
+    assert.ok(!html.includes('The migration completed cleanly.'), 'the case text itself must not leak into the card anywhere');
+    assert.ok(!html.includes('Ship it?'), 'the question text itself must not leak into the card anywhere');
+  });
 });
