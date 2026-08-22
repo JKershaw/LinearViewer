@@ -3373,6 +3373,87 @@ describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
 });
 
 // =============================================================================
+// Acceptance-witness discipline for implementation-authored tests (LIN-2219).
+// lib/prompt-template-defs.js:127 (the bug/investigate template's witness-validation
+// rule) is scoped to the lane that writes the fewest tests. This extends the same
+// discipline — before trusting a test as the acceptance witness, observe it fail (or
+// run the mutation equivalent) — to guideline 6 of the implementation template and its
+// meta-path mirror, clause (10) of the Implementation-prompts quality rule. Assertions
+// are scoped to the guidelines block / quality-rule bullet and use distinctive
+// multi-word phrases so a pre-existing `red`/`fail` substring elsewhere in the prompt
+// (CI language) cannot satisfy them (measured false positive: `includes('red')` already
+// passes today via guideline 3's "required").
+// =============================================================================
+describe('acceptance-witness discipline for authored tests (LIN-2219)', () => {
+  const mockIssue = {
+    id: 'issue-aw', identifier: 'TEST-AW1', title: 'Do a thing',
+    description: 'Do the thing', url: 'https://linear.app/test/issue/TEST-AW1',
+    state: { name: 'Todo', type: 'unstarted' }, labels: ['implementation']
+  };
+  const mockContext = { parent: null, siblings: [], project: null, children: [], comments: [] };
+
+  function guidelinesSlice() {
+    const { prompt } = generatePrompt('implementation', mockIssue, mockContext);
+    const start = prompt.indexOf('### Implementation Guidelines');
+    const end = prompt.indexOf('### Shared Boundaries');
+    assert.ok(start !== -1 && end !== -1 && end > start, 'expected an Implementation Guidelines block before Shared Boundaries');
+    return prompt.slice(start, end);
+  }
+
+  test('implementation guidelines require observing a real failure before trusting a test as the witness', () => {
+    const slice = guidelinesSlice();
+    assert.ok(/observe it fail/.test(slice), 'must require observing the test fail');
+    assert.ok(
+      /capture the actual failing output/.test(slice),
+      'must require capturing actual failing output, not an assertion it would fail'
+    );
+    assert.ok(/mutation equivalent/.test(slice), 'must name the mutation equivalent for an impossible-RED test');
+  });
+
+  test('the acceptance-witness guideline stays tracker-neutral', () => {
+    const slice = guidelinesSlice();
+    assert.ok(!/\bLinear\b/.test(slice), 'the new guideline must not hardcode a tracker noun');
+  });
+
+  test('does not restate the bug/investigate template\'s witness-validation wording (one-source-of-truth)', () => {
+    const slice = guidelinesSlice();
+    assert.ok(
+      !slice.includes('must be validated or replaced before you optimize against it'),
+      'must not restate the bug rule\'s distinctive clause'
+    );
+    assert.ok(
+      !slice.includes('can read green while the outcome is still wrong'),
+      'must not restate the bug rule\'s distinctive clause'
+    );
+  });
+
+  test('meta-prompt Implementation-prompts rule mirrors the acceptance-witness discipline', () => {
+    const p = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-2219',
+      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, implement',
+      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
+    });
+    const implBullet = extractQualityRuleBullet(p, 'Implementation prompts', 'Defer replies');
+    assert.ok(/observe it fail/.test(implBullet), 'meta Implementation-prompts bullet must require observing the test fail');
+    assert.ok(
+      /capture the actual failing output/.test(implBullet),
+      'meta Implementation-prompts bullet must require capturing actual failing output'
+    );
+    assert.ok(/mutation equivalent/.test(implBullet), 'meta Implementation-prompts bullet must name the mutation equivalent');
+    assert.ok(!/\bLinear\b/.test(implBullet), 'meta Implementation-prompts bullet must stay tracker-neutral');
+    assert.ok(
+      !implBullet.includes('must be validated or replaced before you optimize against it'),
+      'meta bullet must not restate the bug rule\'s distinctive clause'
+    );
+    assert.ok(
+      !implBullet.includes('can read green while the outcome is still wrong'),
+      'meta bullet must not restate the bug rule\'s distinctive clause'
+    );
+  });
+});
+
+// =============================================================================
 // Attachment-perception discipline (LIN-872). research/plan/review must fetch AND
 // perceive every attachment before making a grounding claim, enumerate them
 // explicitly, and hard-stop + escalate (recommend `blocked`) on an unperceivable
