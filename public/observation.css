@@ -192,6 +192,51 @@
 .obs-feed-empty { color: var(--muted); font-size: 0.85rem; padding: 0.4rem 0; }
 .obs-feed-empty.hidden { display: none; }
 
+/* Rulings tab (LIN-1728 Phase 4). One card per unanswered decision — an
+   amber left accent (the escalation/waiting hue, matching `.chat-msg--blocked`
+   in chat.css) rather than the status-hue accents .obs-session uses, since a
+   ruling has no lifecycle status of its own. */
+.obs-ruling {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--radius-lg);
+  margin-bottom: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--raised);
+}
+.obs-ruling-head {
+  font-family: var(--font-structural);
+  font-size: 0.85rem;
+  color: var(--fg-dim);
+  margin-bottom: 0.3rem;
+}
+.obs-ruling-issue { font-weight: 600; color: var(--fg); }
+.obs-ruling-ws { color: var(--fg-dim); }
+.obs-ruling-question {
+  font-family: var(--font-content);
+  font-weight: 500;
+  margin: 0 0 0.3rem;
+}
+.obs-ruling-case {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin: 0 0 0.3rem;
+}
+.obs-ruling-cost {
+  color: var(--fg-dim);
+  font-size: 0.82rem;
+  font-style: italic;
+  margin: 0 0 0.3rem;
+}
+.obs-ruling-feedback {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0.4rem 0 0;
+}
+.obs-ruling-feedback:empty { display: none; }
+.obs-ruling-feedback--error { color: var(--red); }
+
 .obs-session {
   border: 1px solid var(--line);
   /* Coloured left accent stripe per status (mockup, design §6.1: 3px); status hue

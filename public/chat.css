@@ -167,6 +167,56 @@
   50% { opacity: 0; }
 }
 
+/* ── Option-button row (LIN-1728 Phase 4) ────────────────────────────────── */
+
+/* The option-button primitive — a decision's choices as pressable buttons,
+   built by public/chat.js's appendOptions. `.chat-options-caption` carries the
+   disposition-derived label ("Reply & continue" / "Reply & start a run" /
+   read-only affordance text); `--readonly` (mid-turn/indeterminate) renders
+   the caption alone, no button row. */
+.chat-options {
+  margin: var(--space-2) 0;
+}
+.chat-options-caption {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  margin-bottom: var(--space-1);
+}
+.chat-options--readonly .chat-options-caption {
+  font-style: italic;
+}
+.chat-options-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.chat-option-btn {
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  padding: 0.3rem var(--space-3);
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.chat-option-btn:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.chat-option-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.chat-option-btn.chat-option--recommended {
+  border-color: var(--blue);
+  font-weight: 600;
+}
+.chat-option-btn.chat-option--recommended::after {
+  content: ' ★';
+}
+
 /* ── Composer ────────────────────────────────────────────────────────────── */
 
 /* A clean, stacked ask row: the input above its action bar. Consumers keep their

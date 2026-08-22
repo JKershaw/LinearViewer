@@ -112,5 +112,83 @@
     return li;
   }
 
-  window.ChatUI = { appendMessage: appendMessage, appendNote: appendNote };
+  // Disposition → caption text (LIN-1728 Phase 4, decision 4/F8). The SAME
+  // button-press means two different things depending on the anchor's
+  // press-time liveness (`lib/unanswered-decisions.js`'s `resolveDisposition`,
+  // resolved server-side and passed straight through, never re-derived here):
+  // resumable/gone both admit a reply (a follow-up vs. a fresh run — a
+  // different action under the hood, so the caption says so honestly);
+  // mid-turn/indeterminate are read-only — no options render, no dispatch is
+  // ever attempted for either.
+  var DISPOSITION_CAPTIONS = {
+    resumable: 'Reply & continue',
+    gone: 'Reply & start a run',
+    'mid-turn': 'still running — reply disabled',
+    indeterminate: 'no action available yet'
+  };
+
+  /**
+   * Append an option-button row — the LIN-1728 chat primitive for answering a
+   * decision. Every option LABEL is agent-authored text (it comes straight off
+   * a `kind: 'decision'` feedback payload another session wrote) and is
+   * rendered via DOM text (`textContent`), never through `appendMessage`'s
+   * `html` sink — that sink is caller-trusted HTML and is unsafe for this
+   * source.
+   *
+   * @param {Element} container - any element to append into (not necessarily a `.chat-thread`).
+   * @param {Object} opts
+   * @param {Array<{id: string, label: string, cost?: number}>} [opts.options] - decision options.
+   * @param {string} [opts.recommended] - the recommended option's `id`, if any.
+   * @param {'resumable'|'gone'|'mid-turn'|'indeterminate'} opts.disposition - press-time disposition (see `lib/unanswered-decisions.js`).
+   * @param {function(string, string): void} [opts.onSelect] - called with `(optionId, optionLabel)` on a button press. Never called for a read-only disposition (mid-turn/indeterminate) or when `options` is empty.
+   * @returns {Element} the appended `<div class="chat-options">` wrapper.
+   */
+  function appendOptions(container, opts) {
+    opts = opts || {};
+    var options = Array.isArray(opts.options) ? opts.options : [];
+    var disposition = opts.disposition;
+    var onSelect = typeof opts.onSelect === 'function' ? opts.onSelect : function () {};
+
+    var wrap = document.createElement('div');
+    wrap.className = 'chat-options';
+    wrap.setAttribute('data-disposition', disposition || '');
+
+    var caption = document.createElement('div');
+    caption.className = 'chat-options-caption';
+    caption.textContent = DISPOSITION_CAPTIONS[disposition] || DISPOSITION_CAPTIONS.indeterminate;
+    wrap.appendChild(caption);
+
+    // Read-only dispositions render the caption alone — no buttons, no dispatch
+    // ever attempted (mirrors `canReplyFor` in lib/unanswered-decisions.js).
+    var readOnly = disposition === 'mid-turn' || disposition === 'indeterminate';
+    if (readOnly || !options.length) {
+      wrap.classList.add('chat-options--readonly');
+      container.appendChild(wrap);
+      return wrap;
+    }
+
+    var row = document.createElement('div');
+    row.className = 'chat-options-row';
+    options.forEach(function (opt) {
+      if (!opt || typeof opt.id !== 'string' || typeof opt.label !== 'string') return;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chat-option chat-option-btn';
+      if (opts.recommended && opt.id === opts.recommended) {
+        btn.classList.add('chat-option--recommended');
+      }
+      // DOM text, never innerHTML — opt.label is agent-authored and must never
+      // reach a markup sink (this is the constraint's targeted regression case:
+      // a label containing markup must render as literal text, not execute).
+      btn.textContent = opt.label;
+      btn.addEventListener('click', function () { onSelect(opt.id, opt.label); });
+      row.appendChild(btn);
+    });
+    wrap.appendChild(row);
+
+    container.appendChild(wrap);
+    return wrap;
+  }
+
+  window.ChatUI = { appendMessage: appendMessage, appendNote: appendNote, appendOptions: appendOptions };
 })();

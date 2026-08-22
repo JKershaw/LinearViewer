@@ -241,6 +241,44 @@ test('§11 AA: each status -dim text colour clears AA-normal on the page surface
   }
 });
 
+// LIN-1728 review F5: the rulings badge (public/style.css) reads
+// `--amber-dim` on white and passed by inspection, but its fill is NOT
+// `--bg` — it's a 10% `--amber` tint over `--card` (mirroring
+// `.chat-msg--blocked`'s amber-as-accent treatment, public/chat.css), which
+// is a materially different, non-`var()` background `resolveToken` can't
+// follow. Recompute it here the same way CSS Color 4's
+// `color-mix(in srgb, …)` does — a per-channel weighted average of the
+// gamma-encoded sRGB bytes — so a change to the mix percentage or either
+// token re-checks contrast rather than passing by inspection alone.
+function mixSrgb(hexA, weightAPercent, hexB) {
+  const a = /^#?([0-9a-f]{6})$/i.exec(hexA.trim());
+  const b = /^#?([0-9a-f]{6})$/i.exec(hexB.trim());
+  assert.ok(a && b, `expected two #rrggbb hex values, got "${hexA}" / "${hexB}"`);
+  const wa = weightAPercent / 100, wb = 1 - wa;
+  let out = '#';
+  for (let i = 0; i < 3; i++) {
+    const ca = parseInt(a[1].slice(i * 2, i * 2 + 2), 16);
+    const cb = parseInt(b[1].slice(i * 2, i * 2 + 2), 16);
+    out += Math.round(ca * wa + cb * wb).toString(16).padStart(2, '0');
+  }
+  return out;
+}
+
+test('§11 AA / LIN-1728 F5: the rulings badge text clears AA-normal on its own tinted fill, not just on --bg', () => {
+  for (const theme of [':root', '.theme-dark']) {
+    const fill = mixSrgb(resolveToken(theme, '--amber'), 10, resolveToken(theme, '--card'));
+    const ratio = contrast(resolveToken(theme, '--amber-dim'), fill);
+    assert.ok(ratio >= AA_NORMAL, `${theme}: --amber-dim on the rulings-badge fill (${fill}) is ${ratio.toFixed(2)}:1 (< ${AA_NORMAL})`);
+  }
+  // Pin the treatment itself, not just the math — a future edit that swaps
+  // back to a solid `--amber` fill (the original F5 bug) should fail here
+  // even before anyone recomputes contrast.
+  const badge = ruleBody(STYLE_CSS, '.rulings-badge {');
+  assert.match(badge, /color:\s*var\(--amber-dim\)/);
+  assert.match(badge, /background:\s*color-mix\(in srgb,\s*var\(--amber\)/);
+  assert.doesNotMatch(badge, /color:\s*white/);
+});
+
 test('§11 note: --faint is structural (non-text), used only for hairlines', () => {
   // --faint on --bg is intentionally below the 4.5:1 TEXT bar — it is the
   // box-drawing / hairline colour (non-text, 3:1 bar), so it is NOT asserted as

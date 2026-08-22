@@ -1996,6 +1996,103 @@ function initThemeToggle() {
 }
 
 // =============================================================================
+// Rulings Badge (LIN-1728 Phase 3)
+// =============================================================================
+// Lives here, not app.js, so it runs on every page that renders the badge
+// (LIN-1728 review F7): app.js is not loaded on the Observation page — the
+// one place rulings actually get answered — so a version scoped to app.js's
+// own DOMContentLoaded handler could never update the badge there, and the
+// two `typeof window.updateRulingsBadge === 'function'` guards in
+// public/observation.js's press handler could never be true. Mirrors
+// initNavBar's own move to common.js for the same reason (LIN-288).
+
+let rulingsPollIntervalId = null;
+// Deliberately a SLOWER, separate cadence than the queue badge's 1s poll
+// (app.js) — this rides the same 5s SWR cache the Observation page / rulings
+// tab poll uses (GET .../api/dashboard/rulings), so a faster client poll
+// here would just re-serve the same cached payload.
+const RULINGS_POLL_INTERVAL_MS = 5000;
+
+/**
+ * Update the ambient "waiting on you" rulings badge count for a workspace.
+ * Mirrors updateQueueBadge's raw-fetch, silently-swallow-failures shape (a
+ * background poller must never redirect to /logout or toast on a transient
+ * error) — reads GET .../api/dashboard/rulings, which is `req.session.workspaces`
+ * scoped server-side (never fleet-wide), not the single-workspace queue count.
+ *
+ * @global
+ */
+window.updateRulingsBadge = async function updateRulingsBadge(urlKey) {
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dashboard/rulings`);
+    if (!response.ok) return;
+
+    const { count } = await response.json();
+    const badge = document.querySelector(`[data-rulings-badge][data-url-key="${urlKey}"]`);
+    if (badge) {
+      const countEl = badge.querySelector('.rulings-count');
+      if (countEl) countEl.textContent = count;
+      badge.classList.toggle('hidden', count === 0);
+    }
+  } catch (e) {
+    console.error('Failed to update rulings badge:', e);
+  }
+};
+
+/**
+ * Start polling for rulings badge updates. 5s cadence (RULINGS_POLL_INTERVAL_MS),
+ * not the queue badge's 1s — the rulings route rides Observation's 5s SWR cache.
+ */
+function startRulingsPolling(urlKey) {
+  if (rulingsPollIntervalId) return;
+
+  rulingsPollIntervalId = setInterval(() => {
+    if (!document.hidden) {
+      window.updateRulingsBadge(urlKey);
+    }
+  }, RULINGS_POLL_INTERVAL_MS);
+}
+
+/**
+ * Stop polling for rulings badge updates.
+ */
+function stopRulingsPolling() {
+  if (rulingsPollIntervalId) {
+    clearInterval(rulingsPollIntervalId);
+    rulingsPollIntervalId = null;
+  }
+}
+
+/**
+ * Initialize the rulings badge: seed its count on load and start polling.
+ * Runs from this file's own DOMContentLoaded handler below, so every page
+ * that renders the badge markup (any page with the `dispatch` feature flag
+ * on, `lib/components/navbar.js`) gets the live-updating count — including
+ * Observation, which renders the badge but does not load app.js.
+ */
+function initRulingsBadge() {
+  const badge = document.querySelector('[data-rulings-badge]');
+  if (!badge) return;
+
+  const urlKey = badge.dataset.urlKey;
+  window.updateRulingsBadge(urlKey);
+  startRulingsPolling(urlKey);
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      window.updateRulingsBadge(urlKey);
+    }
+  });
+
+  // Cleanup on page unload — mirrors app.js's own stopQueuePolling cleanup.
+  // Registered here (only once a badge actually exists), not at module top
+  // level, so this file keeps loading against a minimal `window` stub with
+  // no `addEventListener` (tests/unit/reply-delivery-contract.test.js's
+  // sandbox contract).
+  window.addEventListener('beforeunload', stopRulingsPolling);
+}
+
+// =============================================================================
 // Auto-initialization
 // =============================================================================
 
@@ -2004,5 +2101,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initDisclosure();
   initNavBar();
   initThemeToggle();
+  initRulingsBadge();
   window.ProxyToggle.init();
 });

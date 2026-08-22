@@ -7,6 +7,10 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 let queuePollIntervalId = null
 const QUEUE_POLL_INTERVAL_MS = 1000
 
+// Rulings badge polling (LIN-1728 Phase 3) now lives in common.js — see
+// initRulingsBadge there for why (LIN-1728 review F7: it must be reachable
+// from the Observation page, which loads common.js but not app.js).
+
 // Proxy-toggle logic (state, token mint/cache, block append) now lives in a
 // single shared module: window.ProxyToggle in common.js (LIN-525 #7). The
 // copy/download/dispatch call sites below use the back-compat global
@@ -2105,7 +2109,8 @@ function initSearch() {
   })
 }
 
-// Cleanup polling on page unload
+// Cleanup polling on page unload. Rulings-badge cleanup registers itself
+// from common.js now, alongside its own init (LIN-1728 review F7).
 window.addEventListener('beforeunload', stopQueuePolling)
 
 /**
@@ -2244,7 +2249,8 @@ function initAutopilot() {
 
 document.addEventListener('DOMContentLoaded', () => {
   init()
-  // initNavBar() runs from common.js's DOMContentLoaded handler (LIN-288)
+  // initNavBar() runs from common.js's DOMContentLoaded handler (LIN-288);
+  // initRulingsBadge() runs from there too now (LIN-1728 review F7)
   initSearch()
   initPrompts()
   initDispatchDisclosures()
