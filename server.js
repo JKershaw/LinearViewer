@@ -60,6 +60,7 @@ import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } fro
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { ShipBiscuitHistoryStore } from './lib/ship-biscuit-history-store.js'
 import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
+import { TaskDecisionsStore } from './lib/task-decisions-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
@@ -453,6 +454,16 @@ const shipBiscuitHistoryStore = new ShipBiscuitHistoryStore({
 const taskSnapshotCollection = db.collection('task-snapshots')
 const taskSnapshotStore = new TaskSnapshotStore({
   collection: taskSnapshotCollection
+})
+
+// Task decision store (LIN-2197 Phase 2): task-keyed record of scan-produced
+// decisions, the third producer into the operator decision queue (LIN-1721).
+// Durable + per-task count-capped (no TTL), like task-snapshots above — a TTL
+// would silently delete an unanswered ruling. Not yet threaded into any route
+// factory: the scan routes that read/write it are a later phase.
+const taskDecisionsCollection = db.collection('task-decisions')
+const taskDecisionsStore = new TaskDecisionsStore({
+  collection: taskDecisionsCollection
 })
 
 // Saved chats (LIN-1008): durable, resumable task-chat transcripts, private per
