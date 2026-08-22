@@ -777,6 +777,15 @@ window.ReplyDelivery = (function () {
     var onPartialFailure = handlers.onPartialFailure;
     var onDispatchOk = handlers.onDispatchOk;
 
+    // All four are required, not defaulted to no-ops (see the JSDoc above) —
+    // check up front and throw synchronously rather than letting a missing
+    // handler surface as a TypeError inside the chain below, where the
+    // never-rejects `.catch(function () {})` would swallow it silently.
+    if (typeof onCommentFailed !== 'function' || typeof onDispatchFailed !== 'function' ||
+        typeof onPartialFailure !== 'function' || typeof onDispatchOk !== 'function') {
+      throw new Error('window.ReplyDelivery.deliverReply requires all four handlers: onCommentFailed, onDispatchFailed, onPartialFailure, onDispatchOk');
+    }
+
     function retryDispatch() {
       return doDispatch(opts, prompt);
     }
@@ -788,6 +797,14 @@ window.ReplyDelivery = (function () {
       ).catch(function () {});
     }
 
+    // Two-argument .then, not .then(...).catch(...) — a rejection of
+    // postComment itself (a network-layer fetch failure: offline, DNS,
+    // connection reset) must route to onCommentFailed, not be swallowed
+    // alongside callback throws by the trailing catch. Using the reject arm
+    // here (rather than a chained .catch) also means a throw from the
+    // fulfilled-branch's own callbacks (onDispatchOk/onPartialFailure) can
+    // never be misclassified as a comment failure — those two are already on
+    // separate arms of doDispatch's own .then below.
     return postComment(opts.urlKey, opts.issueId, prompt).then(function (commentResult) {
       if (!commentResult.ok) {
         onCommentFailed(errorFromResult(commentResult));
@@ -797,6 +814,8 @@ window.ReplyDelivery = (function () {
         function () { onDispatchOk(); },
         function (dispatchErr) { onPartialFailure(dispatchErr, retryDispatch); }
       );
+    }, function (commentErr) {
+      onCommentFailed(commentErr);
     }).catch(function () {});
   }
 

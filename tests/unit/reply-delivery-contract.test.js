@@ -218,6 +218,104 @@ test('issueless path (I10): success reaches onDispatchOk with no comment attempt
   assert.equal(fired.onDispatchFailed.length, 0);
 });
 
+test('comment-write fetch REJECTION (F1 regression): onCommentFailed fires, dispatch is never called, and the outer promise still resolves', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/comments/')) return Promise.reject(new TypeError('Failed to fetch'));
+    throw new Error('the dispatch endpoint must never be reached when the comment fetch rejects');
+  });
+  const { fired, handlers } = trackedHandlers();
+
+  // Would throw/reject the test itself if deliverReply's outer promise rejected.
+  await window.ReplyDelivery.deliverReply(
+    { urlKey: 'w', issueId: 'i1', followUpTo: 'lp', target: 'cli' },
+    'hello',
+    handlers
+  );
+
+  assert.equal(calls.length, 1, 'exactly one fetch was attempted (the comment write)');
+  assert.match(calls[0].url, /\/api\/comments\/i1$/);
+  assert.equal(fired.onCommentFailed.length, 1, 'a rejected comment fetch must route to onCommentFailed, not be swallowed');
+  assert.equal(fired.onCommentFailed[0].message, 'Failed to fetch');
+  assert.equal(fired.onDispatchOk.length, 0);
+  assert.equal(fired.onPartialFailure.length, 0);
+  assert.equal(fired.onDispatchFailed.length, 0);
+});
+
+test('dispatch fetch REJECTION, issue-bound (I1/I4 explicit): comment succeeds, dispatch fetch rejects, onPartialFailure fires with a working retryDispatch', async () => {
+  let dispatchCallCount = 0;
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
+    dispatchCallCount++;
+    if (dispatchCallCount === 1) return Promise.reject(new TypeError('Failed to fetch'));
+    return jsonResponse(true, 200, { success: true });
+  });
+  const { fired, handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.deliverReply(
+    { urlKey: 'w', issueId: 'i1', followUpTo: 'lp', target: 'cli' },
+    'hello',
+    handlers
+  );
+
+  assert.equal(fired.onPartialFailure.length, 1, 'a rejected dispatch fetch after a successful comment is a partial failure');
+  assert.equal(fired.onPartialFailure[0].e.message, 'Failed to fetch');
+  assert.equal(fired.onCommentFailed.length, 0);
+  assert.equal(fired.onDispatchOk.length, 0);
+  assert.equal(calls.length, 2);
+
+  await fired.onPartialFailure[0].retry();
+  assert.equal(calls.length, 3, 'retryDispatch() issued exactly ONE more fetch');
+  assert.equal(
+    calls.filter(c => String(c.url).includes('/api/comments/')).length, 1,
+    'the comment endpoint was called exactly once — retry never reposts it even after a rejected dispatch fetch'
+  );
+});
+
+test('dispatch fetch REJECTION, issueless (I10 explicit): onDispatchFailed fires, no comment attempt', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/comments/')) throw new Error('an issueless run must never write a comment');
+    return Promise.reject(new TypeError('Failed to fetch'));
+  });
+  const { fired, handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.deliverReply(
+    { urlKey: 'w', issueless: true, followUpTo: 'lp', target: 'cli' },
+    'hello',
+    handlers
+  );
+
+  assert.equal(calls.length, 1);
+  assert.equal(fired.onDispatchFailed.length, 1);
+  assert.equal(fired.onDispatchFailed[0].message, 'Failed to fetch');
+  assert.equal(fired.onCommentFailed.length, 0);
+  assert.equal(fired.onPartialFailure.length, 0);
+});
+
+test('all four handlers are required (F2): a missing handler throws synchronously rather than disappearing through the blanket catch', () => {
+  const { window } = makeSandbox(() => { throw new Error('fetch should not be called — the precondition check must fire first'); });
+  const { handlers } = trackedHandlers();
+
+  for (const missing of ['onCommentFailed', 'onDispatchFailed', 'onPartialFailure', 'onDispatchOk']) {
+    const incomplete = { ...handlers };
+    delete incomplete[missing];
+    assert.throws(
+      () => window.ReplyDelivery.deliverReply({ urlKey: 'w', issueId: 'i1', target: 'cli' }, 'x', incomplete),
+      /requires all four handlers/,
+      `missing ${missing} must throw synchronously, not resolve silently`
+    );
+  }
+
+  // Also required on the issueless path, which only calls two of the four.
+  for (const missing of ['onDispatchFailed', 'onDispatchOk']) {
+    const incomplete = { ...handlers };
+    delete incomplete[missing];
+    assert.throws(
+      () => window.ReplyDelivery.deliverReply({ urlKey: 'w', issueless: true, target: 'cli' }, 'x', incomplete),
+      /requires all four handlers/
+    );
+  }
+});
+
 test('outgoing dispatch payload (I6) is exactly {prompt,followUpTo,target} — no force key when falsy, no issue fields, no attachProxy', async () => {
   let dispatchBody = null;
   const { window } = makeSandbox((url, opts) => {
