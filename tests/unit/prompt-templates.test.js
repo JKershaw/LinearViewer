@@ -1649,7 +1649,7 @@ describe('Scale to the task (handwritten path)', () => {
 // LIN-177 S4/S5: Capability-aware prompts (provider.ui threaded into both paths)
 // =============================================================================
 import { generateCustomPrompt } from '../../lib/prompt-templates.js';
-import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatPlanFidelityCheck, formatAttachmentsSection, formatAttachmentPerceptionCheck } from '../../lib/prompt-formatters.js';
+import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatPlanFidelityCheck, formatAttachmentsSection, formatAttachmentPerceptionCheck, formatIfBlocked } from '../../lib/prompt-formatters.js';
 import { applyGroundingToRecommendation, formatIssueContext } from '../../lib/openrouter.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 
@@ -3188,6 +3188,113 @@ describe('plan-fidelity reconciliation + refactor-equivalence (LIN-698)', () => 
     assert.ok(/reconcile the plan against the research/.test(p), 'meta-prompt must require plan-vs-research reconciliation');
     assert.ok(/research's reasoning wins/.test(p), 'meta-prompt must give the research priority on conflict');
     assert.ok(/characterization test/.test(p), 'meta-prompt must require characterizing old behavior for refactor labels');
+  });
+});
+
+// =============================================================================
+// Principle 0 gate + self-sufficient ruling pointer for the worker lane (LIN-2202,
+// the worker-path half of LIN-1732's escalation-discipline rubric). formatIfBlocked()
+// is the single shared seam for both handwritten worker templates (plan,
+// implementation); the meta path has no `## If Blocked` section, so its mirror is a
+// prose clause on the existing Plan-prompts / Implementation-prompts quality rules,
+// same LIN-698 pattern as plan-fidelity above.
+// =============================================================================
+describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
+  const mockIssue = {
+    id: 'issue-ib', identifier: 'TEST-IB1', title: 'Do a thing',
+    description: 'Do the thing', url: 'https://linear.app/test/issue/TEST-IB1',
+    state: { name: 'Todo', type: 'unstarted' }, labels: ['implementation']
+  };
+  const mockContext = { parent: null, siblings: [], project: null, children: [], comments: [] };
+
+  test('plan and implementation templates both carry the Principle 0 gate and manual pointer', () => {
+    for (const kind of ['plan', 'implementation']) {
+      const result = generatePrompt(kind, mockIssue, mockContext);
+      assert.ok(result.prompt.includes('## If Blocked'), `${kind}: must keep the If Blocked heading`);
+      assert.ok(
+        result.prompt.includes('Gate on Principle 0'),
+        `${kind}: must include the Principle 0 gate`
+      );
+      assert.ok(
+        result.prompt.includes('`PENDING-EXTERNAL`') && result.prompt.includes('`BLOCKED:`'),
+        `${kind}: must name both sentinels`
+      );
+      assert.ok(
+        result.prompt.includes('The human\'s edge, and how to hand back'),
+        `${kind}: must cite the manual section by name`
+      );
+      assert.ok(
+        result.prompt.includes('GET /api/proxy/autopilot/manual'),
+        `${kind}: must name the portable endpoint pointer`
+      );
+    }
+  });
+
+  test('the manual pointer is portable — no bare repo-relative doc path outside the parenthetical', () => {
+    const body = formatIfBlocked();
+    // The doc path may appear once, alongside the endpoint, inside the citation parenthetical —
+    // but the endpoint (not the doc path) is what a worker on a different repo can actually reach.
+    assert.ok(body.includes('GET /api/proxy/autopilot/manual'));
+  });
+
+  test('step 3\'s exact blocks/blocked-by relationship line survives verbatim on both templates (LIN-357 regression)', () => {
+    const relationshipLine = 'Capture the dependency as a `blocks`/`blocked-by` relationship between the tasks';
+    for (const kind of ['plan', 'implementation']) {
+      const result = generatePrompt(kind, mockIssue, mockContext);
+      assert.ok(result.prompt.includes(relationshipLine), `${kind}: must preserve step 3 verbatim`);
+    }
+  });
+
+  test('does not restate the manual rubric prose (one-source-of-truth)', () => {
+    for (const kind of ['plan', 'implementation']) {
+      const result = generatePrompt(kind, mockIssue, mockContext);
+      assert.ok(
+        !result.prompt.includes('Merge sibling blockers before you bubble up'),
+        `${kind}: must not restate the manual's merge-sibling-blockers rubric text`
+      );
+      assert.ok(
+        !result.prompt.includes('per-option cost belongs in the option'),
+        `${kind}: must not restate the DECISION: JSON emit grammar guidance`
+      );
+    }
+  });
+
+  test('the If Blocked addition is provider-agnostic (no hardcoded tracker noun)', () => {
+    const body = formatIfBlocked();
+    const addedProse = body.slice(body.indexOf('**Gate on Principle 0'));
+    assert.ok(!/\bLinear\b/.test(addedProse), 'the new Principle 0/pointer prose must stay tracker-neutral');
+  });
+
+  test('is NOT routed through the universal grounding seam (LIN-698/LIN-435 anti-pattern)', () => {
+    const issue = { identifier: 'LIN-2202', createdAt: '2026-03-01T00:00:00.000Z', labels: ['implementation'] };
+    const grounding = appendGroundingSections('', issue, { children: [], comments: [] });
+    assert.ok(
+      !grounding.includes('Gate on Principle 0'),
+      'the Principle 0 gate must stay formatIfBlocked-specific and not leak into every template via the shared post-pass'
+    );
+  });
+
+  test('meta-prompt mirrors the Principle 0 gate + manual pointer on both Plan and Implementation quality rules', () => {
+    const p = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-2202',
+      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, implement',
+      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
+    });
+    const planBullet = /- \*\*Plan prompts\*\*[\s\S]*?(?=\n- \*\*Plan-review prompts\*\*)/.exec(p)[0];
+    const implBullet = /- \*\*Implementation prompts\*\*[\s\S]*?(?=\n- \*\*Defer replies\*\*)/.exec(p)[0];
+    for (const [label, bullet] of [['Plan', planBullet], ['Implementation', implBullet]]) {
+      assert.ok(/PENDING-EXTERNAL/.test(bullet), `${label}-prompts bullet must name PENDING-EXTERNAL`);
+      assert.ok(/BLOCKED:/.test(bullet), `${label}-prompts bullet must name BLOCKED:`);
+      assert.ok(
+        bullet.includes('The human\'s edge, and how to hand back'),
+        `${label}-prompts bullet must cite the manual section by name`
+      );
+      assert.ok(
+        bullet.includes('GET /api/proxy/autopilot/manual'),
+        `${label}-prompts bullet must name the portable endpoint pointer`
+      );
+    }
   });
 });
 
