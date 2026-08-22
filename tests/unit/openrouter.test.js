@@ -1220,6 +1220,101 @@ describe('buildMetaPromptTemplate plan completeness check', () => {
   });
 });
 
+// Slices one `- **<label>**` quality-rule bullet out of a generated meta-prompt, up to
+// (not including) the next named bullet. Asserts the match exists with a message naming
+// both bullets, rather than letting a renamed/reordered neighbour bullet turn a missing
+// match into an unguarded `.exec(...)[0]` TypeError on an otherwise unrelated edit.
+function extractQualityRuleBullet(metaPrompt, label, nextLabel) {
+  const pattern = new RegExp(`- \\*\\*${label}\\*\\*[\\s\\S]*?(?=\\n- \\*\\*${nextLabel}\\*\\*)`);
+  const match = pattern.exec(metaPrompt);
+  assert.ok(
+    match,
+    `expected a "**${label}**" quality-rule bullet followed by "**${nextLabel}**" in the generated meta-prompt`
+  );
+  return match[0];
+}
+
+// If Blocked / Principle 0 gate + ruling pointer mirror (LIN-2202) — the meta path
+// has no `## If Blocked` section to copy formatIfBlocked() into, so the worker-lane
+// obligation (Principle 0 gate; cite the manual's "The human's edge, and how to
+// hand back" section + GET /api/proxy/autopilot/manual rather than restate the
+// rubric) is mirrored as prose on the existing Plan-prompts / Implementation-prompts
+// quality rules. This is a parity check on citation intent, not string equality —
+// the two paths render the same anchor/endpoint inside different surrounding prose.
+describe('buildMetaPromptTemplate If Blocked / Principle 0 mirror (LIN-2202)', () => {
+  function build() {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context',
+      identifier: 'LIN-2202',
+      hasSubtasks: false,
+      subtaskCount: 0,
+      completedCount: 0,
+      inProgressCount: 0,
+      remainingCount: 0,
+      hasComments: false,
+      commentCount: 0,
+      aiHints: 'hints'
+    });
+  }
+
+  test('Plan-prompts rule carries the Principle 0 sentinels and the manual pointer', () => {
+    const result = build();
+    const planBullet = extractQualityRuleBullet(result, 'Plan prompts', 'Plan-review prompts');
+    assert.ok(planBullet.includes('PENDING-EXTERNAL'), 'Plan-prompts must name PENDING-EXTERNAL');
+    assert.ok(planBullet.includes('BLOCKED:'), 'Plan-prompts must name BLOCKED:');
+    assert.ok(
+      planBullet.includes('The human\'s edge, and how to hand back'),
+      'Plan-prompts must cite the manual section by name'
+    );
+    assert.ok(
+      planBullet.includes('GET /api/proxy/autopilot/manual'),
+      'Plan-prompts must name the portable endpoint pointer'
+    );
+  });
+
+  test('Implementation-prompts rule carries the Principle 0 sentinels and the manual pointer', () => {
+    const result = build();
+    const implBullet = extractQualityRuleBullet(result, 'Implementation prompts', 'Defer replies');
+    assert.ok(implBullet.includes('PENDING-EXTERNAL'), 'Implementation-prompts must name PENDING-EXTERNAL');
+    assert.ok(implBullet.includes('BLOCKED:'), 'Implementation-prompts must name BLOCKED:');
+    assert.ok(
+      implBullet.includes('The human\'s edge, and how to hand back'),
+      'Implementation-prompts must cite the manual section by name'
+    );
+    assert.ok(
+      implBullet.includes('GET /api/proxy/autopilot/manual'),
+      'Implementation-prompts must name the portable endpoint pointer'
+    );
+  });
+
+  test('does not restate the manual rubric prose (one-source-of-truth)', () => {
+    const result = build();
+    assert.ok(
+      !result.includes('Merge sibling blockers before you bubble up'),
+      'meta prompt must not restate the manual\'s merge-sibling-blockers rubric text'
+    );
+  });
+
+  // F1/F2 remedy: the handwritten `blocked` template's Principle 0 gate + manual
+  // citation must also be mirrored on the meta path's **Blocked prompts** quality
+  // rule bullet — the pair docs/prompt-change-validation.md:33-42 governs — so a
+  // meta-generated `blocked` prompt reaches parity with the handwritten one.
+  test('Blocked-prompts rule carries the Principle 0 gate and the manual pointer', () => {
+    const result = build();
+    const blockedBullet = extractQualityRuleBullet(result, 'Blocked prompts', 'Triage prompts');
+    assert.ok(/Principle 0/.test(blockedBullet), 'Blocked-prompts must gate the blocker analysis on Principle 0');
+    assert.ok(/cost of doing nothing/.test(blockedBullet), 'Blocked-prompts must name the cost of doing nothing');
+    assert.ok(
+      blockedBullet.includes('The human\'s edge, and how to hand back'),
+      'Blocked-prompts must cite the manual section by name'
+    );
+    assert.ok(
+      blockedBullet.includes('GET /api/proxy/autopilot/manual'),
+      'Blocked-prompts must name the portable endpoint pointer'
+    );
+  });
+});
+
 // Class check (LIN-313) — bug and review prompts ask "isolated, or one of a
 // class?" so a narrowly-worded task doesn't clear while its siblings wait to
 // surprise the parent. Mirrors the handwritten path per CLAUDE.md's both-paths
