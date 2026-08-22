@@ -999,6 +999,44 @@ describe('lineage-aware activity clock (LIN-1477)', () => {
     assert.ok(!res.jsonBody.active.some(x => x.sessionId === 'sess-lineage-2'));
   });
 
+  // LIN-2182 review ledger 1. The two tests above pin the lineage clock against a
+  // GENUINE heartbeat (recent ⇒ rescued from stale; old ⇒ not rescued). This pins
+  // the third case the clock had no coverage for: a recent entry that is not a beat
+  // at all, but whose PROSE matches HEARTBEAT_HINT. `kind:'decision'` entries exist
+  // in live data today (S2/LIN-2186 is merged), and before LIN-2182's scoped
+  // exclusion in `parseHeartbeats` such an entry minted a phantom beat carrying the
+  // decision's timestamp — floating `lineageLastActivityMs` → `loopActivityMs` →
+  // `sessionActivityMs` and rescuing a stale session from the archive on the
+  // strength of a question a human has not answered yet. The C3 test above is the
+  // positive control for this one: same fixture shape, genuine beat, rescued.
+  test('a recent DECISION whose prose looks like a beat does NOT rescue the session from stale (LIN-2182)', async () => {
+    const OLD_ISO = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const RECENT_TS = new Date(Date.now() - 5 * 60 * 1000).toISOString(); // 5 min ago
+    const staleAnchor = { id: 'sess-lineage-3', kind: 'autopilot', issueIdentifier: 'LIN-724', issueTitle: 'Lineage session 3', promptName: 'autopilot', prompt: 'p', dispatchedAt: OLD_ISO };
+    const decisionSibling = {
+      id: 'sibling-3', rootItemId: 'sess-lineage-3', issueIdentifier: 'LIN-725', issueTitle: 'Sibling 3',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: OLD_ISO, resolvedAt: OLD_ISO, status: 'taken',
+      feedback: [{
+        kind: 'decision',
+        // Reproduced live during LIN-2182 research: this question alone minted
+        // { toolCount: 3 } when `parseHeartbeats` did not consult `kind`.
+        message: `[decision] ${JSON.stringify({ decision_id: 'd-1', question: 'batch 3 tools in one turn, or keep them serial?' })}`,
+        url: null, urlLabel: null, timestamp: RECENT_TS
+      }]
+    };
+    const router = makeRouter({ 'ws-a': { live: [staleAnchor], history: [decisionSibling], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.ok(!res.jsonBody.active.some(x => x.sessionId === 'sess-lineage-3'),
+      'decision prose must not float the activity clock into the Active bucket');
+    const s = res.jsonBody.recent.find(x => x.sessionId === 'sess-lineage-3');
+    assert.ok(s, 'the session lands in the archive, as it would with no late entry at all');
+    assert.equal(s.stale, true, 'still stale — a question awaiting a human is not activity');
+  });
+
   test('followUpTo supersede/unfreeze behavior is unaffected by lineage fields (I3)', async () => {
     // Mirrors the existing LIN-1341 RC2 block-then-replied regression test, with
     // rootItemId added to both loops, to pin that lineage aggregation composes

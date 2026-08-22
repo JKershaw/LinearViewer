@@ -18,8 +18,19 @@ import {
   getSessionsForWorkspace,
   __internal
 } from '../../lib/pipeline-loops.js';
+import { parseDecisions, parseHeartbeat } from '../../lib/session-telemetry.js';
+import { loopLastActivityMs, isFreshlyActive, isLoopActive } from '../../lib/live-console.js';
 
-const { _toDate, _deriveAgentState, _deriveStage, _matchAgentStatusToLoop, _buildLoops, LOOKBACK_MS } = __internal;
+const {
+  _toDate,
+  _deriveAgentState,
+  _deriveStage,
+  _matchAgentStatusToLoop,
+  _buildLoops,
+  LOOKBACK_MS,
+  _findLastDecision,
+  correlateDecisionCase
+} = __internal;
 
 // ─── Test fixture helpers ────────────────────────────────────────────────────
 
@@ -957,5 +968,439 @@ describe('lean read projection (LIN-623)', () => {
     assert.strictEqual(sessions.length, 1);
     assert.strictEqual(sessions[0].completedAt, completedTs,
       'derived terminal time survives the projected lean read');
+  });
+});
+
+// ── LIN-2182 (H3): decision/decisionCase derivation ────────────────────────────
+// `decision` is the most-recent parseable `kind:'decision'` entry in a loop's
+// post-harvest feedback (backward scan, not `parseDecisions().at(-1)`);
+// `decisionCase` is the maximal contiguous run of `kind:'assistant-text'`
+// entries immediately preceding it. Both are always present (lean and
+// non-lean) — `null`/`[]` when absent, never `undefined`.
+
+function decisionMessage(payload) {
+  return `[decision] ${JSON.stringify(payload)}`;
+}
+
+function decisionEntry(payload, timestamp) {
+  return { kind: 'decision', message: decisionMessage(payload), timestamp };
+}
+
+function textEntry(text, timestamp) {
+  return { kind: 'assistant-text', message: text, timestamp };
+}
+
+const FULL_DECISION_PAYLOAD = {
+  decision_id: 'd-1',
+  question: 'Proceed with the migration?',
+  options: [
+    { id: 'yes', label: 'Proceed' },
+    { id: 'no', label: 'Hold', cost: 2 }
+  ],
+  recommended: 'yes',
+  free_text: true,
+  if_unanswered: { disposition: 'a', note: 'default to hold' }
+};
+
+describe('correlateDecisionCase (LIN-2182 / H3, pure helper)', () => {
+  test('an assistant-text × N run immediately before the index yields exactly those N messages, in order', () => {
+    const feedback = [textEntry('A'), textEntry('B'), textEntry('C'), decisionEntry(FULL_DECISION_PAYLOAD)];
+    assert.deepStrictEqual(correlateDecisionCase(feedback, 3), ['A', 'B', 'C']);
+  });
+
+  test('an interruption (evidence/tool) between the text run and the decision truncates — text before the break is excluded', () => {
+    const feedback = [
+      textEntry('A'),
+      textEntry('B'),
+      { kind: 'evidence', message: '[evidence] PR opened' },
+      textEntry('C'),
+      decisionEntry(FULL_DECISION_PAYLOAD)
+    ];
+    assert.deepStrictEqual(correlateDecisionCase(feedback, 4), ['C']);
+  });
+
+  test('any unexpected kind in the gap truncates, not just evidence/tool — no enumerated blocklist', () => {
+    const feedback = [
+      textEntry('A'),
+      { kind: 'heartbeat', message: '[working] 2 tools/5s' },
+      textEntry('B'),
+      decisionEntry(FULL_DECISION_PAYLOAD)
+    ];
+    assert.deepStrictEqual(correlateDecisionCase(feedback, 3), ['B']);
+  });
+
+  test('a break immediately before the decision degrades to []', () => {
+    const feedback = [textEntry('A'), textEntry('B'), { kind: 'tool', message: 'Bash' }, decisionEntry(FULL_DECISION_PAYLOAD)];
+    assert.deepStrictEqual(correlateDecisionCase(feedback, 3), []);
+  });
+
+  test('the decision as the very first entry yields []', () => {
+    const feedback = [decisionEntry(FULL_DECISION_PAYLOAD)];
+    assert.deepStrictEqual(correlateDecisionCase(feedback, 0), []);
+  });
+
+  test('non-array feedback and a non-integer index are tolerated, never throw', () => {
+    assert.deepStrictEqual(correlateDecisionCase(undefined, 3), []);
+    assert.deepStrictEqual(correlateDecisionCase([], -1), []);
+    assert.deepStrictEqual(correlateDecisionCase([textEntry('A')], null), []);
+  });
+});
+
+describe('_findLastDecision (LIN-2182 / H3, backward scan)', () => {
+  test('a malformed decision entry (unparseable message) is skipped, scanning backwards to an earlier parseable one', () => {
+    const feedback = [
+      decisionEntry({ decision_id: 'd-1' }),
+      { kind: 'decision', message: '[decision] {"decision_id":"d-2", not-json' }
+    ];
+    const { decision, decisionEntryIndex } = _findLastDecision(feedback);
+    assert.strictEqual(decision.decision_id, 'd-1');
+    assert.strictEqual(decisionEntryIndex, 0);
+  });
+
+  test('a decision-shaped message on a non-decision kind is ignored entirely', () => {
+    const feedback = [textEntry(decisionMessage({ decision_id: 'd-1' }))];
+    assert.deepStrictEqual(_findLastDecision(feedback), { decision: null, decisionEntryIndex: -1 });
+  });
+
+  test('repeated decision_ids: returns the CHRONOLOGICALLY LAST entry, unlike parseDecisions().at(-1)', () => {
+    // The exact research repro: d-1 first ask, d-2, then a re-ask of d-1 that is
+    // chronologically last. parseDecisions() dedupes into a Map — last-wins
+    // VALUE but first-appearance POSITION — so .at(-1) returns d-2, which is
+    // wrong. The backward scan must return d-1's re-ask.
+    const feedback = [
+      decisionEntry({ decision_id: 'd-1', question: 'first ask' }, 't1'),
+      decisionEntry({ decision_id: 'd-2', question: 'second ask' }, 't2'),
+      decisionEntry({ decision_id: 'd-1', question: 're-ask of d-1 — chronologically last' }, 't3')
+    ];
+
+    // Prove the trap is real: .at(-1) on parseDecisions gives the WRONG entry.
+    const wrongViaAtMinusOne = parseDecisions(feedback).at(-1);
+    assert.strictEqual(wrongViaAtMinusOne.decision_id, 'd-2', 'sanity: this IS the trap the plan rejected');
+
+    const { decision, decisionEntryIndex } = _findLastDecision(feedback);
+    assert.strictEqual(decision.decision_id, 'd-1');
+    assert.strictEqual(decision.question, 're-ask of d-1 — chronologically last');
+    assert.strictEqual(decisionEntryIndex, 2);
+  });
+
+  test('no decision entries at all yields { decision: null, decisionEntryIndex: -1 }', () => {
+    assert.deepStrictEqual(_findLastDecision([textEntry('A'), { kind: 'status', message: '[done]' }]), {
+      decision: null,
+      decisionEntryIndex: -1
+    });
+  });
+});
+
+describe('_buildLoops: decision/decisionCase derivation end-to-end (LIN-2182 / H3)', () => {
+  test('producer envelope round-trip: a real S2-shaped [decision] message parses through to the loop', () => {
+    const feedback = [textEntry('weighing the options', 't1'), decisionEntry(FULL_DECISION_PAYLOAD, 't2')];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.deepStrictEqual(loop.decision, FULL_DECISION_PAYLOAD);
+    assert.deepStrictEqual(loop.decisionCase, ['weighing the options']);
+  });
+
+  // LIN-2182 review ledger 6: the round-trip above cannot demonstrate whitelisting,
+  // because FULL_DECISION_PAYLOAD carries no field OUTSIDE parseDecision's allow-list
+  // — an equal round-trip is what you would see either way. A wire payload that DOES
+  // carry extraneous keys is the only fixture that can tell the two apart. The
+  // allow-list itself is H2's (LIN-2181) and pinned there; this asserts that H3's
+  // loop-level field inherits it rather than re-widening it.
+  test('extraneous wire fields are stripped on the way onto the loop — top-level and per-option', () => {
+    const wire = {
+      ...FULL_DECISION_PAYLOAD,
+      // Not in parseDecision's top-level allow-list.
+      unexpected_top_level: 'should not survive',
+      internal_cursor: { seq: 7 },
+      options: [
+        { id: 'yes', label: 'Proceed', unexpected_option_field: 'should not survive' },
+        { id: 'no', label: 'Hold', cost: 2 }
+      ]
+    };
+    const feedback = [textEntry('weighing the options', 't1'), decisionEntry(wire, 't2')];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+
+    assert.ok(!('unexpected_top_level' in loop.decision), 'unknown top-level key stripped');
+    assert.ok(!('internal_cursor' in loop.decision), 'unknown top-level object key stripped');
+    assert.ok(!('unexpected_option_field' in loop.decision.options[0]), 'unknown per-option key stripped');
+    assert.deepStrictEqual(loop.decision, FULL_DECISION_PAYLOAD, 'what survives is exactly the allow-listed shape');
+  });
+
+  test('if_unanswered is a deliberate passthrough, NOT allow-listed — recorded so the pin above is not read as wider than it is', () => {
+    // `_parseIfUnanswered` spreads the object wholesale (`{ ...value }`), so keys
+    // inside it are NOT filtered — unlike the top level and unlike options[].
+    // LIN-1727 owns the `if_unanswered` enum; asserting the current behaviour here
+    // means that ticket has a failing pin to update rather than a silent widening.
+    const wire = {
+      decision_id: 'd-1',
+      if_unanswered: { disposition: 'a', note: 'default to hold', extra_inner_key: 'survives today' }
+    };
+    const feedback = [decisionEntry(wire, 't1')];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.deepStrictEqual(loop.decision.if_unanswered, wire.if_unanswered);
+  });
+
+  test('producer-gap pin (row 17, routed to LIN-2187): S2s own wire fixture with no decision_id derives decision: null', () => {
+    // Real shipped producer output (test/decision-emission.test.js in simple-dispatcher):
+    // schema-shaped `options[{id,label}]` + `decision_id` is NOT yet emitted, so every
+    // real message parses to null today. H3 ships inert until LIN-2187 lands.
+    const feedback = [
+      textEntry('should we escalate?', 't1'),
+      { kind: 'decision', message: '[decision] {"kind":"escalate","options":["A","B"]}', timestamp: 't2' }
+    ];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.strictEqual(loop.decision, null);
+    assert.deepStrictEqual(loop.decisionCase, []);
+  });
+
+  test('relay OFF (always ≥1 assistant-text): decisionCase carries the turn text', () => {
+    // ASSISTANT_TEXT_RELAY OFF always posts at least one assistant-text (postTurnText,
+    // including a synthetic EMPTY_RECAP_MARKER for an empty turn) — never a silent
+    // omission (LIN-1291). This is the case where decisionCase is populated.
+    const feedback = [textEntry('(no new output this turn)', 't1'), decisionEntry(FULL_DECISION_PAYLOAD, 't2')];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.deepStrictEqual(loop.decisionCase, ['(no new output this turn)']);
+  });
+
+  test('relay ON, empty delta (can post ZERO assistant-text): decisionCase degrades to [] — this is the degraded-not-OFF case', () => {
+    // ASSISTANT_TEXT_RELAY ON can post nothing when the position-keyed dedup finds no
+    // new blocks (postAssistantTextDelta's `if (!blocks.length) return;`). The ticket's
+    // intuitive framing has this backwards — the empty case belongs to ON, not OFF.
+    const feedback = [decisionEntry(FULL_DECISION_PAYLOAD, 't1'), { kind: 'status', message: '[blocked]', timestamp: 't2' }];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.strictEqual(loop.decision.decision_id, 'd-1');
+    assert.deepStrictEqual(loop.decisionCase, []);
+  });
+
+  test('lean/non-lean parity: decision and decisionCase are identical, and present on the lean loop even though feedback is []', () => {
+    const feedback = [textEntry('A', 't1'), textEntry('B', 't2'), decisionEntry(FULL_DECISION_PAYLOAD, 't3')];
+    const hist = historyItem({ feedback });
+    const full = _buildLoops({ historyItems: [hist], now: NOW })[0];
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true })[0];
+    assert.deepStrictEqual(lean.decision, full.decision);
+    assert.deepStrictEqual(lean.decisionCase, full.decisionCase);
+    assert.deepStrictEqual(lean.decisionCase, ['A', 'B']);
+    assert.deepStrictEqual(lean.feedback, [], 'lean loop still drops raw feedback');
+  });
+
+  test('empty shapes: no decision anywhere yields decision: null and decisionCase: [], never undefined', () => {
+    const feedback = [textEntry('A', 't1'), { kind: 'status', message: '[done]', timestamp: 't2' }];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.strictEqual(loop.decision, null);
+    assert.deepStrictEqual(loop.decisionCase, []);
+    assert.ok('decision' in loop && 'decisionCase' in loop, 'both keys must be present, not omitted');
+
+    const lean = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW, lean: true })[0];
+    assert.strictEqual(lean.decision, null);
+    assert.deepStrictEqual(lean.decisionCase, []);
+    assert.ok('decision' in lean && 'decisionCase' in lean, 'lean loop must carry both keys too, per !== undefined discriminators');
+  });
+
+  // ── Table-driven matrix: homogeneous feedback[]-kind fixtures ──────────────
+  const MATRIX = [
+    {
+      name: 'blocked, short turn: one assistant-text then decision',
+      feedback: [textEntry('turn text', 't1'), decisionEntry({ decision_id: 'd-1' }, 't2'), { kind: 'status', message: '[blocked]', timestamp: 't3' }],
+      decision: { decision_id: 'd-1' },
+      decisionCase: ['turn text']
+    },
+    {
+      name: 'chunked turn: two assistant-text entries then decision',
+      feedback: [
+        textEntry('(recap 1/2) first half', 't1'),
+        textEntry('(recap 2/2) second half', 't2'),
+        decisionEntry({ decision_id: 'd-1' }, 't3'),
+        { kind: 'status', message: '[blocked]', timestamp: 't4' }
+      ],
+      decision: { decision_id: 'd-1' },
+      decisionCase: ['(recap 1/2) first half', '(recap 2/2) second half']
+    },
+    {
+      name: 'multi-block delta: three assistant-text entries then decision',
+      feedback: [textEntry('A', 't1'), textEntry('B', 't2'), textEntry('C', 't3'), decisionEntry({ decision_id: 'd-1' }, 't4')],
+      decision: { decision_id: 'd-1' },
+      decisionCase: ['A', 'B', 'C']
+    },
+    {
+      name: 'complete run with evidence + tool after the decision — those do not affect decisionCase',
+      feedback: [
+        textEntry('A', 't1'),
+        decisionEntry({ decision_id: 'd-1' }, 't2'),
+        { kind: 'evidence', message: '[evidence] PR', timestamp: 't3' },
+        { kind: 'status', message: '[done]', timestamp: 't4' }
+      ],
+      decision: { decision_id: 'd-1' },
+      decisionCase: ['A']
+    },
+    {
+      name: 'decision is first entry',
+      feedback: [decisionEntry({ decision_id: 'd-1' }, 't1'), { kind: 'status', message: '[blocked]', timestamp: 't2' }],
+      decision: { decision_id: 'd-1' },
+      decisionCase: []
+    },
+    {
+      name: 'no decision at all',
+      feedback: [textEntry('A', 't1'), { kind: 'status', message: '[done]', timestamp: 't2' }],
+      decision: null,
+      decisionCase: []
+    },
+    {
+      name: 'two decisions, distinct ids — takes the later one and its own preceding run',
+      feedback: [
+        textEntry('A', 't1'),
+        decisionEntry({ decision_id: 'd-1' }, 't2'),
+        textEntry('B', 't3'),
+        decisionEntry({ decision_id: 'd-2' }, 't4'),
+        { kind: 'status', message: '[blocked]', timestamp: 't5' }
+      ],
+      decision: { decision_id: 'd-2' },
+      decisionCase: ['B']
+    },
+    {
+      name: 'a live heartbeat race (concurrent reaper writer) breaks the run',
+      feedback: [textEntry('A', 't1'), { kind: 'heartbeat', message: '[working] 1 tools/1s', timestamp: 't2' }, decisionEntry({ decision_id: 'd-1' }, 't3')],
+      decision: { decision_id: 'd-1' },
+      decisionCase: []
+    },
+    // ── LIN-2182 review ledger 5 ────────────────────────────────────────────
+    // Plan rows 13, 14 and 6 were asserted at helper level only (_findLastDecision
+    // for 13/14, a near-variant for 6); their plan-specified `decisionCase` values
+    // were never asserted through `_buildLoops`. Helper-level coverage cannot see a
+    // wiring regression between the backward scan and the correlation call, which is
+    // precisely the seam these rows exercise — so they belong in the matrix too.
+    {
+      // Plan row 13. `parseDecision` collapses a same-id re-post LAST-wins; the
+      // backward scan must agree with that AND correlate against the re-ask's OWN
+      // preceding run (['B']), not the first ask's (['A']).
+      name: 'two decisions, SAME id (a re-post): last-wins value, and the case is the re-ask own run',
+      feedback: [
+        textEntry('A', 't1'),
+        decisionEntry({ decision_id: 'd-1', question: 'first ask' }, 't2'),
+        textEntry('B', 't3'),
+        decisionEntry({ decision_id: 'd-1', question: 're-ask, supersedes' }, 't4'),
+        { kind: 'status', message: '[blocked]', timestamp: 't5' }
+      ],
+      decision: { decision_id: 'd-1', question: 're-ask, supersedes' },
+      decisionCase: ['B']
+    },
+    {
+      // Plan row 14. The LAST decision entry is unparseable; the scan must fall back
+      // to the last PARSEABLE one and correlate against THAT index — ['A'], not ['B'].
+      // Getting the index wrong here yields a plausible-but-wrong case rather than a
+      // crash, which is why it needs an end-to-end assertion and not just the helper.
+      name: 'a malformed decision AFTER a good one: falls back to the good one and to ITS preceding run',
+      feedback: [
+        textEntry('A', 't1'),
+        decisionEntry({ decision_id: 'd-1' }, 't2'),
+        textEntry('B', 't3'),
+        { kind: 'decision', message: '[decision] {"decision_id":"d-2", not-json', timestamp: 't4' },
+        { kind: 'status', message: '[blocked]', timestamp: 't5' }
+      ],
+      decision: { decision_id: 'd-1' },
+      decisionCase: ['A']
+    },
+    {
+      // Plan row 6: relay ON, complete run, with tool/usage/evidence entries trailing
+      // the decision. Everything AFTER the decision index is irrelevant by
+      // construction (the scan walks backwards from it) — this pins that.
+      name: 'complete run, relays ON: tool/usage/evidence AFTER the decision leave a two-block case intact',
+      feedback: [
+        textEntry('A', 't1'),
+        textEntry('B', 't2'),
+        decisionEntry({ decision_id: 'd-1' }, 't3'),
+        { kind: 'tool', message: 'Bash', timestamp: 't4' },
+        { kind: 'usage', message: '[usage] 1200 in / 340 out', timestamp: 't5' },
+        { kind: 'evidence', message: '[evidence] PR opened', timestamp: 't6' },
+        { kind: 'status', message: '[done]', timestamp: 't7' }
+      ],
+      decision: { decision_id: 'd-1' },
+      decisionCase: ['A', 'B']
+    }
+  ];
+
+  for (const row of MATRIX) {
+    test(`matrix: ${row.name}`, () => {
+      const hist = historyItem({ feedback: row.feedback });
+      const full = _buildLoops({ historyItems: [hist], now: NOW })[0];
+      const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true })[0];
+      for (const [label, loop] of [['default', full], ['lean', lean]]) {
+        assert.deepStrictEqual(loop.decision, row.decision, `${label}: decision`);
+        assert.deepStrictEqual(loop.decisionCase, row.decisionCase, `${label}: decisionCase`);
+      }
+    });
+  }
+});
+
+// ── LIN-2182 review ledger 1: the heartbeat exclusion is LIVE-affecting ────────
+// H3 ships inert for `decision` (no shipped producer emits a `decision_id` until
+// LIN-2187, pinned by the producer-gap row above) — but the `parseHeartbeats`
+// exclusion is NOT inert. S2/LIN-2186 is merged, so `kind:'decision'` entries
+// exist in live data today; they simply fail `parseDecision`. Any such entry whose
+// PROSE matches HEARTBEAT_HINT minted a phantom beat carrying the decision entry's
+// timestamp, and `parseHeartbeats` feeds three consumers. The PR pinned only the
+// first (`buildRunTelemetry().metrics`, tests/unit/session-telemetry.test.js). The
+// other two are activity clocks, and a phantom moved BOTH:
+//
+//   loop.telemetry.metrics  → loopLastActivityMs → isFreshlyActive  (lib/live-console.js)
+//   loop.lineageLastActivityMs → loopActivityMs  → merged-feed sort (routes/dashboard.js)
+//
+// `lineageLastActivityMs` is the ONLY parseHeartbeats-derived input to
+// routes/dashboard.js's `loopActivityMs` (its other inputs are
+// completedAt/agentTimestamp/resolvedAt/dispatchedAt), so pinning it here pins that
+// consumer's exposure at the source; the user-reachable effect — a session rescued
+// from stale by nothing but decision prose — is pinned end-to-end at route level in
+// tests/unit/dashboard-routes.test.js.
+describe('_buildLoops: decision prose does not float the activity clock (LIN-2182 ledger 1)', () => {
+  const REAL_BEAT_TS = '2026-04-10T10:05:00.000Z';   // ~26h before NOW
+  const LATE_TS = '2026-04-11T11:55:00.000Z';        // 5 min before NOW
+  const STALE_MS = 60 * 60 * 1000;                   // 1h, DEFAULT_LANE_STALE_MS
+  // Reproduced live during LIN-2182 research: this question mints { toolCount: 3 }.
+  const HEARTBEAT_SHAPED_QUESTION = 'batch 3 tools in one turn, or keep them serial?';
+
+  function loopWithLateEntry(lateEntry) {
+    const feedback = [
+      { kind: 'heartbeat', message: '[working] 2 tools in 4s', timestamp: REAL_BEAT_TS },
+      textEntry('weighing it up', '2026-04-11T11:54:00.000Z'),
+      lateEntry,
+      { kind: 'status', message: '[blocked] awaiting a ruling', timestamp: LATE_TS }
+    ];
+    return _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+  }
+
+  const lateDecision = () =>
+    decisionEntry({ decision_id: 'd-1', question: HEARTBEAT_SHAPED_QUESTION }, LATE_TS);
+
+  test('sanity: the prose IS heartbeat-shaped in isolation — only the kind exclusion keeps it out', () => {
+    // Without this, every assertion below would pass vacuously against prose that
+    // never matched HEARTBEAT_HINT in the first place.
+    const phantom = parseHeartbeat(HEARTBEAT_SHAPED_QUESTION, LATE_TS);
+    assert.ok(phantom, 'the question parses as a heartbeat when kind is not consulted');
+    assert.strictEqual(phantom.toolCount, 3);
+    assert.strictEqual(phantom.timestamp, LATE_TS, 'and it carries the entry timestamp — this is what moved the clock');
+  });
+
+  test('the phantom reaches neither telemetry.metrics nor lineageLastActivityMs', () => {
+    const loop = loopWithLateEntry(lateDecision());
+    assert.strictEqual(loop.telemetry.metrics.length, 1, 'only the genuine beat');
+    assert.strictEqual(loop.telemetry.metrics[0].timestamp, REAL_BEAT_TS);
+    assert.strictEqual(loop.lineageLastActivityMs, Date.parse(REAL_BEAT_TS),
+      'the lineage clock — routes/dashboard.js loopActivityMs sole heartbeat-derived input — stays at the real beat');
+    assert.ok(loop.decision, 'and the decision itself still derives — the exclusion is scoped to heartbeat parsing');
+  });
+
+  test('live-console: loopLastActivityMs stays at the real beat, so a blocked run is not classified freshly-active', () => {
+    const loop = loopWithLateEntry(lateDecision());
+    assert.ok(isLoopActive(loop), 'precondition: the loop is active, so isFreshlyActive turns purely on the clock');
+    assert.strictEqual(loopLastActivityMs(loop), Date.parse(REAL_BEAT_TS));
+    assert.strictEqual(isFreshlyActive(loop, NOW.getTime(), STALE_MS), false,
+      'a run blocked awaiting a human must not read as freshly active on the strength of its own question');
+  });
+
+  test('negative control: a GENUINE beat at the same late timestamp does move both clocks', () => {
+    // Isolates the exclusion (skips kind:'decision') from a hardcoded pass (nothing
+    // late ever counts). Same timestamp, same prose — only `kind` differs.
+    const loop = loopWithLateEntry({ kind: 'heartbeat', message: '[working] 3 tools in 9s', timestamp: LATE_TS });
+    assert.strictEqual(loop.lineageLastActivityMs, Date.parse(LATE_TS));
+    assert.strictEqual(loopLastActivityMs(loop), Date.parse(LATE_TS));
+    assert.strictEqual(isFreshlyActive(loop, NOW.getTime(), STALE_MS), true);
   });
 });
