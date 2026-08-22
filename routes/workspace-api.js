@@ -46,6 +46,8 @@ import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
+import { generateScan, parseScanResponse } from '../lib/scan.js';
+import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
@@ -251,9 +253,10 @@ export function buildMockRecommendationHop(ctx) {
  * @param {Function} options.workspaceFromUrl - Middleware to extract workspace from URL
  * @param {Object} options.freeTierStore - Free tier usage store
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
+ * @param {Object} [options.taskDecisionsStore] - Task-keyed scan-decision store (LIN-2197)
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore }) {
   const router = Router();
 
   // ===========================================================================
@@ -2218,6 +2221,355 @@ ${goal}`
       });
     }
     return { done, pending, deviations };
+  }
+
+  // ===========================================================================
+  // Scan API (LIN-2197 Phase 4) — the third producer into the operator
+  // decision queue (LIN-1721): a human-triggered, single-task triage read.
+  //
+  // Mirrors the Brief/Recap route pair's shape (context fetch → canonical id
+  // → hashContext → store lookup/write) but is neither: the store is
+  // task-keyed with no TTL (an unanswered ruling must never silently expire,
+  // unlike the 7-day brief/recap caches), and a scan additionally carries a
+  // fail-closed Principle 0 gate and an outcome (dismiss) write path.
+  // ===========================================================================
+
+  /**
+   * GET scan status. `fresh` means the stored row matches the task's CURRENT
+   * content hash (so it agrees with what a POST scan would return right now,
+   * including any terminal outcome); `stale` means a row exists but for
+   * different content (a re-scan is needed to know the current state);
+   * `missing` means this task has never been scanned.
+   *
+   * @route GET /workspace/:urlKey/api/scan/:issueId
+   * @returns {Object} { status: 'fresh'|'stale'|'missing', decision?, outcome?, outcomeAt?, scannedAt?, id? }
+   */
+  router.get('/workspace/:urlKey/api/scan/:issueId', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { issueId } = req.params;
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
+
+    if (!isValidIssueId(issueId)) {
+      return badRequest.json(res, 'Invalid issue ID format');
+    }
+    if (!taskDecisionsStore) {
+      return jsonError(res, 503, 'Scan store not configured');
+    }
+    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
+    // provider that never implements recommendation context (LIN-1910).
+    if (!issueProvider.supports('fetchRecommendationContext')) {
+      return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+      });
+    }
+
+    try {
+      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+      let context;
+      if (isTestMode) {
+        context = await buildMockRecapContext(issueId);
+        if (!context) return notFound.json(res, 'Issue not found');
+      } else {
+        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
+      }
+
+      const canonicalId = context.issue?.id || issueId;
+      if (!UUID_REGEX.test(canonicalId)) {
+        // Never let a durable scan record be keyed under a non-canonical
+        // fallback (LIN-2197 Phase 2 close-out ledger item 3) — this task's
+        // canonical id could not be resolved from the fetched context.
+        return jsonError(res, 422, "This task's canonical id could not be resolved; scan requires a canonical identity", {
+          code: 'CANONICAL_ID_REQUIRED'
+        });
+      }
+      const inputHash = hashContext(context);
+      const cached = await taskDecisionsStore.getStatus(workspace.urlKey, canonicalId, inputHash);
+
+      if (!cached) {
+        return res.json({ status: 'missing' });
+      }
+      if (cached.inputHash !== inputHash) {
+        return res.json({ status: 'stale', scannedAt: cached.scannedAt });
+      }
+      return res.json({
+        status: 'fresh',
+        id: cached.id,
+        decision: cached.decision,
+        scannedAt: cached.scannedAt,
+        outcome: cached.outcome,
+        outcomeAt: cached.outcomeAt
+      });
+    } catch (error) {
+      console.error('Scan GET error:', error);
+      if (error.response?.status === 401) {
+        return unauthorized.json(res, 'Token expired or invalid');
+      }
+      if (error.message?.includes('not found')) {
+        return notFound.json(res, error.message);
+      }
+      jsonError(res, 500, 'Failed to fetch scan status', { message: error.message });
+    }
+  });
+
+  /**
+   * POST scan: triage this task for an operator-worthy decision. Always
+   * calls the LLM (force-regenerate semantics, matching the recap/brief POST
+   * routes) — idempotency lives in the STORED `_id` (content-hash-keyed), not
+   * in skipping the call. A stored terminal (answered/dismissed) row for the
+   * current content is never overwritten by a fresh call (see
+   * TaskDecisionsStore.recordScan); everything else about the found-vs-not
+   * outcome is decided by lib/scan.js's fail-closed Principle 0 gate and
+   * strict parse/validation, not by this route.
+   *
+   * @route POST /workspace/:urlKey/api/scan/:issueId
+   * @returns {Object} { status: 'fresh', id, decision, scannedAt, outcome, outcomeAt, model }
+   */
+  router.post('/workspace/:urlKey/api/scan/:issueId', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { issueId } = req.params;
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
+
+    if (!isValidIssueId(issueId)) {
+      return badRequest.json(res, 'Invalid issue ID format');
+    }
+    if (!taskDecisionsStore) {
+      return jsonError(res, 503, 'Scan store not configured');
+    }
+    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
+    // provider that never implements recommendation context (LIN-1910).
+    if (!issueProvider.supports('fetchRecommendationContext')) {
+      return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+      });
+    }
+
+    // See the recap/brief POST notes: `isTestMode` gates the DATA mock,
+    // `mockAi` the AI mock (incl. local-provider sessions), and the
+    // AI-config/free-tier guards.
+    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const mockAi = shouldMockAi(workspace);
+    const sessionApiKey = req.session.openRouterApiKey;
+    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+
+    if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+      return jsonError(res, 503, 'AI scan is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
+    }
+
+    if (!mockAi && isFreeTier) {
+      const check = await freeTierStore.tryUse(workspace.urlKey);
+      if (!check.allowed) {
+        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+      }
+    }
+
+    // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
+    const keepalive = armKeepalive(res);
+    try {
+      let context;
+      if (isTestMode) {
+        context = await buildMockRecapContext(issueId);
+        if (!context) {
+          keepalive.stop();
+          return keepalive.send(404, { error: 'Issue not found' });
+        }
+      } else {
+        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
+      }
+
+      const canonicalId = context.issue?.id || issueId;
+      if (!UUID_REGEX.test(canonicalId)) {
+        keepalive.stop();
+        return keepalive.send(422, {
+          error: "This task's canonical id could not be resolved; scan requires a canonical identity",
+          code: 'CANONICAL_ID_REQUIRED'
+        });
+      }
+      const inputHash = hashContext(context);
+      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'scan', forceDefault: isFreeTier });
+
+      let scanResult;
+      let modelUsed;
+      if (mockAi) {
+        // The mock ALSO goes through parseScanResponse (unlike buildMockBrief/
+        // buildMockRecap, which bypass their own parse layer) — this feature's
+        // whole premise is strict, uniform validation, so a mock response must
+        // prove out the same has_decision/isClaimedDecisionValid/parseDecision
+        // gate a real one does, not a shortcut around it.
+        scanResult = parseScanResponse(buildMockScanText(context), { issueId: canonicalId, inputHash });
+        modelUsed = selectedModel;
+      } else {
+        const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
+        const generated = await generateScan(
+          context.issue,
+          context,
+          { apiKey: apiKeyToUse, model: selectedModel, issueId: canonicalId, inputHash, callMeta: { urlKey: workspace?.urlKey } }
+        );
+        scanResult = generated;
+        modelUsed = generated.model;
+      }
+
+      if (scanResult.outcome === 'fail-closed') {
+        // Never send a scan prompt without the Principle 0 gate — and never
+        // persist anything when it was skipped, since nothing was actually
+        // evaluated (a stored zero-finding here would be a false "found
+        // nothing", exactly what this feature exists to prevent).
+        keepalive.stop();
+        return keepalive.send(503, {
+          error: 'Scan rubric is temporarily unavailable; nothing was evaluated',
+          code: 'PRINCIPLE_ZERO_UNAVAILABLE'
+        });
+      }
+      if (scanResult.outcome === 'error') {
+        // A claimed decision that failed validation, or an unparseable
+        // response: persists nothing and asks the operator to retry, rather
+        // than risk silently downgrading a real ruling into a zero-finding.
+        keepalive.stop();
+        return keepalive.send(502, {
+          error: 'Scan produced an unusable response; please retry',
+          code: 'SCAN_PARSE_FAILED'
+        });
+      }
+
+      // 'decision' or 'zero-finding' — both are normal, persisted outcomes.
+      const record = await taskDecisionsStore.recordScan({
+        urlKey: workspace.urlKey,
+        issueId: canonicalId,
+        issueIdentifier: context.issue?.identifier || issueId,
+        inputHash,
+        decision: scanResult.outcome === 'decision' ? scanResult.decision : null
+      });
+      if (!record) {
+        keepalive.stop();
+        return keepalive.send(500, { error: 'Failed to record scan result' });
+      }
+
+      keepalive.stop();
+      keepalive.send(200, {
+        status: 'fresh',
+        id: record.id,
+        decision: record.decision,
+        scannedAt: record.scannedAt,
+        outcome: record.outcome,
+        outcomeAt: record.outcomeAt,
+        model: modelUsed
+      });
+    } catch (error) {
+      keepalive.stop();
+      console.error('Scan POST error:', error);
+      if (error.response?.status === 401) {
+        return keepalive.send(401, { error: 'Token expired or invalid' });
+      }
+      if (error.message?.includes('not found')) {
+        return keepalive.send(404, { error: error.message });
+      }
+      if (error.message?.includes('OpenRouter')) {
+        return keepalive.send(503, { error: 'AI service temporarily unavailable', message: error.message });
+      }
+      keepalive.send(500, { error: 'Failed to run scan', message: error.message });
+    }
+  });
+
+  /**
+   * POST dismiss: stamp a specific scan row 'dismissed' — the operator has
+   * seen this ruling and does not want it counted as an outstanding
+   * decision. Idempotent (TaskDecisionsStore.markOutcome: first stamp wins),
+   * so a double-submit can never flip an already-answered row into
+   * 'dismissed'. Requires the exact record `id` from a prior GET/POST scan
+   * response, not just the task's issueId, so a stale client can't
+   * accidentally dismiss whatever happens to be current server-side.
+   *
+   * @route POST /workspace/:urlKey/api/scan/:issueId/dismiss
+   * @returns {Object} { status: 'fresh', id, decision, outcome, outcomeAt, scannedAt }
+   */
+  router.post('/workspace/:urlKey/api/scan/:issueId/dismiss', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace;
+    const { issueId } = req.params;
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
+    const recordId = req.body?.id;
+
+    if (!isValidIssueId(issueId)) {
+      return badRequest.json(res, 'Invalid issue ID format');
+    }
+    if (typeof recordId !== 'string' || !recordId) {
+      return badRequest.json(res, 'A scan record id is required');
+    }
+    if (!taskDecisionsStore) {
+      return jsonError(res, 503, 'Scan store not configured');
+    }
+    if (!issueProvider.supports('fetchRecommendationContext')) {
+      return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+      });
+    }
+
+    try {
+      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+      let context;
+      if (isTestMode) {
+        context = await buildMockRecapContext(issueId);
+        if (!context) return notFound.json(res, 'Issue not found');
+      } else {
+        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
+      }
+
+      const canonicalId = context.issue?.id || issueId;
+      if (!UUID_REGEX.test(canonicalId)) {
+        return jsonError(res, 422, "This task's canonical id could not be resolved; scan requires a canonical identity", {
+          code: 'CANONICAL_ID_REQUIRED'
+        });
+      }
+
+      const record = await taskDecisionsStore.markOutcome({
+        urlKey: workspace.urlKey, issueId: canonicalId, id: recordId, outcome: 'dismissed'
+      });
+      if (!record) {
+        return notFound.json(res, 'Scan record not found');
+      }
+
+      return res.json({
+        status: 'fresh',
+        id: record.id,
+        decision: record.decision,
+        outcome: record.outcome,
+        outcomeAt: record.outcomeAt,
+        scannedAt: record.scannedAt
+      });
+    } catch (error) {
+      console.error('Scan dismiss error:', error);
+      if (error.response?.status === 401) {
+        return unauthorized.json(res, 'Token expired or invalid');
+      }
+      jsonError(res, 500, 'Failed to dismiss scan result', { message: error.message });
+    }
+  });
+
+  /**
+   * A small deterministic mock scan response for test mode, mirroring
+   * buildMockRecap/buildMockBrief's "derive from context" convention. Unlike
+   * those, this returns raw JSON TEXT (not a pre-parsed shape) — see the
+   * POST route's mockAi branch for why the mock is deliberately routed
+   * through the same parseScanResponse gate as a real LLM response.
+   */
+  function buildMockScanText(context) {
+    const haystack = `${context.issue?.description || ''} ${(context.comments || []).map(c => c.body || '').join(' ')}`;
+    const triggersDecision = /\b(waiting|blocked|research|unclear|decide|decision|question)\b/i.test(haystack);
+    if (!triggersDecision) {
+      return JSON.stringify({ has_decision: false });
+    }
+    return JSON.stringify({
+      has_decision: true,
+      question: `How should ${context.issue?.identifier || 'this task'} proceed?`,
+      options: [
+        { id: 'proceed', label: 'Proceed with the current approach' },
+        { id: 'wait', label: 'Wait for the blocker to clear' }
+      ],
+      recommended: 'wait',
+      free_text: false
+    });
   }
 
   // ===========================================================================
