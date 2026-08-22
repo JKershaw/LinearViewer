@@ -736,6 +736,19 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   })
 
+  // Read sibling to /test/clear-task-decisions (LIN-2217): proves the
+  // 'answered' stamp crosses the durable taskDecisions store boundary.
+  // First read-back store endpoint in this file — see class docstring.
+  router.get('/test/task-decisions', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace'
+      const record = taskDecisionsStore ? await taskDecisionsStore.getStatus(urlKey, req.query.issueId) : null
+      res.json({ ok: true, record })
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
   // Endpoint to clear saved chats for testing (LIN-1008)
   router.get('/test/clear-saved-chats', async (req, res) => {
     try {

@@ -16,6 +16,7 @@
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
+import { testMockData } from '../fixtures/mock-data.js';
 
 test.describe('Scan UI — Dashboard', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
@@ -88,7 +89,8 @@ test.describe('Scan UI — Dashboard', () => {
   // route -> store boundary for this outcome. Depends on the beforeEach
   // clear above — a stale terminal row from a prior run would report
   // 'fresh'/already-answered instead of 'missing' here.
-  test('sending an answer on a decision-bearing task stamps the outcome answered', async ({ page }) => {
+  test('sending an answer on a decision-bearing task stamps the outcome answered', async ({ page, localWorkerUrlKey }) => {
+    const taskId = testMockData.issues.find(i => i.identifier === 'TEST-6').id;
     const { node, row } = openScanToggle(page, 'Task needing preparation');
     await row.click();
     await node.locator('[data-toggle="details"]').first().click();
@@ -101,7 +103,17 @@ test.describe('Scan UI — Dashboard', () => {
     await expect(section).toHaveAttribute('data-state', 'fresh', { timeout: 5000 });
 
     await section.locator('[data-scan-answer-input]').fill('Proceeding with the current approach.');
-    await section.locator('[data-scan-action="answer"]').click();
+
+    // Diagnostic only — names *which* half broke on a wiring regression, but
+    // it is NOT the store-boundary proof: it passes even if the durable
+    // stamp write below is disabled, since it only inspects the outgoing
+    // request. Mirrors tests/e2e/observation-rulings.spec.js:133-141.
+    const [commentReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
+      section.locator('[data-scan-action="answer"]').click()
+    ]);
+    const commentPayload = commentReq.postDataJSON();
+    expect(commentPayload.taskDecisionIssueId).toBe(taskId);
 
     // The just-written answer comment is itself part of the scan's own
     // hashContext, so a successful stamp re-fetches as 'stale', not 'fresh'
@@ -109,6 +121,15 @@ test.describe('Scan UI — Dashboard', () => {
     // that the comment landed and the store recorded outcome:'answered'.
     await expect(section).toHaveAttribute('data-state', 'stale', { timeout: 5000 });
     await expect(section.locator('.scan-placeholder')).toContainText('Your answer was recorded as a comment');
+
+    // The store-boundary proof (LIN-2217): the two assertions above are both
+    // reachable from the comment write alone, regardless of whether the
+    // durable stamp ran — this read-back is the only assertion that crosses
+    // the taskDecisions store boundary and actually pins 'answered'.
+    const { record } = await (await page.request.get(
+      `/test/task-decisions?urlKey=${localWorkerUrlKey}&issueId=${taskId}`
+    )).json();
+    expect(record.outcome).toBe('answered');
   });
 
   test('pressing scan on a task with no blocking language reports no blockers found', async ({ page }) => {
