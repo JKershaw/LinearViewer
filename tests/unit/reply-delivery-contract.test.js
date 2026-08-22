@@ -460,6 +460,71 @@ test('postComment is exported standalone with its settled positional signature (
   assert.deepEqual({ ...result, data: { ...result.data } }, { ok: true, status: 201, data: { success: true } });
 });
 
+test('postComment (LIN-1728 Phase 2): a 4th optional {decisionLoopId, decisionId} arg is forwarded in the body when both are present', async () => {
+  let seenBody = null;
+  const { window } = makeSandbox((url, opts) => {
+    seenBody = JSON.parse(opts.body);
+    return jsonResponse(true, 201, { success: true });
+  });
+
+  await window.ReplyDelivery.postComment('wkey', 'iss1', 'a comment body', { decisionLoopId: 'lp1', decisionId: 'd-1' });
+
+  assert.deepEqual(seenBody, { body: 'a comment body', decisionLoopId: 'lp1', decisionId: 'd-1' });
+});
+
+test('postComment (LIN-1728 Phase 2): a lone decisionLoopId or decisionId (not both) is never sent — not a half-stamp', async () => {
+  const seenBodies = [];
+  const { window } = makeSandbox((url, opts) => {
+    seenBodies.push(JSON.parse(opts.body));
+    return jsonResponse(true, 201, { success: true });
+  });
+
+  await window.ReplyDelivery.postComment('wkey', 'iss1', 'x', { decisionLoopId: 'lp1' });
+  await window.ReplyDelivery.postComment('wkey', 'iss1', 'x', { decisionId: 'd-1' });
+  await window.ReplyDelivery.postComment('wkey', 'iss1', 'x', {});
+  await window.ReplyDelivery.postComment('wkey', 'iss1', 'x');
+
+  for (const body of seenBodies) {
+    assert.deepEqual(body, { body: 'x' }, 'no decision fields leak into the body unless both are present');
+  }
+});
+
+test('deliverReply (LIN-1728 Phase 2): opts.decisionLoopId/decisionId are forwarded into the internal postComment call', async () => {
+  let commentBody = null;
+  const { window } = makeSandbox((url, opts) => {
+    if (String(url).includes('/api/comments/')) {
+      commentBody = JSON.parse(opts.body);
+      return jsonResponse(true, 201, { success: true });
+    }
+    return jsonResponse(true, 200, {});
+  });
+  const { handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.deliverReply(
+    { urlKey: 'w', issueId: 'i1', followUpTo: 'lp', target: 'cli', decisionLoopId: 'lp', decisionId: 'd-9' },
+    'hello',
+    handlers
+  );
+
+  assert.deepEqual(commentBody, { body: 'hello', decisionLoopId: 'lp', decisionId: 'd-9' });
+});
+
+test('deliverReply (LIN-1728 Phase 2): no decision fields on opts means none are sent', async () => {
+  let commentBody = null;
+  const { window } = makeSandbox((url, opts) => {
+    if (String(url).includes('/api/comments/')) {
+      commentBody = JSON.parse(opts.body);
+      return jsonResponse(true, 201, { success: true });
+    }
+    return jsonResponse(true, 200, {});
+  });
+  const { handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.deliverReply({ urlKey: 'w', issueId: 'i1', followUpTo: 'lp', target: 'cli' }, 'hello', handlers);
+
+  assert.deepEqual(commentBody, { body: 'hello' });
+});
+
 test('errorFromResult is exported standalone and matches the server error message, falling back to HTTP <status>', () => {
   const { window } = makeSandbox(() => { throw new Error('no fetch expected'); });
 

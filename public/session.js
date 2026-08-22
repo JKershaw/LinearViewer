@@ -45,7 +45,7 @@
     feedback.textContent = '';
     feedback.className = 'sess-reply-feedback';
 
-    window.ReplyDelivery.postComment(opts.urlKey, opts.issueId, prompt)
+    window.ReplyDelivery.postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId })
       .then(function (result) {
         if (!result.ok) throw window.ReplyDelivery.errorFromResult(result);
         appendYouBubble(thread, prompt);
@@ -231,6 +231,11 @@
 
       for (var j = 0; j < entries.length; j++) {
         var entry = entries[j];
+        // LIN-1728 Phase 2 (Revision 3, F6): a `decision-answer` stamp is
+        // answer metadata, not a chat turn — it must never render as a bare
+        // `{"decision_id":...}` agent bubble. `entry.kind` rides the encoded
+        // JSON per LIN-2184 (lib/render-session.js's encodeFeedbackJSON).
+        if (entry.kind === 'decision-answer') continue;
         var messageHtml = typeof window.renderMarkdown === 'function'
           ? window.renderMarkdown(entry.message || '', { breaks: true })
           : window.escapeHtml(entry.message || '');
@@ -279,6 +284,12 @@
         var issueIdentifier = box.dataset.issueIdentifier || '';
         var issueless = !issueIdentifier;
         var issueId = box.dataset.issueId || issueIdentifier;
+        // LIN-1728 Phase 2: present only when the run carries an unanswered
+        // decision (lib/render-session.js's renderInlineReplyBox omits the
+        // attribute otherwise). The decision-bearing loop IS this reply box's
+        // own loop, so decisionLoopId reuses data-loop-id rather than a
+        // separate attribute.
+        var decisionId = box.dataset.decisionId || null;
 
         var opts = {
           urlKey: box.dataset.urlKey,
@@ -290,7 +301,9 @@
           force: box.dataset.terminal === 'true' || box.dataset.sessionWaiting === 'true',
           sessionWaiting: box.dataset.sessionWaiting === 'true',
           issueId: issueId,
-          issueless: issueless
+          issueless: issueless,
+          decisionLoopId: decisionId ? box.dataset.loopId : null,
+          decisionId: decisionId
         };
 
         if (saveBtn) {

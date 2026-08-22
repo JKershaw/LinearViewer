@@ -146,4 +146,25 @@ describe('toSessionView', () => {
       { message: '[done] resolved and shipped', timestamp: '2026-08-01T01:00:00.000Z' }
     ], '`kind` is dropped from every feedback entry, including the decision entry itself');
   });
+
+  // LIN-2205 (LIN-1728 F6 follow-up): unlike the `decision` entry above (kept,
+  // `kind` merely dropped), a `decision-answer` entry must be EXCLUDED
+  // entirely — the Sessions accordion has no way to filter it client-side
+  // once `kind` is gone, so the exclusion must happen here.
+  it('LIN-2205: a decision-answer entry is excluded entirely, not merely stripped of kind', () => {
+    const loop = {
+      loopId: 'd5',
+      iteration: 1,
+      feedback: [
+        { message: 'a real feedback line', timestamp: '2026-08-01T00:00:00.000Z' },
+        { kind: 'decision-answer', message: '{"decision_id":"d-1"}', timestamp: '2026-08-01T00:01:00.000Z' },
+        { message: 'another real line', timestamp: '2026-08-01T00:02:00.000Z' }
+      ]
+    };
+    const view = toSessionView(loop);
+    assert.deepEqual(view.feedback, [
+      { message: 'a real feedback line', timestamp: '2026-08-01T00:00:00.000Z' },
+      { message: 'another real line', timestamp: '2026-08-01T00:02:00.000Z' }
+    ]);
+  });
 });

@@ -1436,8 +1436,19 @@ ${goal}`
    * named V1 limitation; LIN-2188 owns closing that gap.
    *
    * @route POST /workspace/:urlKey/api/comments/:issueId
-   * Body: { body: string }
+   * Body: { body: string, decisionLoopId?: string, decisionId?: string }
    * @returns 201 { success: true, comment } | 200 { success: true, comment, deduped: true }
+   *
+   * LIN-1728 Phase 2: an optional `{decisionLoopId, decisionId}` pair, both
+   * required together, threaded from the reply box's `data-decision-id`
+   * (`renderInlineReplyBox`, lib/render-session.js) via
+   * `window.ReplyDelivery`. After a successful comment write, best-effort
+   * stamps the answer onto the decision-bearing loop via
+   * `dispatchStore.markDecisionAnswered` — logged on failure, never thrown,
+   * and never blocks the (already-succeeded) comment response. This is the
+   * ONE write path for the `decision-answer` kind (decision 1): a runner
+   * token can never reach it, since it lives outside the runner-facing
+   * feedback route entirely.
    */
   router.post('/workspace/:urlKey/api/comments/:issueId', workspaceFromUrl, json(), async (req, res) => {
     const workspace = req.workspace
@@ -1519,6 +1530,25 @@ ${goal}`
       }
 
       commentDedupe.set(key, commentCreate)
+
+      // Best-effort answer stamp (LIN-1728 decision 1). Both fields required
+      // together — a lone id is a malformed/partial client payload, not a
+      // half-stamp attempt. Failure is logged only: the comment already
+      // succeeded and is the durable half of this write; the stamp is a
+      // secondary annotation the rulings predicate tolerates missing (the
+      // loop just stays "unanswered" until a later attempt succeeds).
+      const { decisionLoopId, decisionId } = req.body || {}
+      if (typeof decisionLoopId === 'string' && decisionLoopId && typeof decisionId === 'string' && decisionId) {
+        try {
+          const stamped = await dispatchQueueStore.markDecisionAnswered(decisionLoopId, workspace.urlKey, decisionId)
+          if (!stamped) {
+            console.error(`Decision-answer stamp not applied: no matching item ${decisionLoopId} in workspace ${workspace.urlKey}`)
+          }
+        } catch (stampErr) {
+          console.error('Decision-answer stamp failed:', stampErr.message)
+        }
+      }
+
       return res.status(201).json(commentCreate)
     } catch (err) {
       console.error('Workspace-api create comment error:', err.message)

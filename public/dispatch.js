@@ -895,10 +895,15 @@ async function loadDispatchHistory(urlKey, offset) {
  * Render feedback entries for a history item
  */
 function renderFeedbackEntries(feedback) {
-  if (!feedback || feedback.length === 0) return ''
+  // LIN-2205 (LIN-1728 F6 follow-up): a `decision-answer` stamp is answer
+  // metadata, not a feedback line — `_formatFeedbackEntries`
+  // (lib/dispatch-store.js) carries `kind` through, so filter here rather
+  // than render a bare `{"decision_id":...}` entry.
+  const visible = (feedback || []).filter(f => f.kind !== 'decision-answer')
+  if (visible.length === 0) return ''
 
-  const entries = feedback.map((f, i) => {
-    const isLast = i === feedback.length - 1
+  const entries = visible.map((f, i) => {
+    const isLast = i === visible.length - 1
     const prefix = isLast ? '\u2514\u2500' : '\u251c\u2500'
     const time = formatDispatchTime(f.timestamp)
     const isSafeUrl = f.url && /^https?:\/\//i.test(f.url)

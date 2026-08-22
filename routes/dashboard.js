@@ -11,6 +11,7 @@
  *   GET      /workspace/:urlKey/dashboard                          — 302 → /observation (retired flag)
  *   GET      /workspace/:urlKey/api/dashboard/sessions             — sessionId-grouped feed (observation poll source; LIN-595)
  *   GET      /workspace/:urlKey/api/dashboard/loops                — merged cross-workspace runs (flat poll source)
+ *   GET      /workspace/:urlKey/api/dashboard/rulings              — unanswered-decision feed (ambient count + rulings tab; LIN-1728)
  *   GET|POST /workspace/:urlKey/api/dashboard/run-summary/:loopId  — cached, on-demand short run summary
  *   GET|POST /workspace/:urlKey/api/dashboard/session-summary/:sessionId — cached session rollup (terminal); cheap latest-child statusLine proxy when live (LIN-592)
  *   GET      /workspace/:urlKey/api/dashboard/session-context/:sessionId — deterministic tasks-touched + relationship graph (LIN-593)
@@ -39,6 +40,7 @@ import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { createTaskDoneCache } from '../lib/task-done-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
+import { collectUnansweredDecisions } from '../lib/unanswered-decisions.js';
 import { collectAgentTokenIds, foldCredentialIndex } from '../lib/credential-state.js';
 import { hasPaidEnvKey } from '../lib/openrouter.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
@@ -1349,6 +1351,40 @@ export function createDashboardRoutes({
       console.error('Dashboard loops error:', error);
       keepalive.stop();
       keepalive.send(500, { error: 'Could not load runs' });
+    }
+  });
+
+  // ─── Filtered rulings feed (LIN-1728 Phase 2) ─────────────────────────────────
+
+  // One cached read backs both consumers (the ambient nav badge, Phase 3, and the
+  // rulings tab, Phase 4) — same `sessionsFeedCache` instance as `/sessions`, just
+  // a separate `rulings` view namespace so the two payload shapes never collide on
+  // one cache entry for the same workspace set (LIN-1728 plan decision 2/3).
+  // Cross-workspace by design (decision 2's "third obs-tab" host), but per the
+  // plan's constraint the ambient count stays scoped to `req.session.workspaces`
+  // like every other Observation read here — never fleet-wide.
+  router.get('/workspace/:urlKey/api/dashboard/rulings', workspaceFromUrl, async (req, res) => {
+    const workspaces = (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }));
+
+    const keepalive = armKeepalive(res);
+    try {
+      const merged = await sessionsFeedCache.get(
+        sessionsFeedCache.keyFor(workspaces, 'rulings'),
+        () => mergeLoops(workspaces)
+      );
+      const rulings = collectUnansweredDecisions({ loops: merged }, { now: new Date() });
+
+      keepalive.stop();
+      keepalive.send(200, {
+        workspaces,
+        count: rulings.length,
+        rulings,
+        generatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Dashboard rulings error:', error);
+      keepalive.stop();
+      keepalive.send(500, { error: 'Could not load rulings' });
     }
   });
 

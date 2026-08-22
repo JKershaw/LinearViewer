@@ -698,12 +698,23 @@ window.ReplyDelivery = (function () {
   // Durable comment write. POST /workspace/:urlKey/api/comments/:issueId —
   // resolves to {ok, status, data}, never rejects on a non-2xx (the caller
   // decides how to surface that).
-  function postComment(urlKey, issueId, prompt) {
+  //
+  // `decision` (LIN-1728 Phase 2, additive 4th positional argument — see the
+  // LIN-2200 review note on why `postComment` stays positional rather than
+  // object-shaped): optional `{decisionLoopId, decisionId}`, both sent only
+  // when both are present, so the route can best-effort stamp
+  // `markDecisionAnswered` alongside this same comment write.
+  function postComment(urlKey, issueId, prompt, decision) {
+    var body = { body: prompt };
+    if (decision && decision.decisionLoopId && decision.decisionId) {
+      body.decisionLoopId = decision.decisionLoopId;
+      body.decisionId = decision.decisionId;
+    }
     return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/comments/' + encodeURIComponent(issueId), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ body: prompt })
+      body: JSON.stringify(body)
     }).then(function (resp) {
       return resp.json().catch(function () { return {}; }).then(function (data) {
         return { ok: resp.ok, status: resp.status, data: data };
@@ -760,6 +771,8 @@ window.ReplyDelivery = (function () {
    * @param {string} [opts.target]               'cli' | 'web'.
    * @param {boolean} [opts.force]
    * @param {boolean} [opts.issueless]
+   * @param {string} [opts.decisionLoopId]        LIN-1728 Phase 2: the decision-bearing loop id, forwarded to postComment.
+   * @param {string} [opts.decisionId]            LIN-1728 Phase 2: the decision_id being answered, forwarded to postComment.
    * @param {string} prompt                      Already-trimmed reply text.
    * @param {Object} handlers                    All four are required — not defaulted to no-ops.
    * @param {function(Error): void} handlers.onCommentFailed    Comment write failed; dispatch never attempted.
@@ -805,7 +818,7 @@ window.ReplyDelivery = (function () {
     // fulfilled-branch's own callbacks (onDispatchOk/onPartialFailure) can
     // never be misclassified as a comment failure — those two are already on
     // separate arms of doDispatch's own .then below.
-    return postComment(opts.urlKey, opts.issueId, prompt).then(function (commentResult) {
+    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId }).then(function (commentResult) {
       if (!commentResult.ok) {
         onCommentFailed(errorFromResult(commentResult));
         return;

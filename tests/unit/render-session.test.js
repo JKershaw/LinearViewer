@@ -1215,6 +1215,25 @@ describe('render-session: durable-comment identity attributes (LIN-2154)', () =>
     assert.match(html, /data-testid="session-inline-reply"[^>]*data-issue-identifier="LIN-1005"/);
   });
 
+  // ─── LIN-1728 Phase 2: data-decision-id threading ────────────────────────
+  test('a loop carrying an unanswered decision emits data-decision-id', () => {
+    const session = fixtureSession({
+      loops: [{
+        loopId: 'loop-decision', issueIdentifier: 'LIN-1006', issueId: 'uuid-1006',
+        iteration: 1, kind: 'implementation', dispatchedAt: '2026-07-04T10:00:00.000Z',
+        terminalStatus: null, feedback: [], telemetry: null,
+        decision: { decision_id: 'd-abc123', question: 'Proceed?' }
+      }]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [], canReply: true });
+    assert.match(html, /data-testid="session-inline-reply"[^>]*data-decision-id="d-abc123"/);
+  });
+
+  test('a loop with no decision never emits data-decision-id', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true });
+    assert.ok(!html.includes('data-decision-id='), 'no data-decision-id attribute when the loop carries no decision');
+  });
+
   test('Save and Save-and-continue buttons both render, with distinct testids', () => {
     const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true });
     assert.match(html, /data-testid="session-inline-reply-save"/);
