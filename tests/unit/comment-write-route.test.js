@@ -62,7 +62,19 @@ function makeFakeDispatchQueueStore(overrides = {}) {
   return { store, calls };
 }
 
-function buildApp({ provider, session, dispatchQueueStore } = {}) {
+function makeFakeTaskDecisionsStore(overrides = {}) {
+  const calls = { markOutcome: [] };
+  const store = {
+    async markOutcome({ urlKey, issueId, id, outcome }) {
+      calls.markOutcome.push({ urlKey, issueId, id, outcome });
+      if (overrides.markOutcome) return overrides.markOutcome({ urlKey, issueId, id, outcome });
+      return { id, urlKey, issueId, outcome, outcomeAt: new Date().toISOString() };
+    },
+  };
+  return { store, calls };
+}
+
+function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore } = {}) {
   registerProvider(provider);
   const app = express();
   app.use(express.json());
@@ -77,6 +89,7 @@ function buildApp({ provider, session, dispatchQueueStore } = {}) {
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
     reportHistoryStore: {}, dispatchQueueStore: dispatchQueueStore || {}, agentStatusStore: {}, promptTraceStore: {},
+    taskDecisionsStore,
   });
   app.use(workspaceRouter);
 
@@ -326,5 +339,116 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — decision-answer stam
     assert.strictEqual(second.status, 200);
     assert.strictEqual(second.body.deduped, true);
     assert.strictEqual(calls.markDecisionAnswered.length, 1, 'no second stamp on a deduped resubmission');
+  });
+});
+
+describe('POST /workspace/:urlKey/api/comments/:issueId — task-decision answer stamp (LIN-2197 Phase 5, L4)', () => {
+  test('both params present → markOutcome is called with outcome: "answered", and the comment still 201s', async () => {
+    const { provider } = makeFakeProvider();
+    const { store, calls } = makeFakeTaskDecisionsStore();
+    const app = buildApp({ provider, taskDecisionsStore: store });
+
+    const { status, body } = await postComment(app, ISSUE_ID, {
+      body: 'ship it — task-decision stamp both-present',
+      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
+      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+    });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(calls.markOutcome.length, 1);
+    assert.deepStrictEqual(calls.markOutcome[0], {
+      urlKey: 'acme', issueId: '11111111-2222-3333-4444-555555555555', id: 'scan_11111111_aaaaaaaaaaaa', outcome: 'answered',
+    });
+  });
+
+  test('params absent → markOutcome is never called; unchanged 201 behavior', async () => {
+    const { provider } = makeFakeProvider();
+    const { store, calls } = makeFakeTaskDecisionsStore();
+    const app = buildApp({ provider, taskDecisionsStore: store });
+
+    const { status } = await postComment(app, ISSUE_ID, { body: 'ship it — task-decision stamp absent' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(calls.markOutcome.length, 0);
+  });
+
+  test('only one of the pair present → markOutcome is never called (not a half-stamp)', async () => {
+    const { provider } = makeFakeProvider();
+    const { store, calls } = makeFakeTaskDecisionsStore();
+    const app = buildApp({ provider, taskDecisionsStore: store });
+
+    const { status } = await postComment(app, ISSUE_ID, {
+      body: 'ship it — task-decision stamp half-present', taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
+    });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(calls.markOutcome.length, 0);
+  });
+
+  test('no taskDecisionsStore configured → route still 201s (optional dependency, never a hard failure)', async () => {
+    const { provider } = makeFakeProvider();
+    const app = buildApp({ provider }); // taskDecisionsStore omitted entirely
+
+    const { status, body } = await postComment(app, ISSUE_ID, {
+      body: 'ship it — no store configured',
+      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
+      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+    });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+  });
+
+  test('stamp failure (store throws) does not fail the comment response', async () => {
+    const { provider } = makeFakeProvider();
+    const { store } = makeFakeTaskDecisionsStore({
+      markOutcome: () => { throw new Error('store down'); },
+    });
+    const app = buildApp({ provider, taskDecisionsStore: store });
+
+    const { status, body } = await postComment(app, ISSUE_ID, {
+      body: 'ship it — task-decision stamp throws',
+      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
+      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+    });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+  });
+
+  test('stamp returning null (no matching row) does not fail the comment response', async () => {
+    const { provider } = makeFakeProvider();
+    const { store } = makeFakeTaskDecisionsStore({ markOutcome: () => null });
+    const app = buildApp({ provider, taskDecisionsStore: store });
+
+    const { status, body } = await postComment(app, ISSUE_ID, {
+      body: 'ship it — task-decision stamp returns null',
+      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
+      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+    });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+  });
+
+  test('a deduped resubmission does not re-stamp', async () => {
+    const { provider } = makeFakeProvider();
+    const { store, calls } = makeFakeTaskDecisionsStore();
+    const app = buildApp({ provider, taskDecisionsStore: store });
+
+    const payload = {
+      body: 'the same text — task-decision stamp dedupe',
+      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
+      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+    };
+    const first = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(calls.markOutcome.length, 1);
+
+    const second = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.deduped, true);
+    assert.strictEqual(calls.markOutcome.length, 1, 'no second stamp on a deduped resubmission');
   });
 });

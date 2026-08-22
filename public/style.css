@@ -3964,6 +3964,210 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 }
 
 /* ==========================================================================
+   Scan section (LIN-2197 Phase 5) — shared ScanSection module. Mirrors the
+   Brief/Recap section styling above (same tokens, same header/placeholder/
+   generating/error shapes) plus its own decision/answer/outcome layout.
+   ========================================================================== */
+
+.scan-section {
+  font-family: var(--font-content);
+  color: var(--fg);
+  font-size: 0.9em;
+}
+
+.scan-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75ch;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.scan-status-label {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.scan-meta {
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+}
+
+.scan-action {
+  margin-left: auto;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  padding: 0.15rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--fg-dim);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.scan-action:hover {
+  border-color: var(--fg);
+  background: var(--bg-alt);
+}
+
+.scan-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.scan-placeholder {
+  color: var(--fg-dim);
+  font-style: italic;
+  padding: 0.35rem 0;
+}
+
+.scan-empty {
+  color: var(--fg-dim);
+  padding: 0.35rem 0;
+}
+
+.scan-error {
+  color: var(--red);
+  font-style: normal;
+}
+
+.scan-generating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5ch;
+  color: var(--fg-dim);
+  font-style: normal;
+}
+
+.scan-spinner {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border: 2px solid var(--fg-dim);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: recap-spin 0.9s linear infinite;
+}
+
+.scan-decision {
+  color: var(--fg);
+}
+
+.scan-decision-question {
+  font-weight: 600;
+  margin: 0 0 var(--space-1);
+}
+
+.scan-decision-options {
+  list-style: none;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.scan-decision-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5ch;
+}
+
+.scan-decision-option-btn {
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  padding: 0.2rem 0.6rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--fg-dim);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.scan-decision-option-btn:hover {
+  border-color: var(--fg);
+}
+
+.scan-decision-recommended {
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+.scan-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.scan-answer-input {
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  width: 100%;
+  min-height: 3.5em;
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--fg-dim);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  resize: vertical;
+}
+
+.scan-answer-actions {
+  display: flex;
+  gap: 0.5ch;
+}
+
+.scan-answer-submit,
+.scan-dismiss {
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.scan-answer-submit {
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  color: var(--bg);
+}
+
+.scan-answer-submit:hover {
+  opacity: 0.9;
+}
+
+.scan-dismiss {
+  background: transparent;
+  border: 1px solid var(--fg-dim);
+  color: var(--fg);
+}
+
+.scan-dismiss:hover {
+  border-color: var(--fg);
+  background: var(--bg-alt);
+}
+
+.scan-outcome-note {
+  color: var(--fg-dim);
+}
+
+.scan-outcome-detail {
+  margin-top: 0.3rem;
+}
+
+.scan-outcome-detail summary {
+  cursor: pointer;
+  color: var(--fg-dim);
+  font-size: var(--font-size-sm);
+}
+
+.scan-outcome-detail .scan-decision {
+  margin-top: 0.3rem;
+}
+
+/* ==========================================================================
    Dispatched Sessions section (LIN-522) — shared SessionsSection module.
    Mirrors the swipe view's session styling (public/swipe.css) so the tree
    view's on-card sessions list reads identically.

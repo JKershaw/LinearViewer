@@ -151,12 +151,16 @@ describe('GET/POST /workspace/:urlKey/api/scan/:issueId', () => {
     assert.ok(posted.body.decision, 'a decision was found');
     assert.equal(posted.body.outcome, null);
     assert.match(posted.body.id, /^scan_66666666_/);
+    // Canonical id round-trips on the response (LIN-2197 Phase 5) — the
+    // client needs it to key a later answer stamp via window.ReplyDelivery.
+    assert.equal(posted.body.issueId, '66666666-6666-6666-6666-666666666666');
 
     const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
     assert.equal(got.status, 200);
     assert.equal(got.body.status, 'fresh');
     assert.deepEqual(got.body.decision, posted.body.decision);
     assert.equal(got.body.outcome, null);
+    assert.equal(got.body.issueId, '66666666-6666-6666-6666-666666666666');
   });
 
   test('POST on a task with no blocking language persists a zero-finding record, not a failure', async () => {
@@ -265,5 +269,32 @@ describe('POST /workspace/:urlKey/api/scan/:issueId/dismiss', () => {
     const first = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}/dismiss`, { id: scanned.body.id });
     const second = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}/dismiss`, { id: scanned.body.id });
     assert.equal(second.body.outcomeAt, first.body.outcomeAt);
+  });
+
+  // LIN-2197 Phase 5 (Phase 4 close-out ledger item L3): dismissing by the
+  // already-canonical UUID skips the provider context fetch entirely — the
+  // route accepts the row's own key directly rather than re-deriving it.
+  test('dismissing by canonical UUID (not the identifier) skips the context fetch and still works', async () => {
+    const scanned = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    const canonicalId = scanned.body.issueId;
+    assert.equal(canonicalId, '66666666-6666-6666-6666-666666666666');
+
+    const dismissed = await post(`/workspace/test-workspace/api/scan/${canonicalId}/dismiss`, { id: scanned.body.id });
+    assert.equal(dismissed.status, 200);
+    assert.equal(dismissed.body.outcome, 'dismissed');
+  });
+
+  // The whole point of the UUID fast path: a UUID no test fixture matches
+  // (standing in for a trashed/deleted task the provider can no longer
+  // fetch) never reaches the context fetch at all. Proven by the FAILURE
+  // MODE, not just the happy path: pre-fix, this 404s as "Issue not found"
+  // (from the context fetch); post-fix it 404s as "Scan record not found"
+  // (from `markOutcome` finding no row) — the message tells us which code
+  // path actually ran.
+  test('a UUID no fixture matches never triggers a context fetch — 404 comes from markOutcome, not "Issue not found"', async () => {
+    const unfetchableUuid = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+    const result = await post(`/workspace/test-workspace/api/scan/${unfetchableUuid}/dismiss`, { id: 'scan_dddddddd_aaaaaaaaaaaa' });
+    assert.equal(result.status, 404);
+    assert.equal(result.body.error, 'Scan record not found');
   });
 });

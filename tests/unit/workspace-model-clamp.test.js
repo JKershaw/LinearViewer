@@ -81,8 +81,8 @@ test('missing urlKey or store still returns DEFAULT_MODEL (unchanged guard)', as
 // resolveAiOperationModel (LIN-1145)
 // =============================================================================
 
-test('AI_OPERATION_KINDS covers the 6 scoped v1 operations', () => {
-  assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'recap', 'brief', 'run-summary', 'session-summary', 'next-run']);
+test('AI_OPERATION_KINDS covers the 7 scoped v1 operations', () => {
+  assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'recap', 'brief', 'scan', 'run-summary', 'session-summary', 'next-run']);
 });
 
 test('resolveAiOperationModel: no overrides → falls back to modelId → DEFAULT_MODEL', async () => {

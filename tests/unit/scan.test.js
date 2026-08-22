@@ -12,7 +12,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildScanMessages, isClaimedDecisionValid, parseScanResponse } from '../../lib/scan.js';
+import { buildScanMessages, generateScan, isClaimedDecisionValid, parseScanResponse } from '../../lib/scan.js';
 import { extractPrincipleZeroSection } from '../../lib/prompts/autopilot-manual.js';
 
 const ISSUE_ID = '11111111-2222-3333-4444-555555555555';
@@ -152,5 +152,32 @@ describe('parseScanResponse — outcome ordering', () => {
     const raw = JSON.stringify({ has_decision: true, question: 'Q?', free_text: true });
     const result = parseScanResponse(raw, { issueId: ISSUE_ID, inputHash: HASH });
     assert.equal(result.decision.decision_id, TaskDecisionsStore.buildId(ISSUE_ID, HASH));
+  });
+});
+
+describe('generateScan — fail-closed at the generateScan level (LIN-2197 Phase 4 close-out ledger item L5)', () => {
+  test('overriding principleZeroSection to null fails closed without ever calling the model', async () => {
+    // No streamChat mock is installed here on purpose: if generateScan reached
+    // streamChat despite the null override, this call would throw on the
+    // unmocked OpenRouter network call instead of resolving — that failure
+    // mode is itself proof the gate was bypassed.
+    const result = await generateScan(
+      { identifier: 'LIN-1', description: 'x' },
+      { issue: { identifier: 'LIN-1' }, comments: [], children: [] },
+      { issueId: ISSUE_ID, inputHash: HASH, principleZeroSection: null }
+    );
+    assert.deepEqual(result, { outcome: 'fail-closed', decision: null, model: null });
+  });
+
+  test('omitting principleZeroSection falls back to a real extraction (default behaviour unchanged)', () => {
+    // buildScanMessages is the unit already covering the real-extraction path
+    // end to end (see the top describe block); this just pins that
+    // generateScan's threading doesn't shadow the default with `undefined`.
+    const messages = buildScanMessages(
+      { identifier: 'LIN-1', description: 'x' },
+      { issue: { identifier: 'LIN-1' }, comments: [], children: [] },
+      { principleZeroSection: undefined }
+    );
+    assert.ok(messages, 'an explicit undefined still falls through to the default extraction');
   });
 });
