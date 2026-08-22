@@ -124,7 +124,10 @@
     resumable: 'Reply & continue',
     gone: 'Reply & start a run',
     'mid-turn': 'still running — reply disabled',
-    indeterminate: 'no action available yet'
+    indeterminate: 'no action available yet',
+    // LIN-2215 F2: a scan-produced decision (LIN-2197 Phase 3) — no dispatch
+    // item behind it, so the reply is comment-only (no run started/resumed).
+    'task-bound': 'A task raised a decision — reply to resolve it'
   };
 
   /**
@@ -139,7 +142,7 @@
    * @param {Object} opts
    * @param {Array<{id: string, label: string, cost?: number}>} [opts.options] - decision options.
    * @param {string} [opts.recommended] - the recommended option's `id`, if any.
-   * @param {'resumable'|'gone'|'mid-turn'|'indeterminate'} opts.disposition - press-time disposition (see `lib/unanswered-decisions.js`).
+   * @param {'resumable'|'gone'|'mid-turn'|'indeterminate'|'task-bound'} opts.disposition - press-time disposition (see `lib/unanswered-decisions.js`).
    * @param {function(string, string): void} [opts.onSelect] - called with `(optionId, optionLabel)` on a button press. Never called for a read-only disposition (mid-turn/indeterminate) or when `options` is empty.
    * @returns {Element} the appended `<div class="chat-options">` wrapper.
    */
@@ -159,8 +162,14 @@
     wrap.appendChild(caption);
 
     // Read-only dispositions render the caption alone — no buttons, no dispatch
-    // ever attempted (mirrors `canReplyFor` in lib/unanswered-decisions.js).
-    var readOnly = disposition === 'mid-turn' || disposition === 'indeterminate';
+    // ever attempted. LIN-2215 F2: inverted to an ALLOW-list mirroring
+    // `canReplyFor`'s own three-way OR (lib/unanswered-decisions.js) — the prior
+    // hand-maintained deny-list (`disposition === 'mid-turn' || ... === 'indeterminate'`)
+    // agreed with the server predicate only by coincidence and had already
+    // drifted once (task-bound rendered as "no action available yet" instead of
+    // reply-eligible). An allow-list fails SAFE: an unrecognized future
+    // disposition now defaults to read-only, not interactive.
+    var readOnly = !(disposition === 'resumable' || disposition === 'gone' || disposition === 'task-bound');
     if (readOnly || !options.length) {
       wrap.classList.add('chat-options--readonly');
       container.appendChild(wrap);

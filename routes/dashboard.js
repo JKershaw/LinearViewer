@@ -441,6 +441,7 @@ function deriveFeedStatusLine(children) {
  * @param {Function} deps.getDeployInfo            - () → deploy metadata
  * @param {number}   [deps.recentLimit=120]        - cap on terminal runs returned by /loops
  * @param {Object}   [deps.sessionsFeedCache]      - short-TTL SWR cache for the /sessions feed (LIN-617)
+ * @param {Object}   [deps.taskDecisionsStore]     - scan-produced task decisions store (LIN-2215), threaded into /api/dashboard/rulings
  * @returns {Router}
  */
 export function createDashboardRoutes({
@@ -478,7 +479,13 @@ export function createDashboardRoutes({
   // of re-reading the backend every ~5s. Injectable (like sessionsFeedCache) so a
   // test can supply an injectable-clock cache and drive the cross-TTL boundary
   // directly (LIN-1259, item 2 hardening).
-  taskDoneCache = createTaskDoneCache()
+  taskDoneCache = createTaskDoneCache(),
+  // Scan-produced task decisions (LIN-2215), the rulings feed's second input
+  // alongside `loops` — see the /api/dashboard/rulings handler below. Default
+  // null → the taskDecisions branch is simply skipped (collectUnansweredDecisions
+  // defaults it to []), same degrade-gracefully convention as briefCacheStore/
+  // recapCacheStore/proxyEventStore above, so an unwired test sees no behaviour change.
+  taskDecisionsStore = null
 }) {
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
@@ -1372,7 +1379,15 @@ export function createDashboardRoutes({
         sessionsFeedCache.keyFor(workspaces, 'rulings'),
         () => mergeLoops(workspaces)
       );
-      const rulings = collectUnansweredDecisions({ loops: merged }, { now: new Date() });
+      // Additive second input (LIN-2215) — same `workspaces` scope as the
+      // loops read above, never fleet-wide. The store read is local/fast
+      // (matching this route's other per-request store calls), so no second
+      // caching layer is introduced here. The `loops` line/logic above is
+      // untouched.
+      const taskDecisions = taskDecisionsStore
+        ? await taskDecisionsStore.listUnansweredForWorkspaces(workspaces.map(w => w.urlKey))
+        : [];
+      const rulings = collectUnansweredDecisions({ loops: merged, taskDecisions }, { now: new Date() });
 
       keepalive.stop();
       keepalive.send(200, {

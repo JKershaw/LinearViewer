@@ -18,9 +18,17 @@ import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 // tests/unit/task-snapshot-store.test.js's mock.
 function createMockCollection() {
   const docs = [];
+  // Minimal `$in` support (real MongoDB/MangoDB shape), only what
+  // listUnansweredForWorkspaces' `{ urlKey: { $in: urlKeys } }` query needs.
+  function matchesField(docValue, queryValue) {
+    if (queryValue && typeof queryValue === 'object' && Array.isArray(queryValue.$in)) {
+      return queryValue.$in.includes(docValue);
+    }
+    return docValue === queryValue;
+  }
   function matches(doc, query) {
     if (query._id !== undefined && doc._id !== query._id) return false;
-    if (query.urlKey !== undefined && doc.urlKey !== query.urlKey) return false;
+    if (query.urlKey !== undefined && !matchesField(doc.urlKey, query.urlKey)) return false;
     if (query.issueId !== undefined && doc.issueId !== query.issueId) return false;
     return true;
   }
@@ -416,5 +424,69 @@ describe('TaskDecisionsStore.markOutcome', () => {
     assert.equal(await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'archived' }), null);
     assert.equal(await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'dismissed' }) && true, true); // sanity: valid call still works
     assert.equal(await store.markOutcome({ issueId: ISSUE_ID, id, outcome: 'dismissed' }), null); // no urlKey
+  });
+});
+
+describe('TaskDecisionsStore.listUnansweredForWorkspaces (LIN-2215)', () => {
+  let collection, store;
+  const ISSUE_ID_2 = '22222222-3333-4444-5555-666666666666';
+  const ISSUE_ID_3 = '33333333-4444-5555-6666-777777777777';
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  test('an empty workspace set returns an empty list without touching the collection', async () => {
+    assert.deepEqual(await store.listUnansweredForWorkspaces([]), []);
+    assert.deepEqual(await store.listUnansweredForWorkspaces(), []);
+  });
+
+  test('spans multiple workspaces, decision-bearing and unanswered rows only', async () => {
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    await store.recordScan({ urlKey: 'ws-b', issueId: ISSUE_ID_2, inputHash: HASH_A, decision: sampleDecision({ decision_id: 'scan_22222222_aaaaaaaaaaaa' }) });
+    // A third workspace, not in the requested set — must not appear.
+    await store.recordScan({ urlKey: 'ws-c', issueId: ISSUE_ID_3, inputHash: HASH_A, decision: sampleDecision({ decision_id: 'scan_33333333_aaaaaaaaaaaa' }) });
+
+    const rows = await store.listUnansweredForWorkspaces(['ws-a', 'ws-b']);
+    assert.equal(rows.length, 2);
+    assert.deepEqual(new Set(rows.map(r => r.urlKey)), new Set(['ws-a', 'ws-b']));
+  });
+
+  test('excludes a row already stamped answered or dismissed', async () => {
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const idA = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await store.markOutcome({ urlKey: 'ws-a', issueId: ISSUE_ID, id: idA, outcome: 'answered' });
+
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID_2, inputHash: HASH_A, decision: sampleDecision({ decision_id: 'scan_22222222_aaaaaaaaaaaa' }) });
+    const idB = TaskDecisionsStore.buildId(ISSUE_ID_2, HASH_A);
+    await store.markOutcome({ urlKey: 'ws-a', issueId: ISSUE_ID_2, id: idB, outcome: 'dismissed' });
+
+    // A third, still-unanswered row must be the only one returned.
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID_3, inputHash: HASH_A, decision: sampleDecision({ decision_id: 'scan_33333333_aaaaaaaaaaaa' }) });
+
+    const rows = await store.listUnansweredForWorkspaces(['ws-a']);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].issueId, ISSUE_ID_3);
+  });
+
+  test('excludes a persisted zero-finding row (decision: null) — nothing to rule on', async () => {
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, decision: null });
+    const rows = await store.listUnansweredForWorkspaces(['ws-a']);
+    assert.deepEqual(rows, []);
+  });
+
+  test('does NOT dedup to latest-per-issue — multiple rescans of the same issue all come back (the predicate owns that reduction)', async () => {
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision({ question: 'first scan' }) });
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_B, decision: sampleDecision({ decision_id: 'scan_11111111_bbbbbbbbbbbb', question: 'second scan, new content' }) });
+
+    const rows = await store.listUnansweredForWorkspaces(['ws-a']);
+    assert.equal(rows.length, 2, 'both rows for the same (urlKey, issueId) are returned raw — dedup is the predicate\'s job, not the store\'s');
+    assert.deepEqual(new Set(rows.map(r => r.decision.question)), new Set(['first scan', 'second scan, new content']));
+  });
+
+  test('an unconfigured store (no collection) degrades to an empty list', async () => {
+    const unconfigured = new TaskDecisionsStore({});
+    assert.deepEqual(await unconfigured.listUnansweredForWorkspaces(['ws-a']), []);
   });
 });

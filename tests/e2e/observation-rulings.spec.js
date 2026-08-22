@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { test, expect } from '../fixtures/test-base.js';
 import { featuresParam } from '../helpers.js';
 
@@ -329,6 +330,108 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     // "Could not resume" error), so this is a real proof of success, not
     // just an absence check.
     await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-Q' })).toHaveCount(0, { timeout: 20000 });
+  });
+});
+
+// LIN-2215 — the task-bound row end to end: a scan-produced decision
+// (LIN-2197's third producer) reaching the rulings surface and its reply
+// path actually delivering. Seeded through a GENUINE local-provider
+// workspace + the REAL scan route (mock-AI gated via shouldMockAi's
+// provider==='local' branch) rather than the loop/dispatch-shaped
+// `seedDecisionWorker` above, which can never produce a task-bound row (no
+// dispatch item backs a scan by design — Phase 3's `anchor.loopId` is
+// always null).
+test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to end', () => {
+  test('scan seeds a task-bound decision; it renders with the task-bound caption (F2); pressing an option posts a real issue comment (F1) and the row clears', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // Unique per run (LIN-2215 plan §6): TaskDecisionsStore is durable,
+    // content-hash idempotent, and — as of this implementation — LIN-2212's
+    // `/test/clear-task-decisions` has not landed (routes/test.js has no
+    // task-decision clear route), so this store is never reset between
+    // runs. A fixed fixture would collide with a prior run's now-terminal
+    // (answered) row and recordScan's terminal-row-never-overwritten rule
+    // would silently keep serving that old answered row — never a fresh,
+    // pressable ruling. A fresh UUID issueId + a nonce in the description
+    // guarantee a new content hash (and a brand-new store row) every run,
+    // making this test re-runnable without depending on LIN-2212's work.
+    const issueId = randomUUID();
+    const nonce = randomUUID();
+    const seed = {
+      projects: [],
+      issues: [{
+        id: issueId,
+        identifier: 'SCAN-1',
+        title: 'Task-bound scan fixture',
+        description: `This task is blocked pending an operator decision. (${nonce})`,
+        state: { name: 'In Progress', type: 'started' },
+        url: `/workspace/${localWorkerUrlKey}/issue/${issueId}`
+      }]
+    };
+    await seedLocal(seed);
+
+    // Seed through the REAL scan route — a genuine TaskDecisionsStore row,
+    // not a hand-inserted fixture (the plan's explicit acceptance bar).
+    const scanResp = await page.request.post(`/workspace/${localWorkerUrlKey}/api/scan/${issueId}`);
+    expect(scanResp.status(), `scan seed failed: ${await scanResp.text()}`).toBe(200);
+    const scanBody = await scanResp.json();
+    expect(scanBody.decision, "the fixture description must trigger buildMockScanText's decision-bearing branch").toBeTruthy();
+
+    await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'SCAN-1' });
+    await expect(row).toBeVisible();
+    // F2: the task-bound caption — proof this is NOT falling back to
+    // "no action available yet" (the pre-fix indeterminate default a
+    // task-bound row rendered under).
+    await expect(row.locator('.chat-options-caption')).toHaveText('A task raised a decision — reply to resolve it');
+    const buttons = row.locator('.chat-option-btn');
+    await expect(buttons).toHaveCount(2);
+
+    // F1: pressing an option must actually reach the issue-keyed comment
+    // route (pre-fix: a silent no-op — no request at all) and carry the
+    // task-decision stamp pair.
+    const [commentReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
+      buttons.first().click()
+    ]);
+    const commentPayload = commentReq.postDataJSON();
+    expect(commentPayload.taskDecisionId).toBe(scanBody.id);
+    expect(commentPayload.taskDecisionIssueId).toBe(issueId);
+    expect((await commentReq.response()).status()).toBe(201);
+
+    // Observable success (per the plan: canReply:true alone is not
+    // acceptance) — the row actually clears from a subsequent poll, proving
+    // the server-side answer stamp landed (collectUnansweredDecisions
+    // excludes an outcome-stamped row). NOT re-checked via a follow-up GET
+    // .../api/scan/:issueId — that reply comment is itself part of the
+    // scan's own input (comments feed hashContext, public/scan.js's own
+    // documented behaviour), so a GET right after would legitimately
+    // recompute a DIFFERENT content hash and report 'stale' rather than the
+    // answered row, which would be a false failure, not a real one.
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'SCAN-1' })).toHaveCount(0, { timeout: 20000 });
+  });
+
+  test('a mid-turn/loop-backed ruling is unaffected by the task-bound wiring — no regression on the existing reply path', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // Regression guard (LIN-2215's own instruction: test both the intended
+    // behaviour and unintended regressions, especially existing loop-backed
+    // rulings). Not a full loop-ruling flow (that is Linear-session-shaped
+    // and already covered above by seedDecisionWorker) — just a check that
+    // a workspace carrying a live, decision-free local task never produces a
+    // spurious ruling of any disposition.
+    await seedLocal({
+      projects: [],
+      issues: [{
+        id: randomUUID(), identifier: 'SCAN-2', title: 'Ordinary task, no blocker language',
+        description: 'Add pagination to the results list.', state: { name: 'In Progress', type: 'started' },
+      }]
+    });
+
+    await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    await expect(page.locator('#obs-rulings .obs-ruling')).toHaveCount(0);
   });
 });
 

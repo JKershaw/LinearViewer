@@ -194,6 +194,39 @@ describe('window.ChatUI.appendOptions (LIN-1728 Phase 4)', () => {
     });
   }
 
+  test('task-bound disposition (LIN-2215 F2) captions distinctly and is reply-eligible, not read-only', () => {
+    const { document, window } = makeSandbox();
+    const container = document.createElement('div');
+    let called = false;
+    const wrap = window.ChatUI.appendOptions(container, {
+      options: [{ id: 'a', label: 'Approve' }],
+      disposition: 'task-bound',
+      onSelect: () => { called = true; }
+    });
+    assert.equal(wrap.children[0].textContent, 'A task raised a decision — reply to resolve it');
+    assert.notEqual(wrap.children[0].textContent, 'no action available yet', 'must not fall back to the indeterminate caption (the pre-fix regression)');
+    assert.ok(!wrap.classList.contains('chat-options--readonly'));
+    assert.equal(container.querySelectorAll('.chat-option-btn').length, 1);
+
+    container.querySelectorAll('.chat-option-btn')[0].click();
+    assert.equal(called, true);
+  });
+
+  test('an unrecognized disposition falls back to the indeterminate caption AND is read-only (fail-safe allow-list, LIN-2215 F2)', () => {
+    const { document, window } = makeSandbox();
+    const container = document.createElement('div');
+    let called = false;
+    const wrap = window.ChatUI.appendOptions(container, {
+      options: [{ id: 'a', label: 'Approve' }],
+      disposition: 'some-future-disposition',
+      onSelect: () => { called = true; }
+    });
+    assert.equal(wrap.children[0].textContent, 'no action available yet');
+    assert.ok(wrap.classList.contains('chat-options--readonly'));
+    assert.equal(container.querySelectorAll('.chat-option-btn').length, 0);
+    assert.equal(called, false);
+  });
+
   test('no options and a repliable disposition still renders read-only (no dispatch attempted with nothing to press)', () => {
     const { document, window } = makeSandbox();
     const container = document.createElement('div');
