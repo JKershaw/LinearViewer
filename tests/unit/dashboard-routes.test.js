@@ -773,6 +773,90 @@ describe('GET /api/dashboard/sessions', () => {
     assert.notEqual(s.status, 'waiting');
   });
 
+  // ── LIN-2184 (H5, beat 2): decision/decisionCase projection widenings ────────
+  test('LIN-2184: the per-run runs[] entry surfaces decision/decisionCase (H3 loop-level fields, widened through)', async () => {
+    const decisionWorker = {
+      id: 'w-dec', sessionId: 'sess-dec', issueIdentifier: 'LIN-461', issueTitle: 'Decision worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [
+        { kind: 'assistant-text', message: 'Considered the schema diff.', timestamp: NOW_ISO },
+        { kind: 'decision', message: '[decision] {"decision_id":"d-461","question":"Proceed?"}', timestamp: NOW_ISO },
+        { message: '[blocked] awaiting your ruling', timestamp: NOW_ISO }
+      ]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [autopilotLiveItem('sess-dec', 'LIN-460')], history: [decisionWorker], agentStatus: [] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-dec');
+    assert.ok(s, 'session is present');
+    const run = s.runs.find(r => r.loopId === 'w-dec');
+    assert.ok(run, 'the decision-bearing run is in runs[]');
+    assert.deepEqual(run.decision, { decision_id: 'd-461', question: 'Proceed?' });
+    assert.deepEqual(run.decisionCase, ['Considered the schema diff.']);
+  });
+
+  test('LIN-2184: the session-level payload surfaces producerLoopId/decision/decisionCase from the rollup', async () => {
+    const decisionWorker = {
+      id: 'w-dec2', sessionId: 'sess-dec2', issueIdentifier: 'LIN-471', issueTitle: 'Decision worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [
+        { kind: 'assistant-text', message: 'Considered the rollback plan.', timestamp: NOW_ISO },
+        { kind: 'decision', message: '[decision] {"decision_id":"d-471"}', timestamp: NOW_ISO },
+        { message: '[blocked] awaiting your ruling', timestamp: NOW_ISO }
+      ]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [autopilotLiveItem('sess-dec2', 'LIN-470')], history: [decisionWorker], agentStatus: [] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-dec2');
+    assert.ok(s, 'session is present');
+    assert.equal(s.producerLoopId, 'w-dec2');
+    assert.deepEqual(s.decision, { decision_id: 'd-471' });
+    assert.deepEqual(s.decisionCase, ['Considered the rollback plan.']);
+  });
+
+  test('LIN-2184: a decision on a non-waiting (session-terminal) loop still carries the fields in the payload — the payload is NOT waiting-gated', async () => {
+    // Mirrors the existing "terminal session with a lingering blocked worker"
+    // fixture above (session-level terminal gate nulls `waiting`/`waitingMessage`)
+    // but adds a decision to the still-[blocked] worker loop, proving H4's ledger
+    // rule holds through the widened projection: producerLoopId/decision/
+    // decisionCase ride UNGATED even though the session's own `waiting` is false.
+    const decisionWorker = {
+      id: 'w-dec3', sessionId: 'sess-dec3', issueIdentifier: 'LIN-481', issueTitle: 'Worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [
+        { kind: 'assistant-text', message: 'Case for the lingering worker.', timestamp: NOW_ISO },
+        { kind: 'decision', message: '[decision] {"decision_id":"d-481"}', timestamp: NOW_ISO },
+        { message: '[blocked] need your decision on the auth flow', timestamp: NOW_ISO }
+      ]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [], history: [autopilotHistoryItem('sess-dec3', 'LIN-480'), decisionWorker], agentStatus: [agentStatusDone('sess-dec3', 'LIN-480')] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    const s = findSession(res.jsonBody, 'sess-dec3');
+    assert.ok(s, 'terminal session is present');
+    assert.equal(s.terminal, true);
+    assert.equal(s.waiting, false, 'the emitted waiting flag is still gated on session terminality (unchanged)');
+    assert.equal(s.producerLoopId, 'w-dec3', 'producerLoopId is NOT gated on session terminality');
+    assert.deepEqual(s.decision, { decision_id: 'd-481' }, 'decision is NOT gated on session terminality');
+    assert.deepEqual(s.decisionCase, ['Case for the lingering worker.'], 'decisionCase is NOT gated on session terminality');
+  });
+
   test('a non-terminal session idle > 24h is derived stale and bucketed out of Active', async () => {
     // Worker that died without a terminal marker, last seen 2 days ago (Bug 3).
     const OLD_ISO = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();

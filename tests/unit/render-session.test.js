@@ -83,6 +83,53 @@ describe('render-session: transcript', () => {
     assert.match(html, /<ul class="sess-run-tx chat-thread" data-testid="session-run-transcript" data-feedback="[^"]*"><\/ul>/);
     assert.ok(!html.includes('sess-run-tx-list'));
   });
+
+  // LIN-2184 (H5): encodeFeedbackJSON must round-trip `kind` so a `decision`
+  // entry can be styled distinctly client-side. The transcript is NOT
+  // waiting-gated, so this must hold on a blocked (non-terminal) run and on a
+  // completed (terminal) run alike.
+  test('LIN-2184: round-trips kind for a decision entry on a waiting (blocked, non-terminal) run', () => {
+    const session = fixtureSession({
+      loops: [{
+        loopId: 'loop-1', issueIdentifier: 'LIN-900', issueId: 'uuid-900', issueTitle: 'Seed task',
+        iteration: 1, kind: 'autopilot', dispatchedAt: '2026-07-04T10:00:00.000Z',
+        terminalStatus: null,
+        feedback: [
+          { kind: 'assistant-text', message: 'Investigating the migration path.', url: null, urlLabel: null, timestamp: '2026-07-04T10:00:01.000Z' },
+          { kind: 'decision', message: '[decision] {"decision_id":"d-1"}', url: null, urlLabel: null, timestamp: '2026-07-04T10:00:02.000Z' },
+          { kind: 'status', message: '[blocked] awaiting your ruling', url: null, urlLabel: null, timestamp: '2026-07-04T10:00:03.000Z' }
+        ],
+        telemetry: { runtime: { ms: 1000 }, metrics: [], producedArtifacts: [] }
+      }]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-feedback="[^"]*&quot;kind&quot;:&quot;decision&quot;[^"]*"/);
+  });
+
+  test('LIN-2184: round-trips kind for a decision entry on a completed (terminal) run', () => {
+    const session = fixtureSession({
+      loops: [{
+        loopId: 'loop-1', issueIdentifier: 'LIN-900', issueId: 'uuid-900', issueTitle: 'Seed task',
+        iteration: 1, kind: 'autopilot', dispatchedAt: '2026-07-04T10:00:00.000Z',
+        terminalStatus: 'done', terminalCompletedAt: '2026-07-04T10:05:00.000Z',
+        feedback: [
+          { kind: 'assistant-text', message: 'The migration is complete.', url: null, urlLabel: null, timestamp: '2026-07-04T10:04:00.000Z' },
+          { kind: 'decision', message: '[decision] {"decision_id":"d-2"}', url: null, urlLabel: null, timestamp: '2026-07-04T10:04:30.000Z' },
+          { kind: 'status', message: '[done] landed', url: null, urlLabel: null, timestamp: '2026-07-04T10:05:00.000Z' }
+        ],
+        telemetry: { runtime: { ms: 1000 }, metrics: [], producedArtifacts: [] }
+      }]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-feedback="[^"]*&quot;kind&quot;:&quot;decision&quot;[^"]*"/);
+  });
+
+  test('LIN-2184: a normal entry with no kind carries kind:null, other keys unchanged', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    // fixtureSession's entries carry no `kind` — assert the shape gained `kind`
+    // (null) without disturbing the pre-existing keys already asserted above.
+    assert.match(html, /data-feedback="[^"]*&quot;kind&quot;:null[^"]*"/);
+  });
 });
 
 describe('render-session: tasks + overview', () => {
