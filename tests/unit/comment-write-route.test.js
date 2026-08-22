@@ -50,7 +50,19 @@ function makeFakeProvider(overrides = {}) {
   return { provider, calls };
 }
 
-function buildApp({ provider, session } = {}) {
+function makeFakeDispatchQueueStore(overrides = {}) {
+  const calls = { markDecisionAnswered: [] };
+  const store = {
+    async markDecisionAnswered(itemId, urlKey, decisionId) {
+      calls.markDecisionAnswered.push({ itemId, urlKey, decisionId });
+      if (overrides.markDecisionAnswered) return overrides.markDecisionAnswered(itemId, urlKey, decisionId);
+      return { success: true, feedbackCount: 1 };
+    },
+  };
+  return { store, calls };
+}
+
+function buildApp({ provider, session, dispatchQueueStore } = {}) {
   registerProvider(provider);
   const app = express();
   app.use(express.json());
@@ -64,7 +76,7 @@ function buildApp({ provider, session } = {}) {
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
-    reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {},
+    reportHistoryStore: {}, dispatchQueueStore: dispatchQueueStore || {}, agentStatusStore: {}, promptTraceStore: {},
   });
   app.use(workspaceRouter);
 
@@ -235,5 +247,84 @@ describe('POST /workspace/:urlKey/api/comments/:issueId (LIN-2154)', () => {
     assert.strictEqual(humanResult.status, 201);
     assert.notStrictEqual(humanResult.body.comment.id, agentResult.body.comment.id);
     assert.strictEqual(calls.createComment.length, 2);
+  });
+});
+
+// =============================================================================
+// LIN-1728 Phase 2: optional decision-answer stamp params on the same route.
+// =============================================================================
+describe('POST /workspace/:urlKey/api/comments/:issueId — decision-answer stamp (LIN-1728)', () => {
+  test('both params present → markDecisionAnswered is called with the right args, and the comment still 201s', async () => {
+    const { provider } = makeFakeProvider();
+    const { store, calls } = makeFakeDispatchQueueStore();
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    const { status, body } = await postComment(app, ISSUE_ID, { body: 'ship it — decision stamp both-present', decisionLoopId: 'loop-1', decisionId: 'd-1' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(calls.markDecisionAnswered.length, 1);
+    assert.deepStrictEqual(calls.markDecisionAnswered[0], { itemId: 'loop-1', urlKey: 'acme', decisionId: 'd-1' });
+  });
+
+  test('params absent → markDecisionAnswered is never called; unchanged 201 behavior', async () => {
+    const { provider } = makeFakeProvider();
+    const { store, calls } = makeFakeDispatchQueueStore();
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    const { status } = await postComment(app, ISSUE_ID, { body: 'ship it — decision stamp absent' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(calls.markDecisionAnswered.length, 0);
+  });
+
+  test('only one of the pair present → markDecisionAnswered is never called (not a half-stamp)', async () => {
+    const { provider } = makeFakeProvider();
+    const { store, calls } = makeFakeDispatchQueueStore();
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    const { status } = await postComment(app, ISSUE_ID, { body: 'ship it — decision stamp half-present', decisionLoopId: 'loop-1' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(calls.markDecisionAnswered.length, 0);
+  });
+
+  test('stamp failure (store throws) does not fail the comment response', async () => {
+    const { provider } = makeFakeProvider();
+    const { store } = makeFakeDispatchQueueStore({
+      markDecisionAnswered: () => { throw new Error('store down'); },
+    });
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    const { status, body } = await postComment(app, ISSUE_ID, { body: 'ship it — decision stamp throws', decisionLoopId: 'loop-1', decisionId: 'd-1' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+  });
+
+  test('stamp returning null (no matching item) does not fail the comment response', async () => {
+    const { provider } = makeFakeProvider();
+    const { store } = makeFakeDispatchQueueStore({ markDecisionAnswered: () => null });
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    const { status, body } = await postComment(app, ISSUE_ID, { body: 'ship it — decision stamp returns null', decisionLoopId: 'loop-1', decisionId: 'd-1' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+  });
+
+  test('a deduped resubmission does not re-stamp', async () => {
+    const { provider } = makeFakeProvider();
+    const { store, calls } = makeFakeDispatchQueueStore();
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    const first = await postComment(app, ISSUE_ID, { body: 'the same text — decision stamp dedupe', decisionLoopId: 'loop-1', decisionId: 'd-1' });
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(calls.markDecisionAnswered.length, 1);
+
+    const second = await postComment(app, ISSUE_ID, { body: 'the same text — decision stamp dedupe', decisionLoopId: 'loop-1', decisionId: 'd-1' });
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.deduped, true);
+    assert.strictEqual(calls.markDecisionAnswered.length, 1, 'no second stamp on a deduped resubmission');
   });
 });

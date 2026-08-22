@@ -185,6 +185,42 @@ async function seedStandaloneWarm(page, { issueIdentifier, issueTitle }) {
   return { item, token };
 }
 
+// Seed an autopilot session with one worker carrying an unanswered `decision`
+// feedback entry (LIN-1728 Phase 2) plus a [blocked] marker — the real
+// "waiting for a ruling" shape the runner emits via
+// `POST /api/dispatch/feedback/:itemId` with `kind: 'decision'` (accepted
+// since LIN-2180, FEEDBACK_ENTRY_KINDS). Returns the seeded decisionId so
+// callers can assert the threaded value.
+async function seedSessionWithDecision(page) {
+  const decisionId = 'd-e2e-1';
+  const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-1728', issueTitle: 'Decision seed', target: 'cli' }
+  });
+  expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+  const anchorId = (await anchor.json()).item.id;
+
+  const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-1728', issueTitle: 'Decision worker', target: 'cli', sessionId: anchorId }
+  });
+  expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+  const workerId = (await worker.json()).item.id;
+
+  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+  const { token } = await tokenResp.json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const take = await page.request.post(`/api/dispatch/take/${workerId}`, { headers: auth });
+  expect(take.status(), `take failed: ${await take.text()}`).toBe(200);
+  const blocked = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+    headers: auth, data: { message: '[blocked] need a ruling before continuing' }
+  });
+  expect(blocked.status(), `blocked feedback failed: ${await blocked.text()}`).toBe(200);
+  const decision = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+    headers: auth, data: { kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Proceed with option A?' }) }
+  });
+  expect(decision.status(), `decision feedback failed: ${await decision.text()}`).toBe(200);
+  return { workerId, decisionId };
+}
+
 // Read the sessions feed and return the first session's id.
 async function discoverSessionId(page) {
   const resp = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
@@ -601,6 +637,94 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await expect(box.locator('.sess-reply-feedback')).toContainText('reply failed');
     await page.waitForTimeout(300);
     expect(dispatchFired).toBe(false);
+  });
+
+  test('data-decision-id is threaded into Save\'s comment write (LIN-1728 Phase 2)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const { decisionId } = await seedSessionWithDecision(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const run = await expandRun(page, 'Decision worker');
+    const box = run.locator('[data-testid="session-inline-reply"]');
+    await expect(box).toHaveAttribute('data-decision-id', decisionId);
+    const loopId = await box.getAttribute('data-loop-id');
+    const saveBtn = box.locator('[data-testid="session-inline-reply-save"]');
+
+    // This session carries an unanswered decision, so it rolls up to the
+    // session-level "waiting on you" banner — Save's own LIN-2154 OQ5 confirm
+    // gate fires; accept it to proceed (this test is about the decision-id
+    // threading, not the waiting-confirm behavior, which is covered elsewhere).
+    page.on('dialog', (dialog) => dialog.accept());
+
+    const [request] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
+      (async () => {
+        await box.locator('textarea').fill('proceeding with option A');
+        await saveBtn.click();
+      })()
+    ]);
+    const payload = request.postDataJSON();
+    expect(payload.decisionLoopId).toBe(loopId);
+    expect(payload.decisionId).toBe(decisionId);
+    const resp = await request.response();
+    expect(resp.status()).toBe(201);
+  });
+
+  test('data-decision-id is threaded into Save-and-continue\'s comment write (LIN-1728 Phase 2)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const { decisionId } = await seedSessionWithDecision(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const run = await expandRun(page, 'Decision worker');
+    const box = run.locator('[data-testid="session-inline-reply"]');
+    const loopId = await box.getAttribute('data-loop-id');
+
+    const [request] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
+      (async () => {
+        await box.locator('textarea').fill('proceeding with option A, continue');
+        await box.locator('[data-testid="session-inline-reply-send"]').click();
+      })()
+    ]);
+    const payload = request.postDataJSON();
+    expect(payload.decisionLoopId).toBe(loopId);
+    expect(payload.decisionId).toBe(decisionId);
+    const resp = await request.response();
+    expect(resp.status()).toBe(201);
+  });
+
+  test('a decision-answer stamp in a run\'s transcript never renders as a chat bubble (LIN-1728 Phase 2, F6)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const { workerId, decisionId } = await seedSessionWithDecision(page);
+    // Stamp the answer directly through the durable comment route's own write
+    // path shape — a `decision-answer` feedback entry — without going through
+    // the UI, isolating this test to the transcript-render exclusion (F6).
+    const commentResp = await page.request.post(`/workspace/${URL_KEY}/api/comments/LIN-1728`, {
+      data: { body: 'recorded', decisionLoopId: workerId, decisionId }
+    });
+    expect(commentResp.status()).toBe(201);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const run = await expandRun(page, 'Decision worker');
+    const transcript = run.locator('[data-testid="session-run-transcript"]');
+    await expect(transcript).toBeVisible();
+    // Exactly the two real entries ([blocked] + the decision itself, which
+    // legitimately renders its own raw JSON) produce chat bubbles — the
+    // third entry, the decision-answer stamp, must never produce one. A
+    // regression (the stamp rendering too) would show as a count of 3.
+    await expect(transcript.locator('.chat-msg')).toHaveCount(2);
   });
 
   // A genuinely issueless run (no issueIdentifier on the dispatch item at all)

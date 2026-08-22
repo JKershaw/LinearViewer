@@ -232,6 +232,135 @@ describe('GET /api/dashboard/loops', () => {
   });
 });
 
+// ─── Filtered rulings feed (LIN-1728 Phase 2) ─────────────────────────────────
+
+// A taken history item carrying a `kind:'decision'` feedback entry (the
+// same shape `hook.js`'s complete-path emission and a `[blocked]`-parked
+// wait both produce) — the input the rulings predicate reads.
+function decisionItem(id, identifier, decisionId, extraFeedback = []) {
+  return {
+    id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`,
+    promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO,
+    status: 'taken',
+    feedback: [
+      { message: '[blocked] need a decision', timestamp: NOW_ISO },
+      { kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Proceed?' }), timestamp: NOW_ISO },
+      ...extraFeedback
+    ]
+  };
+}
+
+describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
+  test('serves unanswered decisions across workspaces, workspace-tagged, count === rulings.length', async () => {
+    const perWorkspace = {
+      'ws-a': { live: [], history: [decisionItem('a-dec', 'LIN-20', 'd-1')], agentStatus: [] },
+      'ws-b': { live: [], history: [decisionItem('b-dec', 'LIN-21', 'd-2')], agentStatus: [] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const session = { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Beta' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.jsonBody;
+    assert.equal(body.count, 2);
+    assert.equal(body.rulings.length, 2);
+    assert.deepEqual(new Set(body.rulings.map(r => r.decision.decision_id)), new Set(['d-1', 'd-2']));
+    assert.deepEqual(new Set(body.rulings.map(r => r.anchor.workspaceUrlKey)), new Set(['ws-a', 'ws-b']));
+  });
+
+  test('an answered decision (matching decision-answer stamp) is excluded', async () => {
+    const answered = decisionItem('a-dec', 'LIN-22', 'd-3', [
+      { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-3' }), timestamp: NOW_ISO }
+    ]);
+    const router = makeRouter({ 'ws-a': { live: [], history: [answered], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.count, 0);
+    assert.deepEqual(res.jsonBody.rulings, []);
+  });
+
+  test('a loop with no decision at all contributes nothing', async () => {
+    const router = makeRouter({ 'ws-a': { live: [], history: [historyItem('a-hist', 'LIN-23')], agentStatus: [agentStatusDone('a-hist', 'LIN-23')] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.count, 0);
+  });
+
+  test('the count/scope is bound to req.session.workspaces, never fleet-wide', async () => {
+    const router = makeRouter({
+      'ws-a': { live: [], history: [decisionItem('a-dec', 'LIN-24', 'd-4')], agentStatus: [] },
+      'ws-unconnected': { live: [], history: [decisionItem('u-dec', 'LIN-25', 'd-5')], agentStatus: [] }
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    // Only ws-a is in the session's connected-workspace set.
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.count, 1);
+    assert.equal(res.jsonBody.rulings[0].decision.decision_id, 'd-4');
+  });
+
+  test('one failing workspace store degrades to a partial rulings list, not a blank feed', async () => {
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return []; },
+        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: [decisionItem('g-dec', 'LIN-26', 'd-6')] }; }
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const session = { workspaces: [{ urlKey: 'bad', name: 'Bad' }, { urlKey: 'good', name: 'Good' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.count, 1, 'the good workspace still contributes its ruling');
+  });
+
+  test('rides the sessionsFeedCache "rulings" namespace — repeated polls within the TTL are served from cache, not a fresh read', async () => {
+    let reads = 0;
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() { reads++; return { items: [decisionItem('a-dec', 'LIN-27', 'd-7')] }; }
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const session = { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+
+    const first = makeReqRes({ session });
+    await handler(first.req, first.res);
+    const second = makeReqRes({ session });
+    await handler(second.req, second.res);
+
+    assert.equal(reads, 1, 'the second poll within the TTL is served from the cache');
+    assert.equal(second.res.jsonBody.count, 1);
+  });
+});
+
 // ─── Feed memory: lean projection + bounded fan-out (LIN-622) ─────────────────
 
 describe('feed memory (LIN-622)', () => {
