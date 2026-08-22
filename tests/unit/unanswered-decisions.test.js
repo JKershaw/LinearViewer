@@ -209,7 +209,7 @@ describe('collectUnansweredDecisions (LIN-1728)', () => {
     assert.deepStrictEqual(collectUnansweredDecisions(undefined, { now: NOW }), []);
   });
 
-  test('taskDecisions defaults to [] and is tolerated as a trivial no-op (LIN-2197 not yet landed)', () => {
+  test('taskDecisions defaults to [] and is tolerated as a trivial no-op', () => {
     const l = loop({ wakeMarker: 'blocked', decision: decision('d-1') });
     const rows = collectUnansweredDecisions({ loops: [l], taskDecisions: [] }, { now: NOW });
     assert.strictEqual(rows.length, 1);
@@ -221,5 +221,128 @@ describe('collectUnansweredDecisions (LIN-1728)', () => {
     const rows = collectUnansweredDecisions({ loops: [a, b] }, { now: NOW });
     assert.strictEqual(rows.length, 2);
     assert.deepStrictEqual(rows.map(r => r.decision.decision_id).sort(), ['d-a', 'd-b']);
+  });
+});
+
+function taskDecision(overrides = {}) {
+  return {
+    id: 'scan_uuid1234_hash567890',
+    urlKey: 'acme',
+    issueId: 'uuid-task-1',
+    issueIdentifier: 'LIN-2197',
+    inputHash: 'hash567890abcd',
+    decision: decision('scan-d-1'),
+    scannedAt: NOW.toISOString(),
+    outcome: null,
+    outcomeAt: null,
+    ...overrides
+  };
+}
+
+describe('collectUnansweredDecisions — taskDecisions branch (LIN-2197 Phase 3)', () => {
+  test('a task decision carrying a real decision, unanswered, surfaces with disposition task-bound and canReply true', () => {
+    const rows = collectUnansweredDecisions({ taskDecisions: [taskDecision()] }, { now: NOW });
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].decision.decision_id, 'scan-d-1');
+    assert.strictEqual(rows[0].disposition, 'task-bound');
+    assert.strictEqual(rows[0].canReply, true);
+  });
+
+  test('a persisted zero-finding scan (decision: null) contributes no row', () => {
+    const rows = collectUnansweredDecisions({ taskDecisions: [taskDecision({ decision: null })] }, { now: NOW });
+    assert.deepStrictEqual(rows, []);
+  });
+
+  test('an answered task decision is excluded', () => {
+    const rows = collectUnansweredDecisions({
+      taskDecisions: [taskDecision({ outcome: 'answered', outcomeAt: NOW.toISOString() })]
+    }, { now: NOW });
+    assert.deepStrictEqual(rows, []);
+  });
+
+  test('a dismissed task decision is excluded', () => {
+    const rows = collectUnansweredDecisions({
+      taskDecisions: [taskDecision({ outcome: 'dismissed', outcomeAt: NOW.toISOString() })]
+    }, { now: NOW });
+    assert.deepStrictEqual(rows, []);
+  });
+
+  test('anchor shape: loopId null, target/followUpTo null, taskDecisionId carries the record id', () => {
+    const entry = taskDecision({
+      id: 'scan_abc12345_deadbeefcafe',
+      issueId: 'uuid-task-2',
+      issueIdentifier: 'LIN-42',
+      urlKey: 'acme-ws'
+    });
+    const rows = collectUnansweredDecisions({ taskDecisions: [entry] }, { now: NOW });
+    assert.deepStrictEqual(rows[0].anchor, {
+      loopId: null,
+      issueId: 'uuid-task-2',
+      issueIdentifier: 'LIN-42',
+      workspaceUrlKey: 'acme-ws',
+      target: null,
+      followUpTo: null,
+      taskDecisionId: 'scan_abc12345_deadbeefcafe'
+    });
+    assert.deepStrictEqual(rows[0].decisionCase, []);
+  });
+
+  test('an older row for the same task is superseded by a newer scan, even when the older row is decision-bearing and unanswered', () => {
+    const older = taskDecision({
+      id: 'scan_uuid1234_older111111',
+      decision: decision('scan-d-older'),
+      scannedAt: new Date(NOW.getTime() - 60000).toISOString()
+    });
+    const newer = taskDecision({
+      id: 'scan_uuid1234_newer222222',
+      decision: decision('scan-d-newer'),
+      scannedAt: NOW.toISOString()
+    });
+    const rows = collectUnansweredDecisions({ taskDecisions: [older, newer] }, { now: NOW });
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].decision.decision_id, 'scan-d-newer');
+  });
+
+  test('a newer zero-finding re-scan supersedes an older unanswered decision, silencing the ruling', () => {
+    const older = taskDecision({
+      id: 'scan_uuid1234_older111111',
+      decision: decision('scan-d-older'),
+      scannedAt: new Date(NOW.getTime() - 60000).toISOString()
+    });
+    const newer = taskDecision({
+      id: 'scan_uuid1234_newer222222',
+      decision: null,
+      scannedAt: NOW.toISOString()
+    });
+    const rows = collectUnansweredDecisions({ taskDecisions: [older, newer] }, { now: NOW });
+    assert.deepStrictEqual(rows, []);
+  });
+
+  test('task decisions for different tasks (different issueId) never supersede each other', () => {
+    const a = taskDecision({ issueId: 'uuid-task-a', decision: decision('scan-d-a') });
+    const b = taskDecision({ issueId: 'uuid-task-b', decision: decision('scan-d-b') });
+    const rows = collectUnansweredDecisions({ taskDecisions: [a, b] }, { now: NOW });
+    assert.strictEqual(rows.length, 2);
+    assert.deepStrictEqual(rows.map(r => r.decision.decision_id).sort(), ['scan-d-a', 'scan-d-b']);
+  });
+
+  test('loops and taskDecisions compose: both surface in the same result set', () => {
+    const l = loop({ wakeMarker: 'blocked', decision: decision('d-loop') });
+    const rows = collectUnansweredDecisions({ loops: [l], taskDecisions: [taskDecision()] }, { now: NOW });
+    assert.strictEqual(rows.length, 2);
+    assert.deepStrictEqual(rows.map(r => r.decision.decision_id).sort(), ['d-loop', 'scan-d-1']);
+    assert.deepStrictEqual(rows.map(r => r.disposition).sort(), ['resumable', 'task-bound']);
+  });
+
+  test('a falsy entry in taskDecisions is tolerated, never throws', () => {
+    const rows = collectUnansweredDecisions({ taskDecisions: [null, undefined, taskDecision()] }, { now: NOW });
+    assert.strictEqual(rows.length, 1);
+  });
+});
+
+describe('canReplyFor via collectUnansweredDecisions — task-bound always admits a reply', () => {
+  test('task-bound is not gated by liveness, unlike resumable/gone/mid-turn/indeterminate', () => {
+    const rows = collectUnansweredDecisions({ taskDecisions: [taskDecision()] }, { now: NOW });
+    assert.strictEqual(rows[0].canReply, true);
   });
 });
