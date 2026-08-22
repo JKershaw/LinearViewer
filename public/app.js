@@ -7,6 +7,13 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 let queuePollIntervalId = null
 const QUEUE_POLL_INTERVAL_MS = 1000
 
+// Rulings badge polling state (LIN-1728 Phase 3). Deliberately a SLOWER, separate
+// cadence than the queue badge's 1s poll above — this rides the same 5s SWR cache
+// the Observation page / rulings tab poll uses (GET .../api/dashboard/rulings),
+// so a faster client poll here would just re-serve the same cached payload.
+let rulingsPollIntervalId = null
+const RULINGS_POLL_INTERVAL_MS = 5000
+
 // Proxy-toggle logic (state, token mint/cache, block append) now lives in a
 // single shared module: window.ProxyToggle in common.js (LIN-525 #7). The
 // copy/download/dispatch call sites below use the back-compat global
@@ -1288,6 +1295,79 @@ function stopQueuePolling() {
   }
 }
 
+// =============================================================================
+// Rulings Badge (LIN-1728 Phase 3)
+// =============================================================================
+
+/**
+ * Update the ambient "waiting on you" rulings badge count for a workspace.
+ * Mirrors updateQueueBadge's raw-fetch, silently-swallow-failures shape (a
+ * background poller must never redirect to /logout or toast on a transient
+ * error) — reads GET .../api/dashboard/rulings, which is `req.session.workspaces`
+ * scoped server-side (never fleet-wide), not the single-workspace queue count.
+ */
+async function updateRulingsBadge(urlKey) {
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dashboard/rulings`)
+    if (!response.ok) return
+
+    const { count } = await response.json()
+    const badge = document.querySelector(`[data-rulings-badge][data-url-key="${urlKey}"]`)
+    if (badge) {
+      const countEl = badge.querySelector('.rulings-count')
+      if (countEl) countEl.textContent = count
+      badge.classList.toggle('hidden', count === 0)
+    }
+  } catch (e) {
+    console.error('Failed to update rulings badge:', e)
+  }
+}
+
+/**
+ * Start polling for rulings badge updates. 5s cadence (RULINGS_POLL_INTERVAL_MS),
+ * not the queue badge's 1s — the rulings route rides Observation's 5s SWR cache.
+ */
+function startRulingsPolling(urlKey) {
+  if (rulingsPollIntervalId) return
+
+  rulingsPollIntervalId = setInterval(() => {
+    if (!document.hidden) {
+      updateRulingsBadge(urlKey)
+    }
+  }, RULINGS_POLL_INTERVAL_MS)
+}
+
+/**
+ * Stop polling for rulings badge updates.
+ */
+function stopRulingsPolling() {
+  if (rulingsPollIntervalId) {
+    clearInterval(rulingsPollIntervalId)
+    rulingsPollIntervalId = null
+  }
+}
+
+/**
+ * Initialize the rulings badge: seed its count on load and start polling.
+ * Loaded wherever app.js loads (same reach as the queue badge above) — pages
+ * that don't include app.js (Observation, the session page) don't get the
+ * live-updating badge either, same pre-existing limitation the queue badge has.
+ */
+function initRulingsBadge() {
+  const badge = document.querySelector('[data-rulings-badge]')
+  if (!badge) return
+
+  const urlKey = badge.dataset.urlKey
+  updateRulingsBadge(urlKey)
+  startRulingsPolling(urlKey)
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      updateRulingsBadge(urlKey)
+    }
+  })
+}
+
 /**
  * Initialize queue panel functionality
  */
@@ -2107,6 +2187,7 @@ function initSearch() {
 
 // Cleanup polling on page unload
 window.addEventListener('beforeunload', stopQueuePolling)
+window.addEventListener('beforeunload', stopRulingsPolling)
 
 /**
  * Get the workspace urlKey from the footer settings link.
@@ -2252,6 +2333,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initRecommendations()
   initAutopilot()
   initQueuePanel()
+  initRulingsBadge()
   initFeatureToggles()
   initFreeTierStatus()
   // +proxy toggle is wired by window.ProxyToggle.init() in common.js (LIN-525)

@@ -42,11 +42,13 @@ const COMMON_JS_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'u
  * to `fetchImpl` and every call recorded. `document` here is only the bare
  * stub common.js's own top-level auto-init needs to register its
  * DOMContentLoaded listener at load time (never fired in this harness) — it
- * is NOT exercised by window.ReplyDelivery itself. The Observation page loads
- * common.js without chat.js (lib/render-observation.js
- * `scripts: ['/common.js', '/observation.js']`), so the helper block under
- * test must never reach for `document.*`/`window.ChatUI` — asserted directly
- * below by inspecting the helper's own source slice, not by omitting document
+ * is NOT exercised by window.ReplyDelivery itself. deliverReply/postComment
+ * must stay DOM-free regardless of what a given page also loads (LIN-1728
+ * Phase 4 added chat.js to the Observation page's own scripts for the rulings
+ * tab's option-button primitive, but that is a fact about the PAGE, not a
+ * license for this helper to reach for `document.*`/`window.ChatUI` — every
+ * caller supplies its own UI via the four outcome callbacks) — asserted
+ * directly below by inspecting the helper's own source slice, not by omitting document
  * from the sandbox (common.js wouldn't even load without it).
  */
 function makeSandbox(fetchImpl) {
@@ -535,7 +537,7 @@ test('errorFromResult is exported standalone and matches the server error messag
   assert.equal(withoutMessage.message, 'HTTP 500');
 });
 
-test('the helper block is DOM-free — no document.* or window.ChatUI reference, since the Observation page loads common.js without chat.js', () => {
+test('the helper block is DOM-free — no document.* or window.ChatUI reference, by contract (LIN-2200/LIN-1728: every caller supplies its own UI)', () => {
   const start = COMMON_JS_SRC.indexOf('window.ReplyDelivery = (function');
   assert.notEqual(start, -1, 'window.ReplyDelivery banner section found in common.js');
   const end = COMMON_JS_SRC.indexOf('\n})();\n', start);

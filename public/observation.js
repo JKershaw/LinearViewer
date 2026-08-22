@@ -58,13 +58,23 @@ const DECISION_EXCERPT_CHARS = 65;
 const hiddenWorkspaces = new Set();        // urlKeys toggled off
 let archiveOpen = false;
 
-// Active view/tab (LIN-1194): 'autopilot' (default — the existing feed) or
-// 'sessions' (the in-flight Sessions view: standalone sessions included, a
-// running-only Active split instead of the recency one). The tab is a pure
-// in-page switch: it flips the poll URL's `?view=` discriminator and the
-// client-side Active/Archive bucketing, and resets the feed state so the two
-// views' distinct session sets never bleed together.
+// Active view/tab (LIN-1194, extended LIN-1728): 'autopilot' (default — the
+// existing feed), 'sessions' (the in-flight Sessions view: standalone sessions
+// included, a running-only Active split instead of the recency one), or
+// 'rulings' (LIN-1728 Phase 4 — unanswered decisions, a different payload
+// shape entirely, polled from a different endpoint). The tab is a pure
+// in-page switch: it flips the poll URL/endpoint and the client-side
+// bucketing, and resets the feed state so views' distinct data sets never
+// bleed together.
 let currentView = 'autopilot';
+
+// Rulings poll state (LIN-1728 Phase 4). Separate from sessionIndex/*Cards
+// above — a ruling row has no stable per-poll identity worth diffing against
+// (unlike a session, which persists across polls), so the rulings feed is
+// simply repainted wholesale on every poll, keyed by decision_id for the
+// in-flight "reply pending" guard below.
+const rulingsPending = new Set();          // decision_id currently mid-reply (disables its buttons)
+const preservedRulingRows = new Map();     // decision_id → <li> to reuse across a poll's repaint (partial-failure retry state)
 
 // Archive pagination state (LIN-631). The live poll always refreshes the first
 // page (offset 0); "load more" requests subsequent offsets and those extra
@@ -1246,25 +1256,267 @@ function startPolling() {
   // so a slow backend can never stack overlapping /sessions scans (each reads the
   // whole workspace). Request pile-up was a memory-pressure path.
   const tick = async () => {
-    if (!document.hidden) await pollSessions();
+    if (!document.hidden) await pollCurrentView();
     pollId = setTimeout(tick, POLL_MS);
   };
   tick();
   if (!visibilityHandler) {
-    visibilityHandler = () => { if (!document.hidden) pollSessions(); };
+    visibilityHandler = () => { if (!document.hidden) pollCurrentView(); };
     document.addEventListener('visibilitychange', visibilityHandler);
+  }
+}
+
+// Dispatch to the right poll for the active tab (LIN-1728: the rulings tab reads
+// a different endpoint entirely, not /sessions with a `?view=` discriminator —
+// a ruling row is not a session).
+function pollCurrentView() {
+  return currentView === 'rulings' ? pollRulings() : pollSessions();
+}
+
+// ─── Rulings (LIN-1728 Phase 4) ─────────────────────────────────────────────
+
+function rulingsUrl(urlKey) {
+  return `/workspace/${encodeURIComponent(urlKey)}/api/dashboard/rulings`;
+}
+
+async function pollRulings() {
+  const urlKey = observationData?.urlKey;
+  if (!urlKey) return;
+  const pollView = currentView;
+  try {
+    const res = await fetch(rulingsUrl(urlKey));
+    if (res.status === 401) { window.location.href = '/logout'; return; }
+    if (!res.ok) { setPollStatus('● disconnected'); return; }
+    if (pollView !== currentView) return; // tab switched mid-flight — discard
+
+    const data = await res.json();
+    const rulings = Array.isArray(data.rulings) ? data.rulings : [];
+    renderRulings(rulings);
+    setPollStatus('● live');
+  } catch (e) {
+    setPollStatus('● disconnected');
+    console.warn('Rulings poll failed:', e);
+  }
+}
+
+// Mostly-wholesale repaint (LIN-1728 Phase 4) — unlike the session feeds
+// above, a ruling row has no cross-poll identity worth a keyed diff (it
+// either still needs an answer or it's gone from the next poll's payload
+// entirely), EXCEPT for the one case that must survive a repaint: a row mid
+// partial-failure retry (`preservedRulingRows`, populated by
+// `deliverRulingReply`'s `onPartialFailure` below). Without this, a poll
+// landing between "resume failed" and the operator pressing "Retry delivery"
+// would silently discard the retry affordance and the "could not resume"
+// feedback — the answer is already durably recorded at that point (the
+// comment succeeded), so losing the retry UI is a real regression, not a
+// cosmetic one.
+function renderRulings(rulings) {
+  const list = document.getElementById('obs-rulings');
+  const empty = document.getElementById('obs-rulings-empty');
+  if (!list) return;
+
+  const seen = new Set();
+  const nodes = [];
+  for (const row of rulings) {
+    const decisionId = row?.decision?.decision_id;
+    if (decisionId && preservedRulingRows.has(decisionId)) {
+      nodes.push(preservedRulingRows.get(decisionId));
+    } else {
+      nodes.push(renderRulingRow(row));
+    }
+    if (decisionId) seen.add(decisionId);
+  }
+  // A preserved row whose decision already dropped out of this poll's payload
+  // (the stamp landed server-side) still shows once more, mid-retry — dropping
+  // it here would be the same silent-discard the preservation exists to avoid.
+  for (const [decisionId, li] of preservedRulingRows) {
+    if (!seen.has(decisionId)) nodes.push(li);
+  }
+
+  list.textContent = '';
+  for (const node of nodes) list.appendChild(node);
+  if (empty) empty.hidden = nodes.length > 0;
+}
+
+// Card content per Principle 5 (docs/escalation-philosophy.md): what (the
+// decision's own question) / why (decisionCase, the same bounded excerpt the
+// feed card uses) / the decision stated as a decision (rendered by the
+// question + options below) / options with recommendation (appendOptions
+// marks the recommended one) / cost of doing nothing (if_unanswered, when the
+// producing session declared one).
+function renderRulingRow(row) {
+  const { decision, decisionCase, anchor, disposition, canReply } = row || {};
+  const li = document.createElement('li');
+  li.className = 'obs-ruling';
+  if (decision && decision.decision_id) li.dataset.decisionId = decision.decision_id;
+
+  const head = document.createElement('div');
+  head.className = 'obs-ruling-head';
+  const idLabel = anchor?.issueIdentifier || anchor?.workspaceUrlKey || 'ruling';
+  head.innerHTML = `<span class="obs-ruling-issue">${escapeHtml(String(idLabel))}</span>`
+    + (anchor?.workspaceUrlKey ? ` <span class="obs-ruling-ws">${escapeHtml(String(anchor.workspaceUrlKey))}</span>` : '');
+  li.appendChild(head);
+
+  if (decision?.question) {
+    const q = document.createElement('p');
+    q.className = 'obs-ruling-question';
+    q.textContent = decision.question;
+    li.appendChild(q);
+  }
+
+  const excerpt = excerptDecisionCase(decisionCase, DECISION_EXCERPT_CHARS);
+  if (excerpt) {
+    const why = document.createElement('p');
+    why.className = 'obs-ruling-case';
+    why.textContent = excerpt;
+    li.appendChild(why);
+  }
+
+  if (decision?.if_unanswered && typeof decision.if_unanswered.summary === 'string') {
+    const cost = document.createElement('p');
+    cost.className = 'obs-ruling-cost';
+    cost.textContent = `If unanswered: ${decision.if_unanswered.summary}`;
+    li.appendChild(cost);
+  }
+
+  window.ChatUI.appendOptions(li, {
+    options: decision?.options,
+    recommended: decision?.recommended,
+    disposition,
+    onSelect: (optionId, optionLabel) => {
+      if (!canReply) return;
+      deliverRulingReply(row, optionLabel, li);
+    }
+  });
+
+  const feedback = document.createElement('p');
+  feedback.className = 'obs-ruling-feedback';
+  li.appendChild(feedback);
+
+  return li;
+}
+
+// Rulings-row press handler (LIN-1728 Phase 4). Per-row `canReply` gate (the
+// caller above already checks it — this is the second, structural guard);
+// branches on `disposition`, resolved server-side at poll time and never
+// re-derived here: `resumable` follows up on the anchor's own loop (no
+// force — same no-force resume `resolveDisposition` reasons about);
+// `gone` is a FRESH issue-scoped dispatch, deliberately NOT routed through
+// `window.ReplyDelivery.deliverReply`'s built-in dispatch (that call is
+// scoped to the follow-up shape only — see the LIN-2200 banner in
+// common.js) and deliberately NOT forcing through the DUPLICATE_DISPATCH
+// guard — a real 409 there means "already replied elsewhere", which must
+// surface as an error, not be forced past. Both branches thread
+// decisionLoopId/decisionId into the comment write, same param pair Phase 2
+// already taught the route to accept.
+function deliverRulingReply(row, prompt, li) {
+  const { decision, anchor, disposition } = row || {};
+  const urlKey = observationData?.urlKey;
+  const decisionId = decision?.decision_id;
+  const decisionLoopId = anchor?.loopId;
+  const feedback = li.querySelector('.obs-ruling-feedback');
+  if (!urlKey || !decisionId || !decisionLoopId || rulingsPending.has(decisionId)) return;
+
+  rulingsPending.add(decisionId);
+  const buttons = li.querySelectorAll('.chat-option-btn');
+  buttons.forEach(b => { b.disabled = true; });
+
+  const restore = () => {
+    rulingsPending.delete(decisionId);
+    buttons.forEach(b => { b.disabled = false; });
+  };
+  const setFeedback = (text, isError) => {
+    if (!feedback) return;
+    feedback.textContent = text;
+    feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
+  };
+  const onDelivered = () => {
+    restore();
+    setFeedback('recorded ✓', false);
+    pollRulings();
+    if (typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(urlKey);
+  };
+
+  if (disposition === 'resumable') {
+    window.ReplyDelivery.deliverReply(
+      { urlKey, issueId: anchor.issueId, followUpTo: decisionLoopId, force: false, target: anchor.target || 'cli', decisionLoopId, decisionId },
+      prompt,
+      {
+        onCommentFailed: (err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); },
+        onDispatchFailed: (err) => { console.error('Ruling reply (dispatch) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); },
+        // Comment already landed (durable) — the resume just could not deliver.
+        // Mirrors public/session.js's onPartialFailure: a "Retry delivery"
+        // affordance that re-fires ONLY the dispatch call, never the comment
+        // (preserved invariant — the plan's "dispatch-only retry-delivery
+        // affordance"). The row already cleared server-side (the answer is
+        // recorded) — `preservedRulingRows` keeps THIS li reused across the
+        // next poll(s) instead of the ruling silently vanishing (it is no
+        // longer in the /rulings payload) or a stray fresh row confusingly
+        // reappearing, until the retry succeeds and releases it below.
+        onPartialFailure: (err, retryDispatch) => {
+          restore();
+          preservedRulingRows.set(decisionId, li);
+          setFeedback('Recorded. Could not resume the session: ' + err.message + '. ', true);
+          if (feedback) {
+            const retryBtn = document.createElement('button');
+            retryBtn.type = 'button';
+            retryBtn.className = 'obs-ruling-retry-delivery';
+            retryBtn.textContent = 'Retry delivery';
+            retryBtn.addEventListener('click', () => {
+              retryBtn.disabled = true;
+              setFeedback('retrying delivery…', false);
+              retryDispatch().then(() => {
+                setFeedback('recorded ✓', false);
+                preservedRulingRows.delete(decisionId);
+                if (typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(urlKey);
+              }).catch((e2) => {
+                setFeedback('Still could not resume: ' + e2.message + '. ', true);
+                feedback.appendChild(retryBtn);
+                retryBtn.disabled = false;
+              });
+            });
+            feedback.appendChild(retryBtn);
+          }
+          pollRulings();
+        },
+        onDispatchOk: onDelivered
+      }
+    );
+    return;
+  }
+
+  if (disposition === 'gone') {
+    if (!anchor.issueId || !anchor.issueIdentifier) {
+      console.error('Ruling reply: no issue to start a fresh run against, cannot reply for a gone session');
+      restore();
+      setFeedback('cannot start a fresh run: no linked issue', true);
+      return;
+    }
+    window.ReplyDelivery.postComment(urlKey, anchor.issueId, prompt, { decisionLoopId, decisionId })
+      .then((commentResult) => {
+        if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
+        return window.dispatchPrompt({
+          urlKey,
+          prompt,
+          issue: { id: anchor.issueId, identifier: anchor.issueIdentifier },
+          target: anchor.target || 'cli'
+        });
+      })
+      .then(onDelivered)
+      .catch((err) => { console.error('Ruling reply (fresh run) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
   }
 }
 
 // ─── Controls ──────────────────────────────────────────────────────────────────
 
-// Switch the active Observation tab (LIN-1194). The two views carry different
-// session sets (Autopilot excludes standalone; Sessions includes standalone but is
-// running-only), so the feed state is reset before re-polling to keep them from
-// bleeding together, and the collapsed cards are torn down so a fresh poll rebuilds
-// them for the new view.
+// Switch the active Observation tab (LIN-1194, extended LIN-1728). The three
+// views carry different data sets entirely (Autopilot excludes standalone;
+// Sessions includes standalone but is running-only; Rulings is unanswered
+// decisions, not sessions at all), so the feed state is reset before
+// re-polling to keep them from bleeding together, and the collapsed cards are
+// torn down so a fresh poll rebuilds them for the new view.
 function switchView(view) {
-  if (view !== 'sessions' && view !== 'autopilot') return;
+  if (view !== 'sessions' && view !== 'autopilot' && view !== 'rulings') return;
   if (view === currentView) return;
   currentView = view;
 
@@ -1277,6 +1529,14 @@ function switchView(view) {
       tab.setAttribute('aria-selected', on ? 'true' : 'false');
     }
   }
+
+  // The rulings tab hosts an entirely different container (#obs-rulings-section)
+  // from the session views' shared Filter/Active/Archive shell
+  // (#obs-session-views) — toggle which one is visible.
+  const sessionViews = document.getElementById('obs-session-views');
+  const rulingsSection = document.getElementById('obs-rulings-section');
+  if (sessionViews) sessionViews.hidden = view === 'rulings';
+  if (rulingsSection) rulingsSection.hidden = view !== 'rulings';
 
   // Tear down the feed state — the other view's sessions must not linger.
   for (const el of activeCards.values()) el.remove();
@@ -1292,7 +1552,7 @@ function switchView(view) {
   renderFeeds();
 
   setPollStatus('loading…');
-  pollSessions();
+  pollCurrentView();
 }
 
 function initControls() {

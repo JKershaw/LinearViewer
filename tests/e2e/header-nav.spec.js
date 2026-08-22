@@ -226,35 +226,42 @@ test.describe('Desktop nav overflow (LIN-1286)', () => {
 // actions. Search (projects-only) must precede the queue badge (feature-gated,
 // all pages), and the gating rules must not leak one onto the wrong page.
 test.describe('nav-actions placement (LIN-1149)', () => {
-  test('search toggle precedes queue badge in DOM order on the projects page', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('search toggle precedes queue badge precedes rulings badge in DOM order on the projects page', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(swimLocalSeed, { features: FLAGS });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // Both search and badge exist in .nav-actions on the projects page.
+    // Search, the queue badge, and the rulings badge (LIN-1728 Phase 3, same
+    // `dispatch` gate as the queue badge) all exist in .nav-actions on the
+    // projects page.
     const actions = page.locator('.nav-actions');
     await expect(actions.locator('.search-toggle')).toBeAttached();
     await expect(actions.locator('[data-queue-badge]')).toBeAttached();
+    await expect(actions.locator('[data-rulings-badge]')).toBeAttached();
     // The search toggle renders BEFORE the queue badge in the source order so it
     // is first in DOM and first in visual reading order (LTR).
     const firstChild = actions.locator('> :first-child');
     await expect(firstChild).toHaveClass(/search-toggle/);
+    // The rulings badge trails the queue badge (LIN-1149, extended LIN-1728).
+    const lastChild = actions.locator('> :last-child');
+    await expect(lastChild).toHaveAttribute('data-rulings-badge', '');
   });
 
-  test('queue badge is the sole nav-action on non-projects pages when dispatch is on (no search leak)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('the queue + rulings badges are the sole nav-actions on non-projects pages when dispatch is on (no search leak)', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(swimLocalSeed, { features: FLAGS });
     // The observation page is non-projects — search must NOT leak here.
     await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
     await page.waitForLoadState('networkidle');
 
     const actions = page.locator('.nav-actions');
-    // Queue badge is present (dispatch flag is on).
+    // Both badges are present (dispatch flag is on).
     await expect(actions.locator('[data-queue-badge]')).toBeAttached();
+    await expect(actions.locator('[data-rulings-badge]')).toBeAttached();
     // Search toggle must NOT appear on non-projects pages.
     await expect(actions.locator('.search-toggle')).toHaveCount(0);
   });
 
-  test('search toggle is present but queue badge absent on projects when dispatch is off (search is NOT dispatch-gated)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('search toggle is present but both badges absent on projects when dispatch is off (search is NOT dispatch-gated)', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(swimLocalSeed, { features: {} }); // dispatch flag OFF
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
@@ -262,8 +269,10 @@ test.describe('nav-actions placement (LIN-1149)', () => {
     const actions = page.locator('.nav-actions');
     // Search toggle is on (projects page, NOT gated on dispatch).
     await expect(actions.locator('.search-toggle')).toBeAttached();
-    // Queue badge is absent (dispatch flag is off).
+    // Both badges are absent (dispatch flag is off) — the rulings badge shares
+    // the queue badge's gate, deliberately (LIN-1728 Phase 3).
     await expect(actions.locator('[data-queue-badge]')).toHaveCount(0);
+    await expect(actions.locator('[data-rulings-badge]')).toHaveCount(0);
   });
 });
 
