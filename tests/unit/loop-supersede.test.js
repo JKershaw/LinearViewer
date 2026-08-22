@@ -116,7 +116,12 @@ describe('loop-supersede characterization (LIN-1478 beat 1, pre-extraction)', ()
     // terminal/resolved (so it contributes no waiting signal of its own), only
     // its `followUpTo` edge matters. This is the mutation a future fold could
     // introduce by widening the input set passed to the shared helper — the
-    // contract is that callers scope the input to ONE session's loops.
+    // contract is that THIS caller scopes the input to ONE session's loops.
+    // (LIN-1728 close-out: the helper's real requirement is loopId uniqueness;
+    // per-session scoping is how deriveSessionWaiting satisfies it, and these
+    // fixtures' short ids are exactly the non-unique case it protects against.
+    // A dispatch-backed caller with globally-unique UUID loopIds may pass a
+    // merged set — see the amended contract in lib/loop-supersede.js.)
     const crossSessionLoop = enrichedLoop({
       loopId: 'other-session-loop',
       followUpTo: 'b1',
