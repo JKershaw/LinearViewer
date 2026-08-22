@@ -456,11 +456,10 @@ const taskSnapshotStore = new TaskSnapshotStore({
   collection: taskSnapshotCollection
 })
 
-// Task decision store (LIN-2197 Phase 2): task-keyed record of scan-produced
-// decisions, the third producer into the operator decision queue (LIN-1721).
-// Durable + per-task count-capped (no TTL), like task-snapshots above — a TTL
-// would silently delete an unanswered ruling. Not yet threaded into any route
-// factory: the scan routes that read/write it are a later phase.
+// Task decision store (LIN-2197 Phase 2, routes wired in Phase 4): task-keyed
+// record of scan-produced decisions, the third producer into the operator
+// decision queue (LIN-1721). Durable + per-task count-capped (no TTL), like
+// task-snapshots above — a TTL would silently delete an unanswered ruling.
 const taskDecisionsCollection = db.collection('task-decisions')
 const taskDecisionsStore = new TaskDecisionsStore({
   collection: taskDecisionsCollection
@@ -2172,7 +2171,7 @@ async function getWorkspaceNorthStar(urlKey, accountId) {
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, rejectedCredentialRegistry }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
