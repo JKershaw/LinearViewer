@@ -16,6 +16,7 @@ import {
   getLoopsForIssue,
   getLoopsForWorkspace,
   getSessionsForWorkspace,
+  isDecisionAnswerEntry,
   __internal
 } from '../../lib/pipeline-loops.js';
 import { parseDecisions, parseHeartbeat } from '../../lib/session-telemetry.js';
@@ -29,6 +30,7 @@ const {
   _buildLoops,
   LOOKBACK_MS,
   _findLastDecision,
+  _findDecisionAnswer,
   correlateDecisionCase
 } = __internal;
 
@@ -1402,5 +1404,75 @@ describe('_buildLoops: decision prose does not float the activity clock (LIN-218
     assert.strictEqual(loop.lineageLastActivityMs, Date.parse(LATE_TS));
     assert.strictEqual(loopLastActivityMs(loop), Date.parse(LATE_TS));
     assert.strictEqual(isFreshlyActive(loop, NOW.getTime(), STALE_MS), true);
+  });
+});
+
+// ── LIN-1728: answeredDecisionId derivation ────────────────────────────────
+function answerEntry(decisionId, timestamp) {
+  return { kind: 'decision-answer', message: JSON.stringify({ decision_id: decisionId }), timestamp };
+}
+
+describe('isDecisionAnswerEntry (LIN-1728)', () => {
+  test('true only for kind: "decision-answer"', () => {
+    assert.strictEqual(isDecisionAnswerEntry({ kind: 'decision-answer' }), true);
+    assert.strictEqual(isDecisionAnswerEntry({ kind: 'decision' }), false);
+    assert.strictEqual(isDecisionAnswerEntry({ kind: 'status' }), false);
+    assert.strictEqual(isDecisionAnswerEntry(undefined), false);
+    assert.strictEqual(isDecisionAnswerEntry(null), false);
+  });
+});
+
+describe('_findDecisionAnswer (LIN-1728, backward scan)', () => {
+  test('returns the decision_id of the last decision-answer entry', () => {
+    const feedback = [answerEntry('d-1', 't1'), answerEntry('d-2', 't2')];
+    assert.strictEqual(_findDecisionAnswer(feedback), 'd-2');
+  });
+
+  test('a malformed answer entry is skipped, scanning backwards to an earlier valid one', () => {
+    const feedback = [answerEntry('d-1', 't1'), { kind: 'decision-answer', message: 'not-json', timestamp: 't2' }];
+    assert.strictEqual(_findDecisionAnswer(feedback), 'd-1');
+  });
+
+  test('no decision-answer entries at all yields null', () => {
+    assert.strictEqual(_findDecisionAnswer([textEntry('A'), { kind: 'status', message: '[done]' }]), null);
+  });
+
+  test('non-array feedback is tolerated, never throws', () => {
+    assert.strictEqual(_findDecisionAnswer(undefined), null);
+  });
+});
+
+describe('_buildLoops: answeredDecisionId derivation end-to-end (LIN-1728)', () => {
+  test('a loop with no decision-answer stamp derives answeredDecisionId: null', () => {
+    const feedback = [decisionEntry(FULL_DECISION_PAYLOAD, 't1')];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.strictEqual(loop.answeredDecisionId, null);
+    assert.ok('answeredDecisionId' in loop, 'key must be present, never omitted');
+  });
+
+  test('a stamped answer matching the current decision derives answeredDecisionId equal to it', () => {
+    const feedback = [decisionEntry(FULL_DECISION_PAYLOAD, 't1'), answerEntry('d-1', 't2')];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.strictEqual(loop.answeredDecisionId, 'd-1');
+  });
+
+  test('a newer decision after an old answer: answeredDecisionId still names the OLD answered id, distinct from the new decision', () => {
+    const feedback = [
+      decisionEntry({ decision_id: 'd-1' }, 't1'),
+      answerEntry('d-1', 't2'),
+      decisionEntry({ decision_id: 'd-2' }, 't3')
+    ];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.strictEqual(loop.decision.decision_id, 'd-2', 'the current decision is the newer, unanswered one');
+    assert.strictEqual(loop.answeredDecisionId, 'd-1', 'the answer stamp still names the old id — this loop is unanswered for d-2');
+  });
+
+  test('lean/non-lean parity: answeredDecisionId is identical and present on the lean loop even though feedback is []', () => {
+    const feedback = [decisionEntry(FULL_DECISION_PAYLOAD, 't1'), answerEntry('d-1', 't2')];
+    const hist = historyItem({ feedback });
+    const full = _buildLoops({ historyItems: [hist], now: NOW })[0];
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true })[0];
+    assert.strictEqual(lean.answeredDecisionId, full.answeredDecisionId);
+    assert.strictEqual(lean.answeredDecisionId, 'd-1');
   });
 });
