@@ -235,6 +235,49 @@ describe('buildAutopilotKickoff (inline handbook / disposition layer)', () => {
     assert.ok(flat.includes('Non-DONE terminal windows are deliberately left open'),
       'the manual keeps non-DONE windows open deliberately');
   });
+
+  test('the human\'s edge section states the escalation-discipline rubric in order (LIN-1732)', () => {
+    // Rubric lives once, in the manual, under this exact heading. Anchor on the bolded
+    // lead-ins and their order, never on the prose between them.
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    const sectionAt = text.indexOf("## The human's edge, and how to hand back");
+    assert.ok(sectionAt > -1, 'the handbook section heading is present, byte-identical');
+
+    const gateAt = text.indexOf('Gate on Principle 0 first', sectionAt);
+    const rulingAt = text.indexOf('make the ruling self-sufficient', sectionAt);
+    const mergeAt = text.indexOf('Merge sibling blockers before you bubble up', sectionAt);
+    assert.ok(gateAt > sectionAt, 'the Principle 0 gate anchor is present inside the section');
+    assert.ok(rulingAt > gateAt, 'the self-sufficient ruling anchor follows the gate');
+    assert.ok(mergeAt > rulingAt, 'the sibling-merge anchor follows the ruling format');
+  });
+
+  test('the "pause for the human" bullet points at the handbook section, without restating its rubric', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    const bulletAt = text.indexOf('pause for the human');
+    assert.ok(bulletAt > -1);
+    const bulletEnd = text.indexOf('\n\n', bulletAt);
+    const bullet = text.slice(bulletAt, bulletEnd > -1 ? bulletEnd : undefined).replace(/\s+/g, ' ');
+
+    assert.ok(bullet.includes("The human's edge, and how to hand back"),
+      'the bullet cites the handbook section by name');
+    assert.ok(!bullet.includes('if_unanswered') && !bullet.includes('options[].cost'),
+      'the bullet stays a pointer — it does not restate the grammar-mapping detail');
+  });
+});
+
+describe('docs/autopilot-kickoff.md (doc twin — sync obligation, LIN-1732)', () => {
+  test('the "pause for the human" bullet cites the handbook section by name, matching the runtime kickoff', () => {
+    const doc = readFileSync(join(__dirname, '../../docs/autopilot-kickoff.md'), 'utf8');
+    const bulletAt = doc.indexOf('pause for the human');
+    assert.ok(bulletAt > -1, 'the doc twin still carries the pause-for-the-human bullet');
+    const bulletEnd = doc.indexOf('\n\n', bulletAt);
+    const bullet = doc.slice(bulletAt, bulletEnd > -1 ? bulletEnd : undefined).replace(/\s+/g, ' ');
+
+    assert.ok(bullet.includes("The human's edge, and how to hand back"),
+      'the doc twin cites the handbook section by name');
+    assert.ok(!bullet.includes('if_unanswered') && !bullet.includes('options[].cost'),
+      'the doc twin bullet stays a pointer too — no second rubric');
+  });
 });
 
 describe('buildAutopilotKickoff (general / stack-walk)', () => {
