@@ -385,6 +385,11 @@
 .obs-summary-reply { color: var(--amber); text-decoration: underline; white-space: nowrap; }
 .obs-summary-reply:hover,
 .obs-summary-reply:focus-visible { color: var(--brand); }
+/* Decision excerpt + option labels on a waiting card (LIN-2184/H5). Demoted
+   off the bold amber `.obs-summary-waiting` label they inherit from by
+   default — the excerpt is supporting detail, not the headline. */
+.obs-summary-decision-excerpt { font-weight: 400; color: var(--muted); }
+.obs-summary-decision-options { font-weight: 400; color: var(--muted); white-space: nowrap; }
 /* Most-recent run kind beside "working…" (LIN-631). */
 .obs-summary-kind {
   font-size: 0.72rem;

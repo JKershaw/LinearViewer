@@ -46,12 +46,13 @@ const ARCHIVE_PAGE_SIZE = 30;               // archive "load more" page size
 // LIN-2184 (H5, beat 4): the feed card's decision-case excerpt budget. The
 // feed is a glance surface, not the full case (that's the waiting banner,
 // beat 3) — Principle 0 (docs/escalation-philosophy.md) says an escalation
-// stream must stay actable-at-a-glance, so this stays SHORT: ~140 chars is
-// roughly one to two lines of card text at the feed's normal width, enough
-// to tell the operator what's being asked without reading a paragraph. A
-// single named constant, referenced once below, so retuning it is a one-line
-// change.
-const DECISION_EXCERPT_CHARS = 140;
+// stream must stay actable-at-a-glance, so this stays SHORT. Retuned from an
+// initial 140 (review measured that at 3-4 lines against the real
+// `.obs-page` content width — 468px mobile / 620px desktop — not the "one to
+// two lines" it was chosen for). ~65 chars lands at roughly two lines at the
+// mobile width, the feed's primary form factor. A single named constant,
+// referenced once below, so retuning it further is a one-line change.
+const DECISION_EXCERPT_CHARS = 65;
 
 // Filter state.
 const hiddenWorkspaces = new Set();        // urlKeys toggled off
