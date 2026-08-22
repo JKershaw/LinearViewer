@@ -379,7 +379,19 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     await page.waitForLoadState('networkidle');
     await page.locator('.obs-tab[data-view="rulings"]').click();
 
-    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'SCAN-1' });
+    // Run-scoped (LIN-2215 close-out, ledger item 2): `TaskDecisionsStore` is
+    // durable with no TTL and `_pruneToCapacity` is scoped per `(urlKey,
+    // issueId)`, so a fresh `issueId` per run means a row leaked by an
+    // earlier failed run (one that failed before the option press below) is
+    // NEVER pruned and stays forever under the same hardcoded 'SCAN-1'
+    // identifier every run shares. Filtering on `data-decision-id` — set from
+    // `decision.decision_id` (public/observation.js's renderRulingRow),
+    // which equals this run's own `scanBody.id` (`TaskDecisionsStore.buildId`
+    // is content-hash-derived from this run's unique issueId + nonce) —
+    // scopes the locator to strictly this run's own row, so it can never
+    // strict-mode-violate against a leaked sibling row the way the fixed
+    // 'SCAN-1' text filter did.
+    const row = page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`);
     await expect(row).toBeVisible();
     // F2: the task-bound caption — proof this is NOT falling back to
     // "no action available yet" (the pre-fix indeterminate default a
@@ -408,8 +420,11 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     // scan's own input (comments feed hashContext, public/scan.js's own
     // documented behaviour), so a GET right after would legitimately
     // recompute a DIFFERENT content hash and report 'stale' rather than the
-    // answered row, which would be a false failure, not a real one.
-    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'SCAN-1' })).toHaveCount(0, { timeout: 20000 });
+    // answered row, which would be a false failure, not a real one. Scoped by
+    // `data-decision-id` for the same leaked-row reason as the locator above
+    // — a `hasText: 'SCAN-1'` filter would also count any leaked sibling row
+    // sharing that same hardcoded identifier and never reach 0.
+    await expect(page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`)).toHaveCount(0, { timeout: 20000 });
   });
 
   test('a mid-turn/loop-backed ruling is unaffected by the task-bound wiring — no regression on the existing reply path', async ({ page, seedLocal, localWorkerUrlKey }) => {
@@ -417,8 +432,31 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     // behaviour and unintended regressions, especially existing loop-backed
     // rulings). Not a full loop-ruling flow (that is Linear-session-shaped
     // and already covered above by seedDecisionWorker) — just a check that
-    // a workspace carrying a live, decision-free local task never produces a
-    // spurious ruling of any disposition.
+    // seeding an ordinary, decision-free local task adds no ruling of any
+    // disposition.
+    //
+    // Run-scoped (LIN-2215 close-out, ledger item 2): a bare
+    // `toHaveCount(0)` is a workspace-global claim, and this worker's
+    // `TaskDecisionsStore` partition is durable with no TTL — a row leaked
+    // by an earlier failed run (the task-bound test above, induced to fail
+    // before its option press) is never pruned and would poison a global
+    // zero-count assertion forever, failing on correct code for a reason
+    // this test never caused. Comparing against a same-run baseline —
+    // captured BEFORE seeding the ordinary task below, with nothing else in
+    // between to mutate the store (this suite has no cross-worker
+    // parallelism yet, per CLAUDE.md's E2E Testing Pattern section) —
+    // preserves the real intent ("seeding this task added no ruling") while
+    // making the check immune to whatever the durable store already held
+    // coming in.
+    await seedLocal({ projects: [], issues: [] });
+    await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
+    await page.waitForLoadState('networkidle');
+    await Promise.all([
+      page.waitForResponse(r => r.url().includes('/api/dashboard/rulings') && r.request().method() === 'GET'),
+      page.locator('.obs-tab[data-view="rulings"]').click()
+    ]);
+    const baselineCount = await page.locator('#obs-rulings .obs-ruling').count();
+
     await seedLocal({
       projects: [],
       issues: [{
@@ -427,11 +465,14 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
       }]
     });
 
-    await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
+    await page.reload();
     await page.waitForLoadState('networkidle');
-    await page.locator('.obs-tab[data-view="rulings"]').click();
+    await Promise.all([
+      page.waitForResponse(r => r.url().includes('/api/dashboard/rulings') && r.request().method() === 'GET'),
+      page.locator('.obs-tab[data-view="rulings"]').click()
+    ]);
 
-    await expect(page.locator('#obs-rulings .obs-ruling')).toHaveCount(0);
+    await expect(page.locator('#obs-rulings .obs-ruling')).toHaveCount(baselineCount);
   });
 });
 
