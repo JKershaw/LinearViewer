@@ -403,3 +403,115 @@ describe('deliverRulingReply — resumable disposition (LIN-1728 review F1/F4)',
     assert.equal(capturedOpts.issueId, 'real-issue-id');
   });
 });
+
+// LIN-2215 F1 — the task-bound disposition (LIN-2197 Phase 3): a scan-produced
+// decision has NO dispatch item behind it, so `anchor.loopId` is always null by
+// design — the whole point of this fix is that the function must still reach
+// its branching logic (not exit silently on the missing loopId) and must
+// never call dispatchPrompt/deliverReply (comment-only, no run to start/resume).
+const TASK_BOUND_ANCHOR = {
+  loopId: null,
+  issueId: '11111111-2222-3333-4444-555555555555',
+  issueIdentifier: 'LIN-2215-T',
+  workspaceUrlKey: 'the-ruling-workspace',
+  target: null,
+  followUpTo: null,
+  taskDecisionId: 'scan_11111111_aaaaaaaaaaaa'
+};
+
+function makeTaskBoundRow({ decision, anchor, ...rest } = {}) {
+  return {
+    decision: decision || { decision_id: 'd-task-1' },
+    anchor: { ...TASK_BOUND_ANCHOR, ...(anchor || {}) },
+    disposition: 'task-bound',
+    ...rest
+  };
+}
+
+describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
+  test('a null decisionLoopId no longer trips the early-return guard — postComment is actually attempted', async () => {
+    let postCommentCalled = false;
+    const { module } = makeSandbox({
+      postComment: async () => { postCommentCalled = true; return { ok: true, status: 201, data: {} }; }
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(makeTaskBoundRow(), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(postCommentCalled, true, 'the pre-fix guard required decisionLoopId and returned silently for every task-bound row');
+  });
+
+  test('success: postComment carries {taskDecisionId, taskDecisionIssueId}, no dispatch is ever attempted, and the row clears', async () => {
+    let capturedArgs = null;
+    let dispatchCalls = 0;
+    let deliverReplyCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, prompt, decision) => { capturedArgs = { urlKey, issueId, prompt, decision }; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      deliverReply: () => { deliverReplyCalls += 1; }
+    });
+    const { deliverRulingReply, rulingsPending } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(makeTaskBoundRow(), 'Approve', li);
+    assert.ok(rulingsPending.has('d-task-1'), 'expected the decision to be marked pending immediately');
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(capturedArgs, 'expected postComment to be called');
+    assert.equal(capturedArgs.urlKey, 'the-ruling-workspace');
+    assert.equal(capturedArgs.issueId, '11111111-2222-3333-4444-555555555555');
+    assert.equal(capturedArgs.prompt, 'Approve');
+    // taskDecisionIssueId must be the canonical UUID (anchor.issueId) — the
+    // field TaskDecisionsStore.markOutcome guards on with its own UUID check —
+    // never anchor.issueIdentifier. (Field-by-field, not deepEqual — the
+    // decision object crosses the vm sandbox boundary, so it is structurally
+    // but not reference-equal to a same-realm object literal.)
+    assert.equal(capturedArgs.decision.taskDecisionId, 'scan_11111111_aaaaaaaaaaaa');
+    assert.equal(capturedArgs.decision.taskDecisionIssueId, '11111111-2222-3333-4444-555555555555');
+
+    assert.equal(dispatchCalls, 0, 'a task-bound reply is comment-only — no run to start or resume');
+    assert.equal(deliverReplyCalls, 0, 'must not route through the follow-up/dispatch delivery path either');
+    assert.ok(!rulingsPending.has('d-task-1'));
+
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /recorded ✓/);
+  });
+
+  test('failure: the comment write rejecting surfaces a visible error and re-enables the buttons — never a silent no-op', async () => {
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: false, status: 502, data: { error: 'upstream write rejected' } })
+    });
+    const { deliverRulingReply, rulingsPending } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(makeTaskBoundRow({ decision: { decision_id: 'd-task-2' } }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(!rulingsPending.has('d-task-2'), 'the pending guard must be released on failure');
+    const buttons = li.querySelectorAll('.chat-option-btn');
+    buttons.forEach((b) => assert.equal(b.disabled, false, 'buttons must be re-enabled on failure'));
+
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /reply failed/);
+  });
+
+  test('a network-layer rejection (postComment itself throws) is caught the same way as a non-ok result', async () => {
+    const { module } = makeSandbox({
+      postComment: async () => { throw new Error('network offline'); }
+    });
+    const { deliverRulingReply, rulingsPending } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(makeTaskBoundRow({ decision: { decision_id: 'd-task-3' } }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(!rulingsPending.has('d-task-3'));
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /reply failed: network offline/);
+  });
+});

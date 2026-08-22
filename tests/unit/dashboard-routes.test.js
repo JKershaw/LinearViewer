@@ -359,6 +359,54 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
     assert.equal(reads, 1, 'the second poll within the TTL is served from the cache');
     assert.equal(second.res.jsonBody.count, 1);
   });
+
+  // ─── taskDecisions threading (LIN-2215) ─────────────────────────────────────
+
+  test('a task-bound row from taskDecisionsStore reaches collectUnansweredDecisions and appears in the response', async () => {
+    const taskDecisionsStore = {
+      async listUnansweredForWorkspaces(urlKeys) {
+        assert.deepEqual(urlKeys, ['ws-a']);
+        return [{
+          id: 'scan_task1_aaaaaaaaaaaa', urlKey: 'ws-a', issueId: '11111111-2222-3333-4444-555555555555',
+          issueIdentifier: 'LIN-30', decision: { decision_id: 'd-task-1', question: 'Proceed?' },
+          scannedAt: new Date().toISOString(), outcome: null, outcomeAt: null
+        }];
+      }
+    };
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      taskDecisionsStore
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.count, 1);
+    assert.equal(res.jsonBody.rulings[0].decision.decision_id, 'd-task-1');
+    assert.equal(res.jsonBody.rulings[0].disposition, 'task-bound');
+  });
+
+  test('an unwired taskDecisionsStore (default null) leaves the loops branch\'s existing behaviour unchanged — regression guard on "don\'t touch the loops branch"', async () => {
+    const perWorkspace = { 'ws-a': { live: [], history: [decisionItem('a-dec', 'LIN-31', 'd-loop-1')], agentStatus: [] } };
+    const router = makeRouter(perWorkspace); // no taskDecisionsStore passed — defaults to null
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.count, 1);
+    assert.equal(res.jsonBody.rulings[0].decision.decision_id, 'd-loop-1');
+    assert.equal(res.jsonBody.rulings[0].disposition !== 'task-bound', true);
+  });
 });
 
 // ─── Feed memory: lean projection + bounded fan-out (LIN-622) ─────────────────

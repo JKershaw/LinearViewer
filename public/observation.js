@@ -1463,7 +1463,13 @@ function deliverRulingReply(row, prompt, li) {
   const decisionId = decision?.decision_id;
   const decisionLoopId = anchor?.loopId;
   const feedback = li.querySelector('.obs-ruling-feedback');
-  if (!targetUrlKey || !decisionId || !decisionLoopId || rulingsPending.has(decisionId)) return;
+  // A task-bound row (LIN-2197 Phase 3) has no dispatch item behind it, so
+  // `anchor.loopId`/`decisionLoopId` is always null by design — admit
+  // `disposition === 'task-bound'` as an alternative to having one, or an
+  // option press on that row would hit this guard and return silently: no
+  // comment, no dispatch, no feedback text, buttons left enabled (LIN-2215 F1,
+  // a regression in kind on LIN-1728's G1, which at least said so out loud).
+  if (!targetUrlKey || !decisionId || (!decisionLoopId && disposition !== 'task-bound') || rulingsPending.has(decisionId)) return;
 
   rulingsPending.add(decisionId);
   const buttons = li.querySelectorAll('.chat-option-btn');
@@ -1591,6 +1597,36 @@ function deliverRulingReply(row, prompt, li) {
         return startRun().then(onDelivered, (dispatchErr) => makePartialFailureHandler('start a run')(dispatchErr, startRun));
       })
       .catch((err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
+    return;
+  }
+
+  if (disposition === 'task-bound') {
+    // Comment-only (LIN-2215 F1) — a task-bound row has no dispatch item
+    // behind it (`anchor.loopId` is always null by design, Phase 3), so
+    // there is no run to start or resume: unlike resumable/gone, this
+    // branch never calls dispatchPrompt/deliverReply. Reuses the SAME
+    // issue-keyed comment path `gone` uses (`window.ReplyDelivery.postComment`),
+    // so a successful write applies the SAME best-effort answer stamp on the
+    // server side (routes/workspace-api.js's comment route) — no new
+    // persistence or dispatch path.
+    //
+    // `taskDecisionIssueId` must be the canonical UUID
+    // `TaskDecisionsStore.markOutcome` guards on (its own UUID_REGEX check) —
+    // `anchor.issueId` is that exact field (`taskDecisionAnchor`,
+    // lib/unanswered-decisions.js), always UUID-shaped when a row exists
+    // (the store rejects a non-UUID issueId at write time). The comment
+    // TARGET itself (the route's own `:issueId` param, permissive of either
+    // shape) still prefers the real id with an identifier fallback, mirroring
+    // the `gone` branch and `public/scan.js`'s own answer-form call.
+    window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt, {
+      taskDecisionId: anchor.taskDecisionId,
+      taskDecisionIssueId: anchor.issueId
+    })
+      .then((commentResult) => {
+        if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
+        onDelivered();
+      })
+      .catch((err) => { console.error('Ruling reply (task-bound comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
   }
 }
 
