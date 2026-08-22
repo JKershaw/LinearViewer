@@ -231,6 +231,65 @@ describe('render-session: waiting banner (LIN-1005)', () => {
     assert.ok(!html.includes('<script>alert(1)</script>'), 'raw script must not leak');
     assert.match(html, /&lt;script&gt;/);
   });
+
+  // LIN-2184 (H5, beat 3): the banner is the first real consumer of the H4
+  // prop-bag seam (decision/decisionCase, already threaded by
+  // routes/dashboard.js:1057 but unconsumed until now).
+  test('LIN-2184: renders the full case (from its chunks) + option labels + question, given a decision on a waiting loop', () => {
+    const decision = {
+      decision_id: 'd-1',
+      question: 'Proceed with the migration?',
+      options: [{ id: 'yes', label: 'Yes, proceed' }, { id: 'no', label: 'No, hold off' }]
+    };
+    const decisionCase = ['Considered the schema diff.', 'Considered the rollback plan.'];
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: true, waitingMessage: 'awaiting your ruling', decision, decisionCase },
+      {}
+    );
+    assert.match(html, /data-testid="session-waiting-decision"/);
+    assert.match(html, /data-testid="session-waiting-decision-question"[^>]*>Proceed with the migration\?</);
+    // Both chunks render, each its own node — never joined into one blob.
+    const chunkMatches = html.match(/data-testid="session-waiting-decision-case-chunk"/g) || [];
+    assert.equal(chunkMatches.length, 2, 'both case chunks render as separate nodes');
+    assert.match(html, /data-testid="session-waiting-decision-case-chunk"[^>]*>Considered the schema diff\.</);
+    assert.match(html, /data-testid="session-waiting-decision-case-chunk"[^>]*>Considered the rollback plan\.</);
+    // Option labels render.
+    assert.match(html, /data-testid="session-waiting-decision-option"[^>]*>Yes, proceed</);
+    assert.match(html, /data-testid="session-waiting-decision-option"[^>]*>No, hold off</);
+  });
+
+  test('LIN-2184: a waiting loop with no decision renders the banner exactly as before — no empty case scaffolding', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: true, waitingMessage: 'need your decision on the auth flow' },
+      {}
+    );
+    assert.match(html, /data-testid="session-waiting-banner"/);
+    assert.match(html, /data-testid="session-waiting-message"[^>]*>need your decision on the auth flow</);
+    assert.ok(!html.includes('data-testid="session-waiting-decision"'), 'no decision wrapper when decision is absent');
+    assert.ok(!html.includes('data-testid="session-waiting-decision-case"'), 'no stray case scaffolding');
+    assert.ok(!html.includes('data-testid="session-waiting-decision-options"'), 'no stray options scaffolding');
+  });
+
+  test('LIN-2184: a multi-chunk decisionCase preserves chunk boundaries, including a (recap i/n) header baked into a chunk\'s own text', () => {
+    const decision = { decision_id: 'd-2', options: [] };
+    // A chunk's own text may already carry the emitter's "(recap i/n)" header
+    // (simple-dispatcher's chunker bakes it into the message, not a separate
+    // field) — rendered verbatim, three chunks stay three nodes, not joined.
+    const decisionCase = [
+      'Part one of the case (recap 1/3)',
+      'Part two of the case (recap 2/3)',
+      'Part three of the case (recap 3/3)'
+    ];
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: true, waitingMessage: 'awaiting your ruling', decision, decisionCase },
+      {}
+    );
+    const chunkMatches = html.match(/data-testid="session-waiting-decision-case-chunk"/g) || [];
+    assert.equal(chunkMatches.length, 3, 'all three chunks render, none dropped or truncated');
+    assert.match(html, /Part one of the case \(recap 1\/3\)/);
+    assert.match(html, /Part two of the case \(recap 2\/3\)/);
+    assert.match(html, /Part three of the case \(recap 3\/3\)/);
+  });
 });
 
 describe('render-session: telemetry + model omission', () => {
