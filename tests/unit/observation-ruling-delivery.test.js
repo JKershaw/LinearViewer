@@ -285,6 +285,36 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     assert.doesNotMatch(feedback.textContent, /Recorded/, 'the answer was never durably recorded here — must not claim otherwise');
   });
 
+  test('G1: an anchor with an issueIdentifier but no raw issueId is answerable — the identifier is used for both the comment write and the fresh dispatch', async () => {
+    // This is the ORDINARY gone-ruling case in this codebase today: every
+    // recommend-and-dispatch loop writes issueId: null (routes/proxy.js),
+    // so anchor.issueId is null for essentially all of them — only
+    // anchor.issueIdentifier is guaranteed present. Gating on the raw id
+    // alone (the pre-fix code) stranded every such ruling as "no linked
+    // issue" even though the row displays its identifier. Mirrors the
+    // resumable branch's own F4 fallback (`issueId || issueIdentifier`).
+    let capturedCommentIssueId = null;
+    let capturedDispatchOpts = null;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId) => { capturedCommentIssueId = issueId; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async (opts) => { capturedDispatchOpts = opts; return { id: 'dispatched-1' }; }
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(makeRow({ anchor: { issueId: null, issueIdentifier: 'LIN-1728-G' }, decision: { decision_id: 'd-gone-4' } }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(capturedCommentIssueId, 'LIN-1728-G', 'the comment write must fall back to the identifier when the raw issueId is absent');
+    assert.ok(capturedDispatchOpts, 'expected dispatchPrompt to be called — this ruling must not be rejected as having no linked issue');
+    assert.equal(capturedDispatchOpts.issue.id, 'LIN-1728-G');
+    assert.equal(capturedDispatchOpts.issue.identifier, 'LIN-1728-G');
+
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /recorded ✓/);
+  });
+
   test('a gone ruling with no linked issue refuses cleanly rather than posting to /api/comments/null', async () => {
     let postCommentCalled = false;
     const { module } = makeSandbox({

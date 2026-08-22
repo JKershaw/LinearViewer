@@ -1558,13 +1558,21 @@ function deliverRulingReply(row, prompt, li) {
   }
 
   if (disposition === 'gone') {
-    if (!anchor.issueId || !anchor.issueIdentifier) {
+    // Identifier-backed targeting (LIN-1728 review G1) — same root cause as
+    // F4 above, left in place on this sibling branch. `anchor.issueId` is
+    // null for essentially every autopilot-dispatched loop (recommend-and-
+    // dispatch never resolves a provider id); only `anchor.issueIdentifier`
+    // is guaranteed present. Gating on the raw id alone stranded every such
+    // `gone` ruling as "no linked issue" even though the row displays its
+    // identifier. Both call sites below must fall back to the identifier
+    // too, mirroring the `resumable` branch's `issueId || issueIdentifier`.
+    if (!anchor.issueIdentifier) {
       console.error('Ruling reply: no issue to start a fresh run against, cannot reply for a gone session');
       restore();
       setFeedback('cannot start a fresh run: no linked issue', true);
       return;
     }
-    window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId, prompt, { decisionLoopId, decisionId })
+    window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt, { decisionLoopId, decisionId })
       .then((commentResult) => {
         if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
         // Deliberately NOT window.ReplyDelivery.deliverReply — that call's
@@ -1577,7 +1585,7 @@ function deliverRulingReply(row, prompt, li) {
         const startRun = () => window.dispatchPrompt({
           urlKey: targetUrlKey,
           prompt,
-          issue: { id: anchor.issueId, identifier: anchor.issueIdentifier },
+          issue: { id: anchor.issueId || anchor.issueIdentifier, identifier: anchor.issueIdentifier },
           target: anchor.target || 'cli'
         });
         return startRun().then(onDelivered, (dispatchErr) => makePartialFailureHandler('start a run')(dispatchErr, startRun));

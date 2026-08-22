@@ -426,20 +426,21 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
 // pre-existing ≤320px header-clearance breach that ticket already tracks.
 // Measured here, not assumed — see the test body for the verdict this feeds.
 //
-// LIN-1728 review (`2d47a7c8`, test-quality note): the previous version of
-// this test counted distinct `.nav-primary-row > *` top positions — but both
-// badges live inside `.nav-actions`, a SINGLE direct child of
-// `.nav-primary-row`. That metric can only see `.nav-actions` as a whole
-// wrapping onto row 2 of the two-row header; it cannot see growth/overflow
-// happening INSIDE `.nav-actions` itself, which is the actual risk a second
-// badge adds. `.nav-actions` is `display:flex` with no `flex-wrap` set
-// anywhere (public/style.css) — its children never wrap onto their own line,
-// they only grow the container past its allotted width — so this measures
-// both: internal child-row count (in case that ever changes) AND horizontal
-// overflow (`scrollWidth` vs `clientWidth`), which is the failure mode that
-// can actually happen today.
+// LIN-1728 review (`2d47a7c8`, test-quality note) + re-review (`9c5b22f6`,
+// G2): the original version of this test only counted distinct
+// `.nav-primary-row > *` top positions. Both badges live inside
+// `.nav-actions`, a SINGLE direct child of `.nav-primary-row`, so that metric
+// can see `.nav-actions` as a whole wrapping onto row 2 of the two-row header
+// (`.nav-primary-row` is `flex-wrap: wrap`, public/style.css) but is blind to
+// growth/overflow happening INSIDE `.nav-actions` itself — the actual risk a
+// second badge adds, since `.nav-actions` is `display:flex` with NO
+// `flex-wrap` set anywhere, so its own children can only overflow, never
+// wrap onto their own line. The two failure modes are independent, so this
+// measures BOTH: the parent row's wrap count (restored) and `.nav-actions`'
+// own internal child-row count plus horizontal overflow (`scrollWidth` vs
+// `clientWidth`).
 test.describe('.nav-actions width at ≤320px with both badges visible (LIN-2191 follow-up check)', () => {
-  test('two visible badges do not add wrapping or overflow beyond the pre-existing single-badge shape', async ({ page }) => {
+  test('two visible badges do not add wrapping or overflow beyond the pre-existing zero-badge shape', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}${featuresParam({ dispatch: true })}`);
     await clearRuns(page);
     await page.setViewportSize({ width: 320, height: 800 });
@@ -447,16 +448,23 @@ test.describe('.nav-actions width at ≤320px with both badges visible (LIN-2191
     await page.waitForLoadState('networkidle');
 
     const measure = () => {
+      const primaryRow = document.querySelector('.nav-primary-row');
+      const parentRows = primaryRow
+        ? new Set(
+            Array.from(primaryRow.children).map(el => Math.round(el.getBoundingClientRect().top))
+          ).size
+        : 0;
       const actions = document.querySelector('.nav-actions');
-      if (!actions) return { childRows: 0, overflowPx: 0 };
+      if (!actions) return { parentRows, childRows: 0, overflowPx: 0 };
       const childRows = new Set(
         Array.from(actions.children).map(el => Math.round(el.getBoundingClientRect().top))
       ).size;
       const overflowPx = Math.max(0, actions.scrollWidth - actions.clientWidth);
-      return { childRows, overflowPx };
+      return { parentRows, childRows, overflowPx };
     };
 
-    // Baseline: both badges hidden (0 queued, 0 rulings) — today's shipped shape.
+    // Baseline: both badges hidden (0 queued, 0 rulings) — today's shipped
+    // zero-badge shape (NOT a single-badge shape — both are hidden here).
     const baseline = await page.evaluate(measure);
 
     // Force both badges visible (as if there were 1 queued item and 1 ruling) —
@@ -467,13 +475,16 @@ test.describe('.nav-actions width at ≤320px with both badges visible (LIN-2191
     });
     const bothVisible = await page.evaluate(measure);
 
-    // Not a strict "must never overflow" assertion — LIN-2191 already tracks
-    // whatever header-clearance breach exists at ≤320px independent of any
-    // badge (captured in `baseline` itself, not this comparison). This guards
-    // specifically against a SECOND badge making `.nav-actions` WORSE than
-    // the single-badge shape already shipped; a bare reproduction is
-    // recorded (not silently absorbed) by this test's own existence rather
-    // than by failing it.
+    // Not a strict "must never overflow/wrap" assertion — LIN-2191 already
+    // tracks whatever header-clearance breach exists at ≤320px independent
+    // of any badge (captured in `baseline` itself, not this comparison).
+    // This guards specifically against a SECOND badge making the header
+    // WORSE than the zero-badge shape already shipped, on both independent
+    // failure modes: `.nav-primary-row` wrapping onto a second header row,
+    // and `.nav-actions` overflowing internally. A bare reproduction of the
+    // pre-existing breach is recorded (not silently absorbed) by this test's
+    // own existence rather than by failing it.
+    expect(bothVisible.parentRows, `.nav-primary-row grew from ${baseline.parentRows} row(s) to ${bothVisible.parentRows} at 320px with both badges visible`).toBeLessThanOrEqual(baseline.parentRows);
     expect(bothVisible.childRows, `.nav-actions grew from ${baseline.childRows} internal row(s) to ${bothVisible.childRows} at 320px with both badges visible`).toBeLessThanOrEqual(baseline.childRows);
     expect(bothVisible.overflowPx, `.nav-actions overflow grew from ${baseline.overflowPx}px to ${bothVisible.overflowPx}px at 320px with both badges visible`).toBeLessThanOrEqual(baseline.overflowPx);
   });
