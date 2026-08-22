@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { ObservationSessionsStore, BUILDER_VERSION } from '../../lib/observation-sessions-store.js';
+import { __internal as pipelineInternal } from '../../lib/pipeline-loops.js';
 
 const URL_KEY = 'acme';
 
@@ -211,4 +212,102 @@ test('clear removes every doc for a workspace', async () => {
   const { sessions, backfilledAt } = await store.findByWorkspace(URL_KEY);
   assert.equal(sessions.length, 0);
   assert.equal(backfilledAt, null);
+});
+
+// ── LIN-2182 (H3) · review ledger 3: persist → read round trip ────────────────
+// The BUILDER_VERSION bump exists so in-flight lean docs read-miss and rebuild
+// CARRYING `decision`/`decisionCase`. Two halves of that were already pinned
+// separately — the derivation (tests/unit/pipeline-loops.test.js) and the
+// invalidation mechanism (the BUILDER_VERSION - 1 tests above) — but nothing
+// exercised the link BETWEEN them: that a session assembled from real built loops
+// still carries the fields after `upsertSession` → `getSession`. That link was
+// read-verified only (`_assembleSession` returns `loops: ordered` verbatim;
+// `upsertSession` stores the session whole), and it is the one hop CI never
+// touched, which is the whole point of the bump. This closes it by test.
+const { _buildLoops, _assembleSession } = pipelineInternal;
+
+const ROUNDTRIP_NOW = new Date('2026-04-11T12:00:00.000Z');
+const ROUNDTRIP_DECISION = { decision_id: 'd-1', question: 'ship it, or hold for review?' };
+
+function decisionBearingSession(sessionId) {
+  const historyItem = {
+    id: sessionId,
+    promptName: 'implementation',
+    prompt: 'implementation prompt text',
+    issueId: 'uuid-100',
+    issueIdentifier: 'LIN-100',
+    issueTitle: 'Issue A',
+    issueUrl: 'https://linear.app/x/issue/LIN-100',
+    workspace: { urlKey: URL_KEY },
+    dispatchedAt: '2026-04-10T10:00:00.000Z',
+    dispatchedBy: 'user-1',
+    target: 'cli',
+    repo: null,
+    status: 'taken',
+    resolvedAt: '2026-04-10T11:00:00.000Z',
+    takenByTokenLabel: 'consumer-1',
+    feedback: [
+      { kind: 'assistant-text', message: 'here is the case', timestamp: '2026-04-10T10:30:00.000Z' },
+      { kind: 'decision', message: `[decision] ${JSON.stringify(ROUNDTRIP_DECISION)}`, timestamp: '2026-04-10T10:31:00.000Z' },
+      { kind: 'status', message: '[blocked] awaiting a ruling', timestamp: '2026-04-10T10:31:01.000Z' }
+    ]
+  };
+  // `lean: true` is the shape the materializer actually persists — the one whose
+  // dropped `feedback[]` makes a lazily-derived field unrecoverable downstream.
+  const loops = _buildLoops({ historyItems: [historyItem], now: ROUNDTRIP_NOW, lean: true });
+  return { session: _assembleSession(sessionId, null, loops), builtLoop: loops[0] };
+}
+
+test('a lean session assembled from real loops carries decision/decisionCase through upsertSession → getSession (LIN-2182)', async () => {
+  const collection = createMockCollection();
+  const store = new ObservationSessionsStore({ collection });
+  const { session, builtLoop } = decisionBearingSession('S-decision');
+
+  // Precondition: the loop genuinely carries the fields before persistence, so a
+  // pass below cannot come from asserting nothing.
+  assert.deepEqual(builtLoop.decision, ROUNDTRIP_DECISION);
+  assert.deepEqual(builtLoop.decisionCase, ['here is the case']);
+  assert.deepEqual(builtLoop.feedback, [], 'and it is the lean shape — raw feedback[] is gone');
+
+  assert.equal(await store.upsertSession(URL_KEY, session), true);
+
+  // The stored doc, as it would survive BSON: the mock keeps object references, so
+  // serialize before asserting or the read could pass on identity alone.
+  const persisted = JSON.parse(JSON.stringify(collection._docs.find(d => d.type === 'session')));
+  assert.deepEqual(persisted.session.loops[0].decision, ROUNDTRIP_DECISION, 'decision is in the written document');
+  assert.deepEqual(persisted.session.loops[0].decisionCase, ['here is the case'], 'decisionCase is in the written document');
+
+  const point = await store.getSession(URL_KEY, 'S-decision');
+  assert.ok(point, 'point read hits at the current builderVersion');
+  assert.deepEqual(point.loops[0].decision, ROUNDTRIP_DECISION);
+  assert.deepEqual(point.loops[0].decisionCase, ['here is the case']);
+
+  const { sessions } = await store.findByWorkspace(URL_KEY);
+  assert.equal(sessions.length, 1);
+  assert.deepEqual(sessions[0].loops[0].decision, ROUNDTRIP_DECISION, 'and on the list read too');
+  assert.deepEqual(sessions[0].loops[0].decisionCase, ['here is the case']);
+
+  // The `!== undefined` build-discriminators (routes/dashboard.js:158/:278/:352,
+  // lib/pipeline-loops.js _loopCompletedAt) read presence, not truthiness — so the
+  // keys must survive persistence even when the values are empty.
+  assert.ok('decision' in point.loops[0] && 'decisionCase' in point.loops[0]);
+});
+
+// LIN-2182: the v8 → v9 bump exists because `decision`/`decisionCase` are NEW KEYS
+// on every loop (the v6/v7 trigger class, not v5's changed-derived-value). A v8 doc
+// predates them entirely, so without the bump the feed would serve caseless loops
+// for up to DEFAULT_HISTORY_TTL (30 days). Pinning the v8 doc as the target set is
+// what makes this bump load-bearing rather than cosmetic — and, unlike the generic
+// `BUILDER_VERSION - 1` tests, it stays meaningful after the next bump.
+test('a v8 doc (pre-LIN-2182) read-misses on both list and point reads so it rebuilds with decision/decisionCase', async () => {
+  const collection = createMockCollection();
+  const store = new ObservationSessionsStore({ collection });
+  const { session } = decisionBearingSession('S-decision');
+  await store.upsertSession(URL_KEY, session);
+
+  const doc = collection._docs.find(d => d.type === 'session');
+  doc.builderVersion = 8;
+
+  assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v8 doc');
+  assert.equal(await store.getSession(URL_KEY, 'S-decision'), null, 'point read misses the v8 doc → route reconstructs');
 });
