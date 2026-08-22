@@ -2274,7 +2274,10 @@ ${goal}`
    * `missing` means this task has never been scanned.
    *
    * @route GET /workspace/:urlKey/api/scan/:issueId
-   * @returns {Object} { status: 'fresh'|'stale'|'missing', decision?, outcome?, outcomeAt?, scannedAt?, id?, issueId? }
+   * @returns {Object} { status: 'fresh'|'stale'|'missing', decision?, outcome?, outcomeAt?, scannedAt?, id?, issueId? } —
+   *   `stale` carries the same decision fields as `fresh` (LIN-2211): the row is still a live,
+   *   answerable/dismissable ruling, only the content hash has moved, so a caller must not treat
+   *   `stale` as a bare `{status, scannedAt}` shape.
    */
   router.get('/workspace/:urlKey/api/scan/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
@@ -2322,7 +2325,15 @@ ${goal}`
         return res.json({ status: 'missing' });
       }
       if (cached.inputHash !== inputHash) {
-        return res.json({ status: 'stale', scannedAt: cached.scannedAt });
+        return res.json({
+          status: 'stale',
+          id: cached.id,
+          issueId: cached.issueId,
+          decision: cached.decision,
+          scannedAt: cached.scannedAt,
+          outcome: cached.outcome,
+          outcomeAt: cached.outcomeAt
+        });
       }
       return res.json({
         status: 'fresh',

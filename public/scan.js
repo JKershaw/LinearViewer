@@ -20,6 +20,13 @@
  *                                          an outcome-stamped row is durable,
  *                                          never silently re-escalated)
  *
+ * `stale` carries the SAME three branches (LIN-2211): a decision found before
+ * unrelated task activity (e.g. an unconnected comment) moved the content
+ * hash is still a live ruling, not a shape the operator lost the ability to
+ * act on — `renderStale` reuses `renderDecisionBody` verbatim so an orphaned
+ * unanswered ruling keeps its answer/dismiss controls alongside the rescan
+ * affordance, rather than degrading to a bare "rescan" placeholder.
+ *
  * Answering posts a durable comment via the shared `window.ReplyDelivery`
  * chain (LIN-2200) — NOT `window.api` directly, per this ticket's own
  * constraint — carrying `{taskDecisionId, taskDecisionIssueId}` so the
@@ -134,8 +141,30 @@
 
   function renderStale(data) {
     const ts = data && data.scannedAt ? relativeTime(data.scannedAt) : '';
-    return `${header('scan · out of date', ts ? `last ${ts}` : '', actionButton('rescan', '↻ rescan'))}
-      <div class="scan-placeholder">Task content has changed since the last scan. Rescan to check for blockers.</div>`;
+    const meta = ts ? `last ${ts}` : '';
+    const rescanBtn = actionButton('rescan', '↻ rescan');
+    const staleNote = '<div class="scan-placeholder">Task content has changed since the last scan. Rescan to check for further blockers.</div>';
+
+    if (!data || !data.decision) {
+      return `${header('scan · out of date', meta, rescanBtn)}
+        <div class="scan-placeholder">Task content has changed since the last scan. Rescan to check for blockers.</div>`;
+    }
+
+    if (data.outcome === 'dismissed' || data.outcome === 'answered') {
+      const outcomeLabel = data.outcome === 'dismissed' ? 'dismissed' : 'answered';
+      const outcomeTs = data.outcomeAt ? relativeTime(data.outcomeAt) : '';
+      return `${header(`scan · out of date · ${outcomeLabel}`, meta, rescanBtn)}
+        <div class="scan-outcome-note" data-testid="scan-outcome-${outcomeLabel}">
+          ${esc(outcomeLabel.charAt(0).toUpperCase() + outcomeLabel.slice(1))}${outcomeTs ? ' ' + esc(outcomeTs) : ''}.
+          <details class="scan-outcome-detail"><summary>show ruling</summary>${renderDecisionBody(data.decision, { interactive: false })}</details>
+        </div>`;
+    }
+
+    // Orphan case: an unanswered ruling whose task content has since changed
+    // (LIN-2211) — still live and actionable, so it gets the same
+    // answer/dismiss interaction `renderFresh` offers, plus the rescan
+    // affordance and a note explaining why it's shown as stale.
+    return `${header('scan · out of date', meta, rescanBtn)}${renderDecisionBody(data.decision, { interactive: true })}${staleNote}`;
   }
 
   // The comment an answer writes is itself part of the scan's own input
@@ -304,6 +333,7 @@
         ctx.lastData = data;
         applyState(container, renderFresh(data), 'fresh');
       } else if (data.status === 'stale') {
+        ctx.lastData = data;
         applyState(container, renderStale(data), 'stale');
       } else {
         applyState(container, renderMissing(), 'missing');

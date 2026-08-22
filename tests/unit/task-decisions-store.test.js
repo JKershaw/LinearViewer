@@ -258,20 +258,27 @@ describe('TaskDecisionsStore.recordScan / getStatus', () => {
     assert.deepEqual(survivingIds, expected);
   });
 
-  test('the current live (unanswered) row survives a prune at maxPerTask: 1', async () => {
+  // LIN-2211 ruling: a decision-bearing, unanswered row is prune-EXEMPT,
+  // unconditionally — the opposite polarity from the pre-LIN-2211 behaviour
+  // this test used to assert (`rows.length === 1`, only the newest survived).
+  // Both rows here are live unanswered rulings, so both now survive even
+  // though `maxPerTask: 1` is exceeded: an escalation queue must never
+  // silently drop a question that was asked of a human, unlike a cache.
+  test('decision-bearing unanswered rows both survive a prune at maxPerTask: 1 (LIN-2211)', async () => {
     const capped = new TaskDecisionsStore({ collection, maxPerTask: 1 });
-    await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const first = await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
     const second = await capped.recordScan({
       urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_B,
       decision: sampleDecision({ decision_id: 'scan_11111111_bbbbbbbbbbbb' })
     });
 
     const rows = collection._docs.filter(d => d.urlKey === URL_KEY && d.issueId === ISSUE_ID);
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]._id, second.id); // the live row, not the pruned-away first one
+    assert.equal(rows.length, 2, 'the cap is intentionally exceeded — both live unanswered rulings survive');
+    const ids = rows.map(r => r._id).sort();
+    assert.deepEqual(ids, [first.id, second.id].sort());
 
     const status = await capped.getStatus(URL_KEY, ISSUE_ID);
-    assert.equal(status.id, second.id);
+    assert.equal(status.id, second.id); // getStatus still falls back to the newest when no hash given
   });
 
   test('an outcome-stamped row survives a capacity prune even when pushed past maxPerTask (LIN-2197 Phase 5, L2)', async () => {
@@ -286,26 +293,102 @@ describe('TaskDecisionsStore.recordScan / getStatus', () => {
     // the dismissed row A would fall off the newest-`maxPerTask` slice and be
     // deleted, so a later revert to A's exact content would re-escalate an
     // already-dismissed ruling (the false-escalation failure this feature is
-    // measured against).
+    // measured against). Churn rows are zero-finding (LIN-2211: a
+    // decision-bearing churn row would now be exempt too, under the broader
+    // ruling, and would no longer exercise ordinary eviction) so this test
+    // still proves real eviction happens around the exempt dismissed row.
     for (const h of ['h1', 'h2', 'h3']) {
       await capped.recordScan({
         urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: h.padEnd(64, '0'),
-        decision: sampleDecision({ decision_id: `scan_11111111_${h}` })
+        decision: null
       });
     }
 
     const rows = collection._docs.filter(d => d.urlKey === URL_KEY && d.issueId === ISSUE_ID);
     const ids = rows.map(r => r._id);
     assert.ok(ids.includes(idA), 'the dismissed row must survive the prune');
-    // The dismissed row plus the newest 2 non-terminal rows (h2, h3) — h1 is
-    // an ordinary prune casualty, unaffected by the outcome exemption.
-    assert.equal(rows.length, 3);
+    // Pruning runs after every single recordScan, so capacity (2) is
+    // re-established each time: the dismissed row A (exempt, never counted
+    // against the cap) plus whichever single zero-finding row is newest at
+    // that moment — h1 and h2 are each evicted in turn as a later churn row
+    // arrives, only h3 (the last one written) survives alongside A.
+    assert.equal(rows.length, 2);
+    assert.ok(ids.includes(TaskDecisionsStore.buildId(ISSUE_ID, 'h3'.padEnd(64, '0'))));
     assert.ok(!ids.includes(TaskDecisionsStore.buildId(ISSUE_ID, 'h1'.padEnd(64, '0'))));
+    assert.ok(!ids.includes(TaskDecisionsStore.buildId(ISSUE_ID, 'h2'.padEnd(64, '0'))));
 
     // getStatus at A's exact hash still finds the (never-deleted) dismissed row.
     const afterRevert = await capped.getStatus(URL_KEY, ISSUE_ID, HASH_A);
     assert.equal(afterRevert.id, idA);
     assert.equal(afterRevert.outcome, 'dismissed');
+  });
+
+  test('a decision-bearing unanswered row survives the prune even N+1 deep past maxPerTask (LIN-2211)', async () => {
+    const N = 3;
+    const capped = new TaskDecisionsStore({ collection, maxPerTask: N });
+    const ids = [];
+    for (let i = 0; i <= N; i++) {
+      const hash = `live${i}`.padEnd(64, '0');
+      const record = await capped.recordScan({
+        urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: hash,
+        decision: sampleDecision({ decision_id: `scan_11111111_live${i}` })
+      });
+      ids.push(record.id);
+    }
+
+    const rows = collection._docs.filter(d => d.urlKey === URL_KEY && d.issueId === ISSUE_ID);
+    assert.equal(rows.length, N + 1, 'every decision-bearing unanswered row survives, cap exceeded by one');
+    const survivingIds = rows.map(r => r._id).sort();
+    assert.deepEqual(survivingIds, [...ids].sort());
+  });
+
+  test('zero-finding rows evict before terminal rows when both are present and capacity is exceeded', async () => {
+    const capped = new TaskDecisionsStore({ collection, maxPerTask: 1 });
+    // Terminal row, already present and dismissed.
+    await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const idTerminal = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    collection._docs.find(d => d._id === idTerminal).outcome = 'dismissed';
+    collection._docs.find(d => d._id === idTerminal).outcomeAt = new Date();
+
+    // A zero-finding row pushes the task to 2 rows against maxPerTask: 1 —
+    // the terminal row is exempt outright, so bucket 1 (zero-finding) must
+    // absorb the eviction instead, even though it is the newer row.
+    const idZero = TaskDecisionsStore.buildId(ISSUE_ID, HASH_B);
+    await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_B, decision: null });
+
+    const rows = collection._docs.filter(d => d.urlKey === URL_KEY && d.issueId === ISSUE_ID);
+    const ids = rows.map(r => r._id);
+    assert.ok(ids.includes(idTerminal), 'the terminal row is exempt and must survive');
+    assert.ok(!ids.includes(idZero), 'the zero-finding row is evicted ahead of the terminal row');
+  });
+
+  test('terminal rows evict oldest-first once zero-finding rows are exhausted', async () => {
+    const capped = new TaskDecisionsStore({ collection, maxPerTask: 2 });
+    // Two terminal rows, oldest first — both fit under the cap so neither
+    // is evicted by virtue of position, only by bucket priority later.
+    await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const idOldTerminal = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    collection._docs.find(d => d._id === idOldTerminal).outcome = 'dismissed';
+    collection._docs.find(d => d._id === idOldTerminal).outcomeAt = new Date();
+
+    await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_B, decision: sampleDecision({ decision_id: 'scan_11111111_hb' }) });
+    const idNewTerminal = TaskDecisionsStore.buildId(ISSUE_ID, HASH_B);
+    collection._docs.find(d => d._id === idNewTerminal).outcome = 'answered';
+    collection._docs.find(d => d._id === idNewTerminal).outcomeAt = new Date();
+
+    // No zero-finding rows exist, so a third row (itself exempt, being
+    // decision-bearing and unanswered) pushes the count past maxPerTask: 2
+    // with an empty bucket 1 — eviction falls straight to bucket 2, taking
+    // the OLDER terminal row.
+    await capped.recordScan({
+      urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: 'h3'.padEnd(64, '0'),
+      decision: sampleDecision({ decision_id: 'scan_11111111_h3' })
+    });
+
+    const rows = collection._docs.filter(d => d.urlKey === URL_KEY && d.issueId === ISSUE_ID);
+    const ids = rows.map(r => r._id);
+    assert.ok(!ids.includes(idOldTerminal), 'the older terminal row is evicted first');
+    assert.ok(ids.includes(idNewTerminal), 'the newer terminal row survives');
   });
 });
 
