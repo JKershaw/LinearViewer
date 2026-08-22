@@ -439,6 +439,24 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
 // measures BOTH: the parent row's wrap count (restored) and `.nav-actions`'
 // own internal child-row count plus horizontal overflow (`scrollWidth` vs
 // `clientWidth`).
+//
+// LIN-1728 close-out (review `5ac8e83f`, H1): the three metrics above are all
+// pinned by CSS structure and cannot move, so none of them is the guard —
+// keep them for the shape they document, but do not read them as coverage.
+// `parentRows` is already at its structural maximum of 2 at 320px (the row has
+// exactly two children, `.nav-filters` and `.nav-actions`, already stacked);
+// `.nav-actions` sets no width and no `overflow-x` (`public/style.css:616-620`),
+// so `scrollWidth === clientWidth` by construction and `overflowPx` is always
+// exactly 0; and `align-items: baseline` puts the `<a>` badge ~2px above the
+// `<button>` badges, so `childRows` reads 2 in every state — rounding noise
+// compared against rounding noise. The review injected `min-width: 900px` on
+// the rulings badge and all three numbers were unchanged (2 / 2 / 0) while the
+// page itself blew out from 320px to 1029px.
+//
+// `document.body.scrollWidth` is the metric that actually moves, so THAT is the
+// assertion carrying this test: a second badge must not widen the page beyond
+// the zero-badge baseline. The `pageWidth` case below is the one a regression
+// fails on; the other three are descriptive.
 test.describe('.nav-actions width at ≤320px with both badges visible (LIN-2191 follow-up check)', () => {
   test('two visible badges do not add wrapping or overflow beyond the pre-existing zero-badge shape', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}${featuresParam({ dispatch: true })}`);
@@ -455,12 +473,15 @@ test.describe('.nav-actions width at ≤320px with both badges visible (LIN-2191
           ).size
         : 0;
       const actions = document.querySelector('.nav-actions');
-      if (!actions) return { parentRows, childRows: 0, overflowPx: 0 };
+      if (!actions) return { parentRows, childRows: 0, overflowPx: 0, pageWidth: document.body.scrollWidth };
       const childRows = new Set(
         Array.from(actions.children).map(el => Math.round(el.getBoundingClientRect().top))
       ).size;
       const overflowPx = Math.max(0, actions.scrollWidth - actions.clientWidth);
-      return { parentRows, childRows, overflowPx };
+      // The load-bearing metric (H1): unlike the three above, this one moves
+      // when a badge grows past what the viewport can hold.
+      const pageWidth = document.body.scrollWidth;
+      return { parentRows, childRows, overflowPx, pageWidth };
     };
 
     // Baseline: both badges hidden (0 queued, 0 rulings) — today's shipped
@@ -487,5 +508,10 @@ test.describe('.nav-actions width at ≤320px with both badges visible (LIN-2191
     expect(bothVisible.parentRows, `.nav-primary-row grew from ${baseline.parentRows} row(s) to ${bothVisible.parentRows} at 320px with both badges visible`).toBeLessThanOrEqual(baseline.parentRows);
     expect(bothVisible.childRows, `.nav-actions grew from ${baseline.childRows} internal row(s) to ${bothVisible.childRows} at 320px with both badges visible`).toBeLessThanOrEqual(baseline.childRows);
     expect(bothVisible.overflowPx, `.nav-actions overflow grew from ${baseline.overflowPx}px to ${bothVisible.overflowPx}px at 320px with both badges visible`).toBeLessThanOrEqual(baseline.overflowPx);
+    // The assertion that can actually fail (H1). `.nav-actions` grows 38px →
+    // 218px inside the 320px viewport when both badges appear, and the page
+    // width must stay put; a badge wide enough to push the document past the
+    // viewport fails here and nowhere else.
+    expect(bothVisible.pageWidth, `the page grew from ${baseline.pageWidth}px to ${bothVisible.pageWidth}px at a 320px viewport with both badges visible`).toBeLessThanOrEqual(baseline.pageWidth);
   });
 });
