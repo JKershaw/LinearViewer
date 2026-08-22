@@ -1439,7 +1439,7 @@ ${goal}`
    * named V1 limitation; LIN-2188 owns closing that gap.
    *
    * @route POST /workspace/:urlKey/api/comments/:issueId
-   * Body: { body: string, decisionLoopId?: string, decisionId?: string }
+   * Body: { body: string, decisionLoopId?: string, decisionId?: string, taskDecisionId?: string, taskDecisionIssueId?: string }
    * @returns 201 { success: true, comment } | 200 { success: true, comment, deduped: true }
    *
    * LIN-1728 Phase 2: an optional `{decisionLoopId, decisionId}` pair, both
@@ -1452,6 +1452,20 @@ ${goal}`
    * ONE write path for the `decision-answer` kind (decision 1): a runner
    * token can never reach it, since it lives outside the runner-facing
    * feedback route entirely.
+   *
+   * LIN-2197 Phase 5 (Phase 4 close-out ledger item L4): the task-decision
+   * sibling of the pair above — an optional `{taskDecisionId, taskDecisionIssueId}`
+   * pair, both required together, threaded from `public/scan.js`'s answer
+   * form via the same `window.ReplyDelivery.postComment`. After a successful
+   * comment write, best-effort stamps `outcome: 'answered'` onto the scanned
+   * row via `taskDecisionsStore.markOutcome` — logged on failure, never
+   * thrown, mirroring the loop-decision stamp's discipline exactly. This is
+   * the first (and, at HEAD, only) production caller of `markOutcome` with
+   * `'answered'` — before this, the outcome was reachable only as
+   * `'dismissed'` via the dismiss route, so `'answered'` was unwritable in
+   * production (the gap Phase 4's review recorded as L4, "the item that must
+   * not be dropped": dismissed-vs-answered is what the false-escalation KPI
+   * `docs/escalation-philosophy.md` is computed from).
    */
   router.post('/workspace/:urlKey/api/comments/:issueId', workspaceFromUrl, json(), async (req, res) => {
     const workspace = req.workspace
@@ -1540,7 +1554,7 @@ ${goal}`
       // succeeded and is the durable half of this write; the stamp is a
       // secondary annotation the rulings predicate tolerates missing (the
       // loop just stays "unanswered" until a later attempt succeeds).
-      const { decisionLoopId, decisionId } = req.body || {}
+      const { decisionLoopId, decisionId, taskDecisionId, taskDecisionIssueId } = req.body || {}
       if (typeof decisionLoopId === 'string' && decisionLoopId && typeof decisionId === 'string' && decisionId) {
         try {
           const stamped = await dispatchQueueStore.markDecisionAnswered(decisionLoopId, workspace.urlKey, decisionId)
@@ -1549,6 +1563,24 @@ ${goal}`
           }
         } catch (stampErr) {
           console.error('Decision-answer stamp failed:', stampErr.message)
+        }
+      }
+
+      // Best-effort answer stamp for a scan-produced decision (LIN-2197
+      // Phase 5, close-out ledger item L4) — the task-keyed sibling of the
+      // loop-decision stamp above, same discipline: both fields required
+      // together, failure logged only, never blocks the already-succeeded
+      // comment response.
+      if (taskDecisionsStore && typeof taskDecisionId === 'string' && taskDecisionId && typeof taskDecisionIssueId === 'string' && taskDecisionIssueId) {
+        try {
+          const stamped = await taskDecisionsStore.markOutcome({
+            urlKey: workspace.urlKey, issueId: taskDecisionIssueId, id: taskDecisionId, outcome: 'answered'
+          })
+          if (!stamped) {
+            console.error(`Task-decision answer stamp not applied: no matching row ${taskDecisionId} for issue ${taskDecisionIssueId} in workspace ${workspace.urlKey}`)
+          }
+        } catch (stampErr) {
+          console.error('Task-decision answer stamp failed:', stampErr.message)
         }
       }
 
@@ -2242,7 +2274,7 @@ ${goal}`
    * `missing` means this task has never been scanned.
    *
    * @route GET /workspace/:urlKey/api/scan/:issueId
-   * @returns {Object} { status: 'fresh'|'stale'|'missing', decision?, outcome?, outcomeAt?, scannedAt?, id? }
+   * @returns {Object} { status: 'fresh'|'stale'|'missing', decision?, outcome?, outcomeAt?, scannedAt?, id?, issueId? }
    */
   router.get('/workspace/:urlKey/api/scan/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
@@ -2295,6 +2327,7 @@ ${goal}`
       return res.json({
         status: 'fresh',
         id: cached.id,
+        issueId: cached.issueId,
         decision: cached.decision,
         scannedAt: cached.scannedAt,
         outcome: cached.outcome,
@@ -2323,7 +2356,7 @@ ${goal}`
    * strict parse/validation, not by this route.
    *
    * @route POST /workspace/:urlKey/api/scan/:issueId
-   * @returns {Object} { status: 'fresh', id, decision, scannedAt, outcome, outcomeAt, model }
+   * @returns {Object} { status: 'fresh', id, issueId, decision, scannedAt, outcome, outcomeAt, model }
    */
   router.post('/workspace/:urlKey/api/scan/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
@@ -2450,6 +2483,7 @@ ${goal}`
       keepalive.send(200, {
         status: 'fresh',
         id: record.id,
+        issueId: record.issueId,
         decision: record.decision,
         scannedAt: record.scannedAt,
         outcome: record.outcome,
@@ -2481,14 +2515,23 @@ ${goal}`
    * response, not just the task's issueId, so a stale client can't
    * accidentally dismiss whatever happens to be current server-side.
    *
+   * LIN-2197 Phase 5 (Phase 4 close-out ledger item L3): when `:issueId` is
+   * already UUID-shaped, it IS the canonical id — `markOutcome` filters on
+   * `{_id, urlKey, issueId}`, so the row's own stored key is the authority
+   * and there is no reason to pay for a provider context fetch just to
+   * re-derive an id already in hand. This also fixes the trashed/deleted-task
+   * case: a stale ruling on a task the provider can no longer fetch could
+   * previously never be dismissed (the fetch 404s before `markOutcome` is
+   * ever reached). A non-UUID `:issueId` (an identifier, or a caller that
+   * hasn't been updated to pass the canonical id GET/POST scan now return)
+   * still resolves it via the context fetch, unchanged.
+   *
    * @route POST /workspace/:urlKey/api/scan/:issueId/dismiss
    * @returns {Object} { status: 'fresh', id, decision, outcome, outcomeAt, scannedAt }
    */
   router.post('/workspace/:urlKey/api/scan/:issueId/dismiss', workspaceFromUrl, json(), async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
-    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
-    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
     const recordId = req.body?.id;
 
     if (!isValidIssueId(issueId)) {
@@ -2500,27 +2543,35 @@ ${goal}`
     if (!taskDecisionsStore) {
       return jsonError(res, 503, 'Scan store not configured');
     }
-    if (!issueProvider.supports('fetchRecommendationContext')) {
-      return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-      });
-    }
 
     try {
-      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-      let context;
-      if (isTestMode) {
-        context = await buildMockRecapContext(issueId);
-        if (!context) return notFound.json(res, 'Issue not found');
+      let canonicalId;
+      if (UUID_REGEX.test(issueId)) {
+        canonicalId = issueId;
       } else {
-        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
-      }
+        const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+        const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
+        if (!issueProvider.supports('fetchRecommendationContext')) {
+          return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
+            code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+          });
+        }
 
-      const canonicalId = context.issue?.id || issueId;
-      if (!UUID_REGEX.test(canonicalId)) {
-        return jsonError(res, 422, "This task's canonical id could not be resolved; scan requires a canonical identity", {
-          code: 'CANONICAL_ID_REQUIRED'
-        });
+        const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+        let context;
+        if (isTestMode) {
+          context = await buildMockRecapContext(issueId);
+          if (!context) return notFound.json(res, 'Issue not found');
+        } else {
+          context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
+        }
+
+        canonicalId = context.issue?.id || issueId;
+        if (!UUID_REGEX.test(canonicalId)) {
+          return jsonError(res, 422, "This task's canonical id could not be resolved; scan requires a canonical identity", {
+            code: 'CANONICAL_ID_REQUIRED'
+          });
+        }
       }
 
       const record = await taskDecisionsStore.markOutcome({
@@ -2542,6 +2593,9 @@ ${goal}`
       console.error('Scan dismiss error:', error);
       if (error.response?.status === 401) {
         return unauthorized.json(res, 'Token expired or invalid');
+      }
+      if (error.message?.includes('not found')) {
+        return notFound.json(res, error.message);
       }
       jsonError(res, 500, 'Failed to dismiss scan result', { message: error.message });
     }

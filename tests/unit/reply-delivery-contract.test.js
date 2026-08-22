@@ -491,6 +491,55 @@ test('postComment (LIN-1728 Phase 2): a lone decisionLoopId or decisionId (not b
   }
 });
 
+test('postComment (LIN-2197 Phase 5): a {taskDecisionId, taskDecisionIssueId} pair is forwarded in the body when both are present', async () => {
+  let seenBody = null;
+  const { window } = makeSandbox((url, opts) => {
+    seenBody = JSON.parse(opts.body);
+    return jsonResponse(true, 201, { success: true });
+  });
+
+  await window.ReplyDelivery.postComment('wkey', 'iss1', 'a comment body', {
+    taskDecisionId: 'scan_11111111_aaaaaaaaaaaa', taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+  });
+
+  assert.deepEqual(seenBody, {
+    body: 'a comment body', taskDecisionId: 'scan_11111111_aaaaaaaaaaaa', taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+  });
+});
+
+test('postComment (LIN-2197 Phase 5): a lone taskDecisionId or taskDecisionIssueId (not both) is never sent — not a half-stamp', async () => {
+  const seenBodies = [];
+  const { window } = makeSandbox((url, opts) => {
+    seenBodies.push(JSON.parse(opts.body));
+    return jsonResponse(true, 201, { success: true });
+  });
+
+  await window.ReplyDelivery.postComment('wkey', 'iss1', 'x', { taskDecisionId: 'scan_11111111_aaaaaaaaaaaa' });
+  await window.ReplyDelivery.postComment('wkey', 'iss1', 'x', { taskDecisionIssueId: '11111111-2222-3333-4444-555555555555' });
+
+  for (const body of seenBodies) {
+    assert.deepEqual(body, { body: 'x' }, 'no task-decision fields leak into the body unless both are present');
+  }
+});
+
+test('postComment: the two decision pairs (LIN-1728 loop-decision, LIN-2197 task-decision) are independent and can both be sent', async () => {
+  let seenBody = null;
+  const { window } = makeSandbox((url, opts) => {
+    seenBody = JSON.parse(opts.body);
+    return jsonResponse(true, 201, { success: true });
+  });
+
+  await window.ReplyDelivery.postComment('wkey', 'iss1', 'x', {
+    decisionLoopId: 'lp1', decisionId: 'd-1',
+    taskDecisionId: 'scan_11111111_aaaaaaaaaaaa', taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+  });
+
+  assert.deepEqual(seenBody, {
+    body: 'x', decisionLoopId: 'lp1', decisionId: 'd-1',
+    taskDecisionId: 'scan_11111111_aaaaaaaaaaaa', taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+  });
+});
+
 test('deliverReply (LIN-1728 Phase 2): opts.decisionLoopId/decisionId are forwarded into the internal postComment call', async () => {
   let commentBody = null;
   const { window } = makeSandbox((url, opts) => {

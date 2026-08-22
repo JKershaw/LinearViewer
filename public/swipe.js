@@ -368,6 +368,22 @@ function renderCard(direction) {
       </div>`);
   }
 
+  // Scan accordion (lazy loaded, LIN-2197 Phase 5) - the third producer into
+  // the operator decision queue (LIN-1721). Only performs the cheap status
+  // check on first expand — the scan itself is always an explicit click,
+  // never auto-triggered by opening the accordion (see public/scan.js).
+  if (urlKey) {
+    groups.insights.push(`
+      <div class="swipe-card-accordion">
+        <div class="swipe-accordion-header" data-accordion="scan">
+          <span class="swipe-accordion-toggle">▶</span> Scan
+        </div>
+        <div class="swipe-accordion-body" data-accordion-body="scan">
+          <div class="scan-section" data-scan-placeholder="1"></div>
+        </div>
+      </div>`);
+  }
+
   // Context accordion (lazy loaded) - relationship diagram, only when authenticated
   if (urlKey) {
     groups.insights.push(`
@@ -713,6 +729,21 @@ function handleAccordionClick(e) {
       const issue = filteredIssues[currentIndex];
       if (issue && urlKey) {
         window.BriefSection.init(placeholder, {
+          urlKey,
+          identifier: issue.identifier || issue.id,
+          source: issue.source
+        });
+      }
+    }
+  }
+
+  if (type === 'scan' && !isOpen) {
+    const placeholder = body.querySelector('[data-scan-placeholder="1"]');
+    if (placeholder && window.ScanSection) {
+      placeholder.removeAttribute('data-scan-placeholder');
+      const issue = filteredIssues[currentIndex];
+      if (issue && urlKey) {
+        window.ScanSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id,
           source: issue.source

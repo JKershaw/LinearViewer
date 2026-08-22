@@ -265,6 +265,40 @@ describe('TaskDecisionsStore.recordScan / getStatus', () => {
     const status = await capped.getStatus(URL_KEY, ISSUE_ID);
     assert.equal(status.id, second.id);
   });
+
+  test('an outcome-stamped row survives a capacity prune even when pushed past maxPerTask (LIN-2197 Phase 5, L2)', async () => {
+    const capped = new TaskDecisionsStore({ collection, maxPerTask: 2 });
+    await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const idA = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    const rowA = collection._docs.find(d => d._id === idA);
+    rowA.outcome = 'dismissed';
+    rowA.outcomeAt = new Date();
+
+    // Push three more distinct-hash scans past the cap — without the L2 fix,
+    // the dismissed row A would fall off the newest-`maxPerTask` slice and be
+    // deleted, so a later revert to A's exact content would re-escalate an
+    // already-dismissed ruling (the false-escalation failure this feature is
+    // measured against).
+    for (const h of ['h1', 'h2', 'h3']) {
+      await capped.recordScan({
+        urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: h.padEnd(64, '0'),
+        decision: sampleDecision({ decision_id: `scan_11111111_${h}` })
+      });
+    }
+
+    const rows = collection._docs.filter(d => d.urlKey === URL_KEY && d.issueId === ISSUE_ID);
+    const ids = rows.map(r => r._id);
+    assert.ok(ids.includes(idA), 'the dismissed row must survive the prune');
+    // The dismissed row plus the newest 2 non-terminal rows (h2, h3) — h1 is
+    // an ordinary prune casualty, unaffected by the outcome exemption.
+    assert.equal(rows.length, 3);
+    assert.ok(!ids.includes(TaskDecisionsStore.buildId(ISSUE_ID, 'h1'.padEnd(64, '0'))));
+
+    // getStatus at A's exact hash still finds the (never-deleted) dismissed row.
+    const afterRevert = await capped.getStatus(URL_KEY, ISSUE_ID, HASH_A);
+    assert.equal(afterRevert.id, idA);
+    assert.equal(afterRevert.outcome, 'dismissed');
+  });
 });
 
 describe('TaskDecisionsStore canonical-UUID guard', () => {

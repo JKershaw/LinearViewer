@@ -173,12 +173,13 @@ function initAttachmentImages(content) {
 }
 
 /**
- * Lazy-mount a shared on-card section (Brief / Recap / Dispatched Sessions) on
- * first expand of its nested toggle. LIN-522: mirrors public/swipe.js, reusing
- * the view-agnostic BriefSection / RecapSection / SessionsSection modules. The
- * issue identifier and workspace url key are read from the toggle's data
+ * Lazy-mount a shared on-card section (Brief / Recap / Scan / Dispatched
+ * Sessions) on first expand of its nested toggle. LIN-522: mirrors
+ * public/swipe.js, reusing the view-agnostic BriefSection / RecapSection /
+ * ScanSection (LIN-2197 Phase 5) / SessionsSection modules. The issue
+ * identifier and workspace url key are read from the toggle's data
  * attributes (set server-side in lib/render.js).
- * @param {'brief'|'recap'|'sessions'} type - Which section to mount
+ * @param {'brief'|'recap'|'scan'|'sessions'} type - Which section to mount
  * @param {HTMLElement} toggle - The nested toggle carrying the data attributes
  * @param {HTMLElement} content - The content container holding the placeholder
  */
@@ -206,6 +207,12 @@ function loadLazySection(type, toggle, content) {
     if (placeholder && window.RecapSection) {
       placeholder.removeAttribute('data-recap-placeholder')
       window.RecapSection.init(placeholder, { urlKey, identifier, source })
+    }
+  } else if (type === 'scan') {
+    const placeholder = content.querySelector('[data-scan-placeholder="1"]')
+    if (placeholder && window.ScanSection) {
+      placeholder.removeAttribute('data-scan-placeholder')
+      window.ScanSection.init(placeholder, { urlKey, identifier, source })
     }
   } else if (type === 'sessions') {
     const placeholder = content.querySelector('[data-sessions-placeholder="1"]')
@@ -782,7 +789,7 @@ function init() {
         // LIN-522: Lazy-mount the shared Brief / Recap / Sessions sections on
         // first expand (mirrors the swipe accordion's placeholder pattern).
         if (
-          (toggleType === 'brief' || toggleType === 'recap' || toggleType === 'context' || toggleType === 'sessions') &&
+          (toggleType === 'brief' || toggleType === 'recap' || toggleType === 'scan' || toggleType === 'context' || toggleType === 'sessions') &&
           !isHidden &&
           !content.dataset.loaded
         ) {

@@ -703,12 +703,20 @@ window.ReplyDelivery = (function () {
   // LIN-2200 review note on why `postComment` stays positional rather than
   // object-shaped): optional `{decisionLoopId, decisionId}`, both sent only
   // when both are present, so the route can best-effort stamp
-  // `markDecisionAnswered` alongside this same comment write.
+  // `markDecisionAnswered` alongside this same comment write. LIN-2197
+  // Phase 5 adds the task-decision sibling pair on the SAME `decision`
+  // object — `{taskDecisionId, taskDecisionIssueId}`, also both-or-neither —
+  // so `public/scan.js`'s answer flow can best-effort stamp a scanned row
+  // 'answered' via the same route, without a second postComment variant.
   function postComment(urlKey, issueId, prompt, decision) {
     var body = { body: prompt };
     if (decision && decision.decisionLoopId && decision.decisionId) {
       body.decisionLoopId = decision.decisionLoopId;
       body.decisionId = decision.decisionId;
+    }
+    if (decision && decision.taskDecisionId && decision.taskDecisionIssueId) {
+      body.taskDecisionId = decision.taskDecisionId;
+      body.taskDecisionIssueId = decision.taskDecisionIssueId;
     }
     return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/comments/' + encodeURIComponent(issueId), {
       method: 'POST',
