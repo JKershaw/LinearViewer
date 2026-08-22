@@ -32,6 +32,7 @@ const sandbox = {
 };
 vm.runInNewContext(src, sandbox, { filename: 'observation.js' });
 const { renderActivityLog, renderArtifacts, classifyArtifact, renderObjective } = sandbox.module.exports;
+const { renderSummaryLine, excerptDecisionCase, renderWaitingDecisionSummary, DECISION_EXCERPT_CHARS } = sandbox.module.exports;
 
 test.describe('renderActivityLog — §6.3 burst copy', () => {
   test('drops the redundant per-burst total when a breakdown sums it', () => {
@@ -127,6 +128,96 @@ test.describe('renderObjective — §4 id-once (LIN-931)', () => {
   test('escapes the objective text', () => {
     const html = renderObjective({ seedTitle: '<script>x</script>', seedIssue: 'LIN-1' });
     assert.doesNotMatch(html, /<script>/);
+    assert.match(html, /&lt;script&gt;/);
+  });
+});
+
+// LIN-2184 (H5, beat 4): the feed card's waiting line gains a BOUNDED excerpt
+// of the case + option labels when a decision is present — never full prose
+// (that's the banner's job, beat 3). Beat 2 widened the session-level
+// projection so s.decision/s.decisionCase reach this consumer.
+test.describe('renderSummaryLine / excerptDecisionCase — waiting card decision excerpt', () => {
+  function waitingSession(overrides = {}) {
+    return {
+      sessionId: `sess-decision-${Math.random().toString(36).slice(2)}`,
+      workspaceUrlKey: 'ws-a',
+      stale: false,
+      terminal: false,
+      waiting: true,
+      waitingMessage: 'need your decision',
+      decision: null,
+      decisionCase: [],
+      ...overrides
+    };
+  }
+
+  test('the excerpt is truncated at DECISION_EXCERPT_CHARS and never exceeds it', () => {
+    const longCase = ['A'.repeat(DECISION_EXCERPT_CHARS + 50)];
+    const excerpt = excerptDecisionCase(longCase, DECISION_EXCERPT_CHARS);
+    assert.ok(excerpt.endsWith('…'), 'truncation is visible (ellipsis)');
+    const withoutEllipsis = excerpt.slice(0, -1);
+    assert.ok(
+      withoutEllipsis.length <= DECISION_EXCERPT_CHARS,
+      `excerpt body (${withoutEllipsis.length}) must not exceed the budget (${DECISION_EXCERPT_CHARS})`
+    );
+  });
+
+  test('a short case under the budget renders whole, with no stray ellipsis', () => {
+    const excerpt = excerptDecisionCase(['Proceed with the migration?'], DECISION_EXCERPT_CHARS);
+    assert.equal(excerpt, 'Proceed with the migration?');
+    assert.ok(!excerpt.includes('…'));
+  });
+
+  test('the excerpt spans multiple chunks rather than silently dropping everything after the first', () => {
+    const excerpt = excerptDecisionCase(['Part one.', 'Part two.', 'Part three.'], DECISION_EXCERPT_CHARS);
+    assert.match(excerpt, /Part one\./);
+    assert.match(excerpt, /Part two\./);
+    assert.match(excerpt, /Part three\./);
+  });
+
+  test('option labels render in the decision summary', () => {
+    const html = renderWaitingDecisionSummary(
+      { decision_id: 'd-1', options: [{ id: 'yes', label: 'Yes, proceed' }, { id: 'no', label: 'No, hold off' }] },
+      ['short case']
+    );
+    assert.match(html, /Yes, proceed/);
+    assert.match(html, /No, hold off/);
+  });
+
+  test('renderSummaryLine: a waiting session with a decision renders the excerpt + option labels + working reply CTA', () => {
+    const s = waitingSession({
+      decision: { decision_id: 'd-1', options: [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }] },
+      decisionCase: ['Considered the schema diff.']
+    });
+    const html = renderSummaryLine(s);
+    assert.match(html, /obs-summary-waiting/);
+    assert.match(html, /waiting on you/);
+    assert.match(html, /obs-summary-decision-excerpt/);
+    assert.match(html, /Considered the schema diff\./);
+    assert.match(html, /obs-summary-decision-options/);
+    assert.match(html, /Yes/);
+    assert.match(html, /No/);
+    assert.match(html, /obs-summary-reply/);
+    assert.match(html, /reply →/);
+  });
+
+  test('renderSummaryLine: a waiting session with NO decision renders exactly as before — no excerpt/options scaffolding', () => {
+    const html = renderSummaryLine(waitingSession());
+    assert.match(html, /obs-summary-waiting/);
+    assert.match(html, /need your decision/);
+    assert.ok(!html.includes('obs-summary-decision-excerpt'), 'no stray excerpt markup when there is no decision');
+    assert.ok(!html.includes('obs-summary-decision-options'), 'no stray options markup when there is no decision');
+    assert.match(html, /obs-summary-reply/, 'the existing reply CTA still renders');
+  });
+
+  test('the excerpt and option labels are HTML-escaped', () => {
+    const s = waitingSession({
+      decision: { decision_id: 'd-1', options: [{ id: 'x', label: '<script>alert(1)</script>' }] },
+      decisionCase: ['<img src=x onerror=alert(1)>']
+    });
+    const html = renderSummaryLine(s);
+    assert.ok(!html.includes('<script>alert(1)</script>'));
+    assert.ok(!html.includes('<img src=x onerror=alert(1)>'));
     assert.match(html, /&lt;script&gt;/);
   });
 });
