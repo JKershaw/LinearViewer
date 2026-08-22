@@ -704,17 +704,27 @@ a.wordmark:hover {
 }
 
 /* Rulings badge in nav bar (LIN-1728 Phase 3) — the ambient "waiting on you"
-   count, same shape as .queue-badge above but visually distinct (amber, the
-   escalation-surface accent used elsewhere for a blocked/waiting state) so
-   the two convey different meanings at a glance. */
+   count, visually distinct from .queue-badge (amber, the escalation-surface
+   accent used elsewhere for a blocked/waiting state) so the two convey
+   different meanings at a glance.
+   LIN-1728 review F5: a solid `--amber` fill has no AA-safe text pairing —
+   white-on-`--amber` computes to 1.80:1, and `--amber-dim` (the palette's
+   own "AA-safe amber text" companion, documented above) is tuned for text on
+   the theme's LIGHT SURFACE, not on the `--amber` fill itself (still only
+   ~3.3:1 there). Rather than inventing a new token, this reuses the SAME
+   existing treatment `.chat-msg--blocked` already uses for amber-as-accent
+   (public/chat.css): `--amber` as a border/accent only, a light tint of it
+   over the surface as the fill, and `--amber-dim` as the text — the pairing
+   the palette comment actually documents as AA-safe (≈5:1 here). */
 .rulings-badge {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   padding: 0.2rem var(--space-2);
-  background: var(--amber);
-  color: white;
-  border: none;
+  background: color-mix(in srgb, var(--amber) 10%, var(--card));
+  color: var(--amber-dim);
+  text-decoration: none;
+  border: 1px solid var(--amber);
   border-radius: var(--radius-sm);
   font-size: 0.8em;
   font-family: var(--font-content);
@@ -722,7 +732,7 @@ a.wordmark:hover {
 }
 
 .rulings-badge:hover {
-  background: color-mix(in srgb, var(--amber) 85%, black);
+  background: color-mix(in srgb, var(--amber) 20%, var(--card));
 }
 
 .rulings-badge.hidden {

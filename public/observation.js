@@ -75,6 +75,14 @@ let currentView = 'autopilot';
 // in-flight "reply pending" guard below.
 const rulingsPending = new Set();          // decision_id currently mid-reply (disables its buttons)
 const preservedRulingRows = new Map();     // decision_id → <li> to reuse across a poll's repaint (partial-failure retry state)
+// decision_id → the <li> currently attached to #obs-rulings for it (LIN-1728
+// review F3). Populated on every renderRulings pass and consulted whenever a
+// row must be REUSED rather than rebuilt (pending or preserved) — the single
+// source of truth for "which node is a still-in-flight deliverRulingReply
+// closure allowed to keep writing into". Without this, a poll landing between
+// press and completion rebuilds a fresh (enabled) row while the closure keeps
+// writing into the now-detached old one — see the renderRulings comment below.
+const renderedRulingRows = new Map();
 
 // Archive pagination state (LIN-631). The live poll always refreshes the first
 // page (offset 0); "load more" requests subsequent offsets and those extra
@@ -1302,14 +1310,29 @@ async function pollRulings() {
 // Mostly-wholesale repaint (LIN-1728 Phase 4) — unlike the session feeds
 // above, a ruling row has no cross-poll identity worth a keyed diff (it
 // either still needs an answer or it's gone from the next poll's payload
-// entirely), EXCEPT for the one case that must survive a repaint: a row mid
-// partial-failure retry (`preservedRulingRows`, populated by
-// `deliverRulingReply`'s `onPartialFailure` below). Without this, a poll
-// landing between "resume failed" and the operator pressing "Retry delivery"
-// would silently discard the retry affordance and the "could not resume"
-// feedback — the answer is already durably recorded at that point (the
-// comment succeeded), so losing the retry UI is a real regression, not a
-// cosmetic one.
+// entirely), EXCEPT for two cases that must survive a repaint:
+//
+//   1. A row mid partial-failure retry (`preservedRulingRows`, populated by
+//      `deliverRulingReply`'s `onPartialFailure` below). Without this, a poll
+//      landing between "resume failed" and the operator pressing "Retry
+//      delivery" would silently discard the retry affordance and the "could
+//      not resume" feedback — the answer is already durably recorded at that
+//      point (the comment succeeded), so losing the retry UI is a real
+//      regression, not a cosmetic one.
+//   2. A row currently mid-flight (`rulingsPending`, review F3). A poll can
+//      land in the ~5s window between a press and its network round trip
+//      completing. Rebuilding the row would hand back a FRESH <li> with
+//      freshly-enabled buttons — even though `rulingsPending` still correctly
+//      blocks a second send, the operator would see the buttons quietly
+//      re-enable — and `deliverRulingReply`'s restore()/setFeedback closures,
+//      captured over the OLD <li>, would keep writing into a now-detached
+//      node invisible to the operator (a plain failure would then show no
+//      error at all). Reusing the exact same <li> while pending means every
+//      write the closure makes lands on the node that stays attached.
+//
+// `renderedRulingRows` is the single map behind both: it tracks whichever
+// <li> is CURRENTLY attached for a decision_id, independent of whether that
+// decision still appears in this poll's payload.
 function renderRulings(rulings) {
   const list = document.getElementById('obs-rulings');
   const empty = document.getElementById('obs-rulings-empty');
@@ -1319,18 +1342,29 @@ function renderRulings(rulings) {
   const nodes = [];
   for (const row of rulings) {
     const decisionId = row?.decision?.decision_id;
-    if (decisionId && preservedRulingRows.has(decisionId)) {
-      nodes.push(preservedRulingRows.get(decisionId));
-    } else {
-      nodes.push(renderRulingRow(row));
-    }
-    if (decisionId) seen.add(decisionId);
+    const mustReuse = decisionId && (rulingsPending.has(decisionId) || preservedRulingRows.has(decisionId));
+    const existing = decisionId && renderedRulingRows.get(decisionId);
+    const li = (mustReuse && existing) ? existing : renderRulingRow(row);
+    nodes.push(li);
+    if (decisionId) { seen.add(decisionId); renderedRulingRows.set(decisionId, li); }
   }
-  // A preserved row whose decision already dropped out of this poll's payload
-  // (the stamp landed server-side) still shows once more, mid-retry — dropping
-  // it here would be the same silent-discard the preservation exists to avoid.
+  // A preserved or still-pending row whose decision already dropped out of
+  // this poll's payload (the stamp landed server-side, or the payload just
+  // hasn't caught up yet) still shows once more — dropping it here would be
+  // the same silent-discard both preservation and pending-reuse exist to avoid.
   for (const [decisionId, li] of preservedRulingRows) {
-    if (!seen.has(decisionId)) nodes.push(li);
+    if (!seen.has(decisionId)) { nodes.push(li); seen.add(decisionId); }
+  }
+  for (const decisionId of rulingsPending) {
+    if (!seen.has(decisionId) && renderedRulingRows.has(decisionId)) {
+      nodes.push(renderedRulingRows.get(decisionId));
+      seen.add(decisionId);
+    }
+  }
+  // Drop bookkeeping for rows no longer worth remembering (answered and
+  // neither pending nor mid partial-failure-retry).
+  for (const decisionId of Array.from(renderedRulingRows.keys())) {
+    if (!seen.has(decisionId)) renderedRulingRows.delete(decisionId);
   }
 
   list.textContent = '';
@@ -1409,13 +1443,27 @@ function renderRulingRow(row) {
 // surface as an error, not be forced past. Both branches thread
 // decisionLoopId/decisionId into the comment write, same param pair Phase 2
 // already taught the route to accept.
+//
+// Cross-workspace targeting (LIN-1728 review F1). The rulings feed is
+// cross-workspace by construction (routes/dashboard.js merges every
+// `req.session.workspaces`); `anchor.workspaceUrlKey` is the ruling's OWN
+// workspace, which may differ from the page you're viewing it from. Every
+// write below (comment, answer stamp, follow-up dispatch, fresh dispatch)
+// MUST target `anchor.workspaceUrlKey`, not the page's own urlKey — using the
+// page's key resolves the comment against the wrong provider/token and
+// `markDecisionAnswered` silently no-ops on a workspace mismatch, so the row
+// never clears. `pageUrlKey` is kept separate and used ONLY to refresh the
+// nav badge element, which is rendered once per page and keyed by the page's
+// own `data-url-key` (`lib/components/navbar.js`) — passing the ruling's
+// workspace there would just fail to find the badge.
 function deliverRulingReply(row, prompt, li) {
   const { decision, anchor, disposition } = row || {};
-  const urlKey = observationData?.urlKey;
+  const pageUrlKey = observationData?.urlKey;
+  const targetUrlKey = anchor?.workspaceUrlKey;
   const decisionId = decision?.decision_id;
   const decisionLoopId = anchor?.loopId;
   const feedback = li.querySelector('.obs-ruling-feedback');
-  if (!urlKey || !decisionId || !decisionLoopId || rulingsPending.has(decisionId)) return;
+  if (!targetUrlKey || !decisionId || !decisionLoopId || rulingsPending.has(decisionId)) return;
 
   rulingsPending.add(decisionId);
   const buttons = li.querySelectorAll('.chat-option-btn');
@@ -1430,55 +1478,79 @@ function deliverRulingReply(row, prompt, li) {
     feedback.textContent = text;
     feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
   };
+  const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
   const onDelivered = () => {
     restore();
     setFeedback('recorded ✓', false);
     pollRulings();
-    if (typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(urlKey);
+    refreshBadge();
+  };
+  // Shared partial-failure UX (LIN-1728 review F2): the durable half (the
+  // comment, already carrying the answer stamp) succeeded; only the run
+  // could not be started/resumed. Mirrors public/session.js's
+  // onPartialFailure — a "Retry delivery" affordance that re-fires ONLY the
+  // run attempt, never the comment (preserved invariant — the plan's
+  // "dispatch-only retry-delivery affordance"), shared verbatim by both the
+  // `resumable` and `gone` branches below so neither can drift from the
+  // other's durability guarantee. The row already cleared server-side (the
+  // answer is recorded) — `preservedRulingRows` keeps THIS li reused across
+  // the next poll(s) instead of the ruling silently vanishing (it is no
+  // longer in the /rulings payload) or a stray fresh row confusingly
+  // reappearing, until the retry succeeds and releases it below.
+  const makePartialFailureHandler = (label) => (err, retryRun) => {
+    restore();
+    preservedRulingRows.set(decisionId, li);
+    setFeedback(`Recorded. Could not ${label}: ${err.message}. `, true);
+    if (feedback) {
+      const retryBtn = document.createElement('button');
+      retryBtn.type = 'button';
+      retryBtn.className = 'obs-ruling-retry-delivery';
+      retryBtn.textContent = 'Retry delivery';
+      retryBtn.addEventListener('click', () => {
+        retryBtn.disabled = true;
+        setFeedback('retrying delivery…', false);
+        retryRun().then(() => {
+          setFeedback('recorded ✓', false);
+          preservedRulingRows.delete(decisionId);
+          refreshBadge();
+        }).catch((e2) => {
+          setFeedback(`Still could not ${label}: ${e2.message}. `, true);
+          feedback.appendChild(retryBtn);
+          retryBtn.disabled = false;
+        });
+      });
+      feedback.appendChild(retryBtn);
+    }
+    pollRulings();
   };
 
   if (disposition === 'resumable') {
+    // A run with no issue anchor at all has no `issueIdentifier` either
+    // (LIN-1728 review F4) — `anchor.issueId` alone is the wrong gate, since
+    // most runs here carry a human `issueIdentifier` but no raw provider
+    // issueId (the comment route accepts either). Mirrors
+    // public/session.js's own precedent exactly: `issueless = !issueIdentifier`,
+    // and the id actually used prefers the real issueId, falling back to the
+    // identifier when the loop carries no separate one. `issueless: true`
+    // (the true issueless case) routes `deliverReply` straight to its
+    // existing dispatch-only path instead of attempting an invalid
+    // `/api/comments/null` write.
     window.ReplyDelivery.deliverReply(
-      { urlKey, issueId: anchor.issueId, followUpTo: decisionLoopId, force: false, target: anchor.target || 'cli', decisionLoopId, decisionId },
+      {
+        urlKey: targetUrlKey,
+        issueId: anchor.issueId || anchor.issueIdentifier,
+        issueless: !anchor.issueIdentifier,
+        followUpTo: decisionLoopId,
+        force: false,
+        target: anchor.target || 'cli',
+        decisionLoopId,
+        decisionId
+      },
       prompt,
       {
         onCommentFailed: (err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); },
         onDispatchFailed: (err) => { console.error('Ruling reply (dispatch) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); },
-        // Comment already landed (durable) — the resume just could not deliver.
-        // Mirrors public/session.js's onPartialFailure: a "Retry delivery"
-        // affordance that re-fires ONLY the dispatch call, never the comment
-        // (preserved invariant — the plan's "dispatch-only retry-delivery
-        // affordance"). The row already cleared server-side (the answer is
-        // recorded) — `preservedRulingRows` keeps THIS li reused across the
-        // next poll(s) instead of the ruling silently vanishing (it is no
-        // longer in the /rulings payload) or a stray fresh row confusingly
-        // reappearing, until the retry succeeds and releases it below.
-        onPartialFailure: (err, retryDispatch) => {
-          restore();
-          preservedRulingRows.set(decisionId, li);
-          setFeedback('Recorded. Could not resume the session: ' + err.message + '. ', true);
-          if (feedback) {
-            const retryBtn = document.createElement('button');
-            retryBtn.type = 'button';
-            retryBtn.className = 'obs-ruling-retry-delivery';
-            retryBtn.textContent = 'Retry delivery';
-            retryBtn.addEventListener('click', () => {
-              retryBtn.disabled = true;
-              setFeedback('retrying delivery…', false);
-              retryDispatch().then(() => {
-                setFeedback('recorded ✓', false);
-                preservedRulingRows.delete(decisionId);
-                if (typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(urlKey);
-              }).catch((e2) => {
-                setFeedback('Still could not resume: ' + e2.message + '. ', true);
-                feedback.appendChild(retryBtn);
-                retryBtn.disabled = false;
-              });
-            });
-            feedback.appendChild(retryBtn);
-          }
-          pollRulings();
-        },
+        onPartialFailure: makePartialFailureHandler('resume the session'),
         onDispatchOk: onDelivered
       }
     );
@@ -1492,18 +1564,25 @@ function deliverRulingReply(row, prompt, li) {
       setFeedback('cannot start a fresh run: no linked issue', true);
       return;
     }
-    window.ReplyDelivery.postComment(urlKey, anchor.issueId, prompt, { decisionLoopId, decisionId })
+    window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId, prompt, { decisionLoopId, decisionId })
       .then((commentResult) => {
         if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
-        return window.dispatchPrompt({
-          urlKey,
+        // Deliberately NOT window.ReplyDelivery.deliverReply — that call's
+        // built-in dispatch is scoped to the follow-up shape only (see the
+        // LIN-2200 banner in common.js); a `gone` reply starts a FRESH
+        // issue-scoped dispatch instead, so it composes its own comment-then-
+        // dispatch chain here, using the SAME shared partial-failure handler
+        // as the `resumable` branch above (review F2) rather than the bare
+        // "reply failed" catch this branch had before.
+        const startRun = () => window.dispatchPrompt({
+          urlKey: targetUrlKey,
           prompt,
           issue: { id: anchor.issueId, identifier: anchor.issueIdentifier },
           target: anchor.target || 'cli'
         });
+        return startRun().then(onDelivered, (dispatchErr) => makePartialFailureHandler('start a run')(dispatchErr, startRun));
       })
-      .then(onDelivered)
-      .catch((err) => { console.error('Ruling reply (fresh run) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
+      .catch((err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
   }
 }
 
@@ -1598,6 +1677,13 @@ function init() {
   observationData = window.__OBSERVATION_DATA__;
   if (!observationData) { console.warn('Observation: no initial data'); return; }
   initControls();
+  // Deep link from the ambient rulings badge (LIN-1728 review F6 —
+  // `lib/components/navbar.js` now links to `?view=rulings` instead of a
+  // button that did nothing). An explicit query param on load, distinct from
+  // the tab strip's in-page `switchView` click handler above.
+  if (new URLSearchParams(window.location.search).get('view') === 'rulings') {
+    switchView('rulings');
+  }
   startPolling();
 }
 
@@ -1627,5 +1713,11 @@ if (typeof module !== 'undefined' && module.exports) {
     // (and its budget constant) so the truncation acceptance test asserts
     // against the constant, not a hard-coded copy of its value.
     renderSummaryLine, excerptDecisionCase, renderWaitingDecisionSummary, DECISION_EXCERPT_CHARS,
+    // LIN-1728 review (`2d47a7c8`, F2): expose the rulings press handler so
+    // the `gone`-disposition partial-failure path (comment durably recorded,
+    // the fresh run fails to start) is unit-testable against a hand-rolled
+    // DOM/fetch-free shim — there is no fixture path in this harness for a
+    // terminal, past-the-reap-window loop, per the review's own note.
+    deliverRulingReply, rulingsPending, preservedRulingRows,
   };
 }

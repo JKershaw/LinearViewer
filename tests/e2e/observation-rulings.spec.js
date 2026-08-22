@@ -29,20 +29,24 @@ async function clearRuns(page) {
 // (unlike session-page.spec.js's minimal question-only fixture). Posting
 // `[blocked]` first yields `wakeMarker: 'blocked'` → disposition `resumable`;
 // omitting it (agentState stays the take-default `running`) yields `mid-turn`.
-async function seedDecisionWorker(page, { issueIdentifier, issueTitle, decisionId, blocked }) {
-  const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+// `urlKey` defaults to the page's own workspace; a two-workspace ruling test
+// seeds it under a DIFFERENT workspace than the one being viewed (F1).
+// `issueIdentifier`/`issueTitle` are optional — omitting both seeds an
+// issueless run (F4), whose decision-bearing loop carries no issue anchor.
+async function seedDecisionWorker(page, { issueIdentifier, issueTitle, decisionId, blocked, urlKey = URL_KEY }) {
+  const anchor = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
     data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier, issueTitle, target: 'cli' }
   });
   expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
   const anchorId = (await anchor.json()).item.id;
 
-  const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+  const worker = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
     data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier, issueTitle, target: 'cli', sessionId: anchorId }
   });
   expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
   const workerId = (await worker.json()).item.id;
 
-  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${urlKey}`);
   const { token } = await tokenResp.json();
   const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   const take = await page.request.post(`/api/dispatch/take/${workerId}`, { headers: auth });
@@ -69,6 +73,14 @@ async function seedDecisionWorker(page, { issueIdentifier, issueTitle, decisionI
   });
   expect(decision.status(), `decision feedback failed: ${await decision.text()}`).toBe(200);
   return { workerId };
+}
+
+async function clearRunsFor(page, urlKey) {
+  await page.request.get(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
+  await page.request.get(`/test/clear-dispatch-history?urlKey=${urlKey}`);
+  await page.request.get(`/test/clear-agent-status?urlKey=${urlKey}`);
+  await page.request.get(`/test/clear-observation-sessions?urlKey=${urlKey}`);
+  await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${urlKey}`);
 }
 
 test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
@@ -207,14 +219,127 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     await page.waitForTimeout(300);
     expect(dispatchFired).toBe(false);
   });
+
+  test('LIN-1728 review F1: a ruling from a non-page workspace writes its comment/stamp/dispatch in the RULING\'s own workspace, and clears', async ({ page, secondWorkerUrlKey }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}&multiWorkspace=true`);
+    await clearRuns(page);
+    await clearRunsFor(page, secondWorkerUrlKey);
+
+    // Seed the decision-bearing loop under the SECOND workspace, then view it
+    // from the FIRST workspace's Observation page — the exact cross-workspace
+    // shape the review's repro steps describe.
+    const { workerId } = await seedDecisionWorker(page, {
+      issueIdentifier: 'LIN-1728-X', issueTitle: 'Cross-workspace ruling', decisionId: 'd-rulings-xws', blocked: true, urlKey: secondWorkerUrlKey
+    });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-X' });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText(secondWorkerUrlKey); // the workspace chip (renderRulingRow)
+
+    const [commentReq, dispatchReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
+      page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
+      row.locator('.chat-option-btn').filter({ hasText: 'Approve' }).click()
+    ]);
+
+    // Both writes must target the RULING's workspace, never the page's.
+    expect(commentReq.url()).toContain(`/workspace/${secondWorkerUrlKey}/api/comments/`);
+    expect(commentReq.url()).not.toContain(`/workspace/${URL_KEY}/api/comments/`);
+    expect((await commentReq.response()).status()).toBe(201);
+    const commentPayload = commentReq.postDataJSON();
+    expect(commentPayload.decisionLoopId).toBe(workerId);
+    expect(commentPayload.decisionId).toBe('d-rulings-xws');
+
+    expect(dispatchReq.url()).toContain(`/workspace/${secondWorkerUrlKey}/api/dispatch`);
+    expect(dispatchReq.url()).not.toContain(`/workspace/${URL_KEY}/api/dispatch`);
+    expect((await dispatchReq.response()).status()).toBe(201);
+
+    // The stamp landed in the RIGHT workspace's store (markDecisionAnswered
+    // filters on {_id, urlKey}) — proven by the row actually clearing, which
+    // it never would if the stamp had been written against the page's
+    // workspace instead (F1's core bug: the row stays forever).
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-X' })).toHaveCount(0, { timeout: 20000 });
+  });
+
+  // LIN-1728 review F4 (issueless resumable ruling — no invalid
+  // `/api/comments/null` write) is covered as a unit test, not here:
+  // `lib/pipeline-loops.js`'s own reconstruction guard drops ANY dispatch
+  // item with no `issueIdentifier` before it ever reaches `getLoopsForWorkspace`
+  // (`!item.issueIdentifier` → "skipping malformed live item"), so a truly
+  // issueless loop can never be seeded through the real dispatch pipeline
+  // this suite drives — there is no live fixture path for it, only a
+  // constructed one. See tests/unit/observation-ruling-delivery.test.js's
+  // "resumable disposition" describe block, which builds the row directly.
+
+  test('LIN-1728 review F3: a poll landing mid-reply does not discard the pending row — buttons stay disabled on the same visible row through the hold, and the reply still completes cleanly', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-1728-Q', issueTitle: 'Poll-race ruling', decisionId: 'd-rulings-race', blocked: true });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-Q' });
+    await expect(row).toBeVisible();
+    // Tag the actual DOM node so we can assert IDENTITY survives the poll
+    // below, not just that "a" row with the same text is visible (a rebuilt
+    // replacement row would satisfy a text-only check just as well).
+    await row.evaluate((el) => { el.dataset.testMarker = 'original'; });
+
+    // Hold the comment write in flight for longer than one 5s poll tick
+    // (POLL_MS, public/observation.js) so a real background poll lands while
+    // the press is still outstanding — the exact race the review describes.
+    await page.route('**/api/comments/**', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      await new Promise((r) => setTimeout(r, 6000));
+      return route.continue();
+    });
+
+    const buttons = row.locator('.chat-option-btn');
+    // Register the poll waiter BEFORE clicking so it catches the very next
+    // background poll rather than racing a poll that landed between the
+    // click and the wait — a deterministic signal instead of a guessed delay.
+    await Promise.all([
+      page.waitForResponse(r => r.url().includes('/api/dashboard/rulings') && r.request().method() === 'GET', { timeout: 7000 }),
+      row.locator('.chat-option-btn').filter({ hasText: 'Approve' }).click()
+    ]);
+
+    // Still the SAME DOM node (identity, not just matching text) and still
+    // disabled — not a freshly repainted, re-enabled row that silently
+    // discarded the in-flight state and left `deliverRulingReply`'s
+    // restore()/setFeedback closures writing into a detached node (pre-fix:
+    // the buttons would quietly re-enable here with no visible feedback at
+    // all on a plain failure).
+    await expect(row).toHaveAttribute('data-test-marker', 'original');
+    await expect(buttons.first()).toBeDisabled();
+
+    // Let the held comment (and the follow-up dispatch) complete. The reply
+    // itself must still succeed cleanly — the row eventually clears once the
+    // server-side answer stamp is reflected (same stale-while-revalidate
+    // cache budget as the "pressing an option..." test above; the immediate
+    // post-completion repaint(s) can legitimately still show the ruling as
+    // unanswered and rebuild a fresh, blank row before the cache catches up
+    // — a pre-existing SWR property, not part of this race). A failed reply
+    // would instead leave the row durably present (or preserved with a
+    // "Could not resume" error), so this is a real proof of success, not
+    // just an absence check.
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-Q' })).toHaveCount(0, { timeout: 20000 });
+  });
 });
 
 test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
-  // The badge's own poll (public/app.js) is loaded on the projects page (and
-  // most other pages) but deliberately NOT on Observation (lib/render-
-  // observation.js's scripts are common.js/chat.js/observation.js — see
-  // the Phase 3 plan note on this pre-existing limitation, same as the queue
-  // badge). Exercise the live client wiring where it actually runs.
+  // The badge's poll (public/common.js's initRulingsBadge/updateRulingsBadge)
+  // is loaded on EVERY page that renders the badge markup, including
+  // Observation (LIN-1728 review F7 — it used to live in public/app.js,
+  // which Observation never loads, so the badge there was permanently dead:
+  // no initial count, no live updates, and the two `window.updateRulingsBadge`
+  // guards in the press handler could never fire). Exercised on the projects
+  // page here; the Observation-specific coverage is below.
   test('hidden with no rulings, shows a workspace-scoped count once one exists, gated on the dispatch flag like the queue badge', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}${featuresParam({ dispatch: true })}`);
     await clearRuns(page);
@@ -255,25 +380,84 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-rulings-badge]')).toHaveCount(0);
   });
+
+  test('LIN-1728 review F7: the badge actually initializes and updates on the Observation page itself', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}${featuresParam({ dispatch: true })}`);
+    await clearRuns(page);
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-1728-B7', issueTitle: 'F7 badge ruling', decisionId: 'd-rulings-badge-f7', blocked: true });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+
+    // Before the fix this was permanently dead on Observation: no seeded
+    // count on load (initRulingsBadge lived in app.js, which Observation
+    // never loads) and the two `window.updateRulingsBadge` guards inside
+    // deliverRulingReply could never resolve to a function.
+    const badge = page.locator('[data-rulings-badge]');
+    await expect(badge).toBeAttached();
+    await expect(badge).not.toHaveClass(/hidden/);
+    await expect(badge.locator('.rulings-count')).toHaveText('1');
+    expect(await page.evaluate(() => typeof window.updateRulingsBadge)).toBe('function');
+  });
+
+  test('LIN-1728 review F6: the badge is a real link into the Rulings tab, not a button that does nothing', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}${featuresParam({ dispatch: true })}`);
+    await clearRuns(page);
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-1728-B6', issueTitle: 'F6 badge ruling', decisionId: 'd-rulings-badge-f6', blocked: true });
+
+    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    const badge = page.locator('[data-rulings-badge]');
+    await expect(badge).toHaveJSProperty('tagName', 'A');
+    await expect(badge).toHaveAttribute('href', `/workspace/${URL_KEY}/observation?view=rulings`);
+
+    await badge.click();
+    await page.waitForURL(`**/workspace/${URL_KEY}/observation?view=rulings`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.obs-tab[data-view="rulings"]')).toHaveClass(/is-active/);
+    await expect(page.locator('#obs-rulings-section')).toBeVisible();
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-B6' })).toBeVisible();
+  });
 });
 
 // LIN-2191 (open question from the LIN-1728 plan): a second badge in
 // `.nav-primary-row`'s `.nav-actions` risks reproducing/worsening the
 // pre-existing ≤320px header-clearance breach that ticket already tracks.
 // Measured here, not assumed — see the test body for the verdict this feeds.
-test.describe('.nav-primary-row width at ≤320px with both badges visible (LIN-2191 follow-up check)', () => {
-  test('two visible badges do not add a wrapped row beyond the pre-existing single-badge breach', async ({ page }) => {
+//
+// LIN-1728 review (`2d47a7c8`, test-quality note): the previous version of
+// this test counted distinct `.nav-primary-row > *` top positions — but both
+// badges live inside `.nav-actions`, a SINGLE direct child of
+// `.nav-primary-row`. That metric can only see `.nav-actions` as a whole
+// wrapping onto row 2 of the two-row header; it cannot see growth/overflow
+// happening INSIDE `.nav-actions` itself, which is the actual risk a second
+// badge adds. `.nav-actions` is `display:flex` with no `flex-wrap` set
+// anywhere (public/style.css) — its children never wrap onto their own line,
+// they only grow the container past its allotted width — so this measures
+// both: internal child-row count (in case that ever changes) AND horizontal
+// overflow (`scrollWidth` vs `clientWidth`), which is the failure mode that
+// can actually happen today.
+test.describe('.nav-actions width at ≤320px with both badges visible (LIN-2191 follow-up check)', () => {
+  test('two visible badges do not add wrapping or overflow beyond the pre-existing single-badge shape', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}${featuresParam({ dispatch: true })}`);
     await clearRuns(page);
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
 
+    const measure = () => {
+      const actions = document.querySelector('.nav-actions');
+      if (!actions) return { childRows: 0, overflowPx: 0 };
+      const childRows = new Set(
+        Array.from(actions.children).map(el => Math.round(el.getBoundingClientRect().top))
+      ).size;
+      const overflowPx = Math.max(0, actions.scrollWidth - actions.clientWidth);
+      return { childRows, overflowPx };
+    };
+
     // Baseline: both badges hidden (0 queued, 0 rulings) — today's shipped shape.
-    const baselineRows = await page.evaluate(() => {
-      const els = document.querySelectorAll('.nav-primary-row > *');
-      return new Set(Array.from(els).map(el => Math.round(el.getBoundingClientRect().top))).size;
-    });
+    const baseline = await page.evaluate(measure);
 
     // Force both badges visible (as if there were 1 queued item and 1 ruling) —
     // the worst case this ticket's plan flags, without needing a real queued
@@ -281,18 +465,16 @@ test.describe('.nav-primary-row width at ≤320px with both badges visible (LIN-
     await page.evaluate(() => {
       document.querySelectorAll('[data-queue-badge], [data-rulings-badge]').forEach(b => b.classList.remove('hidden'));
     });
-    const bothVisibleRows = await page.evaluate(() => {
-      const els = document.querySelectorAll('.nav-primary-row > *');
-      return new Set(Array.from(els).map(el => Math.round(el.getBoundingClientRect().top))).size;
-    });
+    const bothVisible = await page.evaluate(measure);
 
-    // Not a strict "must not wrap" assertion — LIN-2191 already documents this
-    // row wrapping at ≤320px independent of any badge (that pre-existing
-    // reproduction is captured in `baselineRows` itself, not this comparison).
-    // This guards specifically against a SECOND badge adding an ADDITIONAL
-    // wrapped row on top of that pre-existing shape — the "worsens" half of
-    // the Phase 3 plan note; a bare reproduction is recorded (not silently
-    // absorbed) by this test's own existence rather than by failing it.
-    expect(bothVisibleRows, `.nav-primary-row grew from ${baselineRows} row(s) to ${bothVisibleRows} row(s) at 320px with both badges visible`).toBeLessThanOrEqual(baselineRows);
+    // Not a strict "must never overflow" assertion — LIN-2191 already tracks
+    // whatever header-clearance breach exists at ≤320px independent of any
+    // badge (captured in `baseline` itself, not this comparison). This guards
+    // specifically against a SECOND badge making `.nav-actions` WORSE than
+    // the single-badge shape already shipped; a bare reproduction is
+    // recorded (not silently absorbed) by this test's own existence rather
+    // than by failing it.
+    expect(bothVisible.childRows, `.nav-actions grew from ${baseline.childRows} internal row(s) to ${bothVisible.childRows} at 320px with both badges visible`).toBeLessThanOrEqual(baseline.childRows);
+    expect(bothVisible.overflowPx, `.nav-actions overflow grew from ${baseline.overflowPx}px to ${bothVisible.overflowPx}px at 320px with both badges visible`).toBeLessThanOrEqual(baseline.overflowPx);
   });
 });
