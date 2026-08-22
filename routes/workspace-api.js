@@ -2584,6 +2584,7 @@ ${goal}`
       return res.json({
         status: 'fresh',
         id: record.id,
+        issueId: record.issueId,
         decision: record.decision,
         outcome: record.outcome,
         outcomeAt: record.outcomeAt,
