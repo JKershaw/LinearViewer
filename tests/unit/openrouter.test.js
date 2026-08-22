@@ -1315,6 +1315,61 @@ describe('buildMetaPromptTemplate If Blocked / Principle 0 mirror (LIN-2202)', (
   });
 });
 
+// Acceptance-witness discipline for implementation-authored tests (LIN-2219).
+// lib/prompt-template-defs.js:127 (the bug/investigate template's witness-validation
+// rule) is scoped to the lane that writes the fewest tests. Clause (10) of the
+// Implementation-prompts quality rule extends the same discipline — before trusting a
+// test as the acceptance witness, observe it fail (or run the mutation equivalent) —
+// to the meta path. Assertions are scoped to the extracted bullet and use distinctive
+// multi-word phrases so a neighbouring bullet's `red`/`fail` substrings cannot satisfy
+// them; the handwritten mirror lives in tests/unit/prompt-templates.test.js.
+describe('buildMetaPromptTemplate acceptance-witness discipline (LIN-2219)', () => {
+  function build() {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context',
+      identifier: 'LIN-2219',
+      hasSubtasks: false,
+      subtaskCount: 0,
+      completedCount: 0,
+      inProgressCount: 0,
+      remainingCount: 0,
+      hasComments: false,
+      commentCount: 0,
+      aiHints: 'hints'
+    });
+  }
+
+  test('Implementation-prompts rule requires observing a real failure before trusting a test as the witness', () => {
+    const result = build();
+    const implBullet = extractQualityRuleBullet(result, 'Implementation prompts', 'Defer replies');
+    assert.ok(/observe it fail/.test(implBullet), 'must require observing the test fail');
+    assert.ok(
+      /capture the actual failing output/.test(implBullet),
+      'must require capturing actual failing output, not an assertion it would fail'
+    );
+    assert.ok(/mutation equivalent/.test(implBullet), 'must name the mutation equivalent for an impossible-RED test');
+  });
+
+  test('the acceptance-witness clause stays tracker-neutral', () => {
+    const result = build();
+    const implBullet = extractQualityRuleBullet(result, 'Implementation prompts', 'Defer replies');
+    assert.ok(!/\bLinear\b/.test(implBullet), 'the new clause must not hardcode a tracker noun');
+  });
+
+  test('does not restate the bug/investigate template\'s witness-validation wording (one-source-of-truth)', () => {
+    const result = build();
+    const implBullet = extractQualityRuleBullet(result, 'Implementation prompts', 'Defer replies');
+    assert.ok(
+      !implBullet.includes('must be validated or replaced before you optimize against it'),
+      'must not restate the bug rule\'s distinctive clause'
+    );
+    assert.ok(
+      !implBullet.includes('can read green while the outcome is still wrong'),
+      'must not restate the bug rule\'s distinctive clause'
+    );
+  });
+});
+
 // Class check (LIN-313) — bug and review prompts ask "isolated, or one of a
 // class?" so a narrowly-worded task doesn't clear while its siblings wait to
 // surprise the parent. Mirrors the handwritten path per CLAUDE.md's both-paths
