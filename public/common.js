@@ -663,6 +663,147 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
 };
 
 // =============================================================================
+// Reply Delivery (LIN-2200; extracted from public/session.js's LIN-2154 chain)
+// =============================================================================
+//
+// Comment-write-then-dispatch sequencing for a durable answer, shared by any
+// caller that needs the LIN-2154 guarantee: the reply is durable (a recorded
+// comment) even when the follow-up dispatch cannot be delivered. Deliberately
+// kept off `window.dispatchPrompt`/`window.api`: `window.api` throws on a
+// non-2xx response and structurally cannot yield the `{ok, status, data}`
+// shape this chain depends on to distinguish "recorded, not delivered" from
+// "not recorded at all"; `dispatchPrompt` also requires `issue.id` +
+// `issue.identifier` (this chain's callers may carry only one), sends issue
+// fields and `attachProxy` that the dispatch factory/bootstrap-provisioning
+// server contracts key on their ABSENCE from this payload shape (LIN-1292,
+// LIN-1431), and fires `window.updateQueueBadge` as a UI side effect this
+// DOM-free helper must not own.
+//
+// Comment-first, dispatch-second is a safety property, not just ordering: a
+// comment create is deduped server-side (routes/workspace-api.js) and safe to
+// repeat, but a follow-up dispatch is deliberately EXCLUDED from duplicate
+// suppression (lib/dispatch-store.js — "a follow-up IS the intended second
+// dispatch") and double-delivers if naively retried. So the sink that can be
+// safely repeated runs first, and the one that cannot is the one a retry
+// re-fires alone — never re-posting the comment.
+//
+// DOM-free by design: no `document.*`, no `window.ChatUI` (the Observation
+// page, a planned consumer, loads this file without chat.js — `window.ChatUI`
+// is undefined there), no copy strings, no presentation. Every caller supplies
+// its own UI via the four required outcome callbacks.
+/**
+ * @global
+ */
+window.ReplyDelivery = (function () {
+  // Durable comment write. POST /workspace/:urlKey/api/comments/:issueId —
+  // resolves to {ok, status, data}, never rejects on a non-2xx (the caller
+  // decides how to surface that).
+  function postComment(urlKey, issueId, prompt) {
+    return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/comments/' + encodeURIComponent(issueId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ body: prompt })
+    }).then(function (resp) {
+      return resp.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: resp.ok, status: resp.status, data: data };
+      });
+    });
+  }
+
+  // The follow-up dispatch call. Payload is deliberately minimal — exactly
+  // {prompt, followUpTo, target} plus `force` only when truthy — no issue
+  // fields, no `attachProxy` (see the banner note above). Same {ok,status,data}
+  // contract as postComment. Kept private: reachable only through
+  // deliverReply/its internal retryDispatch closure.
+  function postDispatch(opts, prompt) {
+    var body = { prompt: prompt, followUpTo: opts.followUpTo, target: opts.target };
+    if (opts.force) body.force = true;
+    return fetch('/workspace/' + encodeURIComponent(opts.urlKey) + '/api/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(body)
+    }).then(function (resp) {
+      return resp.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: resp.ok, status: resp.status, data: data };
+      });
+    });
+  }
+
+  function errorFromResult(result) {
+    return new Error((result.data && result.data.error) || ('HTTP ' + result.status));
+  }
+
+  function doDispatch(opts, prompt) {
+    return postDispatch(opts, prompt).then(function (result) {
+      if (!result.ok) throw errorFromResult(result);
+    });
+  }
+
+  /**
+   * Comment-first, dispatch-second delivery of a durable reply.
+   *
+   * `opts.issueless` skips the comment write entirely and dispatches only —
+   * byte-for-byte the pre-LIN-2154 behavior for a run with no task to record
+   * against. Otherwise: the comment write must succeed before dispatch is even
+   * attempted (`onCommentFailed`, dispatch never constructed); once the
+   * comment lands, a dispatch failure is a structural partial failure
+   * (`onPartialFailure`), never a silent loss and never a reason to re-post
+   * the comment.
+   *
+   * @global
+   * @param {Object} opts                       Same shape session.js already builds per reply box.
+   * @param {string} opts.urlKey
+   * @param {string} [opts.issueId]              Required unless `issueless`.
+   * @param {string} [opts.followUpTo]           Forwarded to postDispatch unchanged.
+   * @param {string} [opts.target]               'cli' | 'web'.
+   * @param {boolean} [opts.force]
+   * @param {boolean} [opts.issueless]
+   * @param {string} prompt                      Already-trimmed reply text.
+   * @param {Object} handlers                    All four are required — not defaulted to no-ops.
+   * @param {function(Error): void} handlers.onCommentFailed    Comment write failed; dispatch never attempted.
+   * @param {function(Error): void} handlers.onDispatchFailed   Issueless dispatch failed (no comment was ever attempted).
+   * @param {function(Error, function(): Promise<void>): void} handlers.onPartialFailure
+   *        Comment landed, dispatch failed. Second arg is `retryDispatch` — a
+   *        zero-arg function that re-fires ONLY the dispatch call (never the
+   *        comment), resolving on success / rejecting with an Error on failure.
+   * @param {function(): void} handlers.onDispatchOk             Dispatch (and, if applicable, the comment) succeeded.
+   * @returns {Promise<void>} Never rejects — callers can uniformly `.then(restoreButton)`.
+   */
+  function deliverReply(opts, prompt, handlers) {
+    var onCommentFailed = handlers.onCommentFailed;
+    var onDispatchFailed = handlers.onDispatchFailed;
+    var onPartialFailure = handlers.onPartialFailure;
+    var onDispatchOk = handlers.onDispatchOk;
+
+    function retryDispatch() {
+      return doDispatch(opts, prompt);
+    }
+
+    if (opts.issueless) {
+      return doDispatch(opts, prompt).then(
+        function () { onDispatchOk(); },
+        function (dispatchErr) { onDispatchFailed(dispatchErr); }
+      ).catch(function () {});
+    }
+
+    return postComment(opts.urlKey, opts.issueId, prompt).then(function (commentResult) {
+      if (!commentResult.ok) {
+        onCommentFailed(errorFromResult(commentResult));
+        return;
+      }
+      return doDispatch(opts, prompt).then(
+        function () { onDispatchOk(); },
+        function (dispatchErr) { onPartialFailure(dispatchErr, retryDispatch); }
+      );
+    }).catch(function () {});
+  }
+
+  return { deliverReply: deliverReply, postComment: postComment, errorFromResult: errorFromResult };
+})();
+
+// =============================================================================
 // Dispatch Execution Controls (model/harness) — LIN-1096
 // =============================================================================
 //
