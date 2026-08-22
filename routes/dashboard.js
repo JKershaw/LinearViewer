@@ -302,19 +302,41 @@ function loopIsWaiting(loop) {
  * test asserts this against `lib/render-session.js`'s per-run mirror directly.
  *
  * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
- * @returns {{waiting: boolean, message: string|null}}
+ * @returns {{
+ *   waiting: boolean,
+ *   message: string|null,
+ *   producerLoopId: string|null,
+ *   decision: Object|null,
+ *   decisionCase: Array
+ * }} `message`/`producerLoopId`/`decision`/`decisionCase` all come from the
+ *   SAME loop — the first non-superseded, waiting loop whose
+ *   `waitingMessage || agentSummary` is truthy (one producer, always). If
+ *   `waiting` is true but no waiting loop has message text, all four stay
+ *   null/empty — a provenance pointer is meaningless without a message to
+ *   attach it to, so a message-less loop's decision is never surfaced this way.
  */
 export function deriveSessionWaiting(enrichedLoops) {
   const supersededLoopIds = computeSupersededLoopIds(enrichedLoops);
   let waiting = false;
   let message = null;
+  let producerLoopId = null;
+  let decision = null;
+  let decisionCase = [];
+  let foundProducer = false;
   for (const l of enrichedLoops) {
     if (!l || supersededLoopIds.has(l.loopId)) continue;
     if (!loopIsWaiting(l)) continue;
     waiting = true;
-    if (!message) message = l.waitingMessage || l.agentSummary || null;
+    if (foundProducer) continue;
+    const text = l.waitingMessage || l.agentSummary || null;
+    if (!text) continue;
+    foundProducer = true;
+    message = text;
+    producerLoopId = l.loopId;
+    decision = l.decision || null;
+    decisionCase = Array.isArray(l.decisionCase) ? l.decisionCase : [];
   }
-  return { waiting, message };
+  return { waiting, message, producerLoopId, decision, decisionCase };
 }
 
 /**
@@ -545,7 +567,7 @@ export function createDashboardRoutes({
     // the session anchor can post `[done]` while a worker loop lingers `[blocked]`, so
     // the raw rollup must be `&&`-gated on session terminality or the flag contradicts
     // the `done` status ("a finished session is never waiting", LIN-1005 review).
-    const { waiting: rawWaiting, message: rawWaitingMessage } = deriveSessionWaiting(enriched);
+    const { waiting: rawWaiting, message: rawWaitingMessage, producerLoopId, decision, decisionCase } = deriveSessionWaiting(enriched);
     const waiting = !terminal && rawWaiting;
     const waitingMessage = waiting ? rawWaitingMessage : null;
 
@@ -995,7 +1017,7 @@ export function createDashboardRoutes({
       // (a finished session is never waiting, even with a lingering blocked worker).
       const enrichedLoops = (Array.isArray(session.loops) ? session.loops : []).map(enrichLoop);
       const sessionTerminal = sessionIsTerminal(session);
-      const { waiting: rawWaiting, message: rawWaitingMessage } = deriveSessionWaiting(enrichedLoops);
+      const { waiting: rawWaiting, message: rawWaitingMessage, producerLoopId, decision, decisionCase } = deriveSessionWaiting(enrichedLoops);
       const waiting = !sessionTerminal && rawWaiting;
       const waitingMessage = waiting ? rawWaitingMessage : null;
 
@@ -1018,7 +1040,7 @@ export function createDashboardRoutes({
       const credentialByToken = await readSessionCredentials(workspace.urlKey, session);
 
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle },
+        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle },
         pageOptions
       );
       res.send(html);

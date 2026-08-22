@@ -91,9 +91,18 @@ function runBlockHtml(html, loopId) {
 
 describe('loop-supersede characterization (LIN-1478 beat 1, pre-extraction)', () => {
   test('agreement: deriveSessionWaiting and the rendered per-run waiting flags agree on the same two-lineage input', () => {
-    const { waiting, message } = deriveSessionWaiting(twoLineageEnrichedLoops());
+    // LIN-2183: widened shape — producerLoopId/decision/decisionCase ride on the
+    // exact same winning iteration as `message`, so they must name the same loop
+    // (`a2`, the lineage-A tail) that produced `message`, never a1 (superseded)
+    // or b1 (a later-but-not-first waiting loop). Neither fixture loop carries a
+    // `decision`/`decisionCase` field, so both are the empty/null defaults here —
+    // that's a separate, dedicated fixture below (the two-loop producer test).
+    const { waiting, message, producerLoopId, decision, decisionCase } = deriveSessionWaiting(twoLineageEnrichedLoops());
     assert.equal(waiting, true, 'a2 (lineage A tail) and b1 are both genuinely waiting');
     assert.match(message, /a2 needs a decision|b1 needs a decision/, 'message comes from a non-superseded loop, never a1');
+    assert.equal(producerLoopId, 'a2', 'producerLoopId names the same loop that won the message fold');
+    assert.equal(decision, null, 'no loop in this fixture carries a decision');
+    assert.deepEqual(decisionCase, [], 'no loop in this fixture carries a decisionCase');
 
     const html = renderSessionPage({ session: twoLineageSessionFixture(), urlKey: 'ws-a', issueContext: [] });
     assert.ok(!runBlockHtml(html, 'a1').includes('data-testid="session-run-waiting-flag"'), 'a1 is superseded by a2 — no flag');
@@ -136,7 +145,11 @@ describe('loop-supersede characterization (LIN-1478 beat 1, pre-extraction)', ()
   });
 
   test('degenerate: no loops', () => {
-    assert.deepEqual(deriveSessionWaiting([]), { waiting: false, message: null });
+    // LIN-2183: deliberate, planned widening of this literal from the old 2-key
+    // `{ waiting: false, message: null }` to the settled 5-key empty shape — the
+    // only whole-object-literal assertion in this suite, so it is the single
+    // intentional breaker the return-shape widening causes. Not a patched-up red.
+    assert.deepEqual(deriveSessionWaiting([]), { waiting: false, message: null, producerLoopId: null, decision: null, decisionCase: [] });
 
     const html = renderSessionPage({
       session: { sessionId: 'sess-empty', tasksTouched: [], dispatchedAt: '2026-07-20T10:00:00.000Z', telemetry: {}, loops: [] },
@@ -161,5 +174,120 @@ describe('loop-supersede characterization (LIN-1478 beat 1, pre-extraction)', ()
     };
     const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
     assert.ok(runBlockHtml(html, 'b1').includes('data-testid="session-run-waiting-flag"'));
+  });
+
+  // LIN-2183 (H4): the widened return's whole point — prove the fold names the
+  // ACTUAL producing loop, not a take-first artifact. Loop 1 is terminal/`[done]`
+  // with no waiting message at all (so it is never even a candidate — excluded by
+  // `loopIsWaiting`, not by supersession, unlike the agreement-test fixture
+  // above); loop 2 is the only genuinely waiting loop and carries a `decision`.
+  // Before this ticket, the 2-key return had no identity field, so no test could
+  // ever distinguish "correctly named loop 2" from "silently took loop 1" — this
+  // fixture only becomes meaningful once `producerLoopId` exists.
+  test('producer identity: the winning (second) loop names producerLoopId/decision/decisionCase, not a take-first artifact', () => {
+    const decision = { decision_id: 'd-loop2', question: 'Proceed with the migration?', options: [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }] };
+    const decisionCase = ['Considered the schema diff.', 'Considered the rollback plan.'];
+    const loops = [
+      enrichedLoop({ loopId: 'loop1', agentState: 'complete', wakeMarker: 'done', waitingMessage: null, agentSummary: null }),
+      enrichedLoop({ loopId: 'loop2', waitingMessage: '[blocked] loop2 needs a decision', decision, decisionCase })
+    ];
+
+    const result = deriveSessionWaiting(loops);
+    assert.equal(result.waiting, true, 'loop2 is genuinely waiting; loop1 is terminal and excluded');
+    assert.equal(result.message, '[blocked] loop2 needs a decision');
+    assert.equal(result.producerLoopId, 'loop2', 'must name loop2, the loop that actually won the fold — not loop1');
+    assert.deepEqual(result.decision, decision, 'decision must come from the same winning loop, never re-derived elsewhere');
+    assert.deepEqual(result.decisionCase, decisionCase, 'decisionCase must come from the same winning loop, never re-derived elsewhere');
+  });
+
+  // Review (PR #1162, comment a0b0c83b): the mirror of the fixture above.
+  // Proves "one producer, always" the other direction — the loop that WINS the
+  // message fold carries no decision, and a LATER waiting loop does. The
+  // producer-identity test above co-locates message and decision on the same
+  // (second) loop, so it cannot tell "decision came from the producer" from
+  // "decision came from anywhere waiting" — a mutant that sources `decision`
+  // from any waiting loop rather than the message producer survives it. This
+  // fixture separates the two loops so such a mutant is caught: it must assert
+  // `decision === null`/`decisionCase === []`, not loop2's decision.
+  test('one producer, always: decision does not leak from a later waiting loop that never won the message fold', () => {
+    const decision = { decision_id: 'd-loop2', question: 'Proceed with the migration?', options: [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }] };
+    const decisionCase = ['Considered the schema diff.'];
+    const loops = [
+      enrichedLoop({ loopId: 'loop1', waitingMessage: '[blocked] loop1 needs a decision' }),
+      enrichedLoop({ loopId: 'loop2', waitingMessage: '[blocked] loop2 needs a decision', decision, decisionCase })
+    ];
+
+    const result = deriveSessionWaiting(loops);
+    assert.equal(result.waiting, true, 'both loop1 and loop2 are genuinely waiting');
+    assert.equal(result.message, '[blocked] loop1 needs a decision', 'loop1 wins the message fold — it is first');
+    assert.equal(result.producerLoopId, 'loop1', 'producerLoopId must name loop1, the loop that actually won the message fold');
+    assert.equal(result.decision, null, 'decision must not leak from loop2, which never won the message fold');
+    assert.deepEqual(result.decisionCase, [], 'decisionCase must not leak from loop2 either');
+  });
+
+  // Review (PR #1162, comment a0b0c83b), finding (a): pins the no-message
+  // provenance rule as CHOSEN, not incidental. Several waiting loops carry no
+  // message text at all (so nothing ever wins the fold), and one of them
+  // carries a decision anyway. The rule: with no message to attach it to, a
+  // provenance pointer is meaningless — all four derived fields stay
+  // null/empty even though `waiting` is true and a decision exists somewhere
+  // in the scan.
+  test('no-message rule: several message-less waiting loops, one carrying a decision, still null everything out', () => {
+    const decision = { decision_id: 'd-early', question: 'Proceed?', options: [] };
+    const loops = [
+      enrichedLoop({ loopId: 'loop1', waitingMessage: null, agentSummary: null, decision }),
+      enrichedLoop({ loopId: 'loop2', waitingMessage: null, agentSummary: null }),
+      enrichedLoop({ loopId: 'loop3', waitingMessage: null, agentSummary: null })
+    ];
+
+    const result = deriveSessionWaiting(loops);
+    assert.equal(result.waiting, true, 'still waiting even though no loop has message text');
+    assert.equal(result.message, null);
+    assert.equal(result.producerLoopId, null, 'no loop produced a message — no provenance pointer to a loop that produced nothing');
+    assert.equal(result.decision, null, 'an available decision on a message-less loop is not surfaced without a message to attach it to');
+    assert.deepEqual(result.decisionCase, []);
+  });
+
+  // Routed in from LIN-2186 (S2) review, ledger item 3: S2 emits the `[decision]`
+  // feedback entry BEFORE the `[blocked]` status entry precisely so a last-entry
+  // predicate still reads `[blocked]` as the tail. S2's own tests pin this
+  // ordering in simple-dispatcher, a separate package with no dependency edge to
+  // Harbour — what they prove is a local mirror of the rule, not this consumer.
+  // This exercises Harbour's REAL `runIsWaiting` (lib/render-session.js:150-156,
+  // NOT exported — exercised indirectly via renderSessionPage's rendered output,
+  // same technique the fixtures above already use) over a decision-bearing
+  // feedback array in the shape S2 now emits. `runIsWaiting` is NOT modified —
+  // this is a characterization/regression pin closing LIN-2186's ledger item, and
+  // the plan is explicit that it *passes unchanged today* — it is not proof of
+  // new behaviour from this ticket's widening.
+  test('LIN-2186/S2: runIsWaiting still reads [blocked] as the tail past an intervening [decision] entry', () => {
+    const session = {
+      sessionId: 'sess-s2-decision',
+      tasksTouched: ['LIN-900'],
+      dispatchedAt: '2026-07-20T10:00:00.000Z',
+      telemetry: { runtime: { ms: 1000 }, metrics: [], producedArtifacts: [] },
+      loops: [{
+        loopId: 's2-loop',
+        issueIdentifier: 'LIN-900',
+        issueId: 'uuid-900',
+        issueTitle: 'S2 decision-ordering fixture',
+        iteration: 1,
+        kind: 'autopilot',
+        dispatchedAt: '2026-07-20T10:00:00.000Z',
+        terminalStatus: null, // non-terminal — required for the waiting flag to be eligible
+        feedback: [
+          { kind: 'assistant-text', message: 'Investigating the migration path.', url: null, urlLabel: null, timestamp: '2026-07-20T10:00:01.000Z' },
+          { kind: 'decision', message: '[decision] {"decision_id":"d-s2","question":"Proceed with the migration?"}', url: null, urlLabel: null, timestamp: '2026-07-20T10:00:02.000Z' },
+          { kind: 'status', message: '[blocked] awaiting your ruling', url: null, urlLabel: null, timestamp: '2026-07-20T10:00:03.000Z' }
+        ],
+        telemetry: { runtime: { ms: 1000 }, metrics: [], producedArtifacts: [] }
+      }]
+    };
+
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(
+      runBlockHtml(html, 's2-loop').includes('data-testid="session-run-waiting-flag"'),
+      'runIsWaiting must still read the LAST entry ([blocked]) as waiting, unaffected by the intervening [decision] entry'
+    );
   });
 });
