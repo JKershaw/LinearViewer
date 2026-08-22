@@ -3199,6 +3199,21 @@ describe('plan-fidelity reconciliation + refactor-equivalence (LIN-698)', () => 
 // prose clause on the existing Plan-prompts / Implementation-prompts quality rules,
 // same LIN-698 pattern as plan-fidelity above.
 // =============================================================================
+
+// Slices one `- **<label>**` quality-rule bullet out of a generated meta-prompt, up to
+// (not including) the next named bullet. Asserts the match exists with a message naming
+// both bullets, rather than letting a renamed/reordered neighbour bullet turn a missing
+// match into an unguarded `.exec(...)[0]` TypeError on an otherwise unrelated edit.
+function extractQualityRuleBullet(metaPrompt, label, nextLabel) {
+  const pattern = new RegExp(`- \\*\\*${label}\\*\\*[\\s\\S]*?(?=\\n- \\*\\*${nextLabel}\\*\\*)`);
+  const match = pattern.exec(metaPrompt);
+  assert.ok(
+    match,
+    `expected a "**${label}**" quality-rule bullet followed by "**${nextLabel}**" in the generated meta-prompt`
+  );
+  return match[0];
+}
+
 describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
   const mockIssue = {
     id: 'issue-ib', identifier: 'TEST-IB1', title: 'Do a thing',
@@ -3230,11 +3245,19 @@ describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
     }
   });
 
-  test('the manual pointer is portable — no bare repo-relative doc path outside the parenthetical', () => {
+  test('the manual pointer is portable — a bare repo-relative doc path never appears outside the endpoint parenthetical', () => {
     const body = formatIfBlocked();
-    // The doc path may appear once, alongside the endpoint, inside the citation parenthetical —
-    // but the endpoint (not the doc path) is what a worker on a different repo can actually reach.
     assert.ok(body.includes('GET /api/proxy/autopilot/manual'));
+    // The doc path may appear only inside the citation parenthetical that also names the
+    // portable endpoint — a repo-relative path outside that parenthetical would be dead for a
+    // worker running against a different repo, which is exactly the constraint this test name
+    // promises. Every mention of the doc path must therefore be paired with the endpoint.
+    const pairedMentions = (body.match(/\(`docs\/autopilot-operating-manual\.md`, also served at `GET \/api\/proxy\/autopilot\/manual`\)/g) || []).length;
+    const totalMentions = (body.match(/docs\/autopilot-operating-manual\.md/g) || []).length;
+    assert.strictEqual(
+      totalMentions, pairedMentions,
+      'the repo-relative doc path must only ever appear inside the endpoint-paired citation parenthetical, never bare'
+    );
   });
 
   test('step 3\'s exact blocks/blocked-by relationship line survives verbatim on both templates (LIN-357 regression)', () => {
@@ -3281,8 +3304,8 @@ describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
       hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, implement',
       completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
     });
-    const planBullet = /- \*\*Plan prompts\*\*[\s\S]*?(?=\n- \*\*Plan-review prompts\*\*)/.exec(p)[0];
-    const implBullet = /- \*\*Implementation prompts\*\*[\s\S]*?(?=\n- \*\*Defer replies\*\*)/.exec(p)[0];
+    const planBullet = extractQualityRuleBullet(p, 'Plan prompts', 'Plan-review prompts');
+    const implBullet = extractQualityRuleBullet(p, 'Implementation prompts', 'Defer replies');
     for (const [label, bullet] of [['Plan', planBullet], ['Implementation', implBullet]]) {
       assert.ok(/PENDING-EXTERNAL/.test(bullet), `${label}-prompts bullet must name PENDING-EXTERNAL`);
       assert.ok(/BLOCKED:/.test(bullet), `${label}-prompts bullet must name BLOCKED:`);
@@ -3295,6 +3318,57 @@ describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
         `${label}-prompts bullet must name the portable endpoint pointer`
       );
     }
+  });
+
+  // F1/F2 remedy: the `blocked` template (lib/prompt-template-defs.js) is the closest
+  // ungated sibling of the worker-lane rubric this ticket adds, and its meta-path
+  // counterpart — the **Blocked prompts** quality-rule bullet — must carry the same
+  // Principle 0 gate + manual citation, structurally tested on both paths so removing
+  // either directive fails a focused assertion rather than passing silently.
+  test('the handwritten blocked template also gates the blocker analysis on Principle 0 and cites the manual', () => {
+    const result = generatePrompt('blocked', mockIssue, mockContext);
+    assert.ok(
+      /Gate this analysis on Principle 0/.test(result.prompt),
+      'blocked: must gate the blocker analysis on Principle 0'
+    );
+    assert.ok(
+      /cost of doing nothing/.test(result.prompt),
+      'blocked: must name the cost of doing nothing'
+    );
+    assert.ok(
+      result.prompt.includes('The human\'s edge, and how to hand back'),
+      'blocked: must cite the manual section by name'
+    );
+    assert.ok(
+      result.prompt.includes('GET /api/proxy/autopilot/manual'),
+      'blocked: must name the portable endpoint pointer'
+    );
+  });
+
+  test('the meta-path Blocked-prompts quality rule mirrors the same Principle 0 gate + manual pointer', () => {
+    const p = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-2202',
+      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, implement',
+      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
+    });
+    const blockedBullet = extractQualityRuleBullet(p, 'Blocked prompts', 'Triage prompts');
+    assert.ok(
+      /Principle 0/.test(blockedBullet),
+      'Blocked-prompts bullet must gate the blocker analysis on Principle 0'
+    );
+    assert.ok(
+      /cost of doing nothing/.test(blockedBullet),
+      'Blocked-prompts bullet must name the cost of doing nothing'
+    );
+    assert.ok(
+      blockedBullet.includes('The human\'s edge, and how to hand back'),
+      'Blocked-prompts bullet must cite the manual section by name'
+    );
+    assert.ok(
+      blockedBullet.includes('GET /api/proxy/autopilot/manual'),
+      'Blocked-prompts bullet must name the portable endpoint pointer'
+    );
   });
 });
 
