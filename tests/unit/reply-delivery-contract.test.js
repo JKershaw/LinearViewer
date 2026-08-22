@@ -291,6 +291,72 @@ test('dispatch fetch REJECTION, issueless (I10 explicit): onDispatchFailed fires
   assert.equal(fired.onPartialFailure.length, 0);
 });
 
+// ── Callback-routing (L1) ────────────────────────────────────────────────────
+// The two-argument `.then(onFulfilled, onRejected)` at public/common.js:809-818
+// is load-bearing, and its own comment says so: the reject arm is attached to
+// postComment's promise, so it can only ever see a COMMENT-write rejection —
+// never a throw from the fulfilled branch's own callbacks. Rewriting it as the
+// equivalent-looking `.then(fn).catch(rej)` reintroduces exactly that
+// misclassification: a throw from onDispatchOk/onPartialFailure would fire
+// onCommentFailed, telling the user their reply was never recorded when in fact
+// it was written durably. The two tests below are the only thing standing
+// between that "harmless simplification" and green CI. They lock the routing
+// only — not the throwing callbacks' own error handling, which stays the
+// caller's business (the trailing blanket catch keeps the outer promise
+// settled, per the never-rejects contract).
+
+test('callback-routing (L1): a throw from onDispatchOk is NOT misclassified as a comment failure, and the outer promise still resolves', async () => {
+  const { window, calls } = makeSandbox(() => jsonResponse(true, 200, { success: true }));
+  const { fired, handlers } = trackedHandlers();
+
+  const thrown = new Error('presentation blew up after a successful dispatch');
+  // Would throw/reject the test itself if deliverReply's outer promise rejected.
+  await window.ReplyDelivery.deliverReply(
+    { urlKey: 'w', issueId: 'i1', followUpTo: 'lp', target: 'cli' },
+    'hello',
+    Object.assign({}, handlers, {
+      onDispatchOk: () => { fired.onDispatchOk.push(true); throw thrown; },
+    })
+  );
+
+  assert.equal(fired.onDispatchOk.length, 1, 'sanity: the fixture reached onDispatchOk');
+  assert.equal(calls.length, 2, 'sanity: both writes were attempted and both succeeded');
+  assert.equal(
+    fired.onCommentFailed.length, 0,
+    'the comment WAS written — a throw from onDispatchOk must never route to onCommentFailed (a chained .catch instead of the reject arm would)'
+  );
+  assert.equal(fired.onPartialFailure.length, 0);
+  assert.equal(fired.onDispatchFailed.length, 0);
+});
+
+test('callback-routing (L1): a throw from onPartialFailure is NOT misclassified as a comment failure, and the outer promise still resolves', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
+    return jsonResponse(false, 503, { error: 'busy' });
+  });
+  const { fired, handlers } = trackedHandlers();
+
+  const thrown = new Error('retry-affordance render blew up');
+  // Would throw/reject the test itself if deliverReply's outer promise rejected.
+  await window.ReplyDelivery.deliverReply(
+    { urlKey: 'w', issueId: 'i1', followUpTo: 'lp', target: 'cli' },
+    'hello',
+    Object.assign({}, handlers, {
+      onPartialFailure: (e, retry) => { fired.onPartialFailure.push({ e, retry }); throw thrown; },
+    })
+  );
+
+  assert.equal(fired.onPartialFailure.length, 1, 'sanity: the fixture reached onPartialFailure');
+  assert.equal(fired.onPartialFailure[0].e.message, 'busy');
+  assert.equal(calls.length, 2, 'sanity: comment write + one dispatch attempt');
+  assert.equal(
+    fired.onCommentFailed.length, 0,
+    'the comment WAS written — a throw from onPartialFailure must never route to onCommentFailed'
+  );
+  assert.equal(fired.onDispatchOk.length, 0);
+  assert.equal(fired.onDispatchFailed.length, 0);
+});
+
 test('all four handlers are required (F2): a missing handler throws synchronously rather than disappearing through the blanket catch', () => {
   const { window } = makeSandbox(() => { throw new Error('fetch should not be called — the precondition check must fire first'); });
   const { handlers } = trackedHandlers();
