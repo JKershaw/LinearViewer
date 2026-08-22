@@ -237,6 +237,10 @@ describe('POST /workspace/:urlKey/api/scan/:issueId/dismiss', () => {
     assert.equal(dismissed.status, 200);
     assert.equal(dismissed.body.outcome, 'dismissed');
     assert.ok(dismissed.body.outcomeAt);
+    // LIN-2212 (F3, close-out ledger L3): shape parity with GET/POST scan —
+    // dismiss returns the canonical issueId too, so public/scan.js's
+    // ctx.lastData does not lose it after a dismiss.
+    assert.equal(dismissed.body.issueId, scanned.body.issueId);
 
     // GET now agrees: fresh (unchanged content) with the outcome stamped —
     // never regresses to "missing".

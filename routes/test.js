@@ -45,7 +45,7 @@ import { establishAccount } from '../lib/account-session.js';
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -720,6 +720,30 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       const urlKey = req.query.urlKey || 'test-workspace'
       if (taskSnapshotStore) await taskSnapshotStore.clear(urlKey)
       res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to clear the task-decisions (scan) store for testing (LIN-2212)
+  router.get('/test/clear-task-decisions', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace'
+      if (taskDecisionsStore) await taskDecisionsStore.clear(urlKey)
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Read sibling to /test/clear-task-decisions (LIN-2217): proves the
+  // 'answered' stamp crosses the durable taskDecisions store boundary.
+  // First read-back store endpoint in this file — see class docstring.
+  router.get('/test/task-decisions', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace'
+      const record = taskDecisionsStore ? await taskDecisionsStore.getStatus(urlKey, req.query.issueId) : null
+      res.json({ ok: true, record })
     } catch (err) {
       res.status(500).json({ error: err.message })
     }

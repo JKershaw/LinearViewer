@@ -2527,7 +2527,7 @@ ${goal}`
    * still resolves it via the context fetch, unchanged.
    *
    * @route POST /workspace/:urlKey/api/scan/:issueId/dismiss
-   * @returns {Object} { status: 'fresh', id, decision, outcome, outcomeAt, scannedAt }
+   * @returns {Object} { status: 'fresh', id, issueId, decision, outcome, outcomeAt, scannedAt }
    */
   router.post('/workspace/:urlKey/api/scan/:issueId/dismiss', workspaceFromUrl, json(), async (req, res) => {
     const workspace = req.workspace;
@@ -2584,6 +2584,7 @@ ${goal}`
       return res.json({
         status: 'fresh',
         id: record.id,
+        issueId: record.issueId,
         decision: record.decision,
         outcome: record.outcome,
         outcomeAt: record.outcomeAt,

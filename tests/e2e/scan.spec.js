@@ -16,9 +16,15 @@
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
+import { testMockData } from '../fixtures/mock-data.js';
 
 test.describe('Scan UI — Dashboard', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // The task-decisions store is durable with no TTL by design (LIN-2212) —
+    // `seedLocal` re-seeds identical issue content, so an unchanged row from
+    // a prior local run would otherwise stay current and this spec would not
+    // be re-runnable against the same `./data`.
+    await page.request.get(`/test/clear-task-decisions?urlKey=${localWorkerUrlKey}`);
     await seedLocal(workspaceApiLocalSeed);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
@@ -77,6 +83,56 @@ test.describe('Scan UI — Dashboard', () => {
     await expect(section.locator('[data-testid="scan-outcome-dismissed"]')).toBeVisible();
   });
 
+  // Pins the 'answered' stamp round trip (LIN-2212/N5): the committed suite
+  // previously only asserted the answer box was *visible*, never pressed
+  // Send answer, so nothing crossed the browser -> ReplyDelivery -> comments
+  // route -> store boundary for this outcome. Depends on the beforeEach
+  // clear above — a stale terminal row from a prior run would report
+  // 'fresh'/already-answered instead of 'missing' here.
+  test('sending an answer on a decision-bearing task stamps the outcome answered', async ({ page, localWorkerUrlKey }) => {
+    const taskId = testMockData.issues.find(i => i.identifier === 'TEST-6').id;
+    const { node, row } = openScanToggle(page, 'Task needing preparation');
+    await row.click();
+    await node.locator('[data-toggle="details"]').first().click();
+    await node.locator('[data-toggle="scan"]').first().click();
+
+    const section = node.locator('[data-content="scan"] .scan-section');
+    await expect(section).toHaveAttribute('data-state', 'missing', { timeout: 5000 });
+
+    await section.locator('[data-scan-action="scan"]').click();
+    await expect(section).toHaveAttribute('data-state', 'fresh', { timeout: 5000 });
+
+    await section.locator('[data-scan-answer-input]').fill('Proceeding with the current approach.');
+
+    // Diagnostic only — names *which* half broke on a wiring regression, but
+    // it is NOT the store-boundary proof: it passes even if the durable
+    // stamp write below is disabled, since it only inspects the outgoing
+    // request. Mirrors tests/e2e/observation-rulings.spec.js:133-141.
+    const [commentReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
+      section.locator('[data-scan-action="answer"]').click()
+    ]);
+    const commentPayload = commentReq.postDataJSON();
+    expect(commentPayload.taskDecisionIssueId).toBe(taskId);
+
+    // The just-written answer comment is itself part of the scan's own
+    // hashContext, so a successful answer re-fetches as 'stale', not 'fresh'
+    // (public/scan.js's renderAnswerSentStale) — this is the signal that the
+    // comment landed, and only that: it is reachable from the comment write
+    // alone and says nothing about whether the durable stamp ran.
+    await expect(section).toHaveAttribute('data-state', 'stale', { timeout: 5000 });
+    await expect(section.locator('.scan-placeholder')).toContainText('Your answer was recorded as a comment');
+
+    // The store-boundary proof (LIN-2217): the two assertions above are both
+    // reachable from the comment write alone, regardless of whether the
+    // durable stamp ran — this read-back is the only assertion that crosses
+    // the taskDecisions store boundary and actually pins 'answered'.
+    const { record } = await (await page.request.get(
+      `/test/task-decisions?urlKey=${localWorkerUrlKey}&issueId=${taskId}`
+    )).json();
+    expect(record.outcome).toBe('answered');
+  });
+
   test('pressing scan on a task with no blocking language reports no blockers found', async ({ page }) => {
     const { node, row } = openScanToggle(page, 'Add pagination to user list');
     await row.click();
@@ -94,6 +150,9 @@ test.describe('Scan UI — Dashboard', () => {
 
 test.describe('Scan UI — Swipe', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // Same re-runnability fix as the Dashboard describe above — this describe
+    // shares the same per-worker urlKey and durable store.
+    await page.request.get(`/test/clear-task-decisions?urlKey=${localWorkerUrlKey}`);
     await seedLocal(workspaceApiLocalSeed);
     await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
