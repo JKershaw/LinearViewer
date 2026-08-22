@@ -1698,6 +1698,16 @@ a.wordmark:hover {
     align-items: center;
   }
 
+  /* Landing/preview auth links (Sign in / GitHub / Jira, .nav-action.login):
+     unlike .nav-item, .nav-action has no padding of its own, so the 44px
+     min-height above never reached these. Give them a real tap target. */
+  .nav-action.login {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0.5rem 0;
+  }
+
   .nav-value {
     max-width: 12ch;
     overflow: hidden;
@@ -2200,14 +2210,18 @@ body.is-landing {
   background: color-mix(in srgb, var(--teal) 85%, black);
 }
 
-/* GitHub: a co-equal CTA, visually quieter as a teal outline. */
-.landing-cta-github {
+/* GitHub and Jira: co-equal CTAs, visually quieter as a teal outline — the
+   same treatment for both, so a third auth option reads as part of the set
+   rather than introducing its own visual weight. */
+.landing-cta-github,
+.landing-cta-jira {
   background: transparent;
   color: var(--teal);
   border-color: var(--teal);
 }
 
-.landing-cta-github:hover {
+.landing-cta-github:hover,
+.landing-cta-jira:hover {
   background: var(--teal-soft);
 }
 
