@@ -116,9 +116,10 @@ test.describe('Scan UI — Dashboard', () => {
     expect(commentPayload.taskDecisionIssueId).toBe(taskId);
 
     // The just-written answer comment is itself part of the scan's own
-    // hashContext, so a successful stamp re-fetches as 'stale', not 'fresh'
-    // (public/scan.js's renderAnswerSentStale) — this is the real signal
-    // that the comment landed and the store recorded outcome:'answered'.
+    // hashContext, so a successful answer re-fetches as 'stale', not 'fresh'
+    // (public/scan.js's renderAnswerSentStale) — this is the signal that the
+    // comment landed, and only that: it is reachable from the comment write
+    // alone and says nothing about whether the durable stamp ran.
     await expect(section).toHaveAttribute('data-state', 'stale', { timeout: 5000 });
     await expect(section.locator('.scan-placeholder')).toContainText('Your answer was recorded as a comment');
 
