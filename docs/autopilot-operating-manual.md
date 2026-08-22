@@ -383,6 +383,13 @@ Some moments are the human's, and there your job is to hand over cleanly. What's
 where you sit**. In those, re-dispatching blindly risks a collision with a half-finished state; flag it
 and let the human supply the missing piece.
 
+**Gate on Principle 0 first.** Before you park BLOCKED, ask: does this genuinely require the human,
+right now — or is it something you (or the layer above you) can still resolve? Attempt local
+resolution first. If what's actually missing is your parent/orchestrator's next step rather than a
+human decision, that's a wait on the layer above you, not a hand-back to the human — emit
+`PENDING-EXTERNAL`, not `BLOCKED`. Reserve `BLOCKED` for the case that will not clear without a
+person.
+
 A hand-back costs attention, so spend it well, two ways:
 
 - **Only escalate what's actually theirs.** Don't tax them with something you could verify yourself —
@@ -394,6 +401,18 @@ Underneath this sits **reversibility**, a dial not a switch. On a throwaway bran
 range freely — mistakes are cheap. Near a merge, a Done, or anything downstream will consume, tighten:
 that's where one verification before something lands is worth the pause. Keep the irreversible
 decisions yours, earned by evidence — never let the worker certify its own finish line.
+
+**When a park is genuine, make the ruling self-sufficient** — don't hand over a symptom and make the
+human reconstruct it. Cover, in the case itself: **what** is blocked and **why** — the specific
+obstacle, not a generic failure; **the decision**, stated as a decision, not a symptom; **the
+options**, each with your recommendation and your reasoning for it; **the cost of each option**, and
+**the cost of doing nothing** — what continues, what halts, what it costs to wait. When you emit the
+`DECISION:` block, per-option cost belongs in the option's own wording (`options[].cost` only accepts
+a number and silently drops prose); the cost of doing nothing belongs in `if_unanswered`.
+
+**Merge sibling blockers before you bubble up.** If more than one child you're holding is blocked on
+the same root cause, don't escalate once per child — raise ONE hand-back naming the shared cause, with
+the blocked branches named in the case itself (there's no separate field for this; say it in prose).
 
 And the irreversible finish itself — the merge, the Done, the summary, the follow-ups — is no longer
 something you reach down and do by hand. It's a **dispatched step of its own**. `review` only

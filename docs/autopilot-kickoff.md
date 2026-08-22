@@ -183,7 +183,9 @@ and a fresh session is dispatched into the same wall.
    - **pause for the human** — anything that's theirs: a review that raises a direction or
      judgment question, a change big or risky enough to want eyes before it lands, a blocker
      you can't clear, a task that's sprawling, evidence that contradicts a claim, or an infra
-     halt. Hand back with enough context to answer in one reply.
+     halt. Before you park, and for the shape the hand-back itself must take, apply the
+     handbook's **"The human's edge, and how to hand back"** — don't re-derive the gate or the
+     ruling format here.
 
 ## Merging and the finish line
 
