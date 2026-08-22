@@ -75,6 +75,37 @@ test.describe('Landing Page (bespoke showcase)', () => {
     expect(consent.origin).toBe('https://auth.atlassian.com');
     expect(consent.pathname).toBe('/authorize');
     expect(consent.searchParams.get('client_id')).toBeTruthy();
+
+    // LIN-2210 close-out ledger item 1: prior to this PR, `.landing-cta-jira`
+    // had NO CSS rule at all, so it inherited the base `.landing-cta`'s
+    // transparent border/no-background/no-color look — a bare default blue
+    // link beside a filled Linear CTA and an outlined GitHub CTA. Assert
+    // PARITY with the GitHub CTA (not fixed palette literals) so this survives
+    // a future palette change while still catching the regression: markup-only
+    // assertions (visible + href, above) do not.
+    //
+    // This webServer deliberately runs with no GITHUB_* configured (see
+    // settings-providers.spec.js's "not configured on this server" assertion),
+    // so no live `.landing-cta-github` element exists to measure here. Compare
+    // against a same-class sibling inserted next to the real Jira CTA instead —
+    // it picks up the identical CSS rule (`.landing-cta-github,
+    // .landing-cta-jira { ... }`) and the same `.is-landing` token-remap
+    // ancestor context, so this still reads real browser-computed CSS rather
+    // than a hardcoded value.
+    const parity = await page.evaluate(() => {
+      const jira = document.querySelector('[data-testid="landing-cta-jira"]');
+      const synthetic = document.createElement('a');
+      synthetic.className = 'landing-cta landing-cta-github';
+      jira.parentElement.appendChild(synthetic);
+      const read = el => {
+        const s = getComputedStyle(el);
+        return { backgroundColor: s.backgroundColor, color: s.color, borderColor: s.borderColor };
+      };
+      const result = { jira: read(jira), github: read(synthetic) };
+      synthetic.remove();
+      return result;
+    });
+    expect(parity.jira).toEqual(parity.github);
   });
 
   test('shows the showcase sections', async ({ page }) => {

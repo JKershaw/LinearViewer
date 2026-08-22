@@ -517,3 +517,23 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
     expect(clipped).toBe(true);
   });
 });
+
+// LIN-2210 close-out ledger item 2: `.nav-action.login` (Sign in / GitHub / Jira
+// on the landing preview pages' shared nav bar) had no mobile tap target — the
+// existing 44px rule above is written against `.nav-item`, which `.nav-action`
+// never carries. This targets the unauthenticated `/swipe` preview directly (no
+// seedLocal/session needed — it is the landing bar, not a workspace nav), the
+// same surface the review measured 18.7px → 44.0px on.
+test.describe('Landing preview nav auth tap target (LIN-2210)', () => {
+  test('.nav-action.login clears 44px on /swipe at 390px', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.goto('/swipe');
+    await page.waitForLoadState('networkidle');
+
+    const heights = await page.locator('.nav-actions .nav-action.login').evaluateAll(els =>
+      els.map(el => el.getBoundingClientRect().height)
+    );
+    expect(heights.length).toBeGreaterThan(0);
+    for (const h of heights) expect(h).toBeGreaterThanOrEqual(44);
+  });
+});
