@@ -10,8 +10,7 @@
  * Loaded AFTER common.js, chat.js, marked.min.js, purify.min.js, brief.js,
  * recap.js — window.ChatUI, window.renderMarkdown, window.BriefSection,
  * window.RecapSection ARE available. Inline replies use the same raw-fetch
- * dispatch as the original global reply box (window.dispatchPrompt does not
- * support followUpTo).
+ * dispatch as the original global reply box.
  */
 (function () {
   'use strict';
@@ -23,45 +22,6 @@
   function appendYouBubble(thread, text) {
     if (!thread || typeof window.ChatUI === 'undefined') return;
     window.ChatUI.appendMessage(thread, { who: 'you', self: true, text: text, testId: 'session-reply-you' });
-  }
-
-  // ── Durable comment write (LIN-2154) ──────────────────────────────────────
-  // POST /workspace/:urlKey/api/comments/:issueId — the session-auth twin of
-  // the agent-lane comment route. Resolves to {ok, status, data}, never
-  // rejects on a non-2xx (the caller decides how to surface that).
-  function postComment(urlKey, issueId, prompt) {
-    return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/comments/' + encodeURIComponent(issueId), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ body: prompt })
-    }).then(function (resp) {
-      return resp.json().catch(function () { return {}; }).then(function (data) {
-        return { ok: resp.ok, status: resp.status, data: data };
-      });
-    });
-  }
-
-  // The existing dispatch follow-up call, unchanged wire shape — lifted out of
-  // sendReply so both Save-and-continue and its delivery-retry affordance can
-  // call it. Resolves to {ok, status, data}, same contract as postComment.
-  function postDispatch(opts, prompt) {
-    var body = { prompt: prompt, followUpTo: opts.followUpTo, target: opts.target };
-    if (opts.force) body.force = true;
-    return fetch('/workspace/' + encodeURIComponent(opts.urlKey) + '/api/dispatch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify(body)
-    }).then(function (resp) {
-      return resp.json().catch(function () { return {}; }).then(function (data) {
-        return { ok: resp.ok, status: resp.status, data: data };
-      });
-    });
-  }
-
-  function errorFromResult(result) {
-    return new Error((result.data && result.data.error) || ('HTTP ' + result.status));
   }
 
   // ── Save (comment-only) ───────────────────────────────────────────────────
@@ -85,9 +45,9 @@
     feedback.textContent = '';
     feedback.className = 'sess-reply-feedback';
 
-    postComment(opts.urlKey, opts.issueId, prompt)
+    window.ReplyDelivery.postComment(opts.urlKey, opts.issueId, prompt)
       .then(function (result) {
-        if (!result.ok) throw errorFromResult(result);
+        if (!result.ok) throw window.ReplyDelivery.errorFromResult(result);
         appendYouBubble(thread, prompt);
         textarea.value = '';
         feedback.textContent = 'recorded on the task';
@@ -110,7 +70,10 @@
   }
 
   // ── Save and continue (comment write, then the existing dispatch follow-up) ──
-  // Structural partial-failure handling (LIN-2154 OQ4), all client-side:
+  // The comment-first/dispatch-second ordering, the {ok,status,data} raw-fetch
+  // contract, and the partial-failure/retry-only-dispatch guard now live in
+  // window.ReplyDelivery (LIN-2200, public/common.js) — this function supplies
+  // only the DOM/copy/echo for the reply box:
   //   1. comment write fails            -> show the error; dispatch never attempted
   //   2. comment ok, dispatch fails     -> "recorded, could not deliver" + retry-delivery
   //   3. comment ok, dispatch enqueues  -> today's queued copy + recorded confirmation
@@ -144,6 +107,11 @@
       btn.textContent = 'queued ✓';
     }
 
+    // Comment-write failure and issueless-dispatch failure are two distinct
+    // outcomes in window.ReplyDelivery's API (onCommentFailed/onDispatchFailed
+    // — an issueless failure has no comment behind it to have "recorded"), but
+    // both wire to this same handler here: today's identical "reply failed:
+    // ..." copy, zero user-visible change from before the extraction.
     function onDispatchFailed(e) {
       feedback.textContent = 'reply failed: ' + e.message;
       feedback.className = 'sess-reply-feedback error';
@@ -163,8 +131,10 @@
     // (400/409/429/503 -- dispatchQueueLimiter is live, so a retry burst can
     // legitimately hit 429): surface a structural partial failure with a
     // retry affordance that re-fires ONLY the dispatch call -- the comment is
-    // never resent (harmless via dedupe if it were).
-    function onPartialFailure(dispatchErr) {
+    // never resent (harmless via dedupe if it were). `retryDispatch` is
+    // window.ReplyDelivery's own closure over this same opts/prompt — not a
+    // caller-side reimplementation of postDispatch.
+    function onPartialFailure(dispatchErr, retryDispatch) {
       appendYouBubble(thread, prompt);
       textarea.value = '';
       feedback.textContent = 'Recorded on the task. Could not deliver to the session: ' + dispatchErr.message + '. ';
@@ -177,8 +147,7 @@
         retryBtn.disabled = true;
         feedback.textContent = 'retrying delivery…';
         feedback.className = 'sess-reply-feedback';
-        postDispatch(opts, prompt).then(function (result) {
-          if (!result.ok) throw errorFromResult(result);
+        retryDispatch().then(function () {
           feedback.textContent = queuedCopy(true);
           feedback.className = 'sess-reply-feedback';
         }).catch(function (e2) {
@@ -193,28 +162,21 @@
       btn.disabled = false;
     }
 
-    function doDispatch() {
-      return postDispatch(opts, prompt).then(function (result) {
-        if (!result.ok) throw errorFromResult(result);
-      });
-    }
-
-    var chain = opts.issueless
-      ? doDispatch().then(onDispatchOk)
-      : postComment(opts.urlKey, opts.issueId, prompt).then(function (commentResult) {
-          if (!commentResult.ok) throw errorFromResult(commentResult);
-          return doDispatch().then(onDispatchOk).catch(function (dispatchErr) {
-            onPartialFailure(dispatchErr);
-            throw { handledPartialFailure: true };
-          });
-        });
-
-    chain
-      .catch(function (e) {
-        if (e && e.handledPartialFailure) return;
-        onDispatchFailed(e);
-      })
-      .then(restoreButton);
+    // Raw fetch (not window.dispatchPrompt) is deliberate: window.api throws
+    // on a non-2xx response and structurally cannot yield the {ok,status,data}
+    // shape this chain depends on; the payload's minimalism
+    // ({prompt,followUpTo,target[,force]}, no issue fields, no attachProxy) is
+    // a server-side input the dispatch factory/bootstrap-provisioning
+    // contracts key on (LIN-1292, LIN-1431); and dispatchPrompt hard-requires
+    // issue.id+issue.identifier (this box only ever carries one) and fires
+    // window.updateQueueBadge, a UI side effect this reply flow must not own.
+    // Full reasoning: the banner note on window.ReplyDelivery (common.js).
+    window.ReplyDelivery.deliverReply(opts, prompt, {
+      onCommentFailed: onDispatchFailed,
+      onDispatchFailed: onDispatchFailed,
+      onPartialFailure: onPartialFailure,
+      onDispatchOk: onDispatchOk
+    }).then(restoreButton);
   }
 
   // ── Per-run expand/collapse toggle (LIN-1133; LIN-1163 whole-card click) ───
