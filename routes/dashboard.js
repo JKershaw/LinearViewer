@@ -636,7 +636,14 @@ export function createDashboardRoutes({
         metrics: metrics.slice(-6),
         toolPeak: peakToolCount(metrics),
         producedArtifacts: Array.isArray(l.telemetry?.producedArtifacts) ? l.telemetry.producedArtifacts : [],
-        resources: l.telemetry?.resources || null
+        resources: l.telemetry?.resources || null,
+        // LIN-2184 (H5): carry the loop's own build-time decision facts (LIN-2182
+        // / H3, routes/dashboard.js:570's rollup reads the SAME fields from this
+        // loop) through this allow-list projection — otherwise they never reach
+        // the feed card. Deliberately NOT gated on `waiting`; the render is
+        // waiting-gated downstream, the payload is not (H4 review ledger).
+        decision: l.decision || null,
+        decisionCase: Array.isArray(l.decisionCase) ? l.decisionCase : []
       };
     });
 
@@ -659,6 +666,14 @@ export function createDashboardRoutes({
       // surfaces the blocked message text. Null message when nothing is waiting.
       waiting,
       waitingMessage: waiting ? waitingMessage : null,
+      // LIN-2184 (H5): the rollup's decision facts (from the SAME producing loop
+      // as `message`/`waitingMessage` above — `deriveSessionWaiting`'s "one
+      // producer, always" rule) — deliberately NOT gated on `waiting`, unlike
+      // `waitingMessage` just above. The render is waiting-gated (beats 3/4);
+      // the payload must not be, per H4's review ledger.
+      producerLoopId,
+      decision,
+      decisionCase,
       runCount: runs.length,
       runs,
       recentKind: recentRunKind(children),

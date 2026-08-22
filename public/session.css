@@ -100,6 +100,54 @@
   color: var(--muted);
 }
 
+/* Decision case (LIN-2184/H5) — renders inside the banner, between the plain
+   `.sess-waiting-msg` and the CTA, when the rollup carries a `decision`. Full
+   prose is intentional here (see renderWaitingBanner's doc comment); the grid
+   gaps below are what was missing pre-repair — the global `* { margin: 0 }`
+   reset otherwise butts the question/case/options against each other. */
+.sess-waiting-decision {
+  margin: 0.75rem 0 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.sess-waiting-decision-question {
+  margin: 0;
+  font-family: var(--font-content);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.sess-waiting-decision-case {
+  display: grid;
+  gap: 0.4rem;
+}
+.sess-waiting-decision-case-chunk {
+  margin: 0;
+  font-family: var(--font-structural);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sess-waiting-decision-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.sess-waiting-decision-option {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  padding: 0.05rem 0.4rem;
+  color: var(--text);
+  background: var(--inset);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+}
+
 /* ── Overview ─────────────────────────────────────────────────────────────── */
 /* A quiet "spec sheet" panel (LIN-1225): the flat key/value list gains a subtle
    inset container with hairline-separated rows so the run summary reads as a

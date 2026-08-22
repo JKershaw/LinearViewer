@@ -43,6 +43,17 @@ const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000; // 24h
 const ARCHIVE_PAGE_SIZE = 30;               // archive "load more" page size
 
+// LIN-2184 (H5, beat 4): the feed card's decision-case excerpt budget. The
+// feed is a glance surface, not the full case (that's the waiting banner,
+// beat 3) — Principle 0 (docs/escalation-philosophy.md) says an escalation
+// stream must stay actable-at-a-glance, so this stays SHORT. Retuned from an
+// initial 140 (review measured that at 3-4 lines against the real
+// `.obs-page` content width — 468px mobile / 620px desktop — not the "one to
+// two lines" it was chosen for). ~65 chars lands at roughly two lines at the
+// mobile width, the feed's primary form factor. A single named constant,
+// referenced once below, so retuning it further is a one-line change.
+const DECISION_EXCERPT_CHARS = 65;
+
 // Filter state.
 const hiddenWorkspaces = new Set();        // urlKeys toggled off
 let archiveOpen = false;
@@ -264,6 +275,49 @@ function renderProgressBar(s) {
     </div>`;
 }
 
+/**
+ * LIN-2184 (H5, beat 4): bound a decision's case (`decisionCase`, a `string[]`
+ * of un-joined chunks — see H3's correlateDecisionCase) to a single-glance
+ * excerpt. Joins the chunks first so the budget is spent across the WHOLE
+ * case rather than silently dropping every chunk after the first, then
+ * truncates once at the char budget with a trailing ellipsis. Never exceeds
+ * `maxChars` (the acceptance test); returns '' for an empty/absent case.
+ *
+ * @param {Array<string>} decisionCase
+ * @param {number} maxChars
+ * @returns {string}
+ */
+function excerptDecisionCase(decisionCase, maxChars) {
+  const chunks = Array.isArray(decisionCase) ? decisionCase : [];
+  const full = chunks.join(' ').trim();
+  if (!full) return '';
+  if (full.length <= maxChars) return full;
+  return `${full.slice(0, maxChars).trimEnd()}…`;
+}
+
+/**
+ * The feed card's decision summary — a bounded excerpt of the case plus the
+ * option labels, appended to the "waiting on you" line. NOT full prose (that
+ * is the waiting banner's job, beat 3) — this is the glance. Consumes the
+ * already-formed `decision`/`decisionCase` fields beat 2 widened onto the
+ * session payload; never re-derives them.
+ *
+ * @param {Object} decision - `{decision_id, question?, options?: [{id,label,cost?}], ...}`
+ * @param {Array<string>} decisionCase
+ * @returns {string}
+ */
+function renderWaitingDecisionSummary(decision, decisionCase) {
+  const excerpt = excerptDecisionCase(decisionCase, DECISION_EXCERPT_CHARS);
+  const excerptHtml = excerpt
+    ? ` <span class="obs-summary-decision-excerpt">${escapeHtml(excerpt)}</span>`
+    : '';
+  const options = Array.isArray(decision && decision.options) ? decision.options : [];
+  const optionsHtml = options.length
+    ? ` <span class="obs-summary-decision-options">[${options.map(o => escapeHtml(String(o.label))).join(' / ')}]</span>`
+    : '';
+  return `${excerptHtml}${optionsHtml}`;
+}
+
 function renderSummaryLine(s) {
   const st = summaryState.get(s.sessionId);
   if (st && st.pending) return `<span class="obs-summary-line obs-summary-pending">summarising…</span>`;
@@ -276,11 +330,15 @@ function renderSummaryLine(s) {
   // deriveSessionStatus ordering (a day-dead session isn't shown as waiting).
   if (s.waiting) {
     const msg = s.waitingMessage ? ` — ${escapeHtml(String(s.waitingMessage))}` : '';
+    // LIN-2184 (H5): a bounded excerpt of the case + option labels when this
+    // waiting session carries a decision (beat 2 widened the session-level
+    // projection so `s.decision`/`s.decisionCase` reach this consumer).
+    const decisionSummary = s.decision ? renderWaitingDecisionSummary(s.decision, s.decisionCase) : '';
     // The direct path out of the dead-end (LIN-1019): a reply CTA straight to the
     // session page, where the follow-up reply box lives.
     const href = sessionHref(s);
     const reply = href ? ` <a class="obs-summary-reply" href="${escapeHtml(href)}">reply →</a>` : '';
-    return `<span class="obs-summary-line obs-summary-waiting">◐ waiting on you${msg}${reply}</span>`;
+    return `<span class="obs-summary-line obs-summary-waiting">◐ waiting on you${msg}${decisionSummary}${reply}</span>`;
   }
   if (st && st.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(st.statusLine)}</span>`;
   // Live status line served on the feed itself (no per-poll backend fetch).
@@ -1305,5 +1363,9 @@ if (typeof module !== 'undefined' && module.exports) {
     // split (renderTasks groups by issue BEFORE the fold) are unit-testable
     // without a DOM.
     sessionSignature, runsByLineage, renderTaskBlock, renderTasks,
+    // LIN-2184 (H5, beat 4): expose the feed card's decision-excerpt seam
+    // (and its budget constant) so the truncation acceptance test asserts
+    // against the constant, not a hard-coded copy of its value.
+    renderSummaryLine, excerptDecisionCase, renderWaitingDecisionSummary, DECISION_EXCERPT_CHARS,
   };
 }

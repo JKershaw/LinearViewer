@@ -83,6 +83,53 @@ describe('render-session: transcript', () => {
     assert.match(html, /<ul class="sess-run-tx chat-thread" data-testid="session-run-transcript" data-feedback="[^"]*"><\/ul>/);
     assert.ok(!html.includes('sess-run-tx-list'));
   });
+
+  // LIN-2184 (H5): encodeFeedbackJSON must round-trip `kind` so a `decision`
+  // entry can be styled distinctly client-side. The transcript is NOT
+  // waiting-gated, so this must hold on a blocked (non-terminal) run and on a
+  // completed (terminal) run alike.
+  test('LIN-2184: round-trips kind for a decision entry on a waiting (blocked, non-terminal) run', () => {
+    const session = fixtureSession({
+      loops: [{
+        loopId: 'loop-1', issueIdentifier: 'LIN-900', issueId: 'uuid-900', issueTitle: 'Seed task',
+        iteration: 1, kind: 'autopilot', dispatchedAt: '2026-07-04T10:00:00.000Z',
+        terminalStatus: null,
+        feedback: [
+          { kind: 'assistant-text', message: 'Investigating the migration path.', url: null, urlLabel: null, timestamp: '2026-07-04T10:00:01.000Z' },
+          { kind: 'decision', message: '[decision] {"decision_id":"d-1"}', url: null, urlLabel: null, timestamp: '2026-07-04T10:00:02.000Z' },
+          { kind: 'status', message: '[blocked] awaiting your ruling', url: null, urlLabel: null, timestamp: '2026-07-04T10:00:03.000Z' }
+        ],
+        telemetry: { runtime: { ms: 1000 }, metrics: [], producedArtifacts: [] }
+      }]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-feedback="[^"]*&quot;kind&quot;:&quot;decision&quot;[^"]*"/);
+  });
+
+  test('LIN-2184: round-trips kind for a decision entry on a completed (terminal) run', () => {
+    const session = fixtureSession({
+      loops: [{
+        loopId: 'loop-1', issueIdentifier: 'LIN-900', issueId: 'uuid-900', issueTitle: 'Seed task',
+        iteration: 1, kind: 'autopilot', dispatchedAt: '2026-07-04T10:00:00.000Z',
+        terminalStatus: 'done', terminalCompletedAt: '2026-07-04T10:05:00.000Z',
+        feedback: [
+          { kind: 'assistant-text', message: 'The migration is complete.', url: null, urlLabel: null, timestamp: '2026-07-04T10:04:00.000Z' },
+          { kind: 'decision', message: '[decision] {"decision_id":"d-2"}', url: null, urlLabel: null, timestamp: '2026-07-04T10:04:30.000Z' },
+          { kind: 'status', message: '[done] landed', url: null, urlLabel: null, timestamp: '2026-07-04T10:05:00.000Z' }
+        ],
+        telemetry: { runtime: { ms: 1000 }, metrics: [], producedArtifacts: [] }
+      }]
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-feedback="[^"]*&quot;kind&quot;:&quot;decision&quot;[^"]*"/);
+  });
+
+  test('LIN-2184: a normal entry with no kind carries kind:null, other keys unchanged', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    // fixtureSession's entries carry no `kind` — assert the shape gained `kind`
+    // (null) without disturbing the pre-existing keys already asserted above.
+    assert.match(html, /data-feedback="[^"]*&quot;kind&quot;:null[^"]*"/);
+  });
 });
 
 describe('render-session: tasks + overview', () => {
@@ -183,6 +230,90 @@ describe('render-session: waiting banner (LIN-1005)', () => {
     );
     assert.ok(!html.includes('<script>alert(1)</script>'), 'raw script must not leak');
     assert.match(html, /&lt;script&gt;/);
+  });
+
+  // LIN-2184 (H5, beat 3): the banner is the first real consumer of the H4
+  // prop-bag seam (decision/decisionCase, already threaded by
+  // routes/dashboard.js:1057 but unconsumed until now).
+  test('LIN-2184: renders the full case (from its chunks) + option labels + question, given a decision on a waiting loop', () => {
+    const decision = {
+      decision_id: 'd-1',
+      question: 'Proceed with the migration?',
+      options: [{ id: 'yes', label: 'Yes, proceed' }, { id: 'no', label: 'No, hold off' }]
+    };
+    const decisionCase = ['Considered the schema diff.', 'Considered the rollback plan.'];
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: true, waitingMessage: 'awaiting your ruling', decision, decisionCase },
+      {}
+    );
+    assert.match(html, /data-testid="session-waiting-decision"/);
+    assert.match(html, /data-testid="session-waiting-decision-question"[^>]*>Proceed with the migration\?</);
+    // Both chunks render, each its own node — never joined into one blob.
+    const chunkMatches = html.match(/data-testid="session-waiting-decision-case-chunk"/g) || [];
+    assert.equal(chunkMatches.length, 2, 'both case chunks render as separate nodes');
+    assert.match(html, /data-testid="session-waiting-decision-case-chunk"[^>]*>Considered the schema diff\.</);
+    assert.match(html, /data-testid="session-waiting-decision-case-chunk"[^>]*>Considered the rollback plan\.</);
+    // Option labels render.
+    assert.match(html, /data-testid="session-waiting-decision-option"[^>]*>Yes, proceed</);
+    assert.match(html, /data-testid="session-waiting-decision-option"[^>]*>No, hold off</);
+  });
+
+  test('LIN-2184: a waiting loop with no decision renders the banner exactly as before — no empty case scaffolding', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: true, waitingMessage: 'need your decision on the auth flow' },
+      {}
+    );
+    assert.match(html, /data-testid="session-waiting-banner"/);
+    assert.match(html, /data-testid="session-waiting-message"[^>]*>need your decision on the auth flow</);
+    assert.ok(!html.includes('data-testid="session-waiting-decision"'), 'no decision wrapper when decision is absent');
+    assert.ok(!html.includes('data-testid="session-waiting-decision-case"'), 'no stray case scaffolding');
+    assert.ok(!html.includes('data-testid="session-waiting-decision-options"'), 'no stray options scaffolding');
+  });
+
+  test('LIN-2184: a multi-chunk decisionCase preserves chunk boundaries, including a (recap i/n) header baked into a chunk\'s own text', () => {
+    const decision = { decision_id: 'd-2', options: [] };
+    // A chunk's own text may already carry the emitter's "(recap i/n)" header
+    // (simple-dispatcher's chunker bakes it into the message, not a separate
+    // field) — rendered verbatim, three chunks stay three nodes, not joined.
+    const decisionCase = [
+      'Part one of the case (recap 1/3)',
+      'Part two of the case (recap 2/3)',
+      'Part three of the case (recap 3/3)'
+    ];
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: true, waitingMessage: 'awaiting your ruling', decision, decisionCase },
+      {}
+    );
+    const chunkMatches = html.match(/data-testid="session-waiting-decision-case-chunk"/g) || [];
+    assert.equal(chunkMatches.length, 3, 'all three chunks render, none dropped or truncated');
+    assert.match(html, /Part one of the case \(recap 1\/3\)/);
+    assert.match(html, /Part two of the case \(recap 2\/3\)/);
+    assert.match(html, /Part three of the case \(recap 3\/3\)/);
+  });
+
+  // LIN-2184 (H5, beat 5): the ticket's V1-boundary acceptance test. A
+  // completion-path decision is accepted (H1), parsed (H2), and derived (H3)
+  // onto the loop, but H5 must NOT render it on either surface until LIN-1728
+  // supplies a waiting-independent predicate — the SAME `!waiting` gate that
+  // already guards the plain waitingMessage above also guards the decision
+  // (beat 3 never widened the gate, only what renders inside it). This
+  // fixture mirrors a terminal/non-waiting session (`waiting: false`) that
+  // still carries a decision/decisionCase — proving H4's ledger rule that the
+  // PAYLOAD rides ungated does not leak into the RENDER, which stays gated.
+  test('LIN-2184 V1 boundary: a completion-path decision on a non-waiting (terminal) session renders NEITHER the banner NOR any decision markup', () => {
+    const decision = { decision_id: 'd-3', question: 'Ship it?', options: [{ id: 'yes', label: 'Yes' }] };
+    const decisionCase = ['The migration completed cleanly.'];
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: false, waitingMessage: null, decision, decisionCase },
+      {}
+    );
+    assert.ok(!html.includes('data-testid="session-waiting-banner"'), 'no banner at all when the session is not waiting');
+    assert.ok(!html.includes('data-testid="session-waiting-decision"'), 'no decision wrapper');
+    assert.ok(!html.includes('data-testid="session-waiting-decision-case"'), 'no case markup');
+    assert.ok(!html.includes('data-testid="session-waiting-decision-case-chunk"'), 'no case chunk markup');
+    assert.ok(!html.includes('data-testid="session-waiting-decision-options"'), 'no options markup');
+    assert.ok(!html.includes('The migration completed cleanly.'), 'the case text itself must not leak into the page anywhere');
+    assert.ok(!html.includes('Ship it?'), 'the question text itself must not leak into the page anywhere');
   });
 });
 
