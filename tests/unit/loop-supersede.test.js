@@ -290,4 +290,40 @@ describe('loop-supersede characterization (LIN-1478 beat 1, pre-extraction)', ()
       'runIsWaiting must still read the LAST entry ([blocked]) as waiting, unaffected by the intervening [decision] entry'
     );
   });
+
+  // LIN-1728 (Revision 3, F6): the `decision-answer` stamp `markDecisionAnswered`
+  // writes is answer metadata, not a new status — a run genuinely still parked
+  // `[blocked]` must not read as un-waiting just because a Save/Save-and-continue
+  // stamped an answer onto it (the actual resume, if it happens, is a separate
+  // feedback event that would itself move the tail).
+  test('LIN-1728: runIsWaiting still reads [blocked] as the tail past a trailing decision-answer entry', () => {
+    const session = {
+      sessionId: 'sess-lin1728-answer',
+      tasksTouched: ['LIN-900'],
+      dispatchedAt: '2026-07-20T10:00:00.000Z',
+      telemetry: { runtime: { ms: 1000 }, metrics: [], producedArtifacts: [] },
+      loops: [{
+        loopId: 'lin1728-loop',
+        issueIdentifier: 'LIN-900',
+        issueId: 'uuid-900',
+        issueTitle: 'LIN-1728 decision-answer fixture',
+        iteration: 1,
+        kind: 'autopilot',
+        dispatchedAt: '2026-07-20T10:00:00.000Z',
+        terminalStatus: null,
+        feedback: [
+          { kind: 'decision', message: '[decision] {"decision_id":"d-1728","question":"Proceed?"}', url: null, urlLabel: null, timestamp: '2026-07-20T10:00:01.000Z' },
+          { kind: 'status', message: '[blocked] awaiting your ruling', url: null, urlLabel: null, timestamp: '2026-07-20T10:00:02.000Z' },
+          { kind: 'decision-answer', message: '{"decision_id":"d-1728"}', url: null, urlLabel: null, timestamp: '2026-07-20T10:00:03.000Z' }
+        ],
+        telemetry: { runtime: { ms: 1000 }, metrics: [], producedArtifacts: [] }
+      }]
+    };
+
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(
+      runBlockHtml(html, 'lin1728-loop').includes('data-testid="session-run-waiting-flag"'),
+      'a trailing decision-answer stamp must be transparent to the tail read — the loop is still parked [blocked]'
+    );
+  });
 });

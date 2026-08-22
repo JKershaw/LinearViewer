@@ -45,6 +45,34 @@ describe('formatRunContext', () => {
     assert.equal(typeof formatRunContext(null), 'string');
     assert.equal(typeof formatRunContext(undefined), 'string');
   });
+
+  // LIN-1728 (Revision 3, F6): a decision-answer stamp is answer metadata,
+  // not a fact about the run — it must not consume one of the last-8 tail
+  // slots and must never surface as a bare JSON fragment in the prompt.
+  test('excludes decision-answer entries: no decision_id fragment in the built context', () => {
+    const loopWithStamp = {
+      ...LOOP,
+      feedback: [
+        { message: 'opened PR #7' },
+        { kind: 'decision-answer', message: '{"decision_id":"d-1"}' },
+        'done'
+      ]
+    };
+    const out = formatRunContext(loopWithStamp);
+    assert.doesNotMatch(out, /decision_id/);
+  });
+
+  test('a decision-answer entry does not consume one of the last-8 feedback slots', () => {
+    const genuine = Array.from({ length: 8 }, (_, i) => ({ message: `entry ${i}` }));
+    const withStamp = {
+      ...LOOP,
+      feedback: [{ kind: 'decision-answer', message: '{"decision_id":"d-1"}' }, ...genuine]
+    };
+    const out = formatRunContext(withStamp);
+    for (const entry of genuine) {
+      assert.match(out, new RegExp(entry.message), `expected "${entry.message}" to survive the last-8 tail despite the leading stamp`);
+    }
+  });
 });
 
 describe('buildRunSummaryMessages', () => {

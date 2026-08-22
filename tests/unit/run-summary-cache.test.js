@@ -59,6 +59,28 @@ describe('hashLoop', () => {
       hashLoop({ ...LOOP, feedback: [{ message: 'pr opened' }] })
     );
   });
+
+  // LIN-1728 (Revision 3, F6): appending a `decision-answer` stamp to a
+  // terminal loop's feedback (a Save/Save-and-continue after the run is
+  // already cached) must not change inputHash — otherwise the cache-check
+  // route sees a "changed" input and spends a fresh LLM call on a
+  // drill-down whose only actual change was the answer stamp.
+  test('is identical before/after appending a decision-answer entry to feedback', () => {
+    const withoutStamp = LOOP;
+    const withStamp = {
+      ...LOOP,
+      feedback: [...LOOP.feedback, { kind: 'decision-answer', message: '{"decision_id":"d-1"}', timestamp: '2026-08-22T10:00:00.000Z' }]
+    };
+    assert.equal(hashLoop(withoutStamp), hashLoop(withStamp));
+  });
+
+  test('a non-decision-answer feedback entry still changes the hash (the exclusion is scoped)', () => {
+    const withExtra = {
+      ...LOOP,
+      feedback: [...LOOP.feedback, { kind: 'status', message: '[done]', timestamp: '2026-08-22T10:00:00.000Z' }]
+    };
+    assert.notEqual(hashLoop(LOOP), hashLoop(withExtra));
+  });
 });
 
 describe('RunSummaryCacheStore', () => {
