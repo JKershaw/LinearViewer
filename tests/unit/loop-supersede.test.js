@@ -200,6 +200,54 @@ describe('loop-supersede characterization (LIN-1478 beat 1, pre-extraction)', ()
     assert.deepEqual(result.decisionCase, decisionCase, 'decisionCase must come from the same winning loop, never re-derived elsewhere');
   });
 
+  // Review (PR #1162, comment a0b0c83b): the mirror of the fixture above.
+  // Proves "one producer, always" the other direction — the loop that WINS the
+  // message fold carries no decision, and a LATER waiting loop does. The
+  // producer-identity test above co-locates message and decision on the same
+  // (second) loop, so it cannot tell "decision came from the producer" from
+  // "decision came from anywhere waiting" — a mutant that sources `decision`
+  // from any waiting loop rather than the message producer survives it. This
+  // fixture separates the two loops so such a mutant is caught: it must assert
+  // `decision === null`/`decisionCase === []`, not loop2's decision.
+  test('one producer, always: decision does not leak from a later waiting loop that never won the message fold', () => {
+    const decision = { decision_id: 'd-loop2', question: 'Proceed with the migration?', options: [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }] };
+    const decisionCase = ['Considered the schema diff.'];
+    const loops = [
+      enrichedLoop({ loopId: 'loop1', waitingMessage: '[blocked] loop1 needs a decision' }),
+      enrichedLoop({ loopId: 'loop2', waitingMessage: '[blocked] loop2 needs a decision', decision, decisionCase })
+    ];
+
+    const result = deriveSessionWaiting(loops);
+    assert.equal(result.waiting, true, 'both loop1 and loop2 are genuinely waiting');
+    assert.equal(result.message, '[blocked] loop1 needs a decision', 'loop1 wins the message fold — it is first');
+    assert.equal(result.producerLoopId, 'loop1', 'producerLoopId must name loop1, the loop that actually won the message fold');
+    assert.equal(result.decision, null, 'decision must not leak from loop2, which never won the message fold');
+    assert.deepEqual(result.decisionCase, [], 'decisionCase must not leak from loop2 either');
+  });
+
+  // Review (PR #1162, comment a0b0c83b), finding (a): pins the no-message
+  // provenance rule as CHOSEN, not incidental. Several waiting loops carry no
+  // message text at all (so nothing ever wins the fold), and one of them
+  // carries a decision anyway. The rule: with no message to attach it to, a
+  // provenance pointer is meaningless — all four derived fields stay
+  // null/empty even though `waiting` is true and a decision exists somewhere
+  // in the scan.
+  test('no-message rule: several message-less waiting loops, one carrying a decision, still null everything out', () => {
+    const decision = { decision_id: 'd-early', question: 'Proceed?', options: [] };
+    const loops = [
+      enrichedLoop({ loopId: 'loop1', waitingMessage: null, agentSummary: null, decision }),
+      enrichedLoop({ loopId: 'loop2', waitingMessage: null, agentSummary: null }),
+      enrichedLoop({ loopId: 'loop3', waitingMessage: null, agentSummary: null })
+    ];
+
+    const result = deriveSessionWaiting(loops);
+    assert.equal(result.waiting, true, 'still waiting even though no loop has message text');
+    assert.equal(result.message, null);
+    assert.equal(result.producerLoopId, null, 'no loop produced a message — no provenance pointer to a loop that produced nothing');
+    assert.equal(result.decision, null, 'an available decision on a message-less loop is not surfaced without a message to attach it to');
+    assert.deepEqual(result.decisionCase, []);
+  });
+
   // Routed in from LIN-2186 (S2) review, ledger item 3: S2 emits the `[decision]`
   // feedback entry BEFORE the `[blocked]` status entry precisely so a last-entry
   // predicate still reads `[blocked]` as the tail. S2's own tests pin this
