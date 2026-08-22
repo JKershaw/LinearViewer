@@ -107,16 +107,38 @@ async function seedDecisionSession(page) {
 // derived decision/waiting facts before touching the UI — mirrors
 // session-page.spec.js:296-300, so a seeding-order mistake surfaces here
 // rather than being misread as a layout failure later.
+//
+// Polled, not a one-shot read: lib/sessions-feed-cache.js is a 5s
+// stale-while-revalidate cache whose clear() cannot cancel an in-flight
+// producer, so a session seeded right after clearRuns can briefly race a
+// stale/incomplete snapshot back into the cache. This spec's predicate is
+// stricter than session-page.spec.js's (a decision_id match plus a non-empty
+// decisionCase, not just a non-empty sessionId), which makes it more exposed
+// to that window — a first-attempt CI flake (LIN-2193 review/close-out)
+// failed here and passed on the very next retry ~1.4s later.
 async function discoverSessionId(page) {
-  const resp = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
-  expect(resp.status(), `sessions feed failed: ${await resp.text()}`).toBe(200);
-  const body = await resp.json();
-  const all = [...(body.active || []), ...(body.recent || [])];
-  const seeded = all.find(s => s.decision && s.decision.decision_id === DECISION_PAYLOAD.decision_id);
-  expect(seeded, `no decision-bearing session in the feed: ${JSON.stringify(body.counts)}`).toBeTruthy();
-  expect(seeded.waiting).toBe(true);
-  expect(seeded.status).toBe('waiting');
-  expect(Array.isArray(seeded.decisionCase) && seeded.decisionCase.length).toBeGreaterThan(0);
+  let seeded = null;
+  await expect
+    .poll(
+      async () => {
+        const resp = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
+        expect(resp.status(), `sessions feed failed: ${await resp.text()}`).toBe(200);
+        const body = await resp.json();
+        const all = [...(body.active || []), ...(body.recent || [])];
+        const candidate = all.find(s => s.decision && s.decision.decision_id === DECISION_PAYLOAD.decision_id);
+        seeded =
+          candidate &&
+          candidate.waiting === true &&
+          candidate.status === 'waiting' &&
+          Array.isArray(candidate.decisionCase) &&
+          candidate.decisionCase.length > 0
+            ? candidate
+            : null;
+        return seeded;
+      },
+      { timeout: 10000, message: 'no decision-bearing waiting session appeared in the feed' }
+    )
+    .not.toBeNull();
   return seeded.sessionId;
 }
 
