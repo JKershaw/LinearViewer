@@ -120,6 +120,19 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('no live session to resume'));
   });
 
+  test('the wedged-session rule carves out an already-blocked step as expected silence, not a wedge (LIN-2124)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    const flat = text.replace(/\s+/g, ' ');
+    // Without this, a step already woken to the orchestrator as `blocked` (a human
+    // parked on it — the docs/ guide already says so) still matches the ~30-min
+    // silence rule as written, with nothing telling the orchestrator the silence is
+    // expected — risking a nudge/re-dispatch on a run that is correctly waiting on
+    // a human. This is the shipped-prompt residual named by LIN-2124, ported from
+    // the already-adjudicated wording in docs/autopilot-orchestrator-prompt.md.
+    assert.ok(flat.includes('a step already woken to you as `blocked` is expected to stay silent'));
+    assert.ok(flat.includes("don't nudge or re-dispatch it on this rule, keep waiting for the unblock"));
+  });
+
   test('keeps the step-4 "done means go look" cross-check after the swap (LIN-826)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
     // The cross-check that earns its keep — fetch [evidence], confirm the deliverable
@@ -735,6 +748,16 @@ describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
     assert.ok(text.includes('followUpTo'));
     assert.ok(text.includes('30 min'));
     assert.ok(text.includes('liveness'));
+  });
+
+  test('standalone also carves out an already-blocked step as expected silence (LIN-2124)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
+    const flat = text.replace(/\s+/g, ' ');
+    // Both variants of the wedged-session rule need the carve-out — the ticket's
+    // own scope note is that the "both-paths" rule doesn't apply here (this isn't
+    // the recommendation-prompt pair), but BOTH shipped kickoff variants still do.
+    assert.ok(flat.includes('a step already woken to you as `blocked` is expected to stay silent'));
+    assert.ok(flat.includes("don't nudge or re-dispatch it on this rule, keep waiting for the unblock"));
   });
 
   test('standalone now DOES tell the agent to check for the "Your autopilot session id" block (LIN-1324)', () => {
