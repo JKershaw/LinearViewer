@@ -194,7 +194,23 @@ The workspace-unavailable `code`s and how to act on each:
 
 The HTTP status stays `503` for all six — only the body distinguishes them. Callers that don't recognise `code`/`category` can keep treating any non-`2xx` as failure; the new fields are purely additive. Other subsystems' errors may adopt the same envelope over time.
 
-**`PARTIAL_WRITE`** (LIN-2012) is the second adopter. Jira's `updateIssue` is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`) return:
+**`LINEAR_AUTH`** (LIN-2216) is the second adopter, and applies to a DIFFERENT failure point than the six above. Every `WORKSPACE_*` code above fires *before* any call reaches Linear — no credential could be resolved at all. `LINEAR_AUTH` fires *after* a credential resolved and a request was actually sent — Linear itself rejected it:
+
+```json
+{ "error": "Failed to fetch issue", "code": "LINEAR_AUTH", "category": "auth", "retryable": true,
+  "detail": "Linear rejected the request as unauthenticated." }
+```
+
+The HTTP status carries the meaning here, not just the body — `retryable` mirrors it exactly:
+
+| HTTP status | `retryable` | What it means → what to do |
+| --- | --- | --- |
+| `503` | `true` | A credential this proxy believed was still comfortably valid was rejected anyway — most often a short-lived cache/rotation race healing itself. **Back off and retry** (seconds, not a re-auth flow). If the SAME request keeps 503ing repeatedly, treat it as the `401` case below — after one retryable grace, a persistent rejection against a believed-live credential escalates to `401` on its own. |
+| `401` | `false` | Either this proxy's own records already believed the credential was dead/expired, or a credential that looked live was rejected more than once. **A human must re-authenticate** — retrying will not help. |
+
+This endpoint returns `LINEAR_AUTH` in both rows above — **do not** assume `401`-vs-`503` from this code alone is a config problem; check `retryable` (or the status) to decide wait-vs-escalate, the same rule the six `WORKSPACE_*` codes already establish. Every non-auth error (`404`, `429`, `400`, a genuine `500`) is unaffected and carries no `code`/`category`/`retryable` at all, unchanged from before.
+
+**`PARTIAL_WRITE`** (LIN-2012) is the third adopter. Jira's `updateIssue` is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`) return:
 
 ```json
 {
@@ -1995,7 +2011,7 @@ curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" \
 
 3. **Check label IDs before adding** — use `GET /api/proxy/labels` to find the UUID, then pass it to the add-label endpoint.
 
-4. **Handle 503 gracefully** — a 503 means the workspace OAuth token has expired. The user needs to re-authenticate in Linear Viewer.
+4. **Handle 503 gracefully, but check `retryable` before deciding what "gracefully" means** — a `WORKSPACE_*`-coded 503 (see the structured error envelope above) means the workspace OAuth token has expired or is otherwise unavailable; the user needs to re-authenticate. A `LINEAR_AUTH`-coded 503 is different: it means a credential this proxy believed was still valid was rejected upstream anyway — back off and retry, it is usually a short-lived race that heals on its own (LIN-2216). If it keeps happening for the same request, it self-escalates to a `401` on its own; treat that as the re-authenticate case.
 
 5. **Respect rate limits** — 60 requests/minute per IP. Add backoff on 429 responses.
 

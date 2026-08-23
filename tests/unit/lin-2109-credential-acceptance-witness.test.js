@@ -143,11 +143,15 @@ describe('routes/proxy.js logEvent — the acceptance-witness positive half (LIN
     assert.deepEqual(registry.markSuspectCalls, []);
   });
 
-  test('a 401 never witnesses — it marks suspect instead (the two are mutually exclusive per request)', async () => {
+  test('an upstream auth rejection never witnesses — it marks suspect instead (the two are mutually exclusive per request)', async () => {
     const registry = fakeRegistry();
     const authErr = () => { const e = new Error('auth'); e.response = { status: 401, errors: [{ extensions: { statusCode: 401 } }] }; throw e; };
     const { status } = await request(buildApp({ issueDetail: authErr, rejectedCredentialRegistry: registry }), `/api/proxy/issues/${ISSUE_UUID}`);
-    assert.equal(status, 401);
+    // LIN-2216: this fixture's credential looks live to the router (its
+    // resolveWorkspaceAccess stub returns a 1h-future expiresAt), so
+    // graphqlErrorStatus reclassifies the upstream 401 to a retryable 503 —
+    // still a rejection, still routed through markSuspect, never witnessed.
+    assert.equal(status, 503);
     assert.deepEqual(registry.witnessCalls, []);
     assert.equal(registry.markSuspectCalls.length, 1);
   });

@@ -88,7 +88,7 @@ import {
 } from '../lib/proxy-ref-resolver.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { PartialWriteError } from '../lib/partial-write-error.js';
-import { badRequest, jsonError, notFound, serviceUnavailable, unauthorized, workspaceUnavailableEnvelope } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, serviceUnavailable, unauthorized, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -797,11 +797,25 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    */
   async function resolveProviderAccess(urlKey, ownerAccountId, req) {
     if (process.env.NODE_ENV === 'test' && urlKey === TEST_LOCAL_URL_KEY) {
-      if (req) req.resolvedCredentialFingerprint = null;
+      if (req) {
+        req.resolvedCredentialFingerprint = null;
+        req.resolvedCredentialExpiresAt = null;
+      }
       return { provider: localProvider, token: urlKey, reason: 'ok' };
     }
     const { token, scope, reason, provider: providerName, source, expiresAt, credentialFingerprint } = await resolveWorkspaceAccess(urlKey, ownerAccountId);
-    if (req) req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
+    if (req) {
+      req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
+      // LIN-2216: stamped alongside the fingerprint, on THIS request object —
+      // deliberately NOT read back from `credentialResolutions` (a shared,
+      // per-(urlKey,ownerAccountId) map that map every resolution overwrites
+      // and whose own doc says "never read for anything but logging"; an
+      // earlier revision of isTransientProviderAuthFailure read it anyway,
+      // which a concurrent request under the same pair could race — found by
+      // code review). Per-request storage makes the transient-vs-terminal
+      // classification race-free by construction.
+      req.resolvedCredentialExpiresAt = Number.isFinite(expiresAt) ? expiresAt : null;
+    }
     const activeProvider = injectedProvider || getProviderForWorkspace({ provider: providerName });
     // Record WHICH credential this resolution handed out, so a later 401 from the
     // upstream can name it (see recordCredentialResolution / logEvent). Secret-safe
@@ -1093,7 +1107,19 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // proxy-token-stage 401, or a 503 where nothing ever resolved (the
       // common owner_mismatch/not_connected/… case), leaves the fingerprint
       // unset, and `markSuspect` fails open on that (no-op) either way.
-      rejectedCredentialRegistry?.markSuspect(req.resolvedCredentialFingerprint, { reason: status === 401 ? 'provider-401' : 'workspace-503', now: Date.now() });
+      //
+      // LIN-2216: `status === 503` now has TWO distinct meanings sharing
+      // this one branch — a resolution failure (LIN-2236's original case,
+      // no fingerprint) and a TRANSIENT provider-lane 401 reclassified by
+      // `graphqlErrorStatus` (a fingerprint IS present: a credential
+      // resolved, Linear rejected it anyway). The reason label keeps them
+      // apart in the registry's own diagnostics without adding a new status
+      // code or a new field — `req.resolvedCredentialFingerprint` already
+      // distinguishes them, the same presence check `stage` below uses.
+      const reason = status === 401
+        ? 'provider-401'
+        : (req.resolvedCredentialFingerprint ? 'provider-503-transient' : 'workspace-503');
+      rejectedCredentialRegistry?.markSuspect(req.resolvedCredentialFingerprint, { reason, now: Date.now() });
     } else if (status >= 200 && status < 300 && req.resolvedCredentialFingerprint && !skipWitness) {
       // LIN-2109: the positive half of the acceptance witness — a genuine
       // 2xx provider-lane response carrying a resolved fingerprint is the
@@ -1195,24 +1221,102 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   }
 
   /**
+   * LIN-2216: distinguish a TRANSIENT upstream 401 from a genuinely dead
+   * credential, using the same retryable-vs-terminal SHAPE as
+   * `isDefinitiveRevocation`/`isTransientRefreshFailure` (lib/token-refresh.js,
+   * LIN-1545) — that pair classifies an OAuth refresh-EXCHANGE failure
+   * (`TokenRefreshError`), which never occurs on this plain-GraphQL-401 path,
+   * so this is the analogous split for the error class that DOES occur here,
+   * not a reuse of those functions themselves.
+   *
+   * TWO conditions, both required:
+   *
+   * 1. `req.resolvedCredentialExpiresAt` — stamped on THIS request object by
+   *    `resolveProviderAccess`, at the same seam as the fingerprint stamp —
+   *    says THIS request's own resolution believed the credential was still
+   *    comfortably live. Deliberately per-request, not read back from
+   *    `credentialResolutions` (a SHARED, per-(urlKey,ownerAccountId) trail
+   *    whose own doc says "never read for anything but logging"): an earlier
+   *    revision read that map here, which a concurrent request under the
+   *    same pair could race — request A's error handler could read a LATER
+   *    request B's overwritten, live-looking descriptor and misclassify A's
+   *    genuine terminal failure as transient (found by code review).
+   *
+   * 2. NOT already marked suspect. A believed-live credential rejected once
+   *    is the exact signature of `lib/workspace-token-cache.js`'s LIN-2216
+   *    fix target (a cache entry, or a rotation elsewhere, serving a token
+   *    past its real current validity) — a one-off race that resolves
+   *    itself on the next fresh resolve. The SAME fingerprint rejected
+   *    AGAIN despite still looking live inside its nominal window is no
+   *    longer that shape: it looks like a genuine out-of-band revocation
+   *    (the user disconnected the workspace mid-token-life) that merely
+   *    hasn't reached its recorded expiry yet. Without this check, such a
+   *    credential would classify as transient/retryable for the REST of its
+   *    nominal lifetime instead of ever escalating (found by code review) —
+   *    this bounds the transient grace to essentially one occurrence per
+   *    fingerprint, since the first rejection is what marks it suspect via
+   *    `logEvent`'s own markSuspect call, immediately after this classifies it.
+   *
+   * @param {import('express').Request} req
+   * @returns {boolean} true if this 401 should surface as a retryable 503
+   */
+  function isTransientProviderAuthFailure(req) {
+    const expiresAt = req?.resolvedCredentialExpiresAt;
+    const looksLive = typeof expiresAt === 'number' && Number.isFinite(expiresAt) && expiresAt > Date.now();
+    if (!looksLive) return false;
+    if (rejectedCredentialRegistry?.isSuspect(req?.resolvedCredentialFingerprint)) return false;
+    return true;
+  }
+
+  /**
+   * LIN-2216: the extra JSON fields a data-route auth-shaped (401/503)
+   * response carries, alongside the existing `detail` every one of these
+   * ~28 catch blocks already sends. Every other status (404/429/400/500) is
+   * untouched — `{}` — so this diff changes nothing about their response
+   * shape. Reuses `classifyUpstreamError`'s existing `LINEAR_AUTH` code/
+   * category (the same vocabulary render-pages.js's human-facing error page
+   * and the autopilot/kickoff branch below both use for this exact upstream
+   * shape) so a consumer built against docs/proxy-integration.md's
+   * documented 503 contract has a machine-matchable field to update against,
+   * not just a status-code split it has to infer (found by code review —
+   * that doc's Best Practice #4 said "a 503 means re-authenticate", which
+   * this ticket's new transient-503 case makes only conditionally true; see
+   * the doc update alongside this change).
+   *
+   * @param {*} err
+   * @param {number} status - the value `graphqlErrorStatus(err, req)` already returned
+   * @returns {{code?: string, category?: string, retryable?: boolean}}
+   */
+  function graphqlErrorExtra(err, status) {
+    if (status !== 401 && status !== 503) return {};
+    const classification = classifyUpstreamError(err);
+    return { code: classification.code, category: classification.category, retryable: status === 503 };
+  }
+
+  /**
    * Extract the upstream HTTP status from a graphql-request error.
    * graphql-request stores Linear's response status in err.response.status
    * and in err.response.errors[].extensions.statusCode.
    *
    * Maps upstream status to appropriate proxy response status:
-   *  - 401/403 from Linear → 401 (workspace token invalid/expired)
+   *  - 401/403 from Linear, TRANSIENT (see isTransientProviderAuthFailure)
+   *    → 503, retryable — our own records believed this credential was
+   *    still live; Linear disagreeing is a stale-serving/rotation-race
+   *    signature that resolves itself on the next request, not a dead
+   *    credential (LIN-2216)
+   *  - 401/403 from Linear, otherwise → 401 (workspace token invalid/expired)
    *  - 404 from Linear     → 404 (resource not found)
    *  - 429 from Linear     → 429 (rate limited)
    *  - a flagged caller error (extensions.userError) → 400 (see below)
    *  - anything else       → 500
    */
-  function graphqlErrorStatus(err) {
+  function graphqlErrorStatus(err, req) {
     // AbortSignal.timeout() raises a TimeoutError (name === 'TimeoutError')
     // and manual AbortController.abort() raises AbortError.
     if (err.name === 'TimeoutError' || err.name === 'AbortError') return 504;
     const status = err.response?.status
       || err.response?.errors?.[0]?.extensions?.statusCode;
-    if (status === 401 || status === 403) return 401;
+    if (status === 401 || status === 403) return isTransientProviderAuthFailure(req) ? 503 : 401;
     if (status === 404) return 404;
     if (status === 429) return 429;
     // Linear reports a CALLER error inside an HTTP 200 GraphQL envelope carrying
@@ -2319,10 +2423,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/me', 200);
       res.json(user);
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/me', status);
       console.error('Proxy /me error:', err.message);
-      jsonError(res, status, 'Failed to fetch user info', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch user info', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -2375,10 +2479,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/teams', 200);
       res.json({ teams, truncated: !!teams.truncated });
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/teams', status);
       console.error('Proxy /teams error:', err.message);
-      jsonError(res, status, 'Failed to fetch teams', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch teams', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -2396,10 +2500,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/projects', 200);
       res.json({ projects: projectList.map(neutralizeProject) });
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/projects', status);
       console.error('Proxy /projects error:', err.message);
-      jsonError(res, status, 'Failed to fetch projects', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch projects', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -2446,10 +2550,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         logEvent(req, '/api/proxy/issues', 404);
         return jsonError(res, 404, `Team not found: ${err.teamId}`, { code: 'TEAM_NOT_FOUND', truncated: err.truncated });
       }
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/issues', status);
       console.error('Proxy /issues error:', err.message);
-      jsonError(res, status, 'Failed to fetch issues', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch issues', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -2493,10 +2597,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/issues/:id', 200);
       res.json(flattenIssue(issue));
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/issues/:id', status);
       console.error('Proxy /issue error:', err.message);
-      jsonError(res, status, 'Failed to fetch issue', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch issue', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -2525,10 +2629,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/search', 200);
       res.json({ issues: results.map(flattenIssue) });
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/search', status);
       console.error('Proxy /search error:', err.message);
-      jsonError(res, status, 'Failed to search issues', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to search issues', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -2552,10 +2656,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/states', 200);
       res.json({ states: stateList });
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/states', status);
       console.error('Proxy /states error:', err.message);
-      jsonError(res, status, 'Failed to fetch states', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch states', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -2584,10 +2688,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         logEvent(req, '/api/proxy/labels', 404);
         return jsonError(res, 404, `Team not found: ${err.teamId}`, { code: 'TEAM_NOT_FOUND', truncated: err.truncated });
       }
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/labels', status);
       console.error('Proxy /labels error:', err.message);
-      jsonError(res, status, 'Failed to fetch labels', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch labels', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -2617,10 +2721,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         logEvent(req, '/api/proxy/cycles', 404);
         return jsonError(res, 404, `Team not found: ${err.teamId}`, { code: 'TEAM_NOT_FOUND', truncated: err.truncated });
       }
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/cycles', status);
       console.error('Proxy /cycles error:', err.message);
-      jsonError(res, status, 'Failed to fetch cycles', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch cycles', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -2651,10 +2755,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/cycle', 200);
       res.json(flattenCycle(cycle));
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/cycle', status);
       console.error('Proxy /cycle error:', err.message);
-      jsonError(res, status, 'Failed to fetch cycle', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch cycle', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -2695,10 +2799,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         ...flattenRelations(issueRelations)
       });
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/relations', status);
       console.error('Proxy /relations error:', err.message);
-      jsonError(res, status, 'Failed to fetch relations', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch relations', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -2814,10 +2918,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       try {
         attachment = await resolved.provider.fetchAttachment(resolved.token, decoded.value);
       } catch (err) {
-        const status = graphqlErrorStatus(err);
+        const status = graphqlErrorStatus(err, req);
         logEvent(req, endpoint, status);
         console.error('Proxy attachment resolve error:', err.message);
-        return jsonError(res, status, 'Failed to resolve attachment', { detail: graphqlErrorDetail(err) });
+        return jsonError(res, status, 'Failed to resolve attachment', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
       }
       if (!attachment) {
         logEvent(req, endpoint, 404);
@@ -3094,10 +3198,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       res.status(201).json(issueCreate);
     } catch (err) {
       if (refResolutionFailed(req, res, '/api/proxy/issues', err)) return;
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/issues', status);
       console.error('Proxy create issue error:', err.message);
-      jsonError(res, status, 'Failed to create issue', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to create issue', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -3211,10 +3315,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
     } catch (err) {
       if (refResolutionFailed(req, res, '/api/proxy/issues/:id', err)) return;
       if (partialWriteFailed(req, res, '/api/proxy/issues/:id', err)) return;
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/issues/:id', status);
       console.error('Proxy update issue error:', err.message);
-      jsonError(res, status, 'Failed to update issue', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to update issue', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -3256,10 +3360,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         logEvent(req, endpoint, 422);
         return jsonError(res, 422, err.message, { code: err.code, matchCount: err.matchCount });
       }
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, endpoint, status);
       console.error('Proxy description edit (read) error:', err.message);
-      return jsonError(res, status, 'Failed to read issue description', { detail: graphqlErrorDetail(err) });
+      return jsonError(res, status, 'Failed to read issue description', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
 
     if (newDescription.length > MAX_DESCRIPTION_LENGTH) {
@@ -3288,10 +3392,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       // after the field PUT already landed — still must not read as a total
       // failure.
       if (partialWriteFailed(req, res, endpoint, err)) return;
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, endpoint, status);
       console.error('Proxy description edit (write) error:', err.message);
-      jsonError(res, status, 'Failed to update description', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to update description', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   }
 
@@ -3415,10 +3519,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/issues/comments', 201);
       res.status(201).json(commentCreate);
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/issues/comments', status);
       console.error('Proxy create comment error:', err.message);
-      jsonError(res, status, 'Failed to create comment', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to create comment', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -3456,10 +3560,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/issues/comments', 200);
       res.json(commentDelete);
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/issues/comments', status);
       console.error('Proxy delete comment error:', err.message);
-      jsonError(res, status, 'Failed to delete comment', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to delete comment', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -3506,10 +3610,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/issues/comments', 200);
       res.status(200).json(commentUpdate);
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/issues/comments', status);
       console.error('Proxy update comment error:', err.message);
-      jsonError(res, status, 'Failed to update comment', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to update comment', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -3640,10 +3744,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, endpoint, 201);
       res.status(201).json(commentCreate);
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, endpoint, status);
       console.error('Proxy attachment upload error:', err.message);
-      jsonError(res, status, 'Failed to upload attachment', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to upload attachment', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -3683,10 +3787,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/issues/relations', 201);
       res.status(201).json(issueRelationCreate);
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/issues/relations', status);
       console.error('Proxy create relation error:', err.message);
-      jsonError(res, status, 'Failed to create relation', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to create relation', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -3722,10 +3826,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/issues/relations', 200);
       res.json(issueRelationDelete);
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/issues/relations', status);
       console.error('Proxy delete relation error:', err.message);
-      jsonError(res, status, 'Failed to delete relation', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to delete relation', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -3787,10 +3891,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       res.json(issueUpdate);
     } catch (err) {
       if (refResolutionFailed(req, res, '/api/proxy/issues/labels', err)) return;
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/issues/labels', status);
       console.error('Proxy add label error:', err.message);
-      jsonError(res, status, 'Failed to add label', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to add label', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -3845,10 +3949,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       res.json(issueUpdate);
     } catch (err) {
       if (refResolutionFailed(req, res, '/api/proxy/issues/labels', err)) return;
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/issues/labels', status);
       console.error('Proxy remove label error:', err.message);
-      jsonError(res, status, 'Failed to remove label', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to remove label', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -3893,10 +3997,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/stack', 200);
       res.json({ tasks, total, view: resolvedView });
     } catch (err) {
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/stack', status);
       console.error('Proxy /stack error:', err.message);
-      jsonError(res, status, 'Failed to fetch task stack', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to fetch task stack', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -3964,10 +4068,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         logEvent(req, '/api/proxy/prompt', 404);
         return notFound.json(res, 'Issue not found');
       }
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/prompt', status);
       console.error('Proxy /prompt error:', err.message);
-      jsonError(res, status, 'Failed to generate prompt', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to generate prompt', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -4158,7 +4262,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
    * and POST /recommend-and-dispatch so both surfaces report issue-not-found /
    * OpenRouter / graphql failures identically.
    */
-  function recommendErrorResponse(err) {
+  function recommendErrorResponse(err, req) {
     if (err.message?.includes('not found')) {
       return { status: 404, body: { error: 'Issue not found' } };
     }
@@ -4166,7 +4270,8 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       return { status: 503, body: { error: 'AI service temporarily unavailable', detail: err.message } };
     }
     console.error('Proxy /recommend error:', err.message);
-    return { status: graphqlErrorStatus(err), body: { error: 'Failed to get recommendation', detail: graphqlErrorDetail(err) } };
+    const status = graphqlErrorStatus(err, req);
+    return { status, body: { error: 'Failed to get recommendation', detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) } };
   }
 
   /**
@@ -4362,12 +4467,12 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         });
       } catch (err) {
         keepalive.stop();
-        const { status, body } = recommendErrorResponse(err);
+        const { status, body } = recommendErrorResponse(err, req);
         logEvent(req, '/api/proxy/recommend', status);
         keepalive.send(status, body);
       }
     } catch (err) {
-      const { status, body } = recommendErrorResponse(err);
+      const { status, body } = recommendErrorResponse(err, req);
       logEvent(req, '/api/proxy/recommend', status);
       res.status(status).json(body);
     }
@@ -4915,8 +5020,8 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
           status = 503;
           body = { error: 'AI service temporarily unavailable', detail: err.message };
         } else {
-          status = graphqlErrorStatus(err);
-          body = { error: 'Failed to fetch recap', detail: graphqlErrorDetail(err) };
+          status = graphqlErrorStatus(err, req);
+          body = { error: 'Failed to fetch recap', detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) };
           console.error('Proxy /recap error:', err.message);
         }
         logEvent(req, '/api/proxy/recap', status);
@@ -5040,8 +5145,8 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
           status = 503;
           body = { error: 'AI service temporarily unavailable', detail: err.message };
         } else {
-          status = graphqlErrorStatus(err);
-          body = { error: 'Failed to fetch recap', detail: graphqlErrorDetail(err) };
+          status = graphqlErrorStatus(err, req);
+          body = { error: 'Failed to fetch recap', detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) };
           console.error('Proxy /recap error:', err.message);
         }
         logEvent(req, '/api/proxy/recap', status);
@@ -5056,10 +5161,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         logEvent(req, '/api/proxy/recap', 503);
         return jsonError(res, 503, 'AI service temporarily unavailable', { detail: err.message });
       }
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/recap', status);
       console.error('Proxy /recap POST error:', err.message);
-      jsonError(res, status, 'Failed to generate recap', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to generate recap', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -5205,8 +5310,8 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
           status = 503;
           body = { error: 'AI service temporarily unavailable', detail: err.message };
         } else {
-          status = graphqlErrorStatus(err);
-          body = { error: 'Failed to fetch brief', detail: graphqlErrorDetail(err) };
+          status = graphqlErrorStatus(err, req);
+          body = { error: 'Failed to fetch brief', detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) };
           console.error('Proxy /brief error:', err.message);
         }
         logEvent(req, '/api/proxy/brief', status);
@@ -5329,8 +5434,8 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
           status = 503;
           body = { error: 'AI service temporarily unavailable', detail: err.message };
         } else {
-          status = graphqlErrorStatus(err);
-          body = { error: 'Failed to generate brief', detail: graphqlErrorDetail(err) };
+          status = graphqlErrorStatus(err, req);
+          body = { error: 'Failed to generate brief', detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) };
           console.error('Proxy /brief error:', err.message);
         }
         logEvent(req, '/api/proxy/brief', status);
@@ -5345,10 +5450,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         logEvent(req, '/api/proxy/brief', 503);
         return jsonError(res, 503, 'AI service temporarily unavailable', { detail: err.message });
       }
-      const status = graphqlErrorStatus(err);
+      const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/brief', status);
       console.error('Proxy /brief POST error:', err.message);
-      jsonError(res, status, 'Failed to generate brief', { detail: graphqlErrorDetail(err) });
+      jsonError(res, status, 'Failed to generate brief', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -5780,6 +5885,33 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (err && err.proxyAttachFailed) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 503);
         return jsonError(res, 503, PROXY_ATTACH_FAILED_MESSAGE);
+      }
+      // LIN-2216: an upstream provider-auth failure (Linear 401/403) —
+      // resolvePromptIssueContext's own try/catch above only catches a
+      // "not found" message and rethrows everything else, so this is where
+      // it lands. Ahead of the generic 500, same reasoning as the three
+      // guards above: a bare 500 cannot be told apart from a real fault, and
+      // the caller (often an autopilot at its own dispatch seam) needs to
+      // know whether to retry or escalate. `graphqlErrorStatus` carries the
+      // SAME transient-vs-terminal classification the data routes now use
+      // (LIN-2216: 503 when this router's own bookkeeping believed the
+      // credential was still live when Linear rejected it; 401 otherwise) —
+      // reused here rather than re-derived, so the two surfaces can never
+      // disagree about the same rejection. `classifyUpstreamError` supplies
+      // the machine-matchable `code`/`category` — the existing LINEAR_AUTH
+      // vocabulary render-pages.js's human-facing error page already uses
+      // for this exact upstream shape, not a new taxonomy.
+      const authStatus = graphqlErrorStatus(err, req);
+      if (authStatus === 401 || authStatus === 503) {
+        const classification = classifyUpstreamError(err);
+        logEvent(req, '/api/proxy/autopilot/kickoff', authStatus);
+        console.error('Proxy autopilot kickoff error:', err.message);
+        return jsonError(res, authStatus, 'Failed to dispatch autopilot kickoff', {
+          code: classification.code,
+          category: classification.category,
+          retryable: authStatus === 503,
+          detail: classification.detail,
+        });
       }
       logEvent(req, '/api/proxy/autopilot/kickoff', 500);
       console.error('Proxy autopilot kickoff error:', err.message);
@@ -6432,7 +6564,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         }));
       } catch (err) {
         keepalive.stop();
-        const { status, body } = recommendErrorResponse(err);
+        const { status, body } = recommendErrorResponse(err, req);
         logEvent(req, '/api/proxy/recommend-and-dispatch', status);
         return keepalive.send(status, body);
       }
