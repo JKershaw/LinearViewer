@@ -133,12 +133,12 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     }
   });
 
-  test('logEvent calls rejectedCredentialRegistry.markSuspect(req.resolvedCredentialFingerprint, ...) inside its status === 401 branch, reading the stamp — not a fresh fingerprint and not credentialResolutions', () => {
+  test('logEvent calls rejectedCredentialRegistry.markSuspect(req.resolvedCredentialFingerprint, ...) inside its status === 401 || status === 503 branch (LIN-2236 widened it to cover 503 too), reading the stamp — not a fresh fingerprint and not credentialResolutions', () => {
     const start = PROXY_SRC.indexOf('function logEvent(req, endpoint, status, note = null) {');
     assert.ok(start >= 0);
     const end = PROXY_SRC.indexOf('\n  }', start);
     const body = PROXY_SRC.slice(start, end);
-    assert.match(body, /if \(status === 401\)/);
+    assert.match(body, /if \(status === 401 \|\| status === 503\)/);
     assert.match(body, /rejectedCredentialRegistry\?\.markSuspect\(req\.resolvedCredentialFingerprint,/);
   });
 });

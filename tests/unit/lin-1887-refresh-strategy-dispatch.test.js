@@ -103,6 +103,13 @@ function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, ca
       delete: async (accountId, urlKey, provider) => { calls.durableDeletes.push([accountId, urlKey, provider]); },
       deleteAll: async (accountId, urlKey) => { calls.durableDeleteAlls.push([accountId, urlKey]); },
     },
+    // LIN-2236: ensureValidToken/handleUnauthorizedError's real source now
+    // threads this into their refreshOwnerCredential({...}) call — a free
+    // identifier this sliced-source VM context must bind, same as every
+    // other free identifier here. A no-op stub is all this suite needs: it
+    // asserts on `calls.refreshCalls`/`exchangesUsed` via the FAKED
+    // refreshOwnerCredential above, never on lifecycle-event recording.
+    credentialLifecycleEventStore: { recordEvent: async () => {} },
     getActiveWorkspace: () => workspace,
     TOKEN_REFRESH_BUFFER_MS: 5 * 60 * 1000,
     getDeployInfo: () => ({}),
