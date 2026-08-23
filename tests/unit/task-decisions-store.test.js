@@ -342,24 +342,75 @@ describe('TaskDecisionsStore.recordScan / getStatus', () => {
     assert.deepEqual(survivingIds, [...ids].sort());
   });
 
+  // Seeds the zero-finding row as the OLDER of the two non-exempt rows
+  // (LIN-2230 review fix) — not as the newest/current row. The pre-fix
+  // version of this test seeded the zero-finding row newest and asserted
+  // its own eviction, which pinned the LIN-2230 regression (recordScan
+  // evicting the row it had just written) rather than proving bucket
+  // ordering. A third, decision-bearing-unanswered row is recorded last so
+  // the newest row in play is exempt for an unrelated reason (LIN-2211's
+  // unconditional decision-bearing exemption) and the assertion never
+  // depends on evicting whatever recordScan just wrote.
   test('zero-finding rows evict before terminal rows when both are present and capacity is exceeded', async () => {
-    const capped = new TaskDecisionsStore({ collection, maxPerTask: 1 });
-    // Terminal row, already present and dismissed.
+    const capped = new TaskDecisionsStore({ collection, maxPerTask: 2 });
+    // Oldest: a terminal (dismissed) row.
     await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
     const idTerminal = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
     collection._docs.find(d => d._id === idTerminal).outcome = 'dismissed';
     collection._docs.find(d => d._id === idTerminal).outcomeAt = new Date();
 
-    // A zero-finding row pushes the task to 2 rows against maxPerTask: 1 —
-    // the terminal row is exempt outright, so bucket 1 (zero-finding) must
-    // absorb the eviction instead, even though it is the newer row.
+    // Middle: a zero-finding row — older than the row recorded next, so it
+    // is never the newest/current row when the evicting prune runs.
     const idZero = TaskDecisionsStore.buildId(ISSUE_ID, HASH_B);
     await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_B, decision: null });
 
+    // Newest: a decision-bearing unanswered row. Its own write pushes the
+    // task to 3 rows against maxPerTask: 2 — bucket 1 (zero-finding) must
+    // absorb the eviction ahead of bucket 2 (terminal), even though the
+    // terminal row is chronologically older than the zero-finding one.
+    await capped.recordScan({
+      urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: 'h3'.padEnd(64, '0'),
+      decision: sampleDecision({ decision_id: 'scan_11111111_h3' })
+    });
+
     const rows = collection._docs.filter(d => d.urlKey === URL_KEY && d.issueId === ISSUE_ID);
     const ids = rows.map(r => r._id);
-    assert.ok(ids.includes(idTerminal), 'the terminal row is exempt and must survive');
+    assert.ok(ids.includes(idTerminal), 'the terminal row is not evicted while a zero-finding row remains');
     assert.ok(!ids.includes(idZero), 'the zero-finding row is evicted ahead of the terminal row');
+  });
+
+  // LIN-2230 review fix: recordScan's own freshly-written zero-finding row
+  // must never be a candidate for the eviction its own upsert triggers —
+  // otherwise "scan found nothing" is unrecordable at capacity, and
+  // getStatus falls back to an older row, permanently pinning the task
+  // 'stale' (docs/escalation-philosophy.md's false-escalation failure).
+  // Reachability condition (per the ticket): count(terminal) +
+  // count(decision-bearing unanswered) >= maxPerTask, with docs.length
+  // already > maxPerTask before the write below.
+  test('recordScan never evicts the zero-finding row it just wrote, even at capacity (LIN-2230)', async () => {
+    const capped = new TaskDecisionsStore({ collection, maxPerTask: 2 });
+    // Fill the cap with decision-bearing unanswered rows (the production
+    // steady state LIN-2230 identifies as reachable at the real cap of 50).
+    await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    await capped.recordScan({
+      urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_B,
+      decision: sampleDecision({ decision_id: 'scan_11111111_bbbbbbbbbbbb' })
+    });
+
+    // One ordinary scan finds nothing — this is the row under test.
+    const zeroHash = 'zerofinding0'.padEnd(64, '0');
+    const zero = await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: zeroHash, decision: null });
+
+    const rows = collection._docs.filter(d => d.urlKey === URL_KEY && d.issueId === ISSUE_ID);
+    const ids = rows.map(r => r._id);
+    assert.ok(ids.includes(zero.id), 'the just-written zero-finding row must persist, not be pruned by its own recordScan');
+
+    // getStatus at the exact current hash still finds it — the scan panel
+    // reports fresh, not a stale fallback to an older ruling.
+    const status = await capped.getStatus(URL_KEY, ISSUE_ID, zeroHash);
+    assert.equal(status.id, zero.id);
+    assert.equal(status.inputHash, zeroHash);
+    assert.equal(status.decision, null);
   });
 
   test('terminal rows evict oldest-first once zero-finding rows are exhausted', async () => {
