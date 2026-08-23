@@ -95,6 +95,29 @@ test.describe('KPIs page', () => {
     await expect(page.locator('.kpi-cards .kpi-cost-card')).toHaveCount(0);
   });
 
+  test('renders the weekly-budget burn gauge card, honestly labelled as an estimate (LIN-2118)', async ({ page }) => {
+    await page.goto('/kpis');
+
+    const card = page.locator('.kpi-budget-card');
+    await expect(card).toBeVisible();
+    await expect(card.locator('.kpi-budget-value')).toBeVisible();
+    await expect(card.locator('.kpi-budget-label')).toHaveText(/of weekly subscription window consumed \(estimate\)/);
+
+    // Never presented as a direct meter reading — the mission constraint.
+    await expect(card.locator('.kpi-budget-source')).toHaveText(/never a direct meter read/);
+    await expect(card.locator('.kpi-budget-rate')).toHaveText(/burn rate/);
+    await expect(card.locator('.kpi-budget-window')).toHaveText(/window .+ → .+/);
+    await expect(card.locator('.kpi-budget-coverage')).toHaveText(/lineages this window/);
+
+    // Sits above and outside .kpi-cards, same posture as the cost card.
+    await expect(page.locator('.kpi-cards .kpi-budget-card')).toHaveCount(0);
+
+    // Its day-bar chart (or the shared empty-state note) renders alongside
+    // the other chart boxes.
+    const chartOrEmpty = page.locator('#chart-weekly-budget, .kpi-chart-box:has-text("weekly budget burn") .kpi-chart-empty');
+    await expect(chartOrEmpty.first()).toBeVisible();
+  });
+
   test('headlines the dispatch outcome rate with a coverage sub-label', async ({ page }) => {
     await page.goto('/kpis');
 
@@ -153,6 +176,9 @@ test.describe('KPIs page', () => {
     // entirely and this spec would still pass. Pin presence at the public
     // boundary on the RENDERED page, not just in the unit privacy canary.
     expect(data.terminalMarkedTaskCost).toBeTruthy();
+    // Same reasoning (LIN-2118): pin the weekly-budget gauge's presence at
+    // the public boundary, not just in the unit privacy canary.
+    expect(data.weeklyBudgetGauge).toBeTruthy();
   });
 
   test('chart areas render (chart or empty-state note) for each section', async ({ page }) => {
@@ -161,7 +187,7 @@ test.describe('KPIs page', () => {
     // Each chart box ends up with either a live canvas or a "no data yet"
     // note — never an empty hole.
     const boxes = page.locator('.kpi-chart-box');
-    await expect(boxes).toHaveCount(10);
+    await expect(boxes).toHaveCount(11);
     const count = await boxes.count();
     for (let i = 0; i < count; i++) {
       const box = boxes.nth(i);
