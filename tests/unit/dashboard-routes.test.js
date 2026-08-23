@@ -484,6 +484,172 @@ describe('POST /api/dashboard/rulings/dismiss (LIN-2225)', () => {
   });
 });
 
+// ─── Escalation KPIs — operator-facing audit page (LIN-1736) ─────────────────
+
+describe('GET /api/escalation-kpis (LIN-1736)', () => {
+  function makeKpiRouter(perWorkspace, taskDecisionsStore) {
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore, agentStatusStore,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      taskDecisionsStore: taskDecisionsStore || null
+    });
+  }
+
+  test('computes time-to-response and false-escalation from a resolved loop-backed decision, and counts an unresolved one as unanswered', async () => {
+    const raisedMs = Date.now() - 5 * 24 * 60 * 60 * 1000; // 5 days ago
+    const resolvedMs = raisedMs + 24 * 60 * 60 * 1000; // 1 day to resolve
+    const unansweredRaisedMs = Date.now() - 2 * 60 * 60 * 1000; // 2h ago — not stale (< 24h default)
+
+    const resolvedLoop = {
+      id: 'w-resolved', issueIdentifier: 'LIN-1', issueTitle: 'x', promptName: 'implementation', prompt: 'p',
+      dispatchedAt: new Date(raisedMs).toISOString(), resolvedAt: new Date(raisedMs).toISOString(), status: 'taken',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: new Date(raisedMs).toISOString() },
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-1', question: 'Proceed?' }), timestamp: new Date(raisedMs).toISOString() },
+        { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: new Date(resolvedMs).toISOString() }
+      ]
+    };
+    const unansweredLoop = {
+      id: 'w-unanswered', issueIdentifier: 'LIN-2', issueTitle: 'y', promptName: 'implementation', prompt: 'p',
+      dispatchedAt: new Date(unansweredRaisedMs).toISOString(), resolvedAt: new Date(unansweredRaisedMs).toISOString(), status: 'taken',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: new Date(unansweredRaisedMs).toISOString() },
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-2', question: 'Proceed?' }), timestamp: new Date(unansweredRaisedMs).toISOString() }
+      ]
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [resolvedLoop, unansweredLoop], agentStatus: [] } };
+
+    const router = makeKpiRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const session = { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+    const { req, res } = makeReqRes({ session, query: { windowDays: '30' } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.jsonBody;
+    assert.equal(body.windowDays, 30);
+    assert.equal(body.timeToResponse.count, 1);
+    assert.equal(body.timeToResponse.medianMs, 24 * 60 * 60 * 1000);
+    assert.equal(body.falseEscalation.answered, 1);
+    assert.equal(body.falseEscalation.dismissed, 0);
+    assert.equal(body.unansweredAge.count, 1);
+    assert.equal(body.unansweredAge.staleCount, 0, 'a 2h-old ruling is not stale under the 24h default threshold');
+    assert.equal(body.escalationRate.raisedInWindow, 2, 'both decisions were raised within the 30-day window');
+  });
+
+  test('a dismissed decision counts toward falseEscalation.dismissed, not answered', async () => {
+    const raisedMs = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    const resolvedMs = raisedMs + 60 * 60 * 1000;
+    const loop = {
+      id: 'w-dismissed', issueIdentifier: 'LIN-3', issueTitle: 'z', promptName: 'implementation', prompt: 'p',
+      dispatchedAt: new Date(raisedMs).toISOString(), resolvedAt: new Date(raisedMs).toISOString(), status: 'taken',
+      feedback: [
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-1', question: 'Proceed?' }), timestamp: new Date(raisedMs).toISOString() },
+        { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1', outcome: 'dismissed' }), timestamp: new Date(resolvedMs).toISOString() }
+      ]
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [loop], agentStatus: [] } };
+    const router = makeKpiRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.jsonBody.falseEscalation.dismissed, 1);
+    assert.equal(res.jsonBody.falseEscalation.answered, 0);
+    assert.equal(res.jsonBody.falseEscalation.rate, 1);
+  });
+
+  test('folds in the task-bound half via taskDecisionsStore (resolved + unanswered)', async () => {
+    const raisedMs = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    const resolvedMs = raisedMs + 60 * 60 * 1000;
+    const taskDecisionsStore = {
+      async listResolvedForWorkspaces(urlKeys, sinceMs) {
+        assert.deepEqual(urlKeys, ['ws-a']);
+        return [{ id: 'scan_1', urlKey: 'ws-a', issueId: 'iss-1', scannedAt: new Date(raisedMs).toISOString(), outcome: 'answered', outcomeAt: new Date(resolvedMs).toISOString() }];
+      },
+      async listUnansweredForWorkspaces(urlKeys) {
+        return [{
+          id: 'scan_2', urlKey: 'ws-a', issueId: '11111111-2222-3333-4444-555555555555',
+          issueIdentifier: 'LIN-4', decision: { decision_id: 'scan_2', question: 'q?' },
+          scannedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(), outcome: null, outcomeAt: null
+        }];
+      }
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] } };
+    const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.timeToResponse.count, 1);
+    assert.equal(res.jsonBody.falseEscalation.answered, 1);
+    assert.equal(res.jsonBody.unansweredAge.count, 1);
+  });
+
+  test('windowDays is clamped to [1, 365] and defaults to 30 when absent/invalid', async () => {
+    const router = makeKpiRouter({ 'ws-a': { live: [], history: [], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+
+    const noParam = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(noParam.req, noParam.res);
+    assert.equal(noParam.res.jsonBody.windowDays, 30);
+
+    const tooLarge = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] }, query: { windowDays: '9999' } });
+    await handler(tooLarge.req, tooLarge.res);
+    assert.equal(tooLarge.res.jsonBody.windowDays, 365);
+
+    const invalid = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] }, query: { windowDays: 'nope' } });
+    await handler(invalid.req, invalid.res);
+    assert.equal(invalid.res.jsonBody.windowDays, 30);
+  });
+
+  test('targetPerDay is optional — omitted means no verdict, supplied produces a real one', async () => {
+    const router = makeKpiRouter({ 'ws-a': { live: [], history: [], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+
+    const noTarget = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(noTarget.req, noTarget.res);
+    assert.equal(noTarget.res.jsonBody.escalationRate.targetPerDay, null);
+    assert.equal(noTarget.res.jsonBody.escalationRate.overTarget, null);
+
+    const withTarget = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] }, query: { targetPerDay: '2' } });
+    await handler(withTarget.req, withTarget.res);
+    assert.equal(withTarget.res.jsonBody.escalationRate.targetPerDay, 2);
+    assert.equal(withTarget.res.jsonBody.escalationRate.overTarget, false);
+  });
+
+  test('one failing workspace store degrades to a partial computation, not a 500', async () => {
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return []; },
+        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: [] }; }
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'bad', name: 'Bad' }, { urlKey: 'good', name: 'Good' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+  });
+});
+
 // ─── Feed memory: lean projection + bounded fan-out (LIN-622) ─────────────────
 
 describe('feed memory (LIN-622)', () => {

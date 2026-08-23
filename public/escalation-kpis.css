@@ -1,0 +1,36 @@
+/* Escalation KPIs — operator-facing audit page (LIN-1736). Semantic-token-only
+   (dark-safe), mirroring the Rulings card styling in observation.css. */
+
+.kpi-window-form { margin: 0 0 1rem; }
+.kpi-window-form label { font-family: var(--font-structural); font-size: 0.85rem; color: var(--fg-dim); margin-right: 0.4rem; }
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.kpi-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 0.9rem 1rem;
+  background: var(--raised);
+}
+.kpi-card--warn { border-left: 3px solid var(--amber); }
+
+.kpi-card-label {
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.kpi-card-value {
+  font-family: var(--font-structural);
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 0.2rem 0;
+}
+.kpi-card-sub { color: var(--muted); font-size: 0.82rem; }
+
+.kpi-generated-at { color: var(--fg-dim); font-size: 0.78rem; margin-top: 1rem; }
