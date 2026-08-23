@@ -665,6 +665,12 @@ export function createDashboardRoutes({
         // never an empty array, so the client can tell "not a lane" apart from
         // "a lane that hasn't emitted a marker yet".
         ticketWalk: l.telemetry?.ticketWalk || null,
+        // LIN-2244: currently parked on an async wait (e.g. a ScheduleWakeup
+        // CI poll) — distinct from both "working" and "blocked on a human"
+        // (the `decision`/waiting fields below). null when not currently
+        // parked; never inferred from staleness, only from the run's own
+        // latest feedback text (lib/session-telemetry.js's parseParkedWait).
+        parkedWait: l.telemetry?.parkedWait || null,
         // LIN-2184 (H5): carry the loop's own build-time decision facts (LIN-2182
         // / H3, routes/dashboard.js:570's rollup reads the SAME fields from this
         // loop) through this allow-list projection — otherwise they never reach

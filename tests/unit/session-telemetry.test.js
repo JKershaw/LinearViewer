@@ -21,6 +21,7 @@ import {
   parseDecision,
   parseDecisions,
   parseTicketMarkers,
+  parseParkedWait,
   deriveRuntime,
   buildRunTelemetry,
   buildSessionTelemetry,
@@ -216,6 +217,46 @@ describe('parseTicketMarkers (LIN-2242/LIN-2243)', () => {
 
   test('non-array input returns []', () => {
     assert.deepEqual(parseTicketMarkers(undefined), []);
+  });
+});
+
+describe('parseParkedWait (LIN-2244)', () => {
+  test('reports parked when the LATEST entry is the real observed convention', () => {
+    const feedback = [
+      { message: '[working] 6 tools/32s · alive', timestamp: 't1' },
+      { message: '[working · verifying] Not done yet — a scheduled wakeup still pending.', timestamp: 't2' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't2', latest: 't2' });
+  });
+
+  test('"since" is the start of the CONTIGUOUS run of parked entries, not the first-ever mention', () => {
+    const feedback = [
+      { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't1' },
+      { message: '[working] 6 tools/32s · alive', timestamp: 't2' }, // real progress in between
+      { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't3' },
+      { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't4' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't3', latest: 't4' });
+  });
+
+  test('not parked when the LATEST entry is something else — even if parked earlier', () => {
+    const feedback = [
+      { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't1' },
+      { message: '[done] shipped it', timestamp: 't2' },
+    ];
+    assert.equal(parseParkedWait(feedback), null);
+  });
+
+  test('a DIFFERENT "verifying" flow (checking a child session, not a scheduled wakeup) does not match', () => {
+    const feedback = [
+      { message: '[working · verifying] Confirming completion — asked the agent to declare DONE or PENDING...', timestamp: 't1' },
+    ];
+    assert.equal(parseParkedWait(feedback), null);
+  });
+
+  test('non-array / empty input returns null', () => {
+    assert.equal(parseParkedWait(undefined), null);
+    assert.equal(parseParkedWait([]), null);
   });
 });
 
@@ -1041,6 +1082,20 @@ describe('buildRunTelemetry', () => {
       feedback: [{ message: '[done] Task completed' }],
     });
     assert.ok(!('ticketWalk' in nonLane));
+  });
+
+  test('LIN-2244: parkedWait included, omitted (not null), when currently parked / not', () => {
+    const parked = buildRunTelemetry({
+      dispatchedAt: '2026-06-22T10:00:00.000Z',
+      feedback: [{ message: '[working · verifying] a scheduled wakeup still pending.', timestamp: '2026-06-22T10:05:00.000Z' }],
+    });
+    assert.deepEqual(parked.parkedWait, { since: '2026-06-22T10:05:00.000Z', latest: '2026-06-22T10:05:00.000Z' });
+
+    const notParked = buildRunTelemetry({
+      dispatchedAt: '2026-06-22T10:00:00.000Z',
+      feedback: [{ message: '[working] 6 tools/32s · alive' }],
+    });
+    assert.ok(!('parkedWait' in notParked));
   });
 });
 

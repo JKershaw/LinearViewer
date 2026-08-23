@@ -730,6 +730,30 @@ describe('render-session: collapsed-run waiting flag (LIN-1163 item 5)', () => {
     assert.match(html, /data-testid="session-run-waiting-flag"/);
   });
 
+  test('LIN-2244: a run currently parked on an async wait renders a THIRD, distinct flag — not the waiting-for-input one', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null;
+    session.loops[0].telemetry.parkedWait = { since: '2026-07-04T10:01:00.000Z', latest: '2026-07-04T10:03:00.000Z' };
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-testid="session-run-parked-flag"[^>]*>◐ parked on a wait since 2026-07-04T10:01:00\.000Z</);
+    assert.ok(!html.includes('data-testid="session-run-waiting-flag"'), 'not the blocked-on-a-human flag');
+  });
+
+  test('LIN-2244: blocked-on-a-human always wins if both signals were somehow present', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null;
+    session.loops[0].feedback = [{ message: '[blocked] need a decision', url: null, urlLabel: null, timestamp: '2026-07-04T10:02:00.000Z' }];
+    session.loops[0].telemetry.parkedWait = { since: '2026-07-04T10:01:00.000Z', latest: '2026-07-04T10:03:00.000Z' };
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-testid="session-run-waiting-flag"/);
+    assert.ok(!html.includes('data-testid="session-run-parked-flag"'));
+  });
+
+  test('LIN-2244: no parked flag at all when the run is not currently parked', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('data-testid="session-run-parked-flag"'));
+  });
+
   test('a run whose [blocked] entry is NOT the last one does not render the flag', () => {
     const session = fixtureSession();
     session.loops[0].terminalStatus = null;

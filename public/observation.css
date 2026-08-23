@@ -530,6 +530,10 @@
 /* "Waiting on you" (LIN-1005): amber running-family, weighted so the
    needs-you signal reads at a glance without minting a new status colour. */
 .obs-summary-waiting { color: var(--amber); font-weight: 600; }
+/* "Parked on a wait" (LIN-2244): a THIRD state, distinct from both "waiting on
+   you" above and the generic status/working lines — muted, not amber, since
+   nothing here needs a human's attention the way the waiting line does. */
+.obs-summary-parked { color: var(--slate-dim); }
 /* Reply CTA on a waiting card (LIN-1019): the direct link to the session page's
    follow-up reply box. Amber-toned to belong to the waiting line. */
 .obs-summary-reply { color: var(--amber); text-decoration: underline; white-space: nowrap; }

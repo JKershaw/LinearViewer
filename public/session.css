@@ -264,6 +264,17 @@
   color: var(--amber-dim);
   white-space: nowrap;
 }
+/* ── Collapsed-run "parked on a wait" flag (LIN-2244) ──────────────────────
+   A THIRD state, distinct from both "working" and "waiting for input" above —
+   muted, not amber: nothing here needs a human's attention the way the
+   waiting flag does, it is purely informational (so an operator can spot a
+   stalled tail instead of it hiding behind a healthy-looking heartbeat). */
+.sess-run-parked-flag {
+  font-family: var(--font-content);
+  font-size: 0.75rem;
+  color: var(--slate-dim);
+  white-space: nowrap;
+}
 /* The per-run status is now a shared `.status-pill` (dot + AA-safe label); this
    only positions it at the end of the head row. */
 .sess-run-status { margin-left: auto; }
