@@ -95,6 +95,25 @@ describe('db-indexes', () => {
     assert.ok(hasIt, 'dispatch-history must have a {urlKey:1, resolvedAt:-1} index');
   });
 
+  test('declares observer-state\'s eviction index keyed on lastSeenAt, never updatedAt (LIN-2129 review F1, pinned LIN-2142)', () => {
+    // cleanup() (lib/observer-state-store.js) evicts on last-SEEN, not
+    // last-CHANGED — updatedAt only moves on a genuine transition, so an
+    // index keyed there instead would (mis)accelerate a scan that deletes a
+    // live, diagnosis-stable instance. This pins the CORRECT keySpec so a
+    // future edit cannot silently re-key the index back to updatedAt without
+    // this test naming exactly what broke.
+    const hasIt = INDEX_SPECS.some(s =>
+      s.collection === 'observer-state' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ lastSeenAt: 1 })
+    );
+    assert.ok(hasIt, 'observer-state must have a {lastSeenAt:1} index');
+    const hasWrongKey = INDEX_SPECS.some(s =>
+      s.collection === 'observer-state' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ updatedAt: 1 })
+    );
+    assert.strictEqual(hasWrongKey, false, 'observer-state must NOT be indexed on updatedAt — that is the wrong eviction contract');
+  });
+
   test('declares the followUpTo BFS discovery index on both dispatch collections (LIN-1307)', () => {
     // Backs the materializer's followUpTo BFS (_collectSessionIssues / _sessionsTouchingIssue)
     // so a per-write chain-root resolution isn't an unindexed workspace-scoped scan.

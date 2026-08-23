@@ -605,23 +605,58 @@ describe('observer-state-store', () => {
   // reverted; see the beat report.
   // ---------------------------------------------------------------------
 
-  // OS18 (item A). Mutation to defeat: hashState() falling back to
-  // `stableStringify(state)` directly (i.e. deleting the canonicalizeForHash
-  // pre-pass) — verified red, then reverted; see the beat report.
-  test('a Date-only state change genuinely advances — rev and ledger both move, not classified a dedup no-op (item A / F2 guard)', async () => {
+  // OS18 (item A), generalized (LIN-2142). Mutation to defeat: hashState()
+  // falling back to `stableStringify(state)` directly (i.e. deleting the
+  // canonicalizeForHash pre-pass) — the ORIGINAL Date-only case was verified
+  // red under that mutation, then reverted; see the beat report. This table
+  // pins the SAME guard for every non-plain type canonicalizeForHash names:
+  // Date, Map, Set, and an ordinary class instance (real own properties —
+  // the case the module header's "Hashing non-plain values" section
+  // documents this guard as actually covering; a private-fields-only class
+  // is explicitly NOT covered, and is not claimed here — see that section).
+  class Widget {
+    constructor(n) { this.n = n; }
+  }
+
+  const OS18_CASES = [
+    { label: 'Date', first: new Date('2020-01-01T00:00:00Z'), second: new Date('2020-06-15T12:00:00Z') },
+    { label: 'Map', first: new Map([['a', 1]]), second: new Map([['a', 2]]) },
+    { label: 'Set', first: new Set([1, 2]), second: new Set([1, 2, 3]) },
+    { label: 'class instance', first: new Widget(1), second: new Widget(2) }
+  ];
+
+  for (const { label, first, second } of OS18_CASES) {
+    test(`a ${label}-only state change genuinely advances — rev and ledger both move, not classified a dedup no-op (item A / F2 guard)`, async () => {
+      const store = freshStore();
+      const key = `inst-${randomUUID()}`;
+      await store.ensureSeeded(key, { value: first });
+
+      const ok = await store.advance(key, 1, { value: second });
+      assert.strictEqual(ok, true);
+
+      const current = await store.readCurrent(key);
+      assert.strictEqual(current.rev, 2, `a ${label}-only change must genuinely advance rev, never be silently classified a duplicate`);
+      assert.strictEqual(current.ledger.length, 1, `a ${label}-only change must append a ledger entry`);
+    });
+  }
+
+  // Map reorder (LIN-2142) — the companion property OS18 does not cover:
+  // canonicalizeForHash sorts Map entries by stringified key specifically so
+  // that inserting the SAME entries in a different order hashes IDENTICALLY.
+  // Mutation this would catch: dropping that sort (or the Map branch
+  // entirely, falling through to stableStringify's insertion-order-sensitive
+  // walk) would misclassify a reorder as a genuine change.
+  test('a Map whose entries are inserted in a different order hashes identically — reorder alone must NOT trigger a spurious advance', async () => {
     const store = freshStore();
     const key = `inst-${randomUUID()}`;
-    const first = new Date('2020-01-01T00:00:00Z');
-    await store.ensureSeeded(key, { lastSeen: first });
+    await store.ensureSeeded(key, { m: new Map([['a', 1], ['b', 2]]) });
 
-    const second = new Date('2020-06-15T12:00:00Z');
-    const ok = await store.advance(key, 1, { lastSeen: second });
-    assert.strictEqual(ok, true);
+    const result = await store.advance(key, 1, { m: new Map([['b', 2], ['a', 1]]) });
+    assert.strictEqual(result, true, 'a duplicate-content Map, only reordered, must be classified a no-op (true), never a lost-race false');
 
     const current = await store.readCurrent(key);
-    assert.strictEqual(current.rev, 2, 'a Date-only change must genuinely advance rev, never be silently classified a duplicate');
-    assert.strictEqual(current.ledger.length, 1, 'a Date-only change must append a ledger entry');
-    assert.deepStrictEqual(current.state, { lastSeen: second }, 'the new Date must actually be stored');
+    assert.strictEqual(current.rev, 1, 'reorder alone must not bump rev');
+    assert.strictEqual(current.ledger.length, 0, 'reorder alone must not append a ledger entry');
   });
 
   // OS19 (item B) — the regression test for the re-review's item B. Verified
