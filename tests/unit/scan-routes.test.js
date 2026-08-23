@@ -195,6 +195,69 @@ describe('GET/POST /workspace/:urlKey/api/scan/:issueId', () => {
     assert.equal(got.body.code, 'CANONICAL_ID_REQUIRED');
   });
 
+  // LIN-2211 (F1/N2): an orphaned unanswered ruling — the row is still
+  // decision-bearing and unanswered, but ordinary task activity (any
+  // unrelated comment/description edit) has moved the content hash away
+  // from what was scanned. The GET route must still hand back the decision,
+  // id, issueId, and outcome on the `stale` branch, not just `{status,
+  // scannedAt}` — otherwise `renderStale()` has nothing to render an
+  // answer/dismiss control from and the ruling is orphaned forever.
+  test('GET on a decision-bearing row whose content has since changed reports stale WITH the live decision (LIN-2211 orphan repro)', async () => {
+    const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.ok(posted.body.decision);
+
+    // Simulate "ordinary task activity" moving the content hash — same
+    // externally-observable effect as an unrelated comment/description
+    // edit, without needing to mutate the fixture's own content.
+    const row = collection._docs.find(d => d._id === posted.body.id);
+    row.inputHash = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+
+    const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.equal(got.status, 200);
+    assert.equal(got.body.status, 'stale');
+    assert.equal(got.body.id, posted.body.id);
+    assert.equal(got.body.issueId, posted.body.issueId);
+    assert.deepEqual(got.body.decision, posted.body.decision);
+    assert.equal(got.body.outcome, null);
+    assert.ok(got.body.scannedAt);
+  });
+
+  // Regression guard: an ordinary zero-finding stale row (no decision ever
+  // found) must not fabricate one — `stale` carries no `decision` here,
+  // same as before this ticket.
+  test('GET on a zero-finding row whose content has since changed reports stale with no decision', async () => {
+    const posted = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}`);
+    assert.equal(posted.body.decision, null);
+
+    const row = collection._docs.find(d => d._id === posted.body.id);
+    row.inputHash = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+
+    const got = await get(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}`);
+    assert.equal(got.status, 200);
+    assert.equal(got.body.status, 'stale');
+    assert.equal(got.body.decision, null);
+    assert.equal(got.body.outcome, null);
+  });
+
+  // A terminal (already answered/dismissed) row whose content has since
+  // changed must still report its outcome on `stale` — no crash, and the
+  // operator can see it was already resolved rather than re-opened.
+  test('GET on a terminal row whose content has since changed reports stale with the outcome intact', async () => {
+    const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    const dismissed = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}/dismiss`, { id: posted.body.id });
+    assert.equal(dismissed.body.outcome, 'dismissed');
+
+    const row = collection._docs.find(d => d._id === posted.body.id);
+    row.inputHash = 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
+
+    const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.equal(got.status, 200);
+    assert.equal(got.body.status, 'stale');
+    assert.deepEqual(got.body.decision, posted.body.decision);
+    assert.equal(got.body.outcome, 'dismissed');
+    assert.ok(got.body.outcomeAt);
+  });
+
   test('scan store not configured → 503', async () => {
     const unconfiguredApp = express();
     unconfiguredApp.use(express.json());

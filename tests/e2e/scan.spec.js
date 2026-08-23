@@ -133,6 +133,84 @@ test.describe('Scan UI — Dashboard', () => {
     expect(record.outcome).toBe('answered');
   });
 
+  // LIN-2211 (F1/N2): the orphan repro end to end — a decision-bearing scan,
+  // then ordinary unrelated task activity (a comment carrying no
+  // taskDecisionId, same as an operator writing a comment for an entirely
+  // unrelated reason) moves the content hash, and the row must still be
+  // reachable and clearable from the stale render rather than degrading to
+  // a bare rescan placeholder.
+  test('a decision-bearing scan orphaned by an unrelated comment is still answerable from the stale render', async ({ page, localWorkerUrlKey }) => {
+    const taskId = testMockData.issues.find(i => i.identifier === 'TEST-6').id;
+    const { node, row } = openScanToggle(page, 'Task needing preparation');
+    await row.click();
+    await node.locator('[data-toggle="details"]').first().click();
+    await node.locator('[data-toggle="scan"]').first().click();
+
+    const section = node.locator('[data-content="scan"] .scan-section');
+    await expect(section).toHaveAttribute('data-state', 'missing', { timeout: 5000 });
+
+    await section.locator('[data-scan-action="scan"]').click();
+    await expect(section).toHaveAttribute('data-state', 'fresh', { timeout: 5000 });
+    await expect(section.locator('[data-testid="scan-decision-question"]')).toBeVisible();
+
+    // Ordinary task activity, unrelated to the scan — no taskDecisionId, so
+    // this never stamps an outcome; it only moves the content hash the same
+    // way any comment/description edit would.
+    const unrelated = await page.request.post(`/workspace/${localWorkerUrlKey}/api/comments/${taskId}`, {
+      data: { body: 'Unrelated status update, nothing to do with the scan.' }
+    });
+    expect(unrelated.ok()).toBeTruthy();
+
+    // Reload and re-expand to force a fresh GET status check — app.js's
+    // lazy-mount guards against re-init on a later expand of the SAME page
+    // load (`content.dataset.loaded`), so a real re-check needs the page
+    // reload the ticket's own repro describes ("reload/expand the scan
+    // section"), not just a second toggle click.
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    const reopened = openScanToggle(page, 'Task needing preparation');
+    // The row's own expand state persists across reload via localStorage
+    // (public/app.js's `state.expanded`), unlike the nested "Details"/"Scan"
+    // toggles below (a transient `classList.toggle('hidden')`, always
+    // collapsed on a fresh load) — so only click the row if it isn't
+    // already expanded, or this would collapse it right back.
+    const reopenedDetailsToggle = reopened.node.locator('[data-toggle="details"]').first();
+    if (!(await reopenedDetailsToggle.isVisible())) {
+      await reopened.row.click();
+    }
+    await reopenedDetailsToggle.click();
+    await reopened.node.locator('[data-toggle="scan"]').first().click();
+    const reopenedSection = reopened.node.locator('[data-content="scan"] .scan-section');
+    await expect(reopenedSection).toHaveAttribute('data-state', 'stale', { timeout: 5000 });
+
+    // The orphaned ruling is still visible and actionable from the stale
+    // render — not just a bare rescan placeholder.
+    await expect(reopenedSection.locator('[data-testid="scan-decision-question"]')).toBeVisible();
+    await expect(reopenedSection.locator('[data-scan-action="dismiss"]')).toBeVisible();
+    await expect(reopenedSection.locator('[data-scan-answer-input]')).toBeVisible();
+    await expect(reopenedSection.locator('[data-scan-action="rescan"]')).toBeVisible();
+
+    // Distinct text from the sibling "sending an answer" test above — same
+    // urlKey/issueId, and routes/workspace-api.js's comment dedupe collapses
+    // an identical (urlKey, issueId, body) within a 5-minute window (LIN-399),
+    // which would short-circuit before the taskDecision outcome stamp below.
+    await reopenedSection.locator('[data-scan-answer-input]').fill('Proceeding with the current approach, orphan case.');
+    const [commentReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
+      reopenedSection.locator('[data-scan-action="answer"]').click()
+    ]);
+    const commentPayload = commentReq.postDataJSON();
+    expect(commentPayload.taskDecisionIssueId).toBe(taskId);
+
+    // The store-boundary proof: the row clears (stamped 'answered'), even
+    // though it was answered from the STALE render, not the fresh one.
+    await expect(reopenedSection).toHaveAttribute('data-state', 'stale', { timeout: 5000 });
+    const { record } = await (await page.request.get(
+      `/test/task-decisions?urlKey=${localWorkerUrlKey}&issueId=${taskId}`
+    )).json();
+    expect(record.outcome).toBe('answered');
+  });
+
   test('pressing scan on a task with no blocking language reports no blockers found', async ({ page }) => {
     const { node, row } = openScanToggle(page, 'Add pagination to user list');
     await row.click();
