@@ -532,6 +532,8 @@ test.describe('Suggested Next Run Page (experimental)', () => {
 
       const dispatchReq = page.waitForRequest(req =>
         req.url().includes('/api/dispatch') && req.method() === 'POST');
+      const dispatchRes = page.waitForResponse(res =>
+        res.url().includes('/api/dispatch') && res.request().method() === 'POST');
       const cli = card.locator('.next-run-dispatch[data-target="cli"]');
       await cli.click();
 
@@ -550,6 +552,13 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       // LIN-1737 Beat 1: no budget was set on this run, so no bound is threaded.
       expect(body.maxTasks == null).toBe(true);
 
+      // Identify OUR dispatched item by the id the POST response returns, not by
+      // `kind === 'autopilot'` — the live queue is a shared fixture partition
+      // (workerUrlKey) other specs can also leave autopilot-kind items sitting in,
+      // and a kind-only lookup is flaky under parallel/interleaved CI shards.
+      const resBody = await (await dispatchRes).json();
+      const dispatchedId = resBody.item.id;
+
       await expect(cli).toHaveText('dispatched!', { timeout: 5000 });
 
       // ...and the SERVER attaches it (LIN-645's promise is preserved): the stored
@@ -557,7 +566,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       // no-toggle surface still guarantees the token via attachProxy.
       const list = await page.request.get(`/workspace/${URL_KEY}/api/dispatch`);
       const { items } = await list.json();
-      const item = items.find(i => i.kind === 'autopilot');
+      const item = items.find(i => i.id === dispatchedId);
       expect(item).toBeDefined();
       expect(item.prompt).toContain('Workspace API access');
       expect(item.prompt).toContain('/api/proxy/instructions');
