@@ -23,11 +23,27 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STYLE_CSS = readFileSync(join(__dirname, '../../public/style.css'), 'utf8');
 
-/** Slice the body of a selector's first rule block (no nested braces in this file). */
+/**
+ * Slice the body of a selector's first rule block (no nested braces in this file).
+ *
+ * LIN-2247: a plain `css.indexOf(selector)` matches the selector text inside a
+ * PRECEDING comment just as readily as the real rule — `.theme-dark` is named in
+ * a doc comment at the top of the file, well before the actual `.theme-dark {`
+ * rule, so the naive version silently sliced `:root`'s body instead (the next
+ * `{` after that comment). `:root` happens to define the same token *names* as
+ * `.theme-dark`, so every existing caller kept passing without ever reading the
+ * block it claimed to. Requiring the selector be immediately followed by `{`
+ * (mirroring how a rule actually opens) fixes that class of false match.
+ */
 function ruleBody(css, selector) {
-  const start = css.indexOf(selector);
-  assert.notEqual(start, -1, `expected ${selector} in stylesheet`);
-  const open = css.indexOf('{', start);
+  // A few call sites already pass a trailing `{` themselves (to disambiguate a
+  // selector that also appears bare elsewhere) — normalize it away before
+  // re-adding it, so both forms build the same pattern.
+  const bare = selector.replace(/\s*\{\s*$/, '');
+  const re = new RegExp(bare.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{');
+  const m = re.exec(css);
+  assert.notEqual(m, null, `expected ${bare} { ... } in stylesheet`);
+  const open = m.index + m[0].length - 1;
   return css.slice(open + 1, css.indexOf('}', open));
 }
 
@@ -53,6 +69,32 @@ test('.theme-dark re-binds the semantic + status tokens (dark values)', () => {
   for (const token of [...SEMANTIC_TOKENS, ...STATUS_TOKENS, '--focus']) {
     assert.match(dark, new RegExp(`${token}\\s*:`), `.theme-dark must re-bind ${token}`);
   }
+});
+
+// LIN-2247: the landing page re-declares the dark vocabulary under its own
+// `@media (prefers-color-scheme: dark) body.is-landing` block (style.css) rather
+// than inheriting `.theme-dark`, and its header comment claims that block
+// "Mirrors the FULL .theme-dark vocabulary". Nothing enforced that claim — three
+// tokens (`--accent`, `--ok`, `--red-hover`) had drifted out of it, a latent trap
+// for the next landing rule that reaches for one of them. Assert set membership,
+// not just that each token is *defined somewhere* — `ruleBody` on the bare
+// selector `body.is-landing` would match the wrong occurrence (the file has a
+// light-mode `body.is-landing { background-image: ... }` rule, and even a
+// mention of the string in a comment, both of which precede the dark rule), so
+// scope the search to after the dark media query starts.
+function tokenNames(body) {
+  return [...body.matchAll(/(--[a-z0-9-]+)\s*:/g)].map(m => m[1]).sort();
+}
+
+test('the landing dark remap mirrors the full .theme-dark token vocabulary (LIN-2247)', () => {
+  const mediaStart = STYLE_CSS.indexOf('@media (prefers-color-scheme: dark)');
+  assert.notEqual(mediaStart, -1, 'expected the landing dark media query in the stylesheet');
+  const landingDark = ruleBody(STYLE_CSS.slice(mediaStart), 'body.is-landing');
+  assert.deepEqual(
+    tokenNames(landingDark),
+    tokenNames(ruleBody(STYLE_CSS, '.theme-dark')),
+    'body.is-landing (dark) must declare exactly the same token names as .theme-dark'
+  );
 });
 
 test('--brand is teal (per LIN-782) in both themes', () => {
