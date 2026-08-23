@@ -531,6 +531,11 @@
   .lc-lane-ws { display: none; }
   .lc-event { grid-template-columns: auto 1fr; }
   .lc-event-meta { grid-column: 2; }
+
+  /* The fixed feedback FAB (feedback-widget.css) reserves the bottom-right
+     corner: 16px inset + ~32px tall. Clear it vertically so the FAB never
+     sits over "view earlier activity" (LIN-2252). */
+  .lc-more { padding-bottom: 3.5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
