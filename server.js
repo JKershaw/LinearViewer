@@ -1884,6 +1884,28 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     return { token: 'test-token', reason: 'ok', provider: 'linear', credentialFingerprint: fingerprintCredential('test-token') };
   }
 
+  // LIN-2234 (L3 of the LIN-2231 design): canonicalize ownerAccountId BEFORE
+  // the cache key — the single chokepoint every downstream consumer of this
+  // function (the cache, selectOwnerWorkspaceToken, ownerCredentialStore,
+  // detectOwnerAccountMismatch/classifyWorkspaceFailure, and
+  // refreshOwnerWorkspaceToken) inherits automatically, with no other call
+  // site changed. UNSCOPED is left untouched — it is a caller-side sentinel
+  // for the legacy owner-blind path, never a real account id, and must never
+  // be handed to AccountStore or turned into `null` (constraint 11).
+  // `resolveCanonicalAccountId(null)` is a no-lookup no-op, so a legacy
+  // ownerless token (explicit `null`, constraint 2's null-owner fail-closed
+  // case) passes through unresolved just as before. A store failure here
+  // (e.g. Mongo unreachable) is reported the same way the session lookup
+  // below already reports one — store_unreachable, never a 500.
+  if (ownerAccountId !== UNSCOPED) {
+    try {
+      ownerAccountId = await accountStore.resolveCanonicalAccountId(ownerAccountId);
+    } catch (err) {
+      console.error(`[workspace-access] canonical account resolution failed for ${urlKey}:`, err);
+      return { token: null, reason: 'store_unreachable', provider: null, credentialFingerprint: null };
+    }
+  }
+
   const cacheKey = workspaceTokenCacheKey(urlKey, ownerAccountId);
 
   // Check cache first — the factory already applies TTL internally and
