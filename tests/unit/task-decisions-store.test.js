@@ -18,11 +18,16 @@ import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 // tests/unit/task-snapshot-store.test.js's mock.
 function createMockCollection() {
   const docs = [];
-  // Minimal `$in` support (real MongoDB/MangoDB shape), only what
-  // listUnansweredForWorkspaces' `{ urlKey: { $in: urlKeys } }` query needs.
+  // Minimal `$in`/`$ne` support (real MongoDB/MangoDB shape) — only what
+  // listUnansweredForWorkspaces' `{ urlKey: { $in: urlKeys }, outcome: null,
+  // decision: { $ne: null } }` query needs (LIN-2227: the filter moved from a
+  // JS post-filter into the query itself).
   function matchesField(docValue, queryValue) {
     if (queryValue && typeof queryValue === 'object' && Array.isArray(queryValue.$in)) {
       return queryValue.$in.includes(docValue);
+    }
+    if (queryValue && typeof queryValue === 'object' && '$ne' in queryValue) {
+      return docValue !== queryValue.$ne;
     }
     return docValue === queryValue;
   }
@@ -30,6 +35,8 @@ function createMockCollection() {
     if (query._id !== undefined && doc._id !== query._id) return false;
     if (query.urlKey !== undefined && !matchesField(doc.urlKey, query.urlKey)) return false;
     if (query.issueId !== undefined && doc.issueId !== query.issueId) return false;
+    if (query.outcome !== undefined && !matchesField(doc.outcome ?? null, query.outcome)) return false;
+    if (query.decision !== undefined && !matchesField(doc.decision ?? null, query.decision)) return false;
     return true;
   }
   return {
@@ -558,6 +565,30 @@ describe('TaskDecisionsStore.markOutcome', () => {
     assert.equal(await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'archived' }), null);
     assert.equal(await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'dismissed' }) && true, true); // sanity: valid call still works
     assert.equal(await store.markOutcome({ issueId: ISSUE_ID, id, outcome: 'dismissed' }), null); // no urlKey
+  });
+});
+
+// LIN-2226 (folded in from LIN-2223): line-for-line mirror of
+// TaskSnapshotStore.clear's own test (tests/unit/task-snapshot-store.test.js,
+// "clear removes a workspace history") — the method itself is a mirror of
+// TaskSnapshotStore.clear (same guard, same deleteMany({urlKey}), same
+// log-and-return-0), so its test should be too.
+describe('TaskDecisionsStore.clear', () => {
+  test('clear removes a workspace\'s scan rows', async () => {
+    const collection = createMockCollection();
+    const store = new TaskDecisionsStore({ collection });
+    await store.recordScan({ urlKey: 'ws', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const removed = await store.clear('ws');
+    assert.equal(removed, 1);
+    assert.equal(await store.getStatus('ws', ISSUE_ID), null);
+  });
+
+  test('an unconfigured store or missing urlKey degrades to 0, never throws', async () => {
+    const unconfigured = new TaskDecisionsStore({});
+    assert.equal(await unconfigured.clear('ws'), 0);
+    const collection = createMockCollection();
+    const store = new TaskDecisionsStore({ collection });
+    assert.equal(await store.clear(undefined), 0);
   });
 });
 

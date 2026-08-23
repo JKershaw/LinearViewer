@@ -948,10 +948,20 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       await localStore.clear(urlKey);
       await localStore.seed(urlKey, seed);
 
+      // LIN-2226: a second local workspace in the SAME session (cross-workspace
+      // task-bound coverage, mirroring LIN-1728 F1's two-Linear-workspace
+      // `multiWorkspace` shape) — `append: true` adds this workspace to the
+      // existing `session.workspaces` instead of replacing it. Every OTHER
+      // caller is byte-identical: append is opt-in and false by default. A
+      // fresh id (not the shared LOCAL_WS_UUID every single-workspace local
+      // session reuses) avoids two simultaneous entries colliding on `id`.
+      const append = body.append === true || req.query.append === 'true';
+      const wsId = append ? crypto.randomUUID() : LOCAL_WS_UUID;
+
       // Token === urlKey: carries no auth, only selects the store partition.
       // No `accessToken: 'test-token'`, so the mock short-circuit never fires.
       const localWorkspace = {
-        id: LOCAL_WS_UUID,
+        id: wsId,
         name: 'Local Workspace',
         urlKey,
         provider: 'local',
@@ -970,13 +980,21 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
           ...body.extraBindings,
         ];
       }
-      req.session.workspaces = [localWorkspace];
-      req.session.activeWorkspaceId = LOCAL_WS_UUID;
+      if (append && Array.isArray(req.session.workspaces) && req.session.workspaces.length) {
+        // Additive: keep the first (already-established) workspace active —
+        // this call only needs the new one to exist in the session so the
+        // Rulings feed's cross-workspace merge (`req.session.workspaces`) sees
+        // it, not to switch what the page defaults to.
+        req.session.workspaces = [...req.session.workspaces, localWorkspace];
+      } else {
+        req.session.workspaces = [localWorkspace];
+        req.session.activeWorkspaceId = wsId;
+      }
 
       // LIN-1329 fixture re-point (Q4): local's identity scope is the urlKey
       // itself (Q6 — freshly-unique per real create, never a false-conflict
       // risk), mirroring routes/workspace.js's POST /workspace/new.
-      await establishAccount(req.session, accountStore, accountWorkspaceStore, 'local', urlKey, {}, LOCAL_WS_UUID);
+      await establishAccount(req.session, accountStore, accountWorkspaceStore, 'local', urlKey, {}, wsId);
 
       // Optionally provision a mock OpenRouter key, mirroring /test/set-session
       // (L93-97). Honored from query (GET) or body (POST). Superset/no-op by

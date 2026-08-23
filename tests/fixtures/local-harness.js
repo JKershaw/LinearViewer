@@ -359,7 +359,7 @@ export function createLocalProvider() {
  *   `localWorkerUrlKey` worker fixture once specs are swept).
  * @returns {Promise<{urlKey: string, dashboard: string}>}
  */
-export async function seedLocalWorkspace(page, seed = null, { features, openRouterConnected, freeTierEnabled, extraBindings, urlKey = LOCAL_WORKSPACE_URL_KEY } = {}) {
+export async function seedLocalWorkspace(page, seed = null, { features, openRouterConnected, freeTierEnabled, extraBindings, urlKey = LOCAL_WORKSPACE_URL_KEY, append } = {}) {
   const data = { ...(seed ?? defaultLocalSeed(urlKey)), urlKey };
   if (features) data.features = features;
   if (openRouterConnected) data.openRouterConnected = openRouterConnected;
@@ -368,6 +368,10 @@ export async function seedLocalWorkspace(page, seed = null, { features, openRout
   // binding stays active, with each extra appended so the providers settings
   // surface can exercise the active-provider switch end-to-end.
   if (extraBindings) data.extraBindings = extraBindings;
+  // LIN-2226: a SECOND local workspace in the same session (cross-workspace
+  // task-bound coverage) — call this a second time with a different `urlKey`
+  // and `append: true` to add it alongside the first rather than replacing it.
+  if (append) data.append = true;
   const resp = await page.request.post('/test/set-local-session', { data });
   if (!resp.ok()) {
     throw new Error(`seedLocalWorkspace failed: ${resp.status()} ${await resp.text()}`);
