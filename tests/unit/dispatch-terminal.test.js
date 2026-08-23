@@ -288,4 +288,55 @@ describe('deriveLifecycleStatus (LIN-2079)', () => {
     assert.equal(deriveLifecycleStatus(feedback), 'blocked');
     assert.equal(deriveCompletedAt(feedback), null, 'a parked run has not completed');
   });
+
+  // LIN-2123: a session unblocked and resumed IN PLACE (same row, no
+  // follow-up) posts Simple Dispatcher's own one-time
+  // "[working] Resumed session ..." marker — recognized here, in addition to
+  // the wake-event scan, so the derivation stops being permanently sticky on
+  // [blocked] once that specific marker appears later in the array.
+  describe('in-place resume after [blocked] (LIN-2123)', () => {
+    test('a resume marker after [blocked] clears the derived status to null', () => {
+      assert.equal(deriveLifecycleStatus([
+        { message: '[blocked] needs a human decision' },
+        { message: '[working] Resumed session abc12345 (window: w1)' },
+      ]), null);
+    });
+
+    test('the pinned regression case still holds: plain [working] heartbeats (no resume text) do NOT clear [blocked]', () => {
+      assert.equal(deriveLifecycleStatus([
+        { message: '[blocked] needs a human decision' },
+        { message: '[working] 2 tools/5s · alive' },
+        { message: '[working] 3 tools/8s · alive' },
+      ]), 'blocked');
+    });
+
+    test('a LATER [blocked] after a resume marker wins — re-blocked stays blocked', () => {
+      assert.equal(deriveLifecycleStatus([
+        { message: '[blocked] first block' },
+        { message: '[working] Resumed session abc12345 (window: w1)' },
+        { message: '[blocked] blocked again' },
+      ]), 'blocked');
+    });
+
+    test('a resume marker with no prior [blocked] at all changes nothing — still null', () => {
+      assert.equal(deriveLifecycleStatus([
+        { message: '[working] Resumed session abc12345 (window: w1)' },
+      ]), null);
+    });
+
+    test('case-insensitive and whitespace-tolerant, same discipline as the terminal/wake scans', () => {
+      assert.equal(deriveLifecycleStatus([
+        { message: '[blocked] needs a human decision' },
+        { message: '  [WORKING] Resumed session ABC12345 (window: w1)' },
+      ]), null);
+    });
+
+    test('terminal still wins over everything, including a resume marker', () => {
+      assert.equal(deriveLifecycleStatus([
+        { message: '[blocked] needs a human decision' },
+        { message: '[working] Resumed session abc12345 (window: w1)' },
+        { message: '[done] finished' },
+      ]), 'done');
+    });
+  });
 });
