@@ -23,17 +23,24 @@ const escapeHtml = (str) => {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 };
+// `relativeTime` is likewise a browser global (`window.relativeTime`,
+// common.js) that observation.js references bare — a faithful-enough stub for
+// the seams under test here (LIN-2244): it only needs to be deterministic and
+// take a timestamp, never the real "3m ago" formatting.
+const relativeTime = (ts) => (ts ? `stub-relative-time(${ts})` : '');
 const sandbox = {
   module: { exports: {} },
   window: { addEventListener() {} },
   document: { addEventListener() {} },
   escapeHtml,
+  relativeTime,
   console,
 };
 vm.runInNewContext(src, sandbox, { filename: 'observation.js' });
 const { renderActivityLog, renderArtifacts, classifyArtifact, renderObjective } = sandbox.module.exports;
 const { renderSummaryLine, excerptDecisionCase, renderWaitingDecisionSummary, DECISION_EXCERPT_CHARS } = sandbox.module.exports;
 const { laneTicketWalk, ticketProgressText } = sandbox.module.exports;
+const { sessionParkedWait } = sandbox.module.exports;
 
 test.describe('renderActivityLog — §6.3 burst copy', () => {
   test('drops the redundant per-burst total when a breakdown sums it', () => {
@@ -275,5 +282,40 @@ test.describe('laneTicketWalk / ticketProgressText (LIN-2243)', () => {
   test('ticketProgressText returns empty string for an empty/absent walk', () => {
     assert.equal(ticketProgressText(null), '');
     assert.equal(ticketProgressText([]), '');
+  });
+});
+
+// LIN-2244: parked-wait seam, same read-off-runs[] reasoning as ticketWalk.
+test.describe('sessionParkedWait / renderSummaryLine parked branch (LIN-2244)', () => {
+  test('sessionParkedWait finds the first run carrying a non-null parkedWait', () => {
+    const s = { runs: [{ parkedWait: null }, { parkedWait: { since: 't1', latest: 't2' } }] };
+    assert.deepEqual(sessionParkedWait(s), { since: 't1', latest: 't2' });
+  });
+
+  test('sessionParkedWait returns null when no run is currently parked', () => {
+    assert.equal(sessionParkedWait({ runs: [{ parkedWait: null }] }), null);
+    assert.equal(sessionParkedWait({ runs: [] }), null);
+  });
+
+  test('renderSummaryLine renders the parked line, distinct from "waiting on you" and "working"', () => {
+    const s = { stale: false, waiting: false, terminal: false, runs: [{ parkedWait: { since: 't1', latest: 't2' } }] };
+    const html = renderSummaryLine(s);
+    assert.match(html, /obs-summary-parked/);
+    assert.match(html, /parked on a wait since stub-relative-time\(t1\)/);
+    assert.ok(!html.includes('obs-summary-waiting'));
+    assert.ok(!html.includes('working…'));
+  });
+
+  test('renderSummaryLine: "waiting on you" (blocked-on-a-human) wins over parked when both could apply', () => {
+    const s = { stale: false, waiting: true, waitingMessage: null, terminal: false, decision: null, runs: [{ parkedWait: { since: 't1', latest: 't2' } }] };
+    const html = renderSummaryLine(s);
+    assert.match(html, /obs-summary-waiting/);
+    assert.ok(!html.includes('obs-summary-parked'));
+  });
+
+  test('renderSummaryLine: no parked branch at all when no run is currently parked', () => {
+    const s = { stale: false, waiting: false, terminal: false, statusLine: null, runs: [] };
+    const html = renderSummaryLine(s);
+    assert.ok(!html.includes('obs-summary-parked'));
   });
 });

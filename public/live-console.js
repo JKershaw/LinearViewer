@@ -1102,7 +1102,17 @@
     task.setAttribute('title', `open ${lane.workspaceName || lane.workspaceUrlKey} in Observation`);
     const tickets = li.querySelector('.lc-lane-tickets');
     tickets.textContent = ticketProgressText(lane.ticketWalk);
-    li.querySelector('.lc-lane-action').textContent = lane.action || 'working';
+    // LIN-2244: a THIRD lane state, distinct from both actively working and
+    // blocked on a human — overrides the action text (never appends to it)
+    // so "parked" can't be missed alongside a stale-looking "working" label.
+    const actionEl = li.querySelector('.lc-lane-action');
+    if (lane.parkedWait) {
+      actionEl.textContent = `parked since ${rel(lane.parkedWait.since)}`;
+      actionEl.setAttribute('data-parked', '1');
+    } else {
+      actionEl.textContent = lane.action || 'working';
+      actionEl.removeAttribute('data-parked');
+    }
     // Credential badge — textContent like every sibling field, so a hostile
     // token label could not become markup even if one were shown here (it is
     // deliberately not: the label is display-only and adds nothing to a rail

@@ -363,6 +363,22 @@ test('deriveLoopLanes (LIN-2243): a worker-lane loop carries its ticketWalk; a n
   assert.equal(plainLane.ticketWalk, null);
 });
 
+test('deriveLoopLanes (LIN-2244): a currently-parked loop carries its parkedWait; a non-parked loop carries null', () => {
+  const parkedLoop = loop({
+    telemetry: {
+      runtime: { ms: null },
+      metrics: [],
+      producedArtifacts: [],
+      parkedWait: { since: '2026-07-19T11:55:00.000Z', latest: '2026-07-19T11:59:00.000Z' },
+    },
+  });
+  const [lane] = deriveLoopLanes([parkedLoop]);
+  assert.deepEqual(lane.parkedWait, { since: '2026-07-19T11:55:00.000Z', latest: '2026-07-19T11:59:00.000Z' });
+
+  const [plainLane] = deriveLoopLanes([loop()]);
+  assert.equal(plainLane.parkedWait, null);
+});
+
 // LIN-1929 (Phase C of LIN-1908): `latestHeartbeat` used to drop the parsed
 // `state` field even though `parseHeartbeat` already produces it — plumbing
 // only, no new parsing.
@@ -564,6 +580,7 @@ test('buildConsoleFeed with no credentialByToken → every lane unknown, rest of
     lastActivityMs: Date.parse('2026-07-19T11:59:00.000Z'),
     heartbeat: { toolCount: 12, elapsedSeconds: 540, breakdown: { Bash: 7, Read: 5 }, total: 15, state: null },
     ticketWalk: null,
+    parkedWait: null,
   });
 });
 

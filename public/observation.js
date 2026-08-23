@@ -358,6 +358,16 @@ function renderSummaryLine(s) {
     const reply = href ? ` <a class="obs-summary-reply" href="${escapeHtml(href)}">reply →</a>` : '';
     return `<span class="obs-summary-line obs-summary-waiting">◐ waiting on you${msg}${decisionSummary}${reply}</span>`;
   }
+  // LIN-2244: a THIRD state, distinct from both "waiting on you" above and the
+  // generic status/working lines below — parked on a pending async wait (e.g.
+  // a ScheduleWakeup CI poll). Checked before the status-line branches so a
+  // stale-looking "working"/status line can't paper over a genuinely stalled
+  // wait; sits below `waiting` since a human-gated block is the higher-
+  // priority signal when both could somehow apply.
+  const parkedWait = sessionParkedWait(s);
+  if (parkedWait) {
+    return `<span class="obs-summary-line obs-summary-parked">◐ parked on a wait since ${escapeHtml(relativeTime(parkedWait.since))}</span>`;
+  }
   if (st && st.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(st.statusLine)}</span>`;
   // Live status line served on the feed itself (no per-poll backend fetch).
   if (s.statusLine) return `<span class="obs-summary-line obs-summary-status">${escapeHtml(s.statusLine)}</span>`;
@@ -383,6 +393,19 @@ function renderSummaryLine(s) {
 function laneTicketWalk(s) {
   const run = (s.runs || []).find(r => Array.isArray(r.ticketWalk) && r.ticketWalk.length);
   return run ? run.ticketWalk : null;
+}
+
+/**
+ * LIN-2244: same lean-feed reasoning as `laneTicketWalk` above — a run's own
+ * `parkedWait` (built from raw feedback before the lean drop) is what's
+ * reliable on this feed, not a session-level field.
+ *
+ * @param {Object} s - session payload
+ * @returns {{since: string|null, latest: string|null}|null}
+ */
+function sessionParkedWait(s) {
+  const run = (s.runs || []).find(r => r.parkedWait);
+  return run ? run.parkedWait : null;
 }
 
 /**
@@ -2040,5 +2063,8 @@ if (typeof module !== 'undefined' && module.exports) {
     // LIN-2243: expose the worker-lane ticket-walk seam (read off runs[], since
     // the session-level field is inert on this lean feed) for unit testing.
     laneTicketWalk, ticketProgressText,
+    // LIN-2244: expose the parked-wait seam (same lean-feed reasoning) for
+    // unit testing.
+    sessionParkedWait,
   };
 }

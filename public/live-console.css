@@ -391,6 +391,10 @@
   font-size: 0.72rem;
   color: var(--amber-dim);
 }
+/* LIN-2244: "parked on a wait" overrides the amber "working" tone above with a
+   muted one — nothing here needs a human's attention the way the amber
+   working/waiting vocabulary implies elsewhere on this rail. */
+.lc-lane-action[data-parked="1"] { color: var(--slate-dim); }
 /* The lane's credential state (LIN-1588). Three states, and `unknown` is the
    ORDINARY one — so it reads as quiet/dim (absence of evidence), never as a
    fault and never as healthy. Only `dead` is allowed to be loud: it is the one

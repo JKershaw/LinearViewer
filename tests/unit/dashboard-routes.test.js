@@ -1054,6 +1054,56 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(sess.ticketWalk, null, 'session-level ticketWalk is inert on the lean feed, same as resources/model');
   });
 
+  // ─── parkedWait reaches the runs[] projection (LIN-2244) ────────────────────
+  test('a worker currently parked on a scheduled-wakeup wait projects parkedWait on its run', async () => {
+    const parkedWorker = {
+      id: 'w-parked', sessionId: 'sess-parked', issueIdentifier: 'LIN-2244', issueTitle: 'Parked worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, status: 'taken',
+      feedback: [
+        { message: '[working] 6 tools/32s · alive', timestamp: NOW_ISO },
+        { message: '[working · verifying] Not done yet — a scheduled wakeup still pending.', timestamp: NOW_ISO },
+      ]
+    };
+    const perWorkspace = {
+      'ws-a': {
+        live: [autopilotLiveItem('sess-parked', 'LIN-2240'), parkedWorker],
+        history: [],
+        agentStatus: [agentStatusDone('sess-parked', 'LIN-2240')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const sess = findSession(res.jsonBody, 'sess-parked');
+    assert.ok(sess, 'session is present');
+    const run = sess.runs.find(r => r.loopId === 'w-parked');
+    assert.ok(run, 'parked worker run is present');
+    assert.deepEqual(run.parkedWait, { since: NOW_ISO, latest: NOW_ISO });
+  });
+
+  test('a worker with no scheduled-wakeup wait projects parkedWait as null, not undefined', async () => {
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-noparked', 'LIN-840'), workerHistoryItem('w-noparked', 'LIN-841', 'sess-noparked')],
+        agentStatus: [agentStatusDone('sess-noparked', 'LIN-840'), agentStatusDone('w-noparked', 'LIN-841')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const sess = findSession(res.jsonBody, 'sess-noparked');
+    const run = sess.runs.find(r => r.loopId === 'w-noparked');
+    assert.ok(run, 'worker run is present');
+    assert.equal(run.parkedWait, null, 'run parkedWait is null, not undefined');
+  });
+
   test('a worker with no [ticket] markers projects ticketWalk as null, not undefined', async () => {
     const perWorkspace = {
       'ws-a': {
