@@ -100,7 +100,13 @@ async function requestCapturingWarnings(app, path) {
 test('a provider-rejected credential is named: fingerprint, source, provider, expiry', async () => {
   const { status, captured } = await requestCapturingWarnings(buildApp(), `/api/proxy/issues/${ISSUE_UUID}`);
 
-  assert.equal(status, 401);
+  // LIN-2216: this fixture's whole point is "server believed the credential
+  // was still live" (see the msUntilExpiry assertion below) — that is now
+  // exactly the TRANSIENT signature graphqlErrorStatus reclassifies to a
+  // retryable 503, not the terminal 401 pre-LIN-2216 code always returned.
+  // The rejection is still named/logged identically either way — only the
+  // status this test asserts changed.
+  assert.equal(status, 503);
   assert.equal(captured.length, 1, 'exactly one rejection line per failing request');
 
   const line = captured[0];
@@ -215,7 +221,12 @@ test('a provider-rejected credential is marked suspect via the shared registry',
 
   assert.equal(registry.markSuspectCalls.length, 1);
   assert.equal(registry.markSuspectCalls[0].fingerprint, fingerprintCredential('linear-tok'));
-  assert.equal(registry.markSuspectCalls[0].opts.reason, 'provider-401');
+  // LIN-2216: this fixture's credential looks live (see the other test in
+  // this file), so graphqlErrorStatus reclassifies the rejection to a
+  // retryable 503 — still marked suspect either way, but the reason label
+  // distinguishes "a resolved credential got rejected transiently" from a
+  // genuine resolution failure (both share status 503).
+  assert.equal(registry.markSuspectCalls[0].opts.reason, 'provider-503-transient');
   assert.equal(typeof registry.markSuspectCalls[0].opts.now, 'number');
 });
 
@@ -255,5 +266,8 @@ test('a successful request never marks anything suspect', async () => {
 
 test('no rejectedCredentialRegistry injected (e.g. an older test harness) never throws — the wiring is optional-chained', async () => {
   const { status } = await requestCapturingWarnings(buildApp(), `/api/proxy/issues/${ISSUE_UUID}`);
-  assert.equal(status, 401, 'the request completes normally with no registry wired in');
+  // LIN-2216: this fixture's credential looks live, so the response is a
+  // retryable 503 (see the other tests in this file) — the point of THIS
+  // test is only that a missing registry never throws, whatever the status.
+  assert.equal(status, 503, 'the request completes normally with no registry wired in');
 });
