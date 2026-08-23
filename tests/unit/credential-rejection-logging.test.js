@@ -47,7 +47,7 @@ function fakeRejectedCredentialRegistry() {
   };
 }
 
-function buildApp({ resolveWorkspaceAccess, validateToken, issueDetail, rejectedCredentialRegistry } = {}) {
+function buildApp({ resolveWorkspaceAccess, validateToken, issueDetail, rejectedCredentialRegistry, proxyEventStore } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -56,7 +56,7 @@ function buildApp({ resolveWorkspaceAccess, validateToken, issueDetail, rejected
         tokenId: 'tok-agent-1', urlKey: 'acme', label: 'autopilot', scope: 'readWrite', createdBy: 'acct-owner',
       })),
     },
-    proxyEventStore: { recordEvent: async () => {} },
+    proxyEventStore: proxyEventStore ?? { recordEvent: async () => {} },
     resolveWorkspaceAccess: resolveWorkspaceAccess ?? (async () => ({
       token: 'linear-tok', reason: 'ok', provider: 'linear', source: 'session-scan', expiresAt: Date.now() + 3600_000,
       credentialFingerprint: fingerprintCredential('linear-tok'),
@@ -171,6 +171,33 @@ test('a rejected CALLER token is a distinct stage, not confused with a dead work
   assert.equal(captured.length, 1);
   assert.equal(captured[0].stage, 'proxy-token');
   assert.equal(captured[0].credentialFingerprint, undefined, 'no workspace credential was ever resolved');
+});
+
+// LIN-1746 (found by code review, round 5): an earlier revision of
+// resolveProviderAccess stamped req.resolvedCredentialFingerprint (to `null`)
+// even when resolveWorkspaceAccess found NO credential at all — leaving it
+// merely present rather than `undefined`, which logEvent's stage classifier
+// (`!== undefined`) then misfiled as `stage: 'provider-lane'`. That silently
+// inflated providerLaneOccupancy's denominator with zero-fault "evidence"
+// (a 503 never counts as a 401 fault) — able to report a false top-level
+// `verdict: 'ok'` for a token whose workspace credential was 100% dead.
+test('a workspace-resolution failure (no credential ever resolved) is recorded as stage:proxy-token, not provider-lane — never pollutes providerLaneOccupancy', async () => {
+  const recorded = [];
+  const app = buildApp({
+    resolveWorkspaceAccess: async () => ({ token: null, reason: 'session_expired', provider: 'linear' }),
+    proxyEventStore: { recordEvent: async (doc) => { recorded.push(doc); } },
+  });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  const res = await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/issues/${ISSUE_UUID}`, {
+    headers: { Authorization: 'Bearer agent-token' },
+  });
+  await new Promise(resolve => server.close(resolve));
+
+  assert.equal(res.status, 503);
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0].stage, 'proxy-token', 'a resolution failure never attempted a provider-lane call');
+  assert.equal(recorded[0].credentialFingerprint, null, 'no credential was ever resolved to fingerprint');
 });
 
 test('a successful request emits no rejection line', async () => {

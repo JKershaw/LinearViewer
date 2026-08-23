@@ -793,6 +793,24 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * decline) never reads a stale fingerprint from a previous request on the
    * same `req`-shaped object in a test harness.
    *
+   * LIN-1746 (found by code review): the general path stamps ONLY when
+   * `resolveWorkspaceAccess` actually returned a `token` — never on a
+   * resolution failure (`session_expired` / `owner_mismatch` / etc., no
+   * credential to speak of). An earlier revision stamped unconditionally
+   * (`credentialFingerprint ?? null`) even on failure, which left
+   * `req.resolvedCredentialFingerprint` merely PRESENT (`null`, not
+   * `undefined`) on a request that never reached a provider credential at
+   * all — `logEvent`'s `stage` classification below tests presence, not
+   * value, so every `workspaceUnavailable()` 503 for the non-ownerless death
+   * class was misfiled as `stage: 'provider-lane'` instead of
+   * `'proxy-token'`. That polluted `providerLaneOccupancy`'s denominator
+   * with zero-fault "evidence" (a 503 is never a 401, so it never counts as
+   * faulting, only as occupied) — able to report a false `verdict: 'ok'`
+   * from the top-level "primary detector" while the SAME token's workspace
+   * credential was 100% dead, exactly the misdiagnosis this ticket's own
+   * `workspaceAccess` half exists to prevent. The TEST_LOCAL_URL_KEY branch
+   * above is unaffected — it never fails, so it keeps stamping unconditionally.
+   *
    * @returns {Promise<{provider: Object, token: (string|Object|null), reason: string}>}
    */
   async function resolveProviderAccess(urlKey, ownerAccountId, req) {
@@ -804,7 +822,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       return { provider: localProvider, token: urlKey, reason: 'ok' };
     }
     const { token, scope, reason, provider: providerName, source, expiresAt, credentialFingerprint } = await resolveWorkspaceAccess(urlKey, ownerAccountId);
-    if (req) {
+    if (req && token) {
       req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       // LIN-2216: stamped alongside the fingerprint, on THIS request object —
       // deliberately NOT read back from `credentialResolutions` (a shared,
@@ -1066,7 +1084,16 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   function logCredentialRejection(req, endpoint) {
     const descriptor = credentialResolutions.get(resolutionKey(req.proxyUrlKey, req.proxyCreatedBy));
     console.warn('[credential-rejected]', JSON.stringify({
-      stage: descriptor ? 'provider-lane' : 'proxy-token',
+      // LIN-1746 (found by code review, round 6): `stage` here must agree
+      // with logEvent's own `stage` below — both answer "did THIS request
+      // actually resolve a provider credential." `descriptor` presence is
+      // the WRONG signal for that: `recordCredentialResolution` records an
+      // entry unconditionally, even on a resolution failure (credential:
+      // null), so it stays truthy long after this diagnostic's own doc
+      // above says `provider-lane` should mean "Harbour resolved a
+      // credential." `req.resolvedCredentialFingerprint`'s presence is the
+      // correct, already-fixed signal (see resolveProviderAccess).
+      stage: req.resolvedCredentialFingerprint !== undefined ? 'provider-lane' : 'proxy-token',
       endpoint,
       method: req.method,
       urlKey: req.proxyUrlKey ?? null,
@@ -1165,12 +1192,16 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // existing write seam instead of discarded (the ticket's own diagnosis:
     // both were already computed by resolveProviderAccess three lines up the
     // call stack and thrown away). `req.resolvedCredentialFingerprint` is
-    // stamped by resolveProviderAccess on EVERY branch it takes (pinned by
-    // tests/unit/proxy-credential-fingerprint-stamping.test.js) and left
-    // `undefined` — never `null` — on a request that never reached it, so
-    // presence alone (not the value) is the reliable "did this call attempt
-    // provider-credential resolution at all" signal; reusing it here avoids a
-    // second, request-scoped flag that could drift from the first.
+    // stamped by resolveProviderAccess on every branch that actually resolved
+    // a credential (pinned by tests/unit/proxy-credential-fingerprint-stamping.test.js)
+    // and left `undefined` — never `null` — on a request that never reached
+    // one, including a `workspaceUnavailable()` resolution failure (LIN-1746,
+    // found by code review: an earlier revision stamped `null` even on that
+    // failure, which misfiled it as `provider-lane` here and polluted
+    // `providerLaneOccupancy`'s denominator with zero-fault evidence). So
+    // presence alone (not the value) is the reliable "did this call actually
+    // resolve a provider credential" signal; reusing it here avoids a second,
+    // request-scoped flag that could drift from the first.
     const stage = req.resolvedCredentialFingerprint !== undefined ? STAGE_PROVIDER_LANE : STAGE_PROXY_TOKEN;
     proxyEventStore.recordEvent({
       urlKey: req.proxyUrlKey,
@@ -1709,12 +1740,20 @@ GET ${baseUrl}/api/proxy/credential-health?windowMs={ms}
     directly first.
   → { "verdict": "ok"|"degraded"|"unknown", "occupancy": 0|number|null,
       "callRatio": 0|number|null, "bucketsWithEvidence": 4, "bucketsFaulting": 0,
-      "totalCalls": 6, "failedCalls": 0, "windowMs": 900000, "bucketMs": 30000 }
+      "totalCalls": 6, "failedCalls": 0, "windowMs": 900000, "bucketMs": 30000,
+      "workspaceAccess": { "verdict": "unknown"|"likely_dead", "dominantReason": null|string,
+        "reasons": {}, "totalFailures": 0, "windowMs": 900000 } }
   → "verdict" is "unknown" (never a false "ok") until enough of THIS token's own
     traffic has landed to say anything. "occupancy" — the fraction of 30s buckets
     carrying this token's own provider-lane calls that saw a 401 — is the primary
     detector; "callRatio" is supplementary only (retries can inflate it).
-  → "windowMs" accepts a caller override, clamped server-side to [60000, 86400000].
+  → "workspaceAccess" answers a DIFFERENT question — can you resolve a workspace
+    credential AT ALL, covering session_expired/owner_signed_out/owner_mismatch/
+    not_connected (failures before any provider-lane credential resolves, invisible
+    to the fields above). "unknown" after a single failure; "likely_dead" once the
+    SAME reason repeats — "dominantReason" then names it. If you see this, stop
+    guessing the workspace is disconnected and ask for re-dispatch instead.
+  → "windowMs" accepts a caller override (applies to both halves), clamped server-side to [60000, 86400000].
 
 GET ${baseUrl}/api/proxy/teams
   → List all teams
@@ -2433,31 +2472,49 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
   /**
    * GET /api/proxy/credential-health
    *
-   * Consumer-lane provider credential health (LIN-2076, Half B). The
-   * observability half of this ticket: an intermittent provider-lane 401 was
-   * previously discoverable only inside a worker's own transcript. This lets
-   * the SAME worker read its own credential health directly, bounded to the
-   * token it authenticated with — never workspace-wide token metadata, which
-   * is the session-authed `/workspace/:urlKey/api/proxy/credential-health`
-   * route's job and stays exactly as it is.
+   * Consumer-lane provider credential health (LIN-2076 Half B; extended by
+   * LIN-1746). Bounded to the token it authenticated with — never
+   * workspace-wide token metadata, which is the session-authed
+   * `/workspace/:urlKey/api/proxy/credential-health` route's job and stays
+   * exactly as it is. Two DIFFERENT questions, both answered from this one
+   * self-scoped read:
    *
-   * Backed by `providerLaneOccupancy` (lib/proxy-events.js): a time-bucketed
-   * occupancy rate over this token's own `stage: 'provider-lane'` rows, not a
-   * raw call-count ratio (a caller's own retries would otherwise inflate a
-   * single bad bucket's apparent weight). `verdict: 'unknown'` — never a
-   * false `ok` — until at least `OCCUPANCY_MIN_BUCKETS` distinct buckets have
-   * carried this token's own provider-lane traffic.
+   * - The top-level fields (LIN-2076): "is Linear rejecting a credential I
+   *   DID resolve?" — `providerLaneOccupancy`, a time-bucketed occupancy
+   *   rate over this token's own `stage: 'provider-lane'` rows, not a raw
+   *   call-count ratio (a caller's own retries would otherwise inflate a
+   *   single bad bucket's apparent weight). `verdict: 'unknown'` — never a
+   *   false `ok` — until at least `OCCUPANCY_MIN_BUCKETS` distinct buckets
+   *   have carried this token's own provider-lane traffic.
+   * - `workspaceAccess` (LIN-1746): "can I even resolve a workspace
+   *   credential AT ALL?" — the non-ownerless credential-death class
+   *   (`session_expired` / `owner_signed_out` / `owner_mismatch` /
+   *   `not_connected`) that arrives as a 503 from `workspaceUnavailable()`
+   *   BEFORE any provider-lane credential resolves, invisible to the
+   *   occupancy read above by construction (that read is stage-filtered).
+   *   `recentFailureReasons` tallies this token's own recent 503 reasons;
+   *   `verdict: 'unknown'` until the SAME reason has repeated at least
+   *   `RECENT_REASON_MIN_STREAK` times — a single failure is genuinely
+   *   ambiguous between transient and permanently dead (this ticket's own
+   *   framing) — at which point `dominantReason` names it, so a worker can
+   *   stop guessing "the workspace is disconnected" and ask for re-dispatch
+   *   instead (the exact LIN-1576 misdiagnosis this ticket exists to
+   *   prevent).
    *
-   * `windowMs` (optional query param) lets a caller widen the look-back;
-   * clamped server-side to [60s, 24h] by `resolveOccupancyWindow` regardless
-   * of what is requested.
+   * `windowMs` (optional query param) lets a caller widen the look-back for
+   * BOTH halves together; clamped server-side (`resolveOccupancyWindow` /
+   * `resolveCredentialHealthWindow`) regardless of what is requested.
    */
   router.get('/api/proxy/credential-health', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
       const requestedWindowMs = req.query.windowMs !== undefined ? parseInt(req.query.windowMs, 10) : undefined;
-      const result = await proxyEventStore.listProviderLaneOccupancy(req.proxyUrlKey, req.proxyTokenId, { windowMs: requestedWindowMs });
+      // LIN-1746: one query for both halves (found by code review — this
+      // route is meant to be cheap enough to poll; two separate finds()
+      // against the same collection/tokenId on every call was a needless
+      // doubling of I/O once both halves shared one window).
+      const { occupancy, workspaceAccess } = await proxyEventStore.listSelfCredentialHealth(req.proxyUrlKey, req.proxyTokenId, { windowMs: requestedWindowMs });
       logEvent(req, '/api/proxy/credential-health', 200);
-      res.json(result);
+      res.json({ ...occupancy, workspaceAccess });
     } catch (err) {
       logEvent(req, '/api/proxy/credential-health', 500);
       console.error('Proxy consumer credential-health error:', err.message);

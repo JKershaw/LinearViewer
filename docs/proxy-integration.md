@@ -279,7 +279,14 @@ Response:
   "totalCalls": 6,
   "failedCalls": 0,
   "windowMs": 900000,
-  "bucketMs": 30000
+  "bucketMs": 30000,
+  "workspaceAccess": {
+    "verdict": "unknown",
+    "dominantReason": null,
+    "reasons": {},
+    "totalFailures": 0,
+    "windowMs": 900000
+  }
 }
 ```
 
@@ -291,9 +298,20 @@ Response:
   provider-lane traffic) which saw a 401 — the primary detector. `callRatio`
   (failed calls / total calls) is supplementary only: a caller's own retries can
   inflate it independent of how long the fault actually lasted.
-- `windowMs` accepts a caller override but is always clamped to at least 60
-  seconds — a shorter window can land entirely inside one phase of a periodic
-  fault and read falsely clean.
+- **`workspaceAccess`** (LIN-1746) answers a DIFFERENT question: not "is my
+  resolved credential being rejected," but "can I resolve a workspace credential
+  at all." This covers `session_expired` / `owner_signed_out` / `owner_mismatch` /
+  `not_connected` — failures that happen *before* any provider-lane credential
+  resolves, so they never show up in the top-level fields above. `verdict` stays
+  `"unknown"` after a single failure (genuinely ambiguous between transient and
+  permanently dead) and only becomes `"likely_dead"` once the SAME reason has
+  repeated at least twice in the window, at which point `dominantReason` names it
+  (e.g. `"owner_mismatch"`) and `reasons` gives the full per-reason tally. If your
+  token sees this, stop guessing "the workspace is disconnected" — ask for
+  re-dispatch instead.
+- `windowMs` accepts a caller override (applies to both halves) but is always
+  clamped to at least 60 seconds — a shorter window can land entirely inside one
+  phase of a periodic fault and read falsely clean.
 
 #### List Teams
 
