@@ -13,8 +13,82 @@ import { renderErrorPage } from '../lib/render.js'
 import { upsertWorkspace, saveSession, linkProvider, getActiveWorkspace, validateWorkspaceUrlKey, persistOwnerCredential } from '../lib/workspace.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-preferences.js'
-import { establishAccount } from '../lib/account-session.js'
+import { establishAccount, isFreshlyAuthenticated, MERGE_CONFIRM_FRESH_AUTH_WINDOW_MS } from '../lib/account-session.js'
 import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
+import { renderMergeConfirmPage, renderMergeReauthRequiredPage } from '../lib/render-pages.js'
+
+/**
+ * Respond to an `establishAccount` conflict — the seam both the `mode:'new'`
+ * and `mode:'add-source'` callback branches converge on (LIN-2233, L2.2 +
+ * LIN-2231 amendment A1).
+ *
+ * `established.conflict` present means the arriving identity already belongs
+ * to a DIFFERENT, pre-existing account: a real merge candidate. Anything else
+ * (e.g. `established.reason === 'unknown-account'` — a stale/unrecognised
+ * `session.accountId`) is not mergeable and stays the pre-existing dead-end
+ * "Account Conflict" page, unchanged.
+ *
+ * For a real merge candidate, amendment A1 requires BOTH sides freshly
+ * authenticated before a merge can be offered as a one-click confirm — a live
+ * session for the canonical side plus a fresh auth for the arriving side is
+ * NOT enough (a stolen/left-open canonical session + the sitting party's own
+ * real login would otherwise yield a merge the session owner never proved).
+ * `isFreshlyAuthenticated` checks the canonical side's own last proven
+ * identity link in THIS session; the arriving side is fresh by construction
+ * (its OAuth exchange just completed, this request). When the canonical side
+ * isn't fresh, the merge is refused outright (re-auth-required page, no
+ * pending state stored) rather than offered — retry after fresh sign-in.
+ *
+ * Never writes anything to the account/workspace stores itself — only
+ * `POST /auth/merge/confirm` does that, after a second freshness check at
+ * confirm time (see below). Declining (not confirming, or navigating away)
+ * therefore leaves both accounts byte-identical to today.
+ *
+ * @param {Object} params
+ * @param {Object} params.req
+ * @param {Object} params.res
+ * @param {{ok: false, conflict?: {accountId: string}, reason?: string}} params.established
+ * @param {Object} params.workspace - the arriving identity's workspace (already populated by linkProvider)
+ * @param {string} [params.refreshToken] - the arriving identity's OAuth refresh token, if any
+ * @param {'new'|'add-source'} params.mode
+ * @param {string} params.returnUrlKey - urlKey to land on if the merge is later confirmed
+ * @returns {Promise<void>}
+ */
+async function respondToAccountConflict({ req, res, established, workspace, refreshToken, mode, returnUrlKey }) {
+  if (!established.conflict) {
+    const html = renderErrorPage('Account Conflict', 'This Linear account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
+      action: 'Go to homepage',
+      actionUrl: '/'
+    })
+    return res.status(409).send(html)
+  }
+
+  const canonicalAccountId = req.session.accountId
+  const mergedAccountId = established.conflict.accountId
+
+  if (!isFreshlyAuthenticated(req.session, MERGE_CONFIRM_FRESH_AUTH_WINDOW_MS)) {
+    delete req.session.oauthState
+    delete req.session.oauthIntent
+    const html = renderMergeReauthRequiredPage()
+    return res.status(409).send(html)
+  }
+
+  req.session.pendingMerge = {
+    canonicalAccountId,
+    mergedAccountId,
+    workspace,
+    refreshToken: refreshToken || null,
+    mode,
+    returnUrlKey,
+    createdAt: Date.now()
+  }
+  delete req.session.oauthState
+  delete req.session.oauthIntent
+  await saveSession(req.session)
+
+  const html = renderMergeConfirmPage()
+  return res.status(409).send(html)
+}
 
 /**
  * Create auth routes with required dependencies.
@@ -28,9 +102,10 @@ import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
  * @param {(key: string) => void} [options.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`). Called at /logout for every workspace the session referenced, before the session is destroyed.
  * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [options.ownerCredentialStore] - LIN-1523: durable owner-credential store. Linear-only; other providers' auth routers receive this option too (shared mount loop) but ignore it.
+ * @param {import('../lib/account-merge-log.js').AccountMergeLogStore} [options.accountMergeLogStore] - LIN-2233: durable log for confirmed account merges. Optional so tests/callers that don't need the audit trail can omit it.
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore }) {
+export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore }) {
   const router = Router()
 
   const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
@@ -256,25 +331,24 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
         // binding it to the new workspace. The seam is reused INLINE, UNMODIFIED.
         const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', String(viewer.id), {}, workspace.id)
         if (!established.ok) {
-          // Strict conflict (LIN-1326, no auto-merge): the 2nd org's identity is
-          // already owned by a DIFFERENT account. 409 with NOTHING written —
-          // establishAccount returns before bindAccountToWorkspace, so no binding,
-          // no account mutation, session.accountId unchanged, and NO session save on
-          // this path. This 409 IS reachable (accountId is live) — the point of the
-          // branch, unlike the login path's deliberately-unreachable 409 below.
+          // Strict conflict (LIN-1326, no auto-merge — unless confirmed, LIN-2233):
+          // the 2nd org's identity is already owned by a DIFFERENT account. Nothing
+          // written yet — establishAccount returns before bindAccountToWorkspace, so
+          // no binding, no account mutation, session.accountId unchanged, and NO
+          // session save on the refuse-outright branches. This conflict IS reachable
+          // (accountId is live) — the point of the branch, unlike the login path's
+          // deliberately-unreachable dead-end conflict below.
           //
           // LIN-1351 review fix: RESTORE session.workspaces so org-2 (whose live
-          // connection was just refused) does not linger and authorize
-          // /workspace/:urlKey/* access via workspaceFromUrl, and clear the OAuth
-          // state/intent so nothing leaks across this failed round-trip.
+          // connection was just refused/pending) does not linger and authorize
+          // /workspace/:urlKey/* access via workspaceFromUrl until a merge actually
+          // confirms it (see respondToAccountConflict, which re-adds it on confirm).
           req.session.workspaces = workspacesBeforeAddSource
-          delete req.session.oauthState
-          delete req.session.oauthIntent
-          const html = renderErrorPage('Account Conflict', 'This Linear account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
-            action: 'Go to homepage',
-            actionUrl: '/'
-          })
-          return res.status(409).send(html)
+          const returnUrlKey =
+            intent.workspaceUrlKey ||
+            (getActiveWorkspace(req.session) || {}).urlKey ||
+            workspace.urlKey
+          return respondToAccountConflict({ req, res, established, workspace, refreshToken: data.refresh_token, mode: 'add-source', returnUrlKey })
         }
 
         // LIN-1523: durable dual-write, AFTER the limit-check + establishAccount
@@ -300,9 +374,20 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
         return res.redirect(`/workspace/${encodeURIComponent(returnUrlKey)}/settings?provider_ok=linear`)
       }
 
-      // === Normal Linear login (mode:'new') — BYTE-IDENTICAL to the pre-LIN-1351 path ===
+      // === Normal Linear login (mode:'new') ===
       // Preserve existing workspaces before regenerating session
       const existingWorkspaces = req.session.workspaces || []
+      // LIN-2233 (L2.1): carry session.accountId and its freshness stamp across
+      // regenerate() exactly as session.workspaces already is — the manifest
+      // simply omitted accountId until now. Without this, a NEW identity scope
+      // (a second Linear org, a second provider) arriving while a different
+      // account was live in the pre-regenerate session always took the mint
+      // branch instead of the link/conflict branch, because session.accountId
+      // was gone by the time establishAccount ran below. regenerate() itself is
+      // STILL awaited and still runs (session-fixation protection unchanged) —
+      // only the field manifest carried across it changes.
+      const existingAccountId = req.session.accountId
+      const existingIdentityAuthenticatedAt = req.session.identityAuthenticatedAt
 
       // Regenerate session ID to prevent session fixation attacks. Awaited
       // (LIN-1329): the callback now does real async I/O (establishAccount,
@@ -323,13 +408,18 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
 
             // Restore preserved workspaces
             req.session.workspaces = existingWorkspaces
+            // LIN-2233 (L2.1): restore the carried accountId/freshness stamp
+            // BEFORE establishAccount runs, so a returning identity (or a brand-
+            // new one arriving while this account is live) resolves against the
+            // account that was actually live pre-regenerate, not against nothing.
+            req.session.accountId = existingAccountId
+            req.session.identityAuthenticatedAt = existingIdentityAuthenticatedAt
 
             // LIN-1329 (Phase C): establish the durable account for this identity —
             // the single seam every sign-in path converges on. Identity scope is
-            // Linear's viewer.id (the human), never the org — regenerate() just
-            // wiped any prior session.accountId, so a returning user's existing
-            // account is found by identity lookup, not session continuity.
+            // Linear's viewer.id (the human).
             // Add/update workspace in session
+            const workspacesBeforeLogin = req.session.workspaces ? [...req.session.workspaces] : []
             try {
               upsertWorkspace(req.session, workspace)
             } catch (limitError) {
@@ -342,11 +432,12 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
 
             const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', String(viewer.id), {}, workspace.id)
             if (!established.ok) {
-              const html = renderErrorPage('Account Conflict', 'This Linear account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
-                action: 'Go to homepage',
-                actionUrl: '/'
-              })
-              return res.status(409).send(html)
+              // LIN-2233 (L2.2): don't leak the arriving (unconfirmed) workspace's
+              // live token into session.workspaces — restore it, same discipline
+              // as the add-source branch above. respondToAccountConflict re-adds
+              // it only if/when the merge is actually confirmed.
+              req.session.workspaces = workspacesBeforeLogin
+              return await respondToAccountConflict({ req, res, established, workspace, refreshToken: data.refresh_token, mode: 'new', returnUrlKey: workspace.urlKey })
             }
 
             // LIN-1523: durable dual-write, AFTER the limit-check + establishAccount
@@ -400,6 +491,102 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
       })
       res.status(500).send(html)
     }
+  })
+
+  /**
+   * Decline a pending account merge (LIN-2233, L2.2). Byte-identical to today's
+   * behavior: clears the pending offer, writes nothing to either account.
+   */
+  router.post('/auth/merge/decline', (req, res) => {
+    delete req.session.pendingMerge
+    req.session.save(() => {
+      res.redirect('/')
+    })
+  })
+
+  /**
+   * Confirm a pending account merge (LIN-2233, L2.2 + LIN-2231 amendment A1).
+   *
+   * Re-checks freshness at confirm time, not just at offer time — the offer
+   * page can sit open; the proof standard ("two identities each freshly
+   * authenticated in one session") must hold when the merge actually writes,
+   * not merely when it was proposed. Also re-checks that the confirming
+   * session is still the SAME canonical account the pending merge was built
+   * for, so a session swap mid-flow can't redirect a stale pending merge onto
+   * a different account.
+   *
+   * On success: writes the merge (`mergeAccounts`), then completes the
+   * identity link exactly as the non-conflict path would have — binds the
+   * arriving workspace onto the canonical account and persists its owner
+   * credential there. The arriving identity itself is NOT attached to
+   * canonical's `identities[]` (`mergeAccounts` never touches `identities[]`
+   * — it stays recorded on the merged account and resolves through
+   * `mergedInto`, Ticket B's L3 chokepoint).
+   */
+  router.post('/auth/merge/confirm', async (req, res) => {
+    const pending = req.session.pendingMerge
+    if (!pending) {
+      const html = renderErrorPage('Merge Expired', 'This merge confirmation has expired or was never started. Please try connecting the account again.', {
+        action: 'Go to homepage',
+        actionUrl: '/'
+      })
+      return res.status(400).send(html)
+    }
+
+    const stillFresh = isFreshlyAuthenticated(req.session, MERGE_CONFIRM_FRESH_AUTH_WINDOW_MS) &&
+      (Date.now() - pending.createdAt) <= MERGE_CONFIRM_FRESH_AUTH_WINDOW_MS
+    const sameSession = req.session.accountId === pending.canonicalAccountId
+
+    if (!stillFresh || !sameSession) {
+      delete req.session.pendingMerge
+      const html = renderErrorPage('Merge Expired', 'This merge confirmation is no longer fresh. Please sign in again and retry connecting the account.', {
+        action: 'Go to homepage',
+        actionUrl: '/'
+      })
+      return res.status(400).send(html)
+    }
+
+    const merged = await accountStore.mergeAccounts(pending.canonicalAccountId, pending.mergedAccountId, { accountWorkspaceStore, mergeLogStore: accountMergeLogStore })
+    if (!merged.ok) {
+      delete req.session.pendingMerge
+      const html = renderErrorPage('Merge Failed', 'Could not complete the merge. Please try again.', {
+        action: 'Go to homepage',
+        actionUrl: '/'
+      })
+      return res.status(500).send(html)
+    }
+
+    const canonicalAccountId = pending.canonicalAccountId
+    try {
+      upsertWorkspace(req.session, pending.workspace)
+    } catch (limitError) {
+      delete req.session.pendingMerge
+      const html = renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
+        action: 'Go to dashboard',
+        actionUrl: '/'
+      })
+      return res.status(400).send(html)
+    }
+    await accountWorkspaceStore.bindAccountToWorkspace(canonicalAccountId, pending.workspace.id)
+    await persistOwnerCredential(canonicalAccountId, pending.workspace, ownerCredentialStore, pending.refreshToken)
+
+    // LIN-2231 amendment A2: canonicalize the CONFIRMING session explicitly,
+    // even though it should already hold canonicalAccountId (canonical is, by
+    // definition, the account already live in this session when the offer was
+    // made). Cheap insurance, stated explicitly per the amendment. Other
+    // still-live sessions of the MERGED account are a documented, accepted
+    // tail — they keep resolving under the old id until they naturally expire
+    // (≤24h); Ticket B's canonicalization chokepoint (resolveWorkspaceAccess)
+    // is what actually closes that gap, not this route.
+    req.session.accountId = canonicalAccountId
+
+    delete req.session.pendingMerge
+    await saveSession(req.session)
+
+    if (pending.mode === 'add-source') {
+      return res.redirect(`/workspace/${encodeURIComponent(pending.returnUrlKey)}/settings?provider_ok=linear`)
+    }
+    return res.redirect(`/workspace/${encodeURIComponent(pending.workspace.urlKey)}/`)
   })
 
   /**
