@@ -72,7 +72,7 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 // LIN-2154: the session-auth (human-lane) comment write shares the agent-lane's
 // dedupe cache instances (routes/proxy.js) rather than a fresh pair that would
 // miss workspace-wide generation bumps, and its key-building primitive.
-import { dedupeKey } from '../lib/proxy-dedupe.js';
+import { dedupeKey, createDedupeCache } from '../lib/proxy-dedupe.js';
 import { commentDedupe, commentDedupeGenerations } from './proxy.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { isTerminalState, isBlocked } from '../lib/tree.js';
@@ -245,6 +245,66 @@ export function buildMockRecommendationHop(ctx) {
     recommendedAction: 'recommend',
     deferTo: null,
   };
+}
+
+// LIN-2208: whether the decision-answer stamp(s) for a given comment-dedupe
+// `key` have already succeeded — separate from `commentDedupe` itself (which
+// caches the WRITTEN COMMENT and is spread verbatim into the JSON response;
+// piggybacking stamp bookkeeping onto that value would leak new fields into
+// the wire contract). Same TTL discipline as `commentDedupe`: an entry ages
+// out with the comment dedupe window it tracks, so a stamp that never
+// succeeds within 5 minutes simply falls out of both caches together, at
+// which point a resubmission mints a fresh (unrelated) comment+stamp attempt
+// rather than being treated as a retry forever.
+const decisionStampDedupe = createDedupeCache();
+
+/**
+ * Best-effort decision-answer stamp(s) for a human comment write (LIN-1728
+ * decision 1 / LIN-2197 Phase 5) — the loop-backed and task-bound sibling
+ * stamps, factored out so the dedupe-hit retry path (LIN-2208) and the
+ * fresh-write path share identical stamping logic; they must never drift.
+ * Both stamp attempts are independently best-effort (a lone id pair is a
+ * malformed/partial client payload, never a half-stamp attempt) and never
+ * throw — failure is logged only, mirroring the pre-LIN-2208 inline code.
+ *
+ * @returns {Promise<boolean>} true iff every REQUESTED stamp (only the pairs
+ *   actually present in `decision`) succeeded — the signal LIN-2208's dedupe
+ *   bypass uses to decide whether a later identical-text retry still needs to
+ *   try again.
+ */
+async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, taskDecisionsStore }) {
+  const { decisionLoopId, decisionId, taskDecisionId, taskDecisionIssueId } = decision || {};
+  let ok = true;
+
+  if (typeof decisionLoopId === 'string' && decisionLoopId && typeof decisionId === 'string' && decisionId) {
+    try {
+      const stamped = await dispatchQueueStore.markDecisionAnswered(decisionLoopId, workspace.urlKey, decisionId);
+      if (!stamped) {
+        console.error(`Decision-answer stamp not applied: no matching item ${decisionLoopId} in workspace ${workspace.urlKey}`);
+        ok = false;
+      }
+    } catch (stampErr) {
+      console.error('Decision-answer stamp failed:', stampErr.message);
+      ok = false;
+    }
+  }
+
+  if (taskDecisionsStore && typeof taskDecisionId === 'string' && taskDecisionId && typeof taskDecisionIssueId === 'string' && taskDecisionIssueId) {
+    try {
+      const stamped = await taskDecisionsStore.markOutcome({
+        urlKey: workspace.urlKey, issueId: taskDecisionIssueId, id: taskDecisionId, outcome: 'answered'
+      });
+      if (!stamped) {
+        console.error(`Task-decision answer stamp not applied: no matching row ${taskDecisionId} for issue ${taskDecisionIssueId} in workspace ${workspace.urlKey}`);
+        ok = false;
+      }
+    } catch (stampErr) {
+      console.error('Task-decision answer stamp failed:', stampErr.message);
+      ok = false;
+    }
+  }
+
+  return ok;
 }
 
 /**
@@ -1527,6 +1587,20 @@ ${goal}`
       const key = dedupeKey(workspace.urlKey, issueId, body, commentDedupeGenerations.current(workspace.urlKey), 'human-comment')
       const prior = commentDedupe.get(key)
       if (prior) {
+        // LIN-2208: the dedupe cache protects the COMMENT WRITE (never mint a
+        // second comment for an identical resubmission) — it must not also
+        // protect a FAILED decision-answer stamp from ever being retried.
+        // Pressing Save again with the exact same text is the one natural way
+        // an operator retries a failed stamp (the reply text has no reason to
+        // differ), so as long as this key's stamp hasn't already succeeded,
+        // still attempt it before returning the deduped comment response.
+        // `decisionStampDedupe` is what stops that from becoming a THIRD
+        // stamp attempt once one has already landed (the pre-existing "a
+        // deduped resubmission does not re-stamp" success-path coverage).
+        if (!decisionStampDedupe.get(key)) {
+          const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore })
+          if (stampOk) decisionStampDedupe.set(key, true)
+        }
         return res.status(200).json({ ...prior, deduped: true })
       }
 
@@ -1548,41 +1622,15 @@ ${goal}`
 
       commentDedupe.set(key, commentCreate)
 
-      // Best-effort answer stamp (LIN-1728 decision 1). Both fields required
-      // together — a lone id is a malformed/partial client payload, not a
-      // half-stamp attempt. Failure is logged only: the comment already
+      // Best-effort answer stamp(s) (LIN-1728 decision 1 / LIN-2197 Phase 5;
+      // factored into stampDecisionAnswers, shared with the dedupe-hit retry
+      // path above — LIN-2208). Failure is logged only: the comment already
       // succeeded and is the durable half of this write; the stamp is a
       // secondary annotation the rulings predicate tolerates missing (the
-      // loop just stays "unanswered" until a later attempt succeeds).
-      const { decisionLoopId, decisionId, taskDecisionId, taskDecisionIssueId } = req.body || {}
-      if (typeof decisionLoopId === 'string' && decisionLoopId && typeof decisionId === 'string' && decisionId) {
-        try {
-          const stamped = await dispatchQueueStore.markDecisionAnswered(decisionLoopId, workspace.urlKey, decisionId)
-          if (!stamped) {
-            console.error(`Decision-answer stamp not applied: no matching item ${decisionLoopId} in workspace ${workspace.urlKey}`)
-          }
-        } catch (stampErr) {
-          console.error('Decision-answer stamp failed:', stampErr.message)
-        }
-      }
-
-      // Best-effort answer stamp for a scan-produced decision (LIN-2197
-      // Phase 5, close-out ledger item L4) — the task-keyed sibling of the
-      // loop-decision stamp above, same discipline: both fields required
-      // together, failure logged only, never blocks the already-succeeded
-      // comment response.
-      if (taskDecisionsStore && typeof taskDecisionId === 'string' && taskDecisionId && typeof taskDecisionIssueId === 'string' && taskDecisionIssueId) {
-        try {
-          const stamped = await taskDecisionsStore.markOutcome({
-            urlKey: workspace.urlKey, issueId: taskDecisionIssueId, id: taskDecisionId, outcome: 'answered'
-          })
-          if (!stamped) {
-            console.error(`Task-decision answer stamp not applied: no matching row ${taskDecisionId} for issue ${taskDecisionIssueId} in workspace ${workspace.urlKey}`)
-          }
-        } catch (stampErr) {
-          console.error('Task-decision answer stamp failed:', stampErr.message)
-        }
-      }
+      // loop just stays "unanswered" until a later attempt succeeds — LIN-2208
+      // above is what makes an identical-text retry one such later attempt).
+      const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore })
+      if (stampOk) decisionStampDedupe.set(key, true)
 
       return res.status(201).json(commentCreate)
     } catch (err) {

@@ -340,6 +340,46 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — decision-answer stam
     assert.strictEqual(second.body.deduped, true);
     assert.strictEqual(calls.markDecisionAnswered.length, 1, 'no second stamp on a deduped resubmission');
   });
+
+  // LIN-2208: reproduces the failure-then-immediate-identical-retry sequence
+  // from close-out on PR #1170 — a failed stamp followed by the one natural
+  // retry (Save again, IDENTICAL text) must actually re-stamp, not be
+  // swallowed by the comment-dedupe short-circuit. This is the failure path;
+  // the test above it is the success path and must stay proof of THAT case
+  // only (per the ticket's own constraint), not be repurposed here.
+  test('LIN-2208: a failed stamp is retried on an identical-text dedupe resubmission, and a further identical retry does not double-stamp once it succeeds', async () => {
+    const { provider } = makeFakeProvider();
+    let attempt = 0;
+    const { store, calls } = makeFakeDispatchQueueStore({
+      markDecisionAnswered: () => {
+        attempt += 1;
+        return attempt === 1 ? null : { success: true, feedbackCount: 1 };
+      },
+    });
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    const payload = { body: 'the same text — decision stamp retry', decisionLoopId: 'loop-1', decisionId: 'd-1' };
+    const first = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(calls.markDecisionAnswered.length, 1, 'first attempt fails (no matching item yet)');
+
+    // Pre-LIN-2208: the dedupe short-circuit returned {deduped:true} before
+    // ever reaching the stamp block, so a failed stamp could never self-heal
+    // within the 5-minute TTL via the one obvious retry. The comment write
+    // itself must STILL be deduped (no second comment) — only the stamp
+    // attempt bypasses the short-circuit.
+    const second = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.deduped, true, 'the comment write is still deduped — no second comment');
+    assert.strictEqual(calls.markDecisionAnswered.length, 2, 'the retry reached the stamp block and re-attempted');
+
+    // A third identical retry must NOT stamp a third time now that one has
+    // already succeeded — the pre-existing success-path guarantee, unaffected
+    // by this fix.
+    const third = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(third.status, 200);
+    assert.strictEqual(calls.markDecisionAnswered.length, 2, 'no further stamp once one has already succeeded');
+  });
 });
 
 describe('POST /workspace/:urlKey/api/comments/:issueId — task-decision answer stamp (LIN-2197 Phase 5, L4)', () => {
@@ -450,5 +490,36 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — task-decision answer
     assert.strictEqual(second.status, 200);
     assert.strictEqual(second.body.deduped, true);
     assert.strictEqual(calls.markOutcome.length, 1, 'no second stamp on a deduped resubmission');
+  });
+
+  // LIN-2208, task-decision sibling of the loop-decision case above.
+  test('LIN-2208: a failed stamp is retried on an identical-text dedupe resubmission, and a further identical retry does not double-stamp once it succeeds', async () => {
+    const { provider } = makeFakeProvider();
+    let attempt = 0;
+    const { store, calls } = makeFakeTaskDecisionsStore({
+      markOutcome: ({ id, urlKey, issueId, outcome }) => {
+        attempt += 1;
+        return attempt === 1 ? null : { id, urlKey, issueId, outcome, outcomeAt: new Date().toISOString() };
+      },
+    });
+    const app = buildApp({ provider, taskDecisionsStore: store });
+
+    const payload = {
+      body: 'the same text — task-decision stamp retry',
+      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
+      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+    };
+    const first = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(calls.markOutcome.length, 1, 'first attempt fails (no matching row yet)');
+
+    const second = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.deduped, true, 'the comment write is still deduped — no second comment');
+    assert.strictEqual(calls.markOutcome.length, 2, 'the retry reached the stamp block and re-attempted');
+
+    const third = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(third.status, 200);
+    assert.strictEqual(calls.markOutcome.length, 2, 'no further stamp once one has already succeeded');
   });
 });
