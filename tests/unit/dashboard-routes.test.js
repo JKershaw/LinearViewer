@@ -881,6 +881,65 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(run.resources, null, 'run resources is null, not undefined');
   });
 
+  // ─── ticketWalk reaches the runs[] projection (LIN-2243) ─────────────────────
+  // Same shape as the resources widening above: per-run telemetry is built from
+  // raw feedback BEFORE the lean drop, so a worker-lane's [ticket] markers
+  // survive to the feed on the run; the session-level field is inert on the
+  // lean feed for the identical pre-existing reason resources/model are.
+  test('a worker carrying [ticket] markers projects a ticketWalk on its run; session-level stays inert on the lean feed', async () => {
+    const laneWorker = {
+      id: 'w-lane', sessionId: 'sess-lane', issueIdentifier: 'LIN-2242', issueTitle: 'Lane worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [
+        { message: '[ticket] LIN-2242 started', timestamp: NOW_ISO },
+        { message: '[ticket] LIN-2242 done — merged PR #1212', timestamp: NOW_ISO },
+        { message: '[ticket] LIN-2243 started', timestamp: NOW_ISO },
+        { message: '[working] 6 tools/32s · alive', timestamp: NOW_ISO }
+      ]
+    };
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-lane', 'LIN-2240'), laneWorker],
+        agentStatus: [agentStatusDone('sess-lane', 'LIN-2240'), agentStatusDone('w-lane', 'LIN-2242')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const sess = findSession(res.jsonBody, 'sess-lane');
+    assert.ok(sess, 'session is present');
+
+    const run = sess.runs.find(r => r.loopId === 'w-lane');
+    assert.ok(run, 'lane worker run is present');
+    assert.deepEqual(run.ticketWalk.map(w => [w.identifier, w.state]), [['LIN-2242', 'done'], ['LIN-2243', 'started']]);
+
+    assert.equal(sess.ticketWalk, null, 'session-level ticketWalk is inert on the lean feed, same as resources/model');
+  });
+
+  test('a worker with no [ticket] markers projects ticketWalk as null, not undefined', async () => {
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-notick', 'LIN-840'), workerHistoryItem('w-notick', 'LIN-841', 'sess-notick')],
+        agentStatus: [agentStatusDone('sess-notick', 'LIN-840'), agentStatusDone('w-notick', 'LIN-841')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const sess = findSession(res.jsonBody, 'sess-notick');
+    const run = sess.runs.find(r => r.loopId === 'w-notick');
+    assert.ok(run, 'worker run is present');
+    assert.equal(run.ticketWalk, null, 'run ticketWalk is null, not undefined');
+  });
+
   test('a live session carries a deterministic statusLine from its latest child (no per-poll summary fetch needed)', async () => {
     // A running worker decorated with an agent-status summary, under a live
     // (queued) autopilot anchor — i.e. a non-terminal session. The feed must

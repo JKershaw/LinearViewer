@@ -377,6 +377,15 @@
   text-decoration: none;
 }
 .lc-lane-task:hover { color: var(--brand-dim); text-decoration: underline; }
+/* LIN-2243: a worker-lane's touched-ticket count. Empty (no width) for a
+   non-lane loop — never a fixed slot that leaves a visible gap. */
+.lc-lane-tickets {
+  font-family: var(--font-structural);
+  font-size: 0.7rem;
+  color: var(--slate-dim);
+  white-space: nowrap;
+}
+.lc-lane-tickets:empty { display: none; }
 .lc-lane-action {
   font-family: var(--font-structural);
   font-size: 0.72rem;

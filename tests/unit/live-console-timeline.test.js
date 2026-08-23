@@ -129,6 +129,19 @@ test('M5: a run whose dispatch predates the window is clipped to the left edge, 
   assert.equal(runs[0].start, NOW - 24 * HOUR);
 });
 
+test('LIN-2243: a run carries its ticketWalk from telemetry; a non-lane run carries null', () => {
+  const laneRun = loop({
+    loopId: 'lane-1',
+    dispatchedAt: new Date(NOW - HOUR).toISOString(),
+    telemetry: { ticketWalk: [{ identifier: 'LIN-1', state: 'done', outcomeLine: null, timestamp: null }] },
+  });
+  const { runs } = buildTimeline([laneRun, loop({ loopId: 'plain-1' })], { now: NOW });
+  const lane = runs.find(r => r.id === 'lane-1');
+  const plain = runs.find(r => r.id === 'plain-1');
+  assert.deepEqual(lane.ticketWalk, [{ identifier: 'LIN-1', state: 'done', outcomeLine: null, timestamp: null }]);
+  assert.equal(plain.ticketWalk, null);
+});
+
 test('a run dispatched within the window is not clipped', () => {
   const r = loop({ dispatchedAt: new Date(NOW - HOUR).toISOString() });
   const { runs } = buildTimeline([r], { now: NOW });

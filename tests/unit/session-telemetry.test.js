@@ -20,6 +20,7 @@ import {
   parseResources,
   parseDecision,
   parseDecisions,
+  parseTicketMarkers,
   deriveRuntime,
   buildRunTelemetry,
   buildSessionTelemetry,
@@ -169,6 +170,52 @@ describe('parseEvidenceArtifacts', () => {
 
   test('non-array input returns []', () => {
     assert.deepEqual(parseEvidenceArtifacts(undefined), []);
+  });
+});
+
+describe('parseTicketMarkers (LIN-2242/LIN-2243)', () => {
+  test('parses an ordered per-ticket walk from mixed [ticket] markers', () => {
+    const feedback = [
+      { message: '[ticket] LIN-2242 started', timestamp: 't1' },
+      { message: '[ticket] LIN-2242 done — merged PR #1212', timestamp: 't2' },
+      { message: '[ticket] LIN-2243 started', timestamp: 't3' },
+      { message: '[ticket] LIN-2244 blocked — needs Linux host + tmux', timestamp: 't4' },
+    ];
+    const walk = parseTicketMarkers(feedback);
+    assert.deepEqual(walk, [
+      { identifier: 'LIN-2242', state: 'done', outcomeLine: 'merged PR #1212', timestamp: 't2' },
+      { identifier: 'LIN-2243', state: 'started', outcomeLine: null, timestamp: 't3' },
+      { identifier: 'LIN-2244', state: 'blocked', outcomeLine: 'needs Linux host + tmux', timestamp: 't4' },
+    ]);
+  });
+
+  test('a later marker for the same ticket overwrites state in place — first-seen order preserved', () => {
+    const feedback = [
+      { message: '[ticket] LIN-1 started' },
+      { message: '[ticket] LIN-2 started' },
+      { message: '[ticket] LIN-1 refused — acceptance only partly met' },
+    ];
+    const walk = parseTicketMarkers(feedback);
+    assert.deepEqual(walk.map((w) => w.identifier), ['LIN-1', 'LIN-2']);
+    assert.equal(walk[0].state, 'refused');
+  });
+
+  test('is case-insensitive on the state token and tolerates a hyphen instead of an em dash', () => {
+    const walk = parseTicketMarkers([{ message: '[ticket] LIN-9 DONE - shipped' }]);
+    assert.deepEqual(walk, [{ identifier: 'LIN-9', state: 'done', outcomeLine: 'shipped', timestamp: null }]);
+  });
+
+  test('ignores non-[ticket] entries and malformed markers', () => {
+    const feedback = [
+      { message: '[working] 6 tools/32s · alive' },
+      { message: '[ticket] not-an-identifier done' },
+      { message: '[ticket] LIN-1 not-a-real-state' },
+    ];
+    assert.deepEqual(parseTicketMarkers(feedback), []);
+  });
+
+  test('non-array input returns []', () => {
+    assert.deepEqual(parseTicketMarkers(undefined), []);
   });
 });
 
@@ -977,6 +1024,24 @@ describe('buildRunTelemetry', () => {
     });
     assert.ok(!('usage' in withoutUsage));
   });
+
+  test('LIN-2243: ticketWalk included, omitted (not null), when [ticket] markers are/aren\'t present', () => {
+    const lane = buildRunTelemetry({
+      dispatchedAt: '2026-06-22T10:00:00.000Z',
+      feedback: [
+        { message: '[ticket] LIN-1 started' },
+        { message: '[ticket] LIN-1 done — landed' },
+        { message: '[ticket] LIN-2 blocked — needs a human decision' },
+      ],
+    });
+    assert.deepEqual(lane.ticketWalk.map((w) => [w.identifier, w.state]), [['LIN-1', 'done'], ['LIN-2', 'blocked']]);
+
+    const nonLane = buildRunTelemetry({
+      dispatchedAt: '2026-06-22T10:00:00.000Z',
+      feedback: [{ message: '[done] Task completed' }],
+    });
+    assert.ok(!('ticketWalk' in nonLane));
+  });
 });
 
 describe('buildSessionTelemetry', () => {
@@ -1005,5 +1070,22 @@ describe('buildSessionTelemetry', () => {
     assert.equal(t.runtime.ms, null);
     assert.deepEqual(t.metrics, []);
     assert.deepEqual(t.producedArtifacts, []);
+  });
+
+  test('LIN-2243: ticketWalk aggregates [ticket] markers across a lane\'s single loop', () => {
+    const session = {
+      dispatchedAt: '2026-06-22T10:00:00.000Z',
+      loops: [{
+        feedback: [
+          { message: '[ticket] LIN-1 started' },
+          { message: '[ticket] LIN-1 done — landed' },
+          { message: '[ticket] LIN-2 started' },
+        ],
+      }],
+    };
+    const t = buildSessionTelemetry(session);
+    assert.equal(t.ticketWalk.length, 2);
+    assert.equal(t.ticketWalk[0].state, 'done');
+    assert.equal(t.ticketWalk[1].state, 'started');
   });
 });
