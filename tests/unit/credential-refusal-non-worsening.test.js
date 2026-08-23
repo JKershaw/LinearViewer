@@ -176,6 +176,7 @@ describe('LIN-1980 non-worsening acceptance witness', () => {
     const store = {
       async get() { return { provider: 'linear', token: 'dead-upstream-token', refreshToken: 'spent-refresh-token', tokenExpiresAt: Date.now() - 1000 }; },
       async putIfRefreshToken() { return false; },
+      async markPendingSpend() {},
     };
     const refreshAccessToken = async () => { throw new Error('TokenRefreshError: Missing LINEAR_CLIENT_ID or LINEAR_CLIENT_SECRET environment variables'); };
     const persistSession = makePersistSessionRow(collection);
@@ -213,6 +214,9 @@ describe('LIN-1980 non-worsening acceptance witness', () => {
         if (!durableRecord || durableRecord.refreshToken !== expected) return false;
         durableRecord = { ...durableRecord, ...next };
         return true;
+      },
+      async markPendingSpend(accountId, urlKey, provider, refreshToken, attemptedAt) {
+        if (durableRecord) durableRecord = { ...durableRecord, pendingSpend: { refreshToken, attemptedAt } };
       },
     };
     const refreshAccessToken = async (refreshToken) => {
@@ -333,6 +337,9 @@ describe('LIN-1980 non-worsening acceptance witness', () => {
         if (!durableRecord || durableRecord.refreshToken !== expected) return false;
         durableRecord = { ...durableRecord, ...next };
         return true;
+      },
+      async markPendingSpend(accountId, urlKey, provider, refreshToken, attemptedAt) {
+        if (durableRecord) durableRecord = { ...durableRecord, pendingSpend: { refreshToken, attemptedAt } };
       },
     };
     let rotation = 0;

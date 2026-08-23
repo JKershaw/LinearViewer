@@ -69,7 +69,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { selectExpiredOwnerRow, selectOwnerWorkspaceToken, selectOwnerWorkspaceRow } from '../../lib/workspace-token-resolver.js';
+import { selectExpiredOwnerRow, selectOwnerWorkspaceToken, selectOwnerWorkspaceRow, selectOwnerSessionRow, selectOwnerSessionRows } from '../../lib/workspace-token-resolver.js';
 import { refreshOwnerWorkspaceToken, refreshOwnerCredential, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
 import { REFRESH_STRATEGY, refreshStrategyFor } from '../../lib/refresh-strategy.js';
@@ -91,10 +91,26 @@ function sessionRow(sid, accountId, urlKey, { accessToken, expiresAt, refreshTok
 // more than once (e.g. single-flight cleanup).
 function fakeStore(seed = {}) {
   const calls = [];
+  const pendingSpendCalls = [];
   const records = new Map();
   for (const [key, credential] of Object.entries(seed)) records.set(key, credential);
   return {
     calls,
+    // LIN-2235 (L4.1): tracked SEPARATELY from `calls` — existing specs assert
+    // `calls.length` to mean "a durable rotation/put landed", and a
+    // spend-intent marker is neither.
+    pendingSpendCalls,
+    // LIN-2235 (L4.1): field-only marker write. `put`/`putIfRefreshToken`
+    // below replace the WHOLE stored object with `credential`/`next` (neither
+    // of which ever carries `pendingSpend`), so a real rotation already
+    // clears it as a side effect — mirroring the real store's explicit
+    // `pendingSpend: null` $set with no extra code needed here.
+    async markPendingSpend(accountId, urlKey, provider, refreshToken, attemptedAt) {
+      pendingSpendCalls.push({ accountId, urlKey, provider, refreshToken, attemptedAt });
+      const key = `${accountId}::${urlKey}::${provider || 'linear'}`;
+      const current = records.get(key);
+      if (current) records.set(key, { ...current, pendingSpend: { refreshToken, attemptedAt } });
+    },
     // LIN-1887 G4: the fake learns the provider PARTITION, because the real
     // store's `_id` is now `${accountId}::${urlKey}::${provider}` and the CAS
     // witness must land on the same document the read hit. A fake that kept the
@@ -864,6 +880,7 @@ describe('refreshOwnerCredential (LIN-1546, Block F — race-safe rotation)', ()
           : { provider: 'linear', scope: 'org-1', token: 'access-R1', refreshToken: 'R1', tokenExpiresAt: NOW + FAR_FUTURE_MS };
       },
       async putIfRefreshToken() { throw new Error('must not be called — the refresh itself failed with invalid_grant'); },
+      async markPendingSpend() {},
     };
     const refreshAccessToken = async (refreshToken) => {
       assert.equal(refreshToken, 'R0', 'the loser presents the now-spent R0');
@@ -897,6 +914,7 @@ describe('refreshOwnerCredential (LIN-1546, Block F — race-safe rotation)', ()
         this.casAttempts.push(expected);
         return false; // stored refreshToken is no longer R0 → CAS miss (fail safe)
       },
+      async markPendingSpend() {},
     };
     const refreshAccessToken = async () => ({ access_token: 'access-R_loser', refresh_token: 'R_loser', expires_in: 3600 });
 
@@ -918,6 +936,7 @@ describe('refreshOwnerCredential (LIN-1546, Block F — race-safe rotation)', ()
       },
       async putIfRefreshToken() { throw new Error('must not be called — the refresh failed'); },
       async delete() { throw new Error('the seam must never delete — deletes live in the human catches (LIN-1545)'); },
+      async markPendingSpend() {},
     };
     const refreshAccessToken = async () => { throw new TokenRefreshError('Refresh token expired or invalid', 'EXPIRED'); };
 
@@ -942,6 +961,7 @@ describe('refreshOwnerCredential (LIN-1546, Block F — race-safe rotation)', ()
           : null; // a concurrent disconnect deleted it (or a store blip) before our CAS
       },
       async putIfRefreshToken() { return false; },
+      async markPendingSpend() {},
     };
     const refreshAccessToken = async () => ({ access_token: 'access-R_loser', refresh_token: 'R_loser', expires_in: 3600 });
 
@@ -961,6 +981,7 @@ describe('refreshOwnerCredential (LIN-1546, Block F — race-safe rotation)', ()
     const store = {
       async get() { getCount++; return { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS }; },
       async putIfRefreshToken() { throw new Error('must not be called'); },
+      async markPendingSpend() {},
     };
     const refreshAccessToken = async () => { throw new TokenRefreshError('boom', 'NETWORK'); };
 
@@ -1139,6 +1160,7 @@ describe('refreshOwnerCredential (LIN-2097, Block H — freeze + non-live bounda
           : { provider: 'linear', scope: 'org-1', token: 'access-relogin', refreshToken: 'R_relogin', tokenExpiresAt: NOW + PAST_MS };
       },
       async putIfRefreshToken() { return false; }, // CAS miss — the record was replaced under us
+      async markPendingSpend() {},
     };
     const refreshAccessToken = async () => ({ access_token: 'access-R_loser', refresh_token: 'R_loser', expires_in: 3600 });
 
@@ -1254,5 +1276,242 @@ describe('resolveWorkspaceAccess refresh-on-resolve gate (LIN-2097, Block I — 
   test('I4: refreshOnResolveGate is constructed once at module scope via createRefreshOnResolveGate, mirroring rejectedCredentialRegistry\'s own single-shared-instance pattern', () => {
     assert.match(SERVER_SRC, /const refreshOnResolveGate = createRefreshOnResolveGate\(\)/);
     assert.match(SERVER_SRC, /import \{ createRefreshOnResolveGate \} from '\.\/lib\/refresh-on-resolve-gate\.js'/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block K (LIN-2235, L4.2) — mirror retirement on rotation: a successful
+// rotation mirrors accessToken/tokenExpiresAt into EVERY live session row for
+// the owner+workspace, not just the single latest-expiring one. K1/K2 drive
+// `refreshOwnerWorkspaceToken` (doRefresh's mirror step) end to end; K3-K6
+// drive the new pure selector `selectOwnerSessionRows` directly.
+// ---------------------------------------------------------------------------
+
+describe('refreshOwnerWorkspaceToken (LIN-2235, Block K — mirror into every live session row)', () => {
+  beforeEach(() => {
+    _resetInflightForTests();
+  });
+
+  test('K1: two of the owner\'s own session rows for the same workspace BOTH get the fresh accessToken/tokenExpiresAt mirrored, not just the latest-expiring one', async () => {
+    const sessions = [
+      sessionRow('sid-older', 'account-A', 'acme', { accessToken: 'stale-1', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
+      sessionRow('sid-newer', 'account-A', 'acme', { accessToken: 'stale-2', expiresAt: NOW + FURTHER_PAST_MS, refreshToken: undefined }),
+    ];
+    const persisted = [];
+    const refreshAccessToken = async () => ({ access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 });
+    const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
+
+    const result = await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
+
+    assert.equal(result.token, 'fresh-token');
+    assert.equal(persisted.length, 2, 'BOTH of the owner\'s session rows must be mirrored, not just one');
+    const bySid = Object.fromEntries(persisted.map(p => [p.sid, p.session.workspaces[0]]));
+    assert.equal(bySid['sid-older'].accessToken, 'fresh-token');
+    assert.equal(bySid['sid-newer'].accessToken, 'fresh-token');
+    assert.equal(bySid['sid-older'].tokenExpiresAt, result.expiresAt);
+    assert.equal(bySid['sid-newer'].tokenExpiresAt, result.expiresAt);
+    // Never the refreshToken — same rule as the single-row mirror.
+    assert.equal(bySid['sid-older'].refreshToken, undefined);
+    assert.equal(bySid['sid-newer'].refreshToken, undefined);
+  });
+
+  test('K2: a DIFFERENT account\'s session row for the same urlKey, and the SAME account\'s row for a DIFFERENT urlKey, are both left untouched', async () => {
+    const sessions = [
+      sessionRow('sid-owner', 'account-A', 'acme', { accessToken: 'stale-owner', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
+      sessionRow('sid-other-account', 'account-B', 'acme', { accessToken: 'stale-other', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
+      sessionRow('sid-other-workspace', 'account-A', 'other-workspace', { accessToken: 'stale-other-ws', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
+    ];
+    const persisted = [];
+    const refreshAccessToken = async () => ({ access_token: 'fresh-token', refresh_token: 'refresh-A-rotated', expires_in: 3600 });
+    const persistSession = async (sid, session) => { persisted.push({ sid, session }); };
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'refresh-A', tokenExpiresAt: NOW + PAST_MS } });
+
+    await refreshOwnerWorkspaceToken({ sessions, urlKey: 'acme', ownerAccountId: 'account-A', refreshAccessToken, persistSession, store });
+
+    assert.equal(persisted.length, 1, 'only the owner\'s own row for THIS urlKey may be mirrored');
+    assert.equal(persisted[0].sid, 'sid-owner');
+  });
+
+  test('K3 [selectOwnerSessionRows]: returns every matching row for the owner+urlKey, sorted latest-expiring first', () => {
+    const sessions = [
+      sessionRow('sid-a', 'account-A', 'acme', { accessToken: 't-a', expiresAt: 100, refreshToken: undefined }),
+      sessionRow('sid-b', 'account-A', 'acme', { accessToken: 't-b', expiresAt: 300, refreshToken: undefined }),
+      sessionRow('sid-c', 'account-A', 'acme', { accessToken: 't-c', expiresAt: 200, refreshToken: undefined }),
+    ];
+    const rows = selectOwnerSessionRows(sessions, 'acme', 'account-A');
+    assert.deepEqual(rows.map(r => r.sid), ['sid-b', 'sid-c', 'sid-a']);
+  });
+
+  test('K4 [selectOwnerSessionRows]: element 0 matches what selectOwnerSessionRow alone would return (same tie-break)', () => {
+    const sessions = [
+      sessionRow('sid-a', 'account-A', 'acme', { accessToken: 't-a', expiresAt: NOW + PAST_MS, refreshToken: undefined }),
+      sessionRow('sid-b', 'account-A', 'acme', { accessToken: 't-b', expiresAt: NOW + FAR_FUTURE_MS, refreshToken: undefined }),
+    ];
+    const single = selectOwnerSessionRow(sessions, 'acme', 'account-A');
+    const rows = selectOwnerSessionRows(sessions, 'acme', 'account-A');
+    assert.equal(rows[0].sid, single.sid);
+    assert.equal(rows[0].workspaceIndex, single.workspaceIndex);
+  });
+
+  test('K5 [selectOwnerSessionRows]: no matching row, or no ownerAccountId, returns [] (never null)', () => {
+    const sessions = [sessionRow('sid-a', 'account-A', 'acme', { accessToken: 't-a', expiresAt: NOW, refreshToken: undefined })];
+    assert.deepEqual(selectOwnerSessionRows(sessions, 'other-workspace', 'account-A'), []);
+    assert.deepEqual(selectOwnerSessionRows(sessions, 'acme', 'account-B'), []);
+    assert.deepEqual(selectOwnerSessionRows(sessions, 'acme', null), []);
+  });
+
+  test('K6 [selectOwnerSessionRows]: applies NO liveness/refreshability filter — an already-expired row is still included (mirror target, not a refresh candidate)', () => {
+    const sessions = [sessionRow('sid-a', 'account-A', 'acme', { accessToken: 't-a', expiresAt: NOW + PAST_MS, refreshToken: undefined })];
+    const rows = selectOwnerSessionRows(sessions, 'acme', 'account-A');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].sid, 'sid-a');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block L (LIN-2235, L4.1) — the spend-intent journal, and amendment A3's
+// 30-minute-reuse-grace recovery. Driven directly at `refreshOwnerCredential`,
+// the same low-level seam Blocks F/H drive.
+// ---------------------------------------------------------------------------
+
+describe('refreshOwnerCredential (LIN-2235, Block L — spend-intent journal)', () => {
+  beforeEach(() => {
+    _resetInflightForTests();
+  });
+
+  test('L1: the spend-intent marker is written BEFORE the exchange is spent, not after', async () => {
+    const order = [];
+    const store = {
+      async get() { return { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS }; },
+      async markPendingSpend(accountId, urlKey, provider, refreshToken) { order.push(`mark:${refreshToken}`); },
+      async putIfRefreshToken() { order.push('put'); return true; },
+    };
+    const refreshAccessToken = async (refreshToken) => { order.push(`exchange:${refreshToken}`); return { access_token: 'fresh', refresh_token: 'R1', expires_in: 3600 }; };
+
+    await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+
+    assert.deepEqual(order, ['mark:R0', 'exchange:R0', 'put'], 'the marker must be durable before the token is spent, so a crash right after the exchange still leaves it behind');
+  });
+
+  test('L2 [fault injection — the acceptance case]: a "crash" between a successful exchange and the CAS write leaves the marker behind; the NEXT resolve, still within Linear\'s reuse grace, detects it, replays the same token, and completes normally', async () => {
+    // The durable record IS the fixture here (not fakeStore's map-of-seeds) so
+    // its `pendingSpend` field is directly inspectable between the two calls —
+    // exactly the state a real crash would leave in Mongo.
+    const record = { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS, pendingSpend: null };
+    const marks = [];
+    let putAttempts = 0;
+    const store = {
+      async get() { return { ...record }; },
+      async markPendingSpend(accountId, urlKey, provider, refreshToken, attemptedAt) {
+        marks.push({ refreshToken, attemptedAt });
+        record.pendingSpend = { refreshToken, attemptedAt };
+      },
+      async putIfRefreshToken(accountId, urlKey, expected, next) {
+        putAttempts++;
+        if (putAttempts === 1) {
+          // Fault injection: the exchange (below) already succeeded, but the
+          // durable CAS write never lands — models a process death in that
+          // window, per the ticket's own acceptance criterion.
+          throw new Error('simulated process death between exchange and CAS write');
+        }
+        if (record.refreshToken !== expected) return false;
+        record.refreshToken = next.refreshToken;
+        record.token = next.token;
+        record.tokenExpiresAt = next.tokenExpiresAt;
+        record.pendingSpend = null;
+        return true;
+      },
+    };
+    let exchangeCount = 0;
+    const refreshAccessToken = async (refreshToken) => {
+      exchangeCount++;
+      assert.equal(refreshToken, 'R0', 'both the crashed attempt and its replay spend the SAME token — Linear\'s reuse grace is what makes the replay safe');
+      return { access_token: 'fresh-token', refresh_token: 'R1', expires_in: 3600 };
+    };
+
+    // Attempt 1 ("dies mid-flight"): the exchange succeeds but the CAS write throws.
+    await assert.rejects(() => refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store }));
+    assert.equal(marks.length, 1, 'the marker survives the crash — it was written before the exchange');
+    assert.equal(record.refreshToken, 'R0', 'the durable record itself is untouched — the crashed write never landed');
+
+    // Attempt 2 ("the next resolve"): detects the unresolved marker, still
+    // within grace, and replays rather than trusting the stale record.
+    _resetInflightForTests();
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+
+    assert.equal(exchangeCount, 2, 'the replay actually re-spends the token — it is not a silent skip');
+    assert.equal(result.token, 'fresh-token');
+    assert.equal(record.refreshToken, 'R1', 'the replay\'s CAS write lands, resolving what the crash left dangling');
+    assert.equal(record.pendingSpend, null, 'the marker is discharged by the successful write');
+  });
+
+  test('L3 [amendment A3 — past grace]: an unresolved marker older than Linear\'s reuse grace throws a loud, distinguishable error WITHOUT attempting another exchange — never a blind retry of a token already known to be dead', async () => {
+    const FAR_PAST_ATTEMPT = NOW - (31 * 60 * 1000); // 31 minutes ago — past the 30-minute grace
+    const store = {
+      async get() {
+        return {
+          provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS,
+          pendingSpend: { refreshToken: 'R0', attemptedAt: FAR_PAST_ATTEMPT },
+        };
+      },
+      async markPendingSpend() { throw new Error('must not be called — the past-grace check must short-circuit before spending again'); },
+      async putIfRefreshToken() { throw new Error('must not be called'); },
+    };
+    const refreshAccessToken = async () => { throw new Error('must not be called — no network round-trip for a presumed-dead credential'); };
+
+    await assert.rejects(
+      () => refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store }),
+      (err) => {
+        assert.ok(err instanceof TokenRefreshError);
+        assert.notEqual(err.code, 'EXPIRED', 'must not masquerade as a Linear-verified revocation — this is a presumption, not a confirmed invalid_grant');
+        assert.match(err.message, /spend-intent/i);
+        assert.match(err.message, /grace/i);
+        return true;
+      }
+    );
+  });
+
+  test('L4 [boundary]: an unresolved marker still INSIDE the grace window does not throw the presumed-dead error — it falls through to an ordinary (successful) exchange', async () => {
+    const JUST_INSIDE_GRACE = NOW - (29 * 60 * 1000); // 29 minutes ago
+    const record = { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS, pendingSpend: { refreshToken: 'R0', attemptedAt: JUST_INSIDE_GRACE } };
+    const store = {
+      async get() { return { ...record }; },
+      async markPendingSpend() {},
+      async putIfRefreshToken(accountId, urlKey, expected, next) {
+        if (record.refreshToken !== expected) return false;
+        Object.assign(record, next, { pendingSpend: null });
+        return true;
+      },
+    };
+    const refreshAccessToken = async () => ({ access_token: 'fresh-token', refresh_token: 'R1', expires_in: 3600 });
+
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+    assert.equal(result.token, 'fresh-token');
+  });
+
+  test('L5 [stale marker, different token — no special handling]: a marker naming a token that is no longer the record\'s current refreshToken (a prior race loser\'s own marker) is inert — this attempt proceeds as an ordinary refresh', async () => {
+    const record = {
+      provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R1', tokenExpiresAt: NOW + PAST_MS,
+      // Left over from a DIFFERENT (already-resolved-elsewhere) attempt that
+      // spent the now-superseded R0 — irrelevant to spending the CURRENT R1.
+      pendingSpend: { refreshToken: 'R0', attemptedAt: NOW - (60 * 60 * 1000) },
+    };
+    const store = {
+      async get() { return { ...record }; },
+      async markPendingSpend() {},
+      async putIfRefreshToken(accountId, urlKey, expected, next) {
+        if (record.refreshToken !== expected) return false;
+        Object.assign(record, next, { pendingSpend: null });
+        return true;
+      },
+    };
+    const refreshAccessToken = async (refreshToken) => {
+      assert.equal(refreshToken, 'R1', 'must spend the CURRENT refreshToken, not the stale marker\'s');
+      return { access_token: 'fresh-token', refresh_token: 'R2', expires_in: 3600 };
+    };
+
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store });
+    assert.equal(result.token, 'fresh-token');
   });
 });

@@ -248,4 +248,104 @@ describe('owner-credential-store', () => {
     const fetched = await store.get(accountId, urlKey);
     assert.strictEqual(fetched.refreshToken, 'R0');
   });
+
+  // -------------------------------------------------------------------------
+  // markPendingSpend — the spend-intent journal (LIN-2235, L4.1). Against the
+  // same REAL MangoDB instance as the CAS tests above, for the same reason.
+  // -------------------------------------------------------------------------
+
+  // OC13
+  test('markPendingSpend writes a pendingSpend marker readable via get, without touching sibling credential fields', async () => {
+    const store = freshStore();
+    const accountId = randomUUID();
+    const urlKey = `acme-${randomUUID().slice(0, 8)}`;
+    await store.put(accountId, urlKey, sampleCredential({ token: 'access-0', refreshToken: 'R0' }));
+
+    const attemptedAt = Date.now();
+    const ok = await store.markPendingSpend(accountId, urlKey, 'linear', 'R0', attemptedAt);
+    assert.strictEqual(ok, true);
+
+    const fetched = await store.get(accountId, urlKey);
+    assert.deepStrictEqual(fetched.pendingSpend, { refreshToken: 'R0', attemptedAt });
+    // Sibling fields untouched — this is a field-only $set, not a rewrite.
+    assert.strictEqual(fetched.token, 'access-0');
+    assert.strictEqual(fetched.refreshToken, 'R0');
+  });
+
+  // OC14 — the discharge half: a CAS win clears the marker as a side effect
+  test('a putIfRefreshToken CAS win clears a prior pendingSpend marker', async () => {
+    const store = freshStore();
+    const accountId = randomUUID();
+    const urlKey = `acme-${randomUUID().slice(0, 8)}`;
+    await store.put(accountId, urlKey, sampleCredential({ token: 'access-0', refreshToken: 'R0' }));
+    await store.markPendingSpend(accountId, urlKey, 'linear', 'R0', Date.now());
+
+    const won = await store.putIfRefreshToken(accountId, urlKey, 'R0', {
+      provider: 'linear', scope: 'org-1', token: 'access-1', refreshToken: 'R1', tokenExpiresAt: Date.now() + 3600_000,
+    });
+    assert.strictEqual(won, true);
+
+    const fetched = await store.get(accountId, urlKey);
+    assert.strictEqual(fetched.pendingSpend, null, 'a resolved outcome (CAS win) must clear the marker');
+  });
+
+  // OC15 — a lost CAS must NOT clear the marker (the outcome it tracks is still unresolved)
+  test('a putIfRefreshToken CAS loss leaves an existing pendingSpend marker untouched', async () => {
+    const store = freshStore();
+    const accountId = randomUUID();
+    const urlKey = `acme-${randomUUID().slice(0, 8)}`;
+    // The durable record already holds the WINNER's rotated token R1.
+    await store.put(accountId, urlKey, sampleCredential({ token: 'access-winner', refreshToken: 'R1' }));
+    await store.markPendingSpend(accountId, urlKey, 'linear', 'R1', 12345);
+
+    const won = await store.putIfRefreshToken(accountId, urlKey, 'R0', {
+      provider: 'linear', scope: 'org-1', token: 'access-loser', refreshToken: 'R_loser', tokenExpiresAt: Date.now() + 3600_000,
+    });
+    assert.strictEqual(won, false);
+
+    const fetched = await store.get(accountId, urlKey);
+    assert.deepStrictEqual(fetched.pendingSpend, { refreshToken: 'R1', attemptedAt: 12345 }, 'a CAS miss must not touch the marker it did not resolve');
+  });
+
+  // OC16 — a fresh full `put` also discharges a stale marker (re-authentication case)
+  test('a fresh put clears a prior pendingSpend marker', async () => {
+    const store = freshStore();
+    const accountId = randomUUID();
+    const urlKey = `acme-${randomUUID().slice(0, 8)}`;
+    await store.put(accountId, urlKey, sampleCredential({ refreshToken: 'R0' }));
+    await store.markPendingSpend(accountId, urlKey, 'linear', 'R0', Date.now());
+
+    await store.put(accountId, urlKey, sampleCredential({ refreshToken: 'R_relogin' }));
+
+    const fetched = await store.get(accountId, urlKey);
+    assert.strictEqual(fetched.pendingSpend, null);
+  });
+
+  // OC17 — guards: missing accountId/urlKey/refreshToken fail safe (no throw, no write)
+  test('markPendingSpend guards on accountId/urlKey/refreshToken (all fail safe, no throw)', async () => {
+    const store = freshStore();
+    const accountId = randomUUID();
+    const urlKey = `acme-${randomUUID().slice(0, 8)}`;
+    await store.put(accountId, urlKey, sampleCredential({ refreshToken: 'R0' }));
+
+    assert.strictEqual(await store.markPendingSpend(null, urlKey, 'linear', 'R0', Date.now()), false);
+    assert.strictEqual(await store.markPendingSpend(accountId, null, 'linear', 'R0', Date.now()), false);
+    assert.strictEqual(await store.markPendingSpend(accountId, urlKey, 'linear', null, Date.now()), false);
+
+    const fetched = await store.get(accountId, urlKey);
+    assert.strictEqual(fetched.pendingSpend, null, 'none of the guarded calls should have written anything (the seeding put already sets pendingSpend: null)');
+  });
+
+  // OC18 — a record that does not exist is left alone (no upsert)
+  test('markPendingSpend on a missing record is a no-op, never creates one', async () => {
+    const store = freshStore();
+    const accountId = randomUUID();
+    const urlKey = `acme-${randomUUID().slice(0, 8)}`;
+
+    const ok = await store.markPendingSpend(accountId, urlKey, 'linear', 'R0', Date.now());
+    assert.strictEqual(ok, true, 'the write completes without error even though nothing matched');
+
+    const fetched = await store.get(accountId, urlKey);
+    assert.strictEqual(fetched, null, 'no record should have been created');
+  });
 });

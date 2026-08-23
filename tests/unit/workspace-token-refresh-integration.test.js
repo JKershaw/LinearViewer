@@ -154,6 +154,12 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
         durableRecords.set(key, next);
         return true;
       },
+      // LIN-2235 (L4.1): field-only marker write, mirroring the real store.
+      async markPendingSpend(accountId, urlKey, provider, refreshToken, attemptedAt) {
+        const key = `${accountId}::${urlKey}`;
+        const current = durableRecords.get(key);
+        if (current) durableRecords.set(key, { ...current, pendingSpend: { refreshToken, attemptedAt } });
+      },
     };
 
     const result = await refreshOwnerWorkspaceToken({
@@ -227,6 +233,7 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
     const store = {
       async get() { return { provider: 'linear', scope: 'acme-real-2', token: 'stale-access-token', refreshToken: 'dead-refresh-token', tokenExpiresAt: Date.now() - 10_000 }; },
       async put() { throw new Error('must not be called — the refresh failed'); },
+      async markPendingSpend() {},
     };
 
     await assert.rejects(
@@ -435,6 +442,12 @@ describe('LIN-1524 durable-only real-refresh witness (logged-out owner, unstubbe
         durableRecords.set(key, next);
         return true;
       },
+      // LIN-2235 (L4.1): field-only marker write, mirroring the real store.
+      async markPendingSpend(accountId, urlKey, provider, refreshToken, attemptedAt) {
+        const key = `${accountId}::${urlKey}`;
+        const current = durableRecords.get(key);
+        if (current) durableRecords.set(key, { ...current, pendingSpend: { refreshToken, attemptedAt } });
+      },
     };
 
     const result = await refreshOwnerWorkspaceToken({
@@ -587,6 +600,12 @@ describe('LIN-1544 durable-credential resolve witness (logout -> headless resolv
         storeCalls.push({ accountId, urlKey, credential: next });
         durableRecords.set(key, next);
         return true;
+      },
+      // LIN-2235 (L4.1): field-only marker write, mirroring the real store.
+      async markPendingSpend(accountId, urlKey, provider, refreshToken, attemptedAt) {
+        const key = `${accountId}::${urlKey}`;
+        const current = durableRecords.get(key);
+        if (current) durableRecords.set(key, { ...current, pendingSpend: { refreshToken, attemptedAt } });
       },
     };
 
