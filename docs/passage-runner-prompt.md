@@ -94,11 +94,11 @@ best-effort parse it**. Park **BLOCKED**, name the exact deviation, and ask the 
 fix the block or explicitly waive the requirement for this leg. A malformed leg block is a real
 stop condition, not an edge case to route around quietly.
 
-## Step 3 — Fan out one child autopilot per leg
+## Step 3 — Fan out one child per leg
 
 Delegate the mechanics to `GET /autopilot/manual`'s "Dispatching a child autopilot" section —
 this prompt only states *which* children to dispatch and *how much* budget each carries, not new
-mechanism. Two branches, chosen by how many anchors a leg names:
+mechanism. Three branches:
 
 - **Multi-anchor leg** (names more than one anchor): dispatch the child **goal-only** — no
   `issueIdentifier` — with `variant: 'standard'`. The goal must explicitly name the leg's
@@ -107,6 +107,17 @@ mechanism. Two branches, chosen by how many anchors a leg names:
 - **Single-anchor leg** (names exactly one anchor): dispatch the child **with that anchor as**
   `issueIdentifier`, `variant: 'stepper'` — the generic single-concrete-task child shape the
   operating manual already defines.
+- **Ordered multi-anchor leg whose anchors are better carried by one session than split across
+  several** (the leg's own text says so, or its anchors are small, subsystem-disjoint tickets
+  with a real dependency order between them — a later anchor's convention defined by an earlier
+  one): dispatch a **lane child** instead of a standard goal-only child — the manual's third
+  child shape, carrying [`buildWorkerLaneKickoff()`](../lib/prompts/worker-lane-kickoff.js)'s
+  body plus the leg's anchors as its ordered ticket list. Prefer this over the multi-anchor
+  branch above specifically when the anchors' order is load-bearing (a standard goal-only child
+  has no ordering discipline of its own) or when keeping them in one session's context avoids
+  re-deriving shared groundwork per anchor. Do not use it for anchors that are genuinely
+  independent — that's the multi-anchor branch's job, and a lane's sequential loop would only add
+  needless serialization.
 
 On **every** leg-child kickoff, regardless of branch:
 
@@ -130,10 +141,19 @@ budget claim from this runner — never as a flat, shape-independent rule:
 - A **single-anchor (stepper)** leg child DOES carry `issueIdentifier`, so it counts as exactly
   **one** task against your own `maxTasks` bound — the same as any other issue-bearing child
   dispatch.
-- Net: your declared `maxTasks` is a real (if partial) bound on the sum of single-anchor legs,
-  and no bound at all on multi-anchor legs. Still declare your own `maxTasks` for honest
-  bookkeeping (it matches the ratified pool size), but never claim it "bounds nothing on its
-  own" — say what it actually bounds.
+- A **lane child** works its whole ordered ticket list in-session and issues no per-ticket
+  dispatches of its own, so nothing structurally counts its tickets against your bound the way a
+  single-anchor child's one dispatch does — however many anchors the lane actually touches. This
+  is a known, currently-open gap (see `docs/worker-lane-prompt.md`'s Step 7 and
+  `docs/autopilot-operating-manual.md`'s lane-child budget paragraph), not a design choice: a
+  lane self-polls its own `maxTasks`/trim history between tickets and winds down voluntarily,
+  but nothing refuses it at dispatch time the way the factory guard refuses a fresh single-anchor
+  dispatch. Don't report a lane leg's budget as bounded the way a single-anchor leg's is.
+- Net: your declared `maxTasks` is a real (if partial) bound on the sum of single-anchor legs, a
+  self-governed-only bound on lane legs, and no bound at all on multi-anchor legs. Still declare
+  your own `maxTasks` for honest bookkeeping (it matches the ratified pool size), but never claim
+  it "bounds nothing on its own" — say what it actually bounds, and for a lane leg say plainly
+  that the bound is voluntary, not enforced.
 
 There is **no voyage-level cost roll-up**: `GET /cost/{identifier}` is per-issue-identifier
 only. When you write the landing report (Step 7), sum per-anchor `/cost` reads and state the
