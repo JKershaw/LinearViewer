@@ -1,6 +1,6 @@
 # Harbour
 
-A minimal, CLI-aesthetic web app that displays your Linear projects and issues as a collapsible tree — plus a growing set of focused views and an API surface for AI agents.
+A minimal, CLI-aesthetic web app that displays your projects and issues as a collapsible tree — backed by Linear, GitHub, GitHub Projects, Jira, or a local store — plus a growing set of focused views and an API surface for AI agents.
 
 ```
 Platform Projects
@@ -25,7 +25,7 @@ Platform Projects
 - **Swim** - Swim-lane / flow layout showing sequence, parallelism, and dependencies
 - **Roadmap** - Narrative project summary with an at-a-glance digest, recap, and Brief; report history is browsable
 - **Ship** - Radial view of work heading toward delivery
-- **Pipeline** - Floor view reconstructing work loops from activity
+- **Observation** - Cross-workspace feed of agent sessions, drilling into per-task and per-run detail
 
 ### Interaction
 
@@ -47,16 +47,52 @@ Platform Projects
 ### For AI Agents
 
 - **Dispatch Queue** - Queue prompts for external consumers (AI agents, automation) with bearer-token auth
-- **Linear API Proxy** - Token-scoped REST-like access to the Linear workspace (read / readWrite), with audit logging and rate limiting
+- **Workspace API Proxy** - Token-scoped REST-like access to your workspace (read / readWrite); the wire contract is source-neutral — one shape across providers, not a passthrough to any single backend — with audit logging and rate limiting
 - **Task Automation** - Endpoints for agent-driven workflows (stack, prompt, recommend, recap, brief, status)
 
 ## Authentication
 
-Three ways to sign in:
+Several ways to sign in or connect a workspace source:
 
 - **Linear OAuth 2.0** - Sign in with your Linear account, choose your workspace. Sessions last 24 hours with automatic refresh.
 - **Personal Access Token (PAT)** - Set `LINEAR_ACCESS_TOKEN` for zero-config local development; you're logged in automatically.
+- **GitHub App** - Sign in with GitHub, or add a GitHub repository (Issues or Projects v2) as a workspace source. Optional — disabled until configured. See [GitHub App (optional)](#github-app-optional) below.
+- **Jira Cloud** - Sign in with Jira via OAuth 2.0, or link a Jira site as a workspace source via an API token (read-only Phase 1) or OAuth 2.0. See [Jira Cloud (optional)](#jira-cloud-optional) below.
 - **OpenRouter OAuth (PKCE)** - Optionally connect an OpenRouter account for AI features; returns a permanent API key stored alongside your session.
+
+### GitHub App (optional)
+
+GitHub login ("Continue with GitHub") and adding a GitHub repository (Issues or Projects v2) as a workspace source run through a **GitHub App installation**, not a plain OAuth App. They stay **disabled until the GitHub environment variables are set** — the settings page shows GitHub as unavailable, and `/auth/github` returns a clear "not available" message.
+
+To enable them:
+
+1. Create a GitHub App at [github.com/settings/apps](https://github.com/settings/apps/new) (not an OAuth App). Requesting repo/issues read permissions is enough for this integration.
+2. From the app's settings page, note its **App ID**, generate and download a **private key** (PEM), and note the app's **slug** (from its settings URL).
+3. Under the app's "Identifying and authorizing users" section, generate a **Client ID** and **Client secret**.
+4. Add to your production `.env`:
+
+```
+GITHUB_CLIENT_ID=your-github-app-client-id
+GITHUB_CLIENT_SECRET=your-github-app-client-secret
+GITHUB_APP_ID=your-github-app-id
+GITHUB_APP_PRIVATE_KEY=your-github-app-private-key-pem
+GITHUB_APP_SLUG=your-github-app-slug
+```
+
+`GITHUB_REDIRECT_URI` is optional — GitHub falls back to the App's own configured callback URL when unset; set it only if you need a different one (see `.env.example`). After setting the variables and restarting, do a one-time manual smoke test of the GitHub login + "Add a source" flow, since CI exercises only mocked OAuth.
+
+### Jira Cloud (optional)
+
+Jira has two independent link paths, side by side:
+
+- **API token (Phase 1, read-only)** - No server config needed. Visit `/auth/jira?workspace=<urlKey>` and provide your Atlassian email, an [API token](https://id.atlassian.com/manage-profile/security/api-tokens), and your site (e.g. `your-team.atlassian.net`). Reads only today — there is no Jira write support yet.
+- **OAuth 2.0 (3LO)** - Sign in with Jira or add a Jira site the same way as GitHub. Disabled until the Jira OAuth environment variables are set:
+
+```
+JIRA_CLIENT_ID=your-jira-client-id
+JIRA_CLIENT_SECRET=your-jira-client-secret
+JIRA_REDIRECT_URI=https://yourdomain.com/auth/jira/oauth/callback
+```
 
 ## Setup
 
@@ -139,32 +175,13 @@ LINEAR_REDIRECT_URI=https://yourdomain.com/auth/callback
 SESSION_SECRET=generate-a-secure-random-string
 ```
 
-And add `https://yourdomain.com/auth/callback` to your Linear OAuth app's redirect URIs. HTTPS and secure cookies are enforced in production.
-
-### GitHub OAuth (optional)
-
-GitHub login ("Continue with GitHub") and adding a GitHub repository as a workspace source are optional. They stay **disabled until the GitHub environment variables are set** — the settings page shows GitHub as unavailable, and `/auth/github` returns a clear "not available" message.
-
-To enable them:
-
-1. Create an OAuth App at [github.com/settings/developers](https://github.com/settings/developers) → **New OAuth App**.
-   - **Authorization callback URL**: `https://yourdomain.com/auth/github/callback` (must match `GITHUB_REDIRECT_URI` exactly).
-2. The app requests these scopes: `repo read:user read:org` (repo access is needed to read GitHub Issues for a linked repository).
-3. Add to your production `.env`:
-
-```
-GITHUB_CLIENT_ID=your-github-client-id
-GITHUB_CLIENT_SECRET=your-github-client-secret
-GITHUB_REDIRECT_URI=https://yourdomain.com/auth/github/callback
-```
-
-For local development, use `http://localhost:3000/auth/github/callback` instead (see `.env.example`). After setting the variables and restarting, do a one-time manual smoke test of the GitHub login + "Add a source" flow, since CI exercises only mocked OAuth.
+And add `https://yourdomain.com/auth/callback` to your Linear OAuth app's redirect URIs. HTTPS and secure cookies are enforced in production. See [GitHub App (optional)](#github-app-optional) and [Jira Cloud (optional)](#jira-cloud-optional) above for those providers' production setup.
 
 ## Tech Stack
 
 - **Server**: Express.js (Node.js, ES modules)
-- **API**: Linear GraphQL API via `graphql-request`
-- **Auth**: Linear OAuth 2.0, Personal Access Token, and OpenRouter OAuth (PKCE)
+- **API**: Provider-backed (`lib/providers/`) — Linear GraphQL, GitHub/GitHub Projects GraphQL, Jira REST v3, or a local store
+- **Auth**: Linear OAuth 2.0 + PAT, GitHub App, Jira (API token or OAuth 2.0), and OpenRouter OAuth (PKCE)
 - **AI**: OpenRouter API client for recommendations and prompt generation
 - **Sessions**: MongoDB (production) or MangoDB file-based storage (development)
 - **Frontend**: Vanilla JS, no build step
@@ -175,7 +192,7 @@ For local development, use `http://localhost:3000/auth/github/callback` instead 
 
 - [`CLAUDE.md`](CLAUDE.md) - Architecture and full project reference
 - [`docs/dispatch-integration.md`](docs/dispatch-integration.md) - Dispatch queue consumer guide
-- [`docs/proxy-integration.md`](docs/proxy-integration.md) - Linear API Proxy consumer guide
+- [`docs/proxy-integration.md`](docs/proxy-integration.md) - Workspace API Proxy consumer guide (source-neutral)
 
 ## License
 
