@@ -54,7 +54,7 @@ const DIRECT_SITE_ENDPOINTS = [
 ];
 
 describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () => {
-  test('resolveProviderAccess (the provider-lane chokepoint, fronting ~24 sites as ONE surface) stamps req.resolvedCredentialFingerprint on every return path, including the TEST_LOCAL_URL_KEY short-circuit', () => {
+  test('resolveProviderAccess (the provider-lane chokepoint, fronting ~24 sites as ONE surface) stamps req.resolvedCredentialFingerprint on every return path that resolves a credential, including the TEST_LOCAL_URL_KEY short-circuit — but NOT on a resolveWorkspaceAccess failure (LIN-1746: an earlier revision stamped unconditionally, which misfiled a workspace-resolution 503 as stage:"provider-lane")', () => {
     const start = PROXY_SRC.indexOf('async function resolveProviderAccess');
     assert.ok(start >= 0, 'resolveProviderAccess not found');
     const end = PROXY_SRC.indexOf('\n  }', start); // closes at the 2-space method-body indent inside createProxyRoutes

@@ -31,8 +31,16 @@ function fakeCollection() {
           if (query.urlKey !== undefined && d.urlKey !== query.urlKey) return false;
           if (query.tokenId !== undefined && d.tokenId !== query.tokenId) return false;
           if (query.stage !== undefined && d.stage !== query.stage) return false;
+          if (query.status !== undefined && d.status !== query.status) return false;
           if (query.expiresAt && d.expiresAt <= query.expiresAt.$gt) return false;
           if (query.timestamp && d.timestamp <= query.timestamp.$gt) return false;
+          // LIN-1746 (found by code review, round 6): listSelfCredentialHealth's
+          // query now unions both halves' row shapes via $or — without this,
+          // the double silently stopped enforcing ANY stage/status scoping
+          // (query.stage/.status are always undefined on that query), leaving
+          // a regression that drops providerLaneOccupancy's own JS-level
+          // stage filter completely undetected by this file.
+          if (query.$or && !query.$or.some(clause => Object.entries(clause).every(([k, v]) => d[k] === v))) return false;
           return true;
         });
         if (opts.projection) {
