@@ -109,8 +109,10 @@ pool.
 
 **The reserved maintenance leg** is mandatory whenever Step 1 found any periodical `due`:
 a ratified passage goal is a level-1 signal that suppresses level-2 due-periodical
-dispatch, so without this leg the passage silently starves due maintenance. It draws from
-the **same pool** as every other leg (say so when stating its budget), and it is not a
+dispatch, so without this leg the passage silently starves due maintenance. **It counts
+against the 2–4 leg cap** — it is one of the 2–4 legs, not an addition alongside them, so
+four proposed legs plus maintenance is five and breaches the cap. It draws from the
+**same pool** as every other leg (say so when stating its budget), and it is not a
 stand-in for any sessions-per-day cap.
 
 ## Step 4 — Negotiate the whole, ratify once
