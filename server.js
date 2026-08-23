@@ -65,6 +65,7 @@ import { ReportHistoryStore } from './lib/report-history-store.js'
 import { ShipBiscuitHistoryStore } from './lib/ship-biscuit-history-store.js'
 import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
 import { TaskDecisionsStore } from './lib/task-decisions-store.js'
+import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
@@ -469,6 +470,16 @@ const taskDecisionsStore = new TaskDecisionsStore({
   collection: taskDecisionsCollection
 })
 
+// Shelved rulings (LIN-1727): a designed defer with a reason and a re-surface
+// timer, so a deferred ruling can never be silently lost. View-only — never
+// mutates the underlying loop/task-decision row. Durable, no TTL, like
+// task-decisions above: a TTL could silently erase the lapse-count history
+// (docs/escalation-philosophy.md §4/§6).
+const shelvedRulingsCollection = db.collection('shelved-rulings')
+const shelvedRulingsStore = new ShelvedRulingsStore({
+  collection: shelvedRulingsCollection
+})
+
 // Saved chats (LIN-1008): durable, resumable task-chat transcripts, private per
 // {urlKey, accountId}. Content-bearing → session-auth only: deliberately NOT
 // passed to createProxyRoutes / createWorkspaceApiRoutes / kpi-stats below (the
@@ -716,7 +727,7 @@ app.use(session({
 // Test Mode Setup
 // =============================================================================
 if (process.env.NODE_ENV === 'test') {
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo }))
 }
 
 // =============================================================================
@@ -2332,7 +2343,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore }))

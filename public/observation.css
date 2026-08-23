@@ -291,6 +291,57 @@
 .obs-ruling-dismiss:hover { background: color-mix(in srgb, var(--fg-dim) 20%, transparent); }
 .obs-ruling-dismiss:disabled { opacity: 0.5; cursor: default; }
 
+/* Shelve (LIN-1727) — a designed defer, distinct from Dismiss: amber-toned
+   like the ruling's own left accent, since it is a deliberate hold, not a
+   clearance. */
+.obs-ruling-shelve {
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+}
+.obs-ruling-shelve:hover { background: color-mix(in srgb, var(--amber) 22%, transparent); }
+.obs-ruling-shelve:disabled { opacity: 0.5; cursor: default; }
+
+.obs-ruling-shelve-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  padding: 0.5rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+}
+.obs-ruling-shelve-reason {
+  flex: 1 1 12rem;
+  padding: 0.3rem 0.5rem;
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.obs-ruling-shelve-duration {
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.4rem;
+}
+.obs-ruling-shelve-confirm {
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+}
+.obs-ruling-shelve-confirm:hover { background: color-mix(in srgb, var(--amber) 22%, transparent); }
+
+.obs-ruling-lapse-note {
+  color: var(--amber);
+  font-size: 0.8rem;
+  margin: 0.4rem 0 0;
+}
+
 .obs-session {
   border: 1px solid var(--line);
   /* Coloured left accent stripe per status (mockup, design §6.1: 3px); status hue

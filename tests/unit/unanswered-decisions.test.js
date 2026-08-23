@@ -174,7 +174,8 @@ describe('collectUnansweredDecisions (LIN-1728)', () => {
         followUpTo: 'prior-loop'
       },
       disposition: 'resumable',
-      canReply: true
+      canReply: true,
+      shelvedLapseCount: 0
     });
   });
 
@@ -344,5 +345,54 @@ describe('canReplyFor via collectUnansweredDecisions — task-bound always admit
   test('task-bound is not gated by liveness, unlike resumable/gone/mid-turn/indeterminate', () => {
     const rows = collectUnansweredDecisions({ taskDecisions: [taskDecision()] }, { now: NOW });
     assert.strictEqual(rows[0].canReply, true);
+  });
+});
+
+// LIN-1727: shelve is a VIEW operation — a decision with an active shelf row
+// (resurfaceAt in the future) is excluded from the feed entirely; once it
+// passes, the (never-mutated) decision reappears like any other unanswered
+// one, carrying its lapse history.
+describe('collectUnansweredDecisions — shelving (LIN-1727)', () => {
+  function shelf(decisionId, overrides = {}) {
+    return { decisionId, urlKey: 'acme', reason: 'waiting on a stakeholder', shelvedAt: '2026-08-22T00:00:00.000Z', resurfaceAt: '2026-08-23T00:00:00.000Z', lapseCount: 0, ...overrides };
+  }
+
+  test('an actively-shelved loop-backed decision is excluded from the feed', () => {
+    const l = loop({ wakeMarker: 'blocked', decision: decision('d-1') });
+    const rows = collectUnansweredDecisions({ loops: [l], shelvedRulings: [shelf('d-1', { resurfaceAt: '2026-08-23T00:00:00.000Z' })] }, { now: NOW });
+    assert.deepStrictEqual(rows, []);
+  });
+
+  test('an actively-shelved task-bound decision is excluded from the feed', () => {
+    const t = taskDecision();
+    const rows = collectUnansweredDecisions({ taskDecisions: [t], shelvedRulings: [shelf(t.decision.decision_id, { resurfaceAt: '2026-08-23T00:00:00.000Z' })] }, { now: NOW });
+    assert.deepStrictEqual(rows, []);
+  });
+
+  test('a LAPSED shelf (resurfaceAt in the past) no longer excludes the row — it reappears, carrying shelvedLapseCount', () => {
+    const l = loop({ wakeMarker: 'blocked', decision: decision('d-1') });
+    const rows = collectUnansweredDecisions({ loops: [l], shelvedRulings: [shelf('d-1', { resurfaceAt: '2026-08-20T00:00:00.000Z', lapseCount: 2 })] }, { now: NOW });
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].shelvedLapseCount, 2);
+  });
+
+  test('a decision never shelved carries shelvedLapseCount: 0', () => {
+    const l = loop({ wakeMarker: 'blocked', decision: decision('d-1') });
+    const rows = collectUnansweredDecisions({ loops: [l] }, { now: NOW });
+    assert.strictEqual(rows[0].shelvedLapseCount, 0);
+  });
+
+  test('shelving one decision does not affect an unrelated one', () => {
+    const l1 = loop({ loopId: 'loop-1', wakeMarker: 'blocked', decision: decision('d-1') });
+    const l2 = loop({ loopId: 'loop-2', wakeMarker: 'blocked', decision: decision('d-2') });
+    const rows = collectUnansweredDecisions({ loops: [l1, l2], shelvedRulings: [shelf('d-1', { resurfaceAt: '2026-08-23T00:00:00.000Z' })] }, { now: NOW });
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].decision.decision_id, 'd-2');
+  });
+
+  test('a shelf row exactly at resurfaceAt (not strictly future) is treated as lapsed, not active', () => {
+    const l = loop({ wakeMarker: 'blocked', decision: decision('d-1') });
+    const rows = collectUnansweredDecisions({ loops: [l], shelvedRulings: [shelf('d-1', { resurfaceAt: NOW.toISOString() })] }, { now: NOW });
+    assert.strictEqual(rows.length, 1);
   });
 });

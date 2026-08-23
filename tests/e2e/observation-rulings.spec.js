@@ -26,6 +26,9 @@ test.beforeEach(async ({ page, workerUrlKey }) => {
   // items 6/7). Uses the existing test-route cleanup pattern already used in
   // this file (clearRuns/clearRunsFor below), not a new mechanism.
   await page.goto(`/test/clear-task-decisions?urlKey=${URL_KEY}`);
+  // LIN-1727: same rationale as clear-task-decisions above — shelved-rulings
+  // is durable with no TTL, keyed by the same shared per-worker urlKey.
+  await page.goto(`/test/clear-shelved-rulings?urlKey=${URL_KEY}`);
 });
 
 async function clearRuns(page) {
@@ -348,6 +351,97 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     ]);
     expect((await dismissReq.response()).status()).toBe(200);
     await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-M' })).toHaveCount(0, { timeout: 20000 });
+  });
+
+  test('LIN-1727: shelving a ruling requires a reason and hides the row, without mutating the underlying decision', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-1727-S', issueTitle: 'Shelve ruling', decisionId: 'd-rulings-shelve', blocked: true });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1727-S' });
+    await expect(row).toBeVisible();
+
+    // Opening the panel and confirming with no reason must NOT shelve — the
+    // route (and the store beneath it) refuse a blank reason.
+    await row.locator('.obs-ruling-shelve').click();
+    await expect(row.locator('.obs-ruling-shelve-panel')).toBeVisible();
+    let shelveFired = false;
+    page.on('request', (r) => { if (r.url().includes('/rulings/shelve') && r.method() === 'POST') shelveFired = true; });
+    await row.locator('.obs-ruling-shelve-confirm').click();
+    await page.waitForTimeout(200);
+    expect(shelveFired).toBe(false);
+
+    await row.locator('.obs-ruling-shelve-reason').fill('waiting on a stakeholder');
+    const [shelveReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/rulings/shelve') && r.method() === 'POST'),
+      row.locator('.obs-ruling-shelve-confirm').click()
+    ]);
+    const shelvePayload = shelveReq.postDataJSON();
+    expect(shelvePayload.decisionId).toBe('d-rulings-shelve');
+    expect(shelvePayload.reason).toBe('waiting on a stakeholder');
+    expect((await shelveReq.response()).status()).toBe(200);
+
+    // The row disappears from the live queue — shelving is a designed defer,
+    // not an answer or a dismiss (no comment, no stamp on the underlying loop).
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1727-S' })).toHaveCount(0, { timeout: 20000 });
+
+    // Directly verify via the API that the underlying decision is UNCHANGED —
+    // shelving must never mutate the loop/task-decision it defers.
+    const stillUnanswered = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
+    const body = await stillUnanswered.json();
+    expect(body.rulings.some(r => r.decision.decision_id === 'd-rulings-shelve')).toBe(false);
+  });
+
+  test('LIN-1727: re-shelving a STILL-ACTIVE shelf adjusts it without incrementing the lapse count', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-1727-L', issueTitle: 'Re-shelve', decisionId: 'd-rulings-reshelve', blocked: true });
+
+    // Genuine lapse semantics (a re-shelve AFTER the prior timer passed
+    // incrementing lapseCount) need a real clock to elapse and are
+    // unit-covered precisely, with an injectable clock, in
+    // tests/unit/shelved-rulings-store.test.js. This e2e drives the route
+    // end to end for the case it CAN observe without waiting: adjusting a
+    // still-active shelf is not a lapse.
+    const first = await page.request.post(`/workspace/${URL_KEY}/api/dashboard/rulings/shelve`, {
+      data: { decisionId: 'd-rulings-reshelve', reason: 'first reason', resurfaceInMs: 60 * 60 * 1000 }
+    });
+    expect(first.status()).toBe(200);
+    expect((await first.json()).shelf.lapseCount).toBe(0);
+
+    const second = await page.request.post(`/workspace/${URL_KEY}/api/dashboard/rulings/shelve`, {
+      data: { decisionId: 'd-rulings-reshelve', reason: 'updated reason', resurfaceInMs: 2 * 60 * 60 * 1000 }
+    });
+    expect(second.status()).toBe(200);
+    const secondBody = await second.json();
+    expect(secondBody.shelf.reason).toBe('updated reason');
+    expect(secondBody.shelf.lapseCount).toBe(0);
+  });
+
+  test('LIN-1727: shelve is available even on a mid-turn (read-only) ruling', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-1727-M', issueTitle: 'Mid-turn shelve', decisionId: 'd-rulings-midturn-shelve', blocked: false });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1727-M' });
+    await expect(row).toBeVisible();
+    await expect(row.locator('.obs-ruling-shelve')).toBeVisible();
+
+    await row.locator('.obs-ruling-shelve').click();
+    await row.locator('.obs-ruling-shelve-reason').fill('will revisit once it finishes');
+    const [shelveReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/rulings/shelve') && r.method() === 'POST'),
+      row.locator('.obs-ruling-shelve-confirm').click()
+    ]);
+    expect((await shelveReq.response()).status()).toBe(200);
   });
 
   test('LIN-1728 review F1: a ruling from a non-page workspace writes its comment/stamp/dispatch in the RULING\'s own workspace, and clears', async ({ page, secondWorkerUrlKey }) => {
@@ -716,19 +810,17 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     // seeding an ordinary, decision-free local task adds no ruling of any
     // disposition.
     //
-    // Run-scoped (LIN-2215 close-out, ledger item 2): a bare
-    // `toHaveCount(0)` is a workspace-global claim, and this worker's
-    // `TaskDecisionsStore` partition is durable with no TTL — a row leaked
-    // by an earlier failed run (the task-bound test above, induced to fail
-    // before its option press) is never pruned and would poison a global
-    // zero-count assertion forever, failing on correct code for a reason
-    // this test never caused. Comparing against a same-run baseline —
-    // captured BEFORE seeding the ordinary task below, with nothing else in
-    // between to mutate the store (this suite has no cross-worker
-    // parallelism yet, per CLAUDE.md's E2E Testing Pattern section) —
-    // preserves the real intent ("seeding this task added no ruling") while
-    // making the check immune to whatever the durable store already held
-    // coming in.
+    // This worker's `TaskDecisionsStore`/loop-decision partitions are durable
+    // (no TTL) and shared across every spec file at this worker's urlKey —
+    // a baseline-diff against the GLOBAL row count (an earlier version of
+    // this test) is fragile against any unrelated row (e.g. a LIN-2123
+    // sticky `blocked` decision from an earlier test in this run) that
+    // materializes between the two reads for reasons that have nothing to
+    // do with this test's own seed. The real intent is narrower than "the
+    // total count didn't change" — it's "seeding THIS task added no
+    // ruling" — so assert directly against rows naming the seeded task,
+    // immune to whatever else the shared store holds or produces
+    // concurrently.
     await seedLocal({ projects: [], issues: [] });
     await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
     await page.waitForLoadState('networkidle');
@@ -736,7 +828,6 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
       page.waitForResponse(r => r.url().includes('/api/dashboard/rulings') && r.request().method() === 'GET'),
       page.locator('.obs-tab[data-view="rulings"]').click()
     ]);
-    const baselineCount = await page.locator('#obs-rulings .obs-ruling').count();
 
     await seedLocal({
       projects: [],
@@ -753,7 +844,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
       page.locator('.obs-tab[data-view="rulings"]').click()
     ]);
 
-    await expect(page.locator('#obs-rulings .obs-ruling')).toHaveCount(baselineCount);
+    await expect(page.locator('#obs-rulings .obs-ruling', { hasText: 'SCAN-2' })).toHaveCount(0);
   });
 });
 
