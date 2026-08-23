@@ -54,6 +54,7 @@ import { getProviderForWorkspace } from '../lib/providers/registry.js';
 // `priorityLevel` is the additive canonical-scale field this ticket adds.
 import { canonicalPriorityToLinear } from '../lib/providers/models.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
+import { extractPeriodicalGateId, checkPeriodicalReportGate } from '../lib/periodical-report-gate.js';
 import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decodeAttachmentHandle, relayContentTypeFromName, GITHUB_UPLOAD_HOSTS, collectIssueAttachments } from '../lib/proxy-wire.js';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
@@ -3342,7 +3343,33 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       // LIN-556: stateId / projectId accept symbolic names alongside UUIDs;
       // state is scoped to the issue's team. assigneeId / parentId / cycleId
       // stay UUID-only this ticket (named out of scope in the design record).
-      if (stateId) input.stateId = await resolveStateInput(provider, token, teamId, stateId);
+      if (stateId) {
+        input.stateId = await resolveStateInput(provider, token, teamId, stateId);
+        // LIN-694: report-persistence gate for periodical review tasks. The
+        // marker check is free (guard.description was already fetched above
+        // for every write); a states() lookup to learn the target's `type`
+        // only runs for the rare marked issue, so this adds no cost to the
+        // overwhelmingly common (non-periodical) stateId-bearing write.
+        const periodicalGateId = extractPeriodicalGateId(guard?.description);
+        if (periodicalGateId) {
+          let targetStateType = null;
+          try {
+            const states = await provider.states(token, teamId);
+            targetStateType = (states || []).find(s => s.id === input.stateId)?.type || null;
+          } catch {
+            targetStateType = null; // provider without a states() capability — gate cannot apply
+          }
+          const gateResult = checkPeriodicalReportGate({
+            description: guard?.description,
+            comments: guard?.comments?.nodes,
+            targetStateType
+          });
+          if (gateResult.applies && !gateResult.ok) {
+            logEvent(req, '/api/proxy/issues/:id', 409);
+            return jsonError(res, 409, gateResult.message, { code: 'PERIODICAL_REPORT_NOT_PERSISTED' });
+          }
+        }
+      }
       if (projectId) input.projectId = await resolveProjectInput(provider, token, projectId);
       if (assigneeId && UUID_REGEX.test(assigneeId)) input.assigneeId = assigneeId;
       if (parentId === null) input.parentId = null;
