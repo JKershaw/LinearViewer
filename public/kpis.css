@@ -106,6 +106,42 @@ a.kpi-headline-value:hover {
   line-height: 1.5;
 }
 
+/* Weekly-budget burn gauge (LIN-2118) — a third bespoke headline-style card,
+   same posture as `.kpi-cost-card`: an ESTIMATE, so its provenance line
+   (`.kpi-budget-source`) gets the same non-fine-print treatment as the cost
+   card's own bias/coverage disclosures — never display:none or
+   near-invisible sizing at any breakpoint. */
+.kpi-budget-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: var(--space-4);
+}
+
+.kpi-budget-value {
+  font-family: var(--font-structural);
+  font-size: 2.2rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--fg);
+}
+
+.kpi-budget-label {
+  font-family: var(--font-content);
+  font-size: 0.95rem;
+  color: var(--fg);
+}
+
+.kpi-budget-source,
+.kpi-budget-rate,
+.kpi-budget-window,
+.kpi-budget-coverage {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--fg-dim);
+  line-height: 1.5;
+}
+
 /* Stat cards */
 .kpi-cards {
   display: grid;
@@ -265,6 +301,17 @@ a.kpi-headline-value:hover {
   .kpi-cost-shares,
   .kpi-cost-coverage,
   .kpi-cost-usd-lines {
+    line-height: 1.6;
+  }
+
+  .kpi-budget-value {
+    font-size: 1.75rem;
+  }
+
+  .kpi-budget-source,
+  .kpi-budget-rate,
+  .kpi-budget-window,
+  .kpi-budget-coverage {
     line-height: 1.6;
   }
 

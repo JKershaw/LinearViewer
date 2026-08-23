@@ -473,6 +473,28 @@ describe('collectKpiStats', () => {
     assert.ok(!serialized.includes('LIN-PRIVACY-CANARY'), 'issueIdentifier value leaked into the public stats object');
     assert.ok(!serialized.includes('"issueIdentifier"'), 'the issueIdentifier KEY itself must never appear in the output');
   });
+
+  test('privacy (LIN-2118): issueIdentifier never crosses into weeklyBudgetGauge, and the gauge is wired up live', async () => {
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([{
+        _id: 'wb1', rootItemId: 'wb1', issueIdentifier: 'LIN-BUDGET-CANARY',
+        harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(1),
+        feedback: [
+          { kind: 'usage', message: '[usage] {"harness":"claude-code","costUsd":3,"lane":"api"}', timestamp: daysAgo(1).toISOString() },
+          marker('[done] landed it', 0.9)
+        ]
+      }])
+    });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    // The gauge must actually be live (proves the assertion isn't vacuous).
+    assert.equal(stats.weeklyBudgetGauge.windowLineageCount, 1);
+    assert.ok(typeof stats.weeklyBudgetGauge.percentConsumed === 'number');
+
+    const serialized = JSON.stringify(stats);
+    assert.ok(!serialized.includes('LIN-BUDGET-CANARY'), 'issueIdentifier value leaked into weeklyBudgetGauge');
+    assert.ok(!serialized.includes('"issueIdentifier"'), 'the issueIdentifier KEY itself must never appear in the output');
+  });
 });
 
 // LIN-1846: several metrics were labelled "· 30d" but applied no window in

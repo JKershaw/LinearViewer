@@ -99,6 +99,7 @@ lib/
   render-legal.js      Privacy Policy / Terms of Service renderers
   render-kpis.js       Public /kpis instance stats page renderer
   kpi-stats.js         Instance KPI aggregation (privacy boundary for public /kpis)
+  weekly-budget.js     Weekly-budget burn gauge (LIN-2118): an ESTIMATE of the current subscription window's consumption — Harbour cannot read Anthropic's own meter directly. Calibrated from the one recorded checkpoint/spend correlation on LIN-2087 (27 weekly-window points measured against $1,070.58 of API-rate-equivalent spend on 2026-08-14, docs/reviews/capacity-test-run-review-2026-08-14.md), then projected forward from windowed `[usage]` telemetry via the shared `reduceLineageCost` (imported from lib/terminal-marked-task-cost.js, not re-derived). An operator-entered checkpoint (`WEEKLY_BUDGET_CHECKPOINT_PERCENT`/`WEEKLY_BUDGET_CHECKPOINT_AT` env vars, mirroring the `PLAN_FEE_MONTHLY_USD` seam) recalibrates the estimate when dated inside the current Thursday-06:00Z-reset window; absent one, the estimate runs from telemetry alone from zero at reset. Rendered on `/kpis` via `renderWeeklyBudgetGaugeCard` (lib/render-kpis.js)
   pipeline-loops.js    Pipeline loop reconstruction library
   sessions-view.js     Adapts pipeline Loop records into the sessions view
   observation-sessions-store.js     Durable store for materialized Observation session groups
@@ -414,6 +415,9 @@ DISPATCH_OWNERLESS_BROKER_COMPAT  Whether ownerless (createdBy:null) tokens are 
 YAP_BASE_URL            Yap chat server base URL for the experimental Collective live view (optional, defaults to https://yap.jkershaw.com)
 YAP_PASSWORD            Yap server password (optional, sent as Bearer auth on Yap calls)
 PLAN_FEE_MONTHLY_USD    Operator-configured plan-fee amount for the /kpis cost-per-terminal-marked-task card's cash headline (optional, no default — unset or non-numeric both read as null via lib/plan-fee-config.js, same `|| null` convention as DEPLOY_*, so the card renders "—" until set). Schema/config only as of LIN-1958: the amortisation rule that would turn this into a cash-per-task figure (period, workspace scope) is not yet implemented
+WEEKLY_BUDGET_USD_PER_POINT  Overrides the $-per-weekly-window-point calibration factor the /kpis burn gauge (lib/weekly-budget.js, LIN-2118) uses to turn windowed $ spend into an estimated % of the subscription window (optional; defaults to the one recorded LIN-2087 correlation, ≈$39.65/point)
+WEEKLY_BUDGET_CHECKPOINT_PERCENT  An operator-entered current-window-% reading, paired with WEEKLY_BUDGET_CHECKPOINT_AT, that recalibrates the burn gauge (optional; ignored — falls back to a telemetry-only estimate from zero at reset — unless its paired timestamp falls inside the CURRENT Thursday-06:00Z-reset window)
+WEEKLY_BUDGET_CHECKPOINT_AT  ISO timestamp of the WEEKLY_BUDGET_CHECKPOINT_PERCENT reading above (optional; both vars are read together, see lib/weekly-budget.js)
 ```
 
 The five `GITHUB_*` required vars are the exact set in `GITHUB_REQUIRED_ENV` (`lib/providers/github/app-auth.js`); `getMissingGitHubConfig()` reports which are unset. `GITHUB_API_BASE`, `GITHUB_OAUTH_AUTHORIZE_URL`, and `GITHUB_OAUTH_TOKEN_URL` are **hardcoded consts**, not environment variables — do not add them here.

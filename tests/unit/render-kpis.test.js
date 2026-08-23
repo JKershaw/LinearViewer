@@ -77,6 +77,20 @@ function buildStats(overrides = {}) {
       attributableLineageShare: 0.95,
       captureRateShare: 0.85
     },
+    weeklyBudgetGauge: {
+      resetAt: '2026-06-05T06:00:00.000Z',
+      nextResetAt: '2026-06-12T06:00:00.000Z',
+      hoursElapsed: 126,
+      usdPerPoint: 39.65,
+      percentConsumed: 56.3,
+      percentSource: 'telemetry-estimate',
+      burnRatePerHour: 1.5,
+      projectedExhaustionAt: '2026-06-13T02:00:00.000Z',
+      checkpoint: null,
+      windowLineageCount: 40,
+      windowPricedLineageShare: 0.9,
+      dayBars: { days: ['2026-06-09', '2026-06-10'], costUsd: [45.2, 61.8] }
+    },
     funnel: { dispatched: 20, taken: 15, reported: 12, completed: 9 },
     dispatchKinds: [{ label: 'autopilot', count: 4 }, { label: 'research', count: 3 }],
     stepOutcomes: { completed: 5, failed: 1, blocked: 0, other: 2 },
@@ -138,7 +152,7 @@ describe('renderKpisPage', () => {
     const html = renderKpisPage(buildStats());
 
     for (const id of [
-      'chart-proxy-phases', 'chart-outcome-trend', 'chart-dispatch-weekly',
+      'chart-proxy-phases', 'chart-weekly-budget', 'chart-outcome-trend', 'chart-dispatch-weekly',
       'chart-dispatch-kinds', 'chart-funnel', 'chart-step-outcomes',
       'chart-proxy-status', 'chart-top-endpoints', 'chart-hour-of-day',
       'chart-free-tier'
@@ -541,5 +555,81 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
       }
     }));
     assert.ok(html.includes('close-out linked —'), 'null must still render as a dash, not 0% or <1%');
+  });
+});
+
+describe('renderKpisPage: weekly-budget burn gauge card (LIN-2118)', () => {
+  test('renders the estimate value, and labels it as an estimate never a direct meter read', () => {
+    const html = renderKpisPage(buildStats());
+    assert.ok(html.includes('<span class="kpi-budget-value">56.3%</span>'));
+    assert.ok(html.includes('of weekly subscription window consumed (estimate)'));
+    assert.ok(html.includes('never a direct meter read'));
+  });
+
+  test('sources the estimate from telemetry when no operator checkpoint exists this window', () => {
+    const html = renderKpisPage(buildStats());
+    assert.ok(html.includes('estimate from telemetry alone — no operator reading yet this window'));
+  });
+
+  test('sources the estimate from an operator reading, naming its timestamp, when a checkpoint exists', () => {
+    const html = renderKpisPage(buildStats({
+      weeklyBudgetGauge: {
+        resetAt: '2026-06-05T06:00:00.000Z', nextResetAt: '2026-06-12T06:00:00.000Z',
+        hoursElapsed: 10, usdPerPoint: 39.65, percentConsumed: 42, percentSource: 'operator-reading',
+        burnRatePerHour: 1.2, projectedExhaustionAt: null,
+        checkpoint: { percent: 40, at: '2026-06-05T16:00:00.000Z' },
+        windowLineageCount: 5, windowPricedLineageShare: 1, dayBars: { days: [], costUsd: [] }
+      }
+    }));
+    assert.ok(html.includes('estimate anchored to an operator reading at 2026-06-05 16:00 UTC'));
+  });
+
+  test('renders the burn rate and the projected clip time', () => {
+    const html = renderKpisPage(buildStats());
+    assert.ok(html.includes('burn rate 1.5 pts/hr (last 24h)'));
+    assert.ok(html.includes('at this rate the window exhausts 2026-06-13 02:00 UTC'));
+  });
+
+  test('a null projection renders an honest "not projected", never a fabricated time', () => {
+    const html = renderKpisPage(buildStats({
+      weeklyBudgetGauge: {
+        resetAt: '2026-06-05T06:00:00.000Z', nextResetAt: '2026-06-12T06:00:00.000Z',
+        hoursElapsed: 1, usdPerPoint: 39.65, percentConsumed: null, percentSource: 'none',
+        burnRatePerHour: null, projectedExhaustionAt: null, checkpoint: null,
+        windowLineageCount: 0, windowPricedLineageShare: null, dayBars: { days: [], costUsd: [] }
+      }
+    }));
+    assert.ok(html.includes('<span class="kpi-budget-value">—</span>'));
+    assert.ok(html.includes('no data yet this window'));
+    assert.ok(html.includes('not projected to exhaust at the current rate'));
+  });
+
+  test('publishes the window span and the priced-lineage provenance disclosure beside the number', () => {
+    const html = renderKpisPage(buildStats());
+    assert.ok(html.includes('window 2026-06-05 06:00 UTC → 2026-06-12 06:00 UTC'));
+    assert.ok(html.includes('40 lineages this window · 90% priced'));
+  });
+
+  test('degrades safely when weeklyBudgetGauge is entirely absent from stats', () => {
+    const stats = buildStats();
+    delete stats.weeklyBudgetGauge;
+    const html = renderKpisPage(stats);
+    assert.ok(html.includes('<span class="kpi-budget-value">—</span>'));
+    assert.ok(html.includes('no data yet this window'));
+  });
+
+  test('the card renders on the shared .card primitive, above and outside .kpi-cards (grid count unaffected)', () => {
+    const html = renderKpisPage(buildStats());
+    assert.ok(html.includes('class="card kpi-budget-card"'));
+    assert.ok(
+      html.indexOf('kpi-budget-card') < html.indexOf('data-section="kpi-cards"'),
+      'the budget card renders above the stat card grid'
+    );
+    assert.strictEqual((html.match(/class="card kpi-card"/g) || []).length, 11);
+  });
+
+  test('never uses "verified" or a reserved-word synonym anywhere in the rendered page', () => {
+    const html = renderKpisPage(buildStats());
+    assert.ok(!/verified/i.test(html));
   });
 });

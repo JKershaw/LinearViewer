@@ -366,6 +366,28 @@
     });
   }
 
+  // --- Weekly budget burn: $ spend per day, current subscription window ---
+  const weeklyBudget = (data.weeklyBudgetGauge && data.weeklyBudgetGauge.dayBars) || { days: [], costUsd: [] };
+  if (!emptyUnless('chart-weekly-budget', sum(weeklyBudget.costUsd))) {
+    new Chart(document.getElementById('chart-weekly-budget'), {
+      type: 'bar',
+      data: {
+        labels: weeklyBudget.days.map(shortDay),
+        datasets: [{ label: 'API-rate-equivalent $', data: weeklyBudget.costUsd, backgroundColor: COLORS.yellow }]
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function (ctx) { return '$' + ctx.parsed.y.toFixed(2); } } }
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, grid: { color: COLORS.grid }, ticks: { callback: function (v) { return '$' + v; } } }
+        }
+      }
+    });
+  }
+
   // --- Free tier prompts bar (7 days) ---
   const freeTier = data.freeTier;
   if (!emptyUnless('chart-free-tier', sum(freeTier.counts))) {
