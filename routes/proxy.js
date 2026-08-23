@@ -1068,7 +1068,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     }));
   }
 
-  function logEvent(req, endpoint, status, note = null) {
+  function logEvent(req, endpoint, status, note = null, { skipWitness = false } = {}) {
     // LIN-2236 (L5.2 of the LIN-2231 design): 503 joins 401 here — every 503
     // this proxy returns already IS a workspace-credential resolution failure
     // (workspaceUnavailable's reasons: store_unreachable / session_expired /
@@ -1090,6 +1090,46 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // common owner_mismatch/not_connected/… case), leaves the fingerprint
       // unset, and `markSuspect` fails open on that (no-op) either way.
       rejectedCredentialRegistry?.markSuspect(req.resolvedCredentialFingerprint, { reason: status === 401 ? 'provider-401' : 'workspace-503', now: Date.now() });
+    } else if (status >= 200 && status < 300 && req.resolvedCredentialFingerprint && !skipWitness) {
+      // LIN-2109: the positive half of the acceptance witness — a genuine
+      // 2xx provider-lane response carrying a resolved fingerprint is the
+      // sound proof this credential is accepted by the provider, unlike mere
+      // exchange success or adoption (see lib/rejected-credentials.js's
+      // module doc and `accept()`'s own doc for why those are NOT this
+      // signal — LIN-1983's two singleton fingerprints were exchanged,
+      // adopted, `accept()`ed, and 401'd immediately). A 503 never reaches
+      // here (handled above) precisely because a 503 is a resolution
+      // failure, not a provider response — there is nothing to witness.
+      //
+      // Deliberately 2xx-only, NOT "any non-401" (an earlier revision was):
+      // `logEvent` is the single write seam for EVERY proxy response,
+      // including one that resolved a credential (so
+      // `req.resolvedCredentialFingerprint` is truthy) and then failed a
+      // purely LOCAL guard before ever reaching the provider — a malformed
+      // issueId (400), an unsupported-capability decline (422,
+      // `denyIfUnsupported`), or a duplicate-dispatch/budget refusal (409).
+      // None of those contacted the provider at all; witnessing them would
+      // record acceptance for a credential nothing ever asked the provider
+      // about, poisoning the exact signal this ticket exists to make sound
+      // (found by code review; regression-pinned in
+      // tests/unit/lin-2109-credential-acceptance-witness.test.js).
+      //
+      // `skipWitness` (found by a SECOND review pass) covers the same class
+      // one level deeper: a 2xx that never reached the provider because a
+      // CACHE answered it instead — the comment-create dedupe hit (LIN-399,
+      // below) returns a stored prior response without calling
+      // `provider.createComment`. Rather than keep hunting the next such
+      // site by inspection, callers that know they are serving a cached/
+      // local-only 2xx pass this explicitly; new call sites default to
+      // witnessing, so an audit gap fails toward "extra witness," never
+      // toward silently reintroducing a suspect-401-look-alike gap.
+      //
+      // Double-optional-chained (not just on the registry, on the METHOD
+      // too): `witnessAccepted` is new — an older fake registry (several
+      // exist across this suite, implementing only
+      // markSuspect/isSuspect/shouldAttemptRefresh/accept) must degrade to a
+      // no-op here, not throw and hang the request.
+      rejectedCredentialRegistry?.witnessAccepted?.(req.resolvedCredentialFingerprint, Date.now());
     }
     // LIN-2076: `stage` + `credentialFingerprint`, persisted at this single
     // existing write seam instead of discarded (the ticket's own diagnosis:
@@ -3318,7 +3358,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       const key = dedupeKey(req.proxyUrlKey, issueId, body, commentDedupeGenerations.current(req.proxyUrlKey));
       const prior = commentDedupe.get(key);
       if (prior) {
-        logEvent(req, '/api/proxy/issues/comments', 200);
+        // LIN-2109: skipWitness — this 200 is served from the dedupe cache,
+        // never from `provider.createComment` below, so it is not evidence
+        // the provider accepted anything on THIS request.
+        logEvent(req, '/api/proxy/issues/comments', 200, null, { skipWitness: true });
         return res.status(200).json({ ...prior, deduped: true });
       }
 

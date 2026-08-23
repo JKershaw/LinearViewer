@@ -214,7 +214,7 @@ describe('refresh_skip/refresh_fail/refresh_success lifecycle-event wiring (LIN-
 
 describe('logEvent/logCredentialRejection widening (LIN-2236, L5.2 — witness, source-grep)', () => {
   test('logEvent treats 401 and 503 identically — both reach logCredentialRejection and markSuspect', () => {
-    const start = PROXY_SRC.indexOf('function logEvent(req, endpoint, status, note = null) {');
+    const start = PROXY_SRC.indexOf('function logEvent(req, endpoint, status, note = null, { skipWitness = false } = {}) {');
     assert.ok(start >= 0);
     const end = PROXY_SRC.indexOf('\n  }', start);
     const body = PROXY_SRC.slice(start, end);
