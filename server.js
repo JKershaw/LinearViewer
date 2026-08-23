@@ -51,11 +51,13 @@ import { BriefCacheStore } from './lib/brief-cache.js'
 import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
 import { AccountStore } from './lib/account-store.js'
 import { AccountMergeLogStore } from './lib/account-merge-log.js'
+import { CredentialLifecycleEventStore, CREDENTIAL_LIFECYCLE_EVENT_KINDS } from './lib/credential-lifecycle-events.js'
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
 import { createObserverSweepRun } from './lib/observer-sweep.js'
+import { createCredentialInvariantSweepRun } from './lib/credential-invariant-sweep.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
@@ -534,6 +536,17 @@ const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWor
 const ownerCredentialsCollection = db.collection('owner-credentials')
 const ownerCredentialStore = new OwnerCredentialStore({ collection: ownerCredentialsCollection })
 
+// Credential-lifecycle event log (LIN-2236, L5.1 of the LIN-2231 design):
+// durable, append-only record of refresh_skip/refresh_fail/refresh_success/
+// owner_mismatch_503/spend_intent events, so this survives Railway's rolling
+// ~7-day log window the way lib/account-merge-log.js's narrower log already
+// does for merges (LIN-2233). Threaded into resolveWorkspaceAccess and both
+// human refresh entrants (ensureValidToken, handleTokenRefreshAndRetry)
+// below — optional at every call site, so nothing regresses if it is ever
+// omitted.
+const credentialLifecycleEventsCollection = db.collection('credential-lifecycle-events')
+const credentialLifecycleEventStore = new CredentialLifecycleEventStore({ collection: credentialLifecycleEventsCollection })
+
 // Durable observer-instance state (LIN-2129, P1-2 of the LIN-2114 observer-harness
 // epic). One current, versioned state document per observer instance, advanced by
 // a monotonic-rev compare-and-set (shaped on ownerCredentialStore's CAS above) —
@@ -589,6 +602,34 @@ scheduler.register({
 // caller, so the shape sets the precedent.
 }).catch((err) => {
   console.error(`[observer-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
+})
+
+// Credential-lifecycle invariant sweep (LIN-2236, L5.4 of the LIN-2231
+// design): "each (canonical account, workspace) pair with a live
+// account↔workspace edge resolves to a durable owner-credentials record
+// with a future expiry" — a startup/periodic assertion, logged loudly AND
+// durably the moment it breaks, instead of surfacing six days later as a
+// support incident (this design's own origin story). A much longer interval
+// than the observer sweep above: this is a slow-changing invariant over
+// account/credential state, not a fast-moving dispatch fleet census.
+const CREDENTIAL_INVARIANT_SWEEP_INTERVAL_MS = 15 * 60 * 1000 // 15 minutes
+const CREDENTIAL_INVARIANT_SWEEP_LEASE_MS = 5 * 60 * 1000
+scheduler.register({
+  name: 'credential-invariant-sweep',
+  intervalMs: CREDENTIAL_INVARIANT_SWEEP_INTERVAL_MS,
+  leaseMs: CREDENTIAL_INVARIANT_SWEEP_LEASE_MS,
+  run: createCredentialInvariantSweepRun({
+    accountWorkspaceStore,
+    accountStore,
+    ownerCredentialStore,
+    lifecycleEventStore: credentialLifecycleEventStore,
+    sessionsCollection
+  })
+// Same discipline as observer-sweep's own registration above: not awaited
+// (a failed seed write must not abort server boot), with a purpose-written
+// catch so a silent-never-runs state is diagnosable rather than inferred.
+}).catch((err) => {
+  console.error(`[credential-invariant-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
 })
 
 // =============================================================================
@@ -821,7 +862,8 @@ async function ensureValidToken(req, res, next) {
         urlKey: workspace.urlKey,
         provider,
         refreshAccessToken: exchange,
-        store: ownerCredentialStore
+        store: ownerCredentialStore,
+        lifecycleEventStore: credentialLifecycleEventStore
       })
       if (!refreshed) {
         throw new Error(`No durable ${provider} credential to refresh workspace ${workspace.id}`)
@@ -1221,7 +1263,8 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
     urlKey: workspace.urlKey,
     provider,
     refreshAccessToken: exchange,
-    store: ownerCredentialStore
+    store: ownerCredentialStore,
+    lifecycleEventStore: credentialLifecycleEventStore
   });
   // The durable record vanished between the caller's gate and here (rare): treat
   // it as a non-definitive failure so the caller's catch 503s rather than
@@ -1762,9 +1805,15 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 //                       SIGNAL, not a proof: it fires both when the owner account genuinely
 //                       no longer holds this workspace (re-auth cannot fix it) and when the
 //                       owner's own token merely lapsed while a legitimate colleague on the
-//                       same workspace is live (re-auth CAN fix it). The session data cannot
-//                       tell those apart — do not claim it can; see detectOwnerAccountMismatch
-//                       and lib/errors.js's hedged owner_mismatch detail (LIN-1413)
+//                       same workspace is live (re-auth CAN fix it). classifyWorkspaceFailure
+//                       does not consult account identity to tell those two apart — see
+//                       detectOwnerAccountMismatch and lib/errors.js's hedged owner_mismatch
+//                       detail (LIN-1413). LIN-2231 built the same-human identity concept this
+//                       family was missing (merge-on-proof account unification in
+//                       AccountStore.mergeAccounts, canonical token-authority resolution in
+//                       resolveCanonicalAccountId above) — it closes the accountId-FORK defect
+//                       this reason's ambiguity traces back to, not this classification's own
+//                       session-level signal, which stays exactly as uncertain as documented.
 //   owner_signed_out  → the owner has no session row at all (not scoped to this workspace).
 //                       Reclassified from not_connected: honest about the real remedy (sign
 //                       in again, or issue a fresh token) instead of implying the workspace
@@ -2004,7 +2053,8 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
             // retired. Same map both human dispatches read, so a provider cannot
             // be refreshable in a browser and not on this lane.
             resolveExchange: refreshExchangeFor,
-            store: ownerCredentialStore
+            store: ownerCredentialStore,
+            lifecycleEventStore: credentialLifecycleEventStore
           });
           if (refreshed) {
             workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider, scope: refreshed.scope });
@@ -2013,6 +2063,14 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
         } catch (err) {
           console.error(`Token refresh-on-resolve failed for workspace ${urlKey}:`, err);
         }
+      } else {
+        // LIN-2236 (L5.1, refresh_skip branch 1/3): LIN-2097's 60s
+        // refreshOnResolveGate suppressed this attempt — previously silent.
+        credentialLifecycleEventStore.recordEvent({
+          accountId: ownerAccountId, urlKey, provider: selected.provider,
+          kind: CREDENTIAL_LIFECYCLE_EVENT_KINDS.REFRESH_SKIP,
+          detail: { branch: 'cooldown-gate' }
+        }).catch(err => console.error('Failed to record credential-lifecycle event:', err));
       }
     }
 
@@ -2041,6 +2099,19 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
       finalReason: reason,
       ...diag
     });
+
+    // LIN-2236 (L5.1, owner_mismatch_503 kind): the durable twin of the
+    // console.warn above, scoped to the specific reason L5.1 names — carries
+    // the SAME diagnostic already computed for the log line, so this is a
+    // durable copy, not new derivation. Fire-and-forget, same discipline as
+    // routes/proxy.js's logEvent, since this sits on the hot resolve path.
+    if (reason === 'owner_mismatch') {
+      credentialLifecycleEventStore.recordEvent({
+        accountId: ownerAccountId, urlKey, provider: selected.provider,
+        kind: CREDENTIAL_LIFECYCLE_EVENT_KINDS.OWNER_MISMATCH_503,
+        detail: diag
+      }).catch(err => console.error('Failed to record credential-lifecycle event:', err));
+    }
 
     // reason/provider are already the right shape for the workspaceUnavailable
     // 503 envelope — see lib/workspace-token-resolver.js. selected.token is

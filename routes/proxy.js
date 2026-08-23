@@ -1055,21 +1055,40 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // flood can be attributed to one agent's credential rather than guessed at.
       proxyTokenId: req.proxyTokenId ?? null,
       proxyTokenLabel: req.proxyTokenLabel ?? null,
-      ...(descriptor ?? {}),
+      // LIN-2236 (LIN-2231 amendment A4): a 503 this now also covers (see
+      // logEvent below) frequently means NO credential was ever selected —
+      // `credentialResolutions` has no entry for this (urlKey, createdBy) pair
+      // to spread in. That absence is itself a diagnostic fact, not nothing:
+      // record it explicitly as `credentialSource: 'none'` rather than
+      // silently omitting the field (which is indistinguishable, on the wire,
+      // from a descriptor whose source happened to be missing for some other
+      // reason).
+      ...(descriptor ?? { credentialSource: 'none' }),
     }));
   }
 
   function logEvent(req, endpoint, status, note = null) {
-    if (status === 401) {
+    // LIN-2236 (L5.2 of the LIN-2231 design): 503 joins 401 here — every 503
+    // this proxy returns already IS a workspace-credential resolution failure
+    // (workspaceUnavailable's reasons: store_unreachable / session_expired /
+    // not_connected / token_ownerless / owner_mismatch / owner_signed_out),
+    // so the rejection-trail machinery (credentialResolutions lookup,
+    // rejectedCredentialRegistry) that only ever fired for a 401 (the
+    // provider rejecting a credential we DID resolve) was structurally blind
+    // to the whole "we couldn't resolve one at all" class. No new plumbing —
+    // logCredentialRejection's lookup already keys on (urlKey, createdBy),
+    // which every call site already has.
+    if (status === 401 || status === 503) {
       logCredentialRejection(req, endpoint);
       // LIN-1980: mark the credential THIS request actually resolved suspect
       // — sourced from `req.resolvedCredentialFingerprint` (stamped at
       // resolution time by resolveProviderAccess / the 9 direct
       // resolveWorkspaceAccess call sites), never from `credentialResolutions`
       // above, which is logging-only and can miss a direct-resolve site. A
-      // proxy-token-stage 401 (no workspace credential ever resolved) leaves
-      // the fingerprint unset, and `markSuspect` fails open on that (no-op).
-      rejectedCredentialRegistry?.markSuspect(req.resolvedCredentialFingerprint, { reason: 'provider-401', now: Date.now() });
+      // proxy-token-stage 401, or a 503 where nothing ever resolved (the
+      // common owner_mismatch/not_connected/… case), leaves the fingerprint
+      // unset, and `markSuspect` fails open on that (no-op) either way.
+      rejectedCredentialRegistry?.markSuspect(req.resolvedCredentialFingerprint, { reason: status === 401 ? 'provider-401' : 'workspace-503', now: Date.now() });
     }
     proxyEventStore.recordEvent({
       urlKey: req.proxyUrlKey,
