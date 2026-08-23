@@ -1,10 +1,10 @@
 # Harbour
 
-> A minimal web app that displays Linear projects and issues as a collapsible tree with a CLI aesthetic.
+> A minimal web app that displays your task tracker's projects and issues as a collapsible tree with a CLI aesthetic. Backed by Linear, GitHub, GitHub Projects, Jira, or a local store.
 
 ## Overview
 
-- Syncs with Linear via OAuth
+- Syncs with your workspace's provider (Linear, GitHub, GitHub Projects, Jira, or a local store) via OAuth or token auth
 - Supports multiple workspaces
 - Displays projects and issues in a tree structure with box-drawing characters
 
@@ -71,7 +71,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `.node > .line` - task row element within a node
 - `.node > .details` - details panel (sibling of .line within same node)
 - `.node > .children` - container for nested child nodes
-- `[data-id="{linear-issue-id}"]` - task by Linear issue ID (on both .node and .line)
+- `[data-id="{issue-id}"]` - task by issue ID (on both .node and .line; the provider's own canonical id, not Linear-specific)
 - `[data-testid="issue-line"]` - stable task-row hook (on .line; pair with `[data-id]` for a specific issue)
 - `[data-testid="issue-source"]` - per-task source flag, e.g. `data-source="github"` (present only in a multi-provider workspace; absent for single-source/Linear-only)
 - `[data-testid="project"][data-project-name="{name}"]` - project card by name (`[data-testid="project-header"]` on its header)
