@@ -13,6 +13,8 @@
  *   GET      /workspace/:urlKey/api/dashboard/loops                — merged cross-workspace runs (flat poll source)
  *   GET      /workspace/:urlKey/api/dashboard/rulings              — unanswered-decision feed (ambient count + rulings tab; LIN-1728)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/dismiss      — dismiss a loop-backed ruling with no comment (LIN-2225; the task-bound sibling reuses the existing scan dismiss route instead)
+ *   GET      /workspace/:urlKey/escalation-kpis                    — operator-facing escalation KPI audit page (LIN-1736; rate, time-to-response, false-escalation, unanswered age); ?windowDays= (default 30), ?targetPerDay= (optional)
+ *   GET      /workspace/:urlKey/api/escalation-kpis                — the same KPIs as JSON
  *   GET|POST /workspace/:urlKey/api/dashboard/run-summary/:loopId  — cached, on-demand short run summary
  *   GET|POST /workspace/:urlKey/api/dashboard/session-summary/:sessionId — cached session rollup (terminal); cheap latest-child statusLine proxy when live (LIN-592)
  *   GET      /workspace/:urlKey/api/dashboard/session-context/:sessionId — deterministic tasks-touched + relationship graph (LIN-593)
@@ -34,7 +36,9 @@ import { Router, json } from 'express';
 import { jsonError } from '../lib/errors.js';
 import { renderObservationPage } from '../lib/render-observation.js';
 import { renderSessionPage } from '../lib/render-session.js';
-import { getLoopsForWorkspace, getLoopsForIssue, getSessionsForWorkspace, getSessionsForIssues, deriveIssueGraph } from '../lib/pipeline-loops.js';
+import { getLoopsForWorkspace, getLoopsForIssue, getSessionsForWorkspace, getSessionsForIssues, deriveIssueGraph, resolvedDecisionEvents, firstRaisedAt } from '../lib/pipeline-loops.js';
+import { computeEscalationKpis } from '../lib/escalation-kpis.js';
+import { renderEscalationKpisPage } from '../lib/render-escalation-kpis.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -1441,6 +1445,115 @@ export function createDashboardRoutes({
     } catch (error) {
       console.error('Ruling dismiss error:', error);
       jsonError(res, 500, 'Failed to dismiss ruling');
+    }
+  });
+
+  // ─── Escalation KPIs — operator-facing audit page (LIN-1736) ────────────────
+  //
+  // Per docs/escalation-philosophy.md §7: escalation rate, time-to-response,
+  // false-escalation rate, unanswered age — the tuning loop that keeps the
+  // whole system honest. Session-authed, cross-workspace like the rest of
+  // Observation; never the public /kpis surface (lib/kpi-stats.js's privacy
+  // boundary is untouched by this route). Loads on demand rather than being
+  // polled, so a full NON-lean per-workspace read (real feedback[], needed
+  // for resolvedDecisionEvents) is acceptable here in a way it would not be
+  // on the ambient rulings poll (LIN-2227's own lesson).
+  //
+  // "Escalation rate per human" reduces here to "per workspace" — see
+  // lib/escalation-kpis.js's own docstring for why. `targetPerDay` is
+  // deliberately not hardcoded (no software-engineering-context figure has
+  // been established for this product); pass `?targetPerDay=` to set one.
+  async function computeWorkspaceEscalationKpis(workspaces, { windowMs, now, targetPerDay }) {
+    const sinceMs = now.getTime() - windowMs;
+
+    const perWorkspaceLoops = await Promise.all(workspaces.map(urlKey =>
+      getLoopsForWorkspace(urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: false }).catch(() => [])
+    ));
+    const loops = perWorkspaceLoops.flat();
+
+    const loopResolvedEvents = loops.flatMap(loop => resolvedDecisionEvents(loop.feedback));
+
+    const taskResolvedRows = taskDecisionsStore
+      ? await taskDecisionsStore.listResolvedForWorkspaces(workspaces, sinceMs)
+      : [];
+    const taskResolvedEvents = taskResolvedRows.map(r => ({
+      decisionId: r.id, raisedAt: r.scannedAt, resolvedAt: r.outcomeAt, outcome: r.outcome
+    }));
+
+    const taskUnansweredRows = taskDecisionsStore
+      ? await taskDecisionsStore.listUnansweredForWorkspaces(workspaces)
+      : [];
+    // Same predicate the live rulings feed uses (routes/dashboard.js's own
+    // /api/dashboard/rulings above) — never a second, divergent "is this
+    // unanswered" derivation.
+    const unansweredRulings = collectUnansweredDecisions({ loops, taskDecisions: taskUnansweredRows }, { now });
+
+    const unansweredRows = unansweredRulings.map(row => {
+      if (row.disposition === 'task-bound') {
+        const match = taskUnansweredRows.find(t => t.decision?.decision_id === row.decision?.decision_id);
+        return { decisionId: row.decision?.decision_id, raisedAt: match?.scannedAt || null };
+      }
+      const loop = loops.find(l => l.loopId === row.anchor?.loopId);
+      return { decisionId: row.decision?.decision_id, raisedAt: firstRaisedAt(loop?.feedback, row.decision?.decision_id) };
+    });
+
+    return computeEscalationKpis({
+      resolvedEvents: [...loopResolvedEvents, ...taskResolvedEvents],
+      unansweredRows,
+      windowMs,
+      targetPerDay,
+      now
+    });
+  }
+
+  function parseWindowDays(req) {
+    const parsed = parseInt(req.query.windowDays, 10);
+    return Number.isFinite(parsed) ? Math.max(1, Math.min(365, parsed)) : 30;
+  }
+
+  function parseTargetPerDay(req) {
+    if (req.query.targetPerDay === undefined) return null;
+    const parsed = parseFloat(req.query.targetPerDay);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  }
+
+  router.get('/workspace/:urlKey/escalation-kpis', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const workspaces = (req.session.workspaces || []).map(w => w.urlKey);
+    const windowDays = parseWindowDays(req);
+    const targetPerDay = parseTargetPerDay(req);
+    const now = new Date();
+
+    try {
+      const kpis = await computeWorkspaceEscalationKpis(workspaces, { windowMs: windowDays * 24 * 60 * 60 * 1000, now, targetPerDay });
+      res.send(renderEscalationKpisPage(workspace.name, {
+        urlKey: workspace.urlKey,
+        workspaces: req.session.workspaces || [],
+        featureFlags: getFeatureFlags(req.session),
+        kpis,
+        windowDays,
+        generatedAt: now.toISOString()
+      }));
+    } catch (error) {
+      console.error('Escalation KPIs page error:', error);
+      res.status(500).send('Failed to compute escalation KPIs');
+    }
+  });
+
+  router.get('/workspace/:urlKey/api/escalation-kpis', workspaceFromUrl, async (req, res) => {
+    const workspaces = (req.session.workspaces || []).map(w => w.urlKey);
+    const windowDays = parseWindowDays(req);
+    const targetPerDay = parseTargetPerDay(req);
+    const now = new Date();
+    const keepalive = armKeepalive(res);
+    try {
+      const kpis = await computeWorkspaceEscalationKpis(workspaces, { windowMs: windowDays * 24 * 60 * 60 * 1000, now, targetPerDay });
+      keepalive.stop();
+      keepalive.send(200, { windowDays, generatedAt: now.toISOString(), ...kpis });
+    } catch (error) {
+      console.error('Escalation KPIs error:', error);
+      keepalive.stop();
+      keepalive.send(500, { error: 'Could not compute escalation KPIs' });
     }
   });
 

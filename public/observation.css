@@ -192,6 +192,18 @@
 .obs-feed-empty { color: var(--muted); font-size: 0.85rem; padding: 0.4rem 0; }
 .obs-feed-empty.hidden { display: none; }
 
+/* Discovery link from the Rulings tab to the escalation KPI audit page
+   (LIN-1736) — a normal-case link, not an eyebrow-styled label, floated to
+   the opposite end of the same heading row. */
+.obs-rulings-kpis-link {
+  float: right;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  color: var(--fg-dim);
+}
+.obs-rulings-kpis-link:hover { color: var(--blue); }
+
 /* Rulings tab (LIN-1728 Phase 4). One card per unanswered decision — an
    amber left accent (the escalation/waiting hue, matching `.chat-msg--blocked`
    in chat.css) rather than the status-hue accents .obs-session uses, since a

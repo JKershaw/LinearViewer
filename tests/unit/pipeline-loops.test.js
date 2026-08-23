@@ -17,6 +17,8 @@ import {
   getLoopsForWorkspace,
   getSessionsForWorkspace,
   isDecisionAnswerEntry,
+  resolvedDecisionEvents,
+  firstRaisedAt,
   __internal
 } from '../../lib/pipeline-loops.js';
 import { parseDecisions, parseHeartbeat } from '../../lib/session-telemetry.js';
@@ -1488,6 +1490,111 @@ describe('_findDecisionAnswer (LIN-1728, backward scan)', () => {
   test('a dismiss-tagged entry ({decision_id, outcome:"dismissed"}) still resolves the decision_id', () => {
     const feedback = [{ kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1', outcome: 'dismissed' }), timestamp: 't1' }];
     assert.strictEqual(_findDecisionAnswer(feedback), 'd-1');
+  });
+});
+
+// LIN-1736: the loop-backed half of the escalation KPIs' time-to-response and
+// false-escalation inputs — every RESOLVED decision in a loop's feedback,
+// paired with when it was raised and how it was resolved.
+describe('resolvedDecisionEvents (LIN-1736)', () => {
+  test('null/non-array feedback yields []', () => {
+    assert.deepStrictEqual(resolvedDecisionEvents(undefined), []);
+    assert.deepStrictEqual(resolvedDecisionEvents(null), []);
+  });
+
+  test('a decision with no matching stamp is excluded (still-unanswered is not this function\'s question)', () => {
+    const feedback = [decisionEntry({ decision_id: 'd-1', question: 'q?' }, 't1')];
+    assert.deepStrictEqual(resolvedDecisionEvents(feedback), []);
+  });
+
+  test('a resolved decision pairs raisedAt (the decision entry) with resolvedAt (the stamp), outcome "answered" when the stamp carries no outcome field', () => {
+    const feedback = [
+      decisionEntry({ decision_id: 'd-1', question: 'q?' }, 't1'),
+      answerEntry('d-1', 't2'),
+    ];
+    assert.deepStrictEqual(resolvedDecisionEvents(feedback), [
+      { decisionId: 'd-1', raisedAt: 't1', resolvedAt: 't2', outcome: 'answered' },
+    ]);
+  });
+
+  test('outcome "dismissed" is read off the stamp\'s own outcome field (LIN-2225)', () => {
+    const feedback = [
+      decisionEntry({ decision_id: 'd-1', question: 'q?' }, 't1'),
+      { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1', outcome: 'dismissed' }), timestamp: 't2' },
+    ];
+    assert.deepStrictEqual(resolvedDecisionEvents(feedback), [
+      { decisionId: 'd-1', raisedAt: 't1', resolvedAt: 't2', outcome: 'dismissed' },
+    ]);
+  });
+
+  test('multiple distinct decisions in one loop each resolve independently', () => {
+    const feedback = [
+      decisionEntry({ decision_id: 'd-1', question: 'first?' }, 't1'),
+      answerEntry('d-1', 't2'),
+      decisionEntry({ decision_id: 'd-2', question: 'second?' }, 't3'),
+      answerEntry('d-2', 't4'),
+    ];
+    assert.deepStrictEqual(resolvedDecisionEvents(feedback), [
+      { decisionId: 'd-1', raisedAt: 't1', resolvedAt: 't2', outcome: 'answered' },
+      { decisionId: 'd-2', raisedAt: 't3', resolvedAt: 't4', outcome: 'answered' },
+    ]);
+  });
+
+  test('FIRST occurrence wins on both sides — a dedup-retry double-stamp (LIN-2208) does not shift the resolution instant, and a re-raised decision_id keeps its ORIGINAL raisedAt', () => {
+    const feedback = [
+      decisionEntry({ decision_id: 'd-1', question: 'q?' }, 't1'),
+      decisionEntry({ decision_id: 'd-1', question: 'q? (re-asked)' }, 't1b'),
+      answerEntry('d-1', 't2'),
+      answerEntry('d-1', 't2b'), // a redundant re-stamp of the same decision_id
+    ];
+    assert.deepStrictEqual(resolvedDecisionEvents(feedback), [
+      { decisionId: 'd-1', raisedAt: 't1', resolvedAt: 't2', outcome: 'answered' },
+    ]);
+  });
+
+  test('a malformed stamp is skipped, not thrown', () => {
+    const feedback = [
+      decisionEntry({ decision_id: 'd-1', question: 'q?' }, 't1'),
+      { kind: 'decision-answer', message: 'not-json', timestamp: 't2' },
+    ];
+    assert.deepStrictEqual(resolvedDecisionEvents(feedback), []);
+  });
+
+  test('a decision entry with no decision_id (unparseable) is tolerated — the answer, if any, still resolves with raisedAt: null', () => {
+    const feedback = [
+      { kind: 'decision', message: '[decision] not-json', timestamp: 't1' },
+      answerEntry('d-1', 't2'),
+    ];
+    assert.deepStrictEqual(resolvedDecisionEvents(feedback), [
+      { decisionId: 'd-1', raisedAt: null, resolvedAt: 't2', outcome: 'answered' },
+    ]);
+  });
+});
+
+// LIN-1736: the unanswered-age half — companion to resolvedDecisionEvents,
+// for a decision that has NOT been resolved.
+describe('firstRaisedAt (LIN-1736)', () => {
+  test('null/non-array feedback, or no decisionId, yields null', () => {
+    assert.strictEqual(firstRaisedAt(undefined, 'd-1'), null);
+    assert.strictEqual(firstRaisedAt([], null), null);
+  });
+
+  test('returns the timestamp of the matching decision entry', () => {
+    const feedback = [decisionEntry({ decision_id: 'd-1', question: 'q?' }, 't1')];
+    assert.strictEqual(firstRaisedAt(feedback, 'd-1'), 't1');
+  });
+
+  test('a decision_id never raised in this feedback yields null', () => {
+    const feedback = [decisionEntry({ decision_id: 'd-1', question: 'q?' }, 't1')];
+    assert.strictEqual(firstRaisedAt(feedback, 'd-2'), null);
+  });
+
+  test('FIRST occurrence wins — a re-raised decision_id keeps its original raisedAt', () => {
+    const feedback = [
+      decisionEntry({ decision_id: 'd-1', question: 'first ask' }, 't1'),
+      decisionEntry({ decision_id: 'd-1', question: 're-ask' }, 't2'),
+    ];
+    assert.strictEqual(firstRaisedAt(feedback, 'd-1'), 't1');
   });
 });
 

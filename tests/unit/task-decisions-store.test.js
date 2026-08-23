@@ -655,3 +655,64 @@ describe('TaskDecisionsStore.listUnansweredForWorkspaces (LIN-2215)', () => {
     assert.deepEqual(await unconfigured.listUnansweredForWorkspaces(['ws-a']), []);
   });
 });
+
+// LIN-1736: the task-bound half of the escalation KPIs' time-to-response and
+// false-escalation inputs.
+describe('TaskDecisionsStore.listResolvedForWorkspaces (LIN-1736)', () => {
+  let collection, store;
+  const ISSUE_ID_2 = '22222222-3333-4444-5555-666666666666';
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  test('an empty workspace set returns an empty list without touching the collection', async () => {
+    assert.deepEqual(await store.listResolvedForWorkspaces([], 0), []);
+    assert.deepEqual(await store.listResolvedForWorkspaces(undefined, 0), []);
+  });
+
+  test('spans multiple workspaces, resolved rows only — excludes unanswered and zero-finding rows', async () => {
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const idA = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await store.markOutcome({ urlKey: 'ws-a', issueId: ISSUE_ID, id: idA, outcome: 'answered' });
+
+    // Still-unanswered — must not appear.
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID_2, inputHash: HASH_A, decision: sampleDecision({ decision_id: 'scan_22222222_aaaaaaaaaaaa' }) });
+    // Zero-finding — must not appear.
+    await store.recordScan({ urlKey: 'ws-b', issueId: ISSUE_ID, inputHash: HASH_B, decision: null });
+
+    const rows = await store.listResolvedForWorkspaces(['ws-a', 'ws-b'], 0);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].outcome, 'answered');
+  });
+
+  test('excludes rows outside the requested workspace set', async () => {
+    await store.recordScan({ urlKey: 'ws-c', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await store.markOutcome({ urlKey: 'ws-c', issueId: ISSUE_ID, id, outcome: 'dismissed' });
+
+    assert.deepEqual(await store.listResolvedForWorkspaces(['ws-a'], 0), []);
+  });
+
+  test('sinceMs filters by outcomeAt — an older resolution is excluded', async () => {
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await store.markOutcome({ urlKey: 'ws-a', issueId: ISSUE_ID, id, outcome: 'answered' });
+
+    // Directly control outcomeAt (markOutcome stamps `new Date()` internally,
+    // not clock-injectable) — mirrors this test file's own direct-doc-poke
+    // convention elsewhere for timing-sensitive setup.
+    const doc = collection._docs.find(d => d._id === id);
+    doc.outcomeAt = new Date('2026-01-01T00:00:00.000Z');
+
+    const cutoff = new Date('2026-06-01T00:00:00.000Z').getTime();
+    assert.deepEqual(await store.listResolvedForWorkspaces(['ws-a'], cutoff), []);
+    assert.equal((await store.listResolvedForWorkspaces(['ws-a'], 0)).length, 1);
+  });
+
+  test('an unconfigured store (no collection) degrades to an empty list', async () => {
+    const unconfigured = new TaskDecisionsStore({});
+    assert.deepEqual(await unconfigured.listResolvedForWorkspaces(['ws-a'], 0), []);
+  });
+});
