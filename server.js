@@ -57,6 +57,7 @@ import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
 import { createObserverSweepRun } from './lib/observer-sweep.js'
+import { ObserverShadowLogStore } from './lib/observer-shadow-log.js'
 import { createCredentialInvariantSweepRun } from './lib/credential-invariant-sweep.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
@@ -555,6 +556,14 @@ const credentialLifecycleEventStore = new CredentialLifecycleEventStore({ collec
 const observerStateCollection = db.collection('observer-state')
 const observerStateStore = new ObserverStateStore({ collection: observerStateCollection })
 
+// Read-only shadow action log (LIN-2132, P1-5): logs what the sweep's
+// diagnosis WOULD have relayed, in the incumbent's own marker/comment
+// vocabulary, to its OWN store — never a write into the live dispatch
+// pipeline. See lib/observer-shadow-log.js's header for the P1 invariant
+// and the vocabulary mapping.
+const observerShadowLogCollection = db.collection('observer-shadow-log')
+const observerShadowLogStore = new ObserverShadowLogStore({ collection: observerShadowLogCollection })
+
 // Deterministic observer sweep (LIN-2131, P1-3): this scheduler's first real
 // consumer (see the `scheduler` construction comment above). `register()` alone
 // arms nothing — `scheduler.start()` below (in the `app.listen` callback) is
@@ -587,6 +596,7 @@ scheduler.register({
     dispatchStore: dispatchQueueStore,
     agentStatusStore,
     observerStateStore,
+    observerShadowLogStore,
     intervalMs: OBSERVER_SWEEP_INTERVAL_MS
   })
 // `register()` is async and its seed write can fail; close-out ledger item 7.
@@ -3665,6 +3675,14 @@ const server = app.listen(PORT, () => {
       }
     } catch (err) {
       console.error('Observer state cleanup error:', err)
+    }
+    try {
+      const removedCount = await observerShadowLogStore.cleanup()
+      if (removedCount > 0) {
+        console.log(`Observer shadow log cleanup: removed ${removedCount} aged entries`)
+      }
+    } catch (err) {
+      console.error('Observer shadow log cleanup error:', err)
     }
   }, CLEANUP_INTERVAL_MS)
 })
