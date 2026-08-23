@@ -501,6 +501,25 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   })
 
+  // Read-back sibling for a single dispatch item's raw feedback[] (LIN-2209):
+  // proves a write (e.g. a `decision-answer` stamp) actually landed in
+  // storage, independent of whatever a render layer chooses to do with it —
+  // a rendered-count assertion alone cannot distinguish "the stamp was
+  // written and correctly hidden from the transcript" from "the stamp was
+  // never written at all". Mirrors /test/task-decisions's read-back
+  // precedent (LIN-2217) for the dispatch-store side of the same discipline.
+  router.get('/test/dispatch-item', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace'
+      const itemId = req.query.itemId
+      if (!itemId) return res.status(400).json({ error: 'itemId is required' })
+      const item = await dispatchQueueStore.getItemStatus(urlKey, itemId)
+      res.json({ ok: true, feedback: item?.feedback || [] })
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
   // Endpoint to clear the materialized Observation sessions read-model for testing
   // (LIN-623). The derived projection and its source dispatch/agent-status logs are
   // a unit: a test that wipes the source logs must wipe the projection too, else a
