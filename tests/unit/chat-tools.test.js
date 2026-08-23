@@ -876,6 +876,28 @@ describe('pass-3 session reads — list_task_sessions / get_session (LIN-1073)',
     assert.deepStrictEqual(workerRun.telemetry.resources, { peakRssBytes: 536870912, cpuCount: 4 });
   });
 
+  // LIN-2207: `get_session`'s transcript is an LLM tool payload, structurally
+  // the same class of feedback[] consumer LIN-1728 already fixed elsewhere
+  // (run-summary's LLM prompt, public/session.js's rendered transcript,
+  // lib/sessions-view.js) — a `decision-answer` stamp is metadata about a
+  // decision, not a chat turn, and must never reach the model as one.
+  test('LIN-2207: get_session\'s transcript omits a decision-answer stamp', async () => {
+    const history = twoSessionHistory();
+    const workerLoop = history.find(h => h.id === 'w-done');
+    workerLoop.feedback = [
+      ...workerLoop.feedback,
+      { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: T_DONE },
+    ];
+    const executeTool = makeCatalog(history);
+    const result = await executeTool({ name: 'get_session', arguments: { sessionId: 'sess-done' } });
+    const workerRun = result.runs.find(r => r.kind !== 'autopilot' && r.terminalStatus === 'done');
+    assert.ok(workerRun, 'expected the worker run');
+    // The two real entries survive; the stamp does not appear as a third.
+    assert.strictEqual(workerRun.transcript.length, 2);
+    assert.ok(!workerRun.transcript.some(t => t.message.includes('decision_id')),
+      'a decision-answer stamp must never reach the LLM tool payload as a transcript entry');
+  });
+
   test('list_task_sessions does NOT forward resources — it only ever picks runtime, matching its narrower :735 field-by-field projection', async () => {
     const history = twoSessionHistory();
     const workerLoop = history.find(h => h.id === 'w-done');
