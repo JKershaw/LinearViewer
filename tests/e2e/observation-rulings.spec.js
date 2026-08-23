@@ -221,6 +221,86 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     expect(dispatchFired).toBe(false);
   });
 
+  test('LIN-2225: free-text answer on a resumable ruling reuses the option-press comment/dispatch path', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const { workerId } = await seedDecisionWorker(page, { issueIdentifier: 'LIN-2225-T', issueTitle: 'Free-text ruling', decisionId: 'd-rulings-freetext', blocked: true });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-T' });
+    await expect(row).toBeVisible();
+
+    // The declared options stay present and untouched (LIN-2225's scoping
+    // guard) — free text is additive, not a replacement.
+    await expect(row.locator('.chat-option-btn')).toHaveCount(2);
+
+    await row.locator('.obs-ruling-answer-input').fill('why was I asked this?');
+    const [commentReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
+      row.locator('.obs-ruling-answer-send').click()
+    ]);
+    const commentPayload = commentReq.postDataJSON();
+    expect(commentPayload.body).toBe('why was I asked this?');
+    expect(commentPayload.decisionLoopId).toBe(workerId);
+    expect(commentPayload.decisionId).toBe('d-rulings-freetext');
+    expect((await commentReq.response()).status()).toBe(201);
+
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-T' })).toHaveCount(0, { timeout: 20000 });
+  });
+
+  test('LIN-2225: dismiss on a resumable ruling stamps outcome:dismissed with no comment, and the row clears', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const { workerId } = await seedDecisionWorker(page, { issueIdentifier: 'LIN-2225-D', issueTitle: 'Dismiss ruling', decisionId: 'd-rulings-dismiss', blocked: true });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-D' });
+    await expect(row).toBeVisible();
+
+    let commentFired = false;
+    page.on('request', (r) => { if (r.url().includes('/api/comments/') && r.method() === 'POST') commentFired = true; });
+
+    const [dismissReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/dashboard/rulings/dismiss') && r.method() === 'POST'),
+      row.locator('.obs-ruling-dismiss').click()
+    ]);
+    const dismissPayload = dismissReq.postDataJSON();
+    expect(dismissPayload.decisionLoopId).toBe(workerId);
+    expect(dismissPayload.decisionId).toBe('d-rulings-dismiss');
+    expect((await dismissReq.response()).status()).toBe(200);
+    expect(commentFired).toBe(false);
+
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-D' })).toHaveCount(0, { timeout: 20000 });
+  });
+
+  test('LIN-2225: a mid-turn ruling has no free-text composer but IS dismissable', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-2225-M', issueTitle: 'Mid-turn dismiss', decisionId: 'd-rulings-midturn-dismiss', blocked: false });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-M' });
+    await expect(row).toBeVisible();
+    await expect(row.locator('.obs-ruling-answer-input')).toHaveCount(0);
+    await expect(row.locator('.obs-ruling-dismiss')).toBeVisible();
+
+    const [dismissReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/dashboard/rulings/dismiss') && r.method() === 'POST'),
+      row.locator('.obs-ruling-dismiss').click()
+    ]);
+    expect((await dismissReq.response()).status()).toBe(200);
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2225-M' })).toHaveCount(0, { timeout: 20000 });
+  });
+
   test('LIN-1728 review F1: a ruling from a non-page workspace writes its comment/stamp/dispatch in the RULING\'s own workspace, and clears', async ({ page, secondWorkerUrlKey }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}&multiWorkspace=true`);
     await clearRuns(page);
@@ -424,6 +504,51 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     // `data-decision-id` for the same leaked-row reason as the locator above
     // — a `hasText: 'SCAN-1'` filter would also count any leaked sibling row
     // sharing that same hardcoded identifier and never reach 0.
+    await expect(page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`)).toHaveCount(0, { timeout: 20000 });
+  });
+
+  test('LIN-2225: dismiss on a task-bound ruling reuses the existing scan dismiss route/outcome, and the row clears', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const issueId = randomUUID();
+    const nonce = randomUUID();
+    const seed = {
+      projects: [],
+      issues: [{
+        id: issueId,
+        identifier: 'SCAN-3',
+        title: 'Task-bound dismiss fixture',
+        description: `This task is blocked pending an operator decision. (${nonce})`,
+        state: { name: 'In Progress', type: 'started' },
+        url: `/workspace/${localWorkerUrlKey}/issue/${issueId}`
+      }]
+    };
+    await seedLocal(seed);
+
+    // Same real-store seeding discipline as the answer test above (LIN-2215
+    // plan §6) — a fresh issueId + nonce guarantees a new content hash, so
+    // this test is re-runnable without depending on a task-decision clear route.
+    const scanResp = await page.request.post(`/workspace/${localWorkerUrlKey}/api/scan/${issueId}`);
+    expect(scanResp.status(), `scan seed failed: ${await scanResp.text()}`).toBe(200);
+    const scanBody = await scanResp.json();
+    expect(scanBody.decision, "the fixture description must trigger buildMockScanText's decision-bearing branch").toBeTruthy();
+
+    await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`);
+    await expect(row).toBeVisible();
+
+    // Dismiss must hit the EXISTING scan dismiss route (LIN-2211/LIN-2197
+    // Phase 4) — not a new, duplicate dismiss surface — carrying the record's
+    // own canonical id.
+    const [dismissReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes(`/api/scan/${issueId}/dismiss`) && r.method() === 'POST'),
+      row.locator('.obs-ruling-dismiss').click()
+    ]);
+    const dismissPayload = dismissReq.postDataJSON();
+    expect(dismissPayload.id).toBe(scanBody.id);
+    expect((await dismissReq.response()).status()).toBe(200);
+
     await expect(page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`)).toHaveCount(0, { timeout: 20000 });
   });
 

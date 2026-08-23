@@ -98,6 +98,42 @@ describe('markDecisionAnswered (LIN-1728)', () => {
     assert.deepEqual(JSON.parse(doc.feedback[0].message), { decision_id: 'd-1' });
     assert.deepEqual(JSON.parse(doc.feedback[1].message), { decision_id: 'd-2' });
   });
+
+  // LIN-2225: a loop-backed ruling has no separate outcome column the way a
+  // scan-produced task decision does, so a Rulings-page dismiss reuses this
+  // SAME stamp with an explicit outcome — these pin that the two outcomes are
+  // both written under the unchanged 'decision-answer' kind (so every existing
+  // "hide this from the transcript" reader keeps working unmodified) while
+  // staying distinguishable in the stamp's own message.
+  test('outcome "dismissed" tags the stamp but keeps the same kind', async () => {
+    const store = makeStore();
+    const item = await takenItem(store);
+
+    const res = await store.markDecisionAnswered(item._id, URL_KEY, 'd-1', 'dismissed');
+    assert.ok(res && res.success);
+
+    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    assert.equal(doc.feedback[0].kind, 'decision-answer');
+    assert.deepEqual(JSON.parse(doc.feedback[0].message), { decision_id: 'd-1', outcome: 'dismissed' });
+  });
+
+  test('omitting outcome (the pre-LIN-2225 call shape) writes the byte-identical {decision_id} message', async () => {
+    const store = makeStore();
+    const item = await takenItem(store);
+
+    await store.markDecisionAnswered(item._id, URL_KEY, 'd-1');
+    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    assert.equal(doc.feedback[0].message, '{"decision_id":"d-1"}');
+  });
+
+  test('any outcome other than "dismissed" (including "answered") falls back to the plain {decision_id} shape', async () => {
+    const store = makeStore();
+    const item = await takenItem(store);
+
+    await store.markDecisionAnswered(item._id, URL_KEY, 'd-1', 'answered');
+    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    assert.deepEqual(JSON.parse(doc.feedback[0].message), { decision_id: 'd-1' });
+  });
 });
 
 // ── Regression: the runner-facing feedback route must never accept this kind ──
