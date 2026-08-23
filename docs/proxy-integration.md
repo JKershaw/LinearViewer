@@ -239,6 +239,46 @@ Response:
 }
 ```
 
+#### Get Own Credential Health
+
+Reports how healthy the workspace provider credential (e.g. Linear) has been for
+**this token's own calls** over a recent, bucketed window — never workspace-wide
+token metadata. Use this to tell an intermittent provider-lane 401 (the workspace's
+stored credential being rejected upstream) apart from a genuine problem with your
+own token, without waiting to hit the fault directly.
+
+```
+GET /api/proxy/credential-health
+GET /api/proxy/credential-health?windowMs=300000
+```
+
+Response:
+```json
+{
+  "verdict": "ok",
+  "occupancy": 0,
+  "callRatio": 0,
+  "bucketsWithEvidence": 4,
+  "bucketsFaulting": 0,
+  "totalCalls": 6,
+  "failedCalls": 0,
+  "windowMs": 900000,
+  "bucketMs": 30000
+}
+```
+
+- `verdict` is `"unknown"` (not a false `"ok"`) until enough of this token's own
+  traffic has landed to say anything — `bucketsWithEvidence` below a small floor.
+  `"ok"` means no bucket carrying this token's provider-lane calls saw a 401 in the
+  window; `"degraded"` means at least one did.
+- `occupancy` is the fraction of 30-second buckets (that saw this token's own
+  provider-lane traffic) which saw a 401 — the primary detector. `callRatio`
+  (failed calls / total calls) is supplementary only: a caller's own retries can
+  inflate it independent of how long the fault actually lasted.
+- `windowMs` accepts a caller override but is always clamped to at least 60
+  seconds — a shorter window can land entirely inside one phase of a periodic
+  fault and read falsely clean.
+
 #### List Teams
 
 ```

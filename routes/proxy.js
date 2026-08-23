@@ -16,6 +16,7 @@ import { Router, json } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createDedupeCache, createGenerationTracker, dedupeKey } from '../lib/proxy-dedupe.js';
 import { describeCredentialResolution } from '../lib/credential-diagnostics.js';
+import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
 import { deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
@@ -1090,6 +1091,17 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // unset, and `markSuspect` fails open on that (no-op) either way.
       rejectedCredentialRegistry?.markSuspect(req.resolvedCredentialFingerprint, { reason: status === 401 ? 'provider-401' : 'workspace-503', now: Date.now() });
     }
+    // LIN-2076: `stage` + `credentialFingerprint`, persisted at this single
+    // existing write seam instead of discarded (the ticket's own diagnosis:
+    // both were already computed by resolveProviderAccess three lines up the
+    // call stack and thrown away). `req.resolvedCredentialFingerprint` is
+    // stamped by resolveProviderAccess on EVERY branch it takes (pinned by
+    // tests/unit/proxy-credential-fingerprint-stamping.test.js) and left
+    // `undefined` — never `null` — on a request that never reached it, so
+    // presence alone (not the value) is the reliable "did this call attempt
+    // provider-credential resolution at all" signal; reusing it here avoids a
+    // second, request-scoped flag that could drift from the first.
+    const stage = req.resolvedCredentialFingerprint !== undefined ? STAGE_PROVIDER_LANE : STAGE_PROXY_TOKEN;
     proxyEventStore.recordEvent({
       urlKey: req.proxyUrlKey,
       tokenId: req.proxyTokenId,
@@ -1097,7 +1109,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       method: req.method,
       endpoint,
       status,
-      note
+      note,
+      stage,
+      credentialFingerprint: req.resolvedCredentialFingerprint ?? null
     }).catch(err => console.error('Failed to log proxy event:', err));
   }
 
@@ -1537,6 +1551,22 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 GET ${baseUrl}/api/proxy/me
   → Current authenticated user
   → { "id": "...", "name": "Jane Doe", "email": "jane@example.com" }
+
+GET ${baseUrl}/api/proxy/credential-health
+GET ${baseUrl}/api/proxy/credential-health?windowMs={ms}
+  → THIS TOKEN's own provider-credential health over a recent, bucketed window —
+    never workspace-wide token metadata. Use this to tell an intermittent
+    provider-lane 401 (the workspace's own stored credential rejected upstream)
+    apart from a problem with your own token, without having to hit the fault
+    directly first.
+  → { "verdict": "ok"|"degraded"|"unknown", "occupancy": 0|number|null,
+      "callRatio": 0|number|null, "bucketsWithEvidence": 4, "bucketsFaulting": 0,
+      "totalCalls": 6, "failedCalls": 0, "windowMs": 900000, "bucketMs": 30000 }
+  → "verdict" is "unknown" (never a false "ok") until enough of THIS token's own
+    traffic has landed to say anything. "occupancy" — the fraction of 30s buckets
+    carrying this token's own provider-lane calls that saw a 401 — is the primary
+    detector; "callRatio" is supplementary only (retries can inflate it).
+  → "windowMs" accepts a caller override, clamped server-side to [60000, 86400000].
 
 GET ${baseUrl}/api/proxy/teams
   → List all teams
@@ -2247,6 +2277,41 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       logEvent(req, '/api/proxy/me', status);
       console.error('Proxy /me error:', err.message);
       jsonError(res, status, 'Failed to fetch user info', { detail: graphqlErrorDetail(err) });
+    }
+  });
+
+  /**
+   * GET /api/proxy/credential-health
+   *
+   * Consumer-lane provider credential health (LIN-2076, Half B). The
+   * observability half of this ticket: an intermittent provider-lane 401 was
+   * previously discoverable only inside a worker's own transcript. This lets
+   * the SAME worker read its own credential health directly, bounded to the
+   * token it authenticated with — never workspace-wide token metadata, which
+   * is the session-authed `/workspace/:urlKey/api/proxy/credential-health`
+   * route's job and stays exactly as it is.
+   *
+   * Backed by `providerLaneOccupancy` (lib/proxy-events.js): a time-bucketed
+   * occupancy rate over this token's own `stage: 'provider-lane'` rows, not a
+   * raw call-count ratio (a caller's own retries would otherwise inflate a
+   * single bad bucket's apparent weight). `verdict: 'unknown'` — never a
+   * false `ok` — until at least `OCCUPANCY_MIN_BUCKETS` distinct buckets have
+   * carried this token's own provider-lane traffic.
+   *
+   * `windowMs` (optional query param) lets a caller widen the look-back;
+   * clamped server-side to [60s, 24h] by `resolveOccupancyWindow` regardless
+   * of what is requested.
+   */
+  router.get('/api/proxy/credential-health', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const requestedWindowMs = req.query.windowMs !== undefined ? parseInt(req.query.windowMs, 10) : undefined;
+      const result = await proxyEventStore.listProviderLaneOccupancy(req.proxyUrlKey, req.proxyTokenId, { windowMs: requestedWindowMs });
+      logEvent(req, '/api/proxy/credential-health', 200);
+      res.json(result);
+    } catch (err) {
+      logEvent(req, '/api/proxy/credential-health', 500);
+      console.error('Proxy consumer credential-health error:', err.message);
+      jsonError(res, 500, 'Failed to read credential health');
     }
   });
 
