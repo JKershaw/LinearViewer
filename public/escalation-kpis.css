@@ -4,6 +4,24 @@
 .kpi-window-form { margin: 0 0 1rem; }
 .kpi-window-form label { font-family: var(--font-structural); font-size: 0.85rem; color: var(--fg-dim); margin-right: 0.4rem; }
 
+/* Mirrors the house select treatment (.dispatch-exec-harness-select, style.css)
+   with roomier padding — this control submits the form on change, so its hit
+   area needs to clear a comfortable touch target rather than match a compact
+   toolbar select. */
+.kpi-window-select {
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+}
+.kpi-window-select:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
