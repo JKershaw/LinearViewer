@@ -333,6 +333,35 @@
 .sess-chip--cred[data-state="ok"] { color: var(--green-dim); border-color: var(--green-dim); }
 .sess-chip--cred[data-state="dead"] { color: var(--red-dim); border-color: var(--red-dim); }
 
+/* Worker-lane ticket walk (LIN-2242/LIN-2243) — an ordered list of the lane's
+   own [ticket] markers. `blocked`/`refused`/`dissolved` deliberately share the
+   loud `.status-pill--error` colour a `failed` run gets (see render-session.js
+   TICKET_PILL_STATE) — never a dimmer, easy-to-miss treatment. */
+.sess-ticket-walk {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.sess-ticket {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+.sess-ticket-ident {
+  font-family: var(--font-structural);
+  font-weight: 600;
+  color: var(--text);
+}
+.sess-ticket-outcome {
+  font-family: var(--font-content);
+  color: var(--muted);
+}
+
 /* ── Lineage-continuous rendering (LIN-1478 S-C) ───────────────────────────
    A multi-wake lineage folds visually into ONE continuous card — one outer
    border/header region, unbroken transcript flow — while each constituent

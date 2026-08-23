@@ -369,6 +369,38 @@ function renderSummaryLine(s) {
   return `<button type="button" class="obs-summary-gen" data-session="${escapeHtml(s.sessionId)}">summarise this session</button>`;
 }
 
+/**
+ * LIN-2243: a worker-lane's ticket walk lives on its ONE run's telemetry
+ * (`runs[].ticketWalk`) — session-level aggregation is inert on this lean
+ * feed for the same pre-existing reason `resources`/`model` are (the session
+ * assembly re-flattens `loop.feedback`, which the lean projection already
+ * dropped). Read it off the run instead of `s.ticketWalk` so the card works
+ * on the feed poll, not just on a full (non-lean) read.
+ *
+ * @param {Object} s - session payload
+ * @returns {Array|null}
+ */
+function laneTicketWalk(s) {
+  const run = (s.runs || []).find(r => Array.isArray(r.ticketWalk) && r.ticketWalk.length);
+  return run ? run.ticketWalk : null;
+}
+
+/**
+ * "ticket N so far · LIN-XXXX <state>" — deliberately NOT "N of M": the wire
+ * only carries OBSERVED [ticket] markers, never a lane's planned total, so
+ * claiming a total would overclaim knowledge nobody sent. This is what makes
+ * a stalled tail operator-visible instead of hiding behind a healthy-looking
+ * heartbeat (LIN-2243's whole point).
+ *
+ * @param {Array} ticketWalk
+ * @returns {string}
+ */
+function ticketProgressText(ticketWalk) {
+  if (!Array.isArray(ticketWalk) || !ticketWalk.length) return '';
+  const last = ticketWalk[ticketWalk.length - 1];
+  return `ticket ${ticketWalk.length} so far · ${last.identifier} ${last.state}`;
+}
+
 function fillSessionHead(li, s) {
   const status = displayStatus(s);
   const pill = SESSION_PILL[status] || { variant: 'queued', label: status || '' };
@@ -388,6 +420,8 @@ function fillSessionHead(li, s) {
   if (s.model) metaBits.push(`<span class="obs-meta"><span class="obs-meta-k">model</span> <span class="obs-meta-v">${escapeHtml(String(s.model))}</span></span>`);
   if (s.workspaceName) metaBits.push(`<span class="obs-meta obs-meta-ws">${escapeHtml(s.workspaceName)}</span>`);
   if (s.tasksTouched.length > 1) metaBits.push(`<span class="obs-meta">${s.tasksTouched.length} tasks</span>`);
+  const ticketWalk = laneTicketWalk(s);
+  if (ticketWalk) metaBits.push(`<span class="obs-meta obs-meta-tickets">${escapeHtml(ticketProgressText(ticketWalk))}</span>`);
 
   // Header anatomy (LIN-928, design §4): status dot · mono id on line 1, the
   // truncating title on line 2 (the growing `headmain` cluster), and a fixed
@@ -2003,5 +2037,8 @@ if (typeof module !== 'undefined' && module.exports) {
     // DOM/fetch-free shim — there is no fixture path in this harness for a
     // terminal, past-the-reap-window loop, per the review's own note.
     deliverRulingReply, rulingsPending, preservedRulingRows,
+    // LIN-2243: expose the worker-lane ticket-walk seam (read off runs[], since
+    // the session-level field is inert on this lean feed) for unit testing.
+    laneTicketWalk, ticketProgressText,
   };
 }

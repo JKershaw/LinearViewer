@@ -33,6 +33,7 @@ const sandbox = {
 vm.runInNewContext(src, sandbox, { filename: 'observation.js' });
 const { renderActivityLog, renderArtifacts, classifyArtifact, renderObjective } = sandbox.module.exports;
 const { renderSummaryLine, excerptDecisionCase, renderWaitingDecisionSummary, DECISION_EXCERPT_CHARS } = sandbox.module.exports;
+const { laneTicketWalk, ticketProgressText } = sandbox.module.exports;
 
 test.describe('renderActivityLog — §6.3 burst copy', () => {
   test('drops the redundant per-burst total when a breakdown sums it', () => {
@@ -242,5 +243,37 @@ test.describe('renderSummaryLine / excerptDecisionCase — waiting card decision
     assert.ok(!html.includes('obs-summary-decision-options'), 'no options markup');
     assert.ok(!html.includes('The migration completed cleanly.'), 'the case text itself must not leak into the card anywhere');
     assert.ok(!html.includes('Ship it?'), 'the question text itself must not leak into the card anywhere');
+  });
+});
+
+// LIN-2243: worker-lane ticket-walk seam. Read off `runs[]`, never the
+// session-level field, because session-level telemetry is inert on this lean
+// feed (same pre-existing gap as resources/model) — see routes/dashboard.js
+// and its dashboard-routes.test.js precedent this ticket follows.
+test.describe('laneTicketWalk / ticketProgressText (LIN-2243)', () => {
+  test('laneTicketWalk finds the first run carrying a non-empty ticketWalk', () => {
+    const s = { runs: [{ ticketWalk: null }, { ticketWalk: [{ identifier: 'LIN-1', state: 'done' }] }] };
+    assert.deepEqual(laneTicketWalk(s), [{ identifier: 'LIN-1', state: 'done' }]);
+  });
+
+  test('laneTicketWalk returns null for a non-lane session (no run carries one)', () => {
+    assert.equal(laneTicketWalk({ runs: [{ ticketWalk: null }] }), null);
+    assert.equal(laneTicketWalk({ runs: [] }), null);
+  });
+
+  test('ticketProgressText says "so far", never "of M" — the wire has no planned total', () => {
+    const walk = [
+      { identifier: 'LIN-1', state: 'done' },
+      { identifier: 'LIN-2', state: 'blocked' },
+    ];
+    const text = ticketProgressText(walk);
+    assert.match(text, /ticket 2 so far/);
+    assert.match(text, /LIN-2 blocked/);
+    assert.ok(!/of \d/.test(text), 'must never claim a planned total ("of M")');
+  });
+
+  test('ticketProgressText returns empty string for an empty/absent walk', () => {
+    assert.equal(ticketProgressText(null), '');
+    assert.equal(ticketProgressText([]), '');
   });
 });

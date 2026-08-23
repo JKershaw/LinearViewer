@@ -282,7 +282,12 @@
     // window-overlap is a real cull, not just the MIN_W visual floor above.
     const inWindow = window.timelineRunOverlapsWindow(run, windowStart, windowEnd, now);
     div.hidden = !isVisibleWs(run.workspaceUrlKey) || !inWindow;
-    const label = `${run.issueIdentifier || '?'} — ${timelineLabel(run)}`;
+    // LIN-2243: annotate rather than segment the bar — a lane's whole ticket
+    // list otherwise renders as one static identifier for its entire life.
+    const ticketSuffix = run.ticketWalk && run.ticketWalk.length
+      ? ` (${ticketProgressText(run.ticketWalk)})`
+      : '';
+    const label = `${run.issueIdentifier || '?'} — ${timelineLabel(run)}${ticketSuffix}`;
     div.title = label;
     div.setAttribute('aria-label', label);
     if (div.firstElementChild) div.firstElementChild.textContent = label;
@@ -1068,6 +1073,7 @@
     const li = nodeFromHtml(`<li class="lc-lane${shimmer}" data-testid="live-console-lane">
         <span class="lc-lane-bar" aria-hidden="true"></span>
         <a class="lc-lane-task" href="#"></a>
+        <span class="lc-lane-tickets" data-testid="live-console-lane-tickets"></span>
         <span class="lc-lane-mid">
           <span class="lc-lane-action"></span>
           <span class="lc-lane-cred" data-testid="live-console-lane-credential"></span>
@@ -1079,11 +1085,23 @@
     updateLaneNode(li, lane);
     return li;
   }
+  // LIN-2243: a worker-lane's touched-ticket count, deliberately worded "so
+  // far" — the wire only carries OBSERVED [ticket] markers, never the lane's
+  // planned total, so "N of M" would overclaim knowledge nobody sent. This is
+  // the surfacing that makes a stalled tail operator-visible instead of
+  // hiding behind a healthy-looking heartbeat (the whole point of LIN-2243).
+  function ticketProgressText(ticketWalk) {
+    if (!Array.isArray(ticketWalk) || !ticketWalk.length) return '';
+    const last = ticketWalk[ticketWalk.length - 1];
+    return `ticket ${ticketWalk.length} so far · ${last.identifier} ${last.state}`;
+  }
   function updateLaneNode(li, lane) {
     const task = li.querySelector('.lc-lane-task');
     task.textContent = lane.task || '?';
     task.setAttribute('href', obsHref(lane.workspaceUrlKey));
     task.setAttribute('title', `open ${lane.workspaceName || lane.workspaceUrlKey} in Observation`);
+    const tickets = li.querySelector('.lc-lane-tickets');
+    tickets.textContent = ticketProgressText(lane.ticketWalk);
     li.querySelector('.lc-lane-action').textContent = lane.action || 'working';
     // Credential badge — textContent like every sibling field, so a hostile
     // token label could not become markup even if one were shown here (it is

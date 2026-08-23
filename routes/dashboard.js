@@ -660,6 +660,11 @@ export function createDashboardRoutes({
         toolPeak: peakToolCount(metrics),
         producedArtifacts: Array.isArray(l.telemetry?.producedArtifacts) ? l.telemetry.producedArtifacts : [],
         resources: l.telemetry?.resources || null,
+        // LIN-2243: a worker-lane's per-ticket walk, parsed from this run's own
+        // [ticket] markers (lib/session-telemetry.js). null for a non-lane run —
+        // never an empty array, so the client can tell "not a lane" apart from
+        // "a lane that hasn't emitted a marker yet".
+        ticketWalk: l.telemetry?.ticketWalk || null,
         // LIN-2184 (H5): carry the loop's own build-time decision facts (LIN-2182
         // / H3, routes/dashboard.js:570's rollup reads the SAME fields from this
         // loop) through this allow-list projection — otherwise they never reach
@@ -706,6 +711,16 @@ export function createDashboardRoutes({
       runtime: telemetry.runtime || null,
       model: telemetry.model || null,
       resources: telemetry.resources || null,
+      // LIN-2243: session-level ticket walk, assembled the same way
+      // runtime/model/resources already are — and, like `model`/`resources`
+      // (not `runtime`), it is FEEDBACK-derived, so it is unconditionally null
+      // on this endpoint: `buildSessionPayload` is only ever called over a
+      // `lean: true` build (session.loops[].feedback already dropped), which
+      // empties before `_assembleSession` re-flattens it. The card reads the
+      // per-run `runs[].ticketWalk` instead (public/observation.js's
+      // `laneTicketWalk`) — this field is kept only for callers of a non-lean
+      // session build (e.g. the per-session page), where it is NOT dead.
+      ticketWalk: telemetry.ticketWalk || null,
       // Live status line served on the feed (deterministic, cache-free) so the
       // client never issues a per-poll /session-summary scan for a running
       // session. Null for terminal sessions — they render their cached AI summary.

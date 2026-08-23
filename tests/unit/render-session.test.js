@@ -380,6 +380,47 @@ describe('render-session: telemetry + model omission', () => {
 
     assert.equal(withResources, withoutResources, 'renderRunChips/renderSessionPage must not render or be affected by resources fields other than peakRssBytes');
   });
+
+  // ─── ticket walk (LIN-2242/LIN-2243) ────────────────────────────────────────
+  test('LIN-2243: no ticket-walk markup at all when a run carries no [ticket] markers', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('data-testid="session-ticket-walk"'), 'no ticket-walk list when the run is not a lane');
+  });
+
+  test('LIN-2243: a lane run renders an ordered ticket walk with each row\'s identifier + state', () => {
+    const session = fixtureSession();
+    session.loops[0].telemetry.ticketWalk = [
+      { identifier: 'LIN-2242', state: 'done', outcomeLine: 'merged PR #1212', timestamp: null },
+      { identifier: 'LIN-2243', state: 'started', outcomeLine: null, timestamp: null },
+    ];
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-testid="session-ticket-walk"/);
+    const rows = html.match(/data-testid="session-ticket-row"/g) || [];
+    assert.equal(rows.length, 2);
+    assert.match(html, /LIN-2242[\s\S]*?status-pill--done[\s\S]*?done/);
+    assert.match(html, /merged PR #1212/);
+  });
+
+  test('LIN-2243: blocked/refused/dissolved render as a first-class row with the SAME loud pill class a failed run gets — never buried in prose', () => {
+    const session = fixtureSession();
+    session.loops[0].telemetry.ticketWalk = [
+      { identifier: 'LIN-1971', state: 'blocked', outcomeLine: 'needs Linux host + tmux', timestamp: null },
+    ];
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-testid="session-ticket-row"[^>]*data-state="blocked"/);
+    assert.match(html, /status-pill--error/);
+    assert.match(html, /needs Linux host \+ tmux/);
+  });
+
+  test('LIN-2243: ticket-walk content is escaped', () => {
+    const session = fixtureSession();
+    session.loops[0].telemetry.ticketWalk = [
+      { identifier: '<script>alert(1)</script>', state: 'done', outcomeLine: '<img src=x onerror=alert(1)>', timestamp: null },
+    ];
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('<script>alert(1)</script>'));
+    assert.ok(!html.includes('<img src=x onerror=alert(1)>'));
+  });
 });
 
 describe('render-session: brief/recap context branches', () => {

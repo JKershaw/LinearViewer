@@ -277,6 +277,39 @@ item `done`. Until such a marker is posted the item reads as `taken`. Watchers (
 watch/list endpoints and the dashboard Loop feed) read this derived status so they can poll
 a field instead of parsing prose — so always end a run with exactly one terminal marker.
 
+### The `[ticket]` marker (LIN-2242/LIN-2243 — worker lanes only)
+
+A **worker lane** ([`docs/worker-lane-prompt.md`](./worker-lane-prompt.md)) carries an ordered
+ticket list through its own research → implement → review → close-out loop, entirely inside one
+dispatch. The terminal markers above describe the LANE's own lifecycle (one `[done]`/`[failed]`
+at the very end); they say nothing about which of the lane's several tickets that covers, or how
+far through the list it got. A lane emits one additional, non-terminal marker at **each ticket
+transition** — an extra feedback entry alongside its ordinary claim/close-out comments, not a
+replacement for them:
+
+```
+[ticket] LIN-XXXX started
+[ticket] LIN-XXXX done — <one line>
+[ticket] LIN-XXXX blocked — <reason>
+[ticket] LIN-XXXX refused — <reason>
+[ticket] LIN-XXXX dissolved — <reason>
+```
+
+This is a **separate, orthogonal vocabulary** from the terminal markers above — `[ticket] ... done`
+is never read as the dispatch's own terminal status, and it does not derive `status`. It is parsed
+by `parseTicketMarkers` (`lib/session-telemetry.js`) into an ordered per-lane ticket walk
+(`{identifier, state, outcomeLine, timestamp}`), surfaced as "ticket N so far" on the Observation
+card and Live Console lane chip and as a full walk on the per-session page — the surfacing that
+makes a stalled tail in a long ticket list operator-visible instead of hiding behind a healthy-
+looking heartbeat.
+
+**`done` must be gated on exactly the same verified evidence as the lane's own close-out comment
+for that ticket — a landed, CI-green, verified commit — never on intent** ("I merged", "I think
+I'm finished"). An intent-gated marker would be a new premature-completion surface. Non-success
+states are first-class, not an afterthought: `[ticket] LIN-1971 blocked — needs Linux host + tmux`
+is often the single highest-value line a lane emits all day — surface it with the same marker
+discipline as `done`, never as prose buried inside a close-out comment only.
+
 ### Forwarding `dispatchId` to foreman status
 
 If your consumer also writes foreman status entries via

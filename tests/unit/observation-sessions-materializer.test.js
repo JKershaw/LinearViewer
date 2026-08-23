@@ -257,6 +257,44 @@ test('LIN-1341: a STAMPED followUpTo reply closure is discovered via the direct 
   assert.deepEqual(s.tasksTouched.sort(), ['LIN-500', 'LIN-501', 'LIN-502'], 'the follow-up\'s own issue joined the closure via the group query');
 });
 
+// LIN-2242/LIN-2243: a "worker lane" is a plain kind:'implementation' dispatch
+// (never kind:'autopilot') that self-stamps a readable, opaque `sessionId` on
+// itself at dispatch time — not a worker spawned BY an autopilot, and not a
+// followUpTo/sessionGroupId reply. This is the shape LIN-2242's kickoff
+// prompt mandates lanes stamp so they stop being invisible to Observation.
+// No new discovery code is needed: `_sessionsTouchingIssue`'s existing
+// `if (row.sessionId) targets.add(row.sessionId)` branch (it does not care
+// whether `kind` is 'autopilot' or whose id the sessionId names) already
+// covers it — this test is the proof, run against the acceptance criterion
+// itself, not against a new code path.
+test('LIN-2243: a worker-lane dispatch (plain kind, self-stamped readable sessionId) is discovered and materialized within one pass', async () => {
+  const ctx = setup();
+  const { historyCollection, statusCollection, dispatchStore, agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  archive(historyCollection, {
+    id: 'lane-dispatch-id',
+    issueIdentifier: 'LIN-2242',
+    sessionId: 'voyage-lane-codification-2026-08-23',
+    kind: 'implementation',
+    dispatchedAtMs: min(60),
+    resolvedAtMs: min(90),
+    feedback: [
+      { message: '[ticket] LIN-2242 done — merged PR #1212', tsMs: min(70) },
+      { message: '[done] run summary', tsMs: min(90) },
+    ],
+  });
+  status(statusCollection, { id: 'AS-lane', taskIdentifier: 'LIN-2242', tsMs: min(61) });
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore, agentStatusStore, lean: true });
+  assert.deepEqual(full.map(s => s.sessionId), ['voyage-lane-codification-2026-08-23'], 'the live build already groups the lane under its stamped id');
+
+  await materializer.rebuildForWrite(URL_KEY, { issueIdentifier: 'LIN-2242' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  assert.deepEqual(sessions.map(s => s.sessionId), ['voyage-lane-codification-2026-08-23'], 'one materializer pass, triggered off the lane\'s own issue, discovers and persists it');
+  assert.deepEqual(sessions[0], full.find(s => s.sessionId === 'voyage-lane-codification-2026-08-23'), 'byte-identical to the live build');
+});
+
 test('backfillWorkspace persists every full-build session and sets the marker', async () => {
   const ctx = setup();
   seedSpanningFixture(ctx);
