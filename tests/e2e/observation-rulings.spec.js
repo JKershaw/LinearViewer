@@ -151,6 +151,45 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-P' })).toHaveCount(0, { timeout: 20000 });
   });
 
+  // LIN-2209 (F1/L1): the test above proves the UI-driven flow works, but no
+  // single test connects a real stamp write to a real /rulings READ — every
+  // link (attribute emitted, threaded into the POST body, route calls the
+  // store, store persists, answeredDecisionId derives, predicate excludes) is
+  // covered individually elsewhere. This is the composition witness, driven
+  // directly against the API (no UI) so it isolates the round trip itself.
+  test('LIN-2209: the answer-a-ruling round trip is witnessed end to end — GET /rulings count 1 -> save -> count 0, accounting for the sessionsFeedCache SWR TTL', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const { workerId } = await seedDecisionWorker(page, { issueIdentifier: 'LIN-2209-RT', issueTitle: 'Round-trip ruling', decisionId: 'd-rulings-roundtrip', blocked: true });
+
+    const before = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
+    expect(before.status()).toBe(200);
+    const beforeBody = await before.json();
+    expect(beforeBody.count).toBe(1);
+    expect(beforeBody.rulings[0].decision.decision_id).toBe('d-rulings-roundtrip');
+
+    const commentResp = await page.request.post(`/workspace/${URL_KEY}/api/comments/LIN-2209-RT`, {
+      data: { body: 'proceeding', decisionLoopId: workerId, decisionId: 'd-rulings-roundtrip' }
+    });
+    expect(commentResp.status()).toBe(201);
+
+    // sessionsFeedCache is stale-while-revalidate with a 5s TTL
+    // (lib/sessions-feed-cache.js): the FIRST read after the TTL expires
+    // still serves the STALE (pre-answer) value — it only KICKS a background
+    // refresh — and it takes a SECOND read to observe the refreshed value.
+    // "Wait out the TTL, then re-read once" is necessary but not sufficient;
+    // pinning both reads here means a regression to that weaker assumption
+    // fails loudly instead of passing on lucky timing.
+    await page.waitForTimeout(5200);
+    const staleRead = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
+    const staleBody = await staleRead.json();
+    expect(staleBody.count, 'first post-TTL read still serves the stale pre-answer value').toBe(1);
+
+    const freshRead = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
+    const freshBody = await freshRead.json();
+    expect(freshBody.count, 'second post-TTL read observes the refreshed, answered value').toBe(0);
+  });
+
   test('partial failure (comment recorded, resume delivery fails) surfaces a Retry delivery affordance, which re-fires only the dispatch call', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);

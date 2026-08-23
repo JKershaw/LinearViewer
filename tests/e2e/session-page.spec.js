@@ -712,6 +712,20 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
       data: { body: 'recorded', decisionLoopId: workerId, decisionId }
     });
     expect(commentResp.status()).toBe(201);
+
+    // LIN-2209 (F1/L1): a rendered-count assertion alone is not a witness for
+    // the write — storage holding 2 entries (a no-op stamp) and storage
+    // holding 3 (a real stamp, correctly hidden) both render 2 bubbles below.
+    // Read the item back FIRST and prove the stamp actually landed, before
+    // asserting anything about rendering.
+    const itemResp = await page.request.get(`/test/dispatch-item?urlKey=${URL_KEY}&itemId=${workerId}`);
+    expect(itemResp.status()).toBe(200);
+    const { feedback } = await itemResp.json();
+    expect(feedback.length).toBe(3);
+    const stampEntry = feedback.find(f => f.kind === 'decision-answer');
+    expect(stampEntry, 'a decision-answer entry must be present in storage').toBeTruthy();
+    expect(JSON.parse(stampEntry.message).decision_id).toBe(decisionId);
+
     const sessionId = await discoverSessionId(page);
 
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
@@ -722,8 +736,9 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await expect(transcript).toBeVisible();
     // Exactly the two real entries ([blocked] + the decision itself, which
     // legitimately renders its own raw JSON) produce chat bubbles — the
-    // third entry, the decision-answer stamp, must never produce one. A
-    // regression (the stamp rendering too) would show as a count of 3.
+    // third entry, the decision-answer stamp (just proven present above),
+    // must never produce one. A regression (the stamp rendering too) would
+    // show as a count of 3.
     await expect(transcript.locator('.chat-msg')).toHaveCount(2);
   });
 
