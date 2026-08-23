@@ -9,7 +9,7 @@
 //      reaches OpenRouter.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveRoadmapModelOverride } from '../../routes/workspace-api.js';
+import { resolveRoadmapModelOverride } from '../../routes/workspace-api-roadmap.js';
 import { AVAILABLE_MODELS, DEFAULT_MODEL } from '../../lib/openrouter.js';
 import { renderRoadmapPage } from '../../lib/render-roadmap.js';
 
