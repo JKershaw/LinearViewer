@@ -55,8 +55,10 @@ import {
   createObserverSweepRun
 } from '../../lib/observer-sweep.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
+import { ObserverShadowLogStore } from '../../lib/observer-shadow-log.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
+import { isWakeEvent } from '../../lib/dispatch-terminal.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
 
 const { _buildLoops } = __internal;
@@ -565,6 +567,65 @@ describe('observer-sweep: negative capability — no automated-intervention path
     assert.deepStrictEqual(countsAfter, countsBefore, 'no dispatch write and no agent-status write occurred during the guarded sweep');
   });
 
+  test('LIN-2132: sweepOneWorkspace, given deps.observerShadowLogStore, writes ONLY to that store — dispatch/agent-status stay untouched, and the logged entry matches the real wake-marker vocabulary', async () => {
+    const db = client.db(`neg_shadow_${dbCounter++}`);
+    const dispatchQueueCollection = db.collection('dispatch-queue');
+    const dispatchHistoryCollection = db.collection('dispatch-history');
+    const agentStatusCollection = db.collection('foreman-status');
+    const shadowLogCollection = db.collection('observer-shadow-log');
+
+    const realDispatchStore = new DispatchQueueStore({ collection: dispatchQueueCollection, historyCollection: dispatchHistoryCollection, ttl: 86400 });
+    const realAgentStatusStore = new AgentStatusStore({ collection: agentStatusCollection });
+    const realObserverStateStore = new ObserverStateStore({ collection: db.collection('observer-state') });
+    const realShadowLogStore = new ObserverShadowLogStore({ collection: shadowLogCollection });
+
+    const urlKey = `ws-shadow-${randomUUID()}`;
+    // Setup, through the REAL (unguarded) store — same posture as the sibling
+    // test's realAgentStatusStore.recordStatus setup call above: mint a
+    // genuinely `blocked` loop so there is an attention row for the shadow
+    // log to compute something from.
+    const item = await realDispatchStore.addItem(urlKey, { prompt: 'p', issueIdentifier: 'LIN-9', promptName: 'implementation' });
+    const taken = await realDispatchStore.takeItem(item._id, urlKey, 'consumer-1');
+    await realDispatchStore.addFeedback(taken.id, urlKey, { message: '[blocked] need a decision' }, 'consumer-1');
+
+    const countsBefore = {
+      queue: (await dispatchQueueCollection.find({ urlKey }).toArray()).length,
+      history: (await dispatchHistoryCollection.find({ urlKey }).toArray()).length,
+      status: (await agentStatusCollection.find({ urlKey }).toArray()).length
+    };
+
+    const dispatchStore = forbiddenProxy(realDispatchStore, ['listItems', 'listHistory'], 'dispatchStore');
+    const agentStatusStore = forbiddenProxy(realAgentStatusStore, ['listStatus'], 'agentStatusStore');
+    const observerStateStore = forbiddenProxy(realObserverStateStore, ['readCurrent', 'ensureSeeded', 'advance'], 'observerStateStore');
+    // Unlike the three stores above, recordActions IS an allowed call here —
+    // it is this ticket's own store, never the live pipeline.
+    const observerShadowLogStore = forbiddenProxy(realShadowLogStore, ['recordActions'], 'observerShadowLogStore');
+
+    const net = guardNetwork();
+    const now = Date.now();
+    await sweepOneWorkspace(urlKey, { dispatchStore, agentStatusStore, observerStateStore, observerShadowLogStore, now });
+    assert.strictEqual(net.attempts.length, 0, 'this tier makes no /api/proxy call and no model call');
+    net.restore();
+
+    const countsAfter = {
+      queue: (await dispatchQueueCollection.find({ urlKey }).toArray()).length,
+      history: (await dispatchHistoryCollection.find({ urlKey }).toArray()).length,
+      status: (await agentStatusCollection.find({ urlKey }).toArray()).length
+    };
+    assert.deepStrictEqual(countsAfter, countsBefore, 'no dispatch write and no agent-status write occurred — the shadow log write must not touch the live pipeline');
+
+    const { items } = await realShadowLogStore.listByWorkspace(urlKey);
+    assert.strictEqual(items.length, 1, 'exactly one shadow entry logged for the one blocked attention row');
+    const [entry] = items;
+    assert.strictEqual(entry.lane, 'blocked');
+    assert.strictEqual(entry.wouldBeMarker, 'blocked');
+    assert.ok(
+      isWakeEvent(entry.wouldBeFeedback.message),
+      'the logged would-be feedback message must be recognized by the SAME parser real dispatch feedback uses (lib/dispatch-terminal.js isWakeEvent), not merely similarly shaped'
+    );
+    assert.ok(entry.wouldBeComment?.body?.includes('[blocked]'), 'the logged would-be Linear comment carries the same marker vocabulary');
+  });
+
   test('static import assertion: lib/observer-sweep.js imports only pure, read-only modules — including SIDE-EFFECT-ONLY imports', () => {
     // Honest limitation (stated, not hidden): this only sees calls reachable
     // through the injected dispatchStore/agentStatusStore/observerStateStore
@@ -583,8 +644,9 @@ describe('observer-sweep: negative capability — no automated-intervention path
     const specifiers = [...src.matchAll(/^import\s+(?:[^;]*?from\s+)?['"](.+?)['"]\s*;?\s*$/gm)].map((m) => m[1]);
     assert.deepStrictEqual(
       specifiers.sort(),
-      ['./live-console.js', './loop-supersede.js', './pipeline-loops.js'].sort(),
-      'a new import here (e.g. a direct dispatch-store/agent-status-store import bypassing the injected deps seam, in EITHER statement form) must be caught by this assertion'
+      ['./live-console.js', './loop-supersede.js', './pipeline-loops.js', './observer-shadow-log.js'].sort(),
+      'a new import here (e.g. a direct dispatch-store/agent-status-store import bypassing the injected deps seam, in EITHER statement form) must be caught by this assertion. ' +
+      './observer-shadow-log.js (LIN-2132) is the one addition this ticket makes — it is itself pure (no dispatch-store/agent-status-store/linear-provider import; see its own static-import test in observer-shadow-log.test.js) and exports only the pure computeWouldBeActions, never a store instance'
     );
   });
 });
