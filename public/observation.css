@@ -237,6 +237,48 @@
 .obs-ruling-feedback:empty { display: none; }
 .obs-ruling-feedback--error { color: var(--red); }
 
+/* Free-text answer + dismiss (LIN-2225). Mirrors .sess-inline-reply-input /
+   .sess-inline-reply-actions (session.css) — same textarea + action-row shape,
+   scoped to a ruling row instead of a run card. */
+.obs-ruling-answer { margin-top: 0.4rem; }
+.obs-ruling-answer-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.6rem;
+  resize: vertical;
+  padding: 0.35rem 0.5rem;
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.obs-ruling-answer-input:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+.obs-ruling-answer-input:disabled { opacity: 0.6; }
+.obs-ruling-answer-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+}
+.obs-ruling-answer-send {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+.obs-ruling-answer-send:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
+.obs-ruling-answer-send:disabled { opacity: 0.5; cursor: default; }
+.obs-ruling-dismiss {
+  color: var(--fg-dim);
+  background: color-mix(in srgb, var(--fg-dim) 10%, transparent);
+}
+.obs-ruling-dismiss:hover { background: color-mix(in srgb, var(--fg-dim) 20%, transparent); }
+.obs-ruling-dismiss:disabled { opacity: 0.5; cursor: default; }
+
 .obs-session {
   border: 1px solid var(--line);
   /* Coloured left accent stripe per status (mockup, design §6.1: 3px); status hue

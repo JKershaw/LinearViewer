@@ -1423,11 +1423,133 @@ function renderRulingRow(row) {
     }
   });
 
+  // Free-text escape hatch + dismiss (LIN-2225): the declared options stay the
+  // PRIMARY path (untouched above) — this is additive, not a replacement.
+  // "Why was I asked this?" is exactly the sentence an operator could not
+  // previously say anywhere on this page; typing it here and pressing send
+  // reuses `deliverRulingReply` verbatim (same per-disposition comment/dispatch
+  // branches an option press already takes), so free text IS an answer, not a
+  // parallel code path. The composer itself is gated on `canReply` — same bar
+  // as the option buttons — but Dismiss always renders: clearing a ruling the
+  // operator has nothing to say about must not depend on the row being
+  // otherwise repliable (this is the ticket's OTHER named gap).
+  const composer = document.createElement('div');
+  composer.className = 'chat-composer obs-ruling-answer';
+
+  if (canReply) {
+    const input = document.createElement('textarea');
+    input.className = 'obs-ruling-answer-input chat-composer__input';
+    input.rows = 2;
+    input.placeholder = 'Answer in your own words…';
+    input.setAttribute('aria-label', 'Free-text answer');
+    composer.appendChild(input);
+
+    const actions = document.createElement('div');
+    actions.className = 'obs-ruling-answer-actions chat-composer__actions';
+
+    const sendBtn = document.createElement('button');
+    sendBtn.type = 'button';
+    sendBtn.className = 'action-btn obs-ruling-answer-send';
+    sendBtn.textContent = 'send';
+    sendBtn.addEventListener('click', () => {
+      const text = input.value.trim();
+      if (!text) { input.focus(); return; }
+      deliverRulingReply(row, text, li);
+    });
+    actions.appendChild(sendBtn);
+    actions.appendChild(makeDismissButton(row, li));
+    composer.appendChild(actions);
+  } else {
+    const actions = document.createElement('div');
+    actions.className = 'obs-ruling-answer-actions chat-composer__actions';
+    actions.appendChild(makeDismissButton(row, li));
+    composer.appendChild(actions);
+  }
+
+  li.appendChild(composer);
+
   const feedback = document.createElement('p');
   feedback.className = 'obs-ruling-feedback';
   li.appendChild(feedback);
 
   return li;
+}
+
+function makeDismissButton(row, li) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'action-btn obs-ruling-dismiss';
+  btn.textContent = 'dismiss';
+  btn.addEventListener('click', () => dismissRulingRow(row, li));
+  return btn;
+}
+
+// The set of controls a pending reply/dismiss must disable — every
+// interactive element the row can carry, not just `.chat-option-btn`, so a
+// free-text send or a dismiss in flight can't be double-fired by the OTHER
+// control on the same row either.
+function rulingRowControls(li) {
+  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input');
+}
+
+// Dismiss (LIN-2225): the row's other exit, independent of `canReply` — a
+// mid-turn/indeterminate ruling that cannot be replied to can still be
+// dismissed. Branches on anchor shape exactly like `deliverRulingReply`'s own
+// disposition branches, but only two-way: a task-bound row reuses the
+// EXISTING scan dismiss route/outcome (LIN-2211/LIN-2197 Phase 4) verbatim —
+// no dismiss logic is duplicated, per the ticket's own constraint — while a
+// loop-backed row (every other disposition) hits the new rulings dismiss
+// route (routes/dashboard.js), which tags the same decision-answer stamp
+// `outcome: 'dismissed'`. Neither path posts a comment; dismiss is
+// deliberately silent, unlike an answer.
+function dismissRulingRow(row, li) {
+  const { decision, anchor } = row || {};
+  const pageUrlKey = observationData?.urlKey;
+  const targetUrlKey = anchor?.workspaceUrlKey;
+  const decisionId = decision?.decision_id;
+  const isTaskBound = !anchor?.loopId && !!anchor?.taskDecisionId;
+  if (!targetUrlKey || !decisionId || rulingsPending.has(decisionId)) return;
+
+  rulingsPending.add(decisionId);
+  const controls = rulingRowControls(li);
+  controls.forEach(el => { el.disabled = true; });
+
+  const feedback = li.querySelector('.obs-ruling-feedback');
+  const restore = () => {
+    rulingsPending.delete(decisionId);
+    controls.forEach(el => { el.disabled = false; });
+  };
+  const setFeedback = (text, isError) => {
+    if (!feedback) return;
+    feedback.textContent = text;
+    feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
+  };
+  const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
+
+  const req = isTaskBound
+    ? window.api(`/workspace/${encodeURIComponent(targetUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}/dismiss`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        on401: false,
+        body: JSON.stringify({ id: anchor.taskDecisionId })
+      })
+    : window.api(`/workspace/${encodeURIComponent(targetUrlKey)}/api/dashboard/rulings/dismiss`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        on401: false,
+        body: JSON.stringify({ decisionLoopId: anchor.loopId, decisionId })
+      });
+
+  req.then(() => {
+    restore();
+    setFeedback('dismissed', false);
+    pollRulings();
+    refreshBadge();
+  }).catch((err) => {
+    console.error('Ruling dismiss failed:', err);
+    restore();
+    setFeedback('dismiss failed: ' + err.message, true);
+  });
 }
 
 // Rulings-row press handler (LIN-1728 Phase 4). Per-row `canReply` gate (the
@@ -1472,7 +1594,7 @@ function deliverRulingReply(row, prompt, li) {
   if (!targetUrlKey || !decisionId || (!decisionLoopId && disposition !== 'task-bound') || rulingsPending.has(decisionId)) return;
 
   rulingsPending.add(decisionId);
-  const buttons = li.querySelectorAll('.chat-option-btn');
+  const buttons = rulingRowControls(li);
   buttons.forEach(b => { b.disabled = true; });
 
   const restore = () => {

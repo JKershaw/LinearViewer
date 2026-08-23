@@ -12,6 +12,7 @@
  *   GET      /workspace/:urlKey/api/dashboard/sessions             — sessionId-grouped feed (observation poll source; LIN-595)
  *   GET      /workspace/:urlKey/api/dashboard/loops                — merged cross-workspace runs (flat poll source)
  *   GET      /workspace/:urlKey/api/dashboard/rulings              — unanswered-decision feed (ambient count + rulings tab; LIN-1728)
+ *   POST     /workspace/:urlKey/api/dashboard/rulings/dismiss      — dismiss a loop-backed ruling with no comment (LIN-2225; the task-bound sibling reuses the existing scan dismiss route instead)
  *   GET|POST /workspace/:urlKey/api/dashboard/run-summary/:loopId  — cached, on-demand short run summary
  *   GET|POST /workspace/:urlKey/api/dashboard/session-summary/:sessionId — cached session rollup (terminal); cheap latest-child statusLine proxy when live (LIN-592)
  *   GET      /workspace/:urlKey/api/dashboard/session-context/:sessionId — deterministic tasks-touched + relationship graph (LIN-593)
@@ -29,7 +30,8 @@
  * is first-class, so its data endpoints are session-authed only.
  */
 
-import { Router } from 'express';
+import { Router, json } from 'express';
+import { jsonError } from '../lib/errors.js';
 import { renderObservationPage } from '../lib/render-observation.js';
 import { renderSessionPage } from '../lib/render-session.js';
 import { getLoopsForWorkspace, getLoopsForIssue, getSessionsForWorkspace, getSessionsForIssues, deriveIssueGraph } from '../lib/pipeline-loops.js';
@@ -1400,6 +1402,45 @@ export function createDashboardRoutes({
       console.error('Dashboard rulings error:', error);
       keepalive.stop();
       keepalive.send(500, { error: 'Could not load rulings' });
+    }
+  });
+
+  // ─── Dismiss a loop-backed ruling (LIN-2225) ──────────────────────────────
+  //
+  // The task-bound sibling already has a dismiss path — a scan-produced
+  // decision's own `outcome: 'dismissed'` column
+  // (`POST /workspace/:urlKey/api/scan/:issueId/dismiss`, LIN-2211/LIN-2197
+  // Phase 4) — so the Rulings page client calls that route directly for a
+  // task-bound row rather than duplicating it here. A loop-backed decision has
+  // no such column: `dispatchQueueStore` only ever carries the single
+  // `decision-answer` stamp, so dismiss reuses `markDecisionAnswered` verbatim
+  // with an explicit `'dismissed'` outcome tagged into that same stamp
+  // (`lib/dispatch-store.js`) — the ruling clears from the unanswered queue
+  // exactly like a genuine answer (`lib/pipeline-loops.js`'s
+  // `_findDecisionAnswer` only ever reads `decision_id`), while staying
+  // distinguishable in storage for a later false-escalation KPI read
+  // (LIN-1736). No comment is posted — dismiss is deliberately silent, unlike
+  // an answer.
+  //
+  // `:urlKey` targets the RULING's own workspace, mirroring the existing
+  // comment route the free-text/option reply already targets
+  // (`public/observation.js`'s `deliverRulingReply`) — the rulings feed is
+  // cross-workspace, so this is not necessarily the page being viewed from.
+  router.post('/workspace/:urlKey/api/dashboard/rulings/dismiss', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace;
+    const { decisionLoopId, decisionId } = req.body || {};
+    if (typeof decisionLoopId !== 'string' || !decisionLoopId || typeof decisionId !== 'string' || !decisionId) {
+      return jsonError(res, 400, 'decisionLoopId and decisionId are both required');
+    }
+    try {
+      const stamped = await dispatchQueueStore.markDecisionAnswered(decisionLoopId, workspace.urlKey, decisionId, 'dismissed');
+      if (!stamped) {
+        return jsonError(res, 404, 'No matching ruling to dismiss');
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Ruling dismiss error:', error);
+      jsonError(res, 500, 'Failed to dismiss ruling');
     }
   });
 

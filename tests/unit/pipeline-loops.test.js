@@ -1479,6 +1479,16 @@ describe('_findDecisionAnswer (LIN-1728, backward scan)', () => {
   test('non-array feedback is tolerated, never throws', () => {
     assert.strictEqual(_findDecisionAnswer(undefined), null);
   });
+
+  // LIN-2225: a dismiss stamp is the SAME 'decision-answer' kind with an
+  // additive `outcome: 'dismissed'` field (lib/dispatch-store.js). This
+  // module's job — "was this decision_id resolved at all" — must not care
+  // which outcome resolved it, so a dismissed decision clears the unanswered
+  // queue exactly like an answered one.
+  test('a dismiss-tagged entry ({decision_id, outcome:"dismissed"}) still resolves the decision_id', () => {
+    const feedback = [{ kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1', outcome: 'dismissed' }), timestamp: 't1' }];
+    assert.strictEqual(_findDecisionAnswer(feedback), 'd-1');
+  });
 });
 
 describe('_buildLoops: answeredDecisionId derivation end-to-end (LIN-1728)', () => {

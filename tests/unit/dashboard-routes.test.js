@@ -409,6 +409,81 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
   });
 });
 
+describe('POST /api/dashboard/rulings/dismiss (LIN-2225)', () => {
+  function makeDismissRouter(dispatchQueueStoreOverrides = {}) {
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() { return { items: [] }; },
+        ...dispatchQueueStoreOverrides
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+  }
+
+  test('stamps markDecisionAnswered with outcome "dismissed" on the ruling\'s own workspace, no comment posted', async () => {
+    const calls = [];
+    const router = makeDismissRouter({
+      async markDecisionAnswered(itemId, urlKey, decisionId, outcome) {
+        calls.push({ itemId, urlKey, decisionId, outcome });
+        return { success: true, feedbackCount: 1 };
+      }
+    });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/dismiss');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionLoopId: 'loop-1', decisionId: 'd-1' };
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.jsonBody, { success: true });
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0], { itemId: 'loop-1', urlKey: 'ws-a', decisionId: 'd-1', outcome: 'dismissed' });
+  });
+
+  test('400 when decisionLoopId or decisionId is missing — never a half-stamp attempt', async () => {
+    let called = false;
+    const router = makeDismissRouter({ async markDecisionAnswered() { called = true; return { success: true }; } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/dismiss');
+
+    const missingDecisionId = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    missingDecisionId.req.body = { decisionLoopId: 'loop-1' };
+    await handler(missingDecisionId.req, missingDecisionId.res);
+    assert.equal(missingDecisionId.res.statusCode, 400);
+
+    const missingLoopId = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    missingLoopId.req.body = { decisionId: 'd-1' };
+    await handler(missingLoopId.req, missingLoopId.res);
+    assert.equal(missingLoopId.res.statusCode, 400);
+
+    assert.equal(called, false, 'markDecisionAnswered must never be called on a partial payload');
+  });
+
+  test('404 when the store finds no matching item', async () => {
+    const router = makeDismissRouter({ async markDecisionAnswered() { return null; } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/dismiss');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionLoopId: 'loop-1', decisionId: 'd-1' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 404);
+  });
+
+  test('500 when the store throws, never propagates the raw error', async () => {
+    const router = makeDismissRouter({ async markDecisionAnswered() { throw new Error('store down'); } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/dismiss');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionLoopId: 'loop-1', decisionId: 'd-1' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 500);
+  });
+});
+
 // ─── Feed memory: lean projection + bounded fan-out (LIN-622) ─────────────────
 
 describe('feed memory (LIN-622)', () => {
