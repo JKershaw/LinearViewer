@@ -307,7 +307,11 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
 
     assert.strictEqual(res.statusCode, 409);
-    assert.match(res.body, /Account Conflict/);
+    // LIN-2233: addSourceSession() sets accountId directly (never a real
+    // establishAccount call), so session.identityAuthenticatedAt is unset —
+    // NOT freshly authenticated per amendment A1, so the merge is refused
+    // outright (re-auth-required) rather than offered as a one-click confirm.
+    assert.match(res.body, /Sign in again to confirm/);
     // Neither account mutated: Y keeps exactly its one identity; X did NOT gain viewer-2.
     assert.strictEqual((await accountStore.getAccount(otherAccount._id)).identities.length, 1);
     assert.strictEqual((await accountStore.getAccount(myAccount._id)).identities.length, 1);
@@ -401,13 +405,23 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.strictEqual(session.oauthState, undefined);
   });
 
-  test('login-path fence: normal mode:new login still regenerates and does NOT preserve a pre-existing session.accountId (LIN-1351 guard)', async () => {
+  // LIN-2233 (L2.1) superseded this test's original premise: session.accountId
+  // is now DELIBERATELY carried across regenerate() (the fix), not wiped — see
+  // the fork-prevention test in tests/unit/account-identity.test.js for the
+  // intended-behavior case (a REAL pre-existing canonical account surviving
+  // regenerate while linking a brand-new identity). This test now guards the
+  // other half: regenerate() itself is still called (session-fixation
+  // protection intact) even though the carried value changes what happens next.
+  test('login-path fence: normal mode:new login still regenerates the session (session-fixation protection intact) even with a carried accountId (LIN-2233)', async () => {
     const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
     const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
-    // A normal login (no add-source intent) carrying a STALE accountId that MUST be
-    // wiped by regenerate() — never preserved/auto-merged onto the fresh sign-in.
+    // A bogus/stale accountId (never a real account in this fresh store) is now
+    // CARRIED across regenerate per L2.1, so establishAccount sees it as "live"
+    // and attempts to link onto it — which correctly surfaces as an error
+    // (unknown account) rather than silently minting a phantom account under a
+    // fabricated id.
     const session = makeSession({ oauthState: 'real', accountId: 'stale-account-xyz' });
     let regenCount = 0;
     const origRegen = session.regenerate.bind(session);
@@ -415,9 +429,8 @@ describe('routes/auth.js — Linear OAuth callback', () => {
 
     await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
 
-    assert.strictEqual(res.redirectedTo, '/workspace/acme/');
     assert.strictEqual(regenCount, 1, 'login path still regenerates the session');
-    assert.ok(session.accountId, 'a durable account is established by identity lookup');
-    assert.notStrictEqual(session.accountId, 'stale-account-xyz', 'the pre-existing accountId is NOT preserved across regenerate');
+    assert.strictEqual(res.statusCode, 409, 'an unresolvable carried accountId surfaces as a conflict, not a silent phantom mint');
+    assert.match(res.body, /Account Conflict/, 'unknown-account is not a mergeable conflict — the pre-existing dead-end page');
   });
 });

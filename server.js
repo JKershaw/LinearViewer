@@ -50,6 +50,7 @@ import { RecapCacheStore } from './lib/recap-cache.js'
 import { BriefCacheStore } from './lib/brief-cache.js'
 import { RunSummaryCacheStore } from './lib/run-summary-cache.js'
 import { AccountStore } from './lib/account-store.js'
+import { AccountMergeLogStore } from './lib/account-merge-log.js'
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
@@ -499,6 +500,13 @@ setPromptTraceRecorder((trace) => promptTraceStore.record(trace))
 // as of LIN-1329 (Phase C) — see lib/account-session.js.
 const accountsCollection = db.collection('accounts')
 const accountStore = new AccountStore({ collection: accountsCollection })
+
+// Account merge log (LIN-2233, L2.2 of the LIN-2231 design): durable,
+// append-only record of confirmed account merges (routes/auth.js's
+// POST /auth/merge/confirm), since a merge is rare/high-consequence and must
+// survive Railway's rolling ~7-day log window.
+const accountMergeEventsCollection = db.collection('account-merge-events')
+const accountMergeLogStore = new AccountMergeLogStore({ collection: accountMergeEventsCollection })
 
 // Durable workspaces (LIN-1328, Phase B). `workspaceStore` itself stays INERT —
 // deliberately passed to NO route factory and no session read site — until
@@ -956,7 +964,7 @@ app.use((req, res, next) => {
 for (const provider of getAllProviders()) {
   let authRouter
   try {
-    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore })
+    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore })
   } catch (err) {
     if (err instanceof NotImplementedError) continue
     throw err
