@@ -145,14 +145,75 @@ describe('sortIssuesForSwipe', () => {
     assert.deepStrictEqual(cards.map(c => c.id), ['longpath', 'shortpath']);
   });
 
-  test('state still dominates the new feature tiebreakers', () => {
+  test('state still dominates for a BACKLOG item, however high its reach (LIN-1872: promotion is unstarted-only)', () => {
     const cards = [
       createCard({ id: 'backlogHighUnblock', stateType: 'backlog', priority: 1, downstreamUnblocks: 9, criticalPathLen: 9 }),
       createCard({ id: 'startedNoUnblock', stateType: 'started', priority: 4, downstreamUnblocks: 0, criticalPathLen: 1 }),
     ];
     sortIssuesForSwipe(cards);
-    // in-progress work is never displaced by a high-unblock backlog item
+    // in-progress work is never displaced by a high-unblock BACKLOG item —
+    // only `unstarted` is eligible for the LIN-1872 promotion below.
     assert.deepStrictEqual(cards.map(c => c.id), ['startedNoUnblock', 'backlogHighUnblock']);
+  });
+
+  // LIN-1872: an UNSTARTED issue whose downstreamUnblocks clears
+  // UNBLOCK_PROMOTION_THRESHOLD (2) sorts as if it were started — the fix for
+  // the measured incident (LIN-1871: downstreamUnblocks 4, unstarted, buried
+  // below ~34 in-progress items with zero reach). Below the threshold, state
+  // still dominates exactly as before, so a lone blocking edge cannot swamp
+  // in-flight work with context-switches.
+  describe('unstarted high-reach promotion (LIN-1872)', () => {
+    test('an unstarted issue at/above the threshold outranks in-progress work with no reach', () => {
+      const cards = [
+        createCard({ id: 'startedNoUnblock', stateType: 'started', priority: 1, downstreamUnblocks: 0 }),
+        createCard({ id: 'unstartedHighUnblock', stateType: 'unstarted', priority: 4, downstreamUnblocks: 2 }),
+      ];
+      sortIssuesForSwipe(cards);
+      assert.deepStrictEqual(cards.map(c => c.id), ['unstartedHighUnblock', 'startedNoUnblock']);
+    });
+
+    test('the measured incident shape: downstreamUnblocks 4 clears the floor comfortably', () => {
+      const cards = [
+        createCard({ id: 'startedNoUnblock', stateType: 'started', priority: 2, downstreamUnblocks: 0 }),
+        createCard({ id: 'lin1871', stateType: 'unstarted', priority: 2, downstreamUnblocks: 4 }),
+      ];
+      sortIssuesForSwipe(cards);
+      assert.deepStrictEqual(cards.map(c => c.id), ['lin1871', 'startedNoUnblock']);
+    });
+
+    test('below the threshold, an unstarted issue does NOT get promoted — state still dominates', () => {
+      const cards = [
+        createCard({ id: 'startedNoUnblock', stateType: 'started', priority: 4, downstreamUnblocks: 0 }),
+        createCard({ id: 'unstartedLowUnblock', stateType: 'unstarted', priority: 1, downstreamUnblocks: 1 }),
+      ];
+      sortIssuesForSwipe(cards);
+      assert.deepStrictEqual(cards.map(c => c.id), ['startedNoUnblock', 'unstartedLowUnblock']);
+    });
+
+    test('two promoted-unstarted issues still tiebreak on downstreamUnblocks against each other', () => {
+      const cards = [
+        createCard({ id: 'lowerReach', stateType: 'unstarted', priority: 1, downstreamUnblocks: 2 }),
+        createCard({ id: 'higherReach', stateType: 'unstarted', priority: 4, downstreamUnblocks: 5 }),
+      ];
+      sortIssuesForSwipe(cards);
+      assert.deepStrictEqual(cards.map(c => c.id), ['higherReach', 'lowerReach']);
+    });
+
+    test('a promoted unstarted issue and a real started issue tiebreak on downstreamUnblocks, not arrival order', () => {
+      const cards = [
+        createCard({ id: 'realStarted', stateType: 'started', priority: 1, downstreamUnblocks: 3 }),
+        createCard({ id: 'promotedUnstarted', stateType: 'unstarted', priority: 1, downstreamUnblocks: 5 }),
+      ];
+      sortIssuesForSwipe(cards);
+      // both sort at the "started" rank; the higher reach wins the tiebreak
+      assert.deepStrictEqual(cards.map(c => c.id), ['promotedUnstarted', 'realStarted']);
+    });
+
+    test('promotion does not rewrite the card\'s displayed stateType', () => {
+      const card = createCard({ id: 'promoted', stateType: 'unstarted', downstreamUnblocks: 9 });
+      sortIssuesForSwipe([card, createCard({ id: 'other', stateType: 'started' })]);
+      assert.strictEqual(card.stateType, 'unstarted');
+    });
   });
 
   test('falls back to priority when features are absent/equal', () => {

@@ -1008,7 +1008,7 @@ Returns a prioritized, deduplicated task list using the same ordering as the in-
 
 `total` is the full count before `limit` is applied. `parent` is `null` for top-level issues; `children` is `[]` when there are none.
 
-Every task also carries deterministic, in-set ranking features (no LLM): `downstreamUnblocks` (how many tasks this one transitively unblocks), `criticalPathLen` (longest dependency chain through it, the node itself counting as 1), and an optional `heldBy` (identifiers of blockers pushed beyond `limit` that still forced this line's position). The ordering factors `downstreamUnblocks` then `criticalPathLen` in just below state and above priority, so it is explainable rather than opaque.
+Every task also carries deterministic, in-set ranking features (no LLM): `downstreamUnblocks` (how many tasks this one transitively unblocks), `criticalPathLen` (longest dependency chain through it, the node itself counting as 1), and an optional `heldBy` (identifiers of blockers pushed beyond `limit` that still forced this line's position). The ordering factors `downstreamUnblocks` then `criticalPathLen` in just below state and above priority, so it is explainable rather than opaque. An `unstarted` task whose `downstreamUnblocks` is `2` or more sorts as if it were `started` (LIN-1872) — a real, multi-task unblocker is never silently buried below in-progress work that blocks nothing; `backlog` tasks are never promoted this way, however high their reach.
 
 ##### Digest view (`?view=digest`)
 
