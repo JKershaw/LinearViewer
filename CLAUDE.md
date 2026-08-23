@@ -459,6 +459,7 @@ The Dispatch feature allows users to queue prompts for external consumers (AI ag
 - `POST /workspace/:urlKey/api/dispatch` - Queue a prompt
 - `GET /workspace/:urlKey/api/dispatch` - List queued items
 - `DELETE /workspace/:urlKey/api/dispatch/:itemId` - Remove item
+- `PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim` - Graceful trim (LIN-2147): amend a live run's `maxTasks` bound downward. Body `{ maxTasks }` (positive integer, strictly less than the run's current bound — 409 otherwise). Invents no new termination path: the existing `maxTasks`/`countDistinctTasksForSession` guard (LIN-1751, `lib/dispatch-factory.js`) already refuses a genuinely NEW task past the bound while admitting a dispatch for a task already inside it (`alreadyCounted`) regardless of count — so lowering the bound here is sufficient on its own to make a run wind down (finish the current ticket, refuse the next new one) without interrupting any beat already in progress. Idempotent (an absolute set, not a relative decrement) and auditable (`by`/`at`/`maxTasks` appended to the run's own `trimHistory`, readable via `getItemStatus`). Distinct from abort (LIN-553/743): abort is a hard stop mid-work; trim is "finish what you're on, start nothing new."
 - Token management at `/workspace/:urlKey/api/dispatch/tokens`
 
 **Consumer endpoints** (Bearer token auth):
