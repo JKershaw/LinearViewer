@@ -143,7 +143,7 @@
    * @param {Array<{id: string, label: string, cost?: number}>} [opts.options] - decision options.
    * @param {string} [opts.recommended] - the recommended option's `id`, if any.
    * @param {'resumable'|'gone'|'mid-turn'|'indeterminate'|'task-bound'} opts.disposition - press-time disposition (see `lib/unanswered-decisions.js`).
-   * @param {function(string, string): void} [opts.onSelect] - called with `(optionId, optionLabel)` on a button press. Never called for a read-only disposition (mid-turn/indeterminate) or when `options` is empty.
+   * @param {function(string, string): void} [opts.onSelect] - called with `(optionId, optionLabel)` on a button press. Never called for a read-only disposition — an ALLOW-list of `resumable`/`gone`/`task-bound` is interactive; every other value, including one not yet in this list, is read-only (LIN-2215 F2) — or when `options` is empty.
    * @returns {Element} the appended `<div class="chat-options">` wrapper.
    */
   function appendOptions(container, opts) {

@@ -13,9 +13,19 @@ import { featuresParam } from '../helpers.js';
 let URL_KEY;
 let OBSERVATION_URL;
 
-test.beforeEach(({ workerUrlKey }) => {
+test.beforeEach(async ({ page, workerUrlKey }) => {
   URL_KEY = workerUrlKey;
   OBSERVATION_URL = `/workspace/${URL_KEY}/observation`;
+  // LIN-2228: this key is shared (at workers:1) with every other spec file
+  // that seeds a task decision under the same per-worker urlKey (e.g.
+  // tests/e2e/scan.spec.js) — TaskDecisionsStore has no per-spec-file
+  // isolation, only per-urlKey, and is durable with no TTL. Clearing here
+  // immunizes the nav-badge block's workspace-global assertions AND removes
+  // the residue a failed pre-press run in THIS file would otherwise leave
+  // behind forever, rather than merely tolerating it (LIN-2215 review ledger
+  // items 6/7). Uses the existing test-route cleanup pattern already used in
+  // this file (clearRuns/clearRunsFor below), not a new mechanism.
+  await page.goto(`/test/clear-task-decisions?urlKey=${URL_KEY}`);
 });
 
 async function clearRuns(page) {
@@ -543,6 +553,113 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     // `data-decision-id` for the same leaked-row reason as the locator above
     // — a `hasText: 'SCAN-1'` filter would also count any leaked sibling row
     // sharing that same hardcoded identifier and never reach 0.
+    await expect(page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`)).toHaveCount(0, { timeout: 20000 });
+  });
+
+  // LIN-2226 ledger item 3: deliverRulingReply's task-bound branch has a real
+  // failure path (restore() + setFeedback('reply failed: …', true), buttons
+  // re-enabled) covered only in jsdom (tests/unit/observation-ruling-delivery
+  // .test.js) — no e2e has ever made a task-bound reply actually fail in a
+  // browser, so the visible failure text has never been observed there.
+  test('LIN-2226: a failing task-bound reply shows visible "reply failed" feedback and re-enables the buttons', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const issueId = randomUUID();
+    const nonce = randomUUID();
+    const seed = {
+      projects: [],
+      issues: [{
+        id: issueId,
+        identifier: 'SCAN-4',
+        title: 'Task-bound reply-failure fixture',
+        description: `This task is blocked pending an operator decision. (${nonce})`,
+        state: { name: 'In Progress', type: 'started' },
+        url: `/workspace/${localWorkerUrlKey}/issue/${issueId}`
+      }]
+    };
+    await seedLocal(seed);
+
+    const scanResp = await page.request.post(`/workspace/${localWorkerUrlKey}/api/scan/${issueId}`);
+    expect(scanResp.status(), `scan seed failed: ${await scanResp.text()}`).toBe(200);
+    const scanBody = await scanResp.json();
+    expect(scanBody.decision).toBeTruthy();
+
+    await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`);
+    await expect(row).toBeVisible();
+
+    // Force the one way a task-bound reply's failure branch is reached: a
+    // non-ok response from the comments route.
+    await page.route('**/api/comments/**', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'simulated failure' }) });
+    });
+
+    const buttons = row.locator('.chat-option-btn');
+    await buttons.first().click();
+
+    const feedback = row.locator('.obs-ruling-feedback');
+    await expect(feedback).toContainText('reply failed');
+    // The pending guard released and the buttons re-enabled — a row stuck
+    // disabled after a failure would be its own (different) bug.
+    await expect(buttons.first()).toBeEnabled();
+  });
+
+  // LIN-2226 ledger item 4: the loop-backed path has an explicit
+  // cross-workspace test (LIN-1728 review F1, above); the task-bound path
+  // relied on `anchor.workspaceUrlKey` being correct "by inspection" (the
+  // same variable the tested loop path uses) — an argument, not coverage.
+  // Proves it by observation, mirroring F1's shape exactly.
+  test('LIN-2226: a task-bound ruling from a non-page workspace writes its comment/stamp in the RULING\'s own workspace', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const secondUrlKey = `${localWorkerUrlKey}-b`;
+    const issueId = randomUUID();
+    const nonce = randomUUID();
+    const seed = {
+      projects: [],
+      issues: [{
+        id: issueId,
+        identifier: 'SCAN-5',
+        title: 'Task-bound cross-workspace fixture',
+        description: `This task is blocked pending an operator decision. (${nonce})`,
+        state: { name: 'In Progress', type: 'started' },
+        url: `/workspace/${localWorkerUrlKey}/issue/${issueId}`
+      }]
+    };
+    // Workspace A (the ruling's own workspace).
+    await seedLocal(seed);
+    // Workspace B (the page being viewed from) — appended alongside A rather
+    // than replacing it (LIN-2226's `append` addition to the local session
+    // harness, routes/test.js's /test/set-local-session).
+    await seedLocal({ projects: [], issues: [] }, { urlKey: secondUrlKey, append: true });
+
+    const scanResp = await page.request.post(`/workspace/${localWorkerUrlKey}/api/scan/${issueId}`);
+    expect(scanResp.status(), `scan seed failed: ${await scanResp.text()}`).toBe(200);
+    const scanBody = await scanResp.json();
+    expect(scanBody.decision).toBeTruthy();
+
+    // View from workspace B, not A — the exact cross-workspace shape F1 tests.
+    await page.goto(`/workspace/${secondUrlKey}/observation`);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`);
+    await expect(row).toBeVisible();
+    await expect(row).toContainText(localWorkerUrlKey); // the workspace chip (renderRulingRow)
+
+    const [commentReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
+      row.locator('.chat-option-btn').first().click()
+    ]);
+
+    // The comment must target workspace A (the ruling's own), never B (the page).
+    expect(commentReq.url()).toContain(`/workspace/${localWorkerUrlKey}/api/comments/`);
+    expect(commentReq.url()).not.toContain(`/workspace/${secondUrlKey}/api/comments/`);
+    expect((await commentReq.response()).status()).toBe(201);
+    const commentPayload = commentReq.postDataJSON();
+    expect(commentPayload.taskDecisionId).toBe(scanBody.id);
+    expect(commentPayload.taskDecisionIssueId).toBe(issueId);
+
     await expect(page.locator(`#obs-rulings .obs-ruling[data-decision-id="${scanBody.id}"]`)).toHaveCount(0, { timeout: 20000 });
   });
 
