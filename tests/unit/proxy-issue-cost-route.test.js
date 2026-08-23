@@ -282,12 +282,17 @@ describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
     assert.equal(body.totalUsd, 4.9);
   });
 
-  test('an unknown issue with no dispatch rows returns a zeroed, fully-priced result — not 404', async () => {
+  test('LIN-2253: an unknown issue with no dispatch rows returns 200 with noLineage — never a false $0', async () => {
+    // Not 404 (the identifier itself may be perfectly valid — a lane-landed,
+    // non-anchor ticket has no dispatch row of its own by construction), but
+    // also never the old vacuous totalUsd: 0 — that read as a confirmed
+    // zero-cost result rather than "no data reached this issue at all".
     const { app } = buildApp({ history: [] });
     const { status, body } = await get(app, '/api/proxy/issues/LIN-999/cost');
     assert.equal(status, 200);
     assert.equal(body.pricedUsd, 0);
-    assert.equal(body.totalUsd, 0);
+    assert.equal(body.totalUsd, null);
+    assert.equal(body.noLineage, true);
     assert.deepEqual(body.workerSessions, []);
   });
 });

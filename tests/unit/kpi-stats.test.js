@@ -17,7 +17,7 @@ import {
   collectKpiStats, categorizeProxyEvent, PROXY_PHASES,
   ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS,
   OUTCOME_WINDOW_WEEKS, OUTCOME_WINDOW_DAYS,
-  harnessOf, usageOf, evidenceCountOf, loadDispatchHistory, groupDispatchLineages
+  harnessOf, usageOf, evidenceCountOf, ticketMarkerEntriesOf, loadDispatchHistory, groupDispatchLineages
 } from '../../lib/kpi-stats.js';
 
 // Minimal in-memory mock of the collection surface kpi-stats uses:
@@ -855,6 +855,69 @@ describe('groupDispatchLineages (LIN-1957) — the shared extraction', () => {
     assert.strictEqual(rowUsage[1].message, '[usage] {"costUsd":2}');
   });
 
+  test('LIN-2253: ticketMarkers accumulates [ticket] markers across every row in the lineage, parsed once', () => {
+    const rows = [
+      { _id: 'orig', rootItemId: 'lane1', status: 'taken', dispatchedAt: daysAgo(2), feedback: [
+        { message: '[ticket] LIN-900 started', timestamp: daysAgo(2).toISOString() },
+        { message: '[ticket] LIN-900 done', timestamp: daysAgo(1.5).toISOString() }
+      ] },
+      { _id: 'fu', rootItemId: 'lane1', followUpTo: 'lane1', status: 'taken', dispatchedAt: daysAgo(1), feedback: [
+        { message: '[ticket] LIN-901 done', timestamp: daysAgo(0.9).toISOString() }
+      ] }
+    ];
+    const lineages = groupDispatchLineages(rows);
+    const walk = lineages.get('lane1').ticketMarkers;
+    assert.strictEqual(walk.length, 2, 'LIN-900 (latest state wins) + LIN-901, across both rows');
+    const byId = Object.fromEntries(walk.map(m => [m.identifier, m]));
+    assert.strictEqual(byId['LIN-900'].state, 'done', 'the LATER started->done marker wins, not the first one seen');
+    assert.strictEqual(byId['LIN-901'].state, 'done');
+  });
+
+  test('LIN-2253: ticketMarkers is order-independent, same as rowUsage', () => {
+    const rows = [
+      { _id: 'orig', rootItemId: 'lane2', status: 'taken', dispatchedAt: daysAgo(2), feedback: [
+        { message: '[ticket] LIN-910 done', timestamp: daysAgo(1.5).toISOString() }
+      ] },
+      { _id: 'fu', rootItemId: 'lane2', followUpTo: 'lane2', status: 'taken', dispatchedAt: daysAgo(1), feedback: [
+        { message: '[ticket] LIN-911 done', timestamp: daysAgo(0.9).toISOString() }
+      ] }
+    ];
+    const forward = groupDispatchLineages(rows);
+    const reversed = groupDispatchLineages([...rows].reverse());
+    const idsOf = (lineages) => lineages.get('lane2').ticketMarkers.map(m => m.identifier).sort();
+    assert.deepStrictEqual(idsOf(forward), ['LIN-910', 'LIN-911']);
+    assert.deepStrictEqual(idsOf(reversed), ['LIN-910', 'LIN-911']);
+  });
+
+  test('review fix: same-identifier markers across rows resolve by the CONTRIBUTING ROW\'s dispatchedAt, not array/push order', () => {
+    // parseTicketMarkers is last-ARRAY-POSITION-wins, not timestamp-aware —
+    // groupDispatchLineages must sort each row's marker entries by the row's
+    // own dispatchedAt BEFORE parsing, or an unsorted rows[] (an unsorted
+    // concatenation of an unsorted aggregate and an unsorted find, same as
+    // rowUsage's F3 concern) could resolve "latest state" to whichever row
+    // the input array happened to visit last, not the row dispatched last.
+    const earlyRow = { _id: 'early', rootItemId: 'lane5', status: 'taken', dispatchedAt: daysAgo(5), feedback: [
+      { message: '[ticket] LIN-920 started', timestamp: daysAgo(5).toISOString() }
+    ] };
+    const lateRow = { _id: 'late', rootItemId: 'lane5', followUpTo: 'lane5', status: 'taken', dispatchedAt: daysAgo(1), feedback: [
+      { message: '[ticket] LIN-920 done', timestamp: daysAgo(1).toISOString() }
+    ] };
+    // Pass the chronologically-LATER row FIRST in the input array — if the
+    // fix regresses to plain concatenation order, this would resolve to
+    // "started" (whichever entry parseTicketMarkers saw last in array
+    // position) instead of the chronologically-later "done".
+    const lineages = groupDispatchLineages([lateRow, earlyRow]);
+    const walk = lineages.get('lane5').ticketMarkers;
+    assert.strictEqual(walk.length, 1);
+    assert.strictEqual(walk[0].state, 'done', 'the row dispatched LATER wins, regardless of its position in the input array');
+  });
+
+  test('a lineage with no [ticket] markers gets an empty ticketMarkers array, never undefined', () => {
+    const rows = [{ _id: 'orig', rootItemId: 'plain', status: 'taken', dispatchedAt: daysAgo(1), feedback: [{ message: '[done] landed it', timestamp: daysAgo(1).toISOString() }] }];
+    const lineages = groupDispatchLineages(rows);
+    assert.deepStrictEqual(lineages.get('plain').ticketMarkers, []);
+  });
+
   test('computeDispatchOutcomes output is unaffected by the three new fields — the extraction is behavior-preserving', async () => {
     // Same seed as the existing dispatch-outcomes suite, run through the
     // extracted helper's consumer end-to-end via collectKpiStats.
@@ -1379,6 +1442,37 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     // 0 (nothing matches `$eq: [undefined, 'evidence']`), and a filter-less
     // bug would give 4 (every entry, unfiltered).
     assert.strictEqual(evidenceCountOf(rows[0]), 2);
+  });
+
+  test('LIN-2253: ticketMarkerEntries (via loadDispatchHistory) $regexMatch-filters [ticket] markers server-side, proven against the REAL pipeline', async () => {
+    const collections = await realCollections({
+      dispatchHistory: [{
+        _id: 'h1', rootItemId: 'h1', status: 'taken', dispatchedAt: daysAgo(1),
+        feedback: [
+          { message: '[ticket] LIN-920 started', timestamp: daysAgo(2).toISOString() },
+          { message: '[usage] {"costUsd":1}', timestamp: daysAgo(1.5).toISOString(), kind: 'usage' },
+          { message: '[ticket] LIN-920 done', timestamp: daysAgo(1).toISOString() },
+          { message: 'heartbeat: still going', timestamp: daysAgo(1).toISOString(), kind: 'heartbeat' }
+        ]
+      }]
+    });
+
+    const rows = await loadDispatchHistory(collections.dispatchHistory);
+    assert.strictEqual(rows.length, 1);
+    // Only the two [ticket]-prefixed entries survive the server-side
+    // $regexMatch filter — proven against the real aggregation, not a
+    // hand-copied pipeline (same rationale as the usageEntry/evidenceCount
+    // tests above: a regression in the real $project would go unnoticed by
+    // a test that reimplements the filter itself).
+    const entries = ticketMarkerEntriesOf(rows[0]);
+    assert.strictEqual(entries.length, 2);
+    assert.deepStrictEqual(entries.map(e => e.message), ['[ticket] LIN-920 started', '[ticket] LIN-920 done']);
+
+    const lineages = groupDispatchLineages(rows);
+    const walk = lineages.get('h1').ticketMarkers;
+    assert.strictEqual(walk.length, 1);
+    assert.strictEqual(walk[0].identifier, 'LIN-920');
+    assert.strictEqual(walk[0].state, 'done', 'the latest marker wins');
   });
 
   test('the find-path and aggregation-path readers agree on the same seed (via loadDispatchHistory + the mock)', async () => {

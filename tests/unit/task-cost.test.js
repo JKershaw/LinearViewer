@@ -151,6 +151,11 @@ describe('buildTaskCost — unpriced / missing-telemetry handling', () => {
     assert.equal(result.workerSessions.length, 0);
     assert.equal(result.pricedUsd, 0);
     assert.equal(result.noTelemetryCount, 0);
+    // LIN-2253 review: none of these rows ever ran, so zero taken lineages
+    // resolve — the same shape as "no data at all" for this issue, and
+    // totalUsd must reflect that (null), not a confirmed $0.
+    assert.equal(result.noLineage, true);
+    assert.equal(result.totalUsd, null);
   });
 });
 
@@ -188,11 +193,23 @@ describe('buildTaskCost — totalUsd null-vs-priced gating', () => {
     assert.deepEqual(result.appCalls, EMPTY_APP);
   });
 
-  test('no rows at all → zeroed, fully-priced empty result', () => {
+  test('LIN-2253: no rows at all → noLineage, totalUsd null — never a vacuous $0', () => {
+    // Zero `taken` rows is exactly what a lane-landed, non-anchor ticket
+    // looks like (LIN-2253): it has no dispatch row of its own. An empty
+    // set trivially satisfies "everything priced", so before the fix this
+    // read as a confirmed $0 rather than "no data for this issue at all".
     const result = buildTaskCost({ ownRows: [] });
     assert.equal(result.pricedUsd, 0);
-    assert.equal(result.totalUsd, 0);
+    assert.equal(result.totalUsd, null);
+    assert.equal(result.noLineage, true);
     assert.deepEqual(result.workerSessions, []);
+  });
+
+  test('a real lineage sets noLineage false, even when it is unpriced', () => {
+    const unpricedRow = row({ id: 'a', dispatchedAt: '2026-08-01T10:00:00Z', rootItemId: 'root1', feedback: [usageEntry({ model: 'no-such-model/vX' })] });
+    const result = buildTaskCost({ ownRows: [unpricedRow], appSummary: EMPTY_APP });
+    assert.equal(result.noLineage, false);
+    assert.equal(result.totalUsd, null);
   });
 });
 
