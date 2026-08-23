@@ -484,6 +484,109 @@ describe('POST /api/dashboard/rulings/dismiss (LIN-2225)', () => {
   });
 });
 
+describe('POST /api/dashboard/rulings/shelve (LIN-1727)', () => {
+  function makeShelveRouter(shelvedRulingsStoreOverrides) {
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      shelvedRulingsStore: shelvedRulingsStoreOverrides
+    });
+  }
+
+  test('shelves on the ruling\'s own workspace and returns the stored record', async () => {
+    const calls = [];
+    const router = makeShelveRouter({
+      async shelve({ urlKey, decisionId, reason, resurfaceInMs }) {
+        calls.push({ urlKey, decisionId, reason, resurfaceInMs });
+        return { urlKey, decisionId, reason, resurfaceAt: '2026-08-24T00:00:00.000Z', shelvedAt: '2026-08-23T00:00:00.000Z', lapseCount: 0 };
+      }
+    });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'd-1', reason: 'waiting on legal', resurfaceInMs: 24 * 60 * 60 * 1000 };
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.success, true);
+    assert.equal(res.jsonBody.shelf.decisionId, 'd-1');
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0], { urlKey: 'ws-a', decisionId: 'd-1', reason: 'waiting on legal', resurfaceInMs: 24 * 60 * 60 * 1000 });
+  });
+
+  test('400 when decisionId is missing', async () => {
+    const router = makeShelveRouter({ async shelve() { return {}; } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { reason: 'x', resurfaceInMs: 60 * 60 * 1000 };
+    await handler(req, res);
+    assert.equal(res.statusCode, 400);
+  });
+
+  test('400 when reason is missing or blank — silent muting is forbidden', async () => {
+    let called = false;
+    const router = makeShelveRouter({ async shelve() { called = true; return {}; } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
+
+    const missing = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    missing.req.body = { decisionId: 'd-1', resurfaceInMs: 60 * 60 * 1000 };
+    await handler(missing.req, missing.res);
+    assert.equal(missing.res.statusCode, 400);
+
+    const blank = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    blank.req.body = { decisionId: 'd-1', reason: '   ', resurfaceInMs: 60 * 60 * 1000 };
+    await handler(blank.req, blank.res);
+    assert.equal(blank.res.statusCode, 400);
+
+    assert.equal(called, false);
+  });
+
+  test('400 when resurfaceInMs is missing, non-numeric, or outside [5min, 30days]', async () => {
+    const router = makeShelveRouter({ async shelve() { return {}; } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
+
+    for (const bad of [undefined, 'nope', 1000, 31 * 24 * 60 * 60 * 1000]) {
+      const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+      req.body = { decisionId: 'd-1', reason: 'x', resurfaceInMs: bad };
+      await handler(req, res);
+      assert.equal(res.statusCode, 400, `expected 400 for resurfaceInMs=${bad}`);
+    }
+  });
+
+  test('503 when no shelvedRulingsStore is configured', async () => {
+    const router = makeShelveRouter(null);
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'd-1', reason: 'x', resurfaceInMs: 60 * 60 * 1000 };
+    await handler(req, res);
+    assert.equal(res.statusCode, 503);
+  });
+
+  test('500 when the store returns null (failed to shelve)', async () => {
+    const router = makeShelveRouter({ async shelve() { return null; } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'd-1', reason: 'x', resurfaceInMs: 60 * 60 * 1000 };
+    await handler(req, res);
+    assert.equal(res.statusCode, 500);
+  });
+
+  test('500 when the store throws, never propagates the raw error', async () => {
+    const router = makeShelveRouter({ async shelve() { throw new Error('store down'); } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'd-1', reason: 'x', resurfaceInMs: 60 * 60 * 1000 };
+    await handler(req, res);
+    assert.equal(res.statusCode, 500);
+  });
+});
+
 // ─── Escalation KPIs — operator-facing audit page (LIN-1736) ─────────────────
 
 describe('GET /api/escalation-kpis (LIN-1736)', () => {

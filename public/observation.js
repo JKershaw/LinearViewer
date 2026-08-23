@@ -1458,15 +1458,28 @@ function renderRulingRow(row) {
     });
     actions.appendChild(sendBtn);
     actions.appendChild(makeDismissButton(row, li));
+    actions.appendChild(makeShelveButton(row, li));
     composer.appendChild(actions);
   } else {
     const actions = document.createElement('div');
     actions.className = 'obs-ruling-answer-actions chat-composer__actions';
     actions.appendChild(makeDismissButton(row, li));
+    actions.appendChild(makeShelveButton(row, li));
     composer.appendChild(actions);
   }
 
   li.appendChild(composer);
+
+  // LIN-1727: a decision that has lapsed out of a prior shelve (its timer
+  // expired without ever being decided) carries that history forward as a
+  // visible flag — repeated lapses should raise priority, not be silently
+  // tolerated forever (docs/escalation-philosophy.md §4/§6).
+  if (row.shelvedLapseCount > 0) {
+    const lapseNote = document.createElement('p');
+    lapseNote.className = 'obs-ruling-lapse-note';
+    lapseNote.textContent = `⚠ shelved ${row.shelvedLapseCount}× already — still not decided`;
+    li.appendChild(lapseNote);
+  }
 
   const feedback = document.createElement('p');
   feedback.className = 'obs-ruling-feedback';
@@ -1484,12 +1497,117 @@ function makeDismissButton(row, li) {
   return btn;
 }
 
-// The set of controls a pending reply/dismiss must disable — every
+// Shelve (LIN-1727): a DESIGNED defer, not a dismiss — a reason and a
+// re-surface timer are both required (docs/escalation-philosophy.md §6:
+// silent muting is forbidden). Works for every disposition, same as
+// Dismiss, and needs no anchor/disposition branching server-side (it never
+// touches the underlying loop/task-decision row at all).
+const SHELVE_DURATIONS = [
+  ['1 hour', 60 * 60 * 1000],
+  ['4 hours', 4 * 60 * 60 * 1000],
+  ['1 day', 24 * 60 * 60 * 1000],
+  ['3 days', 3 * 24 * 60 * 60 * 1000],
+  ['1 week', 7 * 24 * 60 * 60 * 1000]
+];
+
+function makeShelveButton(row, li) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'action-btn obs-ruling-shelve';
+  btn.textContent = 'shelve';
+  btn.addEventListener('click', () => toggleShelvePanel(row, li));
+  return btn;
+}
+
+function toggleShelvePanel(row, li) {
+  const existing = li.querySelector('.obs-ruling-shelve-panel');
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement('div');
+  panel.className = 'obs-ruling-shelve-panel';
+
+  const reasonInput = document.createElement('input');
+  reasonInput.type = 'text';
+  reasonInput.className = 'obs-ruling-shelve-reason';
+  reasonInput.placeholder = 'Why are you shelving this?';
+  reasonInput.setAttribute('aria-label', 'Shelve reason');
+  panel.appendChild(reasonInput);
+
+  const durationSelect = document.createElement('select');
+  durationSelect.className = 'obs-ruling-shelve-duration';
+  durationSelect.setAttribute('aria-label', 'Re-surface after');
+  for (const [label, ms] of SHELVE_DURATIONS) {
+    const opt = document.createElement('option');
+    opt.value = String(ms);
+    opt.textContent = `re-surface in ${label}`;
+    durationSelect.appendChild(opt);
+  }
+  durationSelect.value = String(24 * 60 * 60 * 1000); // 1 day default
+  panel.appendChild(durationSelect);
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.type = 'button';
+  confirmBtn.className = 'action-btn obs-ruling-shelve-confirm';
+  confirmBtn.textContent = 'confirm shelve';
+  confirmBtn.addEventListener('click', () => {
+    const reason = reasonInput.value.trim();
+    if (!reason) { reasonInput.focus(); return; }
+    shelveRulingRow(row, li, reason, parseInt(durationSelect.value, 10));
+  });
+  panel.appendChild(confirmBtn);
+
+  li.appendChild(panel);
+  reasonInput.focus();
+}
+
+function shelveRulingRow(row, li, reason, resurfaceInMs) {
+  const { decision, anchor } = row || {};
+  const pageUrlKey = observationData?.urlKey;
+  const targetUrlKey = anchor?.workspaceUrlKey;
+  const decisionId = decision?.decision_id;
+  if (!targetUrlKey || !decisionId || rulingsPending.has(decisionId)) return;
+
+  rulingsPending.add(decisionId);
+  const controls = rulingRowControls(li);
+  controls.forEach(el => { el.disabled = true; });
+
+  const feedback = li.querySelector('.obs-ruling-feedback');
+  const restore = () => {
+    rulingsPending.delete(decisionId);
+    controls.forEach(el => { el.disabled = false; });
+  };
+  const setFeedback = (text, isError) => {
+    if (!feedback) return;
+    feedback.textContent = text;
+    feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
+  };
+  const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
+
+  window.api(`/workspace/${encodeURIComponent(targetUrlKey)}/api/dashboard/rulings/shelve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    on401: false,
+    body: JSON.stringify({ decisionId, reason, resurfaceInMs })
+  }).then(() => {
+    restore();
+    const panel = li.querySelector('.obs-ruling-shelve-panel');
+    if (panel) panel.remove();
+    setFeedback('shelved', false);
+    pollRulings();
+    refreshBadge();
+  }).catch((err) => {
+    console.error('Ruling shelve failed:', err);
+    restore();
+    setFeedback('shelve failed: ' + err.message, true);
+  });
+}
+
+// The set of controls a pending reply/dismiss/shelve must disable — every
 // interactive element the row can carry, not just `.chat-option-btn`, so a
-// free-text send or a dismiss in flight can't be double-fired by the OTHER
-// control on the same row either.
+// free-text send, a dismiss, or a shelve in flight can't be double-fired by
+// the OTHER control on the same row either.
 function rulingRowControls(li) {
-  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input');
+  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input, .obs-ruling-shelve');
 }
 
 // Dismiss (LIN-2225): the row's other exit, independent of `canReply` — a

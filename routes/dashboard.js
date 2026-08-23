@@ -13,6 +13,7 @@
  *   GET      /workspace/:urlKey/api/dashboard/loops                — merged cross-workspace runs (flat poll source)
  *   GET      /workspace/:urlKey/api/dashboard/rulings              — unanswered-decision feed (ambient count + rulings tab; LIN-1728)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/dismiss      — dismiss a loop-backed ruling with no comment (LIN-2225; the task-bound sibling reuses the existing scan dismiss route instead)
+ *   POST     /workspace/:urlKey/api/dashboard/rulings/shelve       — shelve any ruling with a reason + re-surface timer (LIN-1727; view-only, works uniformly for loop-backed and task-bound)
  *   GET      /workspace/:urlKey/escalation-kpis                    — operator-facing escalation KPI audit page (LIN-1736; rate, time-to-response, false-escalation, unanswered age); ?windowDays= (default 30), ?targetPerDay= (optional)
  *   GET      /workspace/:urlKey/api/escalation-kpis                — the same KPIs as JSON
  *   GET|POST /workspace/:urlKey/api/dashboard/run-summary/:loopId  — cached, on-demand short run summary
@@ -448,6 +449,7 @@ function deriveFeedStatusLine(children) {
  * @param {number}   [deps.recentLimit=120]        - cap on terminal runs returned by /loops
  * @param {Object}   [deps.sessionsFeedCache]      - short-TTL SWR cache for the /sessions feed (LIN-617)
  * @param {Object}   [deps.taskDecisionsStore]     - scan-produced task decisions store (LIN-2215), threaded into /api/dashboard/rulings
+ * @param {Object}   [deps.shelvedRulingsStore]    - shelved-rulings store (LIN-1727), threaded into /api/dashboard/rulings
  * @returns {Router}
  */
 export function createDashboardRoutes({
@@ -491,7 +493,13 @@ export function createDashboardRoutes({
   // null → the taskDecisions branch is simply skipped (collectUnansweredDecisions
   // defaults it to []), same degrade-gracefully convention as briefCacheStore/
   // recapCacheStore/proxyEventStore above, so an unwired test sees no behaviour change.
-  taskDecisionsStore = null
+  taskDecisionsStore = null,
+  // Shelved rulings (LIN-1727), the rulings feed's THIRD input, alongside
+  // `loops` and `taskDecisions` — see the /api/dashboard/rulings handler
+  // below. Default null → the shelving branch is simply skipped
+  // (collectUnansweredDecisions defaults it to []), same degrade-gracefully
+  // convention as taskDecisionsStore above.
+  shelvedRulingsStore = null
 }) {
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
@@ -1393,7 +1401,14 @@ export function createDashboardRoutes({
       const taskDecisions = taskDecisionsStore
         ? await taskDecisionsStore.listUnansweredForWorkspaces(workspaces.map(w => w.urlKey))
         : [];
-      const rulings = collectUnansweredDecisions({ loops: merged, taskDecisions }, { now: new Date() });
+      // Additive THIRD input (LIN-1727) — same `workspaces` scope, same
+      // local/fast-read discipline as taskDecisions above; no new caching
+      // layer. Raw rows; collectUnansweredDecisions owns the active/lapsed
+      // reduction.
+      const shelvedRulings = shelvedRulingsStore
+        ? await shelvedRulingsStore.listForWorkspaces(workspaces.map(w => w.urlKey))
+        : [];
+      const rulings = collectUnansweredDecisions({ loops: merged, taskDecisions, shelvedRulings }, { now: new Date() });
 
       keepalive.stop();
       keepalive.send(200, {
@@ -1448,6 +1463,44 @@ export function createDashboardRoutes({
     }
   });
 
+  // ─── Shelve a ruling (LIN-1727) ──────────────────────────────────────────
+  //
+  // A deliberate, designed defer — a reason and a re-surface timer are both
+  // required (docs/escalation-philosophy.md §6: silent muting is forbidden).
+  // Works uniformly for a loop-backed OR task-bound ruling — unlike answer/
+  // dismiss, a shelve never writes to the underlying loop/task-decision row
+  // at all (it is a VIEW operation only, keyed on `decisionId` alone in
+  // `lib/shelved-rulings-store.js`), so this route needs no anchor/disposition
+  // branching the way `.../rulings/dismiss` above does.
+  const MIN_SHELVE_MS = 5 * 60 * 1000; // 5 minutes
+  const MAX_SHELVE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+  router.post('/workspace/:urlKey/api/dashboard/rulings/shelve', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace;
+    const { decisionId, reason, resurfaceInMs } = req.body || {};
+    if (typeof decisionId !== 'string' || !decisionId) {
+      return jsonError(res, 400, 'decisionId is required');
+    }
+    if (typeof reason !== 'string' || !reason.trim()) {
+      return jsonError(res, 400, 'A shelve reason is required — silent muting is not allowed');
+    }
+    if (typeof resurfaceInMs !== 'number' || !Number.isFinite(resurfaceInMs) || resurfaceInMs < MIN_SHELVE_MS || resurfaceInMs > MAX_SHELVE_MS) {
+      return jsonError(res, 400, `resurfaceInMs must be between ${MIN_SHELVE_MS} and ${MAX_SHELVE_MS}`);
+    }
+    if (!shelvedRulingsStore) {
+      return jsonError(res, 503, 'Shelved-rulings store not configured');
+    }
+    try {
+      const record = await shelvedRulingsStore.shelve({ urlKey: workspace.urlKey, decisionId, reason, resurfaceInMs });
+      if (!record) {
+        return jsonError(res, 500, 'Failed to shelve ruling');
+      }
+      res.json({ success: true, shelf: record });
+    } catch (error) {
+      console.error('Ruling shelve error:', error);
+      jsonError(res, 500, 'Failed to shelve ruling');
+    }
+  });
+
   // ─── Escalation KPIs — operator-facing audit page (LIN-1736) ────────────────
   //
   // Per docs/escalation-philosophy.md §7: escalation rate, time-to-response,
@@ -1485,7 +1538,11 @@ export function createDashboardRoutes({
       : [];
     // Same predicate the live rulings feed uses (routes/dashboard.js's own
     // /api/dashboard/rulings above) — never a second, divergent "is this
-    // unanswered" derivation.
+    // unanswered" derivation. Deliberately OMITS `shelvedRulings`: unanswered
+    // age must stay monotonic regardless of shelving (LIN-1727's own
+    // constraint) — a shelved-but-still-unanswered decision must keep
+    // counting toward this KPI, not be hidden by it the way it is hidden
+    // from the live queue.
     const unansweredRulings = collectUnansweredDecisions({ loops, taskDecisions: taskUnansweredRows }, { now });
 
     const unansweredRows = unansweredRulings.map(row => {
