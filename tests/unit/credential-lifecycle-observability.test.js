@@ -388,12 +388,30 @@ describe('server.js credential-lifecycle wiring (LIN-2236, Block E — witness, 
   });
 
   test('the refresh-on-resolve cooldown-gate SKIP branch (the else of refreshOnResolveGate.shouldAttempt) records a refresh_skip event', () => {
-    const gateIdx = SERVER_SRC.indexOf('refreshOnResolveGate.shouldAttempt(');
+    // Anchored inside resolveWorkspaceAccess specifically (LIN-2110 added a
+    // SECOND refreshOnResolveGate.shouldAttempt( call site, in
+    // ensureValidToken, which sorts EARLIER in the file — a bare indexOf
+    // would silently start matching the wrong site's window instead of
+    // failing loud).
+    const fnIdx = SERVER_SRC.indexOf('async function resolveWorkspaceAccess(');
+    assert.ok(fnIdx >= 0);
+    const gateIdx = SERVER_SRC.indexOf('refreshOnResolveGate.shouldAttempt(', fnIdx);
     assert.ok(gateIdx >= 0);
     const window = SERVER_SRC.slice(gateIdx, gateIdx + 2000);
     assert.match(window, /\} else \{/);
     assert.match(window, /CREDENTIAL_LIFECYCLE_EVENT_KINDS\.REFRESH_SKIP/);
     assert.match(window, /branch: 'cooldown-gate'/);
+  });
+
+  test('LIN-2110: ensureValidToken\'s OWN refreshOnResolveGate.shouldAttempt( call site (the proactive human-lane arm) also records a refresh_skip event on suppression', () => {
+    const fnIdx = SERVER_SRC.indexOf('async function ensureValidToken(');
+    assert.ok(fnIdx >= 0);
+    const gateIdx = SERVER_SRC.indexOf('refreshOnResolveGate.shouldAttempt(', fnIdx);
+    assert.ok(gateIdx >= 0);
+    const window = SERVER_SRC.slice(gateIdx, gateIdx + 2000);
+    assert.match(window, /CREDENTIAL_LIFECYCLE_EVENT_KINDS\.REFRESH_SKIP/);
+    assert.match(window, /branch: 'ensure-valid-token-cooldown-gate'/);
+    assert.match(window, /return next\(\)/);
   });
 
   test('an owner_mismatch classification durably records an owner_mismatch_503 event carrying the same diagnostic the console.warn line already computes', () => {
