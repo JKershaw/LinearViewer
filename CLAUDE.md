@@ -226,6 +226,15 @@ tests/
   screenshots/         Reference images for visual specs
   visual/              Playwright visual-regression specs
 docs/
+  reviews/                     Periodical review reports (LIN-1967). Canonical, discoverable location: a
+                               periodical's report lives on `main` at `docs/reviews/<periodical-name>-<date>.md`
+                               (e.g. `docs/reviews/documentation-review-2026-08-23.md`), landed via a normal
+                               feature-branch PR with `ci-success` green — never left as a Linear-comment-only
+                               artifact (LIN-694 is the engine gate enforcing this). `<periodical-name>` is a
+                               human-readable slug for the review (not necessarily identical to the template's
+                               internal registry id in lib/periodicals.js — that registry is deliberately kept
+                               location-agnostic and does not encode this path). A trend-aware periodical reads
+                               its own prior editions from this directory before writing a new one.
   archive/                     Numbered standalone HTML documents served verbatim at /archive/:n, public. The numbering is a sequence of DOCUMENTS, not of Harbour Archive editions: #1–#2 are the first and second editions of "The Harbour Archive" museum page (Jan–Jul 2026), #3 is the 2026-08-03 project brief (companion to docs/reviews/recent-headwinds-review-2026-08-03.md). The landing page links the Harbour Archive specifically via a hard-coded /archive/2 (lib/render-landing.js), so adding a non-Archive document does not move it — tests/e2e/archive.spec.js pins that. #3 LINKS its faces from /fonts/*.woff2 (same origin) rather than inlining base64, which is why it is ~77KB rather than ~198KB
   dispatch-integration.md      Dispatch consumer integration guide
   proxy-integration.md         Linear API proxy consumer integration guide
