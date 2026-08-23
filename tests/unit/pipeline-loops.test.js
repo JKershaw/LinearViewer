@@ -394,6 +394,45 @@ describe('_buildLoops', () => {
     assert.strictEqual(loops[0].loopId, 'good');
   });
 
+  // ─── LIN-2232: wake rows are identifier-less by design, not malformed ───────
+  test('LIN-2232: history row with kind:"wake" and no issueIdentifier → skipped silently, zero warn lines', (t) => {
+    const warnMock = t.mock.method(console, 'warn', () => {});
+    const wake = historyItem({ id: 'wake-1', issueIdentifier: undefined, kind: 'wake' });
+    const good = historyItem({ id: 'good' });
+    const loops = _buildLoops({ historyItems: [wake, good], now: NOW });
+    assert.strictEqual(loops.length, 1);
+    assert.strictEqual(loops[0].loopId, 'good');
+    assert.strictEqual(warnMock.mock.calls.length, 0, 'a wake row must produce zero warn lines');
+  });
+
+  test('LIN-2232: live row with kind:"wake" and no issueIdentifier → skipped silently, zero warn lines', (t) => {
+    const warnMock = t.mock.method(console, 'warn', () => {});
+    const wake = liveItem({ id: 'wake-live-1', issueIdentifier: undefined, kind: 'wake' });
+    const good = liveItem({ id: 'good-live' });
+    const loops = _buildLoops({ liveItems: [wake, good], now: NOW });
+    assert.strictEqual(loops.length, 1);
+    assert.strictEqual(loops[0].loopId, 'good-live');
+    assert.strictEqual(warnMock.mock.calls.length, 0, 'a wake row must produce zero warn lines');
+  });
+
+  test('LIN-2232: a genuinely malformed row (no issueIdentifier, not identifier-less-by-design) still warns at least once, with its cause', (t) => {
+    const warnMock = t.mock.method(console, 'warn', () => {});
+    const bad = historyItem({ id: 'bad-warns-once', issueIdentifier: undefined });
+    _buildLoops({ historyItems: [bad], now: NOW });
+    assert.strictEqual(warnMock.mock.calls.length, 1);
+    const [message] = warnMock.mock.calls[0].arguments;
+    assert.match(message, /malformed/);
+  });
+
+  test('LIN-2232: repeated polls over the same genuinely-malformed row warn once per process lifetime, not once per poll', (t) => {
+    const warnMock = t.mock.method(console, 'warn', () => {});
+    const bad = historyItem({ id: 'bad-repeat', issueIdentifier: undefined });
+    _buildLoops({ historyItems: [bad], now: NOW }); // poll 1
+    _buildLoops({ historyItems: [bad], now: NOW }); // poll 2
+    _buildLoops({ historyItems: [bad], now: NOW }); // poll 3
+    assert.strictEqual(warnMock.mock.calls.length, 1, 'must not re-warn on every poll for the same malformed cause');
+  });
+
   test('same-millisecond dispatchedAt → stable order via loopId tie-breaker', () => {
     const ts = '2026-04-10T10:00:00.000Z';
     const a = historyItem({ id: 'aaa', dispatchedAt: ts, resolvedAt: ts });
