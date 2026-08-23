@@ -210,7 +210,19 @@ The HTTP status carries the meaning here, not just the body — `retryable` mirr
 
 This endpoint returns `LINEAR_AUTH` in both rows above — **do not** assume `401`-vs-`503` from this code alone is a config problem; check `retryable` (or the status) to decide wait-vs-escalate, the same rule the six `WORKSPACE_*` codes already establish. Every non-auth error (`404`, `429`, `400`, a genuine `500`) is unaffected and carries no `code`/`category`/`retryable` at all, unchanged from before.
 
-**`PARTIAL_WRITE`** (LIN-2012) is the third adopter. Jira's `updateIssue` is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`) return:
+**`PROXY_TOKEN_INVALID`** (LIN-1985) is the third adopter, and answers a question none of the codes above can: when you get a bare `401` with no `code` at all — the shape every one of Harbour's OWN auth checks returned before this — was it Harbour rejecting **your own bearer token** (bad, missing, empty, expired, or already-consumed — on any endpoint, or on `POST /token` for a bootstrap token specifically), or was it `LINEAR_AUTH` above (Harbour resolved a WORKSPACE credential and Linear rejected it)? Both are `401`; only the `code` (and, explicitly, a new `stage` field on both) tells them apart:
+
+```json
+{ "error": "Invalid, expired, or consumed token", "code": "PROXY_TOKEN_INVALID",
+  "category": "auth", "retryable": false, "stage": "proxy-token" }
+```
+
+- `stage: "proxy-token"` → **your own token**. Mint or re-issue a proxy token; reconnecting the workspace will not help — the workspace credential was never even reached.
+- `stage: "provider-lane"` → the workspace credential itself (now also stamped on every `LINEAR_AUTH` `401` from the table above, alongside its pre-existing `code`/`retryable`). Escalate / reconnect the workspace, per the `LINEAR_AUTH` table above; re-issuing your own proxy token will not help.
+
+Before this, both classes of `401` were undocumented and easy to conflate — a caller-token rejection carried no `code`/`category`/`stage` at all, and the distinction lived only in Harbour's own server-side logs (`[credential-rejected]`), invisible to the very agent that has to pick a remedy.
+
+**`PARTIAL_WRITE`** (LIN-2012) is the fourth adopter. Jira's `updateIssue` is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`) return:
 
 ```json
 {
@@ -2031,9 +2043,11 @@ curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" \
 
 4. **Handle 503 gracefully, but check `retryable` before deciding what "gracefully" means** — a `WORKSPACE_*`-coded 503 (see the structured error envelope above) means the workspace OAuth token has expired or is otherwise unavailable; the user needs to re-authenticate. A `LINEAR_AUTH`-coded 503 is different: it means a credential this proxy believed was still valid was rejected upstream anyway — back off and retry, it is usually a short-lived race that heals on its own (LIN-2216). If it keeps happening for the same request, it self-escalates to a `401` on its own; treat that as the re-authenticate case.
 
-5. **Respect rate limits** — 60 requests/minute per IP. Add backoff on 429 responses.
+5. **On a `401`, check `stage` before assuming "the workspace is disconnected"** (LIN-1985) — `stage: "proxy-token"` (`code: "PROXY_TOKEN_INVALID"`) means YOUR bearer/bootstrap token was rejected; mint or re-issue one, the workspace was never touched. `stage: "provider-lane"` (`code: "LINEAR_AUTH"`) means the STORED workspace credential was rejected; escalate/reconnect the workspace instead. Never guess from the bare status code alone — see the structured error envelope above.
 
-6. **Use readWrite tokens sparingly** — prefer read-only tokens for monitoring and reporting. Only use readWrite when your agent needs to create or modify data.
+6. **Respect rate limits** — 60 requests/minute per IP. Add backoff on 429 responses.
+
+7. **Use readWrite tokens sparingly** — prefer read-only tokens for monitoring and reporting. Only use readWrite when your agent needs to create or modify data.
 
 ## Token Security
 

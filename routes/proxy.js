@@ -88,7 +88,7 @@ import {
 } from '../lib/proxy-ref-resolver.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { PartialWriteError } from '../lib/partial-write-error.js';
-import { badRequest, jsonError, notFound, serviceUnavailable, unauthorized, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, serviceUnavailable, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -705,28 +705,48 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // Proxy Token Authentication Middleware
   // =========================================================================
 
+  // LIN-1985: the structured-error-envelope extra fields for a 401 caused by
+  // Harbour's OWN proxy-token check (a bad/missing/expired bearer token, or a
+  // bootstrap token already exchanged) — never a workspace/provider fault.
+  // The remedy is "mint or re-issue a proxy token," never "reconnect the
+  // workspace." Its counterpart is `LINEAR_AUTH` (lib/errors.js's
+  // `classifyUpstreamError`, surfaced via `graphqlErrorExtra` below): a 401
+  // whose `code` is `LINEAR_AUTH` instead means Linear itself rejected a
+  // workspace credential Harbour DID resolve and send — the opposite remedy
+  // (escalate to a human / reconnect the workspace, never re-issue the
+  // agent's own token). Before this, both classes shared the identical bare
+  // `{"error": "..."}` 401 shape, and the distinction (`stage` in
+  // `logCredentialRejection`'s console.warn / the persisted proxy-event row)
+  // was visible ONLY in Harbour's own logs — invisible to the very agent that
+  // has to decide which remedy applies (the LIN-1985 gap).
+  const PROXY_TOKEN_REJECTED_EXTRA = { code: 'PROXY_TOKEN_INVALID', category: 'auth', retryable: false, stage: STAGE_PROXY_TOKEN };
+
   async function authenticateProxyToken(req, res, next) {
     const authHeader = req.headers.authorization;
 
     if (!authHeader?.startsWith('Bearer ')) {
-      return unauthorized.json(res, 'Missing or invalid Authorization header');
+      return jsonError(res, 401, 'Missing or invalid Authorization header', PROXY_TOKEN_REJECTED_EXTRA);
     }
 
     const token = authHeader.slice(7);
     if (!token) {
-      return unauthorized.json(res, 'Empty token');
+      return jsonError(res, 401, 'Empty token', PROXY_TOKEN_REJECTED_EXTRA);
     }
 
     try {
       const result = await proxyTokenStore.validateToken(token);
       if (!result) {
-        // A rejected CALLER token and a rejected WORKSPACE credential
-        // are both 401 and were previously indistinguishable in the logs, though
-        // their remedies are opposites (re-issue the agent's token vs. repair the
-        // stored credential). This route never reaches logEvent — no workspace is
-        // resolved yet, so there is nothing to audit — hence the direct call.
+        // A rejected CALLER token and a rejected WORKSPACE credential are
+        // both 401 and were, until LIN-1985, distinguishable ONLY in Harbour's
+        // own logs/audit rows (`stage`) — invisible to the agent that actually
+        // has to decide what to do, whose two remedies are opposites (re-issue
+        // its own bearer token vs. escalate a dead stored credential to a
+        // human). `PROXY_TOKEN_REJECTED_EXTRA`'s `code`/`stage` now ride on
+        // the response body itself. This route never reaches logEvent — no
+        // workspace is resolved yet, so there is nothing to audit — hence the
+        // direct call.
         logCredentialRejection(req, 'auth');
-        return unauthorized.json(res, 'Invalid, expired, or consumed token');
+        return jsonError(res, 401, 'Invalid, expired, or consumed token', PROXY_TOKEN_REJECTED_EXTRA);
       }
 
       req.proxyTokenId = result.tokenId;
@@ -1314,14 +1334,38 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * this ticket's new transient-503 case makes only conditionally true; see
    * the doc update alongside this change).
    *
+   * LIN-1985: a genuine (non-transient-reclassified) 401 here always means
+   * `stage: 'provider-lane'` — this function is only ever reached from a
+   * route's catch block AFTER the route's own `if (!token) return
+   * workspaceUnavailable(...)` guard already passed, so the error came from
+   * an actual upstream call to `provider.*`, never from a caller-token
+   * rejection (that class 401s from `authenticateProxyToken`, before any
+   * provider is ever touched — see `PROXY_TOKEN_REJECTED_EXTRA` above, its
+   * counterpart). Stamping it explicitly here — rather than leaving the
+   * agent to infer stage from `code === 'LINEAR_AUTH'` — is the fix for the
+   * LIN-1985 gap: before this, the two failure classes' response bodies
+   * were undocumented and easy to conflate (one carried `code`/`category`,
+   * the other carried nothing at all, with no field either way that named
+   * the distinction directly). Deliberately NOT added to the 503 branch:
+   * that status already carries its own richer, already-documented
+   * discriminators (`workspaceUnavailableEnvelope`'s per-reason `code`s, or
+   * `provider-503-transient`'s `LINEAR_AUTH` — both unambiguously
+   * provider-lane by construction, so a same-valued `stage` there would be
+   * redundant, not clarifying).
+   *
    * @param {*} err
    * @param {number} status - the value `graphqlErrorStatus(err, req)` already returned
-   * @returns {{code?: string, category?: string, retryable?: boolean}}
+   * @returns {{code?: string, category?: string, retryable?: boolean, stage?: string}}
    */
   function graphqlErrorExtra(err, status) {
     if (status !== 401 && status !== 503) return {};
     const classification = classifyUpstreamError(err);
-    return { code: classification.code, category: classification.category, retryable: status === 503 };
+    return {
+      code: classification.code,
+      category: classification.category,
+      retryable: status === 503,
+      ...(status === 401 ? { stage: STAGE_PROVIDER_LANE } : {})
+    };
   }
 
   /**
@@ -2407,11 +2451,11 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
   router.post('/api/proxy/token', proxyLimiter, async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
-      return unauthorized.json(res, 'Missing or invalid Authorization header');
+      return jsonError(res, 401, 'Missing or invalid Authorization header', PROXY_TOKEN_REJECTED_EXTRA);
     }
     const bootstrap = authHeader.slice(7);
     if (!bootstrap) {
-      return unauthorized.json(res, 'Empty token');
+      return jsonError(res, 401, 'Empty token', PROXY_TOKEN_REJECTED_EXTRA);
     }
 
     try {
@@ -2420,7 +2464,9 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       });
       if (!working) {
         // No workspace to attribute a failed exchange to, so it is not audit-logged.
-        return unauthorized.json(res, 'Invalid, expired, or already-exchanged bootstrap token');
+        // LIN-1985: same non-workspace-fault class as authenticateProxyToken's
+        // rejections above — the presented (bootstrap) token itself is bad.
+        return jsonError(res, 401, 'Invalid, expired, or already-exchanged bootstrap token', PROXY_TOKEN_REJECTED_EXTRA);
       }
 
       proxyEventStore.recordEvent({
