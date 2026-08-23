@@ -810,19 +810,17 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     // seeding an ordinary, decision-free local task adds no ruling of any
     // disposition.
     //
-    // Run-scoped (LIN-2215 close-out, ledger item 2): a bare
-    // `toHaveCount(0)` is a workspace-global claim, and this worker's
-    // `TaskDecisionsStore` partition is durable with no TTL — a row leaked
-    // by an earlier failed run (the task-bound test above, induced to fail
-    // before its option press) is never pruned and would poison a global
-    // zero-count assertion forever, failing on correct code for a reason
-    // this test never caused. Comparing against a same-run baseline —
-    // captured BEFORE seeding the ordinary task below, with nothing else in
-    // between to mutate the store (this suite has no cross-worker
-    // parallelism yet, per CLAUDE.md's E2E Testing Pattern section) —
-    // preserves the real intent ("seeding this task added no ruling") while
-    // making the check immune to whatever the durable store already held
-    // coming in.
+    // This worker's `TaskDecisionsStore`/loop-decision partitions are durable
+    // (no TTL) and shared across every spec file at this worker's urlKey —
+    // a baseline-diff against the GLOBAL row count (an earlier version of
+    // this test) is fragile against any unrelated row (e.g. a LIN-2123
+    // sticky `blocked` decision from an earlier test in this run) that
+    // materializes between the two reads for reasons that have nothing to
+    // do with this test's own seed. The real intent is narrower than "the
+    // total count didn't change" — it's "seeding THIS task added no
+    // ruling" — so assert directly against rows naming the seeded task,
+    // immune to whatever else the shared store holds or produces
+    // concurrently.
     await seedLocal({ projects: [], issues: [] });
     await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
     await page.waitForLoadState('networkidle');
@@ -830,7 +828,6 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
       page.waitForResponse(r => r.url().includes('/api/dashboard/rulings') && r.request().method() === 'GET'),
       page.locator('.obs-tab[data-view="rulings"]').click()
     ]);
-    const baselineCount = await page.locator('#obs-rulings .obs-ruling').count();
 
     await seedLocal({
       projects: [],
@@ -847,7 +844,7 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
       page.locator('.obs-tab[data-view="rulings"]').click()
     ]);
 
-    await expect(page.locator('#obs-rulings .obs-ruling')).toHaveCount(baselineCount);
+    await expect(page.locator('#obs-rulings .obs-ruling', { hasText: 'SCAN-2' })).toHaveCount(0);
   });
 });
 
