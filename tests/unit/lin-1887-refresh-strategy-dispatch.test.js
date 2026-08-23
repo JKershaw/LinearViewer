@@ -29,6 +29,9 @@ import { removeWorkspace, normalizeProvider } from '../../lib/workspace.js';
 import { serviceUnavailable } from '../../lib/errors.js';
 import { REFRESH_STRATEGY, refreshDeclarationFor, refreshStrategyFor, relinkNotice } from '../../lib/refresh-strategy.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
+import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
+import { createRefreshOnResolveGate } from '../../lib/refresh-on-resolve-gate.js';
+import { CREDENTIAL_LIFECYCLE_EVENT_KINDS } from '../../lib/credential-lifecycle-events.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -112,6 +115,17 @@ function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, ca
     credentialLifecycleEventStore: { recordEvent: async () => {} },
     getActiveWorkspace: () => workspace,
     TOKEN_REFRESH_BUFFER_MS: 5 * 60 * 1000,
+    // LIN-2110: ensureValidToken's real source now guards its OAUTH_REFRESH
+    // arm with these two free identifiers. REAL implementations (same
+    // convention as REFRESH_STRATEGY/refreshDeclarationFor above) — a FRESH
+    // gate per makeContext() call means every test here hits the gate's
+    // cold-start "no entry yet" path and attempts normally, so this suite's
+    // existing assertions (none of which are about the gate itself) are
+    // unaffected. The gate's own suppression behavior is pinned separately in
+    // tests/unit/lin-2110-ensure-valid-token-refresh-gate.test.js.
+    fingerprintCredential,
+    refreshOnResolveGate: createRefreshOnResolveGate(),
+    CREDENTIAL_LIFECYCLE_EVENT_KINDS,
     getDeployInfo: () => ({}),
     renderLandingPage: () => '<landing/>',
     // LIN-2010: this harness evals REAL server.js source, so every free

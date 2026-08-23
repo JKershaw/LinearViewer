@@ -818,6 +818,46 @@ async function ensureValidToken(req, res, next) {
     return sendRelinkNotice(workspace, res)
   }
 
+  // LIN-2110: bound the OAuth-exchange branch below the same way
+  // refresh-on-resolve already is (LIN-2097's refreshOnResolveGate,
+  // instantiated further down this file — safe to reference here since this
+  // function only ever RUNS per-request, long after module load completes).
+  // A byte-identical exchange freezes the durable record's own recorded
+  // expiry (doOwnerRefresh, lib/workspace-token-refresh.js), which otherwise
+  // re-triggers `needsTokenRefresh` above on every subsequent request with no
+  // exit — one OAuth round-trip per request instead of ~once per cooldown
+  // window. Never applies to REMINT (GitHub-family re-mint from the App
+  // JWT + installationId never returns byte-identical bytes the way a
+  // rotating-refresh-token exchange can) — only the OAUTH_REFRESH arm below
+  // is exposed to the freeze this gates.
+  //
+  // Gated on the DURABLE record's own token — what the exchange below is
+  // actually about to re-spend — not the session mirror, matching
+  // resolveWorkspaceAccess's own staleFingerprint precedent (its
+  // `!selected.token && ownerAccountId !== UNSCOPED` branch, further down
+  // this file — deliberately not cited by line number, which drifts) exactly,
+  // so the same credential identity can never be throttled by one site and
+  // not the other.
+  if (declaration.strategy !== REFRESH_STRATEGY.REMINT) {
+    const staleRecord = await ownerCredentialStore.get(req.session.accountId, workspace.urlKey, provider)
+    const staleFingerprint = staleRecord?.token ? fingerprintCredential(staleRecord.token) : null
+    if (!refreshOnResolveGate.shouldAttempt(`${req.session.accountId}:${workspace.urlKey}`, staleFingerprint)) {
+      // Suppressed: no refresh, no teardown, keep the current (possibly
+      // frozen-expiry) token in place and let the existing 401 retry/liveness
+      // ladder (handleUnauthorizedError) handle an actual failure — the same
+      // fail-safe shape as the `NONE` strategy above, just reached from a
+      // cooldown instead of a declared non-refreshable provider. Recorded via
+      // the same REFRESH_SKIP lifecycle event LIN-2236 already emits from the
+      // sibling gate, so both suppression sites are visible through one kind.
+      credentialLifecycleEventStore.recordEvent({
+        accountId: req.session.accountId, urlKey: workspace.urlKey, provider,
+        kind: CREDENTIAL_LIFECYCLE_EVENT_KINDS.REFRESH_SKIP,
+        detail: { branch: 'ensure-valid-token-cooldown-gate' }
+      }).catch(err => console.error('Failed to record credential-lifecycle event:', err));
+      return next()
+    }
+  }
+
   try {
     // Provider-aware refresh / re-mint seam (LIN-712, widened to github-projects
     // in LIN-1499 Phase 1/D2). GitHub App installation tokens carry NO
