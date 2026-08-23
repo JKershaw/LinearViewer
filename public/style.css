@@ -2146,8 +2146,11 @@ body.is-landing {
     --blue: #6ea8fe;
     --purple: #b794f6;
     --red: #ff6b6b;
+    --red-hover: #ff8787;
     --teal: #2dd4bf;
     --teal-soft: #2dd4bf20;
+    --accent: #ff6b6b;
+    --ok: #4ade80;
     --border: #2c313a;
     --border-strong: #3d4450;
     --border-subtle: rgba(255, 255, 255, 0.12);
