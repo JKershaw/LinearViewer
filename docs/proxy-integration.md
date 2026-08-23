@@ -1295,15 +1295,16 @@ Content-Type: application/json
 | `assigneeId` | UUID | No | Assign to user |
 | `parentId` | UUID | No | Set parent issue |
 | `cycleId` | UUID | No | Assign to cycle |
-| `priority` | int | No | Priority 0 (none) to 4 (urgent) |
+| `priority` | int | No | Issue priority on Linear's **native** scale (descending urgency): `0` = No priority, `1` = Urgent, `2` = High, `3` = Medium, `4` = Low. Prefer `priorityLevel` below for a provider-neutral scale — sending both is refused `400` |
+| `priorityLevel` | int | No | Issue priority on the **canonical** scale (ascending, shared across every provider — LIN-2239): `0` = unknown, `1` = lowest … `4` = highest (Linear: `4` = Urgent, `1` = Low). Maps to the provider's native scale at the write boundary; mutually exclusive with `priority` |
 
 **Provider compatibility.** Not every optional field above is honoured by every provider. An unsupported one is **refused with `400`** rather than silently dropped on a false `201` (a behavior change — earlier versions of this endpoint accepted and silently discarded these fields):
 
-- **GitHub-backed workspaces** do not support `stateId`, `assigneeId`, `parentId`, `cycleId`, `priority`.
+- **GitHub-backed workspaces** do not support `stateId`, `assigneeId`, `parentId`, `cycleId`, `priority`/`priorityLevel` (both map to the same provider capability).
 - **Local-backed workspaces** do not support `assigneeId`, `cycleId`.
 - **Linear-backed workspaces** support every field above.
 
-Returns `201`. The echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus the `children` / `comments` / `relations` collections, which a create cannot set) — self-verifying, so you do **not** need a follow-up `GET` to confirm the fields the request set (an unsupported field never reaches this point, per the compatibility note above):
+Returns `201`. The echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus the `children` / `comments` / `relations` collections, which a create cannot set) — self-verifying, so you do **not** need a follow-up `GET` to confirm the fields the request set (an unsupported field never reaches this point, per the compatibility note above). `priorityLevel` is always present alongside `priority`/`priorityLabel` on every read and write echo, for every provider — it is derived, not something you have to request:
 ```json
 {
   "success": true,
@@ -1316,6 +1317,7 @@ Returns `201`. The echoed `issue` is the **same flat shape as `GET /issues/{id}`
     "labels": [],
     "priority": 1,
     "priorityLabel": "Urgent",
+    "priorityLevel": 4,
     "team": { "id": "uuid", "name": "Engineering" },
     "teamId": "uuid",
     "project": { "id": "uuid", "name": "Project Alpha" },
@@ -1351,17 +1353,18 @@ At least one field must be provided.
 | `assigneeId` | UUID | Assign to user |
 | `parentId` | UUID \| `null` | Set parent issue (UUID), or `null` to remove the parent and promote the issue to top-level |
 | `cycleId` | UUID | Assign to cycle |
-| `priority` | int | Priority 0 (none) to 4 (urgent) |
+| `priority` | int | Issue priority on Linear's **native** scale (descending urgency): `0` = No priority, `1` = Urgent, `2` = High, `3` = Medium, `4` = Low. Prefer `priorityLevel` below for a provider-neutral scale — sending both is refused `400` |
+| `priorityLevel` | int | Issue priority on the **canonical** scale (ascending, shared across every provider — LIN-2239): `0` = unknown, `1` = lowest … `4` = highest (Linear: `4` = Urgent, `1` = Low). Maps to the provider's native scale at the write boundary; mutually exclusive with `priority` |
 
 **Provider compatibility — unlike create, this endpoint does not refuse an unsupported field.** It accepts it and silently drops it, returning `200` with the field simply absent from the echo:
 
-- **GitHub-backed workspaces silently drop** `priority`, `assigneeId`, `parentId`, `cycleId` — only `title`, `description`, and `stateId` take effect.
+- **GitHub-backed workspaces silently drop** `priority`/`priorityLevel` (both map to the same provider capability), `assigneeId`, `parentId`, `cycleId` — only `title`, `description`, and `stateId` take effect.
 - **Local-backed workspaces silently drop** `assigneeId`, `cycleId`.
 - **Linear-backed workspaces:** every field below takes effect.
 
 If you need certainty that a field you set actually landed, follow up with a `GET` on the issue — the echo below is **not** a reliable guarantee for every provider.
 
-Response. As with create, the echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus `children` / `comments` / `relations`). For a Linear-backed workspace every mutable field (`priority`/`priorityLabel`, `labels`, `parent`, `project`, `assignee`, `state`, `cycle`, `estimate`, `team`/`teamId`) reflects the post-write state; for GitHub/Local-backed workspaces, only the fields named above as supported do:
+Response. As with create, the echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus `children` / `comments` / `relations`). For a Linear-backed workspace every mutable field (`priority`/`priorityLabel`/`priorityLevel`, `labels`, `parent`, `project`, `assignee`, `state`, `cycle`, `estimate`, `team`/`teamId`) reflects the post-write state; for GitHub/Local-backed workspaces, only the fields named above as supported do. `priorityLevel` is derived from `priority` on every read/echo regardless of provider — it is never itself dropped or unsupported independently of `priority`:
 ```json
 {
   "success": true,
@@ -1374,6 +1377,7 @@ Response. As with create, the echoed `issue` is the **same flat shape as `GET /i
     "labels": ["bug"],
     "priority": 2,
     "priorityLabel": "High",
+    "priorityLevel": 3,
     "team": { "id": "uuid", "name": "Engineering" },
     "teamId": "uuid",
     "project": { "id": "uuid", "name": "Project Alpha" },

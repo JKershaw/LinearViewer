@@ -49,6 +49,10 @@ import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } f
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
+// LIN-2239: the canonical ascending priority scale's boundary conversion —
+// `priority` (Linear-native, unchanged) stays the wire's authoritative field;
+// `priorityLevel` is the additive canonical-scale field this ticket adds.
+import { canonicalPriorityToLinear } from '../lib/providers/models.js';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
 import { flattenIssue, neutralizeProject, flattenCycle, flattenRelations, decodeAttachmentHandle, relayContentTypeFromName, GITHUB_UPLOAD_HOSTS, collectIssueAttachments } from '../lib/proxy-wire.js';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
@@ -1889,17 +1893,19 @@ short window: a repeat of the same (issue + body) returns the original comment w
 
 POST ${baseUrl}/api/proxy/issues
   Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "..." }
+  → "priority" is Linear's NATIVE scale (DESCENDING urgency): 0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low. Prefer "priorityLevel" instead: the canonical ASCENDING scale shared across every provider — 0 = unknown, 1 = lowest … 4 = highest (Linear: 4 = Urgent). Both map to the same underlying field; sending both in one request is refused 400.
   → Create a new issue; set parentId (UUID) to create as a sub-issue. Returns 201:
-  → { "success": true, "issue": { /* the SAME flat shape as GET /issues/{id} (minus children/comments/relations): id, identifier, title, description, state, labels, priority, priorityLabel, team, teamId, project, parent, cycle, estimate, dueDate, … */ } }
-  → Optional fields your workspace's provider doesn't support are refused with 400, never silently dropped (GitHub-backed: no stateId/assigneeId/priority/cycleId/parentId; Local-backed: no assigneeId/cycleId). Whatever the response DOES echo is self-verifying — it reflects the post-write state of every field the request set, so you do NOT need a follow-up GET to confirm those landed.
+  → { "success": true, "issue": { /* the SAME flat shape as GET /issues/{id} (minus children/comments/relations): id, identifier, title, description, state, labels, priority, priorityLabel, priorityLevel, team, teamId, project, parent, cycle, estimate, dueDate, … */ } }
+  → Optional fields your workspace's provider doesn't support are refused with 400, never silently dropped (GitHub-backed: no stateId/assigneeId/priority/priorityLevel/cycleId/parentId; Local-backed: no assigneeId/cycleId). Whatever the response DOES echo is self-verifying — it reflects the post-write state of every field the request set, so you do NOT need a follow-up GET to confirm those landed.
   → teamId/stateId/projectId accept symbolic refs, not just UUIDs: teamId as a team key (e.g. LIN) or name; stateId as a keyword (done/in-progress/todo/backlog/canceled/duplicate) or state name; projectId as a project name. Ambiguous or unknown names fail with 422 (UUID is the unambiguous escape hatch).
 
 PATCH ${baseUrl}/api/proxy/issues/{issueId}
   Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "...|null" }
+  → "priority"/"priorityLevel": same two scales and the same both-refused-400 rule as POST /api/proxy/issues above.
   → Update an existing issue; set cycleId to assign/move to a cycle; set parentId to a UUID to re-parent, or null to promote to top-level
   → stateId/projectId accept symbolic refs too: stateId as a keyword (done/in-progress/todo/backlog/canceled/duplicate) or state name (scoped to the issue's team), projectId as a project name. Ambiguous/unknown names → 422.
   → { "success": true, "issue": { /* the SAME flat shape as GET /issues/{id} (minus children/comments/relations) */ } }
-  → Unlike create, this endpoint does NOT refuse a field your provider can't honour — it accepts it and silently drops it on a 200 (GitHub-backed: priority/assigneeId/parentId/cycleId are dropped, only title/description/stateId take effect; Local-backed: assigneeId/cycleId are dropped). Follow up with a GET if you need certainty a given field landed.
+  → Unlike create, this endpoint does NOT refuse a field your provider can't honour — it accepts it and silently drops it on a 200 (GitHub-backed: priority/priorityLevel/assigneeId/parentId/cycleId are dropped, only title/description/stateId take effect; Local-backed: assigneeId/cycleId are dropped). Follow up with a GET if you need certainty a given field landed.
   → Passing "description" here REPLACES the whole body. For anything other than a deliberate full rewrite, prefer the two splice endpoints below — they let you supply only the new content, so you never re-emit (and risk corrupting) the existing body.
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/description/append
@@ -2952,7 +2958,17 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       }
       if (denyIfUnsupported(provider, 'createIssue', req, res, '/api/proxy/issues')) return;
 
-      const { teamId, title, description, projectId, stateId, assigneeId, priority, parentId, cycleId } = req.body;
+      const { teamId, title, description, projectId, stateId, assigneeId, priority, priorityLevel, parentId, cycleId } = req.body;
+
+      // LIN-2239: `priority` (Linear-native) and `priorityLevel` (canonical
+      // ascending) both resolve to the SAME provider input field — sending
+      // both is refused rather than silently picking one, since silently
+      // preferring either would recreate the exact "plausible wrong value,
+      // no error" hazard this ticket exists to prevent.
+      if (priority !== undefined && priorityLevel !== undefined) {
+        logEvent(req, '/api/proxy/issues', 400);
+        return badRequest.json(res, 'Provide only one of priority (Linear-native) or priorityLevel (canonical ascending), not both');
+      }
 
       // teamId is required and may be a UUID, a team key (e.g. `LIN`), or a team
       // name (LIN-556); the symbolic→id resolution happens once below so the
@@ -3020,6 +3036,16 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         if (!writableFields.includes('priority')) return refuseUnwritable('priority');
         input.priority = priority;
       }
+      // LIN-2239: priorityLevel reuses isValidPriority's range check — both
+      // scales are integers over the same [0,4] cardinality, just relabeled —
+      // then converts to the provider's native scale before it reaches the
+      // SAME `input.priority` the block above sets. Gated on the SAME
+      // capability (priorityLevel has no independent apiWriteFields entry;
+      // it maps onto the provider's existing priority support).
+      if (priorityLevel !== undefined && isValidPriority(priorityLevel)) {
+        if (!writableFields.includes('priority')) return refuseUnwritable('priorityLevel');
+        input.priority = canonicalPriorityToLinear(priorityLevel);
+      }
 
       const issueCreate = normalizeWritePayload(await provider.createIssue(token, input), 'issue');
       if (writeRejected(req, res, '/api/proxy/issues', issueCreate, 'Issue was not created')) return;
@@ -3072,7 +3098,14 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         return badRequest.json(res, 'Invalid issue ID format');
       }
 
-      const { title, description, stateId, assigneeId, priority, projectId, parentId, cycleId } = req.body;
+      const { title, description, stateId, assigneeId, priority, priorityLevel, projectId, parentId, cycleId } = req.body;
+
+      // LIN-2239: see the create-route comment — same field, same hazard,
+      // same refusal.
+      if (priority !== undefined && priorityLevel !== undefined) {
+        logEvent(req, '/api/proxy/issues/:id', 400);
+        return badRequest.json(res, 'Provide only one of priority (Linear-native) or priorityLevel (canonical ascending), not both');
+      }
 
       // LIN-1552: length + control-char validation via the shared seam
       // (identical rules/messages/order to the former inline checks).
@@ -3084,7 +3117,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       // Reject a wholly empty body before any read (preserves the no-network 400
       // for `{}`); the post-resolution check below still catches a body whose
       // only fields are unsupported/dropped.
-      const hasUpdatableField = [title, description, stateId, assigneeId, projectId, parentId, cycleId, priority]
+      const hasUpdatableField = [title, description, stateId, assigneeId, projectId, parentId, cycleId, priority, priorityLevel]
         .some(v => v !== undefined);
       if (!hasUpdatableField) {
         logEvent(req, '/api/proxy/issues/:id', 400);
@@ -3116,6 +3149,13 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (cycleId && UUID_REGEX.test(cycleId)) input.cycleId = cycleId;
       if (priority !== undefined && isValidPriority(priority)) {
         input.priority = priority;
+      }
+      // LIN-2239: same conversion + capability parity as the create route
+      // (update's existing convention is to silently drop an unsupported
+      // field rather than 400, so no explicit gate here — an unsupported
+      // provider's `updateIssue` already ignores `input.priority`).
+      if (priorityLevel !== undefined && isValidPriority(priorityLevel)) {
+        input.priority = canonicalPriorityToLinear(priorityLevel);
       }
 
       if (Object.keys(input).length === 0) {
