@@ -154,6 +154,8 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
         durableRecords.set(key, next);
         return true;
       },
+      async markSpendIntent() { return true; },
+      async clearSpendIntent() { return true; },
     };
 
     const result = await refreshOwnerWorkspaceToken({
@@ -227,6 +229,8 @@ describe('LIN-1373 real-refresh integration witness (unstubbed refreshAccessToke
     const store = {
       async get() { return { provider: 'linear', scope: 'acme-real-2', token: 'stale-access-token', refreshToken: 'dead-refresh-token', tokenExpiresAt: Date.now() - 10_000 }; },
       async put() { throw new Error('must not be called — the refresh failed'); },
+      async markSpendIntent() { return true; },
+      async clearSpendIntent() { return true; },
     };
 
     await assert.rejects(
@@ -435,6 +439,8 @@ describe('LIN-1524 durable-only real-refresh witness (logged-out owner, unstubbe
         durableRecords.set(key, next);
         return true;
       },
+      async markSpendIntent() { return true; },
+      async clearSpendIntent() { return true; },
     };
 
     const result = await refreshOwnerWorkspaceToken({
@@ -588,6 +594,8 @@ describe('LIN-1544 durable-credential resolve witness (logout -> headless resolv
         durableRecords.set(key, next);
         return true;
       },
+      async markSpendIntent() { return true; },
+      async clearSpendIntent() { return true; },
     };
 
     // Pre-condition: with the live session row gone, the pure selector fails

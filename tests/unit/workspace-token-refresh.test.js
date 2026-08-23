@@ -115,8 +115,27 @@ function fakeStore(seed = {}) {
       const key = `${accountId}::${urlKey}::${next.provider || 'linear'}`;
       const current = records.get(key);
       if (!current || current.refreshToken !== expected) return false;
-      calls.push({ accountId, urlKey, credential: next });
-      records.set(key, next);
+      calls.push({ accountId, urlKey, credential: { ...next, pendingSpend: null } });
+      records.set(key, { ...next, pendingSpend: null });
+      return true;
+    },
+    // LIN-2235 (L4.1): mirrors the real store's `pendingSpend` marker —
+    // written before the exchange, cleared by a landed `putIfRefreshToken`
+    // (above) or an explicit `clearSpendIntent` (below) — so fault-injection
+    // specs can exercise `doOwnerRefresh`'s spend-intent detection against
+    // this same fake rather than needing a real Mango store.
+    async markSpendIntent(accountId, urlKey, provider, spentRefreshToken) {
+      const key = `${accountId}::${urlKey}::${provider || 'linear'}`;
+      const current = records.get(key);
+      if (!current) return false;
+      records.set(key, { ...current, pendingSpend: { refreshToken: spentRefreshToken, attemptedAt: new Date() } });
+      return true;
+    },
+    async clearSpendIntent(accountId, urlKey, provider) {
+      const key = `${accountId}::${urlKey}::${provider || 'linear'}`;
+      const current = records.get(key);
+      if (!current) return false;
+      records.set(key, { ...current, pendingSpend: null });
       return true;
     },
   };
@@ -864,6 +883,8 @@ describe('refreshOwnerCredential (LIN-1546, Block F — race-safe rotation)', ()
           : { provider: 'linear', scope: 'org-1', token: 'access-R1', refreshToken: 'R1', tokenExpiresAt: NOW + FAR_FUTURE_MS };
       },
       async putIfRefreshToken() { throw new Error('must not be called — the refresh itself failed with invalid_grant'); },
+      async markSpendIntent() { return true; },
+      async clearSpendIntent() { return true; },
     };
     const refreshAccessToken = async (refreshToken) => {
       assert.equal(refreshToken, 'R0', 'the loser presents the now-spent R0');
@@ -897,6 +918,8 @@ describe('refreshOwnerCredential (LIN-1546, Block F — race-safe rotation)', ()
         this.casAttempts.push(expected);
         return false; // stored refreshToken is no longer R0 → CAS miss (fail safe)
       },
+      async markSpendIntent() { return true; },
+      async clearSpendIntent() { return true; },
     };
     const refreshAccessToken = async () => ({ access_token: 'access-R_loser', refresh_token: 'R_loser', expires_in: 3600 });
 
@@ -918,6 +941,8 @@ describe('refreshOwnerCredential (LIN-1546, Block F — race-safe rotation)', ()
       },
       async putIfRefreshToken() { throw new Error('must not be called — the refresh failed'); },
       async delete() { throw new Error('the seam must never delete — deletes live in the human catches (LIN-1545)'); },
+      async markSpendIntent() { return true; },
+      async clearSpendIntent() { return true; },
     };
     const refreshAccessToken = async () => { throw new TokenRefreshError('Refresh token expired or invalid', 'EXPIRED'); };
 
@@ -942,6 +967,8 @@ describe('refreshOwnerCredential (LIN-1546, Block F — race-safe rotation)', ()
           : null; // a concurrent disconnect deleted it (or a store blip) before our CAS
       },
       async putIfRefreshToken() { return false; },
+      async markSpendIntent() { return true; },
+      async clearSpendIntent() { return true; },
     };
     const refreshAccessToken = async () => ({ access_token: 'access-R_loser', refresh_token: 'R_loser', expires_in: 3600 });
 
@@ -961,6 +988,8 @@ describe('refreshOwnerCredential (LIN-1546, Block F — race-safe rotation)', ()
     const store = {
       async get() { getCount++; return { provider: 'linear', scope: 'org-1', token: 'stale', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS }; },
       async putIfRefreshToken() { throw new Error('must not be called'); },
+      async markSpendIntent() { return true; },
+      async clearSpendIntent() { return true; },
     };
     const refreshAccessToken = async () => { throw new TokenRefreshError('boom', 'NETWORK'); };
 
@@ -1139,6 +1168,8 @@ describe('refreshOwnerCredential (LIN-2097, Block H — freeze + non-live bounda
           : { provider: 'linear', scope: 'org-1', token: 'access-relogin', refreshToken: 'R_relogin', tokenExpiresAt: NOW + PAST_MS };
       },
       async putIfRefreshToken() { return false; }, // CAS miss — the record was replaced under us
+      async markSpendIntent() { return true; },
+      async clearSpendIntent() { return true; },
     };
     const refreshAccessToken = async () => ({ access_token: 'access-R_loser', refresh_token: 'R_loser', expires_in: 3600 });
 
