@@ -74,7 +74,8 @@ function buildStats(overrides = {}) {
       opencodeSummedShare: 0.4,
       unknownHarnessShare: 0.05,
       pricedLineageShare: 0.8,
-      attributableLineageShare: 0.95
+      attributableLineageShare: 0.95,
+      captureRateShare: 0.85
     },
     funnel: { dispatched: 20, taken: 15, reported: 12, completed: 9 },
     dispatchKinds: [{ label: 'autopilot', count: 4 }, { label: 'research', count: 3 }],
@@ -341,11 +342,11 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
         cashUsd: null, unknownLaneUsd: null, inFlightUsd: null, overheadUsd: null,
         closeOutLineageShare: null, evidenceLinkedShare: null,
         opencodeSummedShare: null, unknownHarnessShare: null,
-        pricedLineageShare: null, attributableLineageShare: null
+        pricedLineageShare: null, attributableLineageShare: null, captureRateShare: null
       }
     }));
     assert.ok(nullHtml.includes('close-out linked — · evidence linked — · opencode summed — · unknown harness —'), 'null shares render as dashes');
-    assert.ok(nullHtml.includes('priced lineages — · attributable lineages —'), 'null coverage ratios render as dashes');
+    assert.ok(nullHtml.includes('priced lineages — · capture rate — · attributable lineages —'), 'null coverage ratios render as dashes');
 
     const zeroHtml = renderKpisPage(buildStats({
       terminalMarkedTaskCost: {
@@ -353,11 +354,11 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
         cashUsd: 0, unknownLaneUsd: 0, inFlightUsd: null, overheadUsd: null,
         closeOutLineageShare: 0, evidenceLinkedShare: 0,
         opencodeSummedShare: 0, unknownHarnessShare: 0,
-        pricedLineageShare: 0, attributableLineageShare: 0
+        pricedLineageShare: 0, attributableLineageShare: 0, captureRateShare: 0
       }
     }));
     assert.ok(zeroHtml.includes('close-out linked 0% · evidence linked 0% · opencode summed 0% · unknown harness 0%'), 'a genuine 0 must render as 0%, not be conflated with null');
-    assert.ok(zeroHtml.includes('priced lineages 0% · attributable lineages 0%'), 'a genuine 0 coverage ratio must render as 0%');
+    assert.ok(zeroHtml.includes('priced lineages 0% · capture rate 0% · attributable lineages 0%'), 'a genuine 0 coverage ratio must render as 0%');
   });
 
   test('inFlightUsd/overheadUsd null render "—", never $0', () => {
@@ -479,6 +480,27 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     // pricedLineageShare — so a reader of "unknown harness 100%" can see the
     // N it is a share of, not just the bare ratio.
     assert.ok(html.includes('<span class="kpi-cost-sample">14 terminal-marked issues · 3 unpriced (excluded)</span>'));
+  });
+
+  test('captureRateShare (LIN-1959) renders beside pricedLineageShare and discloses the capture loss pricedLineageShare cannot see', () => {
+    // The exact scenario the ticket names: priced lineages reads 100% (every
+    // usage-bearing lineage priced) while the true capture rate is low (most
+    // of what ran never posted usage at all) — pricedLineageShare alone would
+    // read as full coverage next to it. Both must render, and pricedLineageShare
+    // must NOT be replaced.
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 5, unpriced: 0, costUsd: 50,
+        cashUsd: 50, unknownLaneUsd: 0, inFlightUsd: null, overheadUsd: null,
+        closeOutLineageShare: 1, evidenceLinkedShare: 1,
+        opencodeSummedShare: 0, unknownHarnessShare: 0,
+        pricedLineageShare: 1, attributableLineageShare: 0.29, captureRateShare: 0.29
+      }
+    }));
+    assert.ok(
+      html.includes('priced lineages 100% · capture rate 29% · attributable lineages 29%'),
+      'the true capture rate must sit directly beside priced lineages, and priced lineages must remain published unchanged'
+    );
   });
 
   test('formatShare: a real non-zero share below the rounding threshold renders "<1%", never a false "0%" (LIN-1958 review F5)', () => {

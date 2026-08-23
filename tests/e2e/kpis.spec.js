@@ -76,6 +76,11 @@ test.describe('KPIs page', () => {
     const coverage = card.locator('.kpi-cost-coverage');
     await expect(coverage).toBeVisible();
     await expect(coverage).toHaveText(/priced lineages/);
+    // LIN-1959: the true capture rate (usageBearingLineages ÷ ranLineages),
+    // published beside — never instead of — pricedLineageShare, so a public
+    // reader is not left with only the narrower share as an apparent
+    // coverage claim.
+    await expect(coverage).toHaveText(/capture rate/);
     await expect(coverage).toHaveText(/attributable lineages/);
 
     const usdLines = card.locator('.kpi-cost-usd-lines');

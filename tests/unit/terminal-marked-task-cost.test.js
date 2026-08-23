@@ -296,10 +296,11 @@ describe('computeTerminalMarkedTaskCost — zero-T degradation', () => {
     assert.equal(result.overheadUsd, null);
     assert.equal(result.pricedLineageShare, null);
     assert.equal(result.attributableLineageShare, null);
+    assert.equal(result.captureRateShare, null);
     for (const key of [
       'costUsd', 'cashUsd', 'unknownLaneUsd', 'closeOutLineageShare', 'evidenceLinkedShare',
       'opencodeSummedShare', 'unknownHarnessShare', 'inFlightUsd', 'overheadUsd',
-      'pricedLineageShare', 'attributableLineageShare'
+      'pricedLineageShare', 'attributableLineageShare', 'captureRateShare'
     ]) {
       assert.ok(!Number.isNaN(result[key]), `${key} must not be NaN`);
     }
@@ -545,6 +546,68 @@ describe('computeTerminalMarkedTaskCost — F5 (LIN-1957 review round 2, Request
     const result = computeTerminalMarkedTaskCost([neverPosted], NOW);
     assert.equal(result.issueCount, 1, 'T is non-zero');
     assert.equal(result.pricedLineageShare, null, 'usageBearingLineages is 0, so this must degrade to null, not divide-by-zero to NaN or read as 0');
+  });
+});
+
+describe('computeTerminalMarkedTaskCost — LIN-1959: captureRateShare, the true capture rate', () => {
+  test('captureRateShare = usage-bearing ÷ ran lineages — the SAME ran-lineages denominator attributableLineageShare uses', () => {
+    const usageBearing = row({
+      id: 'bb1', issueIdentifier: 'LIN-500', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 4, days: 1 }), doneMarker(0.9)]
+    });
+    const neverPosted1 = row({
+      id: 'bb2', issueIdentifier: 'LIN-501', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [doneMarker(0.9)]
+    });
+    const neverPosted2 = row({
+      id: 'bb3', issueIdentifier: 'LIN-502', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [doneMarker(0.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([usageBearing, neverPosted1, neverPosted2], NOW);
+    assert.equal(result.attributableLineageShare, 1, 'sanity: all 3 ran lineages carry an issueIdentifier');
+    assert.equal(result.captureRateShare, 0.333, 'only 1 of 3 ran lineages ever posted usage at all');
+  });
+
+  test('the named honesty scenario: pricedLineageShare alone reads 100% while captureRateShare exposes the real capture loss', () => {
+    // Every lineage that DID post usage is fully priced (pricedLineageShare
+    // = 1, "priced lineages 100%"), but only a fraction of everything that
+    // actually ran ever posted usage in the first place. pricedLineageShare's
+    // own denominator (usage-bearing lineages) cannot see that gap; this is
+    // the field that does.
+    const priced = row({
+      id: 'cc1', issueIdentifier: 'LIN-503', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 4, days: 1 }), doneMarker(0.9)]
+    });
+    const silent = (n) => row({
+      id: `cc${n}`, issueIdentifier: `LIN-50${n}`, harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [doneMarker(0.9)]
+    });
+    const rows = [priced, silent(4), silent(5), silent(6)];
+    const result = computeTerminalMarkedTaskCost(rows, NOW);
+    assert.equal(result.pricedLineageShare, 1, 'every usage-bearing lineage (just the one) is fully priced — reads as 100%');
+    assert.equal(result.captureRateShare, 0.25, 'only 1 of 4 ran lineages posted any usage at all — the true capture rate');
+  });
+
+  test('a `[skipped]` lineage counts toward neither ranLineages nor captureRateShare\'s denominator, same exclusion attributableLineageShare applies', () => {
+    const skipped = row({
+      id: 'dd1', issueIdentifier: undefined, harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 999, lane: 'api', days: 1 }), skippedMarker(0.9)]
+    });
+    const usageBearing = row({
+      id: 'dd2', issueIdentifier: 'LIN-600', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 1, days: 1 }), doneMarker(0.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([skipped, usageBearing], NOW);
+    assert.equal(result.captureRateShare, 1, 'the skipped lineage must not dilute the denominator');
+  });
+
+  test('zero usage-bearing lineages over a non-empty ran population degrades to a genuine 0, not null', () => {
+    const neverPosted = row({
+      id: 'ee1', issueIdentifier: 'LIN-700', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [doneMarker(0.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([neverPosted], NOW);
+    assert.equal(result.captureRateShare, 0, 'ranLineages is 1 (non-zero), so this is a real 0, distinct from the null zero-ranLineages case');
   });
 });
 
