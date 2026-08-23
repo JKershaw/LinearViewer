@@ -590,7 +590,7 @@ describe('POST /api/dashboard/rulings/shelve (LIN-1727)', () => {
 // ─── Escalation KPIs — operator-facing audit page (LIN-1736) ─────────────────
 
 describe('GET /api/escalation-kpis (LIN-1736)', () => {
-  function makeKpiRouter(perWorkspace, taskDecisionsStore) {
+  function makeKpiRouter(perWorkspace, taskDecisionsStore, shelvedRulingsStore) {
     const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
     return createDashboardRoutes({
       workspaceFromUrl: (req, res, next) => next(),
@@ -603,9 +603,40 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
       fetchWorkspaceIssues: async () => [],
       getOpenRouterSource: () => 'env',
       getDeployInfo: () => ({}),
-      taskDecisionsStore: taskDecisionsStore || null
+      taskDecisionsStore: taskDecisionsStore || null,
+      shelvedRulingsStore: shelvedRulingsStore || null
     });
   }
+
+  test('LIN-1727: an actively-shelved decision still counts toward unansweredAge — KPI must stay monotonic regardless of shelving', async () => {
+    const raisedMs = Date.now() - 2 * 60 * 60 * 1000;
+    const loop = {
+      id: 'w-shelved', issueIdentifier: 'LIN-5', issueTitle: 'shelved one', promptName: 'implementation', prompt: 'p',
+      dispatchedAt: new Date(raisedMs).toISOString(), resolvedAt: new Date(raisedMs).toISOString(), status: 'taken',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: new Date(raisedMs).toISOString() },
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-shelved', question: 'Proceed?' }), timestamp: new Date(raisedMs).toISOString() }
+      ]
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [loop], agentStatus: [] } };
+    // The live rulings feed would hide this row (it's actively shelved, well
+    // within its resurfaceAt window) — the KPI route must NOT be given the
+    // means to do the same: shelvedRulingsStore is wired here to prove the
+    // KPI closure ignores it even when a store IS configured, not merely
+    // because the store happens to be absent.
+    const shelvedRulingsStore = {
+      async listForWorkspaces() {
+        return [{ urlKey: 'ws-a', decisionId: 'd-shelved', reason: 'waiting on design', resurfaceAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), lapseCount: 0 }];
+      }
+    };
+    const router = makeKpiRouter(perWorkspace, null, shelvedRulingsStore);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.unansweredAge.count, 1, 'a shelved-but-unanswered decision must still count toward the KPI');
+  });
 
   test('computes time-to-response and false-escalation from a resolved loop-backed decision, and counts an unresolved one as unanswered', async () => {
     const raisedMs = Date.now() - 5 * 24 * 60 * 60 * 1000; // 5 days ago
