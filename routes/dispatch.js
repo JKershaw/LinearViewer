@@ -6,6 +6,8 @@
  *    - POST /workspace/:urlKey/api/dispatch - Add prompt to queue
  *    - GET /workspace/:urlKey/api/dispatch - List queued items
  *    - DELETE /workspace/:urlKey/api/dispatch/:itemId - Remove item
+ *    - PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim - Graceful trim
+ *      (LIN-2147): amend a live run's maxTasks bound downward
  *    - GET /workspace/:urlKey/api/dispatch/count - Get queue count
  *    - Token management endpoints
  *    - Dispatch presets CRUD (LIN-1391): GET/POST /workspace/:urlKey/api/dispatch/presets,
@@ -902,6 +904,56 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     } catch (err) {
       console.error('Remove dispatch item error:', err.message);
       jsonError(res, 500, 'Failed to remove item');
+    }
+  });
+
+  /**
+   * PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim
+   * Graceful trim (LIN-2147): amend a live run's `maxTasks` bound DOWNWARD,
+   * a first-class control rather than a free-text/followUpTo wake nudge.
+   * The run's own existing LIN-1751 budget guard does the rest: its current
+   * in-flight ticket keeps dispatching (review/close-out/corrective
+   * follow-ups all read as `alreadyCounted`, so a trim never interrupts a
+   * child beat already in progress), while the next genuinely NEW task hits
+   * the same 409 BUDGET_EXHAUSTED refusal the orderly-finish path already
+   * handles — no second wind-down verb, distinct from abort (which is a
+   * hard stop mid-work).
+   *
+   * Idempotent (an absolute set, never a relative decrement) and auditable
+   * (`by`/`at`/`maxTasks` appended to the run's own `trimHistory`, readable
+   * via `getItemStatus`/`listHistory`).
+   */
+  router.patch('/workspace/:urlKey/api/dispatch/:sessionId/trim', workspaceFromUrl, async (req, res) => {
+    const { workspace } = req;
+    const { sessionId } = req.params;
+    const { maxTasks } = req.body || {};
+
+    if (!UUID_REGEX.test(sessionId)) {
+      return badRequest.json(res, 'Invalid session ID format');
+    }
+    if (!Number.isInteger(maxTasks) || maxTasks < 1) {
+      return badRequest.json(res, 'maxTasks is required and must be a positive integer');
+    }
+
+    try {
+      const result = await dispatchQueueStore.trimSessionBudget(
+        workspace.urlKey, sessionId, maxTasks, { by: req.session?.accountId || null }
+      );
+
+      if (result.ok) {
+        return res.json({ success: true, item: result.item });
+      }
+      if (result.reason === 'not-found') {
+        return notFound.json(res, 'Run not found');
+      }
+      // 'not-downward': trim is amend-downward only — a bound already at or
+      // below the requested value is not a trim (see the constraint on
+      // trimSessionBudget above). A caller wanting to widen a budget uses a
+      // fresh kickoff, not this control.
+      return jsonError(res, 409, 'Trim must reduce the run\'s task budget below its current value');
+    } catch (err) {
+      console.error('Trim session budget error:', err.message);
+      jsonError(res, 500, 'Failed to trim run');
     }
   });
 
