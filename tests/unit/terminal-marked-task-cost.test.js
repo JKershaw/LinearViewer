@@ -611,6 +611,115 @@ describe('computeTerminalMarkedTaskCost — LIN-1959: captureRateShare, the true
   });
 });
 
+const ticketMarker = (identifier, state, days) => ({
+  message: `[ticket] ${identifier} ${state}`,
+  timestamp: daysAgo(days).toISOString()
+});
+
+describe('computeTerminalMarkedTaskCost — LIN-2253: lane-landed, no-lineage tickets', () => {
+  test('a worker-lane lineage\'s OTHER done tickets are counted in T, flagged noLineage, and never priced', () => {
+    const lane = row({
+      id: 'lane1', issueIdentifier: 'LIN-800', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [
+        ticketMarker('LIN-800', 'started', 2),
+        usageEntry({ costUsd: 12, days: 1.5 }),
+        ticketMarker('LIN-800', 'done', 1.2),
+        ticketMarker('LIN-801', 'done', 1),
+        ticketMarker('LIN-802', 'done', 0.9),
+        doneMarker(0.8)
+      ]
+    });
+    const result = computeTerminalMarkedTaskCost([lane], NOW);
+
+    assert.equal(result.issueCount, 3, 'the anchor plus the two lane-landed tickets');
+    assert.equal(result.noLineageCount, 2);
+    assert.equal(result.unpriced, 2, 'the two no-lineage tickets — the anchor itself IS fully priced');
+    assert.equal(result.costUsd, 12, 'the lane spend stays attributed to the anchor only — no invented per-ticket split');
+  });
+
+  test('a marker in a non-"done" state is never counted as a landed ticket', () => {
+    const lane = row({
+      id: 'lane2', issueIdentifier: 'LIN-810', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [
+        usageEntry({ costUsd: 5, days: 1 }),
+        ticketMarker('LIN-810', 'done', 0.9),
+        ticketMarker('LIN-811', 'blocked', 0.9),
+        ticketMarker('LIN-812', 'refused', 0.9),
+        doneMarker(0.8)
+      ]
+    });
+    const result = computeTerminalMarkedTaskCost([lane], NOW);
+    assert.equal(result.issueCount, 1, 'blocked/refused tickets never landed — only the anchor counts');
+    assert.equal(result.noLineageCount, 0);
+  });
+
+  test('a lane-landed ticket that ALSO has its own separate lineage is not double-counted or flagged noLineage', () => {
+    const lane = row({
+      id: 'lane3', issueIdentifier: 'LIN-820', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [
+        usageEntry({ costUsd: 8, days: 1.5 }),
+        ticketMarker('LIN-820', 'done', 1.2),
+        ticketMarker('LIN-821', 'done', 1),
+        doneMarker(0.9)
+      ]
+    });
+    // LIN-821 ALSO shows up as its own anchor elsewhere (e.g. a later,
+    // independent re-dispatch) — this is the case a naive first-pass add
+    // would double-count.
+    const ownLineage = row({
+      id: 'own821', rootItemId: 'own821', issueIdentifier: 'LIN-821', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 3, days: 0.8 }), doneMarker(0.5)]
+    });
+    const result = computeTerminalMarkedTaskCost([lane, ownLineage], NOW);
+    assert.equal(result.issueCount, 2, 'LIN-820 and LIN-821 — LIN-821 counted once, via its own lineage');
+    assert.equal(result.noLineageCount, 0, 'LIN-821 has a real lineage, so it must not be flagged noLineage');
+    assert.equal(result.costUsd, 11, '8 (LIN-820) + 3 (LIN-821 own lineage) — never LIN-821 counted or priced twice');
+  });
+
+  test('a lane-landed ticket from an UNRESOLVED (non-done) lineage is not counted at all', () => {
+    const inFlight = row({
+      id: 'lane4', issueIdentifier: 'LIN-830', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [
+        usageEntry({ costUsd: 2, days: 0.9 }),
+        ticketMarker('LIN-831', 'done', 0.8)
+        // no terminal [done]/[failed]/etc marker — the lineage itself never resolved
+      ]
+    });
+    const result = computeTerminalMarkedTaskCost([inFlight], NOW);
+    assert.equal(result.issueCount, 0, 'an unresolved lineage contributes nothing, same as before LIN-2253');
+    assert.equal(result.noLineageCount, 0);
+  });
+
+  test('review fix: a lane-landed ticket whose OWN anchor lineage is still in-flight is NOT flagged noLineage', () => {
+    // The adversarial case the LIN-2253 review caught: `issues` is populated
+    // ONLY from DONE lineages, so a naive `issues.has(identifier)` check
+    // cannot see an in-flight (unresolved) anchor lineage and would
+    // misclassify LIN-841 as noLineage — conflating "has a lineage, still
+    // running" (already disclosed via inFlightUsd) with "no lineage at all"
+    // (this ticket's actual mechanism).
+    const laneA = row({
+      id: 'laneA', issueIdentifier: 'LIN-840', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [
+        usageEntry({ costUsd: 5, days: 1.5 }),
+        ticketMarker('LIN-840', 'done', 1.2),
+        ticketMarker('LIN-841', 'done', 1),
+        doneMarker(0.9)
+      ]
+    });
+    // LIN-841 has its own real anchor lineage — dispatched, in-window, but
+    // still IN-FLIGHT (no terminal marker at all).
+    const inFlightOwnLineage = row({
+      id: 'own841', rootItemId: 'own841', issueIdentifier: 'LIN-841', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 4, days: 0.9 })]
+    });
+    const result = computeTerminalMarkedTaskCost([laneA, inFlightOwnLineage], NOW);
+    assert.equal(result.issueCount, 1, 'only LIN-840 (the DONE anchor) reaches T — LIN-841\'s own lineage has not resolved yet');
+    assert.equal(result.noLineageCount, 0, 'LIN-841 has a real (in-flight) lineage — must not be flagged noLineage');
+    assert.equal(result.costUsd, 5, 'LIN-841\'s in-flight spend stays out of costUsd (F4 — see inFlightUsd), never folded in nor invented as a noLineage $0');
+    assert.equal(result.inFlightUsd, 4, 'LIN-841\'s own lineage spend is visible via the existing in-flight disclosure, not silently dropped');
+  });
+});
+
 describe('computeTerminalMarkedTaskCost — naming discipline', () => {
   test('no "verified" or reserved synonym appears in any emitted field name', () => {
     const result = computeTerminalMarkedTaskCost([], NOW);
