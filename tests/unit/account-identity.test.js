@@ -130,6 +130,19 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
     assert.strictEqual(account.identities.length, 2, 'both identities attached to the ONE account');
     assert.ok(account.identities.some(i => i.scope === 'viewer-a'));
     assert.ok(account.identities.some(i => i.scope === 'viewer-b'));
+
+    // LIN-2237 (Ticket E, L6 item 4 — durable-record invariant): the LINK
+    // path (L2.1), not just the merge path (L2.2, covered separately below),
+    // must also leave a durable owner-credentials record for
+    // (canonical account, workspace, provider) — resolveWorkspaceAccess's
+    // durable arm (Ticket B) has nothing to canonicalize INTO if the link
+    // path itself never persisted one.
+    const credA = await stores.ownerCredentialStore.get(accountIdAfterA, 'org-a');
+    assert.ok(credA, 'the FIRST (minting) front-door login persists a durable credential');
+    assert.strictEqual(credA.refreshToken, 'refresh-0');
+    const credB = await stores.ownerCredentialStore.get(accountIdAfterA, 'org-b');
+    assert.ok(credB, 'the SECOND (linking) front-door login — the actual L2.1 fix under test — ALSO persists one, under the SAME account');
+    assert.strictEqual(credB.refreshToken, 'refresh-1');
   });
 
   // === L6 test 2: conflict still conflicts without confirmation =================
