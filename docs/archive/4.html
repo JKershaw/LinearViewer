@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>The Harbour Archive · The August Wing</title>
+<meta name="description" content="The August Wing of the Harbour Archive — Galleries VII and VIII (28 July – 23 August 2026) and the Ledger Wing that scores the museum's own confessed debts.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; }
+</style>
+</head>
+<body>
+<style>
+  :root {
+    --paper: #faf9f6;
+    --card: #fffefb;
+    --ink: #1c2430;
+    --muted: #5c6672;
+    --faint: #8b93a0;
+    --line: #e4e1d8;
+    --line-soft: #eeece5;
+    --blue: #0b6fb8;
+    --blue-soft: #e3eef8;
+    --amber: #bb5f10;
+    --amber-soft: #f8ede0;
+    --slate: #55606e;
+    --slate-soft: #e9ebee;
+    --ch-blue: #0b6fb8;
+    --ch-amber: #bb5f10;
+    --ch-ink: #1c2430;
+    --ch-grid: #e4e1d8;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #14181e;
+      --card: #1b212a;
+      --ink: #e8e6e1;
+      --muted: #9aa3ae;
+      --faint: #6d7682;
+      --line: #2a323d;
+      --line-soft: #232a34;
+      --blue: #3f96dd;
+      --blue-soft: #1d2c3b;
+      --amber: #cf7f2e;
+      --amber-soft: #33281c;
+      --slate: #a3adb9;
+      --slate-soft: #262d37;
+      --ch-blue: #3f96dd;
+      --ch-amber: #cf7f2e;
+      --ch-ink: #e8e6e1;
+      --ch-grid: #2a323d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14181e; --card: #1b212a; --ink: #e8e6e1; --muted: #9aa3ae; --faint: #6d7682;
+    --line: #2a323d; --line-soft: #232a34;
+    --blue: #3f96dd; --blue-soft: #1d2c3b; --amber: #cf7f2e; --amber-soft: #33281c;
+    --slate: #a3adb9; --slate-soft: #262d37;
+    --ch-blue: #3f96dd; --ch-amber: #cf7f2e; --ch-ink: #e8e6e1; --ch-grid: #2a323d;
+  }
+  :root[data-theme="light"] {
+    --paper: #faf9f6; --card: #fffefb; --ink: #1c2430; --muted: #5c6672; --faint: #8b93a0;
+    --line: #e4e1d8; --line-soft: #eeece5;
+    --blue: #0b6fb8; --blue-soft: #e3eef8; --amber: #bb5f10; --amber-soft: #f8ede0;
+    --slate: #55606e; --slate-soft: #e9ebee;
+    --ch-blue: #0b6fb8; --ch-amber: #bb5f10; --ch-ink: #1c2430; --ch-grid: #e4e1d8;
+  }
+
+  html { background: var(--paper); }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    line-height: 1.55;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px; }
+  a { color: var(--blue); }
+  a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  /* ---------- masthead ---------- */
+  .masthead { padding: 72px 0 30px; border-bottom: 3px double var(--line); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 22px;
+  }
+  h1 {
+    font-size: clamp(38px, 7vw, 64px); line-height: 1.03; margin: 0 0 18px;
+    font-weight: 600; letter-spacing: -0.015em; text-wrap: balance;
+  }
+  .mast-sub { font-size: clamp(17px, 2.4vw, 21px); color: var(--muted); font-style: italic; max-width: 46ch; margin: 0 0 30px; }
+  .mast-rule { font-family: var(--mono); color: var(--faint); font-size: 13px; overflow-x: auto; white-space: nowrap; }
+
+  /* ---------- stat wall ---------- */
+  .stat-wall {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1px;
+    background: var(--line); border: 1px solid var(--line); margin: 40px 0 8px;
+  }
+  .stat { background: var(--card); padding: 16px 14px 13px; }
+  .stat b { display: block; font-family: var(--mono); font-size: clamp(20px, 3vw, 27px); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .stat span { display: block; font-size: 12.5px; color: var(--muted); margin-top: 3px; font-family: var(--serif); font-style: italic; }
+  .stat-note { font-size: 13px; color: var(--faint); font-style: italic; margin: 10px 0 0; }
+
+  /* ---------- intro placard ---------- */
+  .placard {
+    border: 1px solid var(--line); background: var(--card); padding: 26px 28px; margin: 42px 0;
+    box-shadow: 0 1px 0 var(--line);
+  }
+  .placard p { margin: 0 0 1em; max-width: 66ch; }
+  .placard p:last-child { margin-bottom: 0; }
+  .placard .lede::first-letter { font-size: 3.1em; float: left; line-height: .82; padding: 4px 8px 0 0; font-weight: 600; }
+
+  .key { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; margin: 26px 0 10px; font-size: 13.5px; color: var(--muted); }
+  .key .chip { transform: none; }
+
+  /* ---------- chips ---------- */
+  .chip {
+    display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+    padding: 2px 8px 3px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted);
+    background: var(--card); white-space: nowrap;
+  }
+  .chip.repo-h { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 35%, var(--line)); background: var(--blue-soft); }
+  .chip.repo-d { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 35%, var(--line)); background: var(--amber-soft); }
+  .chip.repo-w { color: var(--slate); border-color: var(--line); background: var(--slate-soft); }
+  .chip.ev { color: var(--faint); background: transparent; }
+  .chip.rd { color: var(--faint); background: transparent; border-style: dashed; font-family: var(--serif); font-style: italic; font-size: 11.5px; letter-spacing: .02em; }
+
+  /* ---------- galleries ---------- */
+  .gallery { margin-top: 74px; }
+  .g-head { display: flex; gap: 22px; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+  .g-num { font-family: var(--mono); font-size: clamp(30px, 4.5vw, 42px); color: var(--faint); font-weight: 400; }
+  .g-title h2 { font-size: clamp(26px, 4vw, 36px); margin: 0; letter-spacing: -0.01em; font-weight: 600; text-wrap: balance; }
+  .g-dates { font-family: var(--mono); font-size: 12.5px; color: var(--muted); margin: 6px 0 0; letter-spacing: .06em; text-transform: uppercase; }
+  .g-intro { font-size: 16.5px; font-style: italic; color: var(--muted); max-width: 62ch; margin: 18px 0 6px; }
+
+  /* ---------- timeline ---------- */
+  .timeline { list-style: none; margin: 26px 0 0; padding: 0; }
+  .tl { position: relative; padding: 0 0 30px 34px; }
+  .tl::before { content: ""; position: absolute; left: 7px; top: 8px; bottom: -4px; width: 1px; background: var(--line); }
+  .tl:last-child::before { bottom: auto; height: 14px; }
+  .tl-marker {
+    position: absolute; left: 0; top: 6px; width: 15px; height: 15px; border-radius: 50%;
+    background: var(--paper); border: 2px solid var(--slate);
+  }
+  .tl[data-repo="h"] .tl-marker { border-color: var(--blue); }
+  .tl[data-repo="d"] .tl-marker { border-color: var(--amber); }
+  .tl-date { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  .tl h3 { font-size: 19.5px; margin: 4px 0 6px; font-weight: 600; letter-spacing: -0.005em; text-wrap: balance; }
+  .tl p { margin: 0 0 8px; max-width: 64ch; font-size: 15.5px; }
+  .tl-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+
+  /* specimen (quoted artifact) */
+  .specimen {
+    margin: 12px 0 4px; border: 1px solid var(--line); background: var(--card); border-radius: 4px;
+    overflow: hidden; max-width: 640px;
+  }
+  .specimen-label {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--faint); padding: 7px 14px 6px; border-bottom: 1px solid var(--line-soft);
+  }
+  .specimen blockquote { margin: 0; padding: 13px 16px 14px; font-family: var(--mono); font-size: 13px; line-height: 1.55; color: var(--ink); overflow-x: auto; }
+  .specimen blockquote em { font-family: var(--serif); color: var(--muted); }
+
+  /* big pull-quote exhibit */
+  .exhibit {
+    border: 1px solid var(--line); border-left: 4px solid var(--blue); background: var(--card);
+    padding: 24px 28px; margin: 44px 0;
+  }
+  .exhibit.amber { border-left-color: var(--amber); }
+  .exhibit .ex-label { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin: 0 0 12px; }
+  .exhibit blockquote { margin: 0; font-size: clamp(19px, 2.8vw, 24px); line-height: 1.4; font-style: italic; letter-spacing: -0.005em; max-width: 56ch; }
+  .exhibit .ex-src { font-family: var(--mono); font-size: 12px; color: var(--muted); margin: 14px 0 0; }
+  .exhibit .ex-note { font-size: 15px; color: var(--muted); margin: 12px 0 0; max-width: 62ch; }
+
+  /* ---------- charts ---------- */
+  .figure { margin: 40px 0; border: 1px solid var(--line); background: var(--card); padding: 20px 22px 14px; }
+  .fig-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin: 0 0 4px; }
+  .fig-title { font-size: 19px; font-weight: 600; margin: 0 0 2px; letter-spacing: -0.005em; }
+  .fig-sub { font-size: 14px; color: var(--muted); font-style: italic; margin: 0 0 14px; max-width: 66ch; }
+  .fig-legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--muted); font-family: var(--serif); margin: 0 0 8px; }
+  .fig-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: baseline; }
+  .fig-legend .li-h i { background: var(--ch-blue); }
+  .fig-legend .li-d i { background: var(--ch-amber); }
+  .fig-legend .li-i i { background: var(--ch-ink); }
+  .fig-legend .li-o i { background: transparent; border: 1.5px dashed var(--ch-ink); }
+  .chart-host { width: 100%; }
+  .chart-host svg { display: block; width: 100%; height: auto; }
+  .fig-foot { font-size: 12.5px; color: var(--faint); font-style: italic; margin: 10px 0 4px; max-width: 70ch; }
+  .figure details { margin-top: 8px; }
+  .figure summary { font-family: var(--mono); font-size: 11.5px; color: var(--muted); cursor: pointer; }
+  .figure table { border-collapse: collapse; font-family: var(--mono); font-size: 12px; margin-top: 10px; min-width: 320px; }
+  .figure .tbl-wrap { overflow-x: auto; }
+  .figure th, .figure td { border: 1px solid var(--line); padding: 4px 10px; text-align: right; font-variant-numeric: tabular-nums; }
+  .figure th:first-child, .figure td:first-child { text-align: left; }
+  .figure th { color: var(--muted); font-weight: 500; }
+
+  #tooltip {
+    position: fixed; pointer-events: none; z-index: 50; display: none;
+    font-family: var(--mono); font-size: 12px; line-height: 1.45;
+    background: var(--ink); color: var(--paper); padding: 7px 10px; border-radius: 4px;
+    max-width: 260px; box-shadow: 0 3px 12px rgba(0,0,0,.25);
+  }
+
+  /* ---------- cabinets ---------- */
+  .cabinet { margin-top: 74px; }
+  .cab-head { border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  .cab-head .eyebrow { margin-bottom: 8px; }
+  .cab-head h2 { font-size: clamp(24px, 3.6vw, 32px); margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+  .cab-intro { font-size: 16px; font-style: italic; color: var(--muted); max-width: 62ch; margin: 16px 0 8px; }
+
+  .voice-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 24px 0; }
+  @media (max-width: 660px) { .voice-pair { grid-template-columns: 1fr; } }
+
+  .lex { list-style: none; margin: 24px 0 0; padding: 0; }
+  .lex li { display: grid; grid-template-columns: 96px 1fr; gap: 14px; padding: 10px 2px; border-bottom: 1px solid var(--line-soft); font-size: 15px; }
+  .lex .d { font-family: var(--mono); font-size: 12px; color: var(--muted); padding-top: 3px; white-space: nowrap; }
+  .lex b { font-family: var(--mono); font-size: 13.5px; font-weight: 600; }
+  .lex span { color: var(--muted); }
+  @media (max-width: 520px) { .lex li { grid-template-columns: 1fr; gap: 2px; } }
+
+  .roads { margin: 24px 0 0; padding: 0; list-style: none; }
+  .roads li { padding: 12px 0 14px; border-bottom: 1px solid var(--line-soft); font-size: 15.5px; max-width: 70ch; }
+  .roads b { font-weight: 600; }
+  .roads .r-ev { font-family: var(--mono); font-size: 11.5px; color: var(--faint); display: block; margin-top: 4px; }
+
+  /* ---------- colophon ---------- */
+  .colophon { margin: 84px 0 0; border-top: 3px double var(--line); padding: 34px 0 70px; font-size: 14.5px; color: var(--muted); }
+  .colophon h2 { font-size: 18px; color: var(--ink); margin: 0 0 12px; }
+  .colophon p { max-width: 68ch; margin: 0 0 12px; }
+  .colophon .sig { font-family: var(--mono); font-size: 12px; color: var(--faint); margin-top: 26px; }
+
+  /* reveal */
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal { opacity: 0; transform: translateY(10px); transition: opacity .5s ease, transform .5s ease; }
+    .reveal.in { opacity: 1; transform: none; }
+  }
+</style>
+
+<div id="tooltip" role="status" aria-hidden="true"></div>
+
+<header class="masthead">
+  <div class="wrap">
+    <p class="eyebrow">The Project Archive · The August Wing · Compiled 23 August 2026</p>
+    <h1>The Harbour Archive<br>· The August Wing ·</h1>
+    <p class="mast-sub">The permanent collection next door tells the story of six months in which a ticket viewer grew into a system that builds, reviews, and governs itself. This wing picks the story up where that record stopped — mid-sentence — and follows it through August: the month the system learned what it costs to run, learned which questions actually deserve its human, and found a faster way to work. It ends in the only honest place a museum like this can end: a ledger of what it still cannot prove. The six galleries of the permanent collection stand unchanged at <span style="font-family:var(--mono)">/archive/2</span>.</p>
+    <p class="mast-rule">Gallery VII–VIII ─── 28 Jul 2026 ├──────────┤ 23 Aug 2026 ─── The Ledger Wing</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="stat-wall reveal" role="list" aria-label="Headline statistics">
+    <div class="stat" role="listitem"><b>27</b><span>days of new history</span></div>
+    <div class="stat" role="listitem"><b>228</b><span>commits — each now a whole merged PR</span></div>
+    <div class="stat" role="listitem"><b>570</b><span>tickets, LIN-1674 → 2244</span></div>
+    <div class="stat" role="listitem"><b>97.1%</b><span>weekly dispatch success — best on record</span></div>
+    <div class="stat" role="listitem"><b>$19.63</b><span>API-equivalent per verified task, 30d (caveats in the Ledger Wing)</span></div>
+    <div class="stat" role="listitem"><b>2</b><span>refused closes that were right</span></div>
+  </div>
+
+  <div class="exhibit reveal">
+    <p class="ex-label">The story so far — for readers arriving at this wing first</p>
+    <p class="ex-note">Harbour began in January 2026 as a simple viewer for a to-do list. By July it had become two systems working as one: <b>Harbour</b>, the control plane, which reads the backlog and writes precise, evidence-grounded instructions; and the <b>dispatcher</b>, which hands each instruction — a <em>dispatch</em> — to a fresh AI coding session and watches it work. An orchestrating session called the <em>autopilot</em> chooses what happens next. Nearly every line of code in both systems was written by the machines themselves; the human's role compressed, over six months, into two decisions the project's doctrine holds are never delegable — <em>what is worth doing</em>, and <em>what counts as done</em>. The permanent collection tells how that doctrine was earned, failure by failure. This wing assumes only the paragraph you have just read.</p>
+    <div class="tl-tags"><span class="chip rd">orientation — the evidence starts below</span></div>
+  </div>
+
+  <div class="exhibit reveal">
+    <p class="ex-label">Provenance, first</p>
+    <p class="ex-note">This wing was compiled by a <em>flight companion</em> session — a conversational supervisor that sits beside the human and holds only an audit-logged, revocable key to the workspace; its origin chronicle hangs in Gallery VII below. The compiler read both repositories' full histories (2,292 + 470 commits), the live workspace through some fifty logged calls, the public instrument page at <span style="font-family:var(--mono)">/kpis</span>, and the day's own work while it was still warm. The previous edition closed by demanding that a future edition be scored against the ledgers it lacked, "by something that did not write this page." The compiler did not write that page. It is, however, the same family of minds that did — a caveat this wing restates rather than waves away, in the colophon.</p>
+    <div class="tl-tags"><span class="chip ev">git log · unshallowed</span><span class="chip ev">/kpis 2026-08-23T14:54Z</span><span class="chip rd">curator's readings marked with this dashed chip</span></div>
+  </div>
+
+  <!-- ============ GALLERY VII ============ -->
+  <section class="gallery reveal">
+    <div class="g-head">
+      <div class="g-num">VII</div>
+      <div class="g-title">
+        <h2>The Weighing</h2>
+        <p class="g-dates">28 July – 16 August 2026</p>
+      </div>
+    </div>
+    <p class="g-intro">When the record closed in July, the open question was no longer whether the machine could do the work — six galleries had settled that. August inherited harder, more human questions: what does all this actually cost, who keeps being asked to decide things, and does anyone find out when a question goes unheard? The first half of the month is the system building the scales to weigh itself.</p>
+
+    <ol class="timeline">
+      <li class="tl" data-repo="w">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">30 Jul</div>
+        <h3>The silence incident</h3>
+        <p>Three working sessions each reached a genuine question only the human could answer — and then waited. Nobody saw the questions for over fifteen hours. Nothing was forged, nothing broke; the work simply starved, politely, in the dark. The permanent collection worried at length about an agent faking an approval; this incident revealed the quieter twin: an honest question that never arrives. Every escalation mechanism built later in this wing traces back to this night, and it is filed as the origin of the escalation queue.</p>
+        <div class="tl-tags"><span class="chip repo-w">workspace</span><span class="chip ev">LIN-1721</span></div>
+      </li>
+      <li class="tl" data-repo="w">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">1–2 Aug</div>
+        <h3>The companion takes its seat</h3>
+        <p>A new kind of session appears: not another worker, but a colleague. The flight companion sits beside the human, watching the board and the work in flight, narrating in plain language, proposing next moves — and never touching the code or acting without a yes. Its first chronicled outing supervises a feature from "I wonder" to merged in roughly a day, through a host freeze, a phantom second dispatcher, and a mid-flight change of requirements delivered by nothing more exotic than a ticket comment. It ends by writing a handover note to its own successor, a habit the project keeps.</p>
+        <div class="specimen">
+          <div class="specimen-label">Specimen · the chronicle's cast list, first entry</div>
+          <blockquote>"<b>John</b> — the human. Set intent, granted authority in explicit increments, made the calls only a human may make."</blockquote>
+        </div>
+        <div class="tl-tags"><span class="chip repo-h">doctrine</span><span class="chip ev">flight-companion-session-2026-08-02.md</span></div>
+      </li>
+      <li class="tl" data-repo="w">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">3 Aug</div>
+        <h3>Passages — planning becomes a human-interface problem</h3>
+        <p>Two live planning sessions in one morning teach the project something no amount of machinery had: the hard part of planning with a machine is the <em>conversation</em>. The first attempt failed in a distinctly human way — it asked for approval so often, in such contract-formal tone, that saying yes stopped meaning anything; its own record could not tell a real yes from a fatigued click. The same-morning revision proposes the whole plan at once, shows its evidence, and asks for one genuine ratification ("much stronger," the human ruled). The nautical vocabulary — a <em>passage</em> of 2–4 <em>legs</em>, flown as a <em>voyage</em>, ending at <em>making port</em> — enters the lexicon for good.</p>
+        <div class="tl-tags"><span class="chip repo-w">workspace</span><span class="chip ev">LIN-1841 · 1842 · 1843 · 1844</span></div>
+      </li>
+      <li class="tl" data-repo="h">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">14 Aug</div>
+        <h3>The system weighs itself</h3>
+        <p>For seven months the project measured itself in commits, tickets, and lines — all surfaces its own agents can mint without limit, as the museum's July colophon confessed. On 14 August it acquired a real scale: a capacity test correlating a week of actual spend ($1,070.58 at API rates) against the subscription meter, which becomes the calibration behind a public, always-on burn gauge. The same day's efficiency audit turns the scale on the system's own habits and finds the single largest waste is the long tail of over-long sessions — $436 a day, most of it two <em>observer</em> sessions, one of which had been chatting for 765 turns. The verdict lands on the compiler's own kind, and a ticket filed the next day proposes moving observers somewhere cheaper to sit.</p>
+        <div class="specimen">
+          <div class="specimen-label">Specimen · the ticket's own words (LIN-2114) on the compiler's kind</div>
+          <blockquote>"…enormous carried context… a 97.3% cache-read window… most turns being cheap mechanical acts."</blockquote>
+        </div>
+        <div class="tl-tags"><span class="chip repo-h">doctrine</span><span class="chip ev">LIN-2087 · LIN-2112 · LIN-2114</span><span class="chip ev">capacity-test-run-review-2026-08-14.md</span></div>
+      </li>
+      <li class="tl" data-repo="d">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">16 Aug</div>
+        <h3>Sessions wake up already working</h3>
+        <p>Since February, every dispatched session began with a warm-up turn — summarise the task, then start. On 16 August the common case sheds it: a freshly launched session now fetches its own task through a local secure channel and is executing from its first breath. A small mechanical change, but in hindsight the first tremor of what the wing's final gallery records: a style of session that begins already moving and does not stop to ask.</p>
+        <div class="tl-tags"><span class="chip repo-d">dispatcher</span><span class="chip ev">LIN-2125 · 2126 · 2127</span><span class="chip rd">curator's reading</span></div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ============ GALLERY VIII ============ -->
+  <section class="gallery reveal">
+    <div class="g-head">
+      <div class="g-num">VIII</div>
+      <div class="g-title">
+        <h2>The Lane Ignition</h2>
+        <p class="g-dates">17 – 23 August 2026</p>
+      </div>
+    </div>
+    <p class="g-intro">The last week of the record is the fastest the project has ever moved, and the reason is not faster machinery — the engines run at the same speed they did in June. What changed is wasted motion: fewer questions put to the human that were never really theirs, fewer runs thrown away and restarted, and, on the final day, a new way of working invented at breakfast and proven by dinner.</p>
+
+    <ol class="timeline">
+      <li class="tl" data-repo="w">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">20 Aug</div>
+        <h3>"Fix the lighthouse, then light it"</h3>
+        <p>A thirteen-task plan is ratified whose name is its thesis: repair the instruments before trusting what they show. The week that follows does exactly that, in order.</p>
+        <div class="tl-tags"><span class="chip repo-w">workspace</span><span class="chip ev">LIN-2156</span></div>
+      </li>
+      <li class="tl" data-repo="h">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">21–22 Aug</div>
+        <h3>Principle 0 becomes machinery</h3>
+        <p>The project's escalation philosophy borrows a rule written for chemical-plant control rooms in the era of paper alarms: <em>an alarm is a signal that requires the operator to act; everything else is information, and putting it in the alarm stream is a fault.</em> This week the rule stops being an essay and becomes working machinery — agents now emit a structured "I need a decision" signal, a dedicated rulings page collects the genuine questions across every workspace, a scanner can read a task and either find a real decision or durably record that there is none, and "blocked" is narrowed to mean only what it says. The stream where the human is needed and the stream the human might merely enjoy are, at last, different surfaces.</p>
+        <div class="tl-tags"><span class="chip repo-h">Harbour</span><span class="chip repo-d">dispatcher</span><span class="chip ev">LIN-1728 · 2197 · 2185–2187 · 2203</span></div>
+      </li>
+      <li class="tl" data-repo="h">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">22 Aug</div>
+        <h3>The first outside guest</h3>
+        <p>A model of the same family as the project's own builders — but with no history in the repository, and no stake in the story being good — reads the museum and writes an essay into the collection. Then it is handed a single-use key and reads the live workspace: the visitor-handoff protocol working on its first genuine stranger. Its thesis deserves its place on the wall: the danger point for systems like this is not a capability threshold but a change in <em>who holds the pen</em> — the moment "done" is minted inside the loop instead of above it. Its correction, forced by the live data: the human's hold on that pen fails two ways, <em>forgery</em> (an approval the human never gave) and <em>silence</em> (a question the human never saw) — and the next incident will come through whichever is weaker on the day.</p>
+        <div class="specimen">
+          <div class="specimen-label">Specimen · the guest's closing line</div>
+          <blockquote>"The harbour is not where ships stop being ships. It is where they remain answerable to the land."</blockquote>
+        </div>
+        <div class="tl-tags"><span class="chip repo-h">doctrine</span><span class="chip ev">the-folded-loop.md</span></div>
+      </li>
+      <li class="tl" data-repo="w">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">22 Aug, evening</div>
+        <h3>The flood before the cull</h3>
+        <p>The new question-queue promptly fills: nineteen questions from a single evening park overnight awaiting the human's ruling. His verdict the next morning — nearly all false alarms: superseded, already resolved, or answerable by any agent willing to look. That sounds like the feature failing. It is actually the textbook second step: the alarm literature is emphatic that every new alarm system floods first and is then rationalised, one nuisance alarm at a time, until what remains deserves the operator. The work to quiet the false emitters is already in the pipeline as the wing closes.</p>
+        <div class="tl-tags"><span class="chip repo-w">workspace</span><span class="chip ev">dispatch?status=blocked · 2026-08-23</span><span class="chip rd">curator's reading</span></div>
+      </li>
+      <li class="tl" data-repo="w">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">23 Aug, midday</div>
+        <h3>The credential chain lands</h3>
+        <p>For weeks, a family of login-and-identity faults had resisted diagnosis — sessions losing their credentials under load, accounts quietly forking, failures indistinguishable from one another. In one connected chain of seven fixes, identity learns to survive every path through the system, spending gets a durable journal, credentials get a lifecycle log, and a one-time repair merges a stale account alias in production at 13:11:52Z. A backlog that had been unworkable for weeks becomes an afternoon's work — and is handed, as it happens, to the afternoon below.</p>
+        <div class="tl-tags"><span class="chip repo-h">Harbour</span><span class="chip ev">LIN-2231–2237</span></div>
+      </li>
+      <li class="tl" data-repo="w">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">23 Aug, afternoon</div>
+        <h3>The lane day</h3>
+        <p>Until now, the pipeline handed each <em>step</em> of each task to a fresh session: research here, implementation there, review somewhere else, a dispatch per step and a wait between each. A <em>worker lane</em> inverts that: one long session receives a whole ordered list of related tasks — plus the files it owns, the files it must not touch, and one liberating instruction: <em>do not stop between tickets to ask permission</em> — and carries each task through every step itself. Six such lanes, written by hand that morning, produce the best delivery day on record: seven tickets carried to verified completion on six dispatches, zero aborted runs, zero rework loops — where the same class of work the previous day took twenty-nine dispatches, four aborts, and seven hours. Two specimens survive the day. The first is that arithmetic. The second is a refusal.</p>
+        <div class="specimen">
+          <div class="specimen-label">Specimen · the refusal rule, as actually dispatched, and its first two invocations</div>
+          <blockquote>"If ANY acceptance criterion is genuinely unmet → do NOT close it. Post a comment naming precisely which criterion is outstanding and what would discharge it, and leave the state alone. A half-met ticket closed is worse than an open one." — The board-truth-up lane (W0) then refused to close LIN-2010 <em>on the operator's own incorrect say-so</em>, posting "verified NOT closable — leaving state as-is"; and another lane returned LIN-1971 to the backlog rather than fabricate a test witness it had no machine to produce.</blockquote>
+        </div>
+        <p>The permanent collection's central law says success must be minted somewhere the worker cannot reach. On 23 August the law cut in a direction nobody had tested: it held against the <em>human</em> — and then resolved the only way it should. Eighty minutes after the refusal, a different lane implemented the genuinely missing work, and the ticket closed honestly at 14:51Z. The refusal was never obstruction; it was the system holding the door until "done" was true.</p>
+        <div class="tl-tags"><span class="chip repo-w">workspace</span><span class="chip ev">LIN-2231–2237 dispatch lineages</span><span class="chip ev">LIN-2010 · LIN-1971</span></div>
+      </li>
+      <li class="tl" data-repo="h">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">23 Aug, same afternoon</div>
+        <h3>The museum's window goes dark — and the wing records itself</h3>
+        <p>The day's one embarrassment is instructive. On the system's best day, its own observation pages showed nothing: they were built to watch the old one-dispatch-per-step world, and the lanes — hand-written that morning — didn't carry the label those pages group work by, while the steps they'd normally render no longer exist as separate dispatches at all. The watching apparatus was built for a way of working the system had outgrown by lunchtime. By evening, three tickets codify the lane pattern, its labelling, and the pages' catch-up — dispatched, in a recursion the project can no longer avoid, as a lane. This entry describes the day on which it was written; the reader should price that in.</p>
+        <div class="tl-tags"><span class="chip repo-h">Harbour</span><span class="chip ev">LIN-2242 · 2243 · 2244</span><span class="chip rd">same-day history</span></div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ============ FIG F ============ -->
+  <figure class="figure reveal" aria-labelledby="figF-t">
+    <p class="fig-eyebrow">Fig. F · The instruments, continued</p>
+    <p class="fig-title" id="figF-t">The seismograph — with a changed needle</p>
+    <p class="fig-sub">Commits per month, extended through 23 August. Read naively, the August bar says the project collapsed. It says the opposite: since July, every merge squashes a whole pull request — an entire agent work-cycle — into a single commit, so one August commit represents what a dozen June commits did. The needle did not slow; it changed units mid-trace, and an honest chart says so rather than letting the reader misread the drop. (Measured at true UTC-midnight month boundaries, these buckets agree with the permanent collection's table exactly for January through May, and differ for July only because that record closed on the 27th.)</p>
+    <div class="fig-legend"><span class="li-h"><i></i>Harbour</span><span class="li-d"><i></i>simple-dispatcher</span></div>
+    <div class="chart-host">
+      <svg viewBox="0 0 640 180" role="img" aria-label="Commits per month, January through 23 August 2026" style="width:100%;height:auto">
+        <g font-family="ui-monospace,monospace" font-size="11" fill="var(--muted)">
+          <text x="46" y="172" text-anchor="middle">Jan</text><text x="120" y="172" text-anchor="middle">Feb</text><text x="194" y="172" text-anchor="middle">Mar</text><text x="268" y="172" text-anchor="middle">Apr</text><text x="342" y="172" text-anchor="middle">May</text><text x="416" y="172" text-anchor="middle">Jun</text><text x="490" y="172" text-anchor="middle">Jul</text><text x="564" y="172" text-anchor="middle">Aug*</text>
+        </g>
+        <g fill="var(--ch-blue)">
+          <rect x="26" y="67" width="26" height="89"/><rect x="100" y="146" width="26" height="10"/><rect x="174" y="117" width="26" height="39"/><rect x="248" y="125" width="26" height="31"/><rect x="322" y="135" width="26" height="21"/><rect x="396" y="35" width="26" height="121"/><rect x="470" y="27" width="26" height="129"/><rect x="544" y="125" width="26" height="31"/>
+        </g>
+        <g fill="var(--ch-amber)">
+          <rect x="130" y="155" width="14" height="1"/><rect x="426" y="133" width="14" height="23"/><rect x="500" y="98" width="14" height="58"/><rect x="574" y="141" width="14" height="15"/>
+        </g>
+        <line x1="20" y1="156" x2="620" y2="156" stroke="var(--ch-grid)"/>
+      </svg>
+    </div>
+    <details><summary>data table</summary><div class="tbl-wrap"><table>
+      <tr><th>2026</th><th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th><th>Jul</th><th>Aug (to 23rd)</th></tr>
+      <tr><td>Harbour</td><td>435</td><td>47</td><td>189</td><td>149</td><td>103</td><td>588</td><td>628</td><td>153</td></tr>
+      <tr><td>dispatcher</td><td>0</td><td>4</td><td>0</td><td>0</td><td>0</td><td>111</td><td>280</td><td>75</td></tr>
+    </table></div></details>
+    <p class="fig-foot">Rule: author date, true UTC-midnight month boundaries (<span style="font-family:var(--mono)">TZ=UTC git log --date=format-local:'%Y-%m'</span>), both repositories at full history; August runs to the 23rd and excludes this wing's own commit. January–May match the permanent collection's table exactly; June differs by a single commit at a boundary. The permanent collection's write-off instrument (Fig. E) is deliberately <em>not</em> recomputed here, because the squash era broke it: code written and discarded inside a single pull request now never reaches the main branch, so August's apparent 5% discard rate measures a different quantity than the historical 20% and comparing them would flatter the swarm. An instrument that breaks honestly is reporting something too.</p>
+  </figure>
+
+  <!-- ============ FIG G ============ -->
+  <figure class="figure reveal" aria-labelledby="figG-t">
+    <p class="fig-eyebrow">Fig. G · The new instrument</p>
+    <p class="fig-title" id="figG-t">The outcome curve</p>
+    <p class="fig-sub">Of every run of work the system dispatched, how many ended in verified success? The permanent collection's Analysis Wing admitted it could only measure volume; this is the instrument it wished for, pointed at outcomes. Four weeks: 63.2%, then 91.0%, 88.7%, and 97.1% — roughly six hundred failed or abandoned runs in the first week collapsing to about a dozen in the last. Total runs also fall fourfold across the same span: fewer, larger, cleaner passes. That is the lane thesis, stated as a curve.</p>
+    <div class="chart-host">
+      <svg viewBox="0 0 640 190" role="img" aria-label="Weekly dispatch success rate, four weeks" style="width:100%;height:auto">
+        <g font-family="ui-monospace,monospace" font-size="11" fill="var(--muted)">
+          <text x="110" y="182" text-anchor="middle">wk of 26 Jul</text><text x="250" y="182" text-anchor="middle">2 Aug</text><text x="390" y="182" text-anchor="middle">9 Aug</text><text x="530" y="182" text-anchor="middle">16 Aug</text>
+        </g>
+        <g fill="var(--ch-blue)">
+          <rect x="70" y="71.5" width="80" height="92.5"/><rect x="210" y="30.9" width="80" height="133.1"/><rect x="350" y="34.3" width="80" height="129.7"/><rect x="490" y="22" width="80" height="142"/>
+        </g>
+        <g font-family="ui-monospace,monospace" font-size="12" fill="var(--ink)" text-anchor="middle">
+          <text x="110" y="65">63.2%</text><text x="250" y="24">91.0%</text><text x="390" y="28">88.7%</text><text x="530" y="16">97.1%</text>
+        </g>
+        <line x1="40" y1="164" x2="600" y2="164" stroke="var(--ch-grid)"/>
+      </svg>
+    </div>
+    <details><summary>data table</summary><div class="tbl-wrap"><table>
+      <tr><th>week starting</th><th>26 Jul</th><th>2 Aug</th><th>9 Aug</th><th>16 Aug</th></tr>
+      <tr><td>resolved runs</td><td>1,630</td><td>722</td><td>434</td><td>420</td></tr>
+      <tr><td>success rate</td><td>63.2%</td><td>91.0%</td><td>88.7%</td><td>97.1%</td></tr>
+    </table></div></details>
+    <p class="fig-foot">Source: the public instrument page's 30-day outcome trend (<span style="font-family:var(--mono)">/kpis</span>, read 2026-08-23T14:54Z). The instrument's four-week window opens on 26 July, two days before the wing's own span — an artifact of its fixed weekly buckets, not a discrepancy. The compiler read this instrument; it did not compute it — a distinction the colophon's rigor map preserves.</p>
+  </figure>
+
+  <!-- ============ THE LEDGER WING ============ -->
+  <section class="gallery reveal">
+    <div class="g-head">
+      <div class="g-num">§</div>
+      <div class="g-title">
+        <h2>The Ledger Wing</h2>
+        <p class="g-dates">Scoring the museum's own confessed debts</p>
+      </div>
+    </div>
+    <p class="g-intro">Why ledgers? Because every number this project can boast — commits, tickets, lines, even the galleries above — is a surface its own agents can produce without limit. The only measurements that could genuinely indict the project are the ones kept outside that loop, and the July colophon named the four it lacked: money spent, hours of one human's attention, users other than the owner, and defects that escaped. Twenty-seven days later, this wing scores each debt. One is substantially paid, two are part-paid, one has not moved — and per the charter's own rule that a report claiming no blind spots is itself a violation, each verdict carries its blind spot in the same breath.</p>
+
+    <ol class="timeline">
+      <li class="tl" data-repo="h">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">Ledger I</div>
+        <h3>Money spent — substantially discharged, caveats printed</h3>
+        <p>The money ledger now exists, and in the house manner it refuses to overclaim. Every task now carries its own cost record (a per-task <span style="font-family:var(--mono)">/cost</span> read, feeding the public card at <span style="font-family:var(--mono)">/kpis</span>); the 30-day card reads $8,596.89 at API rates across 438 verified tasks — <b>$19.63 per task</b> — and a live gauge estimates the current subscription window at 47.2% consumed, 81 hours in, calibrated from Gallery VII's one recorded correlation. The blind spots, printed by the instrument itself: only about half of running work currently reports its spend (so the true figure is higher), 164 task-lineages carry no price at all, and the headline that would matter most — cash the operator actually feels, versus these API-equivalent rates — is still blank awaiting one configuration value. The project's north star was rewritten this month, by the human only, into an explicitly economic promise to match: <em>verified work at a cost a solo operator can sustain — and prove it.</em></p>
+        <div class="tl-tags"><span class="chip ev">/kpis · terminalMarkedTaskCost · weeklyBudgetGauge</span><span class="chip ev">north-star.md v2</span></div>
+      </li>
+      <li class="tl" data-repo="w">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">Ledger II</div>
+        <h3>Hours of human attention — still missing</h3>
+        <p>Nothing measures what this apparatus costs its one human in attention: the mornings spent ruling on parked questions, the reviews, the reading. The <em>concept</em> entered doctrine this month — the north star now names operator minutes the scarce resource, and interruptions-per-verified-task a tracked tax — but no hours ledger exists, and this wing could not compile one honestly. The debt stands, restated in full.</p>
+        <div class="tl-tags"><span class="chip rd">unchanged since July</span></div>
+      </li>
+      <li class="tl" data-repo="h">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">Ledger III</div>
+        <h3>Users other than the owner — partial, and honestly ambiguous</h3>
+        <p>The instance now reports 7 workspaces and 12 users — the July record could name none. But the claim that matters is the north star's stranger test: could someone with no relationship to the operator sign in and reach their first evidence-verified merge, in one sitting, unaided? Whether any of those twelve has done so is recorded nowhere the compiler could read. The number exists; the claim it would need to support does not yet.</p>
+        <div class="tl-tags"><span class="chip ev">/kpis · totals</span></div>
+      </li>
+      <li class="tl" data-repo="w">
+        <span class="tl-marker" aria-hidden="true"></span>
+        <div class="tl-date">Ledger IV</div>
+        <h3>Defects that escaped — partial</h3>
+        <p>The raw material now accumulates: a headwinds review, a capacity test, an efficiency audit, an incidents directory, and the silence incident of 30 July with its fifteen-hour cost stated plainly. What still does not exist is the ledger itself — defects found by someone other than the machine that made them, counted, over time. Honest post-mortems are not yet a defect-escape rate. The instrument is unbuilt.</p>
+        <div class="tl-tags"><span class="chip ev">docs/reviews/ · docs/incidents/ · LIN-1721</span></div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ============ unredeemed ledger ============ -->
+  <div class="exhibit reveal">
+    <p class="ex-label">The unredeemed ledger, restated · 23 August</p>
+    <p class="ex-note">What is still true as the wing closes, checked live on compilation day wherever a live check was possible. <b>LIN-5</b>, the founding object, is still in the backlog — seven and a half months. A session parked waiting on a human still has no automated backstop; the lane-sized version of that risk — one parked lane now strands a whole list of work, not one task — was filed the day this wing was written. In both repositories, a failing test-run still cannot block a merge; whoever merges must actually read the check. The operator's mid-run "do less" lever cannot yet reach a lane at all. One lane's unfinished tail sits locked behind the very file-ownership rule that kept six concurrent lanes from colliding — the model's best safety mechanism and its starvation mode are the same mechanism. And the Collective's write-safety remains, as it was in July, a sentence in a prompt. None of these are redeemed here; they are simply true, again.</p>
+    <div class="tl-tags"><span class="chip ev">LIN-5 · verified 23 Aug</span><span class="chip ev">LIN-2244 · LIN-2242</span><span class="chip ev">LIN-744 · LIN-625</span></div>
+  </div>
+
+  <!-- ============ lexicon ============ -->
+  <section class="cabinet reveal">
+    <div class="cab-head"><h2>Cabinet Two, extended · The Lexicon</h2></div>
+    <p class="cab-intro">August's additions, first attested dates from the wing's sources. The permanent collection observed that a project that names its concepts can steer them; August named eight.</p>
+    <ul class="lex">
+      <li><span class="d">2 Aug</span><div><b>the companion</b> <span>— a conversational supervisor beside the human; narrates, proposes, never edits code</span></div></li>
+      <li><span class="d">3 Aug</span><div><b>passage · leg · voyage · making port</b> <span>— a ratified plan of 2–4 fronts, the flying of it, and its good stopping point</span></div></li>
+      <li><span class="d">22 Aug</span><div><b>silence vs. forgery</b> <span>— the two ways the human's hold on "done" can fail; liveness and authenticity defend the same wire</span></div></li>
+      <li><span class="d">23 Aug</span><div><b>worker lane</b> <span>— one session, an ordered ticket list, the whole pipeline run inside</span></div></li>
+      <li><span class="d">23 Aug</span><div><b>the carve</b> <span>— a lane's owned files and, load-bearingly, its forbidden ones; who-works-on-what and collision-avoidance as one decision</span></div></li>
+      <li><span class="d">23 Aug</span><div><b>the refusal license</b> <span>— standing permission to refuse a close: "a half-met ticket closed is worse than an open one"</span></div></li>
+      <li><span class="d">23 Aug</span><div><b>tail starvation</b> <span>— the unreached remainder of an over-long lane</span></div></li>
+      <li><span class="d">23 Aug</span><div><b>false assignment</b> <span>— a starved ticket that looks owned, and so is never rescued</span></div></li>
+    </ul>
+  </section>
+
+  <!-- ============ parting exhibit ============ -->
+  <div class="exhibit reveal">
+    <p class="ex-label">Parting exhibit · what the wing adds to the one line</p>
+    <p class="ex-note">The permanent collection compressed six months to a single sentence: the machine does the work; the human keeps the two decisions that were never delegable — what is worth doing, and what counts as done. The August Wing adds the corollary its own best day proved: <em>the second decision cuts both ways.</em> When the operator himself said "done" about a ticket that wasn't, the doctrine refused him too — and closed the ticket honestly the same afternoon, once the missing work was actually done. A judge the workers cannot forge is only finished when it cannot be leaned on from above either — and on 23 August, for the first time in the record, it wasn't.</p>
+    <div class="tl-tags"><span class="chip ev">LIN-2010 · W0 dispatch lineage</span></div>
+  </div>
+
+  <!-- ============ colophon ============ -->
+  <section class="colophon reveal">
+    <h2>Colophon &amp; provenance</h2>
+    <p>Compiled 23 August 2026 by a flight-companion session (Claude, Fable 5) for John Kershaw, from four sources: the full git histories of both repositories (2,292 + 470 commits, measured at the last commits before this wing's own), the live workspace read through some fifty audit-logged proxy calls, the public instrument page (<span style="font-family:var(--mono)">/kpis</span>, read 14:54Z), and the compilation day's own dispatch records. The permanent collection at <span style="font-family:var(--mono)">/archive/2</span> is unchanged; this wing is additive.</p>
+    <p>The rigor map, in the house manner. <b>Exact:</b> the commit tables and counts, reproducible with the git commands any reader can run against the stated rule. <b>Read from an instrument:</b> the outcome curve, the cost figures, and the burn gauge — the compiler read them from <span style="font-family:var(--mono)">/kpis</span> and did not recompute them; they inherit that page's own cache and printed caveats. <b>Classified:</b> the lane-day figures, derived from per-task dispatch records the compiler fetched itself and cited in the evidence chips. <b>Curator's reading:</b> every narrative arc, and every sentence wearing the dashed chip.</p>
+    <p>One correction, in the tradition of the colophon before this one: this wing's first draft mis-bucketed the commit table — the measuring command silently placed each month boundary at the compile hour rather than midnight — and an independent checker caught it before publication. The corrected buckets are printed in Fig. F, and they agree with the permanent collection's own table more closely than the erroneous ones did. The error favoured no thesis; it was simply wrong, and now it is simply fixed. A second catch from the same pass: the refusal rule’s specimen was first quoted from its author’s memory of its own prompt; the checker fetched the text actually dispatched, and the wing now prints that instead. Even the author of a rule is not a source for its wording.</p>
+    <p>Two ironies stand, and naming them does not discharge them. The first is inherited: this wing was researched and written by the machines it describes, and the guest asked to score the museum is of the same family as the curator who built it — score this page against something no relative of the compiler wrote. The second is new: the wing's final gallery describes the day on which it was written. History compiled before the day's test-runs have finished is a hazard the permanent collection never ran, and a future edition should check Gallery VIII's claims against how the lane era actually aged — starting with whether the three tickets it closes on were ever verified done, by the very standard they codify.</p>
+    <p class="sig">THE HARBOUR ARCHIVE · THE AUGUST WING · compiled by the flight companion for John Kershaw · sources: JKershaw/LinearViewer · JKershaw/simple-dispatcher · harbour.cat</p>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var els = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window)) { els.forEach(function (e) { e.classList.add('in'); }); return; }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+  }, { rootMargin: '0px 0px -8% 0px' });
+  els.forEach(function (e) { io.observe(e); });
+})();
+</script>
+
+</body>
+</html>
