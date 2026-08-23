@@ -339,8 +339,10 @@ The mechanism is the same push substrate as a subscribed orchestrator above, poi
   affordance, not a straggler to reap. So on the completion axis you close nothing here; you judge and
   advance, independent of any sibling still live in the set.
 
-Two shapes call for this. You **fan the independent children out concurrently** and hold the whole live
-set at your altitude — you do **not** wait for one child to report before dispatching the next:
+Three shapes call for this. For the first two, you **fan the independent children out concurrently**
+and hold the whole live set at your altitude — you do **not** wait for one child to report before
+dispatching the next. The third — a **lane child** — is dispatched differently, described in its own
+bullet below because it isn't a child *autopilot* at all:
 
 - **An epic, or several independent tasks.** You sit above the set and dispatch one child autopilot per
   task, holding only the cross-task altitude while each child carries its own task's context. Dispatch
@@ -361,6 +363,25 @@ set at your altitude — you do **not** wait for one child to report before disp
   capture the `blocks`/`blocked-by` relationship so the dependency is legible, and dispatch a child
   autopilot for it. The bug ticket is itself a single task, so dispatch it `variant: 'stepper'`. Stand by
   for its report, then resume the blocked task once the bug is cleared (or hand back if it can't be).
+- **A lane child — an ordered ticket list better carried by one long-lived session than split across
+  several per-task children.** Distilled from six lane prompts flown concurrently on 2026-08-23 (best
+  delivery day on record) and codified as [`docs/worker-lane-prompt.md`](./worker-lane-prompt.md)
+  (`LIN-2242`) — reach for this shape when a set of tickets is subsystem-disjoint from your other work,
+  ordered (a later ticket's convention may depend on an earlier one landing first), and small enough
+  that one session can reach its own tail inside a reasonable budget window — sizing by **tail
+  reachability**, never by raw ticket count: a long ticket list whose tail never gets touched before the
+  session runs out is worse than a shorter list that actually finishes. Unlike the two shapes above, a
+  lane child is **not** dispatched via `POST /autopilot/kickoff` — it's a plain `kind: 'implementation'`
+  dispatch whose `prompt` is [`buildWorkerLaneKickoff()`](../lib/prompts/worker-lane-kickoff.js)'s body
+  plus the ordered ticket list, so it carries no `variant` and drives its own research → implement →
+  review → close-out loop per ticket **inside one session**, never pausing between tickets to hand back
+  a plan. Stamp a readable `sessionId` on it exactly as you would any other child (your own session id,
+  or a freshly minted one if you're launching several lanes as siblings) so it groups into your
+  Observation session; unlike an issue-bearing child, nothing structurally counts its tickets against
+  your budget no matter how many it touches — see the budget paragraph below for exactly what that means
+  and why it's a known open gap, not settled behavior. Stand by for its run summary the
+  same way you would a stepper child's report; a lane reports once at the end of its list (or on an early
+  wind-down), not once per ticket.
 
 Keep it to that. Nesting the child's branch under yours on the **Observation** page, and children
 *talking* to each other or back to you mid-flight are deliberately **not** built yet — they're filed as
@@ -375,6 +396,19 @@ took on, the same as any other. A child dispatched with no `issueIdentifier` hol
 so it doesn't consume the bound. The bound itself stays at your altitude: it does **not** auto-inherit
 onto the child's own kickoff, so a child you dispatch is unbudgeted unless you deliberately declare its
 own `maxTasks`.
+
+**A lane child's budget accounting is genuinely different, and this is a known, currently-open gap —
+not a design choice to restate as if it were solved.** `LIN-1751`'s task-budget guard
+(`lib/dispatch-factory.js`) enforces `maxTasks` by counting **dispatch rows** carrying a session's
+`sessionId`; a lane works its ticket list **in-session** and issues no such dispatches, so nothing
+structurally counts a lane's tickets against your bound the way an issue-bearing child autopilot's
+single dispatch does, however many tickets the lane actually touches. `LIN-2147`'s graceful-trim
+`PATCH` has the same limit — trimming a lane's bound doesn't stop anything by itself, because there is
+no dispatch-time seam for a lane to be refused at. `docs/worker-lane-prompt.md` requires a lane to
+self-poll its own `maxTasks`/`trimHistory` between tickets and wind down voluntarily, but this is
+self-governance, not enforcement — do not report a lane's budget as bounded the way an issue-bearing
+child's is, and do not trust a trimmed lane to have actually stopped without checking its own reported
+progress.
 
 ## The human's edge, and how to hand back
 
