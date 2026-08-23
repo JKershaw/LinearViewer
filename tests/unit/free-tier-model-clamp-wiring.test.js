@@ -30,6 +30,7 @@ const DISPLAY_ONLY = new Set([
 
 const FILES = [
   'routes/workspace-api.js',
+  'routes/workspace-api-roadmap.js',
   'routes/proxy.js',
   'routes/task-chat.js',
   'routes/next-run.js',
@@ -57,10 +58,11 @@ test('every billed resolveWorkspaceModel / resolveAiOperationModel call threads 
       );
     });
   }
-  // 17 billed sites: workspace-api has 8 (recommend×2 + recap + brief + scan
-  // [LIN-2197 Phase 4] + feedback-title + roadmap-generate + roadmap-chat),
-  // proxy has 5 (recommend + recap×2 + brief×2), task-chat has 1, next-run
-  // has 1 (resolveAiOperationModel), dashboard has 2 (run-summary +
+  // 17 billed sites: workspace-api has 6 (recommend×2 + recap + brief + scan
+  // [LIN-2197 Phase 4] + feedback-title), workspace-api-roadmap has 2
+  // (roadmap-generate + roadmap-chat, moved out of workspace-api.js by
+  // LIN-2246), proxy has 5 (recommend + recap×2 + brief×2), task-chat has 1,
+  // next-run has 1 (resolveAiOperationModel), dashboard has 2 (run-summary +
   // session-summary, both resolveAiOperationModel).
   assert.equal(billedClampCount, 17, `expected 17 clamped billed sites, found ${billedClampCount}`);
 });

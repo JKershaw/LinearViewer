@@ -18,8 +18,21 @@ import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { UserPreferencesStore } from '../../lib/user-preferences.js';
 
+// Descends into mounted sub-routers (e.g. workspace-api.js's roadmap group,
+// LIN-2246) so a route split into a sibling module is still found by path.
+function findRouteLayer(router, method, path) {
+  for (const l of router.stack) {
+    if (l.route?.path === path && l.route.methods[method]) return l;
+    if (l.name === 'router' && l.handle?.stack) {
+      const nested = findRouteLayer(l.handle, method, path);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
 function getHandler(router, method, path) {
-  const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
+  const layer = findRouteLayer(router, method, path);
   assert.ok(layer, `${method.toUpperCase()} ${path} route is registered`);
   return layer.route.stack[layer.route.stack.length - 1].handle;
 }
