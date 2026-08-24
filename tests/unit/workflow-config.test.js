@@ -43,6 +43,8 @@ describe('VIRTUAL_PROMPTS', () => {
     assert.strictEqual(VIRTUAL_PROMPTS.REVIEW, 'review');
     // LIN-550: close-out is a first-class universal step alongside review/retro.
     assert.strictEqual(VIRTUAL_PROMPTS.CLOSE_OUT, 'close-out');
+    // LIN-2261: the post-merge audit verb, distinct from the pre-merge-framed review.
+    assert.strictEqual(VIRTUAL_PROMPTS.RETROSPECTIVE_AUDIT, 'retrospective-audit');
     assert.strictEqual(VIRTUAL_PROMPTS.RETRO, 'retro');
   });
 });

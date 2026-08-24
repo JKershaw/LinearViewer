@@ -306,9 +306,9 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
     for (const kind of Object.keys(PROMPT_TEMPLATES)) {
       assert.match(html, new RegExp(`data-testid="dispatch-default-row-${kind}"`), `missing row for kind "${kind}"`);
     }
-    // 16 live keys today (LIN-1095's own correction: `bug` is easy to omit).
+    // 17 live keys today (LIN-1095's own correction: `bug` is easy to omit; LIN-2261 added retrospective-audit).
     assert.ok('bug' in PROMPT_TEMPLATES);
-    assert.equal(Object.keys(PROMPT_TEMPLATES).length, 16);
+    assert.equal(Object.keys(PROMPT_TEMPLATES).length, 17);
   });
 
   test('renders an autopilot override row (LIN-1278) and populates it from dispatchDefaults.byKind', () => {
@@ -494,7 +494,7 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
   });
 
   describe('per-type overrides progressive disclosure (LIN-1111)', () => {
-    test('collapses the 16 per-kind rows behind a closed <details> when none are configured', () => {
+    test('collapses the 17 per-kind rows behind a closed <details> when none are configured', () => {
       const html = renderSettingsPage('Acme', BASE);
       const detailsIdx = html.indexOf('<details class="dispatch-kind-overrides">');
       assert.ok(detailsIdx > -1, 'expected a closed <details class="dispatch-kind-overrides">');
