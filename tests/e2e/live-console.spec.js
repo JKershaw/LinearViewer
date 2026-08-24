@@ -1627,4 +1627,51 @@ test.describe('Live Console (experimental)', () => {
       await page.unrouteAll({ behavior: 'ignoreErrors' });
     });
   });
+
+  test.describe('Mobile FAB overlap (LIN-2272)', () => {
+    // LIN-2252's `.lc-more { padding-bottom: 3.5rem }` looked like a fix but
+    // measured as a no-op: `.lc-more-btn` is normal-flow and `.feedback-fab`
+    // is `position: fixed`, so bottom padding on an ancestor can never move
+    // the button relative to the VIEWPORT — it only grows the document and
+    // the max scroll offset, leaving the SAME overlap band at the SAME
+    // scroll positions with or without the rule. This spec pins the real
+    // contract: no rect intersection between the two elements at ANY scroll
+    // offset, not just one snapshot position or a computed-style assertion
+    // (a style assertion would have let the LIN-2252 no-op pass).
+    test('the "view earlier activity" control never overlaps the fixed feedback FAB, at any scroll position', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true, feedbackWidget: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+      await page.request.post('/test/seed-agent-status', {
+        data: { urlKey: URL_KEY, taskIdentifier: 'LIN-1', action: 'implementation', status: 'in_progress', summary: 'seed event so "view earlier" renders' },
+      });
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-event"]');
+
+      const moreBtn = page.locator('[data-testid="live-console-more"]');
+      const fab = page.locator('[data-testid="feedback-fab"]');
+      await expect(moreBtn).toBeVisible();
+      await expect(fab).toBeVisible();
+
+      // Sweep every 2px scroll offset (matching the ticket's own measurement
+      // step) and record any offset where the two rects actually intersect.
+      const offendingOffsets = await page.evaluate(() => {
+        const btn = document.querySelector('[data-testid="live-console-more"]');
+        const fabEl = document.querySelector('[data-testid="feedback-fab"]');
+        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        const offending = [];
+        for (let y = 0; y <= maxScroll; y += 2) {
+          window.scrollTo(0, y);
+          const a = btn.getBoundingClientRect();
+          const b = fabEl.getBoundingClientRect();
+          const intersects = a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+          if (intersects) offending.push(y);
+        }
+        return offending;
+      });
+
+      expect(offendingOffsets, `overlapping at scrollY: ${offendingOffsets.join(', ')}`).toEqual([]);
+    });
+  });
 });
