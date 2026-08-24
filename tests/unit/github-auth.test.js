@@ -754,6 +754,47 @@ describe('GitHub auth routes', () => {
     assert.deepEqual(session.workspaces[0].bindings.map(b => b.scope), ['octocat/hello-world', 'octocat/another-repo']);
   });
 
+  // LIN-2267 (class fix of LIN-2233's L2.1, applied to the GitHub sibling):
+  // mode:'new' DOES regenerate the session (unlike add-source above), and
+  // until this fix that regenerate unconditionally wiped session.accountId —
+  // so a session already holding a live account (from an earlier sign-in,
+  // GitHub or otherwise) that then front-doors with a BRAND-NEW GitHub
+  // identity always took the mint branch instead of linking onto the live
+  // account, forking a second account. Mirrors
+  // tests/unit/account-identity.test.js's "L6 test 1 — fork-prevention".
+  test('POST link (new) carries session.accountId across the fixation-preventing regenerate — a brand-new GitHub identity links onto the LIVE account instead of forking a second one (LIN-2267)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+
+    // First front-door login mints account A.
+    const session = makeSession({
+      githubHumanId: 'human-A',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, makeRes());
+    const accountIdAfterA = session.accountId;
+    assert.ok(accountIdAfterA, 'account A minted and carried into the session');
+
+    // Second front-door login, SAME session, a BRAND-NEW GitHub identity
+    // (different human, different installation account) — the live
+    // accountId must survive session.regenerate() and this identity must
+    // link onto it, not mint a second account.
+    session.githubHumanId = 'human-B'
+    session.githubPending = { token: 'gho_token2', mode: 'new', login: 'octofriend', userId: '99', installationId: '88', tokenExpiresAt: '2026-06-25T20:00:00Z' }
+    const res = makeRes();
+    await handler({ body: { repo: 'octofriend/other-repo' }, session }, res);
+
+    assert.equal(res.redirectedTo, '/workspace/octofriend/');
+    assert.strictEqual(session.accountId, accountIdAfterA, 'session.accountId unchanged across the second front-door login — no fork');
+    assert.equal(session.workspaces.length, 2, 'both workspace containers present (existingWorkspaces carried across regenerate too)');
+    const account = await accountStore.getAccount(accountIdAfterA);
+    assert.strictEqual(account.identities.length, 2, 'both GitHub identities attached to the ONE account');
+    assert.ok(account.identities.some(i => i.scope === 'human-A'));
+    assert.ok(account.identities.some(i => i.scope === 'human-B'));
+  });
+
   test('POST link (add-source) links onto the active workspace without creating a new one', async () => {
     const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');

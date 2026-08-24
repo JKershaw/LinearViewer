@@ -391,6 +391,76 @@ describe('LIN-1890 E2 — a Jira-only sign-in lands in a working workspace', () 
 });
 
 // ---------------------------------------------------------------------------
+// LIN-2267 (class fix of LIN-2233's L2.1, applied to the Jira mode:'new'
+// bootstrap): completeJiraNewLogin's regenerate() unconditionally wiped
+// session.accountId (see the stale docblock comment this ticket corrected) —
+// so a session already holding a live account that then front-doors with a
+// BRAND-NEW Jira identity always took the mint branch instead of linking
+// onto the live account, forking a second one. Mirrors
+// tests/unit/account-identity.test.js's "L6 test 1 — fork-prevention" and
+// the sibling GitHub/GitHub Projects coverage added by this same class fix.
+// ---------------------------------------------------------------------------
+
+/**
+ * A fork-DETECTING account store: unlike makeAccountStores() above (whose
+ * createAccount always returns the same fixed 'acct-new' id, so a second
+ * mint would be indistinguishable from the carried id by equality alone),
+ * this mints a genuinely fresh id each call and counts mints — the real
+ * signal this test needs: "was a second account minted at all".
+ */
+function makeForkTrackingAccountStores() {
+  const identities = new Map();
+  const bound = [];
+  let nextId = 1;
+  let createCount = 0;
+  return {
+    bound,
+    createCount: () => createCount,
+    accountStore: {
+      async findAccountByIdentity(provider, scope) {
+        const id = identities.get(`${provider}:${scope}`);
+        return id ? { _id: id } : null;
+      },
+      async createAccount() { createCount++; return { _id: `acct-${nextId++}` }; },
+      async linkIdentity(accountId, provider, scope) { identities.set(`${provider}:${scope}`, accountId); return { ok: true }; },
+      async deleteAccount() { return true; },
+    },
+    accountWorkspaceStore: { async bindAccountToWorkspace(accountId, workspaceId) { bound.push([accountId, workspaceId]); return true; } },
+  };
+}
+
+describe('LIN-2267 — mode:new carries session.accountId across regenerate', () => {
+  test('a brand-new Jira identity arriving in a session that already holds a live account links onto it instead of forking a second one', async () => {
+    const session = jiraOnlySession();
+    const stores = makeForkTrackingAccountStores();
+
+    // First front-door login mints account A.
+    await signInWithJira({ session, stores });
+    const accountIdAfterA = session.accountId;
+    assert.ok(accountIdAfterA);
+    assert.equal(stores.createCount(), 1);
+
+    // Second front-door login, SAME session, a BRAND-NEW Jira identity (a
+    // different human, a different Jira tenant). The live accountId must
+    // survive completeJiraNewLogin's session.regenerate() and this identity
+    // must link onto it, not mint a second account.
+    const OTHER_HUMAN = { accountId: 'other-jira-human-999', emailAddress: 'other.human@example.com', displayName: 'Other Human' };
+    const app2 = makeApp({
+      session, store: makeStore(), provider: fakeProvider(OTHER_HUMAN), stores,
+      fetches: stubs([{ id: 'cid-9', url: 'https://othercorp.atlassian.net', name: 'OtherCorp' }]),
+    });
+    await request(app2, { path: '/auth/jira/oauth?mode=new' });
+    const callback = await request(app2, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(callback.status, 302);
+    assert.strictEqual(session.accountId, accountIdAfterA, 'session.accountId unchanged across the second front-door login — no fork');
+    assert.equal(stores.createCount(), 1, 'createAccount called only once — the second identity LINKED onto the live account, not re-minted');
+    assert.equal(session.workspaces.length, 2, 'two distinct Jira containers, one per human accountId — the first survives the regenerate too');
+    assert.deepEqual(stores.bound.map(([acct]) => acct), [accountIdAfterA, accountIdAfterA], 'both bindings recorded under the SAME account');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // LIN-1890 close-out — review F3: the carried refresh token on the FAILURE
 // exits.
 //

@@ -582,6 +582,47 @@ describe('GitHub Projects auth routes', () => {
     assert.equal(account.identities.length, 1, 'still exactly one identity, not re-minted');
   });
 
+  // LIN-2267 (class fix of LIN-2233's L2.1, applied to the GitHub Projects
+  // sibling): mode:'new' regenerates the session, and until this fix that
+  // regenerate unconditionally wiped session.accountId — so a session
+  // already holding a live account that then front-doors with a BRAND-NEW
+  // GitHub identity always took the mint branch instead of linking onto the
+  // live account, forking a second account. Mirrors
+  // tests/unit/account-identity.test.js's "L6 test 1 — fork-prevention" and
+  // tests/unit/github-auth.test.js's sibling GitHub Issues coverage.
+  test('POST link (new) carries session.accountId across the fixation-preventing regenerate — a brand-new GitHub identity links onto the LIVE account instead of forking a second one (LIN-2267)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+
+    // First front-door login mints account A.
+    const session = makeSession({
+      githubHumanId: 'human-A',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    await handler({ body: { board: 'octocat/5' }, session }, makeRes());
+    const accountIdAfterA = session.accountId;
+    assert.ok(accountIdAfterA, 'account A minted and carried into the session');
+
+    // Second front-door login, SAME session, a BRAND-NEW GitHub identity
+    // (different human, different installation account) — the live
+    // accountId must survive session.regenerate() and this identity must
+    // link onto it, not mint a second account.
+    session.githubHumanId = 'human-B'
+    session.githubProjectsPending = { token: 'ghs_inst2', mode: 'new', login: 'octofriend', userId: '99', installationId: '88', tokenExpiresAt: '2026-06-25T20:00:00Z' }
+    const res = makeRes();
+    await handler({ body: { board: 'octofriend/7' }, session }, res);
+
+    assert.equal(res.redirectedTo, '/workspace/octofriend/');
+    assert.strictEqual(session.accountId, accountIdAfterA, 'session.accountId unchanged across the second front-door login — no fork');
+    assert.equal(session.workspaces.length, 2, 'both workspace containers present (existingWorkspaces carried across regenerate too)');
+    const account = await accountStore.getAccount(accountIdAfterA);
+    assert.strictEqual(account.identities.length, 2, 'both GitHub identities attached to the ONE account');
+    assert.ok(account.identities.some(i => i.scope === 'human-A'));
+    assert.ok(account.identities.some(i => i.scope === 'human-B'));
+  });
+
   // Mirrors tests/unit/github-auth.test.js's add-source conflict test — the
   // GitHub Projects half of the LIN-1329 review's finding 2 (the auth-route.test.js
   // note claims this file's add-source mode covers the conflict branch).

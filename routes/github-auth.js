@@ -471,6 +471,15 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
       // Preserve existing workspaces across the fixation-preventing regenerate
       // (mirrors the Linear callback).
       const existingWorkspaces = req.session.workspaces || []
+      // LIN-2267 (class fix of LIN-2233's L2.1): carry session.accountId and its
+      // freshness stamp across regenerate() exactly as session.workspaces already
+      // is. Without this, a NEW GitHub identity arriving while a different
+      // account was live in the pre-regenerate session always took the mint
+      // branch instead of the link/conflict branch below, because
+      // session.accountId was gone by the time establishAccount ran —
+      // mirrors the fix applied to routes/auth.js's Linear callback.
+      const existingAccountId = req.session.accountId
+      const existingIdentityAuthenticatedAt = req.session.identityAuthenticatedAt
       // Awaited (LIN-1329): establishAccount below does real async I/O, so the
       // handler must not resolve before the callback finishes — regenerate()
       // itself doesn't await its callback, so without this wrapper the response
@@ -485,10 +494,18 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
               }))
             }
             req.session.workspaces = existingWorkspaces
+            // LIN-2267: restore the carried accountId/freshness stamp BEFORE
+            // establishAccount runs below, so a returning identity (or a
+            // brand-new one arriving while this account is live) resolves
+            // against the account that was actually live pre-regenerate, not
+            // against nothing.
+            req.session.accountId = existingAccountId
+            req.session.identityAuthenticatedAt = existingIdentityAuthenticatedAt
 
-            // LIN-1329 (Phase C): regenerate() just wiped session.accountId (if
-            // any), so a returning user's existing account is found by identity
-            // lookup, not session continuity — same as the Linear OAuth callback.
+            // LIN-1329 (Phase C): find-or-create the durable account for this
+            // identity — a returning user's existing account is found by
+            // identity lookup even with no live session.accountId, same as
+            // the Linear OAuth callback.
             try {
               upsertWorkspace(req.session, workspace)
             } catch (limitError) {

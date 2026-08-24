@@ -581,10 +581,13 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
    * tenant instead — see {@link deriveJiraUrlKey}.
    *
    * `regenerate()` is the session-fixation defence every fresh-login path runs.
-   * It wipes the session, which is why `existingWorkspaces` is captured BEFORE
-   * it and restored after (a user adding Jira as a second identity must not lose
-   * their other workspaces), why `establishAccount` re-resolves the account by
-   * IDENTITY rather than session continuity, and why preferences are rehydrated
+   * It wipes the session, which is why `existingWorkspaces` — and, since
+   * LIN-2267, `accountId`/`identityAuthenticatedAt` — are captured BEFORE it
+   * and restored after (a user adding Jira as a second identity must not lose
+   * their other workspaces, nor fork a second account from the live one),
+   * why `establishAccount` re-resolves the account by IDENTITY (falling back
+   * to the restored `session.accountId` when the identity itself is new)
+   * rather than session continuity alone, and why preferences are rehydrated
    * afterwards rather than assumed to have survived.
    */
   async function completeJiraNewLogin(req, res, site, myself, refreshToken) {
@@ -656,6 +659,15 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     linkProvider(workspace, 'jira', site.url, credentials)
 
     const existingWorkspaces = req.session.workspaces || []
+    // LIN-2267 (class fix of LIN-2233's L2.1): carry session.accountId and its
+    // freshness stamp across regenerate() exactly as existingWorkspaces already
+    // is. Without this, a NEW Jira identity arriving while a different account
+    // was live in the pre-regenerate session always took the mint branch
+    // instead of the link/conflict branch below, because session.accountId was
+    // gone by the time establishAccount ran — mirrors the fix applied to
+    // routes/auth.js's Linear callback.
+    const existingAccountId = req.session.accountId
+    const existingIdentityAuthenticatedAt = req.session.identityAuthenticatedAt
     // Awaited for the same reason github-auth.js awaits it: regenerate() does
     // not await its own callback, so without this the handler could resolve
     // before the async account/preference work inside it finished.
@@ -678,6 +690,13 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
                 }))
               }
               req.session.workspaces = existingWorkspaces
+              // LIN-2267: restore the carried accountId/freshness stamp BEFORE
+              // establishAccount runs below, so a returning identity (or a
+              // brand-new one arriving while this account is live) resolves
+              // against the account that was actually live pre-regenerate,
+              // not against nothing.
+              req.session.accountId = existingAccountId
+              req.session.identityAuthenticatedAt = existingIdentityAuthenticatedAt
 
               try {
                 upsertWorkspace(req.session, workspace)
