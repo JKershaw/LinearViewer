@@ -301,6 +301,79 @@ describe('observer-efficacy-signal: computeIncumbentSignal (LIN-2133)', () => {
     assert.strictEqual(row.timeToRespondMs, null);
     assert.strictEqual(row.resolved, false);
   });
+
+  // LIN-2263 (F1, review R1): real live shape (dispatch `5ac0084e`, verbatim
+  // from the review) — a [blocked] boundary, its [usage] bookkeeping write,
+  // then the runner's OWN stall-failsafe self-check re-asking itself
+  // ("[working · verifying] Confirming completion…", kind:'status' — the
+  // SAME kind a genuine wake marker carries), and finally a REPEATED
+  // [blocked] with nothing external in between. The old kind-only allowlist
+  // measured the self-check entry as "the response" (a false ~7-minute
+  // gap); this must report no response at all — the loop is genuinely still
+  // waiting, exactly as the live session was.
+  test('[blocked] -> [usage] -> runner stall-failsafe self-check ([working · verifying], kind:status) -> repeated [blocked]: no response measured', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        status: 'taken',
+        feedback: [
+          { kind: 'status', message: "[blocked] LIN-2218's deliverable is merged and CI-green", timestamp: '2026-08-22T22:56:18.258Z' },
+          { kind: 'usage', message: '[usage] {"schema":1,"harness":"claude-code","inputTokens":100,"outputTokens":50}', timestamp: '2026-08-22T22:56:18.671Z' },
+          { kind: 'status', message: '[working · verifying] Confirming completion — asked the agent to declare DONE or PENDING...', timestamp: '2026-08-22T23:03:27.326Z' },
+          { kind: 'status', message: '[blocked] LIN-2218 still needs review', timestamp: '2026-08-22T23:03:28.000Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const [row] = computeIncumbentSignal(loops).perLoop;
+    assert.strictEqual(row.respondedAt, null, 'the stall-failsafe self-check and the repeated [blocked] are both runner self-talk, not a response');
+    assert.strictEqual(row.timeToRespondMs, null, 'must not report the runner\'s own ~7-minute stall interval as a response time');
+    assert.strictEqual(row.resolved, false, 'the loop is genuinely still blocked, unresolved');
+  });
+
+  // LIN-2263 (F1, review R1): the OTHER live self-talk shape — an in-place
+  // resume/refire status ("[working] Session resumed…", kind:'status',
+  // hook.js's RESUMING branch) — must not be mistaken for a response either,
+  // whether or not it is followed by a real one.
+  test('[blocked] -> runner resume self-talk ([working] Session resumed, kind:status) -> a real decision-answer: lands on the real response', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        feedback: [
+          { kind: 'status', message: '[blocked] need a decision', timestamp: '2026-04-11T11:10:00.000Z' },
+          { kind: 'status', message: '[working] Session resumed. Re-confirming completion state...', timestamp: '2026-04-11T11:11:00.000Z' },
+          { kind: 'decision-answer', message: 'proceed with option B', timestamp: '2026-04-11T11:30:00.000Z' },
+          { kind: 'status', message: '[done] shipped', timestamp: '2026-04-11T11:31:00.000Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const [row] = computeIncumbentSignal(loops).perLoop;
+    assert.strictEqual(row.respondedAt, '2026-04-11T11:30:00.000Z', 'must skip the resume self-talk and land on the real decision-answer');
+    assert.strictEqual(row.timeToRespondMs, 20 * 60 * 1000);
+    assert.strictEqual(row.resolved, true);
+  });
+
+  // LIN-2263 (review R2): heartbeat (kind:'heartbeat', reapers.js's
+  // runHeartbeats — the single most common kind on live data per the
+  // review) and resource sampling (kind:'resources', RESOURCE_RELAY) must
+  // be skipped the same structural way as usage/tool, not left to rest on
+  // the ACTIVE_PHASES invariant alone.
+  test('a blocked loop whose only later entries are [heartbeat]/[resources] bookkeeping reports no response yet', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        status: 'taken',
+        feedback: [
+          { kind: 'status', message: '[blocked] need a decision', timestamp: '2026-04-11T11:10:00.000Z' },
+          { kind: 'heartbeat', message: '[working] still going', timestamp: '2026-04-11T11:11:00.000Z' },
+          { kind: 'resources', message: '[resources] {"cpu":1,"memMb":200}', timestamp: '2026-04-11T11:12:00.000Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const [row] = computeIncumbentSignal(loops).perLoop;
+    assert.strictEqual(row.respondedAt, null, 'heartbeat/resources are runner bookkeeping — no real response has landed');
+    assert.strictEqual(row.timeToRespondMs, null);
+    assert.strictEqual(row.resolved, false);
+  });
 });
 
 // ─── C. compareArms ──────────────────────────────────────────────────────────
@@ -318,6 +391,10 @@ describe('observer-efficacy-signal: compareArms', () => {
     // LIN-2263: residue that remains after the F1/F2 fixes must still be named.
     assert.ok(bundle.caveats.some((c) => /truncated/i.test(c) && /retention cap/i.test(c)), 'the truncation residue (F2) must be named in the caveat list');
     assert.ok(bundle.caveats.some((c) => /runner-emitted bookkeeping/i.test(c)), 'the incumbent-arm caveat must reflect the F1 fix (bookkeeping entries are skipped, not "the next entry")');
+    // LIN-2263 review R1: the caveat must also name the self-talk residue —
+    // a status-kind entry is only a response when it carries a genuine
+    // state-change marker, not a fabricated "we catch everything" claim.
+    assert.ok(bundle.caveats.some((c) => /self-talk/i.test(c) && /repeated \[blocked\]/i.test(c)), 'the caveat must name the R1 self-talk/repeated-[blocked] residue, not overclaim completeness');
   });
 });
 
