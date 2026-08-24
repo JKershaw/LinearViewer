@@ -302,16 +302,19 @@ describe('observer-efficacy-signal: computeIncumbentSignal (LIN-2133)', () => {
     assert.strictEqual(row.resolved, false);
   });
 
-  // LIN-2263 (F1, review R1): real live shape (dispatch `5ac0084e`, verbatim
-  // from the review) — a [blocked] boundary, its [usage] bookkeeping write,
-  // then the runner's OWN stall-failsafe self-check re-asking itself
-  // ("[working · verifying] Confirming completion…", kind:'status' — the
-  // SAME kind a genuine wake marker carries), and finally a REPEATED
-  // [blocked] with nothing external in between. The old kind-only allowlist
-  // measured the self-check entry as "the response" (a false ~7-minute
-  // gap); this must report no response at all — the loop is genuinely still
-  // waiting, exactly as the live session was.
-  test('[blocked] -> [usage] -> runner stall-failsafe self-check ([working · verifying], kind:status) -> repeated [blocked]: no response measured', () => {
+  // LIN-2263 (F1, review R1 -> re-review R1′): the real, VERBATIM stored
+  // sequence for dispatch `001164ac` (same lineage the first review cited
+  // as `5ac0084e` — identical `22:56:18.258`/`23:03:27.326` timestamps;
+  // entries 75-81 off the workspace proxy). The R1 fix landed with a
+  // TRIMMED 4-row fixture (75, 76, 77, 81) that omitted entries 78-80 — the
+  // very entries that defeat it: a second [usage] write, a [heartbeat], and
+  // finally the agent's own `assistant-text` self-check ANSWER, all still
+  // self-activity between the runner's stall-failsafe re-ask and the loop's
+  // next genuine [blocked]. Running the R1-only fix against this full array
+  // measured `timeToRespondMs: 455768` (7m36s) on entry 80 — nobody
+  // external responded; entry 81 just re-declares [blocked] and the loop
+  // stayed genuinely blocked. This fixture must not be trimmed again.
+  test('[blocked] -> [usage] -> runner self-check ([working · verifying], kind:status) -> [usage] -> [heartbeat] -> agent self-check answer (kind:assistant-text) -> repeated [blocked]: no response measured (verbatim 001164ac)', () => {
     const loops = _buildLoops({
       historyItems: [historyItem({
         status: 'taken',
@@ -319,15 +322,42 @@ describe('observer-efficacy-signal: computeIncumbentSignal (LIN-2133)', () => {
           { kind: 'status', message: "[blocked] LIN-2218's deliverable is merged and CI-green", timestamp: '2026-08-22T22:56:18.258Z' },
           { kind: 'usage', message: '[usage] {"schema":1,"harness":"claude-code","inputTokens":100,"outputTokens":50}', timestamp: '2026-08-22T22:56:18.671Z' },
           { kind: 'status', message: '[working · verifying] Confirming completion — asked the agent to declare DONE or PENDING...', timestamp: '2026-08-22T23:03:27.326Z' },
-          { kind: 'status', message: '[blocked] LIN-2218 still needs review', timestamp: '2026-08-22T23:03:28.000Z' }
+          { kind: 'usage', message: '[usage] {"schema":1,"harness":"claude-code","inputTokens":120,"outputTokens":60}', timestamp: '2026-08-22T23:03:27.715Z' },
+          { kind: 'heartbeat', message: '[working · running] 8 tools in 10m 2s', timestamp: '2026-08-22T23:03:40.844Z' },
+          { kind: 'assistant-text', message: 'Re-checked rather than recalled: proxy still 503 WORKSPACE_OWNER_MISMATCH, LIN-2218 is not actually mergeable yet.', timestamp: '2026-08-22T23:03:54.026Z' },
+          { kind: 'status', message: "[blocked] LIN-2218's witness is merged but the deliverable PR is not", timestamp: '2026-08-22T23:03:54.364Z' }
         ]
       })],
       now: NOW, lean: false
     });
     const [row] = computeIncumbentSignal(loops).perLoop;
-    assert.strictEqual(row.respondedAt, null, 'the stall-failsafe self-check and the repeated [blocked] are both runner self-talk, not a response');
-    assert.strictEqual(row.timeToRespondMs, null, 'must not report the runner\'s own ~7-minute stall interval as a response time');
+    assert.strictEqual(row.respondedAt, null, 'the self-check, its bookkeeping trailer, the agent\'s own assistant-text answer, and the repeated [blocked] are all self-activity, not a response');
+    assert.strictEqual(row.timeToRespondMs, null, 'must not report the agent\'s own ~7m36s self-check answer as a response time (R1′)');
     assert.strictEqual(row.resolved, false, 'the loop is genuinely still blocked, unresolved');
+  });
+
+  // LIN-2263 (review R1′): the sharpest live case — the runner's onboarding
+  // failsafe re-ask, relayed back to itself as `kind: 'assistant-text'`
+  // (dispatch `861aeeb2`/`e431c0e2`, hook.js's `postTurnText`, labelled
+  // precisely so a feedback-channel consumer does not mistake prep-phase
+  // output for real work). Before this fix this measured `timeToRespondMs:
+  // 8468138` (2h21m) — the reaper's own stall/resume backstop interval, not
+  // an efficacy measurement.
+  test('[blocked] -> runner onboarding failsafe re-ask (kind:assistant-text): no response measured', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        status: 'taken',
+        feedback: [
+          { kind: 'status', message: '[blocked] waiting on a decision before onboarding can continue', timestamp: '2026-08-22T09:00:00.000Z' },
+          { kind: 'assistant-text', message: '[onboarding] Failsafe re-ask — prep step, not task work:\nready', timestamp: '2026-08-22T11:21:18.138Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const [row] = computeIncumbentSignal(loops).perLoop;
+    assert.strictEqual(row.respondedAt, null, 'the onboarding failsafe re-ask is the runner relaying its own agent\'s prep output, not an external response');
+    assert.strictEqual(row.timeToRespondMs, null, 'must not report the reaper\'s own ~2h21m stall/resume interval as a response time');
+    assert.strictEqual(row.resolved, false);
   });
 
   // LIN-2263 (F1, review R1): the OTHER live self-talk shape — an in-place
@@ -446,6 +476,27 @@ describe('observer-efficacy-signal: collectNewHarnessSignal / collectIncumbentSi
 
     assert.strictEqual(result.count, 1);
     assert.strictEqual(result.perLoop[0].resolved, true);
+  });
+
+  // LIN-2263 (F2, re-review ledger item 3): drive the REAL pruning path —
+  // write past a small maxPerWorkspace via recordActions (triggering
+  // _pruneToCapacity), then read truncated through collectNewHarnessSignal
+  // — rather than only injecting `capacity` at the computeNewHarnessSignal
+  // level, which proves the detector's arithmetic but not that eviction
+  // actually happened upstream of it.
+  test('truncated is true through collectNewHarnessSignal after recordActions actually prunes the workspace past capacity', async () => {
+    const db = client.db(`eff_${dbCounter++}`);
+    const observerShadowLogStore = new ObserverShadowLogStore({ collection: db.collection('observer-shadow-log'), maxPerWorkspace: 3 });
+    const urlKey = `ws-${randomUUID()}`;
+
+    for (let i = 0; i < 5; i++) {
+      const action = computeWouldBeAction(attentionRow({ loopId: `loop-${i}`, since: '2026-08-20T10:00:00.000Z' }));
+      await observerShadowLogStore.recordActions(urlKey, [action], new Date(`2026-08-20T10:0${i}:00.000Z`));
+    }
+
+    const result = await collectNewHarnessSignal(urlKey, { observerShadowLogStore });
+    assert.strictEqual(result.count, 3, 'only the newest 3 loops survived _pruneToCapacity');
+    assert.strictEqual(result.truncated, true, 'the store actually evicted rows — truncated must be true, not just constructible from an injected capacity');
   });
 
   function forbiddenProxy(target, allowedMethods, label) {
