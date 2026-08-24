@@ -16,10 +16,19 @@
  *   D. Growth/retention cap — per-workspace count cap, matching P1-2's
  *      (lib/observer-state-store.js) retention pattern per this ticket's own
  *      acceptance criteria.
- *   E. Negative/spy — this module's write path never reaches
- *      AgentStatusStore#recordStatus, DispatchQueueStore#addFeedback, or
- *      createComment (lib/providers/linear/index.js), same shape as P1-3's
- *      own no-auto-resume negative test (tests/unit/observer-sweep.test.js).
+ *   E. Static call-site assertion — this module's OWN source never calls
+ *      .recordStatus(/.addFeedback(/.createComment( (LIN-2274: replaces a
+ *      prior negative/spy test that wrapped AgentStatusStore/DispatchQueueStore/
+ *      a fake Linear provider in forbidding Proxies but never passed them into
+ *      computeWouldBeActions or recordActions — neither function takes those
+ *      as arguments, so the Proxies were unreachable by construction and the
+ *      test passed regardless of what the module actually did. The genuine
+ *      integration-level guarantee — that sweepOneWorkspace, which DOES hold
+ *      live dispatchStore/agentStatusStore references, never lets the shadow
+ *      log's presence touch them beyond their existing read calls — is
+ *      already pinned by tests/unit/observer-sweep.test.js's "LIN-2132:
+ *      sweepOneWorkspace, given deps.observerShadowLogStore, writes ONLY to
+ *      that store" test in its own negative-capability suite.
  *   F. Static import assertion — this module imports nothing beyond `crypto`.
  */
 import { test, describe } from 'node:test';
@@ -34,8 +43,6 @@ import {
   RETENTION_IDLE_MS
 } from '../../lib/observer-shadow-log.js';
 import { isWakeEvent, findWakeEvent } from '../../lib/dispatch-terminal.js';
-import { AgentStatusStore } from '../../lib/agent-status-store.js';
-import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 
 // Minimal in-memory mock of the collection surface the store uses —
 // precedent: tests/unit/task-snapshot-store.test.js's createMockCollection.
@@ -235,49 +242,35 @@ describe('observer-shadow-log: ObserverShadowLogStore', () => {
   });
 });
 
-// ─── E. Negative/spy — no live-pipeline write is reachable ──────────────────
+// ─── E. Static call-site assertion — no live-pipeline write is reachable ────
 
 describe('observer-shadow-log: negative capability — no live-pipeline write is reachable (LIN-2132 P1 invariant)', () => {
-  function forbiddenProxy(target, allowedMethods, label) {
-    return new Proxy(target, {
-      get(obj, prop, receiver) {
-        if (typeof prop === 'symbol' || prop === 'then') return Reflect.get(obj, prop, receiver);
-        if (allowedMethods.includes(prop)) {
-          const value = Reflect.get(obj, prop, receiver);
-          return typeof value === 'function' ? value.bind(obj) : value;
-        }
-        throw new Error(`forbidden intervention path: ${label}.${String(prop)}`);
-      }
-    });
-  }
+  test('lib/observer-shadow-log.js source contains no .recordStatus(/.addFeedback(/.createComment( call site', () => {
+    // LIN-2274: a prior version of this test wrapped AgentStatusStore/
+    // DispatchQueueStore/a fake Linear provider in Proxies that throw on any
+    // access, then called computeWouldBeActions(payload) and
+    // shadowStore.recordActions(...) — neither of which takes those stores
+    // as arguments, so the Proxies were never reachable and the test passed
+    // for a reason unrelated to what it asserted (proven: deleting the
+    // Proxies, or handing computeWouldBeActions a version that DID call
+    // .recordStatus/.addFeedback/.createComment on freshly-imported store
+    // instances, left this test green either way). A static scan of the
+    // module's own source is what can actually go red on that mutation.
+    const modulePath = fileURLToPath(new URL('../../lib/observer-shadow-log.js', import.meta.url));
+    const src = readFileSync(modulePath, 'utf8');
+    for (const forbidden of ['.recordStatus(', '.addFeedback(', '.createComment(']) {
+      assert.ok(!src.includes(forbidden), `lib/observer-shadow-log.js must never call ${forbidden} — found a call site`);
+    }
+  });
 
-  test('computeWouldBeActions + ObserverShadowLogStore#recordActions never touch AgentStatusStore#recordStatus or DispatchQueueStore#addFeedback', async () => {
-    // Real store instances, but with EVERY method forbidden except the ones
-    // this module's own header claims it never calls — proves it by
-    // construction rather than by inspection.
-    const agentStatusStore = forbiddenProxy(new AgentStatusStore({ collection: createMockCollection() }), [], 'agentStatusStore');
-    const dispatchStore = forbiddenProxy(new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() }), [], 'dispatchStore');
-    // A fake Linear provider surface — createComment is forbidden entirely.
-    const linearProvider = forbiddenProxy({ createComment: async () => { throw new Error('should never be called'); } }, [], 'linearProvider');
-
+  test('computeWouldBeActions/recordActions still perform the real, intended write (sanity — the guard above is not vacuous either)', async () => {
     const payload = {
       attention: [attentionRow({ loopId: 'x' }), attentionRow({ loopId: 'y', lane: 'silent' })]
     };
     const shadowStore = new ObserverShadowLogStore({ collection: createMockCollection() });
-
-    // The full P1-5 write path, run with the live-pipeline surfaces present
-    // in scope but wired to throw on ANY access — if computeWouldBeActions
-    // or recordActions ever reached toward them, this test fails loudly.
     const actions = computeWouldBeActions(payload);
     const count = await shadowStore.recordActions('ws', actions, new Date());
-
     assert.strictEqual(count, 1, 'only the blocked row produced a shadow entry');
-    // No assertion needed on agentStatusStore/dispatchStore/linearProvider —
-    // the forbiddenProxy above throws synchronously on first access; reaching
-    // this line at all is the proof none were touched.
-    void agentStatusStore;
-    void dispatchStore;
-    void linearProvider;
   });
 });
 
