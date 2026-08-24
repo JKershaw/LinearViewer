@@ -722,12 +722,75 @@ describe('render-session: collapsed-run waiting flag (LIN-1163 item 5)', () => {
     assert.match(html, /data-testid="session-run-waiting-flag"/);
   });
 
-  test('a non-terminal run whose last feedback entry is [pending] renders the waiting flag', () => {
+  // LIN-2264: [pending] is an agent-to-agent orchestrator handoff (LIN-1025/
+  // LIN-843), not a request for user input — it must NOT set this flag. This
+  // used to assert the opposite (matching the old positional last-entry read,
+  // which treated [blocked]/[pending] alike); the semantic-scan fix aligns
+  // `runIsWaiting` with `routes/dashboard.js`'s `loopIsWaiting`, whose
+  // `WAITING_WAKE_MARKERS` set is `{'blocked'}` only.
+  test('a non-terminal run whose last feedback entry is [pending] does NOT render the waiting flag', () => {
     const session = fixtureSession();
     session.loops[0].terminalStatus = null;
     session.loops[0].feedback = [{ message: '[pending] stepper beat done', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:00.000Z' }];
     const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('data-testid="session-run-waiting-flag"'));
+  });
+
+  // LIN-2264: the actual production defect. Simple Dispatcher posts a
+  // `[usage]` bookkeeping entry at the same Stop boundary immediately after a
+  // `[blocked]` status entry (postUsageSnapshot, hook.js), so on real data
+  // EVERY blocked run's literal last feedback entry is `[usage]`, not
+  // `[blocked]` — measured 19/19 in production. The old positional last-entry
+  // read only skipped `decision-answer` entries, so it never found the
+  // `[blocked]` marker here and this flag was effectively dead. The semantic
+  // scan (`findWakeEvent`/`wakeMarker`) finds the LAST *wake* marker
+  // regardless of trailing non-wake bookkeeping.
+  test('LIN-2264: a trailing [usage] entry after [blocked] still renders the waiting flag', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null;
+    session.loops[0].feedback = [
+      { kind: 'status', message: '[blocked] need a decision', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:00.000Z' },
+      { kind: 'usage', message: '[usage] 12,345 tokens', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:01.000Z' }
+    ];
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
     assert.match(html, /data-testid="session-run-waiting-flag"/);
+  });
+
+  // LIN-2264: robust the OTHER direction too — a genuine later wake/terminal
+  // marker (here a resume that runs to completion) must still clear the flag,
+  // proving this isn't just "always true once [blocked] ever appeared".
+  test('LIN-2264: a [blocked] run is no longer waiting once a later real wake marker supersedes it', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null;
+    session.loops[0].feedback = [
+      { kind: 'status', message: '[blocked] need a decision', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:00.000Z' },
+      { kind: 'status', message: '[working] Resumed session', url: null, urlLabel: null, timestamp: '2026-07-04T10:02:00.000Z' },
+      { kind: 'status', message: '[pending] stepper beat done', url: null, urlLabel: null, timestamp: '2026-07-04T10:03:00.000Z' }
+    ];
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('data-testid="session-run-waiting-flag"'));
+  });
+
+  // LIN-2264: prefers the build-time `loop.wakeMarker` (baked by
+  // `lib/pipeline-loops.js`'s `_buildLoops`, present on lean and non-lean
+  // loops alike) over re-scanning `feedback[]`, exactly like
+  // `routes/dashboard.js`'s `loopIsWaiting` — so a lean loop (feedback
+  // dropped) still renders correctly, and a loop's baked verdict is trusted
+  // over stale raw feedback shape.
+  test('LIN-2264: prefers the build-time wakeMarker over re-scanning feedback when present', () => {
+    const waitingSession = fixtureSession();
+    waitingSession.loops[0].terminalStatus = null;
+    waitingSession.loops[0].wakeMarker = 'blocked';
+    waitingSession.loops[0].feedback = [];
+    const waitingHtml = renderSessionPage({ session: waitingSession, urlKey: 'ws-a', issueContext: [] });
+    assert.match(waitingHtml, /data-testid="session-run-waiting-flag"/, 'wakeMarker: blocked renders even with empty feedback[]');
+
+    const doneSession = fixtureSession();
+    doneSession.loops[0].terminalStatus = null;
+    doneSession.loops[0].wakeMarker = 'done';
+    doneSession.loops[0].feedback = [{ message: '[blocked] stale, superseded by the baked wakeMarker', url: null, urlLabel: null, timestamp: '2026-07-04T10:01:00.000Z' }];
+    const doneHtml = renderSessionPage({ session: doneSession, urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!doneHtml.includes('data-testid="session-run-waiting-flag"'), 'wakeMarker: done wins over a stale [blocked] in raw feedback');
   });
 
   test('LIN-2244: a run currently parked on an async wait renders a THIRD, distinct flag — not the waiting-for-input one', () => {
@@ -754,7 +817,15 @@ describe('render-session: collapsed-run waiting flag (LIN-1163 item 5)', () => {
     assert.ok(!html.includes('data-testid="session-run-parked-flag"'));
   });
 
-  test('a run whose [blocked] entry is NOT the last one does not render the flag', () => {
+  // LIN-2264: this used to assert the flag stays OFF here — a symptom of the
+  // very bug this ticket fixes. A trailing non-wake entry (a bare status note,
+  // exactly like the real `[usage]` bookkeeping entry) must NOT hide an
+  // earlier `[blocked]` that nothing has actually superseded: `findWakeEvent`
+  // scans backward past it and still finds `[blocked]` as the last WAKE
+  // marker, matching `routes/dashboard.js`'s `loopIsWaiting` on the same
+  // shape. Only a later marker that is ITSELF a wake event (see the
+  // "superseded by a later real wake marker" test above) clears the flag.
+  test('a [blocked] entry followed by a trailing non-wake entry still renders the flag', () => {
     const session = fixtureSession();
     session.loops[0].terminalStatus = null;
     session.loops[0].feedback = [
@@ -762,7 +833,7 @@ describe('render-session: collapsed-run waiting flag (LIN-1163 item 5)', () => {
       { message: 'human replied, back to work', url: null, urlLabel: null, timestamp: '2026-07-04T10:02:00.000Z' }
     ];
     const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
-    assert.ok(!html.includes('data-testid="session-run-waiting-flag"'));
+    assert.match(html, /data-testid="session-run-waiting-flag"/);
   });
 
   test('a TERMINAL run does not render the flag even if its last entry looks like [blocked]', () => {
