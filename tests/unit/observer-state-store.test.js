@@ -618,11 +618,33 @@ describe('observer-state-store', () => {
     constructor(n) { this.n = n; }
   }
 
+  // LIN-2274: `Widget` above has a real ENUMERABLE own property (`n`), so
+  // `canonicalizeForHash`'s generic `own = {...Object.keys(value)}` walk
+  // (lib/observer-state-store.js:239-240) already distinguishes the two
+  // instances on its own, BEFORE the class-instance fallback branch
+  // (`proto !== Object.prototype` at :242) ever runs its `{__type, __own,
+  // __str}` wrap. Proven: deleting that whole fallback branch (falling
+  // through to the bare `return own` at :258) still leaves 27/27 green,
+  // because `own` alone already differs for `Widget(1)` vs `Widget(2)` — the
+  // Widget row above pins OS18's own claim ("a class-instance-only change
+  // advances"), but does NOT pin the fallback branch specifically. The row
+  // below does: state is held ONLY in a private field (no enumerable own
+  // properties at all — `own` is `{}` for both instances either way), so the
+  // two instances can only be told apart via the fallback's `String(value)`
+  // coercion — exactly the "OR a meaningfully-overridden toString()" half of
+  // the module header's own claim.
+  class PrivateFieldWidget {
+    #n;
+    constructor(n) { this.#n = n; }
+    toString() { return `PrivateFieldWidget(${this.#n})`; }
+  }
+
   const OS18_CASES = [
     { label: 'Date', first: new Date('2020-01-01T00:00:00Z'), second: new Date('2020-06-15T12:00:00Z') },
     { label: 'Map', first: new Map([['a', 1]]), second: new Map([['a', 2]]) },
     { label: 'Set', first: new Set([1, 2]), second: new Set([1, 2, 3]) },
-    { label: 'class instance', first: new Widget(1), second: new Widget(2) }
+    { label: 'class instance', first: new Widget(1), second: new Widget(2) },
+    { label: 'class instance (private field, distinguished only via a real toString() override)', first: new PrivateFieldWidget(1), second: new PrivateFieldWidget(2) }
   ];
 
   for (const { label, first, second } of OS18_CASES) {
@@ -639,6 +661,32 @@ describe('observer-state-store', () => {
       assert.strictEqual(current.ledger.length, 1, `a ${label}-only change must append a ledger entry`);
     });
   }
+
+  // LIN-2274 — the documented OTHER half of the fallback's own header claim:
+  // a class keeping its entire distinguishing state in a private field AND
+  // relying on the DEFAULT Object.prototype.toString (no override) still
+  // collapses two differently-stated instances onto the same hash — the same
+  // failure mode as the pre-fix Date/Map/Set case, just not one this guard
+  // closes. This is a characterization test pinning a stated, accepted
+  // limitation (module header, "Hashing non-plain values"), not a bug: it
+  // asserts the CURRENT collapse behavior so a future change to it is a
+  // deliberate, visible decision rather than a silent drift either way.
+  test('a class instance holding state ONLY in a private field, with no toString() override, silently collapses (documented, accepted limitation — not covered by the fallback)', async () => {
+    class OpaqueWidget {
+      #n;
+      constructor(n) { this.#n = n; }
+    }
+    const store = freshStore();
+    const key = `inst-${randomUUID()}`;
+    await store.ensureSeeded(key, { value: new OpaqueWidget(1) });
+
+    const result = await store.advance(key, 1, { value: new OpaqueWidget(2) });
+    assert.strictEqual(result, true, 'the hash collision misclassifies this as a duplicate no-op — documented behavior, pinned here');
+
+    const current = await store.readCurrent(key);
+    assert.strictEqual(current.rev, 1, 'rev does not advance — this is the collision the module header warns about, not a regression');
+    assert.strictEqual(current.ledger.length, 0);
+  });
 
   // Map reorder (LIN-2142) — the companion property OS18 does not cover:
   // canonicalizeForHash sorts Map entries by stringified key specifically so

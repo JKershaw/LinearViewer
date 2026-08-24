@@ -891,6 +891,48 @@ describe('class check — isolated or one of a class (LIN-313)', () => {
 });
 
 // =============================================================================
+// Mutation-check directive — pin the review institutionalization (LIN-2274)
+// =============================================================================
+// LIN-2274 added a mutation-check directive to the review template so a
+// reviewer independently mutation-checks the load-bearing new/changed tests
+// before approving the close ("the test exists and asserts something" is not
+// proof it asserts the right thing). Nothing pinned it (LIN-2303) — mirrors
+// the class-check (LIN-313) precedent above.
+
+describe('mutation-check directive — pin the review institutionalization (LIN-2274)', () => {
+  const reviewIssue = {
+    id: 'issue-rev-mutation', identifier: 'TEST-MC1', title: 'Verify fix',
+    description: 'Review the landed fix', url: 'https://linear.app/test/issue/TEST-MC1',
+    state: { name: 'In Progress', type: 'started' }, createdAt: '2026-01-01T00:00:00.000Z',
+    labels: []
+  };
+  const ctx = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+
+  test('review template carries the mutation-check guideline bullet', () => {
+    const result = generatePrompt('review', reviewIssue, ctx);
+    assert.ok(/Mutation-check the load-bearing tests \(LIN-2274\)/.test(result.prompt),
+      'review prompt must carry the mutation-check bullet');
+    assert.ok(/name the specific mutation you tried and what you observed/i.test(result.prompt),
+      'must pin the substantive clause, not just the label');
+  });
+
+  test('review checklist carries the mutation-check item', () => {
+    const result = generatePrompt('review', reviewIssue, ctx);
+    assert.ok(result.prompt.includes('- [ ] At least the load-bearing new/changed tests were mutation-checked (code path deleted, test confirmed red, then restored) rather than merely inspected'),
+      'checklist must include the mutation-check line');
+  });
+
+  test('mutation-check directive stays inside Test Quality Check, ahead of the Review Checklist', () => {
+    const result = generatePrompt('review', reviewIssue, ctx);
+    const directiveIndex = result.prompt.indexOf('Mutation-check the load-bearing tests (LIN-2274)');
+    const checklistIndex = result.prompt.indexOf('### Review Checklist');
+    assert.ok(directiveIndex > -1, 'mutation-check directive must be present');
+    assert.ok(checklistIndex > -1, 'Review Checklist section must be present');
+    assert.ok(directiveIndex < checklistIndex, 'mutation-check directive must precede the Review Checklist');
+  });
+});
+
+// =============================================================================
 // look-into Template Tests
 // =============================================================================
 

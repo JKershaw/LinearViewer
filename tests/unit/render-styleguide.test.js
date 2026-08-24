@@ -9,12 +9,33 @@ import { renderStyleguide } from '../../lib/render-styleguide.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STYLE_CSS = join(__dirname, '../../public/style.css');
 
+/**
+ * Slice the body of a selector's first rule block (no nested braces in this file).
+ *
+ * LIN-2274 (same class as LIN-2247's ruleBody fix in theme.test.js): a plain
+ * `css.indexOf(selector)` matches the selector text inside a PRECEDING comment
+ * just as readily as the real rule — `.theme-dark` is named in a doc comment near
+ * the top of style.css, well before the real `.theme-dark {` rule, so the naive
+ * version silently sliced `:root`'s own body instead (the next `{` after that
+ * comment). `:root` happens to define the same token *names* as `.theme-dark`
+ * restates, so the "only overrides existing tokens" assertion below stayed green
+ * checking `:root` against itself — a tautology — regardless of what `.theme-dark`
+ * actually declared (proven: injecting a `.theme-dark`-only, non-`:root` token
+ * left the naive version green). Requiring the selector be immediately followed
+ * by `{` fixes that class of false match.
+ */
+function ruleBody(css, selector) {
+  const re = new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{');
+  const m = re.exec(css);
+  assert.notEqual(m, null, `expected ${selector} { ... } in stylesheet`);
+  const open = m.index + m[0].length - 1;
+  return css.slice(open + 1, css.indexOf('}', open));
+}
+
 /** Extract every custom-property name declared in the first :root {} block. */
 function rootTokenNames() {
   const css = readFileSync(STYLE_CSS, 'utf8');
-  const block = css.slice(css.indexOf(':root'));
-  const body = block.slice(block.indexOf('{') + 1, block.indexOf('}'));
-  return [...body.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map(m => m[1]);
+  return [...ruleBody(css, ':root').matchAll(/(--[a-z0-9-]+)\s*:/gi)].map(m => m[1]);
 }
 
 test('renders a complete, public, static HTML document', () => {
@@ -140,8 +161,7 @@ test('the .theme-dark hook exists in the stylesheet and only overrides tokens', 
   // A theme may only restate EXISTING :root token names (no new tokens), so the
   // "exercises EVERY :root token" guarantee and page byte-stability both hold.
   const rootTokens = new Set(rootTokenNames());
-  const block = css.slice(css.indexOf('.theme-dark'));
-  const body = block.slice(block.indexOf('{') + 1, block.indexOf('}'));
+  const body = ruleBody(css, '.theme-dark');
   for (const m of body.matchAll(/(--[a-z0-9-]+)\s*:/gi)) {
     assert.ok(
       rootTokens.has(m[1]),

@@ -1439,6 +1439,49 @@ describe('buildMetaPromptTemplate class check (LIN-313)', () => {
   });
 });
 
+// Mutation-check directive (LIN-2274) — the Review-prompts rule must instruct
+// the agent to independently mutation-check the load-bearing new/changed
+// tests before approving the close. Mirrors the handwritten path per
+// CLAUDE.md's both-paths rule (review template's Test Quality Check bullet +
+// checklist item). Nothing pinned this on the meta path either (LIN-2303).
+describe('buildMetaPromptTemplate mutation-check directive (LIN-2274)', () => {
+  function build() {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context',
+      identifier: 'LIN-1',
+      hasSubtasks: false,
+      subtaskCount: 0,
+      completedCount: 0,
+      inProgressCount: 0,
+      remainingCount: 0,
+      hasComments: false,
+      commentCount: 0,
+      aiHints: 'hints'
+    });
+  }
+
+  test('Review-prompts rule instructs the agent to mutation-check the load-bearing tests', () => {
+    const result = build();
+    assert.ok(
+      result.includes('mutation-check the load-bearing tests (LIN-2274)'),
+      'the review rule must carry the mutation-check clause'
+    );
+    assert.ok(
+      result.includes('confirm it goes red'),
+      'the review rule must pin the substantive delete-and-confirm-red clause'
+    );
+  });
+
+  test('mutation-check clause precedes the class check within the Review-prompts rule', () => {
+    const result = build();
+    const mutationIndex = result.indexOf('mutation-check the load-bearing tests (LIN-2274)');
+    const classCheckIndex = result.indexOf('class check before approving the close');
+    assert.ok(mutationIndex > -1, 'mutation-check clause must be present');
+    assert.ok(classCheckIndex > -1, 'class check clause must be present');
+    assert.ok(mutationIndex < classCheckIndex, 'mutation-check clause must precede the class check');
+  });
+});
+
 // =============================================================================
 // Surface Assessment necessity gate (LIN-192 origin, LIN-397 gate) — AI path
 //
