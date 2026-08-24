@@ -57,7 +57,7 @@ Several ways to sign in or connect a workspace source:
 - **Linear OAuth 2.0** - Sign in with your Linear account, choose your workspace. Sessions last 24 hours with automatic refresh.
 - **Personal Access Token (PAT)** - Set `LINEAR_ACCESS_TOKEN` for zero-config local development; you're logged in automatically.
 - **GitHub App** - Sign in with GitHub, or add a GitHub repository (Issues or Projects v2) as a workspace source. Optional — disabled until configured. See [GitHub App (optional)](#github-app-optional) below.
-- **Jira Cloud** - Sign in with Jira via OAuth 2.0, or link a Jira site as a workspace source via an API token (read-only Phase 1) or OAuth 2.0. See [Jira Cloud (optional)](#jira-cloud-optional) below.
+- **Jira Cloud** - Sign in with Jira via OAuth 2.0, or link a Jira site as a workspace source via an API token or OAuth 2.0. Reads, plus writes (title/description/status edits, comments, labels) — creating new issues isn't supported yet. See [Jira Cloud (optional)](#jira-cloud-optional) below.
 - **OpenRouter OAuth (PKCE)** - Optionally connect an OpenRouter account for AI features; returns a permanent API key stored alongside your session.
 
 ### GitHub App (optional)
@@ -85,7 +85,7 @@ GITHUB_APP_SLUG=your-github-app-slug
 
 Jira has two independent link paths, side by side:
 
-- **API token (Phase 1, read-only)** - No server config needed. Visit `/auth/jira?workspace=<urlKey>` and provide your Atlassian email, an [API token](https://id.atlassian.com/manage-profile/security/api-tokens), and your site (e.g. `your-team.atlassian.net`). Reads only today — there is no Jira write support yet.
+- **API token** - No server config needed. Visit `/auth/jira?workspace=<urlKey>` and provide your Atlassian email, an [API token](https://id.atlassian.com/manage-profile/security/api-tokens), and your site (e.g. `your-team.atlassian.net`). Supports reads and writes (editing an existing issue's title/description/status and comments/labels); creating new issues isn't supported yet.
 - **OAuth 2.0 (3LO)** - Sign in with Jira or add a Jira site the same way as GitHub. Disabled until the Jira OAuth environment variables are set:
 
 ```
