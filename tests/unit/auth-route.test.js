@@ -433,4 +433,52 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.strictEqual(res.statusCode, 409, 'an unresolvable carried accountId surfaces as a conflict, not a silent phantom mint');
     assert.match(res.body, /Account Conflict/, 'unknown-account is not a mergeable conflict — the pre-existing dead-end page');
   });
+
+  // === LIN-2266: the non-mergeable (unknown-account) branch of
+  // respondToAccountConflict must not leave a stale identity/hygiene state
+  // behind it, or the 409 becomes a permanent lockout / a revived LIN-1351 leak.
+
+  test('mode:new unknown-account 409 clears the stale session.accountId (and its freshness stamp) so a retry self-heals instead of sticking (LIN-2266)', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const session = makeSession({ oauthState: 'real', accountId: 'ghost-account', identityAuthenticatedAt: 12345 });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, makeRes());
+
+    assert.strictEqual(session.accountId, undefined, 'the unresolvable accountId must not survive the 409 — else every retry re-carries it (sticky lockout)');
+    assert.strictEqual(session.identityAuthenticatedAt, undefined, 'the freshness stamp tied to the cleared accountId must not survive it either');
+
+    // The strongest witness: retrying on the SAME (now-cleaned) session succeeds
+    // instead of repeating the 409 — this is what "self-heals" actually means.
+    session.oauthState = 'real2';
+    const retryRes = makeRes();
+    await handler({ query: { code: 'good-code', state: 'real2' }, session }, retryRes);
+    assert.strictEqual(retryRes.statusCode, 200, 'retry no longer 409s');
+    assert.strictEqual(retryRes.redirectedTo, '/workspace/acme/', 'retry lands in the workspace instead of repeating the Account Conflict page');
+    assert.strictEqual(retryRes.body, null, 'retry does not render the Account Conflict page');
+    assert.ok(session.accountId && session.accountId !== 'ghost-account', 'retry mints/links a real accountId instead of re-carrying the ghost');
+  });
+
+  test('add-source unknown-account 409 clears oauthState/oauthIntent (LIN-1351 hygiene) AND the stale accountId (LIN-2266), preserving the session.workspaces restore', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    // A live add-source session whose signed-in accountId is itself a ghost
+    // (deleted account / repointed datastore) — establishAccount has no
+    // existing owner for viewer-2, falls into the "already signed in" branch,
+    // and finds session.accountId doesn't resolve: {ok:false, reason:'unknown-account'}.
+    const session = addSourceSession('ghost-account');
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 409);
+    assert.strictEqual(session.oauthState, undefined, 'LIN-1351: oauthState must not survive a failed non-mergeable add-source round-trip');
+    assert.strictEqual(session.oauthIntent, undefined, 'LIN-1351: oauthIntent must not survive a failed non-mergeable add-source round-trip');
+    assert.strictEqual(session.accountId, undefined, 'LIN-2266: the unresolvable accountId must not stick around either');
+    // session.workspaces restoration (LIN-1351) is untouched by this fix — org-2's
+    // live-token workspace never leaked in, and org-1 (the pre-existing workspace) survives.
+    assert.deepStrictEqual(session.workspaces, [{ id: 'org-1', name: 'Acme', urlKey: 'acme' }]);
+  });
 });
