@@ -1081,6 +1081,25 @@ describe('selectOwnerWorkspaceRow (LIN-1986, Block G — pure selector)', () => 
     assert.equal(result.token, 'live');
     assert.equal(result.reason, 'ok');
   });
+
+  test('G9 (LIN-2275): a fresh, finite Linear row wins over a co-resident sentinel (Jira Basic) row for the SAME owner — the same LIN-1982 defect shape, now fixed here too', () => {
+    const SENTINEL_MS = Number.MAX_SAFE_INTEGER;
+    const sessions = [
+      sessionRow('sid-linear', 'account-A', 'acme', { accessToken: 'tok-linear-fresh', expiresAt: NOW + FAR_FUTURE_MS, provider: 'linear' }),
+      sessionRow('sid-jira', 'account-A', 'acme', { accessToken: 'tok-jira-sentinel', expiresAt: SENTINEL_MS, provider: 'jira' }),
+    ];
+    const ws = selectOwnerWorkspaceRow(sessions, 'acme', 'account-A');
+    assert.equal(ws.accessToken, 'tok-linear-fresh', 'a finite, real expiry must outrank a sentinel one regardless of raw magnitude (LIN-1982 rule, applied here for LIN-2275)');
+  });
+
+  test('G10 (LIN-2275): a sentinel row is still selected when it is the ONLY eligible candidate — the ordinary Local/PAT/Basic-only case is unaffected', () => {
+    const SENTINEL_MS = Number.MAX_SAFE_INTEGER;
+    const sessions = [
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'tok-local', expiresAt: SENTINEL_MS, provider: 'local' }),
+    ];
+    const ws = selectOwnerWorkspaceRow(sessions, 'acme', 'account-A');
+    assert.equal(ws.accessToken, 'tok-local');
+  });
 });
 
 // ---------------------------------------------------------------------------
