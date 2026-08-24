@@ -394,6 +394,145 @@ describe('LIN-1890 E2 — a Jira-only sign-in lands in a working workspace', () 
 });
 
 // ---------------------------------------------------------------------------
+// LIN-2267 (class fix of LIN-2233's L2.1, applied to the Jira mode:'new'
+// bootstrap): completeJiraNewLogin's regenerate() unconditionally wiped
+// session.accountId (see the stale docblock comment this ticket corrected) —
+// so a session already holding a live account that then front-doors with a
+// BRAND-NEW Jira identity always took the mint branch instead of linking
+// onto the live account, forking a second one. Mirrors
+// tests/unit/account-identity.test.js's "L6 test 1 — fork-prevention" and
+// the sibling GitHub/GitHub Projects coverage added by this same class fix.
+// ---------------------------------------------------------------------------
+
+/**
+ * A fork-DETECTING account store: unlike makeAccountStores() above (whose
+ * createAccount always returns the same fixed 'acct-new' id, so a second
+ * mint would be indistinguishable from the carried id by equality alone),
+ * this mints a genuinely fresh id each call and counts mints — the real
+ * signal this test needs: "was a second account minted at all".
+ */
+function makeForkTrackingAccountStores() {
+  const identities = new Map();
+  const bound = [];
+  let nextId = 1;
+  let createCount = 0;
+  return {
+    bound,
+    createCount: () => createCount,
+    accountStore: {
+      async findAccountByIdentity(provider, scope) {
+        const id = identities.get(`${provider}:${scope}`);
+        return id ? { _id: id } : null;
+      },
+      async createAccount() { createCount++; return { _id: `acct-${nextId++}` }; },
+      async linkIdentity(accountId, provider, scope) { identities.set(`${provider}:${scope}`, accountId); return { ok: true }; },
+      async deleteAccount() { return true; },
+    },
+    accountWorkspaceStore: { async bindAccountToWorkspace(accountId, workspaceId) { bound.push([accountId, workspaceId]); return true; } },
+  };
+}
+
+describe('LIN-2267 — mode:new carries session.accountId across regenerate', () => {
+  test('a brand-new Jira identity arriving in a session that already holds a live account links onto it instead of forking a second one', async () => {
+    const session = jiraOnlySession();
+    const stores = makeForkTrackingAccountStores();
+
+    // First front-door login mints account A.
+    await signInWithJira({ session, stores });
+    const accountIdAfterA = session.accountId;
+    assert.ok(accountIdAfterA);
+    assert.equal(stores.createCount(), 1);
+
+    // Second front-door login, SAME session, a BRAND-NEW Jira identity (a
+    // different human, a different Jira tenant). The live accountId must
+    // survive completeJiraNewLogin's session.regenerate() and this identity
+    // must link onto it, not mint a second account.
+    const OTHER_HUMAN = { accountId: 'other-jira-human-999', emailAddress: 'other.human@example.com', displayName: 'Other Human' };
+    const app2 = makeApp({
+      session, store: makeStore(), provider: fakeProvider(OTHER_HUMAN), stores,
+      fetches: stubs([{ id: 'cid-9', url: 'https://othercorp.atlassian.net', name: 'OtherCorp' }]),
+    });
+    await request(app2, { path: '/auth/jira/oauth?mode=new' });
+    const callback = await request(app2, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(callback.status, 302);
+    assert.strictEqual(session.accountId, accountIdAfterA, 'session.accountId unchanged across the second front-door login — no fork');
+    assert.equal(stores.createCount(), 1, 'createAccount called only once — the second identity LINKED onto the live account, not re-minted');
+    assert.equal(session.workspaces.length, 2, 'two distinct Jira containers, one per human accountId — the first survives the regenerate too');
+    assert.deepEqual(stores.bound.map(([acct]) => acct), [accountIdAfterA, accountIdAfterA], 'both bindings recorded under the SAME account');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-2267 amendment (review F1 + F2): the accountId-carry above makes an
+// `unknown-account` conflict reachable on completeJiraNewLogin's regenerate
+// branch for the first time — before the carry, regenerate() always wiped
+// session.accountId, so establishAccount's stale-id branch could never fire
+// here. Now that it IS reachable, this branch must apply the same
+// post-conflict hygiene routes/auth.js's respondToAccountConflict already
+// applies (LIN-2266): clear the stale accountId/freshness stamp/OAuth state,
+// and restore session.workspaces to its pre-login snapshot.
+// ---------------------------------------------------------------------------
+
+/**
+ * An account store that models `unknown-account`: `findAccountByIdentity`
+ * always misses (a brand-new identity), so `establishAccount` falls through
+ * to `else if (session.accountId)` and tries to link onto the CARRIED id —
+ * `linkIdentity` then reports it unknown unless it is the one id this store
+ * actually minted (`'acct-new'`), mirroring `lib/account-store.js`'s real
+ * `getAccount(accountId) === null` branch.
+ */
+function makeUnknownAccountStores() {
+  const bound = []
+  return {
+    bound,
+    accountStore: {
+      async findAccountByIdentity() { return null },
+      async createAccount() { return { _id: 'acct-new' } },
+      async linkIdentity(accountId) {
+        if (accountId !== 'acct-new') return { ok: false, reason: 'unknown-account' }
+        return { ok: true }
+      },
+      async deleteAccount() { return true },
+      async resolveCanonicalAccountId(accountId) { return accountId ?? null },
+    },
+    accountWorkspaceStore: { async bindAccountToWorkspace(accountId, workspaceId) { bound.push([accountId, workspaceId]); return true } },
+  }
+}
+
+describe('LIN-2267 amendment — post-conflict session hygiene on the mode:new unknown-account 409', () => {
+  test('clears the stale accountId and restores session.workspaces, so the retry is not a permanent lockout (F1/F2)', async () => {
+    const linearWs = { id: 'ws-1', urlKey: 'acme-linear', provider: 'linear', accessToken: 'linear-access', bindings: [{ provider: 'linear', scope: 'org-1', credentials: { token: 'linear-access' } }] }
+    const session = makeSession({
+      // A stale/unresolvable accountId — the deleted-account or
+      // restored/repointed-store case establishAccount's unknown-account
+      // branch guards against.
+      accountId: 'acct-DELETED',
+      identityAuthenticatedAt: Date.now(),
+      workspaces: [linearWs],
+    })
+    const stores = makeUnknownAccountStores()
+
+    const { callback } = await signInWithJira({ session, stores })
+
+    assert.equal(callback.status, 409)
+    assert.match(callback.text, /Account Conflict/)
+    // F1: the stale accountId (and its freshness stamp) must not survive
+    // into the retry, or every subsequent front-door login re-derives the
+    // SAME stale id and 409s forever (the LIN-2266 lockout, reintroduced
+    // here).
+    assert.equal(session.accountId, undefined, 'stale accountId cleared')
+    assert.equal(session.identityAuthenticatedAt, undefined, 'freshness stamp cleared')
+    assert.equal(session.oauthState, undefined, 'OAuth state cleared')
+    assert.equal(session.oauthIntent, undefined, 'OAuth intent cleared')
+    // F2: the arriving (unconfirmed) workspace and its live OAuth credentials
+    // must not remain in session.workspaces.
+    assert.deepEqual(session.workspaces, [linearWs], 'session.workspaces restored to its pre-login snapshot')
+    assert.ok(!JSON.stringify(session.workspaces).includes('jira-access-1'), 'the arriving credential does not leak into the session')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // LIN-1890 close-out — review F3: the carried refresh token on the FAILURE
 // exits.
 //

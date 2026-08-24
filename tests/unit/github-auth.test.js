@@ -754,6 +754,91 @@ describe('GitHub auth routes', () => {
     assert.deepEqual(session.workspaces[0].bindings.map(b => b.scope), ['octocat/hello-world', 'octocat/another-repo']);
   });
 
+  // LIN-2267 (class fix of LIN-2233's L2.1, applied to the GitHub sibling):
+  // mode:'new' DOES regenerate the session (unlike add-source above), and
+  // until this fix that regenerate unconditionally wiped session.accountId —
+  // so a session already holding a live account (from an earlier sign-in,
+  // GitHub or otherwise) that then front-doors with a BRAND-NEW GitHub
+  // identity always took the mint branch instead of linking onto the live
+  // account, forking a second account. Mirrors
+  // tests/unit/account-identity.test.js's "L6 test 1 — fork-prevention".
+  test('POST link (new) carries session.accountId across the fixation-preventing regenerate — a brand-new GitHub identity links onto the LIVE account instead of forking a second one (LIN-2267)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+
+    // First front-door login mints account A.
+    const session = makeSession({
+      githubHumanId: 'human-A',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, makeRes());
+    const accountIdAfterA = session.accountId;
+    assert.ok(accountIdAfterA, 'account A minted and carried into the session');
+
+    // Second front-door login, SAME session, a BRAND-NEW GitHub identity
+    // (different human, different installation account) — the live
+    // accountId must survive session.regenerate() and this identity must
+    // link onto it, not mint a second account.
+    session.githubHumanId = 'human-B'
+    session.githubPending = { token: 'gho_token2', mode: 'new', login: 'octofriend', userId: '99', installationId: '88', tokenExpiresAt: '2026-06-25T20:00:00Z' }
+    const res = makeRes();
+    await handler({ body: { repo: 'octofriend/other-repo' }, session }, res);
+
+    assert.equal(res.redirectedTo, '/workspace/octofriend/');
+    assert.strictEqual(session.accountId, accountIdAfterA, 'session.accountId unchanged across the second front-door login — no fork');
+    assert.equal(session.workspaces.length, 2, 'both workspace containers present (existingWorkspaces carried across regenerate too)');
+    const account = await accountStore.getAccount(accountIdAfterA);
+    assert.strictEqual(account.identities.length, 2, 'both GitHub identities attached to the ONE account');
+    assert.ok(account.identities.some(i => i.scope === 'human-A'));
+    assert.ok(account.identities.some(i => i.scope === 'human-B'));
+  });
+
+  // LIN-2267 amendment (review F1 + F2): the accountId-carry above makes an
+  // `unknown-account` conflict reachable on THIS branch for the first time —
+  // before the carry, regenerate() always wiped session.accountId, so
+  // establishAccount's stale-id branch could never fire here (it self-healed
+  // via the mint branch instead). Now that it IS reachable, this branch must
+  // apply the same post-conflict hygiene routes/auth.js's
+  // respondToAccountConflict already applies (LIN-2266): clear the stale
+  // accountId/freshness stamp/OAuth state, and restore session.workspaces to
+  // its pre-login snapshot.
+  test('POST link (new) clears the stale accountId and restores session.workspaces on an unknown-account 409, so the retry is not a permanent lockout (LIN-2267 F1/F2)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
+    const session = makeSession({
+      // A stale/unresolvable accountId — the deleted-account or
+      // restored/repointed-store case establishAccount's unknown-account
+      // branch guards against.
+      accountId: 'acct-DELETED',
+      identityAuthenticatedAt: Date.now(),
+      oauthState: 'state-abc',
+      oauthIntent: { mode: 'new' },
+      githubHumanId: 'human-new',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octonew', userId: '777', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [linearWs],
+    });
+    await handler({ body: { repo: 'octonew/hello-world' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Account Conflict/);
+    // F1: the stale accountId (and its freshness stamp) must not survive into
+    // the retry, or every subsequent front-door login re-derives the SAME
+    // stale id and 409s forever (the LIN-2266 lockout, reintroduced here).
+    assert.equal(session.accountId, undefined, 'stale accountId cleared');
+    assert.equal(session.identityAuthenticatedAt, undefined, 'freshness stamp cleared');
+    assert.equal(session.oauthState, undefined, 'OAuth state cleared');
+    assert.equal(session.oauthIntent, undefined, 'OAuth intent cleared');
+    // F2: the arriving (unconfirmed) workspace and its live installation
+    // token must not remain in session.workspaces.
+    assert.deepEqual(session.workspaces, [linearWs], 'session.workspaces restored to its pre-login snapshot');
+    assert.ok(!JSON.stringify(session.workspaces).includes('gho_token'), 'the arriving credential does not leak into the session');
+  });
+
   test('POST link (add-source) links onto the active workspace without creating a new one', async () => {
     const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
