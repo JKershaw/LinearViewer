@@ -25,6 +25,7 @@ import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import { createAuthRoutes } from '../../routes/auth.js';
 import { AccountStore } from '../../lib/account-store.js';
+import { establishAccount } from '../../lib/account-session.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { AccountMergeLogStore } from '../../lib/account-merge-log.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
@@ -528,6 +529,101 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
       assert.strictEqual((await stores.accountStore.getAccount(mineAccount._id)).mergedInto, canonicalId);
       assert.strictEqual(await stores.accountStore.resolveCanonicalAccountId(canonicalId), canonicalId);
       assert.strictEqual(await stores.accountStore.resolveCanonicalAccountId(mineAccount._id), canonicalId);
+    });
+  });
+
+  // === LIN-2265 close-out: already-corrupt data must not break sign-in =========
+  //
+  // Ledger item from the LIN-2265 review: `establishAccount` now calls
+  // `resolveCanonicalAccountId` whenever `session.accountId` is set, and that
+  // method THROWS on a `mergedInto` cycle or an over-deep chain. No new cycle
+  // can be created (the `mergeAccounts` guard above), so only data corrupted
+  // BEFORE that guard shipped can reach this — but for such an account an
+  // unwrapped call would turn sign-in into a throw where it previously
+  // proceeded, and on the entry paths that do not wrap their own
+  // `establishAccount` call (POST /auth/jira/link) into an unhandled
+  // rejection that hangs the request rather than erroring cleanly. These
+  // tests pin the degrade-instead-of-throw behaviour on seeded corruption.
+
+  describe('LIN-2265 — pre-existing mergedInto corruption degrades, never throws, at the sign-in seam', () => {
+    // Seeds corruption the fixed write path can no longer produce, by writing
+    // `mergedInto` straight onto the documents — this is what an account
+    // corrupted before the guard shipped looks like on disk.
+    async function seedCycle(accountStore) {
+      const a = await accountStore.createAccount();
+      const b = await accountStore.createAccount();
+      await accountStore.collection.updateOne({ _id: a._id }, { $set: { mergedInto: b._id } });
+      await accountStore.collection.updateOne({ _id: b._id }, { $set: { mergedInto: a._id } });
+      await assert.rejects(() => accountStore.resolveCanonicalAccountId(a._id), /cycle detected/,
+        'sanity: the seeded pair is genuinely unresolvable');
+      return { a, b };
+    }
+
+    test('establishAccount with a CYCLIC session.accountId completes instead of throwing, keeping the id uncanonicalized', async () => {
+      const stores = freshStores();
+      const { a } = await seedCycle(stores.accountStore);
+      await stores.accountStore.linkIdentity(a._id, 'linear', 'viewer-cyclic', {});
+
+      const session = makeSession({ accountId: a._id });
+      const established = await establishAccount(
+        session, stores.accountStore, stores.accountWorkspaceStore, 'linear', 'viewer-cyclic', {}, 'org-cyclic'
+      );
+
+      assert.strictEqual(established.ok, true, 'sign-in proceeds exactly as it did before LIN-2265');
+      assert.strictEqual(established.accountId, a._id);
+      assert.strictEqual(session.accountId, a._id, 'degraded to the uncanonicalized id — never a throw, never null');
+    });
+
+    test('an over-deep mergedInto chain degrades the same way', async () => {
+      const stores = freshStores();
+      // 10 accounts chained head -> ... -> tail: deeper than resolveCanonicalAccountId's maxDepth of 8.
+      const chain = [];
+      for (let i = 0; i < 10; i++) chain.push(await stores.accountStore.createAccount());
+      for (let i = 0; i < chain.length - 1; i++) {
+        await stores.accountStore.collection.updateOne({ _id: chain[i]._id }, { $set: { mergedInto: chain[i + 1]._id } });
+      }
+      const head = chain[0];
+      await assert.rejects(() => stores.accountStore.resolveCanonicalAccountId(head._id), /maxDepth/,
+        'sanity: the seeded chain is genuinely over-deep');
+      await stores.accountStore.linkIdentity(head._id, 'linear', 'viewer-deep', {});
+
+      const session = makeSession({ accountId: head._id });
+      const established = await establishAccount(
+        session, stores.accountStore, stores.accountWorkspaceStore, 'linear', 'viewer-deep', {}, 'org-deep'
+      );
+
+      assert.strictEqual(established.ok, true);
+      assert.strictEqual(session.accountId, head._id);
+    });
+
+    test('the front-door callback signs a corrupted account in cleanly — no 500, no unhandled rejection — and the write-path guard still fails a merge closed', async () => {
+      const stores = freshStores();
+      const { a, b } = await seedCycle(stores.accountStore);
+      await stores.accountStore.linkIdentity(a._id, 'linear', 'viewer-mine', {});
+
+      const idx = { index: 0 };
+      const provider = twoIdentityProvider(idx,
+        [{ id: 'org-mine', name: 'Mine', urlKey: 'mine' }, { id: 'org-other', name: 'Other', urlKey: 'other' }],
+        [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
+      const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+      const handler = getHandler(router, 'get', '/auth/callback');
+
+      const session = makeSession({ oauthState: 'real', accountId: a._id });
+      const res = makeRes();
+      await handler({ query: { code: 'c1', state: 'real' }, session }, res);
+
+      assert.strictEqual(res.statusCode, 200, 'a corrupted account still lands, exactly as it did before LIN-2265');
+      assert.strictEqual(res.redirectedTo, '/workspace/mine/');
+      assert.strictEqual(session.accountId, a._id);
+
+      // The second, independent layer is unaffected by the degrade: a merge
+      // built from the stale id still fails closed at the write path.
+      const c = await stores.accountStore.createAccount();
+      const attempt = await stores.accountStore.mergeAccounts(a._id, c._id);
+      assert.strictEqual(attempt.ok, false);
+      assert.strictEqual(attempt.reason, 'canonical-already-merged');
+      assert.strictEqual((await stores.accountStore.getAccount(c._id)).mergedInto, undefined, 'no new pointer written onto the corrupt graph');
+      assert.strictEqual((await stores.accountStore.getAccount(a._id)).mergedInto, b._id, 'the seeded corruption is untouched — never silently repaired here');
     });
   });
 });
