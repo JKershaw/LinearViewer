@@ -6636,9 +6636,16 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
             logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
             return jsonError(res, 503, PROXY_ATTACH_FAILED_MESSAGE);
           }
-          logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
+          // LIN-2260: classify an upstream provider-auth failure the same way
+          // the read path (and GET /recommend via recommendErrorResponse)
+          // already does, instead of collapsing every non-classified throw
+          // into an opaque 500 — graphqlErrorStatus() falls back to 500 for
+          // anything it doesn't recognize, so a genuinely internal failure is
+          // unchanged.
+          const status = graphqlErrorStatus(err, req);
+          logEvent(req, '/api/proxy/recommend-and-dispatch', status);
           console.error('Proxy recommend-and-dispatch override error:', err.message);
-          return jsonError(res, 500, 'Failed to dispatch prompt');
+          return jsonError(res, status, 'Failed to dispatch prompt', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
         }
       }
 
@@ -6824,14 +6831,24 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
           logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
           return keepalive.send(503, { error: PROXY_ATTACH_FAILED_MESSAGE });
         }
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
+        // LIN-2260: classify an upstream provider-auth failure (retryable
+        // 503/LINEAR_AUTH) the same way GET /recommend's recommendErrorResponse
+        // already does, instead of collapsing every non-classified throw into
+        // an opaque 500 — graphqlErrorStatus() falls back to 500 for anything
+        // it doesn't recognize, so a genuinely internal failure is unchanged.
+        const status = graphqlErrorStatus(err, req);
+        logEvent(req, '/api/proxy/recommend-and-dispatch', status);
         console.error('Proxy recommend-and-dispatch error:', err.message);
-        keepalive.send(500, { error: 'Failed to dispatch prompt' });
+        keepalive.send(status, { error: 'Failed to dispatch prompt', detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
       }
     } catch (err) {
-      logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
+      // LIN-2260: same classification as the inner catch arms above — this
+      // outer catch-all fronts every non-classified throw the two arms didn't
+      // already handle (e.g. a failure before `kind` is known which arm to run).
+      const status = graphqlErrorStatus(err, req);
+      logEvent(req, '/api/proxy/recommend-and-dispatch', status);
       console.error('Proxy recommend-and-dispatch error:', err.message);
-      jsonError(res, 500, 'Failed to dispatch prompt');
+      jsonError(res, status, 'Failed to dispatch prompt', { detail: graphqlErrorDetail(err), ...graphqlErrorExtra(err, status) });
     }
   });
 
