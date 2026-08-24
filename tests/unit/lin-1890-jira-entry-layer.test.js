@@ -104,6 +104,9 @@ function makeAccountStores() {
       async createAccount() { return { _id: 'acct-new' }; },
       async linkIdentity(accountId, provider, scope) { identities.set(`${provider}:${scope}`, { _id: accountId }); return { ok: true }; },
       async deleteAccount() { return true; },
+      // This fake models no merging, so canonicalization is always a no-op —
+      // mirrors AccountStore.resolveCanonicalAccountId's no-mergedInto case.
+      async resolveCanonicalAccountId(accountId) { return accountId ?? null; },
     },
     accountWorkspaceStore: { async bindAccountToWorkspace(accountId, workspaceId) { bound.push([accountId, workspaceId]); return true; } },
   };

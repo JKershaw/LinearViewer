@@ -25,6 +25,7 @@ import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import { createAuthRoutes } from '../../routes/auth.js';
 import { AccountStore } from '../../lib/account-store.js';
+import { establishAccount } from '../../lib/account-session.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { AccountMergeLogStore } from '../../lib/account-merge-log.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
@@ -368,6 +369,261 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
       assert.strictEqual(unknownCanonical.reason, 'unknown-canonical');
 
       assert.strictEqual((await stores.accountStore.getAccount(account._id)).mergedInto, undefined);
+    });
+
+    // === LIN-2265: mergeAccounts must not write a mergedInto CYCLE =============
+
+    test('LIN-2265: a second merge that targets an already-merged canonical is refused at the write path, and writes no cycle', async () => {
+      const stores = freshStores();
+      const a = await stores.accountStore.createAccount();
+      const b = await stores.accountStore.createAccount();
+
+      // First merge: B -> A (B becomes the merged side, A is canonical).
+      const first = await stores.accountStore.mergeAccounts(a._id, b._id);
+      assert.strictEqual(first.ok, true);
+
+      // Second merge attempts the OPPOSITE direction, using the account that
+      // was just merged away (B) as the new merge's canonical side. Before
+      // LIN-2265 this succeeded and wrote A.mergedInto = B, producing a
+      // two-node cycle (A.mergedInto=B, B.mergedInto=A).
+      const second = await stores.accountStore.mergeAccounts(b._id, a._id);
+      assert.strictEqual(second.ok, false, 'refused: canonical side (B) is itself already merged (into A)');
+      assert.strictEqual(second.reason, 'canonical-already-merged');
+      assert.strictEqual(second.mergedInto, a._id);
+
+      const aDoc = await stores.accountStore.getAccount(a._id);
+      const bDoc = await stores.accountStore.getAccount(b._id);
+      assert.strictEqual(aDoc.mergedInto, undefined, 'A never gets a mergedInto — no cycle');
+      assert.strictEqual(bDoc.mergedInto, a._id, 'B keeps its original, permanent pointer, unchanged');
+
+      // Both remain resolvable — the cycle this guards against would make
+      // resolveCanonicalAccountId throw for BOTH accounts, forever.
+      assert.strictEqual(await stores.accountStore.resolveCanonicalAccountId(a._id), a._id);
+      assert.strictEqual(await stores.accountStore.resolveCanonicalAccountId(b._id), a._id);
+    });
+  });
+
+  // === LIN-2265: the reachable route-level repro ================================
+
+  describe('LIN-2265 — mergeAccounts cycle via ordinary sign-in (route-level repro)', () => {
+    test('a later login with the merged identity self-heals session.accountId to canonical, so the SECOND merge attempt never even offers a cycle-forming merge', async () => {
+      const stores = freshStores();
+
+      // Round 1, session S1: mint A (viewer-mine), then merge B (viewer-other,
+      // a pre-existing account) into A via the front-door conflict+confirm
+      // flow — the ordinary, legitimate merge.
+      const otherAccount = await stores.accountStore.createAccount();
+      await stores.accountStore.linkIdentity(otherAccount._id, 'linear', 'viewer-other', {});
+
+      const idx = { index: 0 };
+      const provider = twoIdentityProvider(idx,
+        [{ id: 'org-mine', name: 'Mine', urlKey: 'mine' }, { id: 'org-other', name: 'Other', urlKey: 'other' }],
+        [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
+      const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+      const callbackHandler = getHandler(router, 'get', '/auth/callback');
+      const confirmHandler = getHandler(router, 'post', '/auth/merge/confirm');
+
+      const s1 = makeSession({ oauthState: 'real' });
+      await callbackHandler({ query: { code: 'c1', state: 'real' }, session: s1 }, makeRes());
+      const canonicalId = s1.accountId;
+      assert.ok(canonicalId);
+
+      idx.index = 1;
+      s1.oauthState = 'real2';
+      await callbackHandler({ query: { code: 'c2', state: 'real2' }, session: s1 }, makeRes());
+      assert.ok(s1.pendingMerge, 'round 1: a merge is offered');
+      await confirmHandler({ session: s1 }, makeRes());
+      assert.strictEqual((await stores.accountStore.getAccount(otherAccount._id)).mergedInto, canonicalId, 'round 1: B merged into A');
+
+      // Round 2, a FRESH session S2 (e.g. a different browser/device): sign in
+      // with the MERGED identity first — establishAccount finds it still
+      // registered on B (mergeAccounts never touches identities[]), so
+      // session.accountId picks up B, the non-canonical id, exactly as
+      // LIN-2265 describes.
+      idx.index = 1;
+      const s2 = makeSession({ oauthState: 'real3' });
+      const res2 = makeRes();
+      await callbackHandler({ query: { code: 'c3', state: 'real3' }, session: s2 }, res2);
+      assert.strictEqual(res2.statusCode, 200, 'round 2 step 1: an ordinary successful login, not a conflict');
+      assert.strictEqual(s2.accountId, otherAccount._id, 'session.accountId is the merged (non-canonical) id after this login — the reachable hazard');
+
+      // Then, SAME session, sign in with the canonical identity. Before the
+      // fix this reached establishAccount with session.accountId === B and
+      // existingOwner === A, raised a conflict, and confirming it wrote
+      // A.mergedInto = B — a CYCLE (A.mergedInto=B, B.mergedInto=A) that makes
+      // resolveCanonicalAccountId throw for both accounts forever. The fix in
+      // establishAccount canonicalizes session.accountId (B -> A) BEFORE this
+      // comparison, so it now matches existingOwner and no conflict is raised
+      // at all — the login just succeeds under the canonical account.
+      idx.index = 0;
+      s2.oauthState = 'real4';
+      const res3 = makeRes();
+      await callbackHandler({ query: { code: 'c4', state: 'real4' }, session: s2 }, res3);
+
+      assert.strictEqual(res3.statusCode, 200, 'round 2 step 2: no conflict is raised — self-healed instead of offering a cycle-forming merge');
+      assert.strictEqual(res3.redirectedTo, '/workspace/mine/');
+      assert.strictEqual(s2.accountId, canonicalId, 'session.accountId self-healed from the merged id to the canonical one');
+      assert.strictEqual(s2.pendingMerge, undefined, 'no pending merge was ever created');
+
+      const aDoc = await stores.accountStore.getAccount(canonicalId);
+      const bDoc = await stores.accountStore.getAccount(otherAccount._id);
+      assert.strictEqual(aDoc.mergedInto, undefined, 'canonical account never gets a mergedInto — no cycle written');
+      assert.strictEqual(bDoc.mergedInto, canonicalId, 'the original, one-way merge pointer is untouched');
+
+      // Both accounts stay resolvable forever — the exact blast radius LIN-2265
+      // describes (resolveWorkspaceAccess -> store_unreachable) never occurs.
+      assert.strictEqual(await stores.accountStore.resolveCanonicalAccountId(canonicalId), canonicalId);
+      assert.strictEqual(await stores.accountStore.resolveCanonicalAccountId(otherAccount._id), canonicalId);
+    });
+
+    test('LIN-2265: the mirrored login order (viewer-other mints first, viewer-mine is the pre-existing account merged in) self-heals the same way, no cycle', async () => {
+      const stores = freshStores();
+
+      // Round 1, session S1: this time the FIRST login mints the account for
+      // viewer-other, and the pre-existing account (viewer-mine) is the one
+      // that ends up merged — the opposite ordering from the test above.
+      const mineAccount = await stores.accountStore.createAccount();
+      await stores.accountStore.linkIdentity(mineAccount._id, 'linear', 'viewer-mine', {});
+
+      const idx = { index: 1 }; // viewer-other logs in first this time
+      const provider = twoIdentityProvider(idx,
+        [{ id: 'org-mine', name: 'Mine', urlKey: 'mine' }, { id: 'org-other', name: 'Other', urlKey: 'other' }],
+        [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
+      const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+      const callbackHandler = getHandler(router, 'get', '/auth/callback');
+      const confirmHandler = getHandler(router, 'post', '/auth/merge/confirm');
+
+      const s1 = makeSession({ oauthState: 'real' });
+      await callbackHandler({ query: { code: 'c1', state: 'real' }, session: s1 }, makeRes());
+      const canonicalId = s1.accountId; // freshly minted for viewer-other
+      assert.ok(canonicalId);
+      assert.notStrictEqual(canonicalId, mineAccount._id);
+
+      idx.index = 0; // viewer-mine, the pre-existing account, conflicts and merges in
+      s1.oauthState = 'real2';
+      await callbackHandler({ query: { code: 'c2', state: 'real2' }, session: s1 }, makeRes());
+      assert.ok(s1.pendingMerge, 'round 1: a merge is offered');
+      await confirmHandler({ session: s1 }, makeRes());
+      assert.strictEqual((await stores.accountStore.getAccount(mineAccount._id)).mergedInto, canonicalId, 'round 1: mineAccount merged into the canonical (viewer-other-minted) account');
+
+      // Round 2, a fresh session: log in with the now-merged identity
+      // (viewer-mine) first, then the canonical identity (viewer-other).
+      idx.index = 0;
+      const s2 = makeSession({ oauthState: 'real3' });
+      const res2 = makeRes();
+      await callbackHandler({ query: { code: 'c3', state: 'real3' }, session: s2 }, res2);
+      assert.strictEqual(res2.statusCode, 200);
+      assert.strictEqual(s2.accountId, mineAccount._id, 'picks up the merged, non-canonical id');
+
+      idx.index = 1;
+      s2.oauthState = 'real4';
+      const res3 = makeRes();
+      await callbackHandler({ query: { code: 'c4', state: 'real4' }, session: s2 }, res3);
+
+      assert.strictEqual(res3.statusCode, 200, 'self-healed — no conflict, no cycle-forming merge offered');
+      assert.strictEqual(res3.redirectedTo, '/workspace/other/');
+      assert.strictEqual(s2.accountId, canonicalId);
+      assert.strictEqual(s2.pendingMerge, undefined);
+
+      assert.strictEqual((await stores.accountStore.getAccount(canonicalId)).mergedInto, undefined, 'no cycle written');
+      assert.strictEqual((await stores.accountStore.getAccount(mineAccount._id)).mergedInto, canonicalId);
+      assert.strictEqual(await stores.accountStore.resolveCanonicalAccountId(canonicalId), canonicalId);
+      assert.strictEqual(await stores.accountStore.resolveCanonicalAccountId(mineAccount._id), canonicalId);
+    });
+  });
+
+  // === LIN-2265 close-out: already-corrupt data must not break sign-in =========
+  //
+  // Ledger item from the LIN-2265 review: `establishAccount` now calls
+  // `resolveCanonicalAccountId` whenever `session.accountId` is set, and that
+  // method THROWS on a `mergedInto` cycle or an over-deep chain. No new cycle
+  // can be created (the `mergeAccounts` guard above), so only data corrupted
+  // BEFORE that guard shipped can reach this — but for such an account an
+  // unwrapped call would turn sign-in into a throw where it previously
+  // proceeded, and on the entry paths that do not wrap their own
+  // `establishAccount` call (POST /auth/jira/link) into an unhandled
+  // rejection that hangs the request rather than erroring cleanly. These
+  // tests pin the degrade-instead-of-throw behaviour on seeded corruption.
+
+  describe('LIN-2265 — pre-existing mergedInto corruption degrades, never throws, at the sign-in seam', () => {
+    // Seeds corruption the fixed write path can no longer produce, by writing
+    // `mergedInto` straight onto the documents — this is what an account
+    // corrupted before the guard shipped looks like on disk.
+    async function seedCycle(accountStore) {
+      const a = await accountStore.createAccount();
+      const b = await accountStore.createAccount();
+      await accountStore.collection.updateOne({ _id: a._id }, { $set: { mergedInto: b._id } });
+      await accountStore.collection.updateOne({ _id: b._id }, { $set: { mergedInto: a._id } });
+      await assert.rejects(() => accountStore.resolveCanonicalAccountId(a._id), /cycle detected/,
+        'sanity: the seeded pair is genuinely unresolvable');
+      return { a, b };
+    }
+
+    test('establishAccount with a CYCLIC session.accountId completes instead of throwing, keeping the id uncanonicalized', async () => {
+      const stores = freshStores();
+      const { a } = await seedCycle(stores.accountStore);
+      await stores.accountStore.linkIdentity(a._id, 'linear', 'viewer-cyclic', {});
+
+      const session = makeSession({ accountId: a._id });
+      const established = await establishAccount(
+        session, stores.accountStore, stores.accountWorkspaceStore, 'linear', 'viewer-cyclic', {}, 'org-cyclic'
+      );
+
+      assert.strictEqual(established.ok, true, 'sign-in proceeds exactly as it did before LIN-2265');
+      assert.strictEqual(established.accountId, a._id);
+      assert.strictEqual(session.accountId, a._id, 'degraded to the uncanonicalized id — never a throw, never null');
+    });
+
+    test('an over-deep mergedInto chain degrades the same way', async () => {
+      const stores = freshStores();
+      // 10 accounts chained head -> ... -> tail: deeper than resolveCanonicalAccountId's maxDepth of 8.
+      const chain = [];
+      for (let i = 0; i < 10; i++) chain.push(await stores.accountStore.createAccount());
+      for (let i = 0; i < chain.length - 1; i++) {
+        await stores.accountStore.collection.updateOne({ _id: chain[i]._id }, { $set: { mergedInto: chain[i + 1]._id } });
+      }
+      const head = chain[0];
+      await assert.rejects(() => stores.accountStore.resolveCanonicalAccountId(head._id), /maxDepth/,
+        'sanity: the seeded chain is genuinely over-deep');
+      await stores.accountStore.linkIdentity(head._id, 'linear', 'viewer-deep', {});
+
+      const session = makeSession({ accountId: head._id });
+      const established = await establishAccount(
+        session, stores.accountStore, stores.accountWorkspaceStore, 'linear', 'viewer-deep', {}, 'org-deep'
+      );
+
+      assert.strictEqual(established.ok, true);
+      assert.strictEqual(session.accountId, head._id);
+    });
+
+    test('the front-door callback signs a corrupted account in cleanly — no 500, no unhandled rejection — and the write-path guard still fails a merge closed', async () => {
+      const stores = freshStores();
+      const { a, b } = await seedCycle(stores.accountStore);
+      await stores.accountStore.linkIdentity(a._id, 'linear', 'viewer-mine', {});
+
+      const idx = { index: 0 };
+      const provider = twoIdentityProvider(idx,
+        [{ id: 'org-mine', name: 'Mine', urlKey: 'mine' }, { id: 'org-other', name: 'Other', urlKey: 'other' }],
+        [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
+      const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+      const handler = getHandler(router, 'get', '/auth/callback');
+
+      const session = makeSession({ oauthState: 'real', accountId: a._id });
+      const res = makeRes();
+      await handler({ query: { code: 'c1', state: 'real' }, session }, res);
+
+      assert.strictEqual(res.statusCode, 200, 'a corrupted account still lands, exactly as it did before LIN-2265');
+      assert.strictEqual(res.redirectedTo, '/workspace/mine/');
+      assert.strictEqual(session.accountId, a._id);
+
+      // The second, independent layer is unaffected by the degrade: a merge
+      // built from the stale id still fails closed at the write path.
+      const c = await stores.accountStore.createAccount();
+      const attempt = await stores.accountStore.mergeAccounts(a._id, c._id);
+      assert.strictEqual(attempt.ok, false);
+      assert.strictEqual(attempt.reason, 'canonical-already-merged');
+      assert.strictEqual((await stores.accountStore.getAccount(c._id)).mergedInto, undefined, 'no new pointer written onto the corrupt graph');
+      assert.strictEqual((await stores.accountStore.getAccount(a._id)).mergedInto, b._id, 'the seeded corruption is untouched — never silently repaired here');
     });
   });
 });

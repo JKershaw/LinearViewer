@@ -222,4 +222,42 @@ describe('computeWeeklyBudgetGauge — per-day bars', () => {
     const result = computeWeeklyBudgetGauge([], NOW, {}); // NOW is 6h into the window, same UTC day as reset
     assert.deepEqual(result.dayBars.days, ['2026-08-20']);
   });
+
+  test('today\'s spend is NOT dropped when "now" falls between 00:00Z and 06:00Z (LIN-2273)', () => {
+    // Window starts Thu 2026-08-20 06:00Z. "now" is Sat 2026-08-22 03:00Z —
+    // inside the 00:00Z-06:00Z band, BEFORE today's (Sat's) 06:00Z reset
+    // hour, but today's calendar day has already started and already has
+    // spend keyed under it in `byDay`. The old 06:00Z-anchored enumeration
+    // stopped at Friday, silently dropping Saturday's $500 from the chart
+    // even though the card's percentConsumed already reflects it.
+    const now = new Date('2026-08-22T03:00:00.000Z');
+    const thu = RESET_ISO; // 2026-08-20T06:00:00.000Z
+    const fri = '2026-08-21T09:00:00.000Z';
+    const satOvernight = '2026-08-22T01:30:00.000Z'; // inside the 00:00-06:00Z band
+    const rows = [
+      row({ id: 'm1', issueIdentifier: 'LIN-16', dispatchedAt: thu, feedback: [usageEntry({ costUsd: 40, at: thu })] }),
+      row({ id: 'm2', issueIdentifier: 'LIN-17', dispatchedAt: fri, feedback: [usageEntry({ costUsd: 60, at: fri })] }),
+      row({ id: 'm3', issueIdentifier: 'LIN-18', dispatchedAt: satOvernight, feedback: [usageEntry({ costUsd: 500, at: satOvernight })] })
+    ];
+    const result = computeWeeklyBudgetGauge(rows, now, {});
+    assert.deepEqual(result.dayBars.days, ['2026-08-20', '2026-08-21', '2026-08-22']);
+    assert.deepEqual(result.dayBars.costUsd, [40, 60, 500]);
+  });
+
+  test('reset-day "now" (00:00Z-06:00Z, window not yet rolled over) still surfaces the partial day', () => {
+    // "now" is Thu 2026-08-27 03:00Z — the morning OF the next reset, but
+    // before the 06:00Z rollover, so the window is still last week's
+    // (started Thu 2026-08-20 06:00Z). Spend logged overnight on the 27th
+    // must still surface as its own day-bar rather than vanishing.
+    const now = new Date('2026-08-27T03:00:00.000Z');
+    const overnight = '2026-08-27T02:00:00.000Z';
+    const rows = [
+      row({ id: 'n1', issueIdentifier: 'LIN-19', dispatchedAt: overnight, feedback: [usageEntry({ costUsd: 25, at: overnight })] })
+    ];
+    const result = computeWeeklyBudgetGauge(rows, now, {});
+    assert.equal(currentWindowStartMs(now), new Date(RESET_ISO).getTime(), 'still inside the window that started 2026-08-20');
+    assert.ok(result.dayBars.days.includes('2026-08-27'), 'the partial reset-day bucket must be enumerated');
+    const idx = result.dayBars.days.indexOf('2026-08-27');
+    assert.equal(result.dayBars.costUsd[idx], 25);
+  });
 });

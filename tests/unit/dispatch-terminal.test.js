@@ -10,7 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort } from '../../lib/dispatch-terminal.js';
+import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../../lib/dispatch-terminal.js';
 
 describe('deriveTerminalStatus', () => {
   test('null when feedback is missing or not an array', () => {
@@ -289,16 +289,26 @@ describe('deriveLifecycleStatus (LIN-2079)', () => {
     assert.equal(deriveCompletedAt(feedback), null, 'a parked run has not completed');
   });
 
-  // LIN-2123: a session unblocked and resumed IN PLACE (same row, no
-  // follow-up) posts Simple Dispatcher's own one-time
-  // "[working] Resumed session ..." marker — recognized here, in addition to
-  // the wake-event scan, so the derivation stops being permanently sticky on
-  // [blocked] once that specific marker appears later in the array.
-  describe('in-place resume after [blocked] (LIN-2123)', () => {
+  // LIN-2123 / LIN-2268: a session unblocked and resumed posts Simple
+  // Dispatcher's own one-time "[working] Session resumed. ..." marker
+  // (hook.js, NOT dispatcher.js's own router-level "[working] Resumed
+  // session ..." post — see RESUME_MARKER_REGEX's docstring in
+  // lib/dispatch-terminal.js for why that distinction is load-bearing) —
+  // recognized here, in addition to the wake-event scan, so the derivation
+  // stops being permanently sticky on [blocked] once that specific marker
+  // appears later in the array.
+  describe('resume after [blocked] (LIN-2123 / LIN-2268)', () => {
     test('a resume marker after [blocked] clears the derived status to null', () => {
       assert.equal(deriveLifecycleStatus([
         { message: '[blocked] needs a human decision' },
-        { message: '[working] Resumed session abc12345 (window: w1)' },
+        { message: '[working] Session resumed. Executing follow-up...' },
+      ]), null);
+    });
+
+    test('the stall-failsafe refire wording also clears — harmless, since that path never reaches a [blocked] session', () => {
+      assert.equal(deriveLifecycleStatus([
+        { message: '[blocked] needs a human decision' },
+        { message: '[working] Session resumed. Re-confirming completion state...' },
       ]), null);
     });
 
@@ -313,30 +323,81 @@ describe('deriveLifecycleStatus (LIN-2079)', () => {
     test('a LATER [blocked] after a resume marker wins — re-blocked stays blocked', () => {
       assert.equal(deriveLifecycleStatus([
         { message: '[blocked] first block' },
-        { message: '[working] Resumed session abc12345 (window: w1)' },
+        { message: '[working] Session resumed. Executing follow-up...' },
         { message: '[blocked] blocked again' },
       ]), 'blocked');
     });
 
     test('a resume marker with no prior [blocked] at all changes nothing — still null', () => {
       assert.equal(deriveLifecycleStatus([
-        { message: '[working] Resumed session abc12345 (window: w1)' },
+        { message: '[working] Session resumed. Executing follow-up...' },
       ]), null);
     });
 
     test('case-insensitive and whitespace-tolerant, same discipline as the terminal/wake scans', () => {
       assert.equal(deriveLifecycleStatus([
         { message: '[blocked] needs a human decision' },
-        { message: '  [WORKING] Resumed session ABC12345 (window: w1)' },
+        { message: '  [WORKING] session resumed. Executing follow-up...' },
       ]), null);
     });
 
     test('terminal still wins over everything, including a resume marker', () => {
       assert.equal(deriveLifecycleStatus([
         { message: '[blocked] needs a human decision' },
-        { message: '[working] Resumed session abc12345 (window: w1)' },
+        { message: '[working] Session resumed. Executing follow-up...' },
         { message: '[done] finished' },
       ]), 'done');
+    });
+  });
+
+  // LIN-2268: the marker-shape-only tests above are exactly what LIN-2123's
+  // PR #1199 already had — and its regex still passed every one of them
+  // while being a production no-op, because none of them exercised the
+  // REAL production composition: the ORIGINAL (non-followUpTo) dispatch's
+  // own feedback merged, via mergeLineageFeedback + rootItemId, with the
+  // follow-up dispatch row that actually carries the resume. This block
+  // drives deriveLifecycleStatus from THAT composition — routes/proxy.js's
+  // own read path — so a marker that looks right in isolation but never
+  // reaches the anchor row (LIN-2123's original defect) fails here even
+  // though it would have passed every test above.
+  describe('resume after [blocked], driven from a real (non-followUpTo) dispatch composition (LIN-2268)', () => {
+    const SINCE = '2026-08-20T00:00:00.000Z';
+    const ANCHOR = 'root-1';
+
+    test('hook.js\'s resume marker, posted with rootItemId threaded (its real production shape), clears [blocked] on the anchor row', () => {
+      // The ORIGINAL item — dispatched without followUpTo — parked [blocked].
+      const anchorOwnFeedback = [
+        { message: '[blocked] needs a human decision', timestamp: '2026-08-20T01:00:00.000Z', rootItemId: ANCHOR }
+      ];
+      // A follow-up dispatch (item.followUpTo = ANCHOR) resumed the session.
+      // hook.js's Stop-hook choke point threads rootItemId = session.rootItemId
+      // unconditionally (see RESUME_MARKER_REGEX's docstring) — this is that
+      // real shape, not a hand-picked convenience.
+      const followUpRow = {
+        feedback: [
+          { message: '[working] Session resumed. Executing follow-up...', timestamp: '2026-08-20T02:00:00.000Z', rootItemId: ANCHOR }
+        ]
+      };
+      const merged = mergeLineageFeedback(anchorOwnFeedback, [followUpRow], ANCHOR, SINCE);
+      assert.equal(deriveLifecycleStatus(merged), null, 'the anchor row must stop reporting blocked once the resume merges in');
+    });
+
+    test('regression pin: dispatcher.js\'s own router-level resume post — real production shape, rootItemId omitted — never reaches the anchor row and leaves it stuck [blocked]', () => {
+      // This is dispatcher.js's ACTUAL post at its follow-up-resume site
+      // (`feedback(item.id, config.token, { message: ... })`, no rootItemId) —
+      // the exact defect LIN-2268 found. It is filtered out by
+      // mergeLineageFeedback's `entry.rootItemId === anchor` guard, same as
+      // in real production, so the anchor row stays stuck on [blocked].
+      const anchorOwnFeedback = [
+        { message: '[blocked] needs a human decision', timestamp: '2026-08-20T01:00:00.000Z', rootItemId: ANCHOR }
+      ];
+      const followUpRow = {
+        feedback: [
+          { message: '[working] Resumed session abc12345 (window: w1)', timestamp: '2026-08-20T02:00:00.000Z' /* no rootItemId — the bug */ }
+        ]
+      };
+      const merged = mergeLineageFeedback(anchorOwnFeedback, [followUpRow], ANCHOR, SINCE);
+      assert.equal(deriveLifecycleStatus(merged), 'blocked', 'a rootItemId-less post never joins the anchor lineage, so the row is stuck exactly as LIN-2268 found');
     });
   });
 });
