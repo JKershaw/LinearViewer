@@ -318,3 +318,116 @@ Diagnostic work on LIN-1981 used synthetic credential values throughout.
   What happened *inside* a lane's turns is not visible at this altitude — the same blind spot
   [`intra-session-efficiency-review-2026-08-14.md`](intra-session-efficiency-review-2026-08-14.md)
   was written to address for a different day.
+
+---
+
+## Addendum — 2026-08-24: what the run means, and what happens next
+
+*Written the morning after, by the same operator, following a review-and-discuss pass with
+John. The same authorship conflict declared at the top applies here: this is the operator's
+interpretation of the operator's own run. The review sweep described at the end exists
+precisely because that conflict should not be the last word on the 52 closes.*
+
+### The reframe: the speed did not come from skipping doctrine
+
+The tempting reading of §1 is "the lanes were fast because they skipped Harbour's process."
+That is half true, and the halves matter because they point at opposite next steps.
+
+The lane deleted two different things:
+
+- **Machinery, legitimately.** Cold starts, per-step context rebuilds, queue latency
+  (simple-dispatcher deliberately serializes new-task intake to one item per poll cycle),
+  orchestrator turns spent re-orienting, one terminal window per step. This is
+  model-independent overhead, and it is where the stepper era's wall-clock actually went.
+  W3 closing five dispatcher tickets in 61 minutes is this deletion at work.
+- **Doctrine, accidentally.** The `### What CI Did Not Prove` ledger (§6.1), plan-fidelity,
+  the class check, the Surface Assessment gate, the decision-queue escalation path
+  (LIN-2240), the cost lineage (LIN-2253), the observability wire (LIN-2258). These are
+  cheap relative to implementation work — a hand-authored ledger is minutes. The run was
+  not faster because it skipped them; it lost them because doctrine had no delivery
+  mechanism other than the machinery the lane deleted.
+
+Stated once: **Harbour's process was two layers welded together — accumulated judgment
+(templates, ledger, checks) and delivery machinery (dispatch, queue, server-written
+prompts) — and the stepper coupled them, so the judgment could only be had by paying for
+the machinery.** The run proved they separate. LIN-2256 re-delivers the judgment without
+the machinery ("compose, don't paraphrase": the lane fetches each verb's canonical prompt
+via the LIN-839 deterministic `?kind=` override and executes it in-session). The
+dispatch-for-independence principle recorded on that ticket re-admits the machinery only
+where machinery itself is the value.
+
+### Dispatch is the accountability perimeter, not just isolation
+
+The dispatch-for-independence comment on LIN-2256 names three reasons a lane should
+dispatch a real session rather than a sub-agent: auditable independence, model/harness
+heterogeneity, durability across long waits. A fourth deserves equal billing, because it
+dissolves two of this run's defects at once: **a dispatched step re-enters Harbour's
+measurement and enforcement perimeter.** A ticket landed in-session has no lineage and is
+invisible to the cost metric (LIN-2253); an in-session ticket walk is invisible to the
+`maxTasks`/trim guard (§ Step 7 of the lane doc). A per-ticket dispatched child creates
+the lineage and re-enters the budget guard structurally. The dial between "lane holds the
+step" and "lane dispatches the step" is therefore not only a capability dial — it is an
+accountability dial, and the default should consider which steps the *system*, rather
+than the lane's honesty, ought to hold.
+
+### The inversion, named
+
+The earlier "follow-on" idea (LIN-415 lineage) and the lane are the same insight from
+opposite ends. Follow-on said: fresh sessions by default, chain continuity in as the rare
+exception after a flawless session. The lane says: continuity by default, dispatch
+independence out as the principled exception. What licensed the inversion is Step 1 of
+the lane doc — **per-ticket re-grounding gives fresh-context's epistemic benefit without
+paying fresh-context's economic cost** — validated twice in this run against operator
+error (§4). The principle that survives both regimes:
+
+> **Production is continuous; verification is independent.**
+
+### The hybrid program, mapped to the board
+
+The "lanes with Harbour's benefits" model is not a new build. It is:
+
+1. **Lane spine** — exists (`docs/worker-lane-prompt.md`).
+2. **Judgment via the API** — each verb's canonical prompt fetched deterministically and
+   executed in-session; the lane picks the verb, the server writes the words — the verb-
+   override invariant one altitude down (LIN-2256).
+3. **Machinery re-admitted per step, by rule** — the dispatch-for-independence dial plus
+   the accountability-perimeter rule above (mechanisms all ship today).
+4. **Per-ticket signals on a real wire** — one agent-facing channel that should carry both
+   `[ticket]` markers and per-ticket `[decision]` escalations (LIN-2258 + LIN-2240,
+   designed as one endpoint, not two).
+5. **Honest measurement** — lane-landed tickets in the cost denominator (LIN-2253).
+6. **Composition moves to the planner** — carve/order/tail-reachability ratified as a
+   passage rather than operator folklore (fold into LIN-1809; the one unfiled piece —
+   this run's only unrecoverable failure mode was a composition error, W1's starved tail).
+
+Sequence: review sweep (below) → LIN-2258 + finish LIN-2253 → LIN-2256 (its acceptance
+lane hand-authors its ledger per the bootstrap clause) → LIN-2257, whose model-ladder
+verdict — not fiat — should retire the stepper's remaining default call sites. The
+stepper itself stays as the safety floor the lane degrades onto: its capability-
+substitution half is plausibly unnecessary at the frontier, but its enforcement-perimeter
+half was never the slow part and the hybrid keeps all of it.
+
+### The review sweep — dispatched 2026-08-24, results to follow
+
+§ Appendix C's honest position ("49 of 52 closes remain unexamined") is now being tested
+rather than restated. Two read-only retrospective review lanes were dispatched at
+07:53 BST 2026-08-24 over a stratified sample of 16 closes:
+
+- **R1, runtime & dispatcher** (`review-sweep-runtime-2026-08-24`, dispatch `9e20a750`):
+  LIN-2229, 2137, 2119, 2147, 2132, 2208, 2226.
+- **R2, credentials, provider & surfaces** (`review-sweep-surfaces-2026-08-24`, dispatch
+  `5f18f953`): LIN-2110, 2109, 1982, 1746, 2010, 1872, 2118, 2247, plus LIN-2248 as a
+  docs-only control.
+
+Method: each reviewer authors the would-have-been ledger for the landed diff, checks each
+item against post-merge evidence, and issues `discharged` / `undischarged` / `defect` per
+ticket — re-litigating nothing, changing no states, filing a ticket only for a confirmed
+shipped defect. The sweep doubles as the live pilot of LIN-2256's compose mechanism: the
+reviewers fetch the canonical review doctrine via `?kind=review` and report the friction.
+
+The result must be read asymmetrically: real defects found is strong evidence that
+independent review earns its dispatch cost and the dial should default review-out;
+nothing found is *weak* evidence against — one day, one frontier model — but would
+justify keeping review in-session by default and dispatching it out only on the risk
+surfaces. Either way the dial gets its first empirical setting. A second addendum will
+record what came back.
