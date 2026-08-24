@@ -795,6 +795,50 @@ describe('GitHub auth routes', () => {
     assert.ok(account.identities.some(i => i.scope === 'human-B'));
   });
 
+  // LIN-2267 amendment (review F1 + F2): the accountId-carry above makes an
+  // `unknown-account` conflict reachable on THIS branch for the first time —
+  // before the carry, regenerate() always wiped session.accountId, so
+  // establishAccount's stale-id branch could never fire here (it self-healed
+  // via the mint branch instead). Now that it IS reachable, this branch must
+  // apply the same post-conflict hygiene routes/auth.js's
+  // respondToAccountConflict already applies (LIN-2266): clear the stale
+  // accountId/freshness stamp/OAuth state, and restore session.workspaces to
+  // its pre-login snapshot.
+  test('POST link (new) clears the stale accountId and restores session.workspaces on an unknown-account 409, so the retry is not a permanent lockout (LIN-2267 F1/F2)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
+    const session = makeSession({
+      // A stale/unresolvable accountId — the deleted-account or
+      // restored/repointed-store case establishAccount's unknown-account
+      // branch guards against.
+      accountId: 'acct-DELETED',
+      identityAuthenticatedAt: Date.now(),
+      oauthState: 'state-abc',
+      oauthIntent: { mode: 'new' },
+      githubHumanId: 'human-new',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octonew', userId: '777', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [linearWs],
+    });
+    await handler({ body: { repo: 'octonew/hello-world' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Account Conflict/);
+    // F1: the stale accountId (and its freshness stamp) must not survive into
+    // the retry, or every subsequent front-door login re-derives the SAME
+    // stale id and 409s forever (the LIN-2266 lockout, reintroduced here).
+    assert.equal(session.accountId, undefined, 'stale accountId cleared');
+    assert.equal(session.identityAuthenticatedAt, undefined, 'freshness stamp cleared');
+    assert.equal(session.oauthState, undefined, 'OAuth state cleared');
+    assert.equal(session.oauthIntent, undefined, 'OAuth intent cleared');
+    // F2: the arriving (unconfirmed) workspace and its live installation
+    // token must not remain in session.workspaces.
+    assert.deepEqual(session.workspaces, [linearWs], 'session.workspaces restored to its pre-login snapshot');
+    assert.ok(!JSON.stringify(session.workspaces).includes('gho_token'), 'the arriving credential does not leak into the session');
+  });
+
   test('POST link (add-source) links onto the active workspace without creating a new one', async () => {
     const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');

@@ -464,6 +464,75 @@ describe('LIN-2267 — mode:new carries session.accountId across regenerate', ()
 });
 
 // ---------------------------------------------------------------------------
+// LIN-2267 amendment (review F1 + F2): the accountId-carry above makes an
+// `unknown-account` conflict reachable on completeJiraNewLogin's regenerate
+// branch for the first time — before the carry, regenerate() always wiped
+// session.accountId, so establishAccount's stale-id branch could never fire
+// here. Now that it IS reachable, this branch must apply the same
+// post-conflict hygiene routes/auth.js's respondToAccountConflict already
+// applies (LIN-2266): clear the stale accountId/freshness stamp/OAuth state,
+// and restore session.workspaces to its pre-login snapshot.
+// ---------------------------------------------------------------------------
+
+/**
+ * An account store that models `unknown-account`: `findAccountByIdentity`
+ * always misses (a brand-new identity), so `establishAccount` falls through
+ * to `else if (session.accountId)` and tries to link onto the CARRIED id —
+ * `linkIdentity` then reports it unknown unless it is the one id this store
+ * actually minted (`'acct-new'`), mirroring `lib/account-store.js`'s real
+ * `getAccount(accountId) === null` branch.
+ */
+function makeUnknownAccountStores() {
+  const bound = []
+  return {
+    bound,
+    accountStore: {
+      async findAccountByIdentity() { return null },
+      async createAccount() { return { _id: 'acct-new' } },
+      async linkIdentity(accountId) {
+        if (accountId !== 'acct-new') return { ok: false, reason: 'unknown-account' }
+        return { ok: true }
+      },
+      async deleteAccount() { return true },
+      async resolveCanonicalAccountId(accountId) { return accountId ?? null },
+    },
+    accountWorkspaceStore: { async bindAccountToWorkspace(accountId, workspaceId) { bound.push([accountId, workspaceId]); return true } },
+  }
+}
+
+describe('LIN-2267 amendment — post-conflict session hygiene on the mode:new unknown-account 409', () => {
+  test('clears the stale accountId and restores session.workspaces, so the retry is not a permanent lockout (F1/F2)', async () => {
+    const linearWs = { id: 'ws-1', urlKey: 'acme-linear', provider: 'linear', accessToken: 'linear-access', bindings: [{ provider: 'linear', scope: 'org-1', credentials: { token: 'linear-access' } }] }
+    const session = makeSession({
+      // A stale/unresolvable accountId — the deleted-account or
+      // restored/repointed-store case establishAccount's unknown-account
+      // branch guards against.
+      accountId: 'acct-DELETED',
+      identityAuthenticatedAt: Date.now(),
+      workspaces: [linearWs],
+    })
+    const stores = makeUnknownAccountStores()
+
+    const { callback } = await signInWithJira({ session, stores })
+
+    assert.equal(callback.status, 409)
+    assert.match(callback.text, /Account Conflict/)
+    // F1: the stale accountId (and its freshness stamp) must not survive
+    // into the retry, or every subsequent front-door login re-derives the
+    // SAME stale id and 409s forever (the LIN-2266 lockout, reintroduced
+    // here).
+    assert.equal(session.accountId, undefined, 'stale accountId cleared')
+    assert.equal(session.identityAuthenticatedAt, undefined, 'freshness stamp cleared')
+    assert.equal(session.oauthState, undefined, 'OAuth state cleared')
+    assert.equal(session.oauthIntent, undefined, 'OAuth intent cleared')
+    // F2: the arriving (unconfirmed) workspace and its live OAuth credentials
+    // must not remain in session.workspaces.
+    assert.deepEqual(session.workspaces, [linearWs], 'session.workspaces restored to its pre-login snapshot')
+    assert.ok(!JSON.stringify(session.workspaces).includes('jira-access-1'), 'the arriving credential does not leak into the session')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // LIN-1890 close-out — review F3: the carried refresh token on the FAILURE
 // exits.
 //

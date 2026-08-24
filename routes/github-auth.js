@@ -506,6 +506,9 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
             // identity — a returning user's existing account is found by
             // identity lookup even with no live session.accountId, same as
             // the Linear OAuth callback.
+            // LIN-2267 (review F2): snapshot BEFORE upsertWorkspace, so a
+            // conflict return can restore it — mirrors routes/auth.js:437.
+            const workspacesBeforeLogin = req.session.workspaces ? [...req.session.workspaces] : []
             try {
               upsertWorkspace(req.session, workspace)
             } catch (limitError) {
@@ -516,6 +519,22 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
 
             const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', humanId, { login: creds.login }, workspace.id)
             if (!established.ok) {
+              // LIN-2267 (review F1 + F2): this conflict branch is now reachable
+              // because accountId survives regenerate above — before it was
+              // always wiped, so establishAccount could never see a stale one.
+              // Apply the same post-conflict hygiene routes/auth.js's
+              // respondToAccountConflict already applies on its non-mergeable
+              // branch: clear the stale accountId/freshness stamp (or the SAME
+              // stale id is carried into every retry, a permanent login lockout
+              // per LIN-2266) and OAuth state, and restore session.workspaces to
+              // its pre-login snapshot (or the arriving unconfirmed workspace's
+              // live credentials leak into a session that belongs to another
+              // account).
+              delete req.session.accountId
+              delete req.session.identityAuthenticatedAt
+              delete req.session.oauthState
+              delete req.session.oauthIntent
+              req.session.workspaces = workspacesBeforeLogin
               return res.status(409).send(renderErrorPage('Account Conflict', 'This GitHub account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
                 action: 'Go to homepage', actionUrl: '/'
               }))

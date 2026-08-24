@@ -623,6 +623,42 @@ describe('GitHub Projects auth routes', () => {
     assert.ok(account.identities.some(i => i.scope === 'human-B'));
   });
 
+  // LIN-2267 amendment (review F1 + F2), the GitHub Projects sibling of
+  // github-auth.test.js's equivalent: the accountId-carry above makes an
+  // `unknown-account` conflict reachable on THIS branch for the first time —
+  // before the carry, regenerate() always wiped session.accountId, so
+  // establishAccount's stale-id branch could never fire here. Now that it IS
+  // reachable, this branch must apply the same post-conflict hygiene
+  // routes/auth.js's respondToAccountConflict already applies (LIN-2266):
+  // clear the stale accountId/freshness stamp/OAuth state, and restore
+  // session.workspaces to its pre-login snapshot.
+  test('POST link (new) clears the stale accountId and restores session.workspaces on an unknown-account 409, so the retry is not a permanent lockout (LIN-2267 F1/F2)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+    const res = makeRes();
+    const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
+    const session = makeSession({
+      accountId: 'acct-DELETED',
+      identityAuthenticatedAt: Date.now(),
+      oauthState: 'state-abc',
+      oauthIntent: { mode: 'new' },
+      githubHumanId: 'human-new',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octonew', userId: '777', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [linearWs],
+    });
+    await handler({ body: { board: 'octonew/5' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Account Conflict/);
+    assert.equal(session.accountId, undefined, 'stale accountId cleared');
+    assert.equal(session.identityAuthenticatedAt, undefined, 'freshness stamp cleared');
+    assert.equal(session.oauthState, undefined, 'OAuth state cleared');
+    assert.equal(session.oauthIntent, undefined, 'OAuth intent cleared');
+    assert.deepEqual(session.workspaces, [linearWs], 'session.workspaces restored to its pre-login snapshot');
+    assert.ok(!JSON.stringify(session.workspaces).includes('ghs_inst'), 'the arriving credential does not leak into the session');
+  });
+
   // Mirrors tests/unit/github-auth.test.js's add-source conflict test — the
   // GitHub Projects half of the LIN-1329 review's finding 2 (the auth-route.test.js
   // note claims this file's add-source mode covers the conflict branch).
