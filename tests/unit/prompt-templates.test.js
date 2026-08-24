@@ -11,6 +11,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import fs from 'node:fs';
 import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, formatAIHintsForMetaPrompt, getAIRecommendationActionNames, RECOMMEND_META_ACTIONS, DISPATCH_KINDS, isValidDispatchKind, deriveDispatchKind } from '../../lib/prompt-templates.js';
 import { WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
@@ -130,6 +131,41 @@ describe('defer recommend-meta action', () => {
   test('deriveDispatchKind resolves defer to itself, not the custom fallback', () => {
     assert.strictEqual(deriveDispatchKind('defer'), 'defer');
     assert.strictEqual(deriveDispatchKind('DEFER'), 'defer');
+  });
+});
+
+// =============================================================================
+// `public/llms.txt` catalog (LIN-1602 precedent, LIN-2261 review F1): the
+// public, unauthenticated agent-facing catalog is hand-maintained prose, not
+// derived from PROMPT_TEMPLATES — so it can silently drift from the registry.
+// These tests cross-reference the file's content against the live registry
+// rather than pinning a literal count, so the NEXT template addition fails
+// here instead of shipping a stale public claim again.
+// =============================================================================
+
+describe('public/llms.txt prompt catalog stays in sync with PROMPT_TEMPLATES', () => {
+  const llmsTxt = fs.readFileSync(new URL('../../public/llms.txt', import.meta.url), 'utf8');
+  const templateKeys = Object.keys(PROMPT_TEMPLATES);
+
+  test('the advertised count matches the registry size', () => {
+    const match = llmsTxt.match(/Available Prompt Templates \((\d+) total\)/);
+    assert.ok(match, 'llms.txt must carry an "Available Prompt Templates (N total)" header');
+    assert.strictEqual(Number(match[1]), templateKeys.length);
+  });
+
+  test('every registered template kind (including retrospective-audit) is listed as a bullet', () => {
+    for (const key of templateKeys) {
+      assert.ok(
+        llmsTxt.includes(`\`${key}\` -`),
+        `llms.txt is missing a catalog bullet for \`${key}\``,
+      );
+    }
+  });
+
+  test('the "All N templates above" cross-reference also matches the registry size', () => {
+    const match = llmsTxt.match(/All (\d+) templates above/);
+    assert.ok(match, 'llms.txt must carry an "All N templates above" cross-reference');
+    assert.strictEqual(Number(match[1]), templateKeys.length);
   });
 });
 

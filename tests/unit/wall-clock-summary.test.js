@@ -27,6 +27,8 @@ test('bucketOf maps kinds to lifecycle phases, defaulting to orchestration', () 
   assert.equal(bucketOf('implementation'), 'diff');
   assert.equal(bucketOf('review'), 'after');
   assert.equal(bucketOf('close-out'), 'after');
+  assert.equal(bucketOf('retro'), 'after');
+  assert.equal(bucketOf('retrospective-audit'), 'after');
   assert.equal(bucketOf('wake'), 'orchestration');
   assert.equal(bucketOf('autopilot'), 'orchestration');
   assert.equal(bucketOf('something-unknown'), 'orchestration'); // safe default
