@@ -592,6 +592,49 @@ describe('TaskDecisionsStore.clear', () => {
   });
 });
 
+// LIN-2270: the verification counterpart to clear — a `clear` call that
+// silently targets the wrong urlKey leaves `getStatus` still returning null
+// for THAT workspace's own issues (there are none there), so it never
+// surfaced clear's real bug. `count` reads back every row for a urlKey
+// regardless of outcome, which is what a caller needs to prove a clear
+// actually emptied the store rather than assuming it.
+describe('TaskDecisionsStore.count (LIN-2270)', () => {
+  test('counts every row for a urlKey, including outcome-stamped ones, and ignores other workspaces', async () => {
+    const collection = createMockCollection();
+    const store = new TaskDecisionsStore({ collection });
+    const a = await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    await store.markOutcome({ urlKey: 'ws-a', issueId: ISSUE_ID, id: a.id, outcome: 'answered' });
+    await store.recordScan({ urlKey: 'ws-a', issueId: '99999999-8888-7777-6666-555555555555', inputHash: HASH_A, decision: sampleDecision() });
+    await store.recordScan({ urlKey: 'ws-b', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+
+    assert.equal(await store.count('ws-a'), 2);
+    assert.equal(await store.count('ws-b'), 1);
+    assert.equal(await store.count('ws-nonexistent'), 0);
+  });
+
+  test('a clear that targets the wrong urlKey leaves count non-zero for the real one — the exact LIN-2270 bug shape', async () => {
+    const collection = createMockCollection();
+    const store = new TaskDecisionsStore({ collection });
+    await store.recordScan({ urlKey: 'local-workspace-w0', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+
+    // The pre-fix hook cleared this key instead of the one fixtures actually write to.
+    await store.clear('test-workspace-w0');
+    assert.equal(await store.count('local-workspace-w0'), 1, 'clearing the wrong key must not remove the real residue');
+
+    // The fix: clear the key fixtures actually use.
+    await store.clear('local-workspace-w0');
+    assert.equal(await store.count('local-workspace-w0'), 0);
+  });
+
+  test('an unconfigured store or missing urlKey degrades to 0, never throws', async () => {
+    const unconfigured = new TaskDecisionsStore({});
+    assert.equal(await unconfigured.count('ws'), 0);
+    const collection = createMockCollection();
+    const store = new TaskDecisionsStore({ collection });
+    assert.equal(await store.count(undefined), 0);
+  });
+});
+
 describe('TaskDecisionsStore.listUnansweredForWorkspaces (LIN-2215)', () => {
   let collection, store;
   const ISSUE_ID_2 = '22222222-3333-4444-5555-666666666666';

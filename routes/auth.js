@@ -56,6 +56,21 @@ import { renderMergeConfirmPage, renderMergeReauthRequiredPage } from '../lib/re
  */
 async function respondToAccountConflict({ req, res, established, workspace, refreshToken, mode, returnUrlKey }) {
   if (!established.conflict) {
+    // Non-mergeable: establishAccount refused with no merge candidate — today
+    // that's exclusively `reason: 'unknown-account'` (lib/account-store.js), a
+    // session.accountId that no longer resolves to a real account (deleted
+    // account, restored/repointed datastore). Clear it — and its freshness
+    // stamp — before rendering, or the SAME stale id is carried into every
+    // retry (mode:'new' restores it across regenerate per LIN-2233, add-source
+    // never regenerates at all) and this 409 becomes a permanent login
+    // lockout (LIN-2266) instead of the pre-LIN-2233 self-heal. Also clear the
+    // OAuth state/intent here — this early return used to skip the LIN-1351
+    // hygiene the mergeable branches below still do, leaking oauthState/
+    // oauthIntent across a failed round-trip.
+    delete req.session.accountId
+    delete req.session.identityAuthenticatedAt
+    delete req.session.oauthState
+    delete req.session.oauthIntent
     const html = renderErrorPage('Account Conflict', 'This Linear account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
       action: 'Go to homepage',
       actionUrl: '/'

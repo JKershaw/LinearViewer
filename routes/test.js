@@ -779,6 +779,21 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   })
 
+  // Verification sibling to /test/clear-task-decisions (LIN-2270): a
+  // workspace-wide count (any issueId, any outcome), so a caller can assert
+  // a clear actually left the store empty for that key instead of assuming
+  // it did — LIN-2228's original clear silently targeted a urlKey the
+  // fixtures never wrote to, and a green suite gave no signal either way.
+  router.get('/test/task-decisions-count', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace'
+      const count = taskDecisionsStore ? await taskDecisionsStore.count(urlKey) : 0
+      res.json({ ok: true, count })
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
   // Endpoint to clear saved chats for testing (LIN-1008)
   router.get('/test/clear-saved-chats', async (req, res) => {
     try {

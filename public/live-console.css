@@ -532,10 +532,18 @@
   .lc-event { grid-template-columns: auto 1fr; }
   .lc-event-meta { grid-column: 2; }
 
-  /* The fixed feedback FAB (feedback-widget.css) reserves the bottom-right
-     corner: 16px inset + ~32px tall. Clear it vertically so the FAB never
-     sits over "view earlier activity" (LIN-2252). */
-  .lc-more { padding-bottom: 3.5rem; }
+  /* LIN-2272: LIN-2252's `padding-bottom` here was a no-op — `.lc-more-btn`
+     is in normal flow and `.feedback-fab` (feedback-widget.css) is
+     `position: fixed`, so bottom padding on this ancestor only grows the
+     document/max-scroll and never moves the button relative to the
+     viewport. As the page scrolls, the button's fixed document position
+     sweeps past the FAB's fixed screen position regardless of padding, so
+     no amount of vertical spacing here can clear it for every scroll
+     offset. Reserve HORIZONTAL space instead: the FAB occupies the
+     bottom-right corner (16px inset + 83px wide, ~99px), so keep the
+     centred button's right edge left of that band. This holds at every
+     scroll position, since it never depends on scrollY. */
+  .lc-more { padding-right: 7rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

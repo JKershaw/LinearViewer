@@ -112,3 +112,60 @@ describe('routes/test.js — GET /test/task-decisions (LIN-2217)', () => {
     assert.strictEqual(res.jsonBody.error, 'boom');
   });
 });
+
+// LIN-2270: the verification sibling to /test/clear-task-decisions — lets a
+// caller prove a clear actually emptied the store for a urlKey instead of
+// assuming it (the bug this ticket fixes was specifically an unverified
+// cleanup: the beforeEach hook in observation-rulings.spec.js cleared a
+// urlKey nothing wrote to, and a green suite gave no signal either way).
+describe('routes/test.js — GET /test/task-decisions-count (LIN-2270)', () => {
+  test('counts every row for a urlKey regardless of outcome, and ignores other workspaces', async () => {
+    const taskDecisionsStore = new TaskDecisionsStore({ collection: createMockCollection() });
+    const row = await taskDecisionsStore.recordScan({
+      urlKey: URL_KEY, issueId: ISSUE_ID, issueIdentifier: 'TEST-6', inputHash: 'hash1', decision: { question: 'Proceed?' }
+    });
+    await taskDecisionsStore.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id: row.id, outcome: 'answered' });
+    await taskDecisionsStore.recordScan({
+      urlKey: 'other-workspace', issueId: ISSUE_ID, issueIdentifier: 'TEST-7', inputHash: 'hash2', decision: { question: 'Proceed?' }
+    });
+
+    const router = createTestRoutes({ taskDecisionsStore });
+    const handler = getHandler(router, 'get', '/test/task-decisions-count');
+
+    const { req: reqA, res: resA } = makeReqRes({ query: { urlKey: URL_KEY } });
+    await handler(reqA, resA);
+    assert.strictEqual(resA.jsonBody.ok, true);
+    assert.strictEqual(resA.jsonBody.count, 1);
+
+    const { req: reqB, res: resB } = makeReqRes({ query: { urlKey: 'other-workspace' } });
+    await handler(reqB, resB);
+    assert.strictEqual(resB.jsonBody.count, 1);
+
+    const { req: reqC, res: resC } = makeReqRes({ query: { urlKey: 'nonexistent-workspace' } });
+    await handler(reqC, resC);
+    assert.strictEqual(resC.jsonBody.count, 0);
+  });
+
+  test('returns count: 0 when no store is injected', async () => {
+    const router = createTestRoutes({});
+    const handler = getHandler(router, 'get', '/test/task-decisions-count');
+    const { req, res } = makeReqRes({ query: { urlKey: URL_KEY } });
+
+    await handler(req, res);
+
+    assert.strictEqual(res.jsonBody.ok, true);
+    assert.strictEqual(res.jsonBody.count, 0);
+  });
+
+  test('the 500 branch reports a store error rather than throwing', async () => {
+    const taskDecisionsStore = { count: async () => { throw new Error('boom'); } };
+    const router = createTestRoutes({ taskDecisionsStore });
+    const handler = getHandler(router, 'get', '/test/task-decisions-count');
+    const { req, res } = makeReqRes({ query: { urlKey: URL_KEY } });
+
+    await handler(req, res);
+
+    assert.strictEqual(res.statusCode, 500);
+    assert.strictEqual(res.jsonBody.error, 'boom');
+  });
+});

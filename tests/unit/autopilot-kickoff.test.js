@@ -129,8 +129,13 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     // expected — risking a nudge/re-dispatch on a run that is correctly waiting on
     // a human. This is the shipped-prompt residual named by LIN-2124, ported from
     // the already-adjudicated wording in docs/autopilot-orchestrator-prompt.md.
+    // LIN-2269: the original port said "keep waiting for the unblock" — but a
+    // `blocked` step consumes the once-only terminal-wake slot, so its later
+    // genuine done/failed never reaches the orchestrator on the in-place resume
+    // path. Waiting on a wake that provably never arrives strands the run; the
+    // adjudicated wording keeps the orchestrator active instead ("surface it").
     assert.ok(flat.includes('a step already woken to you as `blocked` is expected to stay silent'));
-    assert.ok(flat.includes("don't nudge or re-dispatch it on this rule, keep waiting for the unblock"));
+    assert.ok(flat.includes("don't nudge or re-dispatch it on this rule, surface it to the human so they can unblock it"));
   });
 
   test('keeps the step-4 "done means go look" cross-check after the swap (LIN-826)', () => {
@@ -756,8 +761,12 @@ describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
     // Both variants of the wedged-session rule need the carve-out — the ticket's
     // own scope note is that the "both-paths" rule doesn't apply here (this isn't
     // the recommendation-prompt pair), but BOTH shipped kickoff variants still do.
+    // LIN-2269: same forward fix as the pushed variant above — "surface it to the
+    // human" replaces "keep waiting for the unblock", since the wake that wording
+    // waited on is suppressed by the in-place resume path (LIN-1357's terminal-wake
+    // slot; see lib/dispatch-terminal.js).
     assert.ok(flat.includes('a step already woken to you as `blocked` is expected to stay silent'));
-    assert.ok(flat.includes("don't nudge or re-dispatch it on this rule, keep waiting for the unblock"));
+    assert.ok(flat.includes("don't nudge or re-dispatch it on this rule, surface it to the human so they can unblock it"));
   });
 
   test('standalone now DOES tell the agent to check for the "Your autopilot session id" block (LIN-1324)', () => {

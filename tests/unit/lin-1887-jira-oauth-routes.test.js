@@ -70,6 +70,9 @@ function makeAccountStores() {
       async findAccountByIdentity(provider, scope) { return identities.get(`${provider}:${scope}`) ?? null; },
       async createAccount() { return { _id: 'acct-new' }; },
       async linkIdentity(accountId, provider, scope) { identities.set(`${provider}:${scope}`, { _id: accountId }); return { ok: true }; },
+      // This fake models no merging, so canonicalization is always a no-op —
+      // mirrors AccountStore.resolveCanonicalAccountId's no-mergedInto case.
+      async resolveCanonicalAccountId(accountId) { return accountId ?? null; },
     },
     accountWorkspaceStore: { async bindAccountToWorkspace() { return true; } },
   };
