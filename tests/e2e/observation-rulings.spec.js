@@ -13,21 +13,29 @@ import { featuresParam } from '../helpers.js';
 let URL_KEY;
 let OBSERVATION_URL;
 
-test.beforeEach(async ({ page, workerUrlKey }) => {
+test.beforeEach(async ({ page, workerUrlKey, localWorkerUrlKey }) => {
   URL_KEY = workerUrlKey;
   OBSERVATION_URL = `/workspace/${URL_KEY}/observation`;
-  // LIN-2228: this key is shared (at workers:1) with every other spec file
-  // that seeds a task decision under the same per-worker urlKey (e.g.
-  // tests/e2e/scan.spec.js) — TaskDecisionsStore has no per-spec-file
-  // isolation, only per-urlKey, and is durable with no TTL. Clearing here
-  // immunizes the nav-badge block's workspace-global assertions AND removes
-  // the residue a failed pre-press run in THIS file would otherwise leave
-  // behind forever, rather than merely tolerating it (LIN-2215 review ledger
-  // items 6/7). Uses the existing test-route cleanup pattern already used in
-  // this file (clearRuns/clearRunsFor below), not a new mechanism.
-  await page.goto(`/test/clear-task-decisions?urlKey=${URL_KEY}`);
-  // LIN-1727: same rationale as clear-task-decisions above — shelved-rulings
-  // is durable with no TTL, keyed by the same shared per-worker urlKey.
+  // LIN-2270 (was LIN-2228, ledger item 7 — reopened, the original close was
+  // wrong): every TaskDecisionsStore row this file produces comes from the
+  // 'Task-bound ruling' describe block below, which seeds through the REAL
+  // scan route against `localWorkerUrlKey` (local-workspace-w0) — the scan
+  // pipeline is local-provider-only, it never writes under `workerUrlKey`
+  // (test-workspace-w0). LIN-2228 cleared `workerUrlKey` instead: a key
+  // nothing here ever writes to, so the clear was a no-op every run.
+  // Execution proved it — planted residue survived 24 hook runs, and a green
+  // run added another row on top, because "the suite passed" was never
+  // checked against the store actually being empty. Clearing the right key
+  // AND reading the count back (rather than trusting the clear call) is what
+  // makes this a real assertion instead of the same unverified assumption.
+  await page.request.get(`/test/clear-task-decisions?urlKey=${localWorkerUrlKey}`);
+  const afterClear = await page.request.get(`/test/task-decisions-count?urlKey=${localWorkerUrlKey}`);
+  expect((await afterClear.json()).count, 'task-decisions store must be empty after the beforeEach clear').toBe(0);
+  // LIN-1727: shelved-rulings is durable with no TTL, keyed by the same
+  // shared per-worker urlKey — but unlike task decisions, every shelve in
+  // this file goes through `/workspace/${URL_KEY}/api/dashboard/rulings/shelve`
+  // (the loop-decision path, not the local-provider scan path), so
+  // `workerUrlKey` IS the key actually written here.
   await page.goto(`/test/clear-shelved-rulings?urlKey=${URL_KEY}`);
 });
 
