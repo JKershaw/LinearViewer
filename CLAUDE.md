@@ -111,7 +111,7 @@ lib/
   swim-graph.js        Swim dependency-graph model (flow / side-rail view)
   prompt-templates.js  Prompt template query functions and main entry point
   prompt-formatters.js Shared formatting helpers for prompt templates
-  prompt-template-defs.js  Prompt template definitions (14 templates)
+  prompt-template-defs.js  Prompt template definitions (17 templates)
   completion-signals.js  Completion signals for prompt assessment
   custom-prompts-store.js  Custom prompt template storage (per workspace)
   collective-characters-store.js  Collective character (persona) storage (LIN-1048): mirrors custom-prompts-store (Mongo/Mango, UUID, per-anchor-urlKey partition); each record carries its own repo binding (workspaceUrlKey, re-validated at dispatch, NO stored proxy token) + the five persona fields; two kinds — `custom` (capped 20, throw on overflow) and `recent` (auto-recorded per /start dispatch, rolling 10, evict-oldest, never throw); identity = binding+persona, so saving a recent promotes it to custom in place and a dispatched saved character is not double-listed

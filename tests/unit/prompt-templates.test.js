@@ -11,7 +11,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, formatAIHintsForMetaPrompt, RECOMMEND_META_ACTIONS, DISPATCH_KINDS, isValidDispatchKind, deriveDispatchKind } from '../../lib/prompt-templates.js';
+import fs from 'node:fs';
+import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, formatAIHintsForMetaPrompt, getAIRecommendationActionNames, RECOMMEND_META_ACTIONS, DISPATCH_KINDS, isValidDispatchKind, deriveDispatchKind } from '../../lib/prompt-templates.js';
 import { WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 
@@ -99,12 +100,13 @@ describe('getPromptLabels', () => {
     assert.ok(labels.includes('implementation'));
     assert.ok(labels.includes('review'));
     assert.ok(labels.includes('close-out'));
+    assert.ok(labels.includes('retrospective-audit'));
     assert.ok(labels.includes('retro'));
   });
 
-  test('has exactly 16 templates', () => {
+  test('has exactly 17 templates', () => {
     const labels = getPromptLabels();
-    assert.strictEqual(labels.length, 16);
+    assert.strictEqual(labels.length, 17);
   });
 });
 
@@ -117,7 +119,7 @@ describe('defer recommend-meta action', () => {
     // The no-body cost contract is structural: defer has no PROMPT_TEMPLATES entry,
     // so it cannot produce a prompt and cannot inflate the template count.
     assert.ok(!('defer' in PROMPT_TEMPLATES), 'defer must not be a prompt template');
-    assert.strictEqual(getPromptLabels().length, 16, 'defer must not change the template count');
+    assert.strictEqual(getPromptLabels().length, 17, 'defer must not change the template count');
   });
 
   test('defer is registered in RECOMMEND_META_ACTIONS and the dispatch vocabulary', () => {
@@ -129,6 +131,41 @@ describe('defer recommend-meta action', () => {
   test('deriveDispatchKind resolves defer to itself, not the custom fallback', () => {
     assert.strictEqual(deriveDispatchKind('defer'), 'defer');
     assert.strictEqual(deriveDispatchKind('DEFER'), 'defer');
+  });
+});
+
+// =============================================================================
+// `public/llms.txt` catalog (LIN-1602 precedent, LIN-2261 review F1): the
+// public, unauthenticated agent-facing catalog is hand-maintained prose, not
+// derived from PROMPT_TEMPLATES — so it can silently drift from the registry.
+// These tests cross-reference the file's content against the live registry
+// rather than pinning a literal count, so the NEXT template addition fails
+// here instead of shipping a stale public claim again.
+// =============================================================================
+
+describe('public/llms.txt prompt catalog stays in sync with PROMPT_TEMPLATES', () => {
+  const llmsTxt = fs.readFileSync(new URL('../../public/llms.txt', import.meta.url), 'utf8');
+  const templateKeys = Object.keys(PROMPT_TEMPLATES);
+
+  test('the advertised count matches the registry size', () => {
+    const match = llmsTxt.match(/Available Prompt Templates \((\d+) total\)/);
+    assert.ok(match, 'llms.txt must carry an "Available Prompt Templates (N total)" header');
+    assert.strictEqual(Number(match[1]), templateKeys.length);
+  });
+
+  test('every registered template kind (including retrospective-audit) is listed as a bullet', () => {
+    for (const key of templateKeys) {
+      assert.ok(
+        llmsTxt.includes(`\`${key}\` -`),
+        `llms.txt is missing a catalog bullet for \`${key}\``,
+      );
+    }
+  });
+
+  test('the "All N templates above" cross-reference also matches the registry size', () => {
+    const match = llmsTxt.match(/All (\d+) templates above/);
+    assert.ok(match, 'llms.txt must carry an "All N templates above" cross-reference');
+    assert.strictEqual(Number(match[1]), templateKeys.length);
   });
 });
 
@@ -280,6 +317,7 @@ describe('PROMPT_TEMPLATES', () => {
       'implementation',
       'review',
       'close-out',
+      'retrospective-audit',
       'retro'
     ];
     for (const labelName of expectedTemplates) {
@@ -1854,6 +1892,47 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
   });
 });
 
+describe('meta-prompt retrospective-audit routing + quality rule (LIN-2261)', () => {
+  const baseArgs = {
+    issueContext: 'CTX', identifier: 'LIN-2261',
+    hasSubtasks: true, subtaskCount: 2, completedCount: 2, inProgressCount: 0, remainingCount: 0,
+    hasComments: true, commentCount: 2, aiHints: 'H', actionVocabulary: 'plan, review, retrospective-audit, implementation, bug',
+    completionSignals: 'S', focusedSubtaskId: null
+  };
+
+  test('Step 0 names retrospective-audit as a third branch, distinct from review/close-out', () => {
+    const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
+    assert.ok(/Step 0: The substantive work here is already complete — recommend `review`, `close-out`, or `retrospective-audit`/.test(p),
+      'Step 0 heading names all three branches');
+    assert.ok(/already merged and Done \(close-out has already run\) → recommend `retrospective-audit`/i.test(p),
+      'a third bullet routes fully-closed work to retrospective-audit');
+    assert.ok(/NOT another `review` or `close-out`/i.test(p), 'it forbids re-recommending review or close-out');
+    assert.ok(/does not change state or file follow-ups/i.test(p), 'the bullet states the read-only contract');
+  });
+
+  test('the retrospective-audit quality rule is present exactly once and mirrors the read-only contract', () => {
+    const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: false, hasOpenChildren: true });
+    const matches = p.match(/\*\*Retrospective-audit prompts\*\* must/g) || [];
+    assert.strictEqual(matches.length, 1, 'exactly one Retrospective-audit-prompts rule exists');
+    assert.ok(/open from the fact that the work is already merged/i.test(p), 'must open from already-merged');
+    assert.ok(/must NOT re-verify overall correctness/i.test(p), 'must not re-verify correctness');
+    assert.ok(/audit the claims/i.test(p) && /audit test integrity/i.test(p) && /ownership orphans/i.test(p),
+      'must cover claims, test integrity, and ownership orphans');
+    assert.ok(/forbid changing status, labels/i.test(p), 'must forbid state changes');
+    assert.ok(/forbid filing follow-up tickets/i.test(p), 'must forbid filing follow-ups');
+  });
+
+  test('retrospective-audit is offered in the AI recommendation vocabulary (unlike retro)', () => {
+    const names = getAIRecommendationActionNames();
+    assert.ok(names.includes('retrospective-audit'), 'retrospective-audit must be an emittable action');
+    assert.ok(!names.includes('retro'), 'retro stays excluded from AI recommendation');
+  });
+
+  test('retrospective-audit derives to a real (non-custom) dispatch kind', () => {
+    assert.notStrictEqual(deriveDispatchKind('retrospective-audit'), 'custom');
+  });
+});
+
 describe('meta-prompt design shape-fork routing + aiHint discriminators (LIN-878)', () => {
   const baseArgs = {
     issueContext: 'CTX', identifier: 'LIN-878',
@@ -1892,12 +1971,70 @@ describe('meta-prompt design shape-fork routing + aiHint discriminators (LIN-878
     assert.ok(/Choose over: choose `spike` over `research`/i.test(hints), 'spike Choose over rendered');
   });
 
-  test('discriminators are additive — only the three tagged kinds emit them (back-compatible)', () => {
+  test('discriminators are additive — only the tagged kinds emit them (back-compatible)', () => {
     const hints = formatAIHintsForMetaPrompt();
-    assert.strictEqual((hints.match(/When NOT:/g) || []).length, 3, 'exactly design/scoping/spike emit When NOT');
-    assert.strictEqual((hints.match(/Choose over:/g) || []).length, 3, 'exactly design/scoping/spike emit Choose over');
+    // LIN-2261 added retrospective-audit as a fourth tagged kind (disambiguating it from review/retro).
+    assert.strictEqual((hints.match(/When NOT:/g) || []).length, 4, 'exactly design/scoping/spike/retrospective-audit emit When NOT');
+    assert.strictEqual((hints.match(/Choose over:/g) || []).length, 4, 'exactly design/scoping/spike/retrospective-audit emit Choose over');
     // core kinds still render their situation/goal/workflow untouched
     assert.ok(/\*\*research\*\*/.test(hints) && /\*\*review\*\*/.test(hints), 'core kinds still present');
+  });
+});
+
+// =============================================================================
+// retrospective-audit template (LIN-2261) — the post-merge audit verb
+// =============================================================================
+
+describe('retrospective-audit template', () => {
+  const mockIssue = {
+    id: 'issue-retro-audit',
+    identifier: 'LIN-2261',
+    title: 'Test Task',
+    description: 'Test description',
+    url: 'https://linear.app/test/issue/LIN-2261',
+    labels: [],
+    createdAt: '2026-08-01T00:00:00Z'
+  };
+  const mockContext = { parent: null, siblings: [], project: null, children: [], comments: [] };
+
+  test('is registered with category UNIVERSAL, an aiHint, and completionSignals', () => {
+    const template = PROMPT_TEMPLATES['retrospective-audit'];
+    assert.ok(template, 'retrospective-audit template must exist');
+    assert.strictEqual(template.category, PROMPT_CATEGORIES.UNIVERSAL);
+    assert.ok(template.aiHint, 'must have an aiHint so it is AI-recommendable');
+    assert.ok(template.completionSignals, 'must have completionSignals');
+  });
+
+  test('is part of the AI recommendation vocabulary (unlike retro)', () => {
+    const names = getAIRecommendationActionNames();
+    assert.ok(names.includes('retrospective-audit'), 'retrospective-audit must be recommendable');
+  });
+
+  test('generates a prompt that opens from the fact the change is already merged', () => {
+    const result = generatePrompt('retrospective-audit', mockIssue, mockContext);
+    assert.strictEqual(result.name, 'retrospective-audit');
+    assert.ok(/already merged/i.test(result.prompt), 'must state the change is already merged');
+    assert.ok(!/status to "In Progress"/i.test(result.prompt), 'must not change status — read-only');
+  });
+
+  test('does not re-verify overall correctness and focuses on claims + test integrity', () => {
+    const result = generatePrompt('retrospective-audit', mockIssue, mockContext);
+    assert.ok(/re-verify overall correctness/i.test(result.prompt), 'must disclaim re-verifying correctness');
+    assert.ok(/Audit the Claims/i.test(result.prompt), 'must audit claims');
+    assert.ok(/Audit Test Integrity/i.test(result.prompt), 'must audit test integrity');
+    assert.ok(/Ownership Orphans/i.test(result.prompt), 'must check ownership orphans');
+  });
+
+  test('forbids state changes and follow-up filing', () => {
+    const result = generatePrompt('retrospective-audit', mockIssue, mockContext);
+    assert.ok(/do not change status, labels/i.test(result.prompt), 'must forbid status/label changes');
+    assert.ok(/do not merge or mark anything Done/i.test(result.prompt), 'must forbid merge/Done');
+    assert.ok(/do not file follow-up tickets/i.test(result.prompt), 'must forbid filing follow-ups');
+  });
+
+  test('reports findings as a comment (read-only workflow), not a Linear write beyond the comment', () => {
+    const result = generatePrompt('retrospective-audit', mockIssue, mockContext);
+    assert.ok(/Add findings as a comment/i.test(result.prompt), 'workflow ends in a findings comment');
   });
 });
 

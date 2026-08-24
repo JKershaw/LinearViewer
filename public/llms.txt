@@ -184,7 +184,7 @@ relationship between the tasks, not as a label.
 - `.prompt-copy` - copy button (inside container)
 - `.prompt-download` - download button (inside container); saves the prompt as a `.md` file. Use this instead of copy for very large prompts (e.g. retro on an epic) that exceed clipboard limits. The file matches what copy yields, including the `+proxy` block when that toggle is on. Filename: `<identifier>-<promptName>.md`.
 
-### Available Prompt Templates (16 total)
+### Available Prompt Templates (17 total)
 
 **Default Prompts** (shown for every issue, including completed/canceled):
 - `look-into` - look into: Quick overview and context for any task
@@ -205,10 +205,11 @@ relationship between the tasks, not as a label.
 - `review` - review: Verify implementation before merge
 - `close-out` - close-out: Discharge the review ledger, then merge, set Done, post the summary, and file follow-ups
 - `retro` - retro: Retrospective look-back (or in-flight reorient) — reconstruct what happened, assess downstream effects/risks, surface lessons; presents findings without writing back
+- `retrospective-audit` - retrospective audit: Audit a merged change's claims and test integrity after the fact; presents findings without writing back
 
 ### Public Templates Page
 
-All 16 templates above (never the meta-prompt) are also published, unauthenticated, at `/templates` — a public page with no session/workspace requirement, linked from every other page's footer (`a.footer-legal[href="/templates"]`; on `/templates` itself the footer shows it as plain current-page `<strong>` text, not a link). Each template renders in a `.prompt-card`, with its full text inside that card's `<details class="prompt-details"><pre class="prompt-text">` — so fetching the HTML is enough to read every template, no JavaScript required. The `.template-copy-btn` copy control is **not** in the served HTML: `/templates.js` injects one per card on `DOMContentLoaded` (client-only; no dispatch, no proxy token), so with JS off the cards and their text remain, minus the copy buttons. Indexable (no `noindex`) — unlike `/kpis`/`/styleguide`, discoverability is the point.
+All 17 templates above (never the meta-prompt) are also published, unauthenticated, at `/templates` — a public page with no session/workspace requirement, linked from every other page's footer (`a.footer-legal[href="/templates"]`; on `/templates` itself the footer shows it as plain current-page `<strong>` text, not a link). Each template renders in a `.prompt-card`, with its full text inside that card's `<details class="prompt-details"><pre class="prompt-text">` — so fetching the HTML is enough to read every template, no JavaScript required. The `.template-copy-btn` copy control is **not** in the served HTML: `/templates.js` injects one per card on `DOMContentLoaded` (client-only; no dispatch, no proxy token), so with JS off the cards and their text remain, minus the copy buttons. Indexable (no `noindex`) — unlike `/kpis`/`/styleguide`, discoverability is the point.
 
 ### More Prompts Inline
 Access additional prompt templates from any issue, regardless of its labels or state.

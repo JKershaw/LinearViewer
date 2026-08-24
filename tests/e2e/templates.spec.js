@@ -1,7 +1,7 @@
 /**
  * E2E tests for the public /templates page (LIN-1889).
  *
- * The page requires no authentication and publishes the 16 non-meta prompt
+ * The page requires no authentication and publishes the 17 non-meta prompt
  * templates for anyone to view and copy. Modeled on tests/e2e/kpis.spec.js
  * and tests/e2e/legal.spec.js.
  */
@@ -14,9 +14,9 @@ test.describe('Templates page', () => {
     await expect(page).toHaveTitle(/Templates/);
   });
 
-  test('shows all 16 non-meta templates', async ({ page }) => {
+  test('shows all 17 non-meta templates', async ({ page }) => {
     await page.goto('/templates');
-    await expect(page.locator('.prompt-card')).toHaveCount(16);
+    await expect(page.locator('.prompt-card')).toHaveCount(17);
   });
 
   test('never renders the meta prompt', async ({ page }) => {
