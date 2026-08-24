@@ -395,4 +395,31 @@ describe('collectUnansweredDecisions — shelving (LIN-1727)', () => {
     const rows = collectUnansweredDecisions({ loops: [l], shelvedRulings: [shelf('d-1', { resurfaceAt: NOW.toISOString() })] }, { now: NOW });
     assert.strictEqual(rows.length, 1);
   });
+
+  // LIN-2262: decision_id is agent-invented free text, not a UUID — two
+  // workspaces inventing the same short id is ordinary, not exotic. The
+  // shelf gate must key on (urlKey, decisionId), matching the store's own
+  // composite key, so shelving in one workspace cannot suppress an entirely
+  // unshelved decision in another that happens to share a decision_id.
+  test('shelving a decision in one workspace does not suppress the same decision_id, unshelved, in another workspace', () => {
+    const acme = loop({ loopId: 'loop-acme', workspaceUrlKey: 'acme', wakeMarker: 'blocked', decision: decision('proceed-or-abort') });
+    const globex = loop({ loopId: 'loop-globex', workspaceUrlKey: 'globex', wakeMarker: 'blocked', decision: decision('proceed-or-abort') });
+    const rows = collectUnansweredDecisions(
+      { loops: [acme, globex], shelvedRulings: [shelf('proceed-or-abort', { urlKey: 'acme', resurfaceAt: '2026-08-23T00:00:00.000Z' })] },
+      { now: NOW }
+    );
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].anchor.workspaceUrlKey, 'globex');
+  });
+
+  test('shelving a task-bound decision in one workspace does not suppress the same decision_id, unshelved, in another workspace', () => {
+    const acmeTask = taskDecision({ urlKey: 'acme', issueId: 'uuid-acme-task', decision: decision('proceed-or-abort') });
+    const globexTask = taskDecision({ urlKey: 'globex', issueId: 'uuid-globex-task', decision: decision('proceed-or-abort') });
+    const rows = collectUnansweredDecisions(
+      { taskDecisions: [acmeTask, globexTask], shelvedRulings: [shelf('proceed-or-abort', { urlKey: 'acme', resurfaceAt: '2026-08-23T00:00:00.000Z' })] },
+      { now: NOW }
+    );
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].anchor.workspaceUrlKey, 'globex');
+  });
 });

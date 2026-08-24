@@ -1490,7 +1490,7 @@ export function createDashboardRoutes({
   // required (docs/escalation-philosophy.md §6: silent muting is forbidden).
   // Works uniformly for a loop-backed OR task-bound ruling — unlike answer/
   // dismiss, a shelve never writes to the underlying loop/task-decision row
-  // at all (it is a VIEW operation only, keyed on `decisionId` alone in
+  // at all (it is a VIEW operation only, keyed on `(urlKey, decisionId)` in
   // `lib/shelved-rulings-store.js`), so this route needs no anchor/disposition
   // branching the way `.../rulings/dismiss` above does.
   const MIN_SHELVE_MS = 5 * 60 * 1000; // 5 minutes
