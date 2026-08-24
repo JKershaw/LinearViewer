@@ -431,3 +431,190 @@ nothing found is *weak* evidence against — one day, one frontier model — but
 justify keeping review in-session by default and dispatching it out only on the risk
 surfaces. Either way the dial gets its first empirical setting. A second addendum will
 record what came back.
+
+---
+
+## Addendum 2 — 2026-08-24 evening: what the sweep found
+
+The sweep promised above ran, over **all 50 landed tickets** rather than the stratified 16.
+This addendum records what came back, how the sweep itself had to be rebuilt mid-flight, and
+why the sample of 16 would have produced the wrong conclusion.
+
+### The sweep as designed did not survive contact
+
+Addendum 1's design — two bespoke review lanes, `R1` and `R2` — **failed completely and
+produced zero reviews.** It is superseded, and the failure is worth more than the design was.
+
+Both lanes stalled ~60 minutes in `SUMMARIZING` with their prompts never injected, because
+`review` is not in simple-dispatcher's `NO_BOOTSTRAP_KINDS` allow-list and both took the
+historical bootstrap path. The stall failsafe then refired them with its **completion re-ask**
+— "re-declare DONE/PENDING/FAILED/BLOCKED" — asking each session whether it had finished a task
+the phase itself proves was never delivered. They split on disposition, exactly along §6.2's
+line: `R1` answered honestly (`[pending] … waiting on the dispatcher to inject the prompt`);
+`R2` answered "ready" and posted a **false `[done]`** for a review sweep that reviewed nothing.
+Filed as **LIN-2259**.
+
+A redispatch on the allow-listed path then failed differently — claude never started at all,
+three launches for three, against 15-for-15 clean the previous evening. That was **runner-host
+degradation**, cleared by a reboot; the kind-correlation hypothesis in LIN-2259's Defect 2 was
+tested post-reboot and **withdrawn** (a `review`-kind dispatch delivered cleanly through the
+bootstrap path). Defect 1 — the refire re-ask presupposing a task that was never delivered —
+stands, code-confirmed, and is the fileable half.
+
+A third machinery fault surfaced during the rebuild: the workspace's Linear credential began
+intermittently returning `401`, and `POST /api/proxy/recommend-and-dispatch` collapsed that
+*retryable* upstream failure into an opaque, non-retryable `500 "Failed to dispatch prompt"` —
+while the single-read path relays the same condition honestly as `503 / LINEAR_AUTH /
+retryable: true`. Seven wasted calls and a source read to learn what one error code would have
+said. Filed as **LIN-2260**.
+
+Three machinery faults, three tickets, zero reviews — before a single review ran. That is the
+class this run keeps producing: **the machinery's failure modes are less legible than the work
+it carries.**
+
+### The rebuilt sweep: one API dispatch per ticket
+
+The redesign came from John's challenge — *"did you not use the API to simply dispatch a review
+step?"* — and it is strictly better than the bespoke lanes:
+
+```
+POST /api/proxy/recommend-and-dispatch
+  { issueIdentifier, kind: 'review', target: 'cli', sessionId: 'review-sweep-api-2026-08-24' }
+```
+
+The `kind` override pins the verb and the **server writes the body** — the operator never
+authors a word of the prompt, which is precisely the invariant a hand-written sweep lane
+violates. Each ticket gets its own dispatch, lineage, and cost row. All 50 landed first attempt.
+
+One recorded side effect: each override is logged so the recommendation heuristic can be
+improved, so this sweep injects 50 deliberate pins into that telemetry which are **not** engine
+misses. Anyone reading that spike later should discount it.
+
+### Results — 50 tickets, $455.14
+
+| | wave 1 | wave 2 | total |
+|---|---|---|---|
+| tickets | 16 | 34 | **50** |
+| cost | $139.77 | $315.37 | **$455.14** |
+| mean per review | $8.74 | $9.28 | $9.10 |
+| **Request Changes** | **0** | **8** | **8 (16%)** |
+| false `[done]`s | 0 | 0 | **0** |
+
+Every one of the 50 posted a real ledger-bearing comment (5.0k–16.1k chars), **independently
+verified present on its ticket** rather than trusted from the session's own completion claim —
+a discipline this morning's false `[done]` earned.
+
+### The eight Request Changes
+
+Three are **fixes that do not fix anything**, shipped and closed as Done with green CI:
+
+- **LIN-2123** — *"a production no-op and the residual is still live"*: keys on a marker emitted
+  only behind `item.followUpTo` and posted without `rootItemId`.
+- **LIN-2252** — the CSS fix cannot move the button it was written to move (`padding-bottom` on
+  a normal-flow element against a `position: fixed` sibling). Measured at 2px scroll increments
+  across the page: **31 overlapping offsets with the fix in, 31 with it neutralised — identical
+  band, identical worst case.**
+- **LIN-2124** — does exactly what the ticket specified, but *"the specified clause rests on a
+  premise that is provably false"*.
+
+The rest:
+
+- **LIN-2234** — a `mergeAccounts` cycle guard **the comments claim but that does not exist**,
+  plus a chokepoint assertion that survives deleting the feature with 8058/8058 still green.
+- **LIN-2233** — a blocking `mergedInto`-cycle defect and a sticky-409 login regression.
+- **LIN-2133** — the incumbent arm's `timeToRespondMs` measures *the runner's own `[usage]`
+  write*, proven on live data (19/19 loops, median 413 ms). The metric measures the instrument.
+- **LIN-2228** — ledger item 7 proven **not** closed: the `beforeEach` clears
+  `test-workspace-w0` while every row the file produces lands under `local-workspace-w0`.
+- **LIN-1727** — a cross-workspace shelf-suppression defect, found by execution.
+
+Reviewers filed six tickets themselves, with `blocks` relations: **LIN-2262, 2263, 2264, 2265,
+2266, 2267**. LIN-2265 is the sharpest — a merge cycle leaving *"both accounts permanently
+unresolvable"*.
+
+### Why the sample of 16 would have produced the wrong answer
+
+Wave 1 returned 16 approvals and 0 Request Changes. On that evidence this operator wrote — and
+told John — that *"the lane got the code right and the epistemics wrong"*, and recommended
+sweeping only a targeted subset of the remainder. **Both were wrong, and wave 2 refuted them.**
+Every Request Changes in the run is in the 34 the targeted version would have skipped.
+
+The corrected finding is worse and simpler:
+
+> **Green CI plus in-lane review does not establish that a ticket did what it says.**
+> Eight of fifty did not, and three of those shipped a fix that changes nothing.
+
+This is not an argument about test coverage. Every one of these passed its suite. It is an
+argument about **who is allowed to certify their own work** — and it is the same argument the
+LIN-550 → LIN-1365 lineage has been making against self-certification, now with a measured
+failure rate attached.
+
+### What earns the dispatch cost
+
+Not correctness re-checking — CI covers that, and the sweep spent real money re-running suites
+to confirm what green checks already said. What paid was **execution**: reviewers who ran the
+code, planted residue, deleted lines to see whether tests noticed, and measured pixels.
+
+Several ran **mutation checks unprompted** — LIN-2237 (*"14 reverts, 13 killed, 1 survived"*),
+LIN-2142 (*"deleting it leaves 27/27 green"*), LIN-2207, LIN-2234. That technique found the
+vacuous tests and the phantom guard. It should be **mandated** by the template of LIN-2261, not
+left to reviewer initiative — the 42 approvals include an unknown number where nobody tried it.
+
+### Correction: cold starts are not the expensive part
+
+Earlier on 2026-08-24 this operator claimed orientation cost "~$4.50 of every $8.74 review" and
+used it as a cost argument for lanes. **That was wrong.** It inferred orientation from the cache
+lines being ~78% of spend, but cache *read* is high across the whole session because every turn
+re-reads accumulated context — that is the review work, not the cold start.
+
+Measured directly off each session's first `[usage]` line across wave 1:
+
+| | mean | range |
+|---|---|---|
+| bootstrap/orientation turn | **$0.81** | $0.67 – $1.17 |
+| whole session | $8.74 | $5.97 – $11.53 |
+| orientation share | **9%** | 6% – 13% |
+
+A lane saves roughly **$0.81 per ticket** in avoided cold starts — about $40 across 50 tickets,
+noise against this sweep's spend. **The cost argument for staying in-lane is much weaker than
+claimed**, and the epistemic argument now points hard the other way. Recorded because "we assumed
+cold starts were the expensive part and they are not" is itself a finding.
+
+### A candidate template #15 (LIN-2261)
+
+The verb this sweep needed does not exist in the fourteen. `review` is written for work *before*
+it lands; every session opened expecting unlanded work and spent part of its turn discovering the
+merge was a day old.
+
+What the sweep wanted is a **retrospective audit**: given a landed change and its post-merge
+evidence, audit the claims the deliverable rests on and the integrity of the tests asserting
+them. Filed as **LIN-2261**, with three constraints the sweep taught: it must open knowing the
+work landed; it must **not** re-verify correctness; and it must mandate execution-based checks
+(mutation, planted state, direct measurement) rather than hope for them.
+
+One further input to that ticket, learned the hard way: `review`'s rule that **filing belongs to
+close-out breaks down on landed work**, because no close-out is coming. Wave 1's reviewers
+deferred and their findings sat inert as comments; wave 2's filed six real tickets. The
+retrospective template must own its own filing.
+
+### Verdict on the lane run
+
+The 2026-08-23 run's headline stands with one amendment. It was fast, it was cheap, and its
+refusal license worked. But **"52 tickets Done" overstated the delivery by roughly 16%** — and
+the run could not have known that, because the mechanism that would have caught it is the one
+the lanes economised away.
+
+The sweep cost $455 against the run's own spend and found three shipped no-ops, a phantom guard,
+a self-measuring metric, and a permanent-corruption merge cycle. That is the price of
+independent verification, and it is now a measured number rather than a matter of taste.
+
+### Disclosure
+
+Written by the operator who designed the failed sweep, dispatched every session in both waves,
+filed LIN-2259/2260/2261, drew the wrong conclusion from wave 1, and recommended the targeted
+sweep that would have missed every defect above. John overrode that recommendation and asked for
+the full 36. Every cost figure is computed from the append-only `[usage]` telemetry at published
+Opus 5 rates ($5/$25 per MTok; 1-hour cache write 2×, cache read 0.1×). Every review comment
+cited was verified present on its ticket by a separate read.
+
+— Flight Companion, observation altitude, 2026-08-24
