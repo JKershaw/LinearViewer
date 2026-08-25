@@ -105,6 +105,33 @@ describe('observer-efficacy-signal: computeNewHarnessSignal (LIN-2133)', () => {
     assert.deepStrictEqual(computeNewHarnessSignal(null).perLoop, []);
     assert.strictEqual(computeNewHarnessSignal([{ loopId: null }]).count, 0, 'an entry with no loopId is skipped, not crashed on');
   });
+
+  // LIN-2263 (F2): ObserverShadowLogStore#_pruneToCapacity evicts the
+  // WORKSPACE's oldest entries once it holds `capacity` of them — so when the
+  // entries handed to computeNewHarnessSignal already sit at/past that cap,
+  // any loop's own firstDetectedAt may really be "oldest survivor", not true
+  // first detection. `truncated` must say so rather than silently trusting
+  // detectionLagMs/stillBlockedObservedMs.
+  test('truncated is false when entry count is under the given capacity', () => {
+    const a = computeWouldBeAction(attentionRow({ since: '2026-08-20T10:00:00.000Z' }));
+    const result = computeNewHarnessSignal([{ ...a, recordedAt: new Date('2026-08-20T10:01:00.000Z') }], { capacity: 200 });
+    assert.strictEqual(result.truncated, false);
+  });
+
+  test('truncated is true when entry count is at/past the given capacity', () => {
+    const entries = Array.from({ length: 3 }, (_, i) => ({
+      ...computeWouldBeAction(attentionRow({ loopId: `loop-${i}`, since: '2026-08-20T10:00:00.000Z' })),
+      recordedAt: new Date(`2026-08-20T10:0${i}:00.000Z`)
+    }));
+    const result = computeNewHarnessSignal(entries, { capacity: 3 });
+    assert.strictEqual(result.truncated, true, 'entries.length (3) >= capacity (3) — eviction may already be discarding this workspace\'s oldest rows');
+  });
+
+  test('truncated stays false (never guessed) when no capacity is given', () => {
+    const a = computeWouldBeAction(attentionRow({ since: '2026-08-20T10:00:00.000Z' }));
+    const result = computeNewHarnessSignal([{ ...a, recordedAt: new Date('2026-08-20T10:01:00.000Z') }]);
+    assert.strictEqual(result.truncated, false);
+  });
 });
 
 // ─── B. computeIncumbentSignal ──────────────────────────────────────────────
@@ -208,6 +235,175 @@ describe('observer-efficacy-signal: computeIncumbentSignal (LIN-2133)', () => {
     assert.deepStrictEqual(computeIncumbentSignal([]).perLoop, []);
     assert.deepStrictEqual(computeIncumbentSignal(null).perLoop, []);
   });
+
+  // LIN-2263 (F1): realistic stored-entry shape — `[decision] -> [blocked] ->
+  // [usage]` — matching hook.js's `blocked` boundary (assistant-text, an
+  // optional `betweenTextAndStatus` decision, the `[blocked]` status entry,
+  // then the runner's own `postUsageSnapshot` bookkeeping write at the SAME
+  // Stop, gated on WORKER_USAGE_RELAY). A real human/observer response
+  // arrives much later, as a `decision-answer` entry. The positional
+  // `feedback[first.index + 1]` bug reads the `[usage]` row as the response
+  // (a sub-second gap); the fix must skip it and land on the real one.
+  test('[decision] -> [blocked] -> [usage]: timeToRespondMs skips the runner\'s own [usage] bookkeeping entry (WORKER_USAGE_RELAY on)', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        feedback: [
+          { kind: 'assistant-text', message: 'Looking into it now.', timestamp: '2026-04-11T11:09:00.000Z' },
+          { kind: 'decision', message: 'DECISION: needs a ruling on scope', timestamp: '2026-04-11T11:09:30.000Z' },
+          { kind: 'status', message: '[blocked] need a decision', timestamp: '2026-04-11T11:10:00.000Z' },
+          { kind: 'usage', message: '[usage] {"schema":1,"harness":"claude-code","inputTokens":100,"outputTokens":50}', timestamp: '2026-04-11T11:10:00.400Z' },
+          { kind: 'decision-answer', message: 'proceed with option B', timestamp: '2026-04-11T12:45:00.000Z' },
+          { kind: 'status', message: '[done] shipped', timestamp: '2026-04-11T12:46:00.000Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const result = computeIncumbentSignal(loops);
+    assert.strictEqual(result.count, 1);
+    const [row] = result.perLoop;
+    assert.strictEqual(row.respondedAt, '2026-04-11T12:45:00.000Z', 'must land on the decision-answer, not the [usage] bookkeeping row');
+    assert.strictEqual(row.timeToRespondMs, 95 * 60 * 1000, '95 minutes to the real response, not ~400ms to [usage]');
+    assert.strictEqual(row.resolved, true);
+  });
+
+  test('[decision] -> [blocked] -> (no [usage]): same real response, unaffected by WORKER_USAGE_RELAY being off', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        feedback: [
+          { kind: 'assistant-text', message: 'Looking into it now.', timestamp: '2026-04-11T11:09:00.000Z' },
+          { kind: 'decision', message: 'DECISION: needs a ruling on scope', timestamp: '2026-04-11T11:09:30.000Z' },
+          { kind: 'status', message: '[blocked] need a decision', timestamp: '2026-04-11T11:10:00.000Z' },
+          { kind: 'decision-answer', message: 'proceed with option B', timestamp: '2026-04-11T12:45:00.000Z' },
+          { kind: 'status', message: '[done] shipped', timestamp: '2026-04-11T12:46:00.000Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const result = computeIncumbentSignal(loops);
+    const [row] = result.perLoop;
+    assert.strictEqual(row.timeToRespondMs, 95 * 60 * 1000, 'same measurement whether or not the runner relayed [usage]');
+  });
+
+  test('a blocked loop whose only later entries are runner bookkeeping ([tool]/[usage]) reports no response yet, not a false sub-second gap', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        status: 'taken',
+        feedback: [
+          { kind: 'status', message: '[blocked] need a decision', timestamp: '2026-04-11T11:10:00.000Z' },
+          { kind: 'tool', message: '(tool-activity) Bash: git status', timestamp: '2026-04-11T11:10:00.200Z' },
+          { kind: 'usage', message: '[usage] {"schema":1,"harness":"claude-code","inputTokens":100,"outputTokens":50}', timestamp: '2026-04-11T11:10:00.400Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const [row] = computeIncumbentSignal(loops).perLoop;
+    assert.strictEqual(row.respondedAt, null, 'both trailing entries are runner bookkeeping — no real response has landed');
+    assert.strictEqual(row.timeToRespondMs, null);
+    assert.strictEqual(row.resolved, false);
+  });
+
+  // LIN-2263 (F1, review R1 -> re-review R1′): the real, VERBATIM stored
+  // sequence for dispatch `001164ac` (same lineage the first review cited
+  // as `5ac0084e` — identical `22:56:18.258`/`23:03:27.326` timestamps;
+  // entries 75-81 off the workspace proxy). The R1 fix landed with a
+  // TRIMMED 4-row fixture (75, 76, 77, 81) that omitted entries 78-80 — the
+  // very entries that defeat it: a second [usage] write, a [heartbeat], and
+  // finally the agent's own `assistant-text` self-check ANSWER, all still
+  // self-activity between the runner's stall-failsafe re-ask and the loop's
+  // next genuine [blocked]. Running the R1-only fix against this full array
+  // measured `timeToRespondMs: 455768` (7m36s) on entry 80 — nobody
+  // external responded; entry 81 just re-declares [blocked] and the loop
+  // stayed genuinely blocked. This fixture must not be trimmed again.
+  test('[blocked] -> [usage] -> runner self-check ([working · verifying], kind:status) -> [usage] -> [heartbeat] -> agent self-check answer (kind:assistant-text) -> repeated [blocked]: no response measured (verbatim 001164ac)', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        status: 'taken',
+        feedback: [
+          { kind: 'status', message: "[blocked] LIN-2218's deliverable is merged and CI-green", timestamp: '2026-08-22T22:56:18.258Z' },
+          { kind: 'usage', message: '[usage] {"schema":1,"harness":"claude-code","inputTokens":100,"outputTokens":50}', timestamp: '2026-08-22T22:56:18.671Z' },
+          { kind: 'status', message: '[working · verifying] Confirming completion — asked the agent to declare DONE or PENDING...', timestamp: '2026-08-22T23:03:27.326Z' },
+          { kind: 'usage', message: '[usage] {"schema":1,"harness":"claude-code","inputTokens":120,"outputTokens":60}', timestamp: '2026-08-22T23:03:27.715Z' },
+          { kind: 'heartbeat', message: '[working · running] 8 tools in 10m 2s', timestamp: '2026-08-22T23:03:40.844Z' },
+          { kind: 'assistant-text', message: 'Re-checked rather than recalled: proxy still 503 WORKSPACE_OWNER_MISMATCH, LIN-2218 is not actually mergeable yet.', timestamp: '2026-08-22T23:03:54.026Z' },
+          { kind: 'status', message: "[blocked] LIN-2218's witness is merged but the deliverable PR is not", timestamp: '2026-08-22T23:03:54.364Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const [row] = computeIncumbentSignal(loops).perLoop;
+    assert.strictEqual(row.respondedAt, null, 'the self-check, its bookkeeping trailer, the agent\'s own assistant-text answer, and the repeated [blocked] are all self-activity, not a response');
+    assert.strictEqual(row.timeToRespondMs, null, 'must not report the agent\'s own ~7m36s self-check answer as a response time (R1′)');
+    assert.strictEqual(row.resolved, false, 'the loop is genuinely still blocked, unresolved');
+  });
+
+  // LIN-2263 (review R1′): the sharpest live case — the runner's onboarding
+  // failsafe re-ask, relayed back to itself as `kind: 'assistant-text'`
+  // (dispatch `861aeeb2`/`e431c0e2`, hook.js's `postTurnText`, labelled
+  // precisely so a feedback-channel consumer does not mistake prep-phase
+  // output for real work). Before this fix this measured `timeToRespondMs:
+  // 8468138` (2h21m) — the reaper's own stall/resume backstop interval, not
+  // an efficacy measurement.
+  test('[blocked] -> runner onboarding failsafe re-ask (kind:assistant-text): no response measured', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        status: 'taken',
+        feedback: [
+          { kind: 'status', message: '[blocked] waiting on a decision before onboarding can continue', timestamp: '2026-08-22T09:00:00.000Z' },
+          { kind: 'assistant-text', message: '[onboarding] Failsafe re-ask — prep step, not task work:\nready', timestamp: '2026-08-22T11:21:18.138Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const [row] = computeIncumbentSignal(loops).perLoop;
+    assert.strictEqual(row.respondedAt, null, 'the onboarding failsafe re-ask is the runner relaying its own agent\'s prep output, not an external response');
+    assert.strictEqual(row.timeToRespondMs, null, 'must not report the reaper\'s own ~2h21m stall/resume interval as a response time');
+    assert.strictEqual(row.resolved, false);
+  });
+
+  // LIN-2263 (F1, review R1): the OTHER live self-talk shape — an in-place
+  // resume/refire status ("[working] Session resumed…", kind:'status',
+  // hook.js's RESUMING branch) — must not be mistaken for a response either,
+  // whether or not it is followed by a real one.
+  test('[blocked] -> runner resume self-talk ([working] Session resumed, kind:status) -> a real decision-answer: lands on the real response', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        feedback: [
+          { kind: 'status', message: '[blocked] need a decision', timestamp: '2026-04-11T11:10:00.000Z' },
+          { kind: 'status', message: '[working] Session resumed. Re-confirming completion state...', timestamp: '2026-04-11T11:11:00.000Z' },
+          { kind: 'decision-answer', message: 'proceed with option B', timestamp: '2026-04-11T11:30:00.000Z' },
+          { kind: 'status', message: '[done] shipped', timestamp: '2026-04-11T11:31:00.000Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const [row] = computeIncumbentSignal(loops).perLoop;
+    assert.strictEqual(row.respondedAt, '2026-04-11T11:30:00.000Z', 'must skip the resume self-talk and land on the real decision-answer');
+    assert.strictEqual(row.timeToRespondMs, 20 * 60 * 1000);
+    assert.strictEqual(row.resolved, true);
+  });
+
+  // LIN-2263 (review R2): heartbeat (kind:'heartbeat', reapers.js's
+  // runHeartbeats — the single most common kind on live data per the
+  // review) and resource sampling (kind:'resources', RESOURCE_RELAY) must
+  // be skipped the same structural way as usage/tool, not left to rest on
+  // the ACTIVE_PHASES invariant alone.
+  test('a blocked loop whose only later entries are [heartbeat]/[resources] bookkeeping reports no response yet', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        status: 'taken',
+        feedback: [
+          { kind: 'status', message: '[blocked] need a decision', timestamp: '2026-04-11T11:10:00.000Z' },
+          { kind: 'heartbeat', message: '[working] still going', timestamp: '2026-04-11T11:11:00.000Z' },
+          { kind: 'resources', message: '[resources] {"cpu":1,"memMb":200}', timestamp: '2026-04-11T11:12:00.000Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const [row] = computeIncumbentSignal(loops).perLoop;
+    assert.strictEqual(row.respondedAt, null, 'heartbeat/resources are runner bookkeeping — no real response has landed');
+    assert.strictEqual(row.timeToRespondMs, null);
+    assert.strictEqual(row.resolved, false);
+  });
 });
 
 // ─── C. compareArms ──────────────────────────────────────────────────────────
@@ -222,6 +418,13 @@ describe('observer-efficacy-signal: compareArms', () => {
     assert.ok(bundle.caveats.length >= 3);
     assert.ok(bundle.caveats.some((c) => /lower-bound/i.test(c)));
     assert.ok(bundle.caveats.some((c) => /must not be diffed/i.test(c)));
+    // LIN-2263: residue that remains after the F1/F2 fixes must still be named.
+    assert.ok(bundle.caveats.some((c) => /truncated/i.test(c) && /retention cap/i.test(c)), 'the truncation residue (F2) must be named in the caveat list');
+    assert.ok(bundle.caveats.some((c) => /runner-emitted bookkeeping/i.test(c)), 'the incumbent-arm caveat must reflect the F1 fix (bookkeeping entries are skipped, not "the next entry")');
+    // LIN-2263 review R1: the caveat must also name the self-talk residue —
+    // a status-kind entry is only a response when it carries a genuine
+    // state-change marker, not a fabricated "we catch everything" claim.
+    assert.ok(bundle.caveats.some((c) => /self-talk/i.test(c) && /repeated \[blocked\]/i.test(c)), 'the caveat must name the R1 self-talk/repeated-[blocked] residue, not overclaim completeness');
   });
 });
 
@@ -275,6 +478,27 @@ describe('observer-efficacy-signal: collectNewHarnessSignal / collectIncumbentSi
     assert.strictEqual(result.perLoop[0].resolved, true);
   });
 
+  // LIN-2263 (F2, re-review ledger item 3): drive the REAL pruning path —
+  // write past a small maxPerWorkspace via recordActions (triggering
+  // _pruneToCapacity), then read truncated through collectNewHarnessSignal
+  // — rather than only injecting `capacity` at the computeNewHarnessSignal
+  // level, which proves the detector's arithmetic but not that eviction
+  // actually happened upstream of it.
+  test('truncated is true through collectNewHarnessSignal after recordActions actually prunes the workspace past capacity', async () => {
+    const db = client.db(`eff_${dbCounter++}`);
+    const observerShadowLogStore = new ObserverShadowLogStore({ collection: db.collection('observer-shadow-log'), maxPerWorkspace: 3 });
+    const urlKey = `ws-${randomUUID()}`;
+
+    for (let i = 0; i < 5; i++) {
+      const action = computeWouldBeAction(attentionRow({ loopId: `loop-${i}`, since: '2026-08-20T10:00:00.000Z' }));
+      await observerShadowLogStore.recordActions(urlKey, [action], new Date(`2026-08-20T10:0${i}:00.000Z`));
+    }
+
+    const result = await collectNewHarnessSignal(urlKey, { observerShadowLogStore });
+    assert.strictEqual(result.count, 3, 'only the newest 3 loops survived _pruneToCapacity');
+    assert.strictEqual(result.truncated, true, 'the store actually evicted rows — truncated must be true, not just constructible from an injected capacity');
+  });
+
   function forbiddenProxy(target, allowedMethods, label) {
     return new Proxy(target, {
       get(obj, prop, receiver) {
@@ -288,15 +512,20 @@ describe('observer-efficacy-signal: collectNewHarnessSignal / collectIncumbentSi
     });
   }
 
-  test('collectNewHarnessSignal, run through a Proxy allowing ONLY listByWorkspace, makes no other call', async () => {
+  test('collectNewHarnessSignal, run through a Proxy allowing ONLY listByWorkspace + maxPerWorkspace, makes no other call', async () => {
     const db = client.db(`eff_neg_${dbCounter++}`);
     const realStore = new ObserverShadowLogStore({ collection: db.collection('observer-shadow-log') });
     const urlKey = `ws-${randomUUID()}`;
     await realStore.recordActions(urlKey, [computeWouldBeAction(attentionRow())], new Date('2026-08-20T10:01:00.000Z'));
 
-    const observerShadowLogStore = forbiddenProxy(realStore, ['listByWorkspace'], 'observerShadowLogStore');
+    // LIN-2263 (F2): collectNewHarnessSignal also reads the store's own
+    // maxPerWorkspace (a plain property, not a store call) to thread
+    // truncation-awareness into computeNewHarnessSignal — allowed alongside
+    // listByWorkspace, still nothing else.
+    const observerShadowLogStore = forbiddenProxy(realStore, ['listByWorkspace', 'maxPerWorkspace'], 'observerShadowLogStore');
     const result = await collectNewHarnessSignal(urlKey, { observerShadowLogStore });
     assert.strictEqual(result.count, 1);
+    assert.strictEqual(result.truncated, false);
   });
 
   test('collectIncumbentSignal, run through Proxies allowing only read methods, makes no write call on either store', async () => {
