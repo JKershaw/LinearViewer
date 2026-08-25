@@ -370,6 +370,29 @@ describe('runCredentialInvariantSweep (LIN-2236, Block D — orchestration, real
     assert.deepEqual(result.violations, []);
   });
 
+  test('an edge STILL BOUND to a MERGED (non-canonical) accountId is canonicalized before the credential lookup (LIN-2308: pins the resolveCanonicalAccountId call in the uniqueAccountIds loop, not just the pure classifier)', async () => {
+    // The test above merges WITH accountWorkspaceStore, which rebinds the
+    // edge onto canonical before this sweep ever reads it — so it never
+    // actually exercises resolving a non-canonical accountId. Here the merge
+    // is done WITHOUT accountWorkspaceStore, so the edge below still carries
+    // the merged (pre-merge) accountId, modeling a real account-workspace
+    // edge that hasn't been migrated onto canonical — exactly the case the
+    // uniqueAccountIds -> resolveCanonicalAccountId loop exists to handle.
+    const stores = freshStores();
+    const canonical = await stores.accountStore.createAccount();
+    const merged = await stores.accountStore.createAccount();
+    await stores.accountStore.mergeAccounts(canonical._id, merged._id);
+    await stores.accountWorkspaceStore.bindAccountToWorkspace(merged._id, 'org-1');
+    await stores.ownerCredentialStore.put(canonical._id, 'acme', { provider: 'linear', token: 't', refreshToken: 'r', tokenExpiresAt: NOW + FAR_FUTURE_MS });
+    const sessionsCollection = { find: () => ({ toArray: async () => [sessionRowFor('org-1', 'acme', 'linear')] }) };
+
+    const result = await runCredentialInvariantSweep({ ...stores, sessionsCollection, now: NOW });
+    // The credential is stored under canonical._id only. If the merged edge's
+    // accountId were used as-is (mutation: dropping the resolveCanonicalAccountId
+    // call), the lookup would miss and this would come back as a "missing" violation.
+    assert.deepEqual(result.violations, []);
+  });
+
   test('throws loudly when now is not provided (same discipline as observer-sweep)', async () => {
     const stores = freshStores();
     const sessionsCollection = { find: () => ({ toArray: async () => [] }) };
