@@ -1165,6 +1165,61 @@ describe('triage template', () => {
     assert.ok(/follow-up tasks or subtasks/i.test(p),
       'meta-prompt triage rule should forbid creating follow-up tasks or subtasks');
   });
+
+  // ===========================================================================
+  // LIN-2316: the displayed priority must never be a bare native (descending)
+  // integer with no scale, and the priority-write authority must name exactly
+  // one field — the provider-neutral, ascending `priorityLevel` — never the
+  // native `priority` field. Field-scoped, not phrase-locked (LIN-2315):
+  // assertions key on WHICH field is named/displayed, not on specific prose,
+  // so a paraphrase that keeps naming the wrong field still fails.
+  // ===========================================================================
+
+  // Extracts every backtick-quoted `priority`-family field identifier
+  // (priority, priorityLevel, priorityLabel, ...) from a text slice.
+  function namedPriorityFields(text) {
+    return [...text.matchAll(/`(priority\w*)`/g)].map(m => m[1]);
+  }
+
+  test('(f1) the Current State priority line is never a bare native integer — it always names the priorityLevel field', () => {
+    // priority: 2 is a plain native (descending) int with no label attached,
+    // the exact shape the live enqueueFeedbackTriage call site supplies —
+    // the shape most exposed to reverting into a bare, unannotated int.
+    const result = generatePrompt('triage', { ...mockIssue, priority: 2, priorityLabel: undefined }, mockContext);
+    const currentState = result.prompt.slice(result.prompt.indexOf('## Current State'), result.prompt.indexOf('## Goal'));
+    const priorityLine = currentState.split('\n').find(l => l.startsWith('**Priority:**'));
+    assert.ok(priorityLine, 'Current State carries a Priority line');
+    const displayedValue = priorityLine.replace(/^\*\*Priority:\*\*\s*/, '');
+    assert.ok(!/^\d+\s*$/.test(displayedValue),
+      'the priority value must not be a bare integer with no field/scale named');
+    assert.ok(/\bpriorityLevel\b/.test(displayedValue),
+      'the displayed value names the priorityLevel field');
+    assert.ok(!/\bpriority\b(?!Level)/i.test(displayedValue),
+      'the displayed value does not also name the bare native priority field');
+  });
+
+  test('(f2) a Not Set priority still renders through the same field-scoped path (no bare-int regression for the unset case)', () => {
+    const result = generatePrompt('triage', { ...mockIssue, priority: undefined, priorityLabel: undefined }, mockContext);
+    const currentState = result.prompt.slice(result.prompt.indexOf('## Current State'), result.prompt.indexOf('## Goal'));
+    const priorityLine = currentState.split('\n').find(l => l.startsWith('**Priority:**'));
+    assert.strictEqual(priorityLine, '**Priority:** Not set');
+  });
+
+  test('(f3) the Role authority line names priorityLevel as the sole priority write field', () => {
+    const result = generatePrompt('triage', mockIssue, mockContext);
+    const roleLine = result.prompt.split('\n').find(l => l.startsWith('**Role**:'));
+    assert.ok(roleLine, 'the Role authority line is present');
+    assert.deepStrictEqual(namedPriorityFields(roleLine), ['priorityLevel'],
+      'the Role line names exactly priorityLevel as a priority-family field — never a bare native `priority` alongside it');
+  });
+
+  test('(f4) the Other Metadata Priority bullet names priorityLevel as the sole write field', () => {
+    const result = generatePrompt('triage', mockIssue, mockContext);
+    const metadataBullet = result.prompt.split('\n').find(l => l.trim().startsWith('- **Priority**:'));
+    assert.ok(metadataBullet, 'the Other Metadata Priority bullet is present');
+    assert.deepStrictEqual(namedPriorityFields(metadataBullet), ['priorityLevel'],
+      'the metadata bullet names exactly priorityLevel — an unnamed write field (no backtick-quoted field at all) or a bare native `priority` both fail this');
+  });
 });
 
 // =============================================================================
