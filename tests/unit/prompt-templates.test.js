@@ -2396,6 +2396,102 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assertOrdered(t.aiHint.goal, 'close-out.aiHint.goal');
     assertOrdered(t.aiHint.workflow, 'close-out.aiHint.workflow');
   });
+
+  // ===========================================================================
+  // Follow-up triage: filed follow-ups get a priority and a type label (LIN-2309)
+  // ===========================================================================
+
+  test('(i1) close-out carries a Follow-up Triage section requiring priority + type label on every filed follow-up', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(/### Follow-up Triage/.test(prompt), 'close-out has the Follow-up Triage section');
+    assert.ok(/never leave it at the provider default/i.test(prompt),
+      'follow-ups must not be left at the provider default');
+  });
+
+  test('(i2) priority guidance derives from risk, requires stated reasoning, and forbids inventing a numeric scale', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(/derive it from the finding's own risk/i.test(prompt), 'priority is derived from the finding\'s risk');
+    assert.ok(/state that reasoning in one line on the ticket/i.test(prompt), 'reasoning must be stated on the ticket');
+    assert.ok(/`priorityLevel`.*`priority`/.test(prompt), 'names the provider-neutral priorityLevel and native priority fields');
+    assert.ok(/do not invent a numeric scale of your own/i.test(prompt), 'forbids inventing a numeric scale');
+  });
+
+  test('(i3) label guidance uses the workspace label catalog and requires an explicit note when nothing fits', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(/GET \/api\/proxy\/labels/.test(prompt), 'labels come from the workspace\'s own catalog endpoint');
+    assert.ok(/never a hardcoded vocabulary/i.test(prompt), 'forbids a hardcoded label vocabulary');
+    assert.ok(/say so explicitly on the ticket rather than inventing one/i.test(prompt),
+      'requires an explicit note instead of inventing a label');
+  });
+
+  test('(i4) triage is best-effort and degrades to a note rather than blocking or expanding the close', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(/best-effort, never blocking/i.test(prompt), 'triage is explicitly best-effort, never blocking');
+    assert.ok(/record a one-line note on the ticket saying so instead of retrying or failing the close/i.test(prompt),
+      'degrades to a stated note rather than retrying or failing the close');
+    assert.ok(/does not change which follow-ups get filed or expand close-out's authority/i.test(prompt),
+      'metadata-only — does not widen close-out\'s mandate');
+  });
+
+  test('(i5) the workflow list and the All-Clear list both point filers at Follow-up Triage', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    const workflow = prompt.slice(prompt.indexOf('## Workflow'), prompt.indexOf('## Context'));
+    assert.ok(/each carrying a priority and a type label \(see Follow-up Triage below\)/.test(workflow),
+      'workflow step 8 references Follow-up Triage');
+    const irreversible = prompt.slice(prompt.indexOf('### On All-Clear — Perform the Irreversible Set'));
+    assert.ok(/each carrying a priority and a type label \(see Follow-up Triage below\)/.test(irreversible),
+      'All-Clear item 5 references Follow-up Triage');
+  });
+
+  test('(i6) Follow-up Triage sits after "Always name a next action" and before Archive & Prune', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    const nextActionAt = prompt.indexOf('**Always name a next action.**');
+    const triageAt = prompt.indexOf('### Follow-up Triage');
+    const archiveAt = prompt.indexOf('### Archive & Prune Superseded Stage Artifacts');
+    assert.ok(nextActionAt > -1 && triageAt > -1 && archiveAt > -1, 'all three anchors are present');
+    assert.ok(nextActionAt < triageAt && triageAt < archiveAt,
+      'Follow-up Triage sits strictly between the next-action note and Archive & Prune');
+  });
+
+  test('(i7) Follow-up Triage is scoped to close-out only — it does not leak into other templates via the shared grounding post-pass', () => {
+    const { prompt: bugPrompt } = generatePrompt('bug', { ...issue, labels: ['bug'] }, context);
+    const { prompt: implPrompt } = generatePrompt('implementation', issue, context);
+    assert.ok(!bugPrompt.includes('Follow-up Triage'), 'Follow-up Triage does not leak into the bug template');
+    assert.ok(!implPrompt.includes('Follow-up Triage'), 'Follow-up Triage does not leak into the implementation template');
+  });
+
+  test('(i8) close-out still emits no literal "Linear" with Follow-up Triage included, and stays byte-identical for Linear (LIN-177 parity)', () => {
+    const { prompt } = generatePrompt('close-out', issue, context);
+    assert.ok(!prompt.includes('Linear'), 'Follow-up Triage introduces no literal "Linear"');
+    const i = { ...issue, labels: ['close-out'] };
+    const base = generatePrompt('close-out', i, context, {}).prompt;
+    const withUi = generatePrompt('close-out', i, context, {}, { ...DEFAULT_PROMPT_UI }).prompt;
+    assert.strictEqual(withUi, base, 'close-out must stay byte-identical for Linear with Follow-up Triage included');
+  });
+
+  test('(meta i9) the Close-out quality rule also requires a priority and a type label on every filed follow-up', () => {
+    const meta = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-901', hasSubtasks: false, subtaskCount: 0,
+      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
+      aiHints: 'H', actionVocabulary: 'review, close-out, implementation', completionSignals: 'S'
+    });
+    const rule = meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Close-out prompts**'));
+    assert.ok(rule, 'the Close-out prompts quality rule exists');
+    assert.ok(/every follow-up ticket filed above must additionally carry a priority and a type label/i.test(rule),
+      'meta rule requires priority + type label on every filed follow-up');
+    assert.ok(/derive the priority from the finding's own risk/i.test(rule), 'meta rule derives priority from risk');
+    assert.ok(/setting it via the provider-neutral `priorityLevel`.*never a hand-invented numeric scale/i.test(rule),
+      'meta rule forbids a hand-invented numeric scale');
+    assert.ok(/GET \/api\/proxy\/labels/.test(rule), 'meta rule sources labels from the workspace catalog');
+    assert.ok(/say so explicitly on the ticket rather than inventing one/i.test(rule),
+      'meta rule requires an explicit note instead of inventing a label');
+    assert.ok(/best-effort — when a provider silently drops priority on write, or offers no usable label catalog, record a one-line note/i.test(rule),
+      'meta rule degrades best-effort to a stated note');
+    assert.ok(/this adds metadata only and does not change which follow-ups get filed/i.test(rule),
+      'meta rule stays metadata-only, does not widen close-out\'s mandate');
+    assert.ok(rule.split('\n').length === 1 || !rule.includes('\n'),
+      'the Close-out prompts rule stays a single line, since tests extract it by its line prefix');
+  });
 });
 
 // =============================================================================
