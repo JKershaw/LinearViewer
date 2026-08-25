@@ -2412,7 +2412,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const { prompt } = generatePrompt('close-out', issue, context);
     assert.ok(/derive it from the finding's own risk/i.test(prompt), 'priority is derived from the finding\'s risk');
     assert.ok(/state that reasoning in one line on the ticket/i.test(prompt), 'reasoning must be stated on the ticket');
-    assert.ok(/`priorityLevel`.*`priority`/.test(prompt), 'names the provider-neutral priorityLevel and native priority fields');
+    assert.ok(/`priorityLevel` \(ascending, 4 = highest\)/.test(prompt), 'names the provider-neutral priorityLevel field with its ascending scale');
+    assert.ok(!/the native `priority` field/.test(prompt), 'does not name the native priority field — its scale is inverted (LIN-2311)');
     assert.ok(/do not invent a numeric scale of your own/i.test(prompt), 'forbids inventing a numeric scale');
   });
 
@@ -2482,6 +2483,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.ok(/derive the priority from the finding's own risk/i.test(rule), 'meta rule derives priority from risk');
     assert.ok(/setting it via the provider-neutral `priorityLevel`.*never a hand-invented numeric scale/i.test(rule),
       'meta rule forbids a hand-invented numeric scale');
+    assert.ok(!/the native `priority` field/.test(rule),
+      'meta rule does not name the native priority field — its scale is inverted (LIN-2311)');
     assert.ok(/GET \/api\/proxy\/labels/.test(rule), 'meta rule sources labels from the workspace catalog');
     assert.ok(/say so explicitly on the ticket rather than inventing one/i.test(rule),
       'meta rule requires an explicit note instead of inventing a label');
