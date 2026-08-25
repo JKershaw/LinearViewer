@@ -16,6 +16,14 @@ import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPro
 import { WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 
+// Extracts every backtick-quoted `priority`-family field identifier
+// (priority, priorityLevel, priorityLabel, ...) from a text slice. Field-scoped,
+// not phrase-locked (LIN-2315/LIN-2316): keys on WHICH field is named, not on
+// specific prose, so a paraphrase that still names the wrong field still fails.
+function namedPriorityFields(text) {
+  return [...text.matchAll(/`(priority\w*)`/g)].map(m => m[1]);
+}
+
 // =============================================================================
 // hasPrompt Tests
 // =============================================================================
@@ -1174,12 +1182,6 @@ describe('triage template', () => {
   // assertions key on WHICH field is named/displayed, not on specific prose,
   // so a paraphrase that keeps naming the wrong field still fails.
   // ===========================================================================
-
-  // Extracts every backtick-quoted `priority`-family field identifier
-  // (priority, priorityLevel, priorityLabel, ...) from a text slice.
-  function namedPriorityFields(text) {
-    return [...text.matchAll(/`(priority\w*)`/g)].map(m => m[1]);
-  }
 
   test('(f1) the Current State priority line is never a bare native integer — it always names the priorityLevel field', () => {
     // priority: 2 is a plain native (descending) int with no label attached,
@@ -2518,8 +2520,15 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.ok(/derive it from the finding's own risk/i.test(prompt), 'priority is derived from the finding\'s risk');
     assert.ok(/state that reasoning in one line on the ticket/i.test(prompt), 'reasoning must be stated on the ticket');
     assert.ok(/`priorityLevel` \(ascending, 4 = highest\)/.test(prompt), 'names the provider-neutral priorityLevel field with its ascending scale');
-    assert.ok(!/the native `priority` field/.test(prompt), 'does not name the native priority field — its scale is inverted (LIN-2311)');
     assert.ok(/do not invent a numeric scale of your own/i.test(prompt), 'forbids inventing a numeric scale');
+    // Field-scoped, not phrase-locked (LIN-2315): a paraphrase that still names the
+    // native field (e.g. "or `priority`, the provider-native equivalent") fails this
+    // even though it doesn't match the literal phrase the old assertion keyed on.
+    const triageSection = prompt.slice(prompt.indexOf('### Follow-up Triage'), prompt.indexOf('### Archive & Prune'));
+    const priorityBullet = triageSection.split('\n').find(l => l.trim().startsWith('- **Priority**:'));
+    assert.ok(priorityBullet, 'the Follow-up Triage Priority bullet is present');
+    assert.deepStrictEqual(namedPriorityFields(priorityBullet), ['priorityLevel'],
+      'the Priority bullet names exactly priorityLevel as a priority-family field — its scale is inverted on the native field (LIN-2311), so naming that field there under any wording is the hazard');
   });
 
   test('(i3) label guidance uses the workspace label catalog and requires an explicit note when nothing fits', () => {
@@ -2588,8 +2597,11 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.ok(/derive the priority from the finding's own risk/i.test(rule), 'meta rule derives priority from risk');
     assert.ok(/setting it via the provider-neutral `priorityLevel`.*never a hand-invented numeric scale/i.test(rule),
       'meta rule forbids a hand-invented numeric scale');
-    assert.ok(!/the native `priority` field/.test(rule),
-      'meta rule does not name the native priority field — its scale is inverted (LIN-2311)');
+    // Field-scoped, not phrase-locked (LIN-2315): a paraphrase that still names the
+    // native field (e.g. "or `priority`, the provider-native equivalent") fails this
+    // even though it doesn't match the literal phrase the old assertion keyed on.
+    assert.deepStrictEqual(namedPriorityFields(rule), ['priorityLevel'],
+      'the Close-out prompts rule names exactly priorityLevel as a priority-family field — its scale is inverted on the native field (LIN-2311), so naming that field there under any wording is the hazard');
     assert.ok(/GET \/api\/proxy\/labels/.test(rule), 'meta rule sources labels from the workspace catalog');
     assert.ok(/say so explicitly on the ticket rather than inventing one/i.test(rule),
       'meta rule requires an explicit note instead of inventing a label');
