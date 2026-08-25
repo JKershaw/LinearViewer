@@ -177,8 +177,10 @@ describe('LIN-2231 L6 item 3 — merge-then-resolve (Ticket E, composing Ticket 
 //       witness) + THIS FILE's merge-then-resolve test (behavioural):
 //       revert the ORDER (canonicalize after the cache key instead of
 //       before) and the witness's `resolveIdx < cacheKeyIdx` fails; revert
-//       the call entirely and this file's positive-case test fails (reaches
-//       `not_connected`/null instead of the canonical token).
+//       the call entirely and canonical-account-resolution.test.js's Block C
+//       (LIN-2271, behavioural vm harness) fails — it drives the real
+//       resolveWorkspaceAccess and asserts both the returned token/reason and
+//       the owner observed by workspaceTokenCacheKey.
 //
 // Ticket C (LIN-2235):
 //   - spend-intent journal (markSpendIntent/clearSpendIntent/pendingSpend)
