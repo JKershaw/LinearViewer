@@ -618,3 +618,178 @@ Opus 5 rates ($5/$25 per MTok; 1-hour cache write 2×, cache read 0.1×). Every 
 cited was verified present on its ticket by a separate read.
 
 — Flight Companion, observation altitude, 2026-08-24
+
+## Addendum 3 — 2026-08-25: the correction, the planning defect, and the remediation wave
+
+Three things this addendum owes the record: a cost figure in Addendum 2 that is wrong and needs
+withdrawing; a failure mode of the lane model that Addendum 2 did not name; and the results of the
+remediation wave that the eight Request Changes triggered.
+
+### Correction: the sweep cost $210.59, not $455.14
+
+Addendum 2's headline sweep cost is **wrong, and roughly double the truth**. The error is mine and
+it is arithmetic, not judgement.
+
+Simple Dispatcher's `[usage]` feedback entries are **cumulative running totals** — each line
+restates the session's spend to date. Addendum 2 summed every line in a session as though each were
+an increment, multiplying each session's cost by its number of usage lines. The corrected method
+takes the **last** line per dispatch and prices it at the same verified rates.
+
+| | published | **corrected** |
+|---|---|---|
+| wave 1 (16 tickets) | $139.77 | **$64.18** |
+| wave 2 (34 tickets) | $315.37 | **$146.41** |
+| **total (50 tickets)** | **$455.14** | **$210.59** |
+| mean per review | $9.10 | **$4.21** |
+
+What does **not** change: the rate table (the sweep ran `claude-opus-5` throughout, so Addendum 2's
+"at published Opus 5 rates" was correct), the eight Request Changes, the zero false `[done]`s, and
+every finding in "The eight Request Changes".
+
+**What does change, and matters more than the halving.** Addendum 2's orientation figure of
+**$0.81 per cold start was measured off each session's *first* usage line — a single reading, not a
+sum — so it was never affected and stands exactly as published** (range $0.67–$1.17, re-measured).
+But its *share* was computed against the inflated session total. Re-measured against the corrected
+denominator across all 16 wave-1 sessions:
+
+| | published | **corrected** |
+|---|---|---|
+| orientation turn | $0.81 | **$0.81** (unchanged) |
+| whole session | $8.74 | **$4.01** |
+| **orientation share** | **9%** | **20%** |
+
+So Addendum 2's conclusion needs softening, not just re-typing. "Cold starts are not the expensive
+part" still holds — 20% is not the majority of a session. But calling the ~$40 of avoided cold
+starts across 50 tickets **"noise against this sweep's spend"** was wrong: $40 against a corrected
+$210.59 is **19%**, not the 8.8% the inflated figure implied. The cost argument for staying in-lane
+is weaker than originally claimed, but materially stronger than Addendum 2 concluded. The epistemic
+argument against lanes is untouched — it never rested on cost.
+
+This error also propagated into LIN-2273's review, which used the inflated figure to infer that
+`DEFAULT_USD_PER_POINT` might be off by ~2.7×. A correction comment was posted to that ticket
+before its close-out, and the calibration follow-up was not filed.
+
+### The failure mode Addendum 2 did not name: lanes skip the *plan*
+
+Addendum 2 framed the lane defect as an **accountability** problem — a lane reviews its own work,
+so nothing independent checks the claim. That is true and remains the primary finding. But the
+remediation wave surfaced a second, distinct failure that the self-review framing does not cover.
+
+**A lane collapses research → plan → implement → review into one session, so there is no
+plan-review gate.** Not a weakened one: none. The consequence is that a lane can commit to an
+approach that *cannot work by construction* and discover this only through repeated implementation
+rounds, each of which is locally correct.
+
+**LIN-2263 is the worked example.** Its defect — `findNextResponse` deciding "is this an external
+response?" by inferring provenance from `kind` — drew three fix rounds:
+
+| round | fix | what the next review found on live data |
+|---|---|---|
+| 1 | denylist `usage`/`tool` | the runner's own stall re-ask carries `kind: 'status'` |
+| 2 | + `heartbeat`, `resources` | `assistant-text` / `evidence` still measured (18 of 21 fixed) |
+| 3 | + `assistant-text`, `evidence` | **`kind: 'decision'`** still measured — plus `refusal` |
+
+Every round was locally correct and the trajectory improved (21 mismeasured → 3 → 1–2). But every
+round was the *same move* — extend a denylist — and the denylist can never be complete, because
+`kind` does not encode provenance: `decision`, `assistant-text` and `status` are each written by the
+runner in some paths and by an external party in others. Round 3 went further and *strengthened* a
+docstring claim that `decision` is "genuine external content, never runner-emitted" — which is
+false, and is itself the shipped-false-prose class LIN-2276 exists to fix.
+
+This is a **design** error, not a coding error. It is exactly what a plan-review gate is for: the
+question "can this approach converge at all?" is asked once, before three implementation rounds pay
+for the answer. LIN-2259 reached the same wall by a different mechanism — three passes, each
+closing one prediction path in a reaper that *predicts* the string a hook will inject, with nothing
+structurally bounding how many such paths exist.
+
+Both tickets were escalated as a **single** decision rather than one each, because they share one
+root cause: distinguishing the system's own output from genuine external input by enumerating the
+system's outputs. The bounding shape is to stop inferring — record provenance at write time, or
+invert to a positive allowlist so an unclassified kind fails closed.
+
+**Recorded as a finding about the operating model, not about these two tickets.** The lane template's
+economy is real, but plan-review is not one of the stages it can safely economise away.
+
+### The remediation wave — 19 tickets, 15 landed
+
+The eight Request Changes and the sweep's own machinery faults produced 19 fix tickets
+(LIN-2259–2277), each run through **three separate sessions**: implementation, independent review,
+close-out. Top-level orchestration was handed to an autopilot session at 20:32Z on 2026-08-24 after
+the operator's own environment proved unable to hold a wake.
+
+| | |
+|---|---|
+| Done, merged and verified | **15** |
+| Merge commits on `origin/main` | **17** (15 Harbour, 2 Simple Dispatcher) |
+| Blocked on an operator ruling | 3 — LIN-2259, LIN-2263, LIN-2271 |
+| Held pending measurement | 1 — LIN-2277 |
+| Autopilot runtime before blocking | 2h31m |
+
+Every merge commit was verified present on `origin/main` by a read independent of the session that
+claimed it. No false `[done]` was found.
+
+**The autopilot blocked deliberately, and that is the result worth recording.** It did not stall,
+fail, or exhaust its budget: it reached two questions that were scope-and-worth calls rather than
+technical ones, filed both as decisions with costed options, and parked. `BLOCKED` carries no
+automated backstop by design (LIN-744), so it waited. A run that stops at the edge of its own
+mandate is the behaviour the refusal license was written for, now observed at the orchestration
+tier rather than the worker tier.
+
+Two quality signals from the same run. LIN-2263's session named its own earlier misjudgement in
+writing — *"I predicted after round 2 that the enumeration was bounded by the observed corpus. That
+was wrong"* — and stopped rather than dispatching a fourth round. And LIN-2261's reviewer caught two
+blocking registration gaps a passing CI did not: a stale "(16 total)" in the public, agent-facing
+`llms.txt`, and a missing `BUCKET_OF_KIND` entry that would have misattributed the new template's
+telemetry. Both are the shipped-false-prose class.
+
+### The expansion ratio: 19 tickets in, 30 out
+
+The wave filed **30 follow-ups** (LIN-2278–2307; one, LIN-2303, landed within the run). Nineteen
+fix tickets produced thirty new ones — a **1.6× expansion**.
+
+This is not a defect of the remediation. It is the clearest available measure of what the lane run
+deferred: each of these was found by a session that had the time and the mandate to look, and 8 of
+the 30 are explicitly sibling-class findings from class checks. The debt existed before the wave;
+the wave is where it became visible.
+
+It does, however, expose a real gap in the close-out template: **a follow-up filed by close-out
+carries no priority and no type label.** Of the 30, 17 landed with no priority set and only 3 with
+any label at all. On a board of 761 open issues where 44% sit at the default "Medium" and 7.5% carry
+any label, an untriaged follow-up is close to invisible. Filing without triage is filing into a
+drawer. That is a template change, and it is cheaper than the human triage pass it replaces.
+
+### Concurrency: the ceiling was emergent, not configured
+
+The 2026-08-23 run's peak was measured at **16 concurrent sessions** (from each dispatch's own
+`resolvedAt` → `completedAt`). No configured limit produced that number: the window cap
+(`LAUNCH_MAX_WINDOWS` = 50) never bound, and the poll interval (5s) is not a throttle.
+
+The real governor is **cold-start launch pacing** (`pacing.js`): `freshLaunchDeferReason` defers
+every fresh launch while any hook session still lacks a `transcriptPath`, so launches serialise at
+roughly one per settle. The ceiling is therefore emergent:
+
+```
+peak ≈ session_duration ÷ cold_start_settle ≈ 11.1 min ÷ 61 s ≈ 16
+```
+
+An observed count of ~32 on the Live Console is not in conflict: `DEFAULT_LANE_STALE_MS` is one
+hour, so a lane stays rendered for an hour after its last heartbeat. Both numbers are correct and
+measure different things — concurrent *execution* versus concurrent *display*.
+
+The pacing gate's stated rationale is AppleScript window-creation contention under iTerm
+(~5s idle rising to ~19s after three stacked creates). That rationale does not transfer to the kitty
+driver, which launches over a remote-control socket with no AppleScript involved. Whether the
+machine-saturation half of the rationale still holds is unmeasured. Filed as **LIN-2277**, held
+pending measurement on the host rather than guessed at here.
+
+### Disclosure
+
+Written by the operator who produced the $455.14 error being corrected above, and who propagated it
+into LIN-2273's review before catching it. The corrected figures are recomputed from the same
+append-only `[usage]` telemetry, taking the last cumulative line per dispatch, at rates verified
+against published pricing on 2026-08-24. The orientation share was re-measured across all 16 wave-1
+sessions with numerator and denominator drawn from the same computation, rather than by dividing two
+previously published numbers. Every merge commit claimed in the remediation table was verified on
+`origin/main` by a read independent of the session that reported it.
+
+— Flight Companion, observation altitude, 2026-08-25
