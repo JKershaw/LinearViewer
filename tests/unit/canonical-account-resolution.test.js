@@ -16,35 +16,47 @@ import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 import { MangoClient } from '@jkershaw/mangodb';
 import { AccountStore } from '../../lib/account-store.js';
+import { UNSCOPED, TOKEN_REFRESH_BUFFER_MS, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from '../../lib/workspace-token-resolver.js';
+import { CREDENTIAL_SOURCES, fingerprintCredential } from '../../lib/credential-diagnostics.js';
+import { CREDENTIAL_LIFECYCLE_EVENT_KINDS } from '../../lib/credential-lifecycle-events.js';
+import { workspaceTokenCacheKey as realWorkspaceTokenCacheKey } from '../../lib/workspace-token-cache.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+
+// ---------------------------------------------------------------------------
+// Shared fixture (hoisted for LIN-2271, plan-review F1): Block A's local
+// Mango AccountStore fixture and its lifecycle, promoted to module scope so
+// Block C and the mutation-check block below can also call freshStore() —
+// this is an in-file hoist, not a new shared abstraction: no second fixture
+// exists anywhere, and nothing outside this file imports it.
+// ---------------------------------------------------------------------------
+let dbClient, dbDir, counter = 0;
+
+before(async () => {
+  dbDir = mkdtempSync(join(tmpdir(), 'canonical-resolution-'));
+  dbClient = new MangoClient(dbDir);
+  await dbClient.connect();
+});
+
+after(async () => {
+  if (dbClient?.close) await dbClient.close();
+  if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+});
+
+function freshStore() {
+  const db = dbClient.db(`canon_${counter++}`);
+  return new AccountStore({ collection: db.collection('accounts') });
+}
 
 // ---------------------------------------------------------------------------
 // Block A — AccountStore.resolveCanonicalAccountId (behavioural)
 // ---------------------------------------------------------------------------
 
 describe('AccountStore.resolveCanonicalAccountId (LIN-2234, Block A — behavioural)', () => {
-  let dbClient, dbDir, counter = 0;
-
-  before(async () => {
-    dbDir = mkdtempSync(join(tmpdir(), 'canonical-resolution-'));
-    dbClient = new MangoClient(dbDir);
-    await dbClient.connect();
-  });
-
-  after(async () => {
-    if (dbClient?.close) await dbClient.close();
-    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
-  });
-
-  function freshStore() {
-    const db = dbClient.db(`canon_${counter++}`);
-    return new AccountStore({ collection: db.collection('accounts') });
-  }
-
   test('null/falsy accountId -> null immediately, no lookup performed', async () => {
     const store = freshStore();
     // A collection whose findOne throws proves "no lookup" — any call at all
@@ -181,5 +193,162 @@ describe('resolveWorkspaceAccess canonicalization wiring (LIN-2234, Block B — 
     const after = body.slice(resolveIdx, resolveIdx + 400);
     assert.match(after, /catch \(err\)/, 'the resolveCanonicalAccountId call must be wrapped so a store failure (e.g. corrupt-cycle throw) does not become an unhandled rejection');
     assert.match(after, /store_unreachable/, 'a canonical-resolution failure must fall back to the same store_unreachable reason the session lookup below uses');
+  });
+
+  test('the canonicalized result is ASSIGNED BACK to ownerAccountId — not merely called and discarded', () => {
+    const body = extractResolveWorkspaceAccessBody(SERVER_SRC);
+    assert.match(
+      body,
+      /ownerAccountId\s*=\s*await\s+accountStore\.resolveCanonicalAccountId\(/,
+      'the call\'s result must be assigned back to ownerAccountId — a substring match on the call name alone (as the other four tests in this block use) cannot see whether the result is bound to anything'
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block C — resolveWorkspaceAccess canonicalization (LIN-2271, behavioural,
+// vm-executed). server.js is not import-safe in a unit test (Mongo connect +
+// app.listen() at module load), so this slices the real function body via
+// extractResolveWorkspaceAccessBody above and executes it in a node:vm
+// context, injecting the REAL collaborators (workspaceTokenCacheKey,
+// selectOwnerWorkspaceToken, classifyWorkspaceFailure,
+// describeWorkspaceResolution, fingerprintCredential, CREDENTIAL_SOURCES,
+// CREDENTIAL_LIFECYCLE_EVENT_KINDS, UNSCOPED) and faking only the I/O
+// boundaries (sessionsCollection, workspaceTokenCache, ownerCredentialStore,
+// refreshOnResolveGate, credentialLifecycleEventStore,
+// attemptSuspectCredentialRefresh).
+// ---------------------------------------------------------------------------
+
+async function runResolveWorkspaceAccess({ urlKey, ownerAccountId, sessions, accountStore, source = SERVER_SRC, cacheKeyCalls = [] }) {
+  const context = vm.createContext({
+    UNSCOPED, TOKEN_REFRESH_BUFFER_MS,
+    selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution,
+    CREDENTIAL_SOURCES, fingerprintCredential, CREDENTIAL_LIFECYCLE_EVENT_KINDS,
+    accountStore,
+    workspaceTokenCacheKey: (urlKey, ownerAccountId) => {
+      cacheKeyCalls.push(ownerAccountId);
+      return realWorkspaceTokenCacheKey(urlKey, ownerAccountId);
+    },
+    sessionsCollection: { find: () => ({ toArray: async () => sessions }) },
+    workspaceTokenCache: { get: () => undefined, set: () => true },
+    ownerCredentialStore: { get: async () => null },
+    refreshOnResolveGate: { shouldAttempt: () => false },
+    credentialLifecycleEventStore: { recordEvent: async () => {} },
+    attemptSuspectCredentialRefresh: async () => null,
+    console: { log() {}, warn() {}, error() {} },
+    process: { env: {} },
+  });
+  const script = extractResolveWorkspaceAccessBody(source) + '\nresolveWorkspaceAccess';
+  const fn = vm.runInContext(script, context);
+  return fn(urlKey, ownerAccountId);
+}
+
+describe('resolveWorkspaceAccess canonicalization (LIN-2271, Block C — behavioural, vm-executed)', () => {
+  test('AC1 (production shape): a real merge + a live session owned by canonical + caller passes the MERGED id -> resolves to canonical\'s token, and workspaceTokenCacheKey observes the CANONICAL owner', async () => {
+    const store = freshStore();
+    const canonical = await store.createAccount();
+    const merged = await store.createAccount();
+    assert.ok((await store.mergeAccounts(canonical._id, merged._id)).ok);
+
+    const sessions = [{ _id: 'sid-1', session: { accountId: canonical._id, workspaces: [
+      { urlKey: 'acme', provider: 'linear', accessToken: 'canonical-live-token', tokenExpiresAt: Date.now() + 10_000_000 }
+    ] } }];
+    const cacheKeyCalls = [];
+
+    const result = await runResolveWorkspaceAccess({ urlKey: 'acme', ownerAccountId: merged._id, sessions, accountStore: store, cacheKeyCalls });
+
+    assert.equal(result.token, 'canonical-live-token');
+    assert.equal(result.reason, 'ok');
+    assert.equal(cacheKeyCalls[0], canonical._id, 'the cache key must be derived from the CANONICAL id, not the merged id the caller passed in — this is the property the ticket exists to pin');
+  });
+
+  test('UNSCOPED bypasses canonicalization entirely — the store is never reached, not merely never asserted (behavioural upgrade of constraint 11)', async () => {
+    const throwingStore = { resolveCanonicalAccountId: () => { throw new Error('must not be called for UNSCOPED'); } };
+    const sessions = [{ _id: 'sid-1', session: { accountId: 'acct-x', workspaces: [
+      { urlKey: 'acme', provider: 'linear', accessToken: 'some-token', tokenExpiresAt: Date.now() + 10_000_000 }
+    ] } }];
+    const result = await runResolveWorkspaceAccess({ urlKey: 'acme', ownerAccountId: UNSCOPED, sessions, accountStore: throwingStore });
+    assert.equal(result.reason, 'ok', 'the call must complete without the throwing store ever being invoked');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-2271 mutation-check: the chokepoint assertions above must actually
+// catch their own removal. Mirrors lin-1885's convention — each mutation
+// builds an in-memory mutated copy of SERVER_SRC and feeds it through the
+// harness's `source` override; the on-disk server.js is never touched.
+//
+// Reproduced 2026-08-24 at a954dc0c:
+//   sed -i '' '2012s/ownerAccountId = await accountStore/await accountStore/' server.js
+//   node --test tests/unit/*.test.js -> 8119/8119 green. Restored via `git checkout -- server.js`.
+// ---------------------------------------------------------------------------
+
+function mutateServerSrc(mutator) {
+  const body = extractResolveWorkspaceAccessBody(SERVER_SRC);
+  const mutatedBody = mutator(body);
+  assert.notEqual(mutatedBody, body, 'the mutation must actually change resolveWorkspaceAccess\'s body');
+  const mutatedSource = SERVER_SRC.replace(body, mutatedBody);
+  assert.notEqual(mutatedSource, SERVER_SRC, 'the mutated source must differ from SERVER_SRC — guards a rename/refactor that misses the target failing loudly instead of silently mutating nothing');
+  return mutatedSource;
+}
+
+const GUARD_BLOCK = `  if (ownerAccountId !== UNSCOPED) {
+    try {
+      ownerAccountId = await accountStore.resolveCanonicalAccountId(ownerAccountId);
+    } catch (err) {
+      console.error(\`[workspace-access] canonical account resolution failed for \${urlKey}:\`, err);
+      return { token: null, reason: 'store_unreachable', provider: null, credentialFingerprint: null };
+    }
+  }`;
+
+describe('LIN-2271 mutation-check: the chokepoint assertions above must actually catch their own removal', () => {
+  test('M1 (required) — drop the `ownerAccountId = ` assignment: Block C AC1 goes red', async () => {
+    const mutated = mutateServerSrc(body => body.replace(
+      'ownerAccountId = await accountStore.resolveCanonicalAccountId(ownerAccountId);',
+      'await accountStore.resolveCanonicalAccountId(ownerAccountId);'
+    ));
+    const store = freshStore();
+    const canonical = await store.createAccount();
+    const merged = await store.createAccount();
+    assert.ok((await store.mergeAccounts(canonical._id, merged._id)).ok);
+    const sessions = [{ _id: 'sid-1', session: { accountId: canonical._id, workspaces: [
+      { urlKey: 'acme', provider: 'linear', accessToken: 'canonical-live-token', tokenExpiresAt: Date.now() + 10_000_000 }
+    ] } }];
+    const result = await runResolveWorkspaceAccess({ urlKey: 'acme', ownerAccountId: merged._id, sessions, accountStore: store, source: mutated });
+    assert.deepEqual({ token: result.token, reason: result.reason }, { token: null, reason: 'owner_mismatch' });
+  });
+
+  test('M2 (recommended) — delete the whole guard block: Block C AC1 goes red', async () => {
+    const mutated = mutateServerSrc(body => body.replace(GUARD_BLOCK, ''));
+    const store = freshStore();
+    const canonical = await store.createAccount();
+    const merged = await store.createAccount();
+    assert.ok((await store.mergeAccounts(canonical._id, merged._id)).ok);
+    const sessions = [{ _id: 'sid-1', session: { accountId: canonical._id, workspaces: [
+      { urlKey: 'acme', provider: 'linear', accessToken: 'canonical-live-token', tokenExpiresAt: Date.now() + 10_000_000 }
+    ] } }];
+    const result = await runResolveWorkspaceAccess({ urlKey: 'acme', ownerAccountId: merged._id, sessions, accountStore: store, source: mutated });
+    assert.deepEqual({ token: result.token, reason: result.reason }, { token: null, reason: 'owner_mismatch' });
+  });
+
+  test('M3 (recommended) — canonicalize AFTER the cache key is derived: return value stays green, but workspaceTokenCacheKey observes the MERGED (stale) owner', async () => {
+    const mutated = mutateServerSrc(body => {
+      const withoutGuard = body.replace(GUARD_BLOCK, '');
+      return withoutGuard.replace(
+        'const cacheKey = workspaceTokenCacheKey(urlKey, ownerAccountId);',
+        `const cacheKey = workspaceTokenCacheKey(urlKey, ownerAccountId);\n${GUARD_BLOCK}`
+      );
+    });
+    const store = freshStore();
+    const canonical = await store.createAccount();
+    const merged = await store.createAccount();
+    assert.ok((await store.mergeAccounts(canonical._id, merged._id)).ok);
+    const sessions = [{ _id: 'sid-1', session: { accountId: canonical._id, workspaces: [
+      { urlKey: 'acme', provider: 'linear', accessToken: 'canonical-live-token', tokenExpiresAt: Date.now() + 10_000_000 }
+    ] } }];
+    const cacheKeyCalls = [];
+    const result = await runResolveWorkspaceAccess({ urlKey: 'acme', ownerAccountId: merged._id, sessions, accountStore: store, source: mutated, cacheKeyCalls });
+    assert.equal(result.reason, 'ok', 'sanity: the return value alone does NOT catch reordering — this is why Block B\'s text-order witness must stay');
+    assert.equal(cacheKeyCalls[0], merged._id, 'workspaceTokenCacheKey must be shown observing the STALE (merged) owner under this mutation — the cache key is now derived before canonicalization runs, so it is keyed by the id the caller passed in, not the canonical id; this is exactly what a return-value-only assertion cannot see');
   });
 });
