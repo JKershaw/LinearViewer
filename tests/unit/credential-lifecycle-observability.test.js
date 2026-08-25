@@ -359,9 +359,9 @@ describe('runCredentialInvariantSweep (LIN-2236, Block D — orchestration, real
     const canonical = await stores.accountStore.createAccount();
     const merged = await stores.accountStore.createAccount();
     await stores.accountStore.mergeAccounts(canonical._id, merged._id);
-    // The edge is still recorded on the MERGED account id (mergeAccounts rebinds
-    // accountWorkspaceStore edges onto canonical, so bind there to model the
-    // post-merge state realistically).
+    // The edge is bound directly to canonical._id (not the merged id) —
+    // modeling an edge that already points at canonical, so the sweep sees
+    // only the canonical accountId and a merge alone is not a violation.
     await stores.accountWorkspaceStore.bindAccountToWorkspace(canonical._id, 'org-1');
     await stores.ownerCredentialStore.put(canonical._id, 'acme', { provider: 'linear', token: 't', refreshToken: 'r', tokenExpiresAt: NOW + FAR_FUTURE_MS });
     const sessionsCollection = { find: () => ({ toArray: async () => [sessionRowFor('org-1', 'acme', 'linear')] }) };
@@ -371,12 +371,13 @@ describe('runCredentialInvariantSweep (LIN-2236, Block D — orchestration, real
   });
 
   test('an edge STILL BOUND to a MERGED (non-canonical) accountId is canonicalized before the credential lookup (LIN-2308: pins the resolveCanonicalAccountId call in the uniqueAccountIds loop, not just the pure classifier)', async () => {
-    // The test above merges WITH accountWorkspaceStore, which rebinds the
-    // edge onto canonical before this sweep ever reads it — so it never
-    // actually exercises resolving a non-canonical accountId. Here the merge
-    // is done WITHOUT accountWorkspaceStore, so the edge below still carries
-    // the merged (pre-merge) accountId, modeling a real account-workspace
-    // edge that hasn't been migrated onto canonical — exactly the case the
+    // The test above binds the edge to canonical._id directly, so
+    // uniqueAccountIds only ever holds the canonical id and
+    // resolveCanonicalAccountId is an identity no-op there — it never
+    // actually exercises resolving a non-canonical accountId. Here the edge
+    // is bound to merged._id instead, so uniqueAccountIds holds the merged
+    // (pre-merge) accountId, modeling a real account-workspace edge that
+    // hasn't been migrated onto canonical — exactly the case the
     // uniqueAccountIds -> resolveCanonicalAccountId loop exists to handle.
     const stores = freshStores();
     const canonical = await stores.accountStore.createAccount();
