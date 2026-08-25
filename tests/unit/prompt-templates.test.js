@@ -1220,6 +1220,56 @@ describe('triage template', () => {
     assert.deepStrictEqual(namedPriorityFields(metadataBullet), ['priorityLevel'],
       'the metadata bullet names exactly priorityLevel — an unnamed write field (no backtick-quoted field at all) or a bare native `priority` both fail this');
   });
+
+  // ===========================================================================
+  // LIN-2317: the generated-prompt sibling of LIN-2316. LIN-2316 fixed only the
+  // handwritten triage template (asserted by f1-f4 above); the meta-prompt's
+  // "Triage prompts" quality rule and the triage aiHint.goal it feeds still
+  // authorized a priority write without naming which field, so a model told
+  // "you may change priority" could reach for the native (descending) `priority`
+  // field and invert its intent. Field-scoped per LIN-2315: assertions key on
+  // WHICH field is named, not on specific prose.
+  // ===========================================================================
+
+  test('(meta f5) the Triage-prompts quality rule names priorityLevel as the sole priority write field', () => {
+    const p = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-2317',
+      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'triage, plan, review',
+      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
+    });
+    const triageBullet = extractQualityRuleBullet(p, 'Triage prompts', 'Bug prompts');
+    assert.deepStrictEqual(namedPriorityFields(triageBullet), ['priorityLevel'],
+      'the Triage-prompts quality rule names exactly priorityLevel as a priority-family field — an unnamed write field or a bare native `priority` both fail this');
+  });
+
+  test('(meta f6) the triage aiHint.goal fed into the meta-prompt names priorityLevel as the sole priority write field', () => {
+    const hints = formatAIHintsForMetaPrompt();
+    // Extract the triage entry specifically: the block starting at "**triage** (" up to the next blank line.
+    const triageBlock = hints.slice(hints.indexOf('**triage** ('), hints.indexOf('\n\n', hints.indexOf('**triage** (')));
+    assert.ok(triageBlock.includes('**triage** ('), 'the meta-prompt aiHints include a triage entry');
+    assert.deepStrictEqual(namedPriorityFields(triageBlock), ['priorityLevel'],
+      'the triage aiHint block names exactly priorityLevel as a priority-family field — an unnamed write field or a bare native `priority` both fail this');
+  });
+
+  test('(f7) canonical priority 0 is annotated as unknown/none, not only the top of the scale', () => {
+    const result = generatePrompt('triage', { ...mockIssue, priority: 0, priorityLabel: undefined }, mockContext);
+    const currentState = result.prompt.slice(result.prompt.indexOf('## Current State'), result.prompt.indexOf('## Goal'));
+    const priorityLine = currentState.split('\n').find(l => l.startsWith('**Priority:**'));
+    assert.ok(priorityLine, 'Current State carries a Priority line');
+    assert.ok(/\bpriorityLevel\s+0\b/.test(priorityLine), 'the displayed value names priorityLevel 0');
+    assert.ok(/unknown\/none|unknown|none/i.test(priorityLine),
+      'the scale note annotates 0 as unknown/none, not only the top of the scale');
+    assert.ok(/4\s*=\s*highest/i.test(priorityLine), 'the scale note still explains the top of the scale');
+  });
+
+  test('(f8) a non-zero canonical priority is unaffected by the 0-annotation (no regression)', () => {
+    const result = generatePrompt('triage', { ...mockIssue, priority: 2, priorityLabel: undefined }, mockContext);
+    const currentState = result.prompt.slice(result.prompt.indexOf('## Current State'), result.prompt.indexOf('## Goal'));
+    const priorityLine = currentState.split('\n').find(l => l.startsWith('**Priority:**'));
+    assert.ok(/\bpriorityLevel\s+3\b/.test(priorityLine), 'native priority 2 maps to canonical priorityLevel 3');
+    assert.ok(!/unknown/i.test(priorityLine), 'a set priority does not carry the unknown/none annotation');
+  });
 });
 
 // =============================================================================
