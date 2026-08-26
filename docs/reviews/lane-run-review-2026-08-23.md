@@ -793,3 +793,117 @@ previously published numbers. Every merge commit claimed in the remediation tabl
 `origin/main` by a read independent of the session that reported it.
 
 — Flight Companion, observation altitude, 2026-08-25
+
+---
+
+## Addendum 4 — 2026-08-26: the ledger, and what "tasks grow tasks" actually costs
+
+Addendum 3 recorded the remediation wave as it stood on 2026-08-25 morning. This addendum closes
+the accounting: what the lane run's repair has actually cost in tickets, how much of it is done,
+and what the compounding looks like now there are three generations of it to measure.
+
+Every number below was produced by enumerating all 63 descendant tickets (LIN-2259–2321) directly
+through the proxy on 2026-08-26, not by carrying forward a previously published figure.
+
+### The three-layer ledger
+
+| Layer | Range | Done | Open |
+|---|---|---:|---:|
+| Fix tickets — the run's own eight defects plus sweep machinery faults | LIN-2259–2277 | **17** | **2** |
+| Follow-ups the wave filed | LIN-2278–2307 | **1** | **29** |
+| Third generation — filed by the fixes to the fixes | LIN-2308–2321 | **7** | **7** |
+| **Total** | | **25** | **38** |
+
+**The lane run's own damage is repaired.** Seventeen of nineteen fix tickets are merged and
+verified. The two remainders are parked by operator decision, not stalled: LIN-2259 is
+`blocked-by` LIN-2310 (its F3 defect is confirmed live in `reapers.js:1481-1503`, and the fix
+depends on a structural provenance change), and LIN-2277 is held pending a measurement only the
+operator's own machine can take.
+
+**The debt the run made visible is not repaired.** Of the thirty follow-ups the wave filed, exactly
+one is closed — LIN-2303, which landed inside the run itself. The other twenty-nine have not been
+started.
+
+### The compounding, measured across three generations
+
+| Generation | In | Filed | Ratio |
+|---|---:|---:|---:|
+| Remediation wave (2026-08-24) | 19 | 30 | **1.6×** |
+| Third generation (2026-08-25) | 8 merges | 10 | **1.25×** |
+
+The ratio is falling, and the fall is the more interesting number. The third generation also
+*closed* four of the ten it filed within the same day, for a net of +6 rather than +10.
+
+Two things plausibly explain the drop, and they are not the same kind of thing. The wave was
+repairing work that had skipped its plan stage, so its class checks were finding genuine unhandled
+siblings in quantity. The third generation was repairing work that had just been reviewed, so there
+was less left to find. That is a real effect. But LIN-2309 also landed on 2026-08-25 morning, which
+forced every close-out follow-up to carry a priority and a type label — and a ticket that must be
+triaged at filing time is a ticket whose author has to decide whether it is worth filing. No
+attempt has been made to separate these two causes, and the numbers here cannot.
+
+**What is certain is that the expansion has not stopped.** Eight merges on 2026-08-25 — every one
+independently verified, zero defects found in anything that landed — still left the board six
+tickets larger than it started.
+
+### The triage — and a corrected assumption
+
+The twenty-nine were triaged by the operator on 2026-08-26, read-only, with no dispatched session.
+
+The working assumption going in was that a wave filing under a mandate-to-look but no worth test
+would have produced some padding, and that the real number might be closer to twelve. **That
+assumption was wrong.** All twenty-nine carry source-verified evidence, a named class, and an
+explicit re-verification at HEAD by the session that filed them. None is speculative. None was
+closed as not-worth-doing.
+
+This is worth recording because it inverts the expected finding: the wave's filing discipline was
+better than the operator's prior estimate of it, and the backlog is a real one.
+
+What the triage changed was **order**, not membership:
+
+| Change | Tickets | Reason |
+|---|---|---|
+| Raised to High | LIN-2294 | A human-parked beat is nudged and re-dispatched — it overrides a deliberate `BLOCKED` park and spends budget doing it |
+| Lowered to Low | LIN-2283 | Author states it is low-impact until the consumer is wired up |
+| Lowered to Low | LIN-2280 | An investigation, not a fix |
+| Lowered to Low | LIN-2286, 2290, 2292, 2305 | Test coverage for changes already merged and independently reviewed |
+| Lowered to Low | LIN-2295 | Doc-twin drift — owned by the documentation periodical, which is the standing sweep for this class, not hand-driven work |
+
+After triage the twenty-nine sit at **11 High, 10 Medium, 8 Low**.
+
+The eleven High are three coherent clusters plus two singletons, and they are the natural pick-up
+order:
+
+* **Identity / account-merge** — LIN-2304, 2285, 2300. All three dead-end a real user: ten
+  account-conflict 409s with no confirm-to-merge route on the non-Linear providers, a third account
+  hitting a 500 on merge, and a stale `session.accountId` surviving a non-mergeable 409.
+* **Resume / blocked-marker lineage** — LIN-2297 (the root cause a shipped prompt fix works
+  around), LIN-2281, LIN-2282.
+* **Cross-workspace `decision_id` collision** — LIN-2291, LIN-2293. An agent-invented
+  `decision_id` treated as globally unique on a cross-workspace surface.
+* **Singletons** — LIN-2278 (the last instance of a class LIN-1982 and LIN-2275 already closed) and
+  LIN-2302 (five shipped-prose false claims; overlaps the documentation periodical's remit).
+
+### The operator error worth recording
+
+For a full day the remediation cadence worked the *newest* layer — LIN-2308–2321, the fixes to the
+fixes — while the twenty-nine sat untouched. Eight merges, zero defects, roughly $88. Good work on
+the wrong queue.
+
+The reason is structural rather than careless, which is why it is worth naming: each close-out
+hands its successor a freshly-written, freshly-verified ticket with warm context, and taking it is
+always cheaper than opening a cold one from a list. A pipeline that always takes its own output
+will drain its newest layer indefinitely and never reach the backlog underneath. Nothing in the
+close-out template, the ranker, or the operator's own habit pushed back on that.
+
+The correction is the triage above: the backlog now carries an order the board can be picked up on
+without re-deriving it.
+
+### Disclosure
+
+This addendum was written by the operator who ran the remediation cadence it criticises, and who
+made both the assumption about padding that the triage disproved and the queue-selection error in
+the preceding section. The ticket counts are reproducible: enumerate LIN-2259–2321 and group by
+state. The priority changes are listed individually above and are reversible.
+
+— Flight Companion, observation altitude, 2026-08-26
