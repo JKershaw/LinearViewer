@@ -190,6 +190,47 @@ describe('shared two-stage contract (all periodicals)', () => {
         assert.match(prompt, /what you examine/i);
         assert.match(prompt, /stays within its existing bound/i);
       });
+
+      // LIN-2323: the universal adversarial-second-read directive, appended
+      // once by buildPeriodicalScaffold so all 15 templates carry it — mirrors
+      // the LIN-700 gap-audit pins above (one shared bullet, one loop).
+      test('LIN-2323: directs a fresh-context, separate-session adversarial second-read, not a self-review', () => {
+        assert.match(prompt, /fresh-context adversarial second-read/i);
+        assert.match(prompt, /required, structural step, not advice/i);
+        assert.match(prompt, /largest item in this window that this report missed or misfiled/i);
+        // The three-tier resolution: separate session preferred, sub-agent
+        // accepted, same-session self-review explicitly rejected.
+        assert.match(prompt, /Tier 1 \(preferred\)/i);
+        assert.match(prompt, /Tier 2 \(accepted fallback\)/i);
+        assert.match(prompt, /Tier 3.*is not accepted/i);
+        assert.match(prompt, /state which of Tier 1 or Tier 2 you used/i);
+      });
+
+      test('LIN-2323: pins the exact appendix header and all three gate-checked comment tokens', () => {
+        assert.match(prompt, /## Adversarial Second-Read/);
+        assert.match(prompt, /Adversarial second-read verdict: AGREE/);
+        assert.match(prompt, /Adversarial second-read verdict: DISAGREE/);
+        assert.match(prompt, /Differed from top finding: YES/);
+        assert.match(prompt, /Differed from top finding: NO/);
+        assert.match(prompt, /Disposition: fixed in place/);
+        assert.match(prompt, /Disposition: escalated/);
+        assert.match(prompt, /Disposition: no change/);
+        // All three must land in ONE comment body — not three separate posts.
+        assert.match(prompt, /together in a single comment body/i);
+      });
+
+      test('LIN-2323: the comment is mandatory and gate-enforced, the appendix is a human-readable duplicate only', () => {
+        assert.match(prompt, /mandatory, not optional documentation/i);
+        assert.match(prompt, /refuses a premature done transition/i);
+        assert.match(prompt, /a human-readable duplicate the engine never reads/i);
+      });
+
+      test('LIN-2323: AGREE and DISAGREE both conclude normally — disagreement is the escalation, never a reason to park the task', () => {
+        assert.match(prompt, /AGREE and DISAGREE both conclude this task normally/i);
+        assert.match(prompt, /a DISAGREE verdict is itself the escalation/i);
+        assert.match(prompt, /never a reason to leave this task open pending a human/i);
+        assert.match(prompt, /an open, not-yet-merged report pull request already satisfies/i);
+      });
     });
   }
 });

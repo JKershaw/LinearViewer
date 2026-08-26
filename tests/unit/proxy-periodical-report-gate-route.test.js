@@ -81,6 +81,10 @@ async function patch(app, issueId, body) {
 
 const ISSUE_UUID = '33333333-3333-3333-3333-333333333333';
 const gatedDescription = `${buildPeriodicalGateMarker('Documentation Review')}\n\nRun the review.`;
+const REPORT_EVIDENCE_COMMENT = { body: 'Landed: https://github.com/JKershaw/LinearViewer/pull/1223' };
+const ADVERSARIAL_COMPLETE_COMMENT = {
+  body: 'Adversarial second-read verdict: AGREE. Differed from top finding: NO. Disposition: no change.',
+};
 
 describe('PATCH /api/proxy/issues/:issueId — periodical report-persistence gate (LIN-694)', () => {
   test('refuses a marked issue moving to a completed state with no evidence comment', async () => {
@@ -95,15 +99,53 @@ describe('PATCH /api/proxy/issues/:issueId — periodical report-persistence gat
     assert.equal(calls.updateIssue.length, 0, 'the write must never reach the provider');
   });
 
-  test('allows the same transition once a real evidence comment exists', async () => {
+  test('allows the same transition once a real evidence comment AND a complete adversarial-read record exist', async () => {
     const { provider, calls } = makeProvider({
       description: gatedDescription,
-      comments: [{ body: 'Landed: https://github.com/JKershaw/LinearViewer/pull/1223' }],
+      comments: [REPORT_EVIDENCE_COMMENT, ADVERSARIAL_COMPLETE_COMMENT],
     });
     const { status } = await patch(buildApp(provider), ISSUE_UUID, { stateId: 'state-done' });
     assert.equal(status, 200);
     assert.equal(calls.updateIssue.length, 1);
     assert.equal(calls.updateIssue[0].stateId, 'state-done');
+  });
+
+  // LIN-2323 — the new adversarial-read evidence predicate, end-to-end through
+  // the route. Report-persistence evidence alone is no longer sufficient.
+  test('refuses a marked issue moving to completed when the adversarial-read comment is absent entirely', async () => {
+    const { provider, calls } = makeProvider({
+      description: gatedDescription,
+      comments: [REPORT_EVIDENCE_COMMENT],
+    });
+    const { status, body } = await patch(buildApp(provider), ISSUE_UUID, { stateId: 'state-done' });
+    assert.equal(status, 409);
+    assert.equal(body.code, 'PERIODICAL_ADVERSARIAL_READ_NOT_RECORDED');
+    assert.match(body.error, /adversarial second-read/i);
+    assert.equal(calls.updateIssue.length, 0, 'the write must never reach the provider');
+  });
+
+  test('refuses a marked issue moving to completed when the adversarial-read comment carries only the verdict token', async () => {
+    const { provider, calls } = makeProvider({
+      description: gatedDescription,
+      comments: [REPORT_EVIDENCE_COMMENT, { body: 'Adversarial second-read verdict: AGREE' }],
+    });
+    const { status, body } = await patch(buildApp(provider), ISSUE_UUID, { stateId: 'state-done' });
+    assert.equal(status, 409);
+    assert.equal(body.code, 'PERIODICAL_ADVERSARIAL_READ_NOT_RECORDED');
+    assert.equal(calls.updateIssue.length, 0, 'a bare-AGREE record must not satisfy the widened predicate');
+  });
+
+  test('allows a complete DISAGREE record too — escalation does not block concluding', async () => {
+    const { provider, calls } = makeProvider({
+      description: gatedDescription,
+      comments: [
+        REPORT_EVIDENCE_COMMENT,
+        { body: 'Adversarial second-read verdict: DISAGREE. Differed from top finding: YES. Disposition: escalated.' },
+      ],
+    });
+    const { status } = await patch(buildApp(provider), ISSUE_UUID, { stateId: 'state-done' });
+    assert.equal(status, 200);
+    assert.equal(calls.updateIssue.length, 1);
   });
 
   test('does not gate a marked issue moving to a non-completed state', async () => {

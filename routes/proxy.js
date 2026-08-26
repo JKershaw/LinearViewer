@@ -3412,7 +3412,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
           });
           if (gateResult.applies && !gateResult.ok) {
             logEvent(req, '/api/proxy/issues/:id', 409);
-            return jsonError(res, 409, gateResult.message, { code: 'PERIODICAL_REPORT_NOT_PERSISTED' });
+            return jsonError(res, 409, gateResult.message, { code: gateResult.code });
           }
         }
       }
