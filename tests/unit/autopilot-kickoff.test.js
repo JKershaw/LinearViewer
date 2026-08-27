@@ -692,6 +692,24 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
     assert.ok(text.includes('READ-ONLY'));
     assert.ok(text.includes(STEPPER_MARKER));
   });
+
+  test('stepper beat 4 (push) carves out an already-blocked beat as expected silence, not a wedge (LIN-2294)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper' });
+    const flat = text.replace(/\s+/g, ' ');
+    // Ported from the already-adjudicated orchestrator wording (LIN-2124/LIN-2269):
+    // without this, a beat already woken to the stepper as `blocked` still matches
+    // the ~30-min wedged-beat ceiling as written, with nothing telling the stepper the
+    // silence is expected — risking a nudge/re-dispatch on a beat a human is parked on.
+    assert.ok(flat.includes('a beat already woken to you as `blocked` is expected to stay silent'));
+    assert.ok(flat.includes("don't nudge or re-dispatch it on this rule, surface it to the human so they can unblock it"));
+  });
+
+  test('stepper beat 4 (standalone) carves out an already-blocked beat as expected silence, not a wedge (LIN-2294)', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper', standalone: true });
+    const flat = text.replace(/\s+/g, ' ');
+    assert.ok(flat.includes('a beat already woken to you as `blocked` is expected to stay silent'));
+    assert.ok(flat.includes("don't nudge or re-dispatch it on this rule, surface it to the human so they can unblock it"));
+  });
 });
 
 describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
