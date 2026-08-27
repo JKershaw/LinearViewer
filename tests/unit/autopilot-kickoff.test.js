@@ -692,6 +692,43 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
     assert.ok(text.includes('READ-ONLY'));
     assert.ok(text.includes(STEPPER_MARKER));
   });
+
+  // The carve-out clause is isolated to the stepper's OWN beat 4 before asserting, using the
+  // same heading-split idiom the LIN-1324 composition test uses. Asserting against the whole
+  // flattened kickoff would not discriminate: `variant: 'stepper'` emits the standard
+  // orchestrator sections too, and step 3's already-shipped carve-out (LIN-2124/LIN-2269)
+  // states the operative directive verbatim — so a whole-text `includes` for the shared
+  // sentence passes even with the stepper branches unfixed (LIN-2294 review, mutation M3).
+  const flatStepperBeat4 = ({ standalone = false } = {}) => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, variant: 'stepper', standalone });
+    const afterStepper = text.split(STEPPER_MARKER)[1];
+    assert.ok(afterStepper, 'stepper section marker is present');
+    const stepperSection = afterStepper.split('**Hard rules')[0];
+    const heading = standalone
+      ? /^4\. \*\*Wait per Setup's session-id check/m
+      : /^4\. \*\*Stand by for the push/m;
+    const beat4Section = stepperSection.split(heading)[1];
+    assert.ok(beat4Section, 'stepper beat 4 heading is present and unchanged');
+    // Stop at beat 5 so the assertions cannot reach past beat 4 into later stepper prose.
+    return beat4Section.split(/^5\. \*\*/m)[0].replace(/\s+/g, ' ');
+  };
+
+  test('stepper beat 4 (push) carves out an already-blocked beat as expected silence, not a wedge (LIN-2294)', () => {
+    const beat4 = flatStepperBeat4();
+    // Ported from the already-adjudicated orchestrator wording (LIN-2124/LIN-2269):
+    // without this, a beat already woken to the stepper as `blocked` still matches
+    // the ~30-min wedged-beat ceiling as written, with nothing telling the stepper the
+    // silence is expected — risking a nudge/re-dispatch on a beat a human is parked on.
+    assert.ok(beat4.includes('a beat already woken to you as `blocked` is expected to stay silent'));
+    // The operative directive, not just the setup sentence — dropping this half must go red.
+    assert.ok(beat4.includes("don't nudge or re-dispatch it on this rule, surface it to the human so they can unblock it"));
+  });
+
+  test('stepper beat 4 (standalone) carves out an already-blocked beat as expected silence, not a wedge (LIN-2294)', () => {
+    const beat4 = flatStepperBeat4({ standalone: true });
+    assert.ok(beat4.includes('a beat already woken to you as `blocked` is expected to stay silent'));
+    assert.ok(beat4.includes("don't nudge or re-dispatch it on this rule, surface it to the human so they can unblock it"));
+  });
 });
 
 describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
