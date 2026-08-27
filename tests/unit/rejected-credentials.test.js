@@ -243,6 +243,25 @@ describe('recordByteIdenticalRejection / isPastByteIdenticalThreshold (LIN-2327)
     assert.equal(registry.isPastByteIdenticalThreshold('', 1), false);
   });
 
+  test('write-side fail-open: a falsy fingerprint write does not consume registry capacity or displace a real entry', () => {
+    // Proves the WRITE site itself fails open, independent of
+    // isPastByteIdenticalThreshold's own falsy guard (the test above). A
+    // limit of 2 is filled exactly by two real, past-threshold fingerprints;
+    // if recordByteIdenticalRejection(falsy) inserted anything at all, each
+    // falsy call would push the map over its limit and LRU-evict fp-a (the
+    // oldest real entry) even though fp-a was never touched again.
+    const registry = createRejectedCredentialRegistry({ limit: 2, now: () => 1000 });
+    registry.recordByteIdenticalRejection('fp-a');
+    registry.recordByteIdenticalRejection('fp-a');
+    registry.recordByteIdenticalRejection('fp-b');
+    registry.recordByteIdenticalRejection('fp-b');
+    registry.recordByteIdenticalRejection(null);
+    registry.recordByteIdenticalRejection(undefined);
+    registry.recordByteIdenticalRejection('');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-a', 2), true, 'fp-a must survive: falsy writes must not consume capacity or evict a real entry');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-b', 2), true, 'fp-b must survive too');
+  });
+
   test('LRU eviction: a past-threshold fingerprint can be silently evicted by newer fingerprints once the registry limit is exceeded — reading it does not protect it (limit-only retention, no TTL, no read-refresh)', () => {
     const registry = createRejectedCredentialRegistry({ limit: 3, now: () => 1000 });
     registry.recordByteIdenticalRejection('fp-1');

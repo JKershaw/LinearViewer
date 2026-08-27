@@ -1317,9 +1317,12 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    *    to the just-rejected credential. Unlike condition 2, this counter
    *    outlives the suspect mark's TTL by design, so a fingerprint that has
    *    proven itself unrecoverable stays terminal even after suspicion lapses
-   *    or the process restarts — otherwise the retryable-503 grace would
+   *    within the SAME process — otherwise the retryable-503 grace would
    *    re-arm every suspect-TTL window while the underlying credential never
-   *    actually changes bytes.
+   *    actually changes bytes. The registry is per-process and in-memory
+   *    (see lib/rejected-credentials.js's module doc), so a process restart
+   *    clears this counter along with every other mark — it does not survive
+   *    a restart, and re-arming there is the correct failure direction.
    *
    * @param {import('express').Request} req
    * @returns {boolean} true if this 401 should surface as a retryable 503
@@ -1332,8 +1335,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // LIN-2327: a fingerprint that has come back byte-identical from a
     // forced refresh at least BYTE_IDENTICAL_ESCALATION_THRESHOLD times is
     // never transient, even once its suspect mark has lapsed — otherwise the
-    // retryable-503 grace re-arms every suspect-TTL window/restart while the
-    // underlying credential never actually changes bytes.
+    // retryable-503 grace re-arms every suspect-TTL window while the
+    // underlying credential never actually changes bytes. This counter is
+    // per-process/in-memory, so a process restart clears it and the
+    // retryable-503 grace re-arms then too — this classifier change does not
+    // prevent that.
     if (rejectedCredentialRegistry?.isPastByteIdenticalThreshold?.(req?.resolvedCredentialFingerprint, BYTE_IDENTICAL_ESCALATION_THRESHOLD)) return false;
     return true;
   }
