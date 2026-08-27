@@ -161,12 +161,15 @@ describe('observer-efficacy-signal: computeIncumbentSignal (LIN-2133)', () => {
   }
   const NOW = new Date('2026-04-11T12:00:00.000Z');
 
-  test('a loop with a [blocked] marker followed by a later entry: timeToRespondMs is the gap to the NEXT feedback entry', () => {
+  // LIN-2310: the response entry must carry the positive-allowlist stamp —
+  // a bare kindless "a human replied" no longer counts on its own (see the
+  // dedicated kindless-entry test below).
+  test('a loop with a [blocked] marker followed by a later decision-answer entry: timeToRespondMs is the gap to that entry', () => {
     const loops = _buildLoops({
       historyItems: [historyItem({
         feedback: [
           { message: '[blocked] need a decision', timestamp: '2026-04-11T11:10:00.000Z' },
-          { message: 'a human replied', timestamp: '2026-04-11T11:12:30.000Z' },
+          { kind: 'decision-answer', message: 'a human replied', timestamp: '2026-04-11T11:12:30.000Z' },
           { message: '[done] shipped', timestamp: '2026-04-11T11:15:00.000Z' }
         ]
       })],
@@ -208,7 +211,7 @@ describe('observer-efficacy-signal: computeIncumbentSignal (LIN-2133)', () => {
       historyItems: [historyItem({
         feedback: [
           { message: '[blocked] first', timestamp: '2026-04-11T11:00:00.000Z' },
-          { message: 'nudge', timestamp: '2026-04-11T11:01:00.000Z' },
+          { kind: 'decision-answer', message: 'nudge', timestamp: '2026-04-11T11:01:00.000Z' },
           { message: '[blocked] second', timestamp: '2026-04-11T11:20:00.000Z' }
         ]
       })],
@@ -216,6 +219,53 @@ describe('observer-efficacy-signal: computeIncumbentSignal (LIN-2133)', () => {
     });
     const [row] = computeIncumbentSignal(loops).perLoop;
     assert.strictEqual(row.timeToRespondMs, 60_000, 'measured from the FIRST blocked marker to the very next entry');
+  });
+
+  // LIN-2310 (decision d): a genuinely kindless entry — pre-LIN-1475 data, or
+  // a hand-built fixture — no longer counts as a response under the positive
+  // allowlist. Under the old denylist it WOULD have counted (nothing in
+  // RUNNER_BOOKKEEPING_KINDS/isRunnerSelfTalkStatus excluded a kindless
+  // entry); this is a deliberate, named behavior change, not a bug — do not
+  // "fix" this test back to a non-null assertion.
+  test('a kindless entry after [blocked] is NOT a response under the positive allowlist: timeToRespondMs stays null', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        status: 'taken',
+        feedback: [
+          { message: '[blocked] need a decision', timestamp: '2026-04-11T11:10:00.000Z' },
+          { message: 'a kindless legacy-shaped entry', timestamp: '2026-04-11T11:12:00.000Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const [row] = computeIncumbentSignal(loops).perLoop;
+    assert.strictEqual(row.respondedAt, null, 'a kindless entry carries no decision-answer stamp, so it fails closed as no-response');
+    assert.strictEqual(row.timeToRespondMs, null);
+    assert.strictEqual(row.resolved, false);
+  });
+
+  // LIN-2310 (F3): a genuine, non-blocked wake marker on ANY kind other than
+  // decision-answer — including kind: 'status', which used to count under the
+  // old isRunnerSelfTalkStatus exclusion (it only excluded self-talk and a
+  // repeated [blocked], never a real wake marker like this) — no longer
+  // counts as a response either. This is the second, larger behavior change
+  // LIN-2310 makes (not just the kindless-row change above): the SAME
+  // fixture shape asserted a non-null timeToRespondMs before this fix.
+  test('a genuine non-blocked wake marker on kind:status is NOT a response under the positive allowlist: timeToRespondMs stays null', () => {
+    const loops = _buildLoops({
+      historyItems: [historyItem({
+        status: 'taken',
+        feedback: [
+          { kind: 'status', message: '[blocked] need a decision', timestamp: '2026-04-11T11:10:00.000Z' },
+          { kind: 'status', message: '[done] shipped', timestamp: '2026-04-11T11:15:00.000Z' }
+        ]
+      })],
+      now: NOW, lean: false
+    });
+    const [row] = computeIncumbentSignal(loops).perLoop;
+    assert.strictEqual(row.respondedAt, null, 'a [done] wake marker with no decision-answer stamp is not a counted response under the new rule');
+    assert.strictEqual(row.timeToRespondMs, null);
+    assert.strictEqual(row.resolved, true, 'deriveLifecycleStatus still sees the real [done] marker — resolved and timeToRespondMs now diverge, the broadened N1 caveat');
   });
 
   test('summary.timeToRespond.resolvedRate reflects the fraction of blocked loops that are no longer blocked', () => {
@@ -418,13 +468,16 @@ describe('observer-efficacy-signal: compareArms', () => {
     assert.ok(bundle.caveats.length >= 3);
     assert.ok(bundle.caveats.some((c) => /lower-bound/i.test(c)));
     assert.ok(bundle.caveats.some((c) => /must not be diffed/i.test(c)));
-    // LIN-2263: residue that remains after the F1/F2 fixes must still be named.
+    // LIN-2263/F2 residue is untouched by this ticket and must still be named.
     assert.ok(bundle.caveats.some((c) => /truncated/i.test(c) && /retention cap/i.test(c)), 'the truncation residue (F2) must be named in the caveat list');
-    assert.ok(bundle.caveats.some((c) => /runner-emitted bookkeeping/i.test(c)), 'the incumbent-arm caveat must reflect the F1 fix (bookkeeping entries are skipped, not "the next entry")');
-    // LIN-2263 review R1: the caveat must also name the self-talk residue —
-    // a status-kind entry is only a response when it carries a genuine
-    // state-change marker, not a fabricated "we catch everything" claim.
-    assert.ok(bundle.caveats.some((c) => /self-talk/i.test(c) && /repeated \[blocked\]/i.test(c)), 'the caveat must name the R1 self-talk/repeated-[blocked] residue, not overclaim completeness');
+    // LIN-2310: the positive-allowlist rule itself.
+    assert.ok(bundle.caveats.some((c) => /decision-answer/i.test(c) && /positive allowlist/i.test(c)), 'the incumbent-arm caveat must state the positive-allowlist rule, not a denylist description');
+    // LIN-2310: the near-total-null residue — the honest result, not a regression.
+    assert.ok(bundle.caveats.some((c) => /null for nearly every loop/i.test(c) && /followUpTo/i.test(c)), 'the caveat must name the near-universal null result and why (human replies land as a new dispatch row)');
+    // LIN-2310 (broadened N1): resolved/timeToRespondMs disagreement is now the common case, not narrow.
+    assert.ok(bundle.caveats.some((c) => /diverge for most answered loops/i.test(c)), 'the N1 caveat must be broadened, not left describing only the narrow [skipped] case');
+    // LIN-2310 (F6, cross-repo composition): findFirstBlockedMarker's [blocked] population is no longer guaranteed homogeneous.
+    assert.ok(bundle.caveats.some((c) => /not guaranteed homogeneous in cause/i.test(c)), 'the cross-repo composition caveat must be present');
   });
 });
 
