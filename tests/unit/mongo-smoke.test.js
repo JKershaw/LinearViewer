@@ -750,6 +750,38 @@ describe(
       assert.strictEqual(edge.wakeWitnessMeta[beat2._id].attempt, 0);
     });
 
+    // LIN-2297: the once-only guard/witness key becomes class-aware — bare
+    // `doc._id` for a genuine terminal, `${doc._id}#blocked` for a blocked
+    // wake. Confirmatory, not load-bearing: the underlying primitive (array
+    // `$ne` against a string) is unchanged and already pinned above on real
+    // Mongo; this closes the loop for the new composite-string value.
+    test('addFeedback: [blocked] then [done] on ONE item mints two wakes and two distinct terminalWakeItems entries on real MongoDB (LIN-2297)', async () => {
+      const store = freshDispatchStore('feedback-wake-blocked-then-done');
+      const child = await store.addItem('acme', {
+        prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-2297',
+        sessionId: 'parent-S1', subscription: 'everything'
+      });
+      await store.takeItem(child._id, 'acme', 'token-a');
+
+      await store.addFeedback(child._id, 'acme', { message: '[blocked] need a human' }, 'token-a');
+      await store.addFeedback(child._id, 'acme', { message: '[done] finished after unblock' }, 'token-a');
+
+      const queued = await store.collection.find({ urlKey: 'acme', kind: 'wake' }).toArray();
+      assert.strictEqual(queued.length, 2, '[blocked] then [done] on the same row each mint their own wake on real MongoDB');
+
+      const edge = await store.historyCollection.findOne({ _id: child._id });
+      assert.deepStrictEqual(
+        [...edge.terminalWakeItems].sort(),
+        [child._id, `${child._id}#blocked`].sort(),
+        'terminalWakeItems holds both the bare id (the genuine terminal) and the #blocked-suffixed id — the composite key CASes correctly as a distinct array member on real MongoDB'
+      );
+      assert.deepStrictEqual(
+        Object.keys(edge.wakeWitnessMeta).sort(),
+        [child._id, `${child._id}#blocked`].sort(),
+        'wakeWitnessMeta holds both keys too — re-keyed together with terminalWakeItems, not left behind'
+      );
+    });
+
     // -----------------------------------------------------------------------
     // LIN-2079 (PR #1145 review ledger item 2): the `listHistory({status,
     // silentSince})` predicate on the engine production actually runs.
