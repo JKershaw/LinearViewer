@@ -210,3 +210,87 @@ describe('bounded registry', () => {
     assert.equal(registry.isSuspect('fp-4'), true);
   });
 });
+
+// LIN-2327: the fourth, independent `byteIdenticalRejections` map — see the
+// module docstring's "BYTE-IDENTICAL-REJECTION COUNTER" section. Fingerprint-
+// only key, no TTL, limit-only eviction, deliberate non-de-escalation.
+describe('recordByteIdenticalRejection / isPastByteIdenticalThreshold (LIN-2327)', () => {
+  test('reaches threshold at exactly the configured count, not before or after', () => {
+    const registry = createRejectedCredentialRegistry({ now: () => 1000 });
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-a', 2), false, 'no rejections yet');
+    registry.recordByteIdenticalRejection('fp-a');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-a', 2), false, 'one rejection is not yet past threshold 2');
+    registry.recordByteIdenticalRejection('fp-a');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-a', 2), true, 'second rejection reaches threshold 2');
+  });
+
+  test('counts are tracked independently per fingerprint', () => {
+    const registry = createRejectedCredentialRegistry({ now: () => 1000 });
+    registry.recordByteIdenticalRejection('fp-a');
+    registry.recordByteIdenticalRejection('fp-a');
+    registry.recordByteIdenticalRejection('fp-b');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-a', 2), true);
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-b', 2), false, 'fp-b has only one rejection');
+  });
+
+  test('fail-open: a falsy fingerprint is never recorded and never reads past threshold', () => {
+    const registry = createRejectedCredentialRegistry({ now: () => 1000 });
+    registry.recordByteIdenticalRejection(null);
+    registry.recordByteIdenticalRejection(undefined);
+    registry.recordByteIdenticalRejection('');
+    assert.equal(registry.isPastByteIdenticalThreshold(null, 1), false);
+    assert.equal(registry.isPastByteIdenticalThreshold(undefined, 1), false);
+    assert.equal(registry.isPastByteIdenticalThreshold('', 1), false);
+  });
+
+  test('write-side fail-open: a falsy fingerprint write does not consume registry capacity or displace a real entry', () => {
+    // Proves the WRITE site itself fails open, independent of
+    // isPastByteIdenticalThreshold's own falsy guard (the test above). A
+    // limit of 2 is filled exactly by two real, past-threshold fingerprints;
+    // if recordByteIdenticalRejection(falsy) inserted anything at all, each
+    // falsy call would push the map over its limit and LRU-evict fp-a (the
+    // oldest real entry) even though fp-a was never touched again.
+    const registry = createRejectedCredentialRegistry({ limit: 2, now: () => 1000 });
+    registry.recordByteIdenticalRejection('fp-a');
+    registry.recordByteIdenticalRejection('fp-a');
+    registry.recordByteIdenticalRejection('fp-b');
+    registry.recordByteIdenticalRejection('fp-b');
+    registry.recordByteIdenticalRejection(null);
+    registry.recordByteIdenticalRejection(undefined);
+    registry.recordByteIdenticalRejection('');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-a', 2), true, 'fp-a must survive: falsy writes must not consume capacity or evict a real entry');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-b', 2), true, 'fp-b must survive too');
+  });
+
+  test('LRU eviction: a past-threshold fingerprint can be silently evicted by newer fingerprints once the registry limit is exceeded — reading it does not protect it (limit-only retention, no TTL, no read-refresh)', () => {
+    const registry = createRejectedCredentialRegistry({ limit: 3, now: () => 1000 });
+    registry.recordByteIdenticalRejection('fp-1');
+    registry.recordByteIdenticalRejection('fp-1');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-1', 2), true, 'fp-1 is past threshold before any eviction pressure');
+    registry.recordByteIdenticalRejection('fp-2');
+    registry.recordByteIdenticalRejection('fp-3');
+    // A fourth distinct fingerprint pushes the map past its configured limit
+    // of 3 — fp-1 is the oldest WRITE, and the read above did not refresh its
+    // position, so it is the one evicted.
+    registry.recordByteIdenticalRejection('fp-4');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-1', 2), false, 'fp-1 silently de-escalates back to false once evicted, despite never being de-escalated by accept()/witnessAccepted()');
+  });
+
+  test('non-de-escalation: accept() does not clear or reduce the byte-identical-rejection count', () => {
+    const registry = createRejectedCredentialRegistry({ now: () => 1000 });
+    registry.recordByteIdenticalRejection('fp-a');
+    registry.recordByteIdenticalRejection('fp-a');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-a', 2), true);
+    registry.accept('fp-a');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-a', 2), true, 'accept() clears the suspect mark but must not de-escalate a past-threshold fingerprint');
+  });
+
+  test('non-de-escalation: a later witnessAccepted() (real non-401 provider-lane success) does not clear or reduce the byte-identical-rejection count', () => {
+    const registry = createRejectedCredentialRegistry({ now: () => 1000 });
+    registry.recordByteIdenticalRejection('fp-a');
+    registry.recordByteIdenticalRejection('fp-a');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-a', 2), true);
+    registry.witnessAccepted('fp-a');
+    assert.equal(registry.isPastByteIdenticalThreshold('fp-a', 2), true, 'a witnessed success must not de-escalate a past-threshold fingerprint — re-auth mints a new fingerprint instead');
+  });
+});

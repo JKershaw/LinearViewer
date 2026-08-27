@@ -40,6 +40,21 @@ const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 const URL_KEY = 'acme-suspect';
 const ACCOUNT = 'account-suspect';
 
+// LIN-2327: a recording fake mirroring credentialLifecycleEventStore's
+// interface (lib/credential-lifecycle-events.js), enough for the mirror below
+// to model every fire-and-forget recordEvent call the real
+// attemptSuspectCredentialRefresh (and, beneath it, the real
+// refreshOwnerWorkspaceToken) makes. Every call is appended to
+// `recordedEvents` — most of this file's tests never inspect it (their own
+// coverage is the SERVER_SRC anti-drift pins below); the ledger-item-6 test
+// further down is the one consumer that reads it, to assert the persisted
+// `refresh_skip` payload's actual shape and secret-safety rather than arguing
+// it from the source text alone.
+const credentialLifecycleEventStore = {
+  recordedEvents: [],
+  async recordEvent(event) { this.recordedEvents.push(event); },
+};
+
 function inMemorySessionsCollection(seedDocs) {
   const docs = seedDocs.map(d => ({ ...d }));
   return {
@@ -133,10 +148,22 @@ async function attemptSuspectRefresh({ fingerprint, urlKey, ownerAccountId, regi
     const refreshed = await refreshOwnerWorkspaceToken({
       sessions, urlKey, ownerAccountId, refreshAccessToken, persistSession,
       resolveProvider: () => ({}), store,
+      lifecycleEventStore: credentialLifecycleEventStore,
     });
     if (!refreshed) return null;
     const refreshedFingerprint = fingerprintCredential(refreshed.token);
-    if (refreshedFingerprint === fingerprint) return null;
+    // LIN-2327: mirrors server.js's block shape — record the (secret-safe)
+    // refresh_skip lifecycle event and bump the fingerprint-only
+    // byte-identical-rejection counter before falling through untouched.
+    if (refreshedFingerprint === fingerprint) {
+      credentialLifecycleEventStore.recordEvent({
+        accountId: ownerAccountId, urlKey, provider: refreshed.provider,
+        kind: 'refresh_skip',
+        detail: { branch: 'byte-identical-after-rejection', fingerprint: refreshedFingerprint }
+      }).catch(() => {});
+      registry.recordByteIdenticalRejection?.(refreshedFingerprint);
+      return null;
+    }
     return { ...refreshed, credentialFingerprint: refreshedFingerprint };
   } catch {
     return null;
@@ -395,6 +422,68 @@ function stripComments(src) {
   return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
 }
 
+describe('LIN-2327 ledger item 6: persisted refresh_skip payload shape and secret safety', () => {
+  test('the byte-identical branch records a refresh_skip event whose captured payload carries the documented shape and no raw token bytes', async () => {
+    // Same fixture shape as the other byte-identical-adjacent scenarios above
+    // (a durable record whose exchange returns the SAME access-token bytes,
+    // with a finite tokenExpiresAt so LIN-2097's freeze — and therefore
+    // liveness — engages), but this is the one test in the file that DRIVES
+    // the mirror's byte-identical branch and inspects what it recorded,
+    // rather than only pinning server.js's source text.
+    const collection = inMemorySessionsCollection([liveButDeadSessionRow()]);
+    let durableRecord = {
+      provider: 'linear',
+      token: 'dead-upstream-token',
+      refreshToken: 'refresh-ledger6',
+      tokenExpiresAt: Date.now() + 24 * 3600 * 1000,
+    };
+    const store = {
+      async get() { return durableRecord; },
+      async putIfRefreshToken(accountId, urlKey, expected, next) {
+        if (!durableRecord || durableRecord.refreshToken !== expected) return false;
+        durableRecord = { ...durableRecord, ...next };
+        return true;
+      },
+      async markSpendIntent() { return true; },
+      async clearSpendIntent() { return true; },
+    };
+    // The byte-identical exchange itself: Linear hands back the SAME
+    // access_token bytes as the credential that was just rejected.
+    const refreshAccessToken = async () => ({ access_token: 'dead-upstream-token', refresh_token: 'rotated-refresh-ledger6', expires_in: 3600 });
+    const persistSession = makePersistSessionRow(collection);
+    const registry = createRejectedCredentialRegistry();
+    const cache = createWorkspaceTokenCache();
+
+    const eventsBefore = credentialLifecycleEventStore.recordedEvents.length;
+    registry.markSuspect(fingerprintCredential('dead-upstream-token'), { reason: 'provider-401' });
+    const result = await candidateResolve({ collection, urlKey: URL_KEY, ownerAccountId: ACCOUNT, refreshAccessToken, persistSession, store, registry, cache });
+    assert.equal(result.token, 'dead-upstream-token', 'the byte-identical branch falls through to the originally-selected credential — never withheld');
+
+    // The real refreshOwnerWorkspaceToken beneath the mirror also records its
+    // own spend_intent/refresh_success events on this same fake — filter down
+    // to the one this ticket's branch itself records.
+    const newEvents = credentialLifecycleEventStore.recordedEvents.slice(eventsBefore);
+    const skipEvents = newEvents.filter(e => e.kind === 'refresh_skip' && e.detail?.branch === 'byte-identical-after-rejection');
+    assert.equal(
+      skipEvents.length,
+      1,
+      `expected exactly one byte-identical-after-rejection refresh_skip event, got: ${newEvents.map(e => `${e.kind}${e.detail?.branch ? ':' + e.detail.branch : e.detail?.via ? ':' + e.detail.via : ''}`).join(', ') || '(none)'}`
+    );
+
+    const [event] = skipEvents;
+    assert.equal(event.kind, 'refresh_skip');
+    assert.equal(event.detail.branch, 'byte-identical-after-rejection');
+    assert.match(event.detail.fingerprint, /^[0-9a-f]{12}$/, 'fingerprint must be the documented 12-character lowercase hex digest shape');
+    assert.equal(event.detail.fingerprint, fingerprintCredential('dead-upstream-token'), 'the recorded fingerprint must match the credential that was actually rejected and re-served');
+
+    // Secret safety: none of the events this scenario produced — not just the
+    // refresh_skip one — may carry the raw fixture token bytes anywhere in
+    // their serialized form.
+    const serialized = JSON.stringify(newEvents);
+    assert.ok(!serialized.includes('dead-upstream-token'), 'no captured lifecycle event payload may contain the raw fixture token bytes');
+  });
+});
+
 describe('LIN-1980 anti-drift pin (production source, not the mirror)', () => {
   test('resolveWorkspaceAccess computes credentialFingerprint on every credential-bearing return path, including the NODE_ENV=test short-circuit', () => {
     const flat = stripComments(extractResolveWorkspaceAccessBody(SERVER_SRC)).replace(/\s+/g, ' ');
@@ -423,7 +512,44 @@ describe('LIN-1980 anti-drift pin (production source, not the mirror)', () => {
   test('a same-fingerprint or null refresh result falls through untouched — never withholds the originally-selected credential', () => {
     const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
     assert.match(flat, /if \(!refreshed\) return null/);
-    assert.match(flat, /refreshedFingerprint === fingerprint\) return null/);
+    // LIN-2327: the byte-identical branch grew a block body (lifecycle event
+    // + counter bump) before its return null. A loose open-brace...return
+    // null...close-brace scan (with a lazy `.*?`) is satisfiable by the
+    // downstream `catch` block's own `return null;`, since this function
+    // extracts to its top-level closing brace and both `return null;`s live
+    // inside it — that would leave the branch's own fall-through unpinned.
+    // Anchor on the counter bump immediately preceding the branch's own
+    // `return null;` and the block's close brace, which only the
+    // byte-identical branch's own source can satisfy.
+    assert.match(
+      flat,
+      /recordByteIdenticalRejection\?\.\(refreshedFingerprint\); return null; \}/,
+      'the byte-identical branch must fall through with return null INSIDE the block — a downstream return null in the catch must not satisfy this pin'
+    );
+  });
+
+  test('the byte-identical branch records a refresh_skip lifecycle event and bumps the byte-identical-rejection counter before falling through — LIN-2327', () => {
+    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
+    assert.match(flat, /kind: CREDENTIAL_LIFECYCLE_EVENT_KINDS\.REFRESH_SKIP/);
+    assert.match(flat, /branch: 'byte-identical-after-rejection'/);
+    assert.match(flat, /rejectedCredentialRegistry\.recordByteIdenticalRejection\?\.\(refreshedFingerprint\)/);
+  });
+
+  test('the forced refresh call passes lifecycleEventStore — LIN-2327 (previously omitted at this call site)', () => {
+    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
+    assert.match(flat, /lifecycleEventStore:\s*credentialLifecycleEventStore/);
+  });
+
+  test('same-key anti-drift: the byte-identical counter call sites never key on scope, only on the bare fingerprint — LIN-2327 (C3)', () => {
+    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
+    assert.doesNotMatch(flat, /recordByteIdenticalRejection\?\.\(`/, 'recordByteIdenticalRejection must never be called with a template-literal scope composite');
+    assert.match(flat, /recordByteIdenticalRejection\?\.\(refreshedFingerprint\)/, 'recordByteIdenticalRejection must be called with the bare fingerprint');
+    // routes/proxy.js contains a NUL byte (an unrelated composite-key
+    // literal) — readFileSync('utf8') still returns a plain JS string the
+    // regexes below match fine; do not switch this to a NUL-unsafe tool.
+    const proxySrc = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
+    assert.doesNotMatch(proxySrc, /isPastByteIdenticalThreshold\?\.\([^)]*`/, 'isPastByteIdenticalThreshold must never be called with a template-literal scope composite');
+    assert.match(proxySrc, /isPastByteIdenticalThreshold\?\.\(req\?\.resolvedCredentialFingerprint,\s*BYTE_IDENTICAL_ESCALATION_THRESHOLD\)/, 'isPastByteIdenticalThreshold must be called with the bare req-stamped fingerprint');
   });
 
   test('shouldAttemptRefresh is called with a (ownerAccountId, urlKey) scope key — review F1: bounds attempts across fingerprint churn, not just per-fingerprint', () => {
