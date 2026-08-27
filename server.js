@@ -2225,14 +2225,29 @@ async function attemptSuspectCredentialRefresh({ fingerprint, urlKey, ownerAccou
       persistSession: persistSessionRow,
       resolveProvider: getProviderForWorkspace,
       resolveExchange: refreshExchangeFor,
-      store: ownerCredentialStore
+      store: ownerCredentialStore,
+      lifecycleEventStore: credentialLifecycleEventStore
     });
     if (!refreshed) return null;
     const refreshedFingerprint = fingerprintCredential(refreshed.scope ?? refreshed.token);
     // The provider hasn't necessarily fixed anything — a re-mint/re-read can
     // hand back the identical dead credential. Only a GENUINE replacement
     // counts as recovery; anything else falls through untouched.
-    if (refreshedFingerprint === fingerprint) return null;
+    if (refreshedFingerprint === fingerprint) {
+      // LIN-2327: make the byte-identical loop visible (previously silent)
+      // and count it toward the escalation threshold that turns this
+      // fingerprint's provider-auth classification terminal — see
+      // isTransientProviderAuthFailure (routes/proxy.js). Fire-and-forget,
+      // secret-safe (fingerprint digest only, never token bytes), same
+      // `.catch` shape as this file's other REFRESH_SKIP sites.
+      credentialLifecycleEventStore.recordEvent({
+        accountId: ownerAccountId, urlKey, provider: refreshed.provider,
+        kind: CREDENTIAL_LIFECYCLE_EVENT_KINDS.REFRESH_SKIP,
+        detail: { branch: 'byte-identical-after-rejection', fingerprint: refreshedFingerprint }
+      }).catch(err => console.error('Failed to record credential-lifecycle event:', err));
+      rejectedCredentialRegistry.recordByteIdenticalRejection?.(refreshedFingerprint);
+      return null;
+    }
     return { ...refreshed, credentialFingerprint: refreshedFingerprint };
   } catch (err) {
     console.error(`Suspect-credential forced refresh failed for workspace ${urlKey}:`, err);

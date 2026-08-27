@@ -25,7 +25,7 @@ import express from 'express';
 import { createWorkspaceTokenCache } from '../../lib/workspace-token-cache.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
-import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
+import { createRejectedCredentialRegistry, DEFAULT_SUSPECT_TTL_MS, BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../../lib/rejected-credentials.js';
 
 // ---------------------------------------------------------------------------
 // Block A — lib/workspace-token-cache.js
@@ -190,6 +190,94 @@ describe('graphqlErrorStatus — transient (503) vs terminal (401) upstream auth
 
     const second = await request(app, `/api/proxy/issues/${ISSUE_UUID}`);
     assert.equal(second.status, 401, 'second rejection: this fingerprint is now marked suspect from the first — no longer explainable as a one-off race, escalate');
+  });
+
+  // LIN-2327 — read-half pin: registry state → real classifier → real route.
+  // Scope split, stated explicitly so it is not mistaken for end-to-end
+  // proof: this pins the READ half only — that a rejectedCredentialRegistry
+  // whose byte-identical counter is already past threshold makes
+  // isTransientProviderAuthFailure return false (terminal 401) through the
+  // real HTTP route, and that this holds across a genuine suspect-TTL
+  // boundary. It cannot exercise the WRITE half — recordByteIdenticalRejection
+  // is called from server.js's attemptSuspectCredentialRefresh, which sits
+  // outside createProxyRoutes entirely (buildDataRouteApp stubs
+  // resolveWorkspaceAccess directly, and server.js is not import-safe —
+  // app.listen executes at module scope). The write half is covered by
+  // tests/unit/credential-refusal-non-worsening.test.js's source-text/mirror
+  // anti-drift pins instead — the established pattern this repo uses for
+  // server.js-only code no unit test can import.
+  test('a fingerprint past the byte-identical threshold stays terminal (401) even after its suspect mark genuinely lapses across the suspect-TTL boundary', async () => {
+    // Seeded from the REAL clock, not this file's usual synthetic idiom.
+    // routes/proxy.js:1170 always stamps a suspect mark with the real wall
+    // clock (`now: Date.now()`) regardless of what clock the registry itself
+    // was constructed with, while isSuspect (:1319) is called with no `at`
+    // argument and therefore reads whatever clock the registry uses. A
+    // synthetic low seed (e.g. 1_000_000) can never exceed a
+    // real-Date.now()-stamped markedAt by suspectTtlMs, so advancing such a
+    // clock could never genuinely lapse the suspect mark — the TTL boundary
+    // this test exists to cross would never be crossed. Seeding from
+    // Date.now() is the only construction under which advancing `t` past
+    // DEFAULT_SUSPECT_TTL_MS genuinely lapses the mark.
+    let t = Date.now();
+    const registry = createRejectedCredentialRegistry({ now: () => t });
+    const fingerprint = fingerprintCredential('linear-tok');
+
+    // Prime the registry directly — this harness cannot reach the write site
+    // (server.js's attemptSuspectCredentialRefresh) that would normally
+    // produce this state.
+    for (let i = 0; i < BYTE_IDENTICAL_ESCALATION_THRESHOLD; i++) registry.recordByteIdenticalRejection(fingerprint);
+    registry.markSuspect(fingerprint, { reason: 'primed-for-test', now: t });
+    assert.equal(registry.isSuspect(fingerprint), true, 'sanity: the priming mark must be live before driving any request');
+
+    const app = buildDataRouteApp({ rejectedCredentialRegistry: registry });
+
+    // (a) Within the suspect-TTL window: terminal 401 while isSuspect is
+    // still true — explainable by either clause at this point, but must not
+    // regress to the pre-fix 503.
+    const within = await request(app, `/api/proxy/issues/${ISSUE_UUID}`);
+    assert.equal(within.status, 401, 'primed past-threshold fingerprint, still within its suspect-TTL window, must classify terminal');
+    assert.equal(registry.isSuspect(fingerprint), true, 'still within the 10-minute suspect window');
+
+    // (b) Advance the registry's OWN clock past the suspect TTL and prove
+    // the boundary was genuinely crossed — not merely assumed. Re-anchored
+    // from a FRESH Date.now() read rather than `t + DEFAULT_SUSPECT_TTL_MS`:
+    // request (a) above drove a real 401 response, which re-marks the
+    // fingerprint via routes/proxy.js:1170's OWN `now: Date.now()` call —
+    // the real wall clock, independent of this registry's injected clock —
+    // at whatever instant that request actually ran, slightly after our
+    // original seed. Advancing from a fresh real-time read (plus a safety
+    // margin) guarantees `t` lands past that re-mark too, not just past the
+    // priming mark.
+    t = Date.now() + DEFAULT_SUSPECT_TTL_MS + 1000;
+    assert.equal(registry.isSuspect(fingerprint), false, 'the suspect mark must have genuinely lapsed once its TTL has elapsed on the registry\'s own clock');
+
+    // (c) A further rejection against the SAME fingerprint after the
+    // boundary must still return 401 — proving the byte-identical counter,
+    // not the (now-lapsed) suspect mark, is what keeps this classification
+    // terminal. This is the entire point of the fix: without it, the
+    // classifier's only remaining escalation path (the pre-existing isSuspect
+    // clause) would have nothing left to say and this would regress to 503.
+    const pastBoundary = await request(app, `/api/proxy/issues/${ISSUE_UUID}`);
+    assert.equal(pastBoundary.status, 401, 'the byte-identical-rejection counter must keep this fingerprint terminal even after its suspect mark has lapsed');
+  });
+
+  test('a genuinely different fingerprint carries none of another fingerprint\'s past-threshold history — reset-on-replacement half, proved against the real registry/classifier/route', async () => {
+    const registry = createRejectedCredentialRegistry();
+    const staleFingerprint = fingerprintCredential('linear-tok');
+    registry.recordByteIdenticalRejection(staleFingerprint);
+    registry.recordByteIdenticalRejection(staleFingerprint);
+    registry.markSuspect(staleFingerprint, { reason: 'unrelated-prior-history', now: Date.now() });
+
+    const app = buildDataRouteApp({
+      rejectedCredentialRegistry: registry,
+      resolveWorkspaceAccess: async () => ({
+        token: 'different-tok', reason: 'ok', provider: 'linear', source: 'session-scan',
+        expiresAt: Date.now() + 3600_000, credentialFingerprint: fingerprintCredential('different-tok'),
+      }),
+    });
+
+    const { status } = await request(app, `/api/proxy/issues/${ISSUE_UUID}`);
+    assert.equal(status, 503, 'a genuinely different fingerprint carries no suspect mark and no byte-identical count of its own — first rejection is still a transient grace');
   });
 
   test('the transient classification is per-REQUEST (req.resolvedCredentialExpiresAt), not read from the shared, racy credentialResolutions trail', async () => {

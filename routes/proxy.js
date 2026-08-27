@@ -16,6 +16,7 @@ import { Router, json } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createDedupeCache, createGenerationTracker, dedupeKey } from '../lib/proxy-dedupe.js';
 import { describeCredentialResolution } from '../lib/credential-diagnostics.js';
+import { BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../lib/rejected-credentials.js';
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
 import { deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.js';
@@ -1317,6 +1318,12 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     const looksLive = typeof expiresAt === 'number' && Number.isFinite(expiresAt) && expiresAt > Date.now();
     if (!looksLive) return false;
     if (rejectedCredentialRegistry?.isSuspect(req?.resolvedCredentialFingerprint)) return false;
+    // LIN-2327: a fingerprint that has come back byte-identical from a
+    // forced refresh at least BYTE_IDENTICAL_ESCALATION_THRESHOLD times is
+    // never transient, even once its suspect mark has lapsed — otherwise the
+    // retryable-503 grace re-arms every suspect-TTL window/restart while the
+    // underlying credential never actually changes bytes.
+    if (rejectedCredentialRegistry?.isPastByteIdenticalThreshold?.(req?.resolvedCredentialFingerprint, BYTE_IDENTICAL_ESCALATION_THRESHOLD)) return false;
     return true;
   }
 
