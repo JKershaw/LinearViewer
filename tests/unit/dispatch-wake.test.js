@@ -834,3 +834,165 @@ describe('addFeedback wake — LIN-2078 abort-row exclusion', () => {
     assert.equal(wakes.length, 0, 'the gone-target abort-rejection produces no wake — this silence is intentional, not a bug (plan-review Note A)');
   });
 });
+
+// ── LIN-2297: class-aware once-only wake guard ─────────────────────────────
+//
+// Pre-fix, the once-only guard was keyed on bare `doc._id` for EVERY wake
+// marker, including `[blocked]`. A `[blocked]` wake therefore burned the same
+// guard slot a later genuine terminal (`[done]`/`[aborted]`/…) on that same
+// row needed, silently dropping it. The fix keys the guard/witness on
+// `(producing item, marker class)`, derived via `deriveTerminalStatus` (the
+// same blocked-vs-terminal discriminator `dispatch-terminal.js` already
+// owns): bare `doc._id` for a genuine terminal, `${doc._id}#blocked` for a
+// blocked wake. `producingItemId` on the minted row stays the bare id — it is
+// row attribution, not guard identity.
+describe('addFeedback wake — LIN-2297 class-aware once-only guard', () => {
+  const wakesTo = (collection, historyCollection, target) =>
+    wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
+
+  test('THE PIN — [blocked] then [done] on the SAME producing item mints a SECOND wake, not suppressed', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const child = await takenChild(store);
+    const PARENT = 'parent-S1';
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[blocked] need a human' }, 'token-a');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 1,
+      "the child's [blocked] wakes the parent once — fails pre-fix if the guard suppresses even the FIRST wake");
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[done] finished after unblock' }, 'token-a');
+    await drain();
+
+    const wakes = wakesTo(collection, historyCollection, PARENT);
+    assert.equal(wakes.length, 2,
+      'a SECOND wake mints from the SAME row for the genuine [done] terminal — this is the bug this ticket fixes: pre-fix, the [blocked] wake already burned the guard slot and this [done] is dropped as already-woke-for-this-item');
+
+    const doneWake = wakes[1];
+    assert.equal(doneWake.producingItemId, child._id, 'producingItemId on the minted row stays the BARE row id — row attribution, not guard identity');
+    assert.equal(doneWake.followUpTo, PARENT);
+    assert.match(doneWake.prompt, /Outcome:\s*\[done\] finished after unblock/,
+      "the acceptance witness: the SECOND wake's Outcome line carries the genuine [done] marker, not just \"a wake exists\"");
+  });
+
+  test('negative control — same-class re-report suppressed ([blocked] -> [blocked])', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const child = await takenChild(store);
+    const PARENT = 'parent-S1';
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[blocked] need a human' }, 'token-a');
+    await store.addFeedback(child._id, URL_KEY, { message: '[blocked] still need a human' }, 'token-a');
+    await drain();
+
+    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 1,
+      'a repeated [blocked] on the same row is still suppressed — same-class suppression (LIN-1357) must survive the class-aware re-key');
+  });
+
+  test('negative control — same-class re-report suppressed ([done] -> [done]) on a row that already carries a [blocked] witness', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const child = await takenChild(store);
+    const PARENT = 'parent-S1';
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[blocked] need a human' }, 'token-a');
+    await store.addFeedback(child._id, URL_KEY, { message: '[done] finished after unblock' }, 'token-a');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 2, 'blocked + done — two distinct classes, two wakes');
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[done] finished after unblock (re-reported)' }, 'token-a');
+    await drain();
+
+    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 2,
+      'still exactly two wakes — the re-reported [done] is suppressed by the bare-key guard even though this row also carries a suffixed #blocked key, confirming the bare-key path was not accidentally widened');
+  });
+
+  test('sibling 1 — abort of a blocked child still wakes the parent (confirmed live regression)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const PARENT = 'parent-S1';
+
+    const child = await takenChild(store);
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[blocked] need a human' }, 'token-a');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 1, "the child's [blocked] wakes the parent once");
+
+    // LIN-2078/LIN-1471 abort topology: an abort item posts its own [aborted]
+    // (excluded, LIN-2078), and the aborted child's OWN row also posts
+    // [aborted] (the LIN-1471 mirror) — the sole surviving channel.
+    const abortItem = await store.addItem(URL_KEY, {
+      abort: true, abortTo: child._id, sessionId: PARENT, subscription: 'everything', target: 'cli'
+    });
+    await store.takeItem(abortItem._id, URL_KEY, 'token-abort');
+
+    await store.addFeedback(abortItem._id, URL_KEY, { message: '[aborted] cancelled by operator' }, 'token-abort');
+    await store.addFeedback(child._id, URL_KEY, { message: '[aborted] cancelled by operator' }, 'token-a');
+    await drain();
+
+    const wakes = wakesTo(collection, historyCollection, PARENT);
+    assert.equal(wakes.length, 2,
+      "a SECOND wake mints from the child's own [aborted] mirror — pre-fix, the earlier [blocked] wake already burned the guard slot and the LIN-1471 abort mirror is silently dropped, so the parent is never told its blocked branch was cancelled");
+    assert.equal(wakes[1].producingItemId, child._id, "the surviving abort wake's producing row is the child's, not the abort item's");
+    assert.match(wakes[1].prompt, /Outcome:\s*\[aborted\] cancelled by operator/, 'the second wake carries the genuine [aborted] marker');
+  });
+
+  test('witness collision + contents — [blocked] then [done] leaves TWO distinct, correctly-populated witness entries', async () => {
+    const { store } = makeStore();
+    const child = await takenChild(store);
+
+    const blockedResult = await store.addFeedback(child._id, URL_KEY, { message: '[blocked] need a human' }, 'token-a');
+    await drain();
+    const doneResult = await store.addFeedback(child._id, URL_KEY, { message: '[done] finished after unblock' }, 'token-a');
+    await drain();
+    assert.ok(blockedResult && doneResult);
+
+    const edgeDoc = await store.historyCollection.findOne({ _id: child._id });
+    const witnessKeys = Object.keys(edgeDoc.wakeWitnessMeta || {}).sort();
+    assert.deepEqual(witnessKeys, [child._id, `${child._id}#blocked`].sort(),
+      'exactly two witness keys: the bare id (the [done] witness) and the #blocked-suffixed id (the [blocked] witness)');
+
+    const bareWitness = edgeDoc.wakeWitnessMeta[child._id];
+    const blockedWitness = edgeDoc.wakeWitnessMeta[`${child._id}#blocked`];
+
+    // A partial re-key (every write site EXCEPT the best-effort mintedWakeId
+    // stamp-back) would leave one of these `mintedWakeId`s stuck at `null`
+    // while `feedbackIndex` looks populated on both — the exact false-green
+    // the plan-review's applied-patch probe found. Assert CONTENTS, not just
+    // key existence.
+    assert.ok(typeof bareWitness.feedbackIndex === 'number', 'the bare-key witness carries a feedbackIndex');
+    assert.ok(typeof blockedWitness.feedbackIndex === 'number', 'the #blocked witness carries a feedbackIndex');
+
+    // Scan both collections directly (mirrors the wakeItems() helper above).
+    const allWakes = [
+      ...store.collection._docs.filter(d => d.kind === 'wake' && d.producingItemId === child._id),
+      ...store.historyCollection._docs.filter(d => d.kind === 'wake' && d.producingItemId === child._id)
+    ];
+    const blockedWakeRow = allWakes.find(w => /\[blocked\]/.test(w.prompt));
+    const doneWakeRow = allWakes.find(w => /\[done\]/.test(w.prompt));
+    assert.ok(blockedWakeRow && doneWakeRow, 'both minted wake rows are findable by their producing item');
+
+    assert.equal(blockedWitness.mintedWakeId, blockedWakeRow._id,
+      "the #blocked witness's mintedWakeId equals the [blocked] wake's OWN row id, not the [done] wake's");
+    assert.equal(bareWitness.mintedWakeId, doneWakeRow._id,
+      "the bare witness's mintedWakeId equals the [done] wake's OWN row id, not the [blocked] wake's");
+  });
+
+  test('witness collision negative control — [blocked] -> [blocked] leaves exactly ONE witness key, no spurious bare entry', async () => {
+    const { store } = makeStore();
+    const child = await takenChild(store);
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[blocked] need a human' }, 'token-a');
+    await drain();
+    const edgeDocAfterFirst = await store.historyCollection.findOne({ _id: child._id });
+    const firstMintedWakeId = edgeDocAfterFirst.wakeWitnessMeta[`${child._id}#blocked`].mintedWakeId;
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[blocked] still need a human' }, 'token-a');
+    await drain();
+
+    const edgeDoc = await store.historyCollection.findOne({ _id: child._id });
+    const witnessKeys = Object.keys(edgeDoc.wakeWitnessMeta || {});
+    assert.deepEqual(witnessKeys, [`${child._id}#blocked`],
+      'exactly ONE witness key — the #blocked-suffixed id. A partial re-key (the stamp-back left un-rekeyed) fabricates a spurious BARE child._id entry with no seed under this exact sequence, which this asserts against explicitly.');
+    assert.ok(!(child._id in (edgeDoc.wakeWitnessMeta || {})), 'no bare child._id key exists');
+
+    assert.equal(edgeDoc.wakeWitnessMeta[`${child._id}#blocked`].mintedWakeId, firstMintedWakeId,
+      "the witness's mintedWakeId is unchanged by the suppressed repeat — still the FIRST [blocked] wake's row id");
+  });
+});
