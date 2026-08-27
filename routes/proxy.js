@@ -1282,7 +1282,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * so this is the analogous split for the error class that DOES occur here,
    * not a reuse of those functions themselves.
    *
-   * TWO conditions, both required:
+   * THREE conditions, all required:
    *
    * 1. `req.resolvedCredentialExpiresAt` — stamped on THIS request object by
    *    `resolveProviderAccess`, at the same seam as the fingerprint stamp —
@@ -1309,6 +1309,17 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    *    this bounds the transient grace to essentially one occurrence per
    *    fingerprint, since the first rejection is what marks it suspect via
    *    `logEvent`'s own markSuspect call, immediately after this classifies it.
+   *
+   * 3. NOT past the byte-identical-rejection escalation threshold (LIN-2327).
+   *    `rejectedCredentialRegistry.isPastByteIdenticalThreshold` consults the
+   *    fingerprint-only, no-TTL counter that `attemptSuspectCredentialRefresh`
+   *    (server.js) bumps whenever a forced refresh comes back byte-identical
+   *    to the just-rejected credential. Unlike condition 2, this counter
+   *    outlives the suspect mark's TTL by design, so a fingerprint that has
+   *    proven itself unrecoverable stays terminal even after suspicion lapses
+   *    or the process restarts — otherwise the retryable-503 grace would
+   *    re-arm every suspect-TTL window while the underlying credential never
+   *    actually changes bytes.
    *
    * @param {import('express').Request} req
    * @returns {boolean} true if this 401 should surface as a retryable 503

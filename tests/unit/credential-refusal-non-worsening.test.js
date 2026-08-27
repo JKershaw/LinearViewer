@@ -444,10 +444,19 @@ describe('LIN-1980 anti-drift pin (production source, not the mirror)', () => {
     const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
     assert.match(flat, /if \(!refreshed\) return null/);
     // LIN-2327: the byte-identical branch grew a block body (lifecycle event
-    // + counter bump) before its return null — assert the block SHAPE
-    // (open brace ... return null ... close brace) rather than requiring the
-    // old textual adjacency of `) return null` directly.
-    assert.match(flat, /refreshedFingerprint === fingerprint\) \{.*?return null;.*?\}/, 'the byte-identical branch must still fall through with return null, now from inside a block');
+    // + counter bump) before its return null. A loose open-brace...return
+    // null...close-brace scan (with a lazy `.*?`) is satisfiable by the
+    // downstream `catch` block's own `return null;`, since this function
+    // extracts to its top-level closing brace and both `return null;`s live
+    // inside it — that would leave the branch's own fall-through unpinned.
+    // Anchor on the counter bump immediately preceding the branch's own
+    // `return null;` and the block's close brace, which only the
+    // byte-identical branch's own source can satisfy.
+    assert.match(
+      flat,
+      /recordByteIdenticalRejection\?\.\(refreshedFingerprint\); return null; \}/,
+      'the byte-identical branch must fall through with return null INSIDE the block — a downstream return null in the catch must not satisfy this pin'
+    );
   });
 
   test('the byte-identical branch records a refresh_skip lifecycle event and bumps the byte-identical-rejection counter before falling through — LIN-2327', () => {
