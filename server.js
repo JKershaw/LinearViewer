@@ -517,7 +517,7 @@ const accountsCollection = db.collection('accounts')
 const accountStore = new AccountStore({ collection: accountsCollection })
 
 // Account merge log (LIN-2233, L2.2 of the LIN-2231 design): durable,
-// append-only record of confirmed account merges (routes/auth.js's
+// append-only record of confirmed account merges (routes/account-merge.js's
 // POST /auth/merge/confirm), since a merge is rare/high-consequence and must
 // survive Railway's rolling ~7-day log window.
 const accountMergeEventsCollection = db.collection('account-merge-events')

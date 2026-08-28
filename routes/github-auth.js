@@ -510,7 +510,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
             // identity lookup even with no live session.accountId, same as
             // the Linear OAuth callback.
             // LIN-2267 (review F2): snapshot BEFORE upsertWorkspace, so a
-            // conflict return can restore it — mirrors routes/auth.js:437.
+            // conflict return can restore it — mirrors routes/auth.js:348.
             const workspacesBeforeLogin = req.session.workspaces ? [...req.session.workspaces] : []
             try {
               upsertWorkspace(req.session, workspace)
