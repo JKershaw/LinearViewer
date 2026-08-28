@@ -19,6 +19,7 @@ import {
   extractVerdict, computeIssueRoundTrips, computePlanReviewRoundTrips,
   derivePrimaryFloor, MIN_DENOMINATOR, __internal,
 } from '../../lib/plan-review-round-trips.js';
+import { __internal as followOnRatioInternal } from '../../lib/follow-on-ratio.js';
 
 const ASOF = '2026-08-09T12:00:00.000Z';
 
@@ -145,6 +146,31 @@ describe('computeIssueRoundTrips — R0 eligibility (extraction-first, state-sec
     assert.equal(result.lineageBleed, false);
   });
 
+  test('LIN-2037 item 2: a noGenuineAttempt row is excluded from verdictTier even though its structural tier C would resolve non-null', () => {
+    // aborted row's nextRow is a `plan` row, so tier C WOULD resolve to
+    // 'request changes' if this row's tally were counted — pinning that it
+    // is not, since the row never settled anything (it was skipped, and R0
+    // settles two rows later on the DONE-line tier-B resolution instead).
+    const iss = issue('verdict-tier-skip', {
+      rows: [
+        row('aborted-row', 'plan-review', 'aborted', '2026-08-09T10:00:00.000Z', '2026-08-09T10:01:00.000Z'),
+        row('next', 'plan', 'done', '2026-08-09T10:05:00.000Z', '2026-08-09T10:10:00.000Z'),
+        row('resolved-row', 'plan-review', 'done', '2026-08-09T10:15:00.000Z', '2026-08-09T10:20:00.000Z',
+          feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:20:00.000Z')),
+      ],
+    });
+
+    const result = computeIssueRoundTrips(iss, { asOf: ASOF });
+    assert.equal(result.diagnostics.noGenuineAttempt, 1);
+    assert.equal(result.R0.row.id, 'resolved-row');
+    assert.deepEqual(result.verdictTier, { a: 0, b: 1, c: 0, none: 0 },
+      'the skipped aborted row must not tally into tier c, even though its structural tier would have resolved');
+
+    const agg = computePlanReviewRoundTrips([iss], { asOf: ASOF });
+    assert.deepEqual(agg.diagnostics.verdictTier, { a: 0, b: 1, c: 0, none: 0 },
+      'the aggregate total must also exclude the skipped row');
+  });
+
   for (const status of ['cancelled', 'canceled', 'expired', 'aborted', 'failed']) {
     test(`all-rows-${status}: issue excluded via noGenuineAttemptIssues, distinct from right-censoring`, () => {
       const iss = issue(`allskip-${status}`, {
@@ -250,6 +276,18 @@ describe('computeIssueRoundTrips — R0 eligibility (extraction-first, state-sec
     const result = computeIssueRoundTrips(iss, { asOf: ASOF });
     assert.equal(result.R0.tier, 'c');
     assert.equal(result.R0.verdict, 'approve');
+  });
+});
+
+// ─── computeIssueRoundTrips — asOf validation (LIN-2037 item 3) ─────────────
+
+describe('computeIssueRoundTrips — required asOf', () => {
+  test('required asOf throws when missing or unparseable, mirroring computePlanReviewRoundTrips', () => {
+    const iss = issue('asof-missing', {
+      rows: [row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z')],
+    });
+    assert.throws(() => computeIssueRoundTrips(iss, {}), /asOf must be a parseable ISO instant/);
+    assert.throws(() => computeIssueRoundTrips(iss, { asOf: 'not-a-date' }), /asOf must be a parseable ISO instant/);
   });
 });
 
@@ -586,6 +624,24 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
     assert.equal(agg.roundTrips.n, 1, 'roundTrips.n must only count issues that reached plan-review');
     assert.deepEqual(agg.roundTrips.distribution, { 0: 1 });
     assert.equal(agg.roundTrips.mean, 0);
+  });
+
+  test('LIN-2037 item 4: an all-non-gate population (no issue reaches plan-review) pins mean=null, distribution={}', () => {
+    const neverReached = [];
+    for (let i = 0; i < 5; i++) {
+      neverReached.push(issue(`f5-never-${i}`, {
+        rows: [row('p1', 'plan', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z')],
+      }));
+    }
+    const agg = computePlanReviewRoundTrips(neverReached, { asOf: ASOF });
+    assert.equal(agg.roundTrips.n, 0);
+    assert.equal(agg.roundTrips.mean, null);
+    assert.deepEqual(agg.roundTrips.distribution, {});
+  });
+
+  test('MIN_DENOMINATOR is single-sourced from follow-on-ratio.js\'s __internal bag, not re-declared (LIN-2037 item 1)', () => {
+    assert.equal(MIN_DENOMINATOR, followOnRatioInternal.MIN_DENOMINATOR,
+      'must be the SAME binding, not merely an equal-by-value local constant');
   });
 
   test('gate-due / gate-honoured rates aggregate, with the MIN_DENOMINATOR floor', () => {
