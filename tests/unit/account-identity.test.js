@@ -597,7 +597,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
       assert.strictEqual(session.accountId, a._id, 'degraded to the uncanonicalized id — never a throw, never null');
     });
 
-    test('an over-deep mergedInto chain degrades the same way', async () => {
+    test('an over-deep mergedInto chain degrades the same way, and the degrade is observable via the log line (LIN-2285 close-out ledger item 5/7)', async (t) => {
       const stores = freshStores();
       // 10 accounts chained head -> ... -> tail: deeper than resolveCanonicalAccountId's maxDepth of 8.
       const chain = [];
@@ -610,6 +610,12 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
         'sanity: the seeded chain is genuinely over-deep');
       await stores.accountStore.linkIdentity(head._id, 'linear', 'viewer-deep', {});
 
+      // LIN-2285 close-out ledger item 7: the degrade path's observability
+      // claim ("watch Railway logs for [account-session] canonical account
+      // resolution failed") was itself unpinned by any test. Assert the
+      // console.error emission directly, not just the behavioral degrade.
+      const errMock = t.mock.method(console, 'error', () => {});
+
       const session = makeSession({ accountId: head._id });
       const established = await establishAccount(
         session, stores.accountStore, stores.accountWorkspaceStore, 'linear', 'viewer-deep', {}, 'org-deep'
@@ -617,6 +623,44 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
 
       assert.strictEqual(established.ok, true);
       assert.strictEqual(session.accountId, head._id);
+      assert.ok(errMock.mock.calls.length >= 1, 'the degrade emits at least one log line');
+      assert.ok(
+        errMock.mock.calls.some(call => typeof call.arguments[0] === 'string' &&
+          call.arguments[0].includes('[account-session] canonical account resolution failed') &&
+          call.arguments[0].includes(head._id) &&
+          call.arguments[0].includes('self-heal')),
+        'the log line names both the account and the call-site context, as the close-out monitor promise claims'
+      );
+    });
+
+    test('a chain right at the maxDepth=8 boundary resolves normally — one node shorter than the over-deep test above, which is exactly where it starts throwing', async () => {
+      const stores = freshStores();
+      // 8 accounts chained head -> ... -> tail (7 mergedInto edges). Empirically the
+      // largest chain resolveCanonicalAccountId(..., maxDepth=8) resolves without
+      // throwing — the loop's hop index inspects one node per iteration (hop 0..7,
+      // 8 iterations total), so a 9th account (the over-deep test's 9-account/
+      // 8-edge chain, one node longer than this one) pushes the terminal node's own
+      // "no mergedInto" check past hop 7 and trips the throw before ever examining
+      // it — not a fencepost in this test, but the real shape of the boundary.
+      const chain = [];
+      for (let i = 0; i < 8; i++) chain.push(await stores.accountStore.createAccount());
+      for (let i = 0; i < chain.length - 1; i++) {
+        await stores.accountStore.collection.updateOne({ _id: chain[i]._id }, { $set: { mergedInto: chain[i + 1]._id } });
+      }
+      const head = chain[0];
+      const tail = chain[chain.length - 1];
+      const resolved = await stores.accountStore.resolveCanonicalAccountId(head._id);
+      assert.strictEqual(resolved, tail._id, 'sanity: this chain resolves to the tail without throwing — the boundary the over-deep test sits just past');
+      await stores.accountStore.linkIdentity(head._id, 'linear', 'viewer-boundary', {});
+
+      const session = makeSession({ accountId: head._id });
+      const established = await establishAccount(
+        session, stores.accountStore, stores.accountWorkspaceStore, 'linear', 'viewer-boundary', {}, 'org-boundary'
+      );
+
+      assert.strictEqual(established.ok, true);
+      assert.strictEqual(established.accountId, tail._id, 'genuinely canonicalized to the tail, not degraded to the uncanonicalized head');
+      assert.strictEqual(session.accountId, tail._id);
     });
 
     test('the front-door callback signs a corrupted account in cleanly — no 500, no unhandled rejection — and the write-path guard still fails a merge closed', async () => {
@@ -697,6 +741,12 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
       assert.strictEqual(session.pendingMerge.canonicalAccountId, c);
       assert.strictEqual(session.pendingMerge.mergedAccountId, a._id, 'the offer names the CANONICAL absorber A, not the raw merged id B');
       assert.notStrictEqual(session.pendingMerge.mergedAccountId, b._id);
+      // LIN-2285 close-out ledger item 3: under this fix, confirming can now
+      // absorb a canonical account (A) that itself already includes prior
+      // merges (B) — the merge-confirm copy (lib/render-pages.js:346) was
+      // updated to say so; pin the string here since nothing else did.
+      assert.match(offerRes.body, /which may itself already include other previously-merged identities and data/,
+        'the merge-confirm page copy names that the offered account may already absorb prior merges');
 
       const confirmRes = makeRes();
       await confirmHandler({ session }, confirmRes);
@@ -973,7 +1023,21 @@ describe('LIN-2285 — residual /auth/merge/confirm 500 is reason-specific for a
     };
   }
 
-  const REASONS = ['missing-id', 'self-merge', 'unknown-canonical', 'unknown-merged', 'canonical-already-merged', 'already-merged'];
+  // LIN-2285 close-out ledger item 4: `doesNotMatch(generic)` alone would
+  // also pass a map that pointed every reason at ONE shared non-generic
+  // string — it proves "not generic", not "names the situation" (the
+  // acceptance wording). Pin each reason's OWN distinguishing phrase too, so
+  // a regression that collapsed two reasons onto the same copy would fail
+  // here even though it would still dodge the generic-fallback check above.
+  const REASON_DISTINGUISHING_PHRASE = {
+    'missing-id': /could not be identified/,
+    'self-merge': /these are the same account/,
+    'unknown-canonical': /your account could not be found/,
+    'unknown-merged': /the other account could not be found/,
+    'canonical-already-merged': /your account has already been merged/,
+    'already-merged': /the other account has already been merged/,
+  };
+  const REASONS = Object.keys(REASON_DISTINGUISHING_PHRASE);
 
   for (const reason of REASONS) {
     test(`reason '${reason}' gets specific copy, not the generic "Could not complete the merge. Please try again."`, async () => {
@@ -985,6 +1049,16 @@ describe('LIN-2285 — residual /auth/merge/confirm 500 is reason-specific for a
       assert.doesNotMatch(res.body, /Could not complete the merge\. Please try again\./,
         'never the generic fallback for a reason mergeAccounts actually returns');
       assert.match(res.body, /Could not complete the merge/, 'still names the failure as a merge failure');
+      assert.match(res.body, REASON_DISTINGUISHING_PHRASE[reason],
+        `names the specific '${reason}' situation, not merely a non-generic string shared with another reason`);
+
+      // Cross-check: no OTHER reason's distinguishing phrase leaks into this
+      // one's copy — proves the six entries are genuinely distinct, not just
+      // individually non-generic.
+      for (const [otherReason, otherPhrase] of Object.entries(REASON_DISTINGUISHING_PHRASE)) {
+        if (otherReason === reason) continue;
+        assert.doesNotMatch(res.body, otherPhrase, `'${reason}' copy must not also match '${otherReason}'s distinguishing phrase`);
+      }
     });
   }
 

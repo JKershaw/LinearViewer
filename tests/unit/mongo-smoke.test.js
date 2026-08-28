@@ -421,6 +421,108 @@ describe(
       );
     });
 
+    // --- LIN-2285 close-out ledger item 1: merged-identity establishAccount
+    // path on real MongoDB ---
+    //
+    // The primary LIN-2285 fix canonicalizes the merged side of an
+    // account-merge decision inside `establishAccount`. The LIN-1348 test
+    // above only drives the MINT-race path (`minted && conflict`); it never
+    // touches `linkIdentity`'s duplicate-key (`err.code === 11000`) arm on an
+    // EXISTING (non-minted) account, nor `_mergeIdentity`'s `arrayFilters`
+    // write — both directly upstream of the ids this fix canonicalizes, and
+    // both unexercised against real MongoDB per the implementation review's
+    // "What CI Did Not Prove" ledger (item 1).
+
+    test('establishAccount: same-account no-op re-link of an already-merged identity exercises _mergeIdentity\'s arrayFilters write on real MongoDB (LIN-2285)', async () => {
+      const collection = freshCollection('accounts');
+      await collection.createIndex(
+        { 'identities.provider': 1, 'identities.scope': 1 },
+        { unique: true, sparse: true, name: 'accounts_identity_unique' }
+      );
+      const accountStore = new AccountStore({ collection });
+      const accountWorkspaceStore = new AccountWorkspaceStore({
+        collection: freshCollection('account-workspaces')
+      });
+
+      const a = await accountStore.createAccount();
+      await accountStore.linkIdentity(a._id, 'linear', 'viewer-a-real', { token: 'a-token' });
+      const b = await accountStore.createAccount();
+      await accountStore.linkIdentity(b._id, 'linear', 'viewer-b-real', { token: 'b-token-stale' });
+      const merged = await accountStore.mergeAccounts(a._id, b._id, { accountWorkspaceStore });
+      assert.strictEqual(merged.ok, true);
+
+      // Session already on the canonical absorber A signs in with B's
+      // (now merged-away) identity. Step 1(b)'s equality fallthrough
+      // applies: resolvedOwnerId (A) === session.accountId (A), so this is a
+      // same-account no-op — no conflict raised — and `accountId` stays raw
+      // (B, the identity's real current owner) for the `linkIdentity` call
+      // two lines later. B already owns this identity, so `linkIdentity`
+      // routes to `_mergeIdentity`'s `arrayFilters` update, not the $push
+      // branch.
+      const session = { accountId: a._id };
+      const result = await establishAccount(session, accountStore, accountWorkspaceStore, 'linear', 'viewer-b-real', { token: 'b-token-fresh' }, 'ws-real-noop');
+
+      assert.strictEqual(result.ok, true, 'no conflict for the same-account no-op case');
+      assert.strictEqual(result.accountId, a._id, 'canonicalized before the session write');
+      assert.strictEqual(session.accountId, a._id);
+
+      const bDoc = await accountStore.getAccount(b._id);
+      const identity = bDoc.identities.find(i => i.provider === 'linear' && i.scope === 'viewer-b-real');
+      assert.ok(identity, 'the identity is still registered on B — mergeAccounts never migrates identities[]');
+      assert.strictEqual(identity.credentials.token, 'b-token-fresh', 'arrayFilters credentials merge actually wrote through on real MongoDB, not just MangoDB');
+    });
+
+    test('establishAccount: many pre-existing accounts racing to link the SAME new identity exercise linkIdentity\'s E11000 arm through the (c) race-sibling branch on real MongoDB (LIN-2285)', async () => {
+      const collection = freshCollection('accounts');
+      await collection.createIndex(
+        { 'identities.provider': 1, 'identities.scope': 1 },
+        { unique: true, sparse: true, name: 'accounts_identity_unique' }
+      );
+      const accountStore = new AccountStore({ collection });
+      const accountWorkspaceStore = new AccountWorkspaceStore({
+        collection: freshCollection('account-workspaces')
+      });
+
+      // Many DISTINCT, already-established accounts (none minted by this
+      // call — every establishAccount call below takes the `!minted` branch)
+      // race to link the same brand-new identity. Each sees no owner at its
+      // own pre-check, so each attempts the guarded $push; the
+      // `accounts_identity_unique` index lets only one through, and every
+      // loser's push throws E11000. `linkIdentity: 400 parallel links`
+      // (above) exercises the E11000 catch directly on `accountStore.linkIdentity`;
+      // this exercises it through `establishAccount`'s (c) `!minted &&
+      // linked.conflict` branch instead — what LIN-2285 changed — which a
+      // 2-way race could dodge by resolving via the plain sequential
+      // owner-check instead of the write-time catch, so this uses the same
+      // order of magnitude as the file's other race tests to make a genuine
+      // E11000 collision as close to certain as a real-Mongo race gets.
+      const RACERS = 20;
+      const contenders = await Promise.all(Array.from({ length: RACERS }, () => accountStore.createAccount()));
+
+      const results = await Promise.allSettled(
+        contenders.map((account, i) =>
+          establishAccount({ accountId: account._id }, accountStore, accountWorkspaceStore, 'linear', 'race-real-id', {}, `ws-race-${i}`)
+        )
+      );
+
+      assert.ok(results.every(r => r.status === 'fulfilled'), 'establishAccount must never throw under a real duplicate-key race');
+      const outcomes = results.map(r => r.value);
+
+      const winners = outcomes.filter(r => r.ok === true);
+      const losers = outcomes.filter(r => r.ok === false);
+      assert.strictEqual(winners.length, 1, 'exactly one racer wins the identity outright');
+      assert.strictEqual(losers.length, RACERS - 1, 'every other racer observes a conflict rather than a silent double-link');
+      assert.ok(losers.every(r => r.conflict), 'every loser gets a conflict, not a bare unhandled failure');
+      assert.ok(losers.every(r => r.conflict.accountId === winners[0].accountId),
+        'every loser\'s propagated conflict names the real winner, resolved via resolveCanonicalDegraded against real MongoDB');
+
+      const holders = await collection
+        .find({ identities: { $elemMatch: { provider: 'linear', scope: 'race-real-id' } } })
+        .toArray();
+      assert.strictEqual(holders.length, 1, 'exactly one account holds the identity after the race');
+      assert.strictEqual(holders[0]._id, winners[0].accountId);
+    });
+
     // --- LIN-1343/LIN-1357: addFeedback atomic $push + terminal-wake CAS ---
     //
     // account-store.test.js's concurrency pins run only against MangoDB (a
