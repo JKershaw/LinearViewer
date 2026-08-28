@@ -207,13 +207,16 @@ describe('renderKpisPage', () => {
     assert.strictEqual(html.match(/kpi-range-toggle/g).length, 3);
   });
 
-  test('omits the truncation caption on dispatch-kinds/top-endpoints charts when nothing was dropped (LIN-2325 F4)', () => {
+  test('omits the truncation caption on dispatch-kinds when nothing was dropped, but always renders a (hidden) captioned slot for the range-toggled top-endpoints chart (LIN-2325 F1/F4)', () => {
     // chart-funnel always carries its own unconditional caption (see below),
     // so scope the assertion to the two top-8 chart titles specifically
-    // rather than the whole page.
+    // rather than the whole page. Unlike dispatch-kinds (no range toggle),
+    // top-endpoints is range-toggled, so its caption slot is always present
+    // — id'd, so the client can rewrite it per view — even when the active
+    // (30d) view has nothing to disclose (LIN-2325 F1 review fix).
     const html = renderKpisPage(buildStats({ dispatchKindsOtherCount: 0, topEndpointsOtherCount: 0 }));
     assert.ok(html.includes('<span class="kpi-tree-glyph">├─</span> dispatch kinds · 30d</span></h3>'), 'no caption span after the dispatch-kinds title');
-    assert.ok(html.includes('<span class="kpi-tree-glyph">├─</span> top proxy endpoints · 30d</span><span class="kpi-range-toggle"'), 'no caption span before the top-endpoints range toggle');
+    assert.ok(html.includes('<span class="kpi-tree-glyph">├─</span> top proxy endpoints · 30d</span><span class="kpi-chart-caption" id="chart-top-endpoints-caption" style="display:none"></span><span class="kpi-range-toggle"'), 'top-endpoints caption slot present but hidden when otherCount is 0');
   });
 
   test('renders "+N more" captions on dispatch-kinds/top-endpoints charts when the top-8 cut drops values (LIN-2325 F4)', () => {
@@ -221,7 +224,21 @@ describe('renderKpisPage', () => {
     // The caption lives in the TITLE area (emptyUnless() replaces `body`
     // wholesale, which would destroy a caption living there instead).
     assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> dispatch kinds · 30d</span><span class="kpi-chart-caption">+3 more</span>'));
-    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> top proxy endpoints · 30d</span><span class="kpi-chart-caption">+2 more</span>'));
+    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> top proxy endpoints · 30d</span><span class="kpi-chart-caption" id="chart-top-endpoints-caption">+2 more</span>'));
+  });
+
+  test('the top-endpoints caption is range-aware: the 24h view does not inherit the 30d truncation count (LIN-2325 F1)', () => {
+    // Regression guard for the review's exact repro: 30d has more than 8
+    // distinct endpoints (truncated), but 24h has 8 or fewer (nothing
+    // dropped in the narrower window) — the two counts must be able to
+    // disagree, and each must be independently available to the renderer.
+    const html = renderKpisPage(buildStats({ topEndpointsOtherCount: 4, topEndpointsHourlyOtherCount: 0 }));
+    assert.ok(html.includes('<span class="kpi-chart-caption" id="chart-top-endpoints-caption">+4 more</span>'), 'initial (30d) view discloses its own truncation');
+    // The 24h count is published in the embedded payload (asserted below)
+    // for the client-side range toggle to read; wireRangeToggle's caption
+    // rewrite itself is a client-side interaction, verified in
+    // tests/e2e/kpis.spec.js, not here (node:test cannot execute browser JS).
+    assert.ok(html.includes('"topEndpointsHourlyOtherCount":0'), 'the 24h count must be published so the toggle can rewrite the caption honestly');
   });
 
   test('renders the funnel lower-bound caption unconditionally (LIN-2325 F4)', () => {
@@ -556,7 +573,7 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     // story that DOES cover whole-lineage capture loss, unlike
     // pricedLineageShare — so a reader of "unknown harness 100%" can see the
     // N it is a share of, not just the bare ratio.
-    assert.ok(html.includes('<span class="kpi-cost-sample">14 terminal-marked issues · 3 unpriced (excluded) · 0 never observed (no lineage)</span>'));
+    assert.ok(html.includes('<span class="kpi-cost-sample">14 terminal-marked issues · 3 unpriced (excluded), of which 0 never observed (no lineage)</span>'));
   });
 
   test('renders noLineageCount so lane-landed issues that were never observed are distinguished from pricing exclusions (LIN-2325 F1)', () => {
@@ -564,16 +581,19 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     // emits noLineageCount and publishes it in the embedded __KPI_DATA__
     // payload; this card is the one place that must actually render it, so a
     // public reader can tell "never observed" apart from "unpriced".
+    // noLineageCount is always a subset of unpriced (lib/terminal-marked-task-cost.js) —
+    // 8 unpriced, 7 of which were never observed at all; unpriced > noLineageCount so the
+    // fixture also exercises the "unpriced but had a lineage" remainder (LIN-2325 F2).
     const html = renderKpisPage(buildStats({
       terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 10, unpriced: 3, noLineageCount: 7, costUsd: 176.4,
+        windowDays: 30, issueCount: 10, unpriced: 8, noLineageCount: 7, costUsd: 176.4,
         cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
         closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
         opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
         pricedLineageShare: 0.8, attributableLineageShare: 0.95
       }
     }));
-    assert.ok(html.includes('<span class="kpi-cost-sample">10 terminal-marked issues · 3 unpriced (excluded) · 7 never observed (no lineage)</span>'));
+    assert.ok(html.includes('<span class="kpi-cost-sample">10 terminal-marked issues · 8 unpriced (excluded), of which 7 never observed (no lineage)</span>'));
   });
 
   test('captureRateShare (LIN-1959) renders beside pricedLineageShare and discloses the capture loss pricedLineageShare cannot see', () => {

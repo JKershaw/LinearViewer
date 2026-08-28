@@ -715,6 +715,26 @@ describe('collectKpiStats — hourly proxy siblings for the 24h toggle (LIN-1846
     assert.strictEqual(stats.proxyStatus.ok, 3);
     assert.strictEqual(stats.topEndpoints[0].count, 3);
   });
+
+  test('discloses the top-8 truncation for the 24h window independently of 30d (LIN-2325 F1 review fix)', async () => {
+    // The review's exact repro: 10 distinct endpoints over 30d (2 dropped by
+    // the top-8 cut), but only 4 of them were hit in the last 24h — a
+    // caption computed from the 30d count would falsely claim truncation in
+    // the 24h view, which has none.
+    const hoursAgo = (n) => new Date(NOW.getTime() - n * 60 * 60 * 1000);
+    const event = (endpoint, hours) => ({ endpoint, method: 'GET', status: 200, timestamp: hoursAgo(hours) });
+    const events = [
+      ...Array.from({ length: 4 }, (_, i) => event(`/api/proxy/recent-${i}`, i)), // inside 24h
+      ...Array.from({ length: 6 }, (_, i) => event(`/api/proxy/older-${i}`, 48 + i)) // inside 30d only
+    ];
+    const collections = buildCollections({ proxyEvents: createMockCollection(events) });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.topEndpoints.length, 8, '10 distinct endpoints over 30d, cut to top 8');
+    assert.strictEqual(stats.topEndpointsOtherCount, 2, '2 of the 10 distinct 30d endpoints are dropped');
+    assert.strictEqual(stats.topEndpointsHourly.length, 4, 'only the 4 recent endpoints fall inside 24h');
+    assert.strictEqual(stats.topEndpointsHourlyOtherCount, 0, '4 distinct endpoints is well under the top-8 cut — nothing dropped in the 24h view, unlike the 30d one');
+  });
 });
 
 // LIN-1586 pins the PROJECTION half of the LIN-1539/LIN-1540 verdict, the half

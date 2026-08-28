@@ -234,6 +234,45 @@ test.describe('KPIs page', () => {
     });
   }
 
+  test('the top-endpoints "+N more" caption is range-aware: switching to 24h drops a stale 30d truncation claim (LIN-2325 F1)', async ({ page }) => {
+    // The review's exact repro needs a 30d/24h split the seed fixture above
+    // can't produce (both events are seeded "now", so they always agree) —
+    // a caption computed for the 30d truncation count carrying over unchanged
+    // to the 24h view. Intercept the real server response and patch ONLY the
+    // two topEndpoints*OtherCount figures (embedded payload + the matching
+    // server-rendered caption markup) to a case where 30d over-truncates
+    // (otherCount 3) and 24h has nothing to disclose (otherCount 0) — every
+    // other byte of the page, including the real public/kpis.js client
+    // script and the real wireRangeToggle wiring, is untouched.
+    await page.route('**/kpis', async (route) => {
+      const response = await route.fetch();
+      let body = await response.text();
+      body = body.replace(
+        /"topEndpointsOtherCount":\d+,"topEndpointsHourlyOtherCount":\d+/,
+        '"topEndpointsOtherCount":3,"topEndpointsHourlyOtherCount":0'
+      );
+      body = body.replace(
+        /<span class="kpi-chart-caption" id="chart-top-endpoints-caption"[^>]*>[^<]*<\/span>/,
+        '<span class="kpi-chart-caption" id="chart-top-endpoints-caption">+3 more</span>'
+      );
+      await route.fulfill({ response, body });
+    });
+
+    await page.goto('/kpis');
+
+    const caption = page.locator('#chart-top-endpoints-caption');
+    await expect(caption).toBeVisible();
+    await expect(caption).toHaveText('+3 more');
+
+    const toggle = page.locator('.kpi-range-toggle[data-chart="chart-top-endpoints"]');
+    await toggle.locator('[data-range="24h"]').click();
+    await expect(toggle.locator('.kpi-range-btn.is-active')).toHaveText('24h');
+
+    // The disclosure must match the DISPLAYED (24h) data, not the 30d claim
+    // still sitting in the DOM before the toggle wired this up.
+    await expect(caption).toBeHidden();
+  });
+
   test('renders without horizontal overflow on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/kpis');
