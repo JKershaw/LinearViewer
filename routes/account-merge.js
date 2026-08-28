@@ -12,6 +12,27 @@ import { isFreshlyAuthenticated, MERGE_CONFIRM_FRESH_AUTH_WINDOW_MS } from '../l
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 
 /**
+ * LIN-2285: `mergeAccounts` (lib/account-store.js) has exactly six failure
+ * reasons — the primary LIN-2285 fix means the acceptance-witness flow no
+ * longer reaches this residual branch at all, but it stays reachable via a
+ * narrow inter-session race (another session merges the canonical account
+ * between offer and confirm → `canonical-already-merged`), so the generic
+ * "Merge Failed" dead-end this ticket exists to remove must not survive here
+ * either. `self-merge`/`missing-id` are defence in depth: the corrected
+ * `establishAccount` race handling (`lib/account-session.js`) is designed so
+ * neither should reach this handler, but "should not be reachable" is not
+ * the same guarantee as "cannot fall back to the generic copy if it is".
+ */
+const MERGE_FAILURE_COPY = {
+  'missing-id': 'Could not complete the merge: one of the accounts involved could not be identified. Please try again.',
+  'self-merge': 'Could not complete the merge: these are the same account. No merge is needed.',
+  'unknown-canonical': 'Could not complete the merge: your account could not be found. Please sign in again.',
+  'unknown-merged': 'Could not complete the merge: the other account could not be found. Please try again.',
+  'canonical-already-merged': 'Could not complete the merge: your account has already been merged into another account since this offer was made. Please sign in again.',
+  'already-merged': 'Could not complete the merge: the other account has already been merged into a different account since this offer was made. Please sign in again.',
+}
+
+/**
  * @param {Object} options
  * @param {import('../lib/account-store.js').AccountStore} options.accountStore
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore
@@ -85,7 +106,8 @@ export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, 
     const merged = await accountStore.mergeAccounts(pending.canonicalAccountId, pending.mergedAccountId, { accountWorkspaceStore, mergeLogStore: accountMergeLogStore })
     if (!merged.ok) {
       delete req.session.pendingMerge
-      const html = renderErrorPage('Merge Failed', 'Could not complete the merge. Please try again.', {
+      const message = MERGE_FAILURE_COPY[merged.reason] || 'Could not complete the merge. Please try again.'
+      const html = renderErrorPage('Merge Failed', message, {
         action: 'Go to homepage',
         actionUrl: '/'
       })

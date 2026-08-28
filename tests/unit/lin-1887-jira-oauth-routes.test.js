@@ -23,8 +23,14 @@
 import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import express from 'express';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MangoClient } from '@jkershaw/mangodb';
 
 import { createJiraAuthRoutes } from '../../routes/jira-auth.js';
+import { AccountStore } from '../../lib/account-store.js';
+import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 
 const ENV_KEYS = ['JIRA_CLIENT_ID', 'JIRA_CLIENT_SECRET', 'JIRA_REDIRECT_URI'];
 let savedEnv;
@@ -78,7 +84,7 @@ function makeAccountStores() {
   };
 }
 
-function makeApp({ session, store, provider, fetches = {} }) {
+function makeApp({ session, store, provider, fetches = {}, accountStore, accountWorkspaceStore }) {
   const app = express();
   app.use(express.urlencoded({ extended: false }));
   app.use((req, _res, next) => { req.session = session; next(); });
@@ -90,7 +96,12 @@ function makeApp({ session, store, provider, fetches = {} }) {
     }
     throw new Error(`unstubbed fetch: ${url}`);
   };
-  app.use(createJiraAuthRoutes({ provider, ...makeAccountStores(), ownerCredentialStore: store }));
+  // LIN-2285: an accountStore/accountWorkspaceStore pair can be passed in
+  // (real, MangoDB-backed ones) so a test can pre-seed a merge and check
+  // canonicalization — the fake `makeAccountStores()` below models no
+  // merging at all, so it stays the default for every other test in this file.
+  const stores = accountStore ? { accountStore, accountWorkspaceStore } : makeAccountStores();
+  app.use(createJiraAuthRoutes({ provider, ...stores, ownerCredentialStore: store }));
   return app;
 }
 
@@ -305,5 +316,76 @@ describe('LIN-1887 — the Phase 1 Basic routes are untouched', () => {
     const res = await request(app, { path: '/auth/jira?workspace=acme' });
     assert.equal(res.status, 200);
     assert.match(res.text, /data-testid="jira-link-form"/);
+  });
+});
+
+// LIN-2285 (plan-review F2): the merged-side canonicalization fix in
+// establishAccount (lib/account-session.js) makes `established.accountId`
+// canonical for every call site, including `routes/jira-auth.js`'s OWN
+// durable rotating-refresh write (`persistRefresh`, a second, Jira-specific
+// consumer of the same OwnerCredentialStore the LIN-1887 tests above already
+// pin for Linear). Real, MangoDB-backed account stores here (not the fake
+// `makeAccountStores()` above, which models no merging at all) so a merge
+// can genuinely be pre-seeded.
+describe('LIN-2285 — a fresh Jira login with an already-merged identity canonicalizes the durable credential write', () => {
+  let dbClient, dbDir;
+
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'jira-oauth-lin2285-'));
+    dbClient = new MangoClient(dbDir);
+    await dbClient.connect();
+  });
+  after(async () => {
+    if (dbClient?.close) await dbClient.close();
+    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+  });
+
+  function realAccountStores() {
+    const db = dbClient.db('acct');
+    return {
+      accountStore: new AccountStore({ collection: db.collection('accounts') }),
+      accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
+    };
+  }
+
+  // mode:'new' mints a fresh workspace container via `req.session.regenerate`
+  // — none of the `add-source` sessions above exercise that branch, so this
+  // session needs its own `regenerate`, mirroring tests/unit/account-identity.test.js's.
+  function makeFreshLoginSession() {
+    return {
+      workspaces: [],
+      oauthState: 'nonce',
+      oauthIntent: { mode: 'new', provider: 'jira' },
+      save(cb) { if (cb) cb(null); },
+      regenerate(cb) {
+        for (const k of Object.keys(this)) {
+          if (typeof this[k] !== 'function') delete this[k];
+        }
+        cb();
+      },
+    };
+  }
+
+  test('persistRefresh writes the rotating refresh token under the CANONICAL account, not the merged one', async () => {
+    const { accountStore, accountWorkspaceStore } = realAccountStores();
+    const a = await accountStore.createAccount();
+    const b = await accountStore.createAccount();
+    await accountStore.linkIdentity(b._id, 'jira', 'atlassian-acct-1', {});
+    assert.equal((await accountStore.mergeAccounts(a._id, b._id)).ok, true, 'sanity: B is merged into A before this login ever happens');
+
+    const store = makeStore();
+    const session = makeFreshLoginSession();
+    const app = makeApp({ session, store, provider: fakeProvider(), fetches: stubs(), accountStore, accountWorkspaceStore });
+    const res = await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
+
+    assert.equal(res.status, 302, res.text);
+    assert.equal(session.accountId, a._id, 'session.accountId is canonical, not the merged id B');
+
+    const urlKey = session.workspaces[0].urlKey;
+    const canonicalCred = await store.get(a._id, urlKey, 'jira');
+    assert.ok(canonicalCred, 'the durable rotating refresh token landed under the CANONICAL account');
+    assert.equal(canonicalCred.refreshToken, 'atlassian-refresh-ROTATING');
+    const mergedCred = await store.get(b._id, urlKey, 'jira');
+    assert.equal(mergedCred, null, 'no write happened under the merged (non-canonical) account');
   });
 });

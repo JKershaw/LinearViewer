@@ -30,6 +30,7 @@ import '../lib/providers/jira/index.js';
 import { createFakeJiraClient } from '../lib/providers/jira/fake-client.js';
 import { defaultJiraSeed, JIRA_WORKSPACE_URL_KEY, JIRA_SITE } from '../tests/fixtures/jira-harness.js';
 import { establishAccount } from '../lib/account-session.js';
+import { respondToAccountConflict } from '../lib/account-conflict.js';
 
 /**
  * Create test routes with required dependencies.
@@ -287,6 +288,73 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       }
     })
   })
+
+  // LIN-2285 close-out ledger item 2: no E2E coverage exists for the
+  // account-merge confirm flow at all (409 offer -> confirm -> redirect).
+  // This fixture builds the exact LIN-2285 acceptance scenario — B merged
+  // into A before the session starts, a third account C signs in with B's
+  // identity and gets offered a merge against the CANONICAL absorber A, not
+  // the raw merged id — through the real production seams: `establishAccount`
+  // for every identity and the real `respondToAccountConflict` responder for
+  // the offer (same function `routes/auth.js` calls on a live conflict). The
+  // confirm step itself is deliberately NOT reimplemented here — the spec
+  // submits the real `POST /auth/merge/confirm` form the response renders.
+  router.get('/test/set-merge-conflict-session', async (req, res) => {
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const baseUrlKey = req.query.urlKey || 'merge-conflict';
+
+    const workspaceFor = (label) => ({
+      id: crypto.randomUUID(),
+      name: `Merge ${label}`,
+      urlKey: `${baseUrlKey}-${label}-${suffix}`,
+      accessToken: 'test-token',
+      tokenExpiresAt: Date.now() + (24 * 60 * 60 * 1000),
+      addedAt: Date.now()
+    });
+
+    const wsA = workspaceFor('a');
+    const wsB = workspaceFor('b');
+    const wsC = workspaceFor('c');
+
+    // A (the canonical absorber) and B (merged into A) are set up on their
+    // own throwaway sessions, entirely before this request's own session
+    // exists — mirroring "B merged into A before this session ever starts".
+    const aResult = await establishAccount({}, accountStore, accountWorkspaceStore, 'linear', `test-merge-a-${suffix}`, {}, wsA.id);
+    const bSession = {};
+    const bResult = await establishAccount(bSession, accountStore, accountWorkspaceStore, 'linear', `test-merge-b-${suffix}`, {}, wsB.id);
+    const merged = await accountStore.mergeAccounts(aResult.accountId, bResult.accountId, { accountWorkspaceStore });
+    if (!merged.ok) {
+      return res.status(500).send(`fixture setup failed: merge (${merged.reason})`);
+    }
+
+    // A THIRD, unrelated account C mints via THIS session.
+    req.session.workspaces = [wsC];
+    req.session.activeWorkspaceId = wsC.id;
+    const cResult = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', `test-merge-c-${suffix}`, {}, wsC.id);
+    if (!cResult.ok) {
+      return res.status(500).send('fixture setup failed: mint C');
+    }
+
+    // Same session signs in with B's identity — B is already merged into A.
+    // A genuine conflict: C is a distinct canonical account from A.
+    const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', `test-merge-b-${suffix}`, {}, wsB.id);
+    if (established.ok || !established.conflict) {
+      return res.status(500).send('fixture setup failed: expected a conflict, got ' + JSON.stringify(established));
+    }
+
+    return respondToAccountConflict({
+      req,
+      res,
+      established,
+      workspace: wsB,
+      refreshToken: null,
+      mode: 'new',
+      returnUrlKey: wsB.urlKey,
+      identityLabel: 'Linear',
+      reauthUrl: '/auth/linear',
+      provider: 'linear',
+    });
+  });
 
   // Endpoint to clear session (for testing logout and unauthenticated states)
   router.get('/test/clear-session', (req, res) => {
