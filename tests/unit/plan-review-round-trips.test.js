@@ -486,6 +486,63 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
       'p1=0 with denominator=500 must not claim there is no denominator');
   });
 
+  // ─── LIN-2036: continuous effect model + F3 conjunct drop, at aggregate level ───
+
+  function verdictIssues(idPrefix, approveCount, requestChangesCount) {
+    const issues = [];
+    for (let i = 0; i < approveCount; i++) {
+      issues.push(issue(`${idPrefix}-a${i}`, {
+        rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
+          feedbackDone('DONE: Verdict: Approve.', '2026-08-01T00:05:00.000Z'))],
+      }));
+    }
+    for (let i = 0; i < requestChangesCount; i++) {
+      issues.push(issue(`${idPrefix}-rc${i}`, {
+        rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
+          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-01T00:05:00.000Z'))],
+      }));
+    }
+    return issues;
+  }
+
+  test('LIN-2036 F2 regression: d=12, p1=0.5 must NOT be sufficient (the pre-fix code declared this sufficient at requiredN=11)', () => {
+    const agg = computePlanReviewRoundTrips(verdictIssues('f2-12', 6, 6), { asOf: ASOF });
+    assert.equal(agg.primary.denominator, 12);
+    assert.equal(agg.primary.rate, 0.5);
+    assert.equal(agg.primary.sufficient, false,
+      'd=12,p1=0.5 (requiredN=58 under the continuous rule) must not be sufficient');
+  });
+
+  test('LIN-2036 F2 regression: d=20, p1=0.45 must NOT be sufficient (the pre-fix code declared this sufficient at requiredN=16)', () => {
+    const agg = computePlanReviewRoundTrips(verdictIssues('f2-20', 9, 11), { asOf: ASOF });
+    assert.equal(agg.primary.denominator, 20);
+    assert.equal(agg.primary.rate, 0.45);
+    assert.equal(agg.primary.sufficient, false,
+      'd=20,p1=0.45 (requiredN=50 under the continuous rule) must not be sufficient');
+  });
+
+  test('LIN-2036 F3 pin: n=52, d=85 must be sufficient — the floating-point knife edge the dropped numerator conjunct got wrong', () => {
+    const agg = computePlanReviewRoundTrips(verdictIssues('f3', 52, 33), { asOf: ASOF });
+    assert.equal(agg.primary.denominator, 85);
+    assert.equal(agg.primary.numerator, 52);
+    assert.equal(agg.primary.sufficient, true,
+      'requiredN(52/85) === 85 so the denominator check alone passes; the conjunct (dropped) used to flip this to false on a Math.ceil round-up of the requiredNumerator');
+  });
+
+  test('LIN-2036 F1: sufficiencyFormula reports the realised ratio, not the constant — 2.000× at p1=0.19, 1.333× (never 2×) at p1=0.6', () => {
+    const low = computePlanReviewRoundTrips(verdictIssues('f1-low', 19, 81), { asOf: ASOF });
+    assert.equal(low.definition.measuredP1, 0.19);
+    assert.match(low.definition.sufficiencyFormula, /2\.000×/);
+    assert.match(low.definition.sufficiencyFormula, /min\(/, 'must name the continuous min() rule');
+
+    const high = computePlanReviewRoundTrips(verdictIssues('f1-high', 60, 40), { asOf: ASOF });
+    assert.equal(high.definition.measuredP1, 0.6);
+    assert.match(high.definition.sufficiencyFormula, /1\.333×/);
+    assert.doesNotMatch(high.definition.sufficiencyFormula, /(?<!\d)2×/,
+      'must not claim a 2× effect above p1=0.5, where the realised ratio is 1.333×');
+    assert.match(high.definition.sufficiencyFormula, /min\(/, 'must name the continuous min() rule');
+  });
+
   test('round-trip distribution and mean', () => {
     const zero = issue('rt0', {
       rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
@@ -647,6 +704,52 @@ describe('derivePrimaryFloor', () => {
     const low = derivePrimaryFloor(0.05);
     const high = derivePrimaryFloor(0.19);
     assert.notEqual(low.requiredN, high.requiredN);
+  });
+
+  // ─── LIN-2036: continuous min() effect model (replaces the p1=0.5 branch) ───
+
+  test('LIN-2036 F2: derivePrimaryFloor(0.5).requiredN is at or above MIN_DENOMINATOR (the pre-fix code returned 11)', () => {
+    assert.ok(derivePrimaryFloor(0.5).requiredN >= MIN_DENOMINATOR,
+      `expected requiredN(0.5) >= ${MIN_DENOMINATOR}, got ${derivePrimaryFloor(0.5).requiredN}`);
+  });
+
+  test('LIN-2036 F2: no p1 in [0,1] yields a requiredN below MIN_DENOMINATOR (the pre-fix code violated this for p1 in ~[0.36, 0.5])', () => {
+    for (let i = 0; i <= 1000; i++) {
+      const p1 = i / 1000;
+      const floor = derivePrimaryFloor(p1);
+      assert.ok(floor.requiredN >= MIN_DENOMINATOR,
+        `p1=${p1} produced requiredN=${floor.requiredN}, below MIN_DENOMINATOR=${MIN_DENOMINATOR}`);
+    }
+  });
+
+  test('LIN-2036 F2: continuity at the p1=0.5 fork — requiredN(0.5) === requiredN(0.5001) (the pre-fix code jumped 11 -> 58)', () => {
+    assert.equal(derivePrimaryFloor(0.5).requiredN, derivePrimaryFloor(0.5001).requiredN);
+  });
+
+  test('LIN-2036 F4: complement-branch coverage at p1 = 0.6, 0.8, 1.0 — p2 stays strictly inside (p1c, 1), requiredN is monotone', () => {
+    const mid = derivePrimaryFloor(0.6);
+    const higher = derivePrimaryFloor(0.8);
+    const boundary = derivePrimaryFloor(1.0);
+
+    // p1=0.6 and p1=0.8 are well clear of the SUFFICIENCY_MIN_P boundary, so
+    // p1c === p1 there and `p2 > p1` is the p1c comparison. p1=1.0 is the one
+    // case where p1c is clamped away from the raw p1 — the only invariant
+    // that survives the clamp (and the one the retired `p2 ∈ (p1, 1)` witness
+    // got wrong) is that p2 stays strictly below 1, never saturating back
+    // onto 1 (which would reintroduce requiredN = Infinity).
+    assert.ok(mid.p2 > 0.6 && mid.p2 < 1);
+    assert.ok(higher.p2 > 0.8 && higher.p2 < 1);
+    assert.ok(boundary.p2 < 1, 'p2 must never reach exactly 1, even at the p1=1 boundary');
+
+    assert.ok(mid.requiredN < higher.requiredN && higher.requiredN < boundary.requiredN,
+      `expected monotone requiredN, got ${mid.requiredN} < ${higher.requiredN} < ${boundary.requiredN}`);
+  });
+
+  test('LIN-2036 Decision 3: the accepted p1=1 boundary artifact renders 1.000× and stays finite, and is not special-cased away', () => {
+    const floor = derivePrimaryFloor(1.0);
+    assert.ok(Number.isFinite(floor.requiredN));
+    assert.equal(floor.effectRatio.toFixed(3), '1.000');
+    assert.equal(floor.p2.toFixed(4), '1.0000');
   });
 });
 
