@@ -663,8 +663,69 @@ describe('LIN-2300 — OAuth add-source and existing-container unknown-account 4
     assert.match(picked.text, /Account Conflict/);
     assert.equal(session.accountId, undefined, 'stale accountId cleared');
     assert.equal(session.identityAuthenticatedAt, undefined, 'freshness stamp cleared');
+    // LIN-2300 close-out F2: the mutation-check found this exit's oauthState/
+    // oauthIntent clearing was unwitnessed (dropping either field failed 7 of
+    // 8 tests, not 8) — assert both explicitly, matching the add-source test
+    // above and the helper's full four-field contract.
+    assert.equal(session.oauthState, undefined, 'OAuth state cleared');
+    assert.equal(session.oauthIntent, undefined, 'OAuth intent cleared');
     assert.equal(session.jiraPending?.refreshToken, undefined, 'the carried token is gone (dropCarriedRefreshToken, unchanged behavior)');
     assert.equal(JSON.stringify(session).includes('atlassian-refresh-ROTATING'), false, 'and nothing else in the session kept a copy of it');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-2300 close-out F1: the OAuth add-source exit's `!established.conflict`
+// guard was unwitnessed — removing it (making the clear unconditional) failed
+// zero tests. A mergeable conflict must still preserve session.accountId here,
+// exactly as it already does at the binding-add exit above.
+// ---------------------------------------------------------------------------
+
+describe('LIN-2300 close-out F1 — OAuth add-source preserves session.accountId on a MERGEABLE conflict', () => {
+  test('OAuth add-source (jira-auth.js:519): a MERGEABLE conflict returns 409 and preserves session.accountId', async () => {
+    const session = withLinearSession();
+    const stores = makeAccountStores();
+    stores.accountStore.findAccountByIdentity = async () => ({ _id: 'acct-B' });
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores, fetches: stubs(ONE_SITE) });
+
+    await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme-linear' });
+    const callback = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(callback.status, 409);
+    assert.match(callback.text, /Account Conflict/);
+    assert.equal(session.accountId, 'acct-1', 'session.accountId preserved on a mergeable conflict');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-2300 close-out — same-session self-heal: an unknown-account 409 on
+// attempt 1 must not doom every later attempt on the same session. Attempt 2,
+// after the stale id is cleared, mints and lands on a fresh account.
+// ---------------------------------------------------------------------------
+
+describe('LIN-2300 close-out — OAuth add-source self-heals across a same-session retry', () => {
+  test('OAuth add-source (jira-auth.js:519): after an unknown-account 409 clears the session, a second attempt on the SAME session succeeds', async () => {
+    const linearWs = { id: 'ws-1', urlKey: 'acme-linear', provider: 'linear', accessToken: 'linear-access', bindings: [{ provider: 'linear', scope: 'org-1', credentials: { token: 'linear-access' } }] };
+    const session = makeSession({
+      accountId: 'acct-DELETED',
+      workspaces: [linearWs],
+      activeWorkspaceId: 'ws-1',
+    });
+    const stores = makeUnknownAccountStores();
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores, fetches: stubs(ONE_SITE) });
+
+    await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme-linear' });
+    const attempt1 = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+    assert.equal(attempt1.status, 409, 'attempt 1: the stale accountId fails as before');
+    assert.equal(session.accountId, undefined, 'attempt 1: stale accountId cleared, opening the door to a retry');
+
+    // Same session object, second attempt — the account is re-established fresh.
+    await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme-linear' });
+    const attempt2 = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(attempt2.status, 302, 'attempt 2: succeeds and redirects');
+    assert.equal(attempt2.location, '/workspace/acme-linear/settings?provider_ok=jira');
+    assert.ok(session.accountId, 'attempt 2: a fresh accountId is established on the same session');
   });
 });
 

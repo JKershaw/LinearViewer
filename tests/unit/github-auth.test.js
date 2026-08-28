@@ -787,6 +787,73 @@ describe('GitHub auth routes', () => {
     assert.equal(existing.bindings.length, 1, 'no new binding written');
   });
 
+  // LIN-2300 close-out F1: the existing-container branch's `!established.conflict`
+  // guard was unwitnessed — removing it made the clear unconditional and no test
+  // failed. Mirrors the add-source mergeable-conflict test below, for this branch.
+  test('POST link (new, existing container) returns 409 Account Conflict when the GitHub identity already belongs to a DIFFERENT account, and preserves session.accountId (LIN-2300)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-42', {});
+    const myAccount = await accountStore.createAccount();
+
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const existing = {
+      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho_token' } }],
+    };
+    const session = makeSession({
+      accountId: myAccount._id,
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [existing],
+    });
+    await handler({ body: { repo: 'octocat/another-repo' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Account Conflict/);
+    assert.equal(existing.bindings.length, 1, 'no new binding written');
+    // LIN-2300: a MERGEABLE conflict must NOT clear session.accountId — it is
+    // needed by the merge-confirm flow this 409 dead-ends into today (LIN-2304).
+    assert.equal(session.accountId, myAccount._id, 'session.accountId preserved on a mergeable conflict');
+  });
+
+  // LIN-2300 close-out — same-session self-heal: an unknown-account 409 on
+  // attempt 1 must not doom every later attempt on the same session. Attempt 2,
+  // after the stale id is cleared, mints and lands on a fresh account.
+  test('POST link (new, existing container) self-heals: after an unknown-account 409 clears the session, a second attempt on the SAME session succeeds (LIN-2300)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const existing = {
+      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho_token' } }],
+    };
+    const session = makeSession({
+      accountId: 'acct-DELETED',
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [existing],
+    });
+
+    const attempt1 = makeRes();
+    await handler({ body: { repo: 'octocat/another-repo' }, session }, attempt1);
+    assert.equal(attempt1.statusCode, 409, 'attempt 1: the stale accountId fails as before');
+    assert.equal(session.accountId, undefined, 'attempt 1: stale accountId cleared, opening the door to a retry');
+
+    // Same session object, second attempt — the account is re-established fresh.
+    session.githubPending = { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' };
+    const attempt2 = makeRes();
+    await handler({ body: { repo: 'octocat/third-repo' }, session }, attempt2);
+
+    assert.equal(attempt2.redirectedTo, '/workspace/octocat/', 'attempt 2: succeeds and redirects');
+    assert.ok(session.accountId, 'attempt 2: a fresh accountId is established on the same session');
+    const account = await accountStore.getAccount(session.accountId);
+    assert.ok(account, 'attempt 2: the newly established account is real and durable');
+    assert.equal(existing.bindings.length, 2, 'attempt 2: the retried binding is written');
+  });
+
   // LIN-2267 (class fix of LIN-2233's L2.1, applied to the GitHub sibling):
   // mode:'new' DOES regenerate the session (unlike add-source above), and
   // until this fix that regenerate unconditionally wiped session.accountId —

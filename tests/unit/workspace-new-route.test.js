@@ -226,4 +226,34 @@ describe('POST /workspace/new (local bootstrap)', () => {
     assert.strictEqual(req.session.oauthState, undefined, 'OAuth state cleared');
     assert.strictEqual(req.session.oauthIntent, undefined, 'OAuth intent cleared');
   });
+
+  // LIN-2300 close-out — same-session self-heal: an unknown-account failure on
+  // attempt 1 must not doom every later attempt on the same session. Attempt
+  // 2, after the stale id is cleared, mints and lands on a fresh account.
+  test('self-heals: after an unknown-account failure clears the session, a second attempt on the SAME session succeeds (LIN-2300)', async () => {
+    const store = new LocalStore({ collection: makeCollection() });
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const handler = getHandler(createWorkspaceRoutes({ localStore: store, accountStore, accountWorkspaceStore }));
+    const session = { accountId: 'acct-DELETED' };
+
+    const attempt1 = makeReqRes({ body: { name: 'First Try' }, session });
+    await handler(attempt1.req, attempt1.res);
+    assert.strictEqual(attempt1.res.statusCode, 500, 'attempt 1: the stale accountId fails as before');
+    assert.strictEqual(session.accountId, undefined, 'attempt 1: stale accountId cleared, opening the door to a retry');
+    // upsertWorkspace runs BEFORE establishAccount on this route, so a failed
+    // attempt leaves a half-built local workspace behind (LIN-2345, filed and
+    // explicitly out of scope for this ticket's accountId class) — unchanged
+    // by this fix, just not worsened by it.
+    assert.strictEqual(session.workspaces.length, 1, 'attempt 1: the pre-existing half-built-workspace residue (LIN-2345), not fixed here');
+
+    // Same session object, second attempt — the account is re-established fresh.
+    const attempt2 = makeReqRes({ body: { name: 'Second Try' }, session });
+    await handler(attempt2.req, attempt2.res);
+
+    assert.ok(attempt2.res.redirectedTo?.startsWith('/workspace/second-try-'), 'attempt 2: succeeds and redirects');
+    assert.ok(session.accountId, 'attempt 2: a fresh accountId is established on the same session');
+    const account = await accountStore.getAccount(session.accountId);
+    assert.ok(account, 'attempt 2: the newly established account is real and durable');
+    assert.strictEqual(session.workspaces.length, 2, 'attempt 2: the retried workspace is created alongside the attempt-1 residue');
+  });
 });
