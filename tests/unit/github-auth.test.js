@@ -25,6 +25,8 @@ import { githubErrorDiagnostic } from '../../lib/errors.js';
 import { getMissingGitHubConfig, getGitHubConfigProblems, isGitHubConfigured } from '../../lib/providers/github/app-auth.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
+import { AccountMergeLogStore } from '../../lib/account-merge-log.js';
+import { createAccountMergeRoutes } from '../../routes/account-merge.js';
 
 // Ephemeral RSA keypair so completeInstallation's App-JWT signing (mintAppJwt)
 // runs for real against a valid PEM — generated, never on disk.
@@ -937,6 +939,162 @@ describe('GitHub auth routes', () => {
     // token must not remain in session.workspaces.
     assert.deepEqual(session.workspaces, [linearWs], 'session.workspaces restored to its pre-login snapshot');
     assert.ok(!JSON.stringify(session.workspaces).includes('gho_token'), 'the arriving credential does not leak into the session');
+  });
+
+  // === LIN-2304: mode:'new' regenerate branch reaches the shared merge offer ===
+  //
+  // Prerequisite: the F1 clearing block on this branch must be conditional on
+  // `!established.conflict`, or the arriving conflict account id is destroyed
+  // before it can become `canonicalAccountId` — the merge offer could never be
+  // built. These tests exercise the FIRST mergeable-conflict coverage this
+  // branch has ever had (LIN-2267 review ledger item 1).
+
+  test('POST link (new) reaches the shared merge offer — not the old dead-end 409 — when the GitHub identity already belongs to a DIFFERENT account, preserving session.accountId as the canonical id (LIN-2304)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const canonicalAccount = await accountStore.createAccount();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
+
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const session = makeSession({
+      // A LIVE session for a DIFFERENT, already-canonical account, freshly
+      // authenticated in THIS session — the amendment A1 proof standard for
+      // the canonical side.
+      accountId: canonicalAccount._id,
+      identityAuthenticatedAt: Date.now(),
+      githubHumanId: 'human-other',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    const res = makeRes();
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Merge these accounts\?/, 'the shared merge offer, not the old dead-end "Account Conflict" page');
+    assert.match(res.body, /This GitHub account/, 'identityLabel is parameterized to GitHub, never left as Linear\'s literal');
+    assert.ok(session.pendingMerge, 'a pending merge offer is stored — but nothing written yet');
+    assert.strictEqual(session.pendingMerge.canonicalAccountId, canonicalAccount._id, 'canonicalAccountId is session.accountId — never undefined');
+    assert.strictEqual(session.pendingMerge.mergedAccountId, otherAccount._id);
+    assert.strictEqual(session.accountId, canonicalAccount._id, 'session.accountId (the canonical id) is preserved, not cleared');
+    assert.strictEqual((await accountStore.getAccount(canonicalAccount._id)).mergedInto, undefined, 'nothing written yet — offer only');
+    assert.strictEqual((await accountStore.getAccount(otherAccount._id)).mergedInto, undefined);
+  });
+
+  test('POST link (new) refuses a one-click merge and offers re-auth instead when the canonical session is LIVE but STALE (LIN-2304)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const canonicalAccount = await accountStore.createAccount();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
+
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const session = makeSession({
+      accountId: canonicalAccount._id,
+      // Well outside the 10-minute fresh-auth window.
+      identityAuthenticatedAt: Date.now() - 60 * 60 * 1000,
+      githubHumanId: 'human-other',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    const res = makeRes();
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Sign in again to confirm/);
+    assert.strictEqual(session.pendingMerge, undefined, 'no pending merge is offered when the canonical side is not fresh');
+    assert.strictEqual((await accountStore.getAccount(canonicalAccount._id)).mergedInto, undefined);
+    assert.strictEqual((await accountStore.getAccount(otherAccount._id)).mergedInto, undefined);
+  });
+
+  test('GitHub confirm-to-completion: merges, binds the workspace, applies the uniform completion step, and writes NO owner credential (LIN-2304 finding 1)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const canonicalAccount = await accountStore.createAccount();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
+
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const session = makeSession({
+      accountId: canonicalAccount._id,
+      identityAuthenticatedAt: Date.now(),
+      githubHumanId: 'human-other',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, makeRes());
+    assert.ok(session.pendingMerge, 'sanity: the offer was built');
+
+    const credentialCalls = [];
+    const ownerCredentialStore = { put: async (...args) => { credentialCalls.push(args); } };
+    const prefsCalls = [];
+    const userPreferencesStore = { getUserPreferences: async (accountId) => { prefsCalls.push(accountId); return {}; } };
+    const mergeRouter = createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, userPreferencesStore });
+    const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
+
+    const res = makeRes();
+    await confirmHandler({ session }, res);
+
+    assert.strictEqual(res.redirectedTo, '/workspace/octocat/');
+    assert.strictEqual(session.pendingMerge, undefined);
+    assert.strictEqual((await accountStore.getAccount(otherAccount._id)).mergedInto, canonicalAccount._id, 'mergeAccounts actually ran');
+    assert.strictEqual(session.activeWorkspaceId, 'github:42', 'uniform completion: activeWorkspaceId set');
+    assert.deepStrictEqual(prefsCalls, [canonicalAccount._id], 'uniform completion: preferences rehydrated for the canonical account');
+    // The finding-1 fix: GitHub writes no owner credential today (its normal
+    // sign-in path never calls persistOwnerCredential), and the confirm path
+    // must not introduce one — the offer carried no refreshToken, so
+    // pending.refreshToken is null and the gated call is skipped entirely.
+    assert.deepStrictEqual(credentialCalls, [], 'GitHub confirm introduces NO owner-credential write');
+  });
+
+  // === LIN-2304: LIN-2265's cycle guard stays load-bearing from a widened surface ===
+
+  test('cycle-guard witness: a pre-corrupted canonical account refuses the merge at the write path when confirmed from the WIDENED GitHub surface — no new mergedInto pointer written (LIN-2304 / LIN-2265)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+
+    // Seed corruption the fixed write path can no longer produce (mirrors
+    // tests/unit/account-identity.test.js's seedCycle): two accounts each
+    // pointing mergedInto at the other. establishAccount's own
+    // resolveCanonicalAccountId call degrades (catches, keeps the
+    // uncanonicalized id) rather than throwing — the naive two-login repro
+    // would self-heal and never even raise a conflict, so this is the only
+    // construction that actually reaches the guard from a widened surface.
+    const a = await accountStore.createAccount();
+    const b = await accountStore.createAccount();
+    await accountStore.collection.updateOne({ _id: a._id }, { $set: { mergedInto: b._id } });
+    await accountStore.collection.updateOne({ _id: b._id }, { $set: { mergedInto: a._id } });
+
+    const thirdAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(thirdAccount._id, 'github', 'human-third', {});
+
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const session = makeSession({
+      // A live session for the CORRUPTED account (degrades to itself, never
+      // canonicalizes, never throws — see lib/account-session.js).
+      accountId: a._id,
+      identityAuthenticatedAt: Date.now(),
+      githubHumanId: 'human-third',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    const offerRes = makeRes();
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, offerRes);
+    assert.equal(offerRes.statusCode, 409);
+    assert.ok(session.pendingMerge, 'the widened surface DOES offer a merge — the guard lives at the write path, not the offer');
+    assert.strictEqual(session.pendingMerge.canonicalAccountId, a._id);
+    assert.strictEqual(session.pendingMerge.mergedAccountId, thirdAccount._id);
+
+    const mergeRouter = createAccountMergeRoutes({ accountStore, accountWorkspaceStore });
+    const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
+    const confirmRes = makeRes();
+    await confirmHandler({ session }, confirmRes);
+
+    assert.equal(confirmRes.statusCode, 500);
+    assert.match(confirmRes.body, /Merge Failed/, 'refused at the write path — LIN-2265\'s guard, exercised for the first time from a non-Linear surface');
+    assert.strictEqual((await accountStore.getAccount(thirdAccount._id)).mergedInto, undefined, 'no new mergedInto pointer written onto the third account');
+    assert.strictEqual((await accountStore.getAccount(a._id)).mergedInto, b._id, 'the seeded corruption is untouched — never silently repaired here');
+    assert.strictEqual((await accountStore.getAccount(b._id)).mergedInto, a._id, 'no cycle widened or altered');
   });
 
   test('POST link (add-source) links onto the active workspace without creating a new one', async () => {

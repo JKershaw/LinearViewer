@@ -24,6 +24,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import { createAuthRoutes } from '../../routes/auth.js';
+import { createAccountMergeRoutes } from '../../routes/account-merge.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { establishAccount } from '../../lib/account-session.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
@@ -159,7 +160,8 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
       [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
     const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
     const handler = getHandler(router, 'get', '/auth/callback');
-    const declineHandler = getHandler(router, 'post', '/auth/merge/decline');
+    const mergeRouter = createAccountMergeRoutes({ ...stores });
+    const declineHandler = getHandler(mergeRouter, 'post', '/auth/merge/decline');
 
     const session = makeSession({ oauthState: 'real' });
     await handler({ query: { code: 'c1', state: 'real' }, session }, makeRes());
@@ -206,7 +208,15 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
       [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
     const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
     const callbackHandler = getHandler(router, 'get', '/auth/callback');
-    const confirmHandler = getHandler(router, 'post', '/auth/merge/confirm');
+    // LIN-2304: confirm-completion is now uniform across every provider,
+    // including Linear — the confirm handler applies activeWorkspaceId and
+    // rehydrated preferences the same way every provider's non-conflict
+    // success path already does, closing a pre-existing gap on Linear's own
+    // confirm route rather than forking it. A fake store witnesses both.
+    const prefsCalls = [];
+    const userPreferencesStore = { getUserPreferences: async (accountId) => { prefsCalls.push(accountId); return { theme: 'dark' }; } };
+    const mergeRouter = createAccountMergeRoutes({ ...stores, userPreferencesStore });
+    const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
 
     const session = makeSession({ oauthState: 'real' });
     await callbackHandler({ query: { code: 'c1', state: 'real' }, session }, makeRes());
@@ -224,6 +234,12 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
     assert.strictEqual(session.accountId, canonicalId, 'amendment A2: session.accountId set to canonical on confirm');
     assert.strictEqual(session.pendingMerge, undefined);
     assert.ok(session.workspaces.some(w => w.id === 'org-other'), 'the arriving workspace is added back to session.workspaces on confirm');
+    // LIN-2304: the uniform completion step — previously ABSENT from Linear's
+    // own confirm handler (§0 of the plan's research), a pre-existing gap
+    // this ticket closes deliberately, not a provider fork.
+    assert.strictEqual(session.activeWorkspaceId, 'org-other', 'LIN-2304: activeWorkspaceId is now set on confirm, uniformly');
+    assert.deepStrictEqual(prefsCalls, [canonicalId], 'LIN-2304: preferences are now rehydrated for the canonical account on confirm, uniformly');
+    assert.strictEqual(session.theme, 'dark', 'the rehydrated preference actually lands on the session');
 
     const merged = await stores.accountStore.getAccount(otherAccount._id);
     assert.strictEqual(merged.mergedInto, canonicalId, 'merged account aliased via mergedInto — permanent pointer');
@@ -286,7 +302,8 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
   test('POST /auth/merge/confirm with no pending merge in session is refused (400), writes nothing', async () => {
     const stores = freshStores();
     const router = createAuthRoutes({ provider: {}, sessionStore: { cleanup: async () => {} }, ...stores });
-    const confirmHandler = getHandler(router, 'post', '/auth/merge/confirm');
+    const mergeRouter = createAccountMergeRoutes({ ...stores });
+    const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
     const session = makeSession({});
     const res = makeRes();
 
@@ -421,7 +438,8 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
         [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
       const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
       const callbackHandler = getHandler(router, 'get', '/auth/callback');
-      const confirmHandler = getHandler(router, 'post', '/auth/merge/confirm');
+      const mergeRouter = createAccountMergeRoutes({ ...stores });
+      const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
 
       const s1 = makeSession({ oauthState: 'real' });
       await callbackHandler({ query: { code: 'c1', state: 'real' }, session: s1 }, makeRes());
@@ -491,7 +509,8 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
         [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
       const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
       const callbackHandler = getHandler(router, 'get', '/auth/callback');
-      const confirmHandler = getHandler(router, 'post', '/auth/merge/confirm');
+      const mergeRouter = createAccountMergeRoutes({ ...stores });
+      const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
 
       const s1 = makeSession({ oauthState: 'real' });
       await callbackHandler({ query: { code: 'c1', state: 'real' }, session: s1 }, makeRes());

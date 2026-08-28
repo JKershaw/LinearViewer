@@ -85,6 +85,7 @@ import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, remo
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from './lib/refresh-strategy.js'
 import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/jira/oauth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
+import { createAccountMergeRoutes } from './routes/account-merge.js'
 import { createEnsurePATSession } from './lib/pat-session.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
@@ -516,7 +517,7 @@ const accountsCollection = db.collection('accounts')
 const accountStore = new AccountStore({ collection: accountsCollection })
 
 // Account merge log (LIN-2233, L2.2 of the LIN-2231 design): durable,
-// append-only record of confirmed account merges (routes/auth.js's
+// append-only record of confirmed account merges (routes/account-merge.js's
 // POST /auth/merge/confirm), since a merge is rare/high-consequence and must
 // survive Railway's rolling ~7-day log window.
 const accountMergeEventsCollection = db.collection('account-merge-events')
@@ -1074,6 +1075,12 @@ for (const provider of getAllProviders()) {
   }
   app.use(authRouter)
 }
+// LIN-2304: the merge confirm/decline routes are shared across every
+// provider's conflict-offer flow — mounted exactly ONCE here, never
+// per-provider (every provider router mounts at root too, so a per-provider
+// registration of these same paths would be shadowed by whichever router
+// mounts first).
+app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore }))
 app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined

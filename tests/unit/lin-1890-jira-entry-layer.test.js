@@ -34,8 +34,15 @@
 import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import express from 'express';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MangoClient } from '@jkershaw/mangodb';
 
 import { createJiraAuthRoutes, deriveJiraUrlKey } from '../../routes/jira-auth.js';
+import { createAccountMergeRoutes } from '../../routes/account-merge.js';
+import { AccountStore } from '../../lib/account-store.js';
+import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { getWorkspaceCallScope, getBindingCallScope, getWorkspaceToken } from '../../lib/workspace.js';
 
 const ENV_KEYS = ['JIRA_CLIENT_ID', 'JIRA_CLIENT_SECRET', 'JIRA_REDIRECT_URI'];
@@ -529,6 +536,99 @@ describe('LIN-2267 amendment — post-conflict session hygiene on the mode:new u
     // must not remain in session.workspaces.
     assert.deepEqual(session.workspaces, [linearWs], 'session.workspaces restored to its pre-login snapshot')
     assert.ok(!JSON.stringify(session.workspaces).includes('jira-access-1'), 'the arriving credential does not leak into the session')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// LIN-2304: the mode:'new' regenerate branch reaches the shared merge offer
+// instead of the old dead-end 409 — the FIRST mergeable-conflict coverage
+// this branch has ever had (LIN-2267 review ledger item 1).
+// ---------------------------------------------------------------------------
+
+describe('LIN-2304 — Jira mode:new regenerate branch reaches the shared merge offer', () => {
+  test('a MERGEABLE conflict reaches the shared merge offer (not the old dead-end "Account Conflict" page), preserving session.accountId as canonical', async () => {
+    const stores = makeAccountStores()
+    await stores.accountStore.linkIdentity('acct-other', 'jira', MYSELF.accountId)
+    const session = makeSession({
+      // A LIVE session for a DIFFERENT, already-canonical account, freshly
+      // authenticated in THIS session — the amendment A1 proof standard.
+      accountId: 'acct-canonical',
+      identityAuthenticatedAt: Date.now(),
+      workspaces: [],
+    })
+
+    const { callback } = await signInWithJira({ session, stores })
+
+    assert.equal(callback.status, 409)
+    assert.match(callback.text, /Merge these accounts\?/, 'the shared merge offer, not the old dead-end 409')
+    assert.match(callback.text, /This Jira account/, 'identityLabel is parameterized to Jira')
+    assert.ok(session.pendingMerge, 'a pending merge offer is stored — but nothing written yet')
+    assert.strictEqual(session.pendingMerge.canonicalAccountId, 'acct-canonical', 'canonicalAccountId is session.accountId — never undefined')
+    assert.strictEqual(session.pendingMerge.mergedAccountId, 'acct-other')
+    assert.strictEqual(session.accountId, 'acct-canonical', 'session.accountId (the canonical id) is preserved, not cleared')
+  })
+
+  test('refuses a one-click merge and offers re-auth instead when the canonical session is LIVE but STALE', async () => {
+    const stores = makeAccountStores()
+    await stores.accountStore.linkIdentity('acct-other', 'jira', MYSELF.accountId)
+    const session = makeSession({
+      accountId: 'acct-canonical',
+      // Well outside the 10-minute fresh-auth window.
+      identityAuthenticatedAt: Date.now() - 60 * 60 * 1000,
+      workspaces: [],
+    })
+
+    const { callback } = await signInWithJira({ session, stores })
+
+    assert.equal(callback.status, 409)
+    assert.match(callback.text, /Sign in again to confirm/)
+    assert.strictEqual(session.pendingMerge, undefined, 'no pending merge is offered when the canonical side is not fresh')
+  })
+
+  // Credential-write witness (paired with github-auth.test.js's "writes NO
+  // owner credential" witness): Jira's rotating refresh token IS threaded
+  // into the offer (the closure-scope `refreshToken` completeJiraNewLogin
+  // already holds), so a confirmed merge must persist it durably, exactly as
+  // `persistRefresh` would have on the non-conflict path.
+  test('Jira confirm-to-completion persists the arriving identity\'s rotating refresh token under the CANONICAL account (LIN-2304 finding 1, paired witness)', async () => {
+    const dbDir = mkdtempSync(join(tmpdir(), 'lin-2304-jira-merge-'))
+    const dbClient = new MangoClient(dbDir)
+    await dbClient.connect()
+    try {
+      const db = dbClient.db('acct')
+      const accountStore = new AccountStore({ collection: db.collection('accounts') })
+      const accountWorkspaceStore = new AccountWorkspaceStore({ collection: db.collection('account-workspaces') })
+      const canonicalAccount = await accountStore.createAccount()
+      const otherAccount = await accountStore.createAccount()
+      await accountStore.linkIdentity(otherAccount._id, 'jira', MYSELF.accountId, {})
+
+      const session = makeSession({
+        accountId: canonicalAccount._id,
+        identityAuthenticatedAt: Date.now(),
+        workspaces: [],
+      })
+      const { callback } = await signInWithJira({ session, stores: { accountStore, accountWorkspaceStore } })
+      assert.equal(callback.status, 409)
+      assert.ok(session.pendingMerge, 'sanity: the offer was built')
+      assert.strictEqual(session.pendingMerge.refreshToken, 'atlassian-refresh-ROTATING', 'sanity: the arriving refresh token was threaded into the offer')
+
+      const credentialCalls = []
+      const ownerCredentialStore = { put: async (...args) => { credentialCalls.push(args) } }
+      const mergeRouter = createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore })
+      const confirmHandler = mergeRouter.stack.find(l => l.route?.path === '/auth/merge/confirm').route.stack[0].handle
+
+      const res = { statusCode: 200, redirectedTo: null, status(c) { this.statusCode = c; return this }, send(b) { this.body = b; return this }, redirect(u) { this.redirectedTo = u; return this } }
+      await confirmHandler({ session }, res)
+
+      assert.strictEqual((await accountStore.getAccount(otherAccount._id)).mergedInto, canonicalAccount._id, 'mergeAccounts actually ran')
+      assert.strictEqual(credentialCalls.length, 1, 'Jira confirm DOES persist an owner credential — unlike GitHub\'s paired witness')
+      const [accountId, , credential] = credentialCalls[0]
+      assert.strictEqual(accountId, canonicalAccount._id)
+      assert.strictEqual(credential.refreshToken, 'atlassian-refresh-ROTATING')
+    } finally {
+      if (dbClient?.close) await dbClient.close()
+      rmSync(dbDir, { recursive: true, force: true })
+    }
   })
 })
 
