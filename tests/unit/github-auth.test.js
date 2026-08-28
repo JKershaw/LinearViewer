@@ -754,6 +754,39 @@ describe('GitHub auth routes', () => {
     assert.deepEqual(session.workspaces[0].bindings.map(b => b.scope), ['octocat/hello-world', 'octocat/another-repo']);
   });
 
+  // LIN-2300: the existing-container branch (re-adding a repo to an
+  // already-connected GitHub container) never regenerates the session — a
+  // stale, unresolvable session.accountId here would otherwise 409 every
+  // subsequent attempt for as long as the session lives.
+  test('POST link (new, existing container) clears a stale, unresolvable session.accountId on an unknown-account 409 (LIN-2300)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const existing = {
+      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho_token' } }],
+    };
+    const session = makeSession({
+      accountId: 'acct-DELETED',
+      identityAuthenticatedAt: Date.now(),
+      oauthState: 'state-abc',
+      oauthIntent: { mode: 'new' },
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [existing],
+    });
+    await handler({ body: { repo: 'octocat/another-repo' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Account Conflict/);
+    assert.equal(session.accountId, undefined, 'stale accountId cleared');
+    assert.equal(session.identityAuthenticatedAt, undefined, 'freshness stamp cleared');
+    assert.equal(session.oauthState, undefined, 'OAuth state cleared');
+    assert.equal(session.oauthIntent, undefined, 'OAuth intent cleared');
+    assert.equal(existing.bindings.length, 1, 'no new binding written');
+  });
+
   // LIN-2267 (class fix of LIN-2233's L2.1, applied to the GitHub sibling):
   // mode:'new' DOES regenerate the session (unlike add-source above), and
   // until this fix that regenerate unconditionally wiped session.accountId —
@@ -889,6 +922,41 @@ describe('GitHub auth routes', () => {
     // Neither account was mutated.
     assert.strictEqual((await accountStore.getAccount(otherAccount._id)).identities.length, 1);
     assert.strictEqual((await accountStore.getAccount(myAccount._id)).identities.length, 0);
+    // LIN-2300: a MERGEABLE conflict must NOT clear session.accountId — it is
+    // needed by the merge-confirm flow this 409 dead-ends into today (LIN-2304).
+    assert.equal(session.accountId, myAccount._id, 'session.accountId preserved on a mergeable conflict');
+  });
+
+  // LIN-2300 (sibling of LIN-2266/LIN-2267): unlike the conflict case above,
+  // an `unknown-account` 409 here has no merge candidate to preserve state
+  // for, and this branch never regenerates the session — so a stale
+  // accountId left uncleared would 409 every subsequent add-source attempt
+  // for as long as the session lives.
+  test('POST link (add-source) clears a stale, unresolvable session.accountId on an unknown-account 409 (LIN-2300)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
+    const session = makeSession({
+      accountId: 'acct-DELETED',
+      identityAuthenticatedAt: Date.now(),
+      oauthState: 'state-abc',
+      oauthIntent: { mode: 'add-source' },
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [linearWs],
+      activeWorkspaceId: 'org-1',
+    });
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Account Conflict/);
+    assert.equal(session.accountId, undefined, 'stale accountId cleared');
+    assert.equal(session.identityAuthenticatedAt, undefined, 'freshness stamp cleared');
+    assert.equal(session.oauthState, undefined, 'OAuth state cleared');
+    assert.equal(session.oauthIntent, undefined, 'OAuth intent cleared');
+    assert.equal(linearWs.bindings, undefined, 'no binding written');
   });
 
   test('POST link (add-source) binds onto the VIEWED workspace, not the active one (LIN-541)', async () => {

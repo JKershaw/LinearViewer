@@ -43,7 +43,7 @@ import {
   saveSession,
   upsertWorkspace,
 } from '../lib/workspace.js'
-import { establishAccount } from '../lib/account-session.js'
+import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import {
@@ -244,6 +244,7 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       { email: myself.emailAddress, displayName: myself.displayName }, workspace.id
     )
     if (!established.ok) {
+      if (!established.conflict) clearUnresolvableAccountSession(req.session)
       return res.status(409).send(renderErrorPage('Account Conflict', 'This Jira account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
         action: 'Go to homepage', actionUrl: '/'
       }))
@@ -521,6 +522,7 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       { email: myself.emailAddress, displayName: myself.displayName }, workspace.id
     )
     if (!established.ok) {
+      if (!established.conflict) clearUnresolvableAccountSession(req.session)
       return res.status(409).send(renderErrorPage('Account Conflict', 'This Jira account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
         action: 'Go to homepage', actionUrl: '/'
       }))
@@ -634,6 +636,7 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
         // The one 409 that runs no regenerate — the session, and the carried
         // token in it, both survive this exit unless dropped here.
         dropCarriedRefreshToken(req)
+        if (!established.conflict) clearUnresolvableAccountSession(req.session)
         return res.status(409).send(renderErrorPage('Account Conflict', 'This Jira account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
           action: 'Go to homepage', actionUrl: '/'
         }))

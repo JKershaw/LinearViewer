@@ -211,6 +211,58 @@ describe('routes/jira-auth.js', () => {
       const workspaces = await accountWorkspaceStore.listWorkspacesForAccount(firstAccountId)
       assert.deepEqual(workspaces.sort(), ['ws-1', 'ws-2'])
     })
+
+    // LIN-2300: this synchronous, no-OAuth-round-trip site had zero
+    // conflict/unknown-account coverage of either kind before this ticket.
+    // Mergeable characterization first — a real merge candidate must NOT
+    // have session.accountId cleared, matching respondToAccountConflict's
+    // (routes/auth.js) own policy.
+    test('a MERGEABLE conflict (Jira identity already linked to a DIFFERENT account) returns 409 and preserves session.accountId', async () => {
+      const { accountStore, accountWorkspaceStore } = freshAccountStores()
+      const otherAccount = await accountStore.createAccount()
+      await accountStore.linkIdentity(otherAccount._id, 'jira', 'jira-acct-1', {})
+      const myAccount = await accountStore.createAccount()
+
+      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore })
+      const handler = getHandler(router, 'post', '/auth/jira/link')
+      const res = makeRes()
+      const session = makeSession({ accountId: myAccount._id, workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
+
+      await handler({ body: { workspace: 'acme', email: 'ada@acme.com', apiToken: 'tok-123', site: SITE }, session }, res)
+
+      assert.equal(res.statusCode, 409)
+      assert.match(res.body, /Account Conflict/)
+      assert.equal(session.workspaces[0].provider, undefined, 'no binding written')
+      assert.equal(session.accountId, myAccount._id, 'session.accountId preserved on a mergeable conflict')
+    })
+
+    // Non-mergeable: session.accountId points at an account that no longer
+    // exists (deleted account, restored/repointed datastore) and no other
+    // account owns the arriving identity. This site never regenerates the
+    // session, so an uncleared stale id would 409 every retry.
+    test('an unknown-account 409 clears the stale session.accountId (LIN-2300)', async () => {
+      const { accountStore, accountWorkspaceStore } = freshAccountStores()
+      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore })
+      const handler = getHandler(router, 'post', '/auth/jira/link')
+      const res = makeRes()
+      const session = makeSession({
+        accountId: 'acct-DELETED',
+        identityAuthenticatedAt: Date.now(),
+        oauthState: 'state-abc',
+        oauthIntent: { mode: 'add-source' },
+        workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }],
+      })
+
+      await handler({ body: { workspace: 'acme', email: 'ada@acme.com', apiToken: 'tok-123', site: SITE }, session }, res)
+
+      assert.equal(res.statusCode, 409)
+      assert.match(res.body, /Account Conflict/)
+      assert.equal(session.accountId, undefined, 'stale accountId cleared')
+      assert.equal(session.identityAuthenticatedAt, undefined, 'freshness stamp cleared')
+      assert.equal(session.oauthState, undefined, 'OAuth state cleared')
+      assert.equal(session.oauthIntent, undefined, 'OAuth intent cleared')
+      assert.equal(session.workspaces[0].provider, undefined, 'no binding written')
+    })
   })
 })
 

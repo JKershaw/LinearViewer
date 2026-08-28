@@ -689,6 +689,39 @@ describe('GitHub Projects auth routes', () => {
     // Neither account was mutated.
     assert.strictEqual((await accountStore.getAccount(otherAccount._id)).identities.length, 1);
     assert.strictEqual((await accountStore.getAccount(myAccount._id)).identities.length, 0);
+    // LIN-2300: a MERGEABLE conflict must NOT clear session.accountId — it is
+    // needed by the merge-confirm flow this 409 dead-ends into today (LIN-2304).
+    assert.equal(session.accountId, myAccount._id, 'session.accountId preserved on a mergeable conflict');
+  });
+
+  // LIN-2300: add-source never regenerates the session — a stale,
+  // unresolvable session.accountId left uncleared here would 409 every
+  // subsequent add-source attempt for as long as the session lives.
+  test('POST link (add-source) clears a stale, unresolvable session.accountId on an unknown-account 409 (LIN-2300)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+    const res = makeRes();
+    const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
+    const session = makeSession({
+      accountId: 'acct-DELETED',
+      identityAuthenticatedAt: Date.now(),
+      oauthState: 'state-abc',
+      oauthIntent: { mode: 'add-source' },
+      githubHumanId: 'human-42',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [linearWs],
+      activeWorkspaceId: 'org-1',
+    });
+    await handler({ body: { board: 'octocat/5' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Account Conflict/);
+    assert.equal(session.accountId, undefined, 'stale accountId cleared');
+    assert.equal(session.identityAuthenticatedAt, undefined, 'freshness stamp cleared');
+    assert.equal(session.oauthState, undefined, 'OAuth state cleared');
+    assert.equal(session.oauthIntent, undefined, 'OAuth intent cleared');
+    assert.equal(linearWs.bindings, undefined, 'no binding written');
   });
 
   test('POST link (new) adds a board as a binding onto an EXISTING GitHub account container (coexists with Issues)', async () => {
@@ -710,6 +743,38 @@ describe('GitHub Projects auth routes', () => {
     assert.equal(session.workspaces.length, 1, 'no duplicate workspace created');
     assert.deepEqual(existing.bindings.map(b => `${b.provider}:${b.scope}`),
       ['github:octocat/hello-world', 'github-projects:octocat/5']);
+  });
+
+  // LIN-2300: the existing-container branch (mode 'new', re-adding a board
+  // onto an already-connected GitHub container) never regenerates the
+  // session either — same stale-accountId hazard as add-source above.
+  test('POST link (new, existing container) clears a stale, unresolvable session.accountId on an unknown-account 409 (LIN-2300)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+    const res = makeRes();
+    const existing = {
+      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho' } }],
+    };
+    const session = makeSession({
+      accountId: 'acct-DELETED',
+      identityAuthenticatedAt: Date.now(),
+      oauthState: 'state-abc',
+      oauthIntent: { mode: 'new' },
+      githubHumanId: 'human-42',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [existing],
+    });
+    await handler({ body: { board: 'octocat/5' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Account Conflict/);
+    assert.equal(session.accountId, undefined, 'stale accountId cleared');
+    assert.equal(session.identityAuthenticatedAt, undefined, 'freshness stamp cleared');
+    assert.equal(session.oauthState, undefined, 'OAuth state cleared');
+    assert.equal(session.oauthIntent, undefined, 'OAuth intent cleared');
+    assert.equal(existing.bindings.length, 1, 'no new binding written');
   });
 
   test('POST link (add-source) binds onto the VIEWED workspace without clobbering its primary', async () => {

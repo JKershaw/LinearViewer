@@ -194,4 +194,36 @@ describe('POST /workspace/new (local bootstrap)', () => {
     assert.strictEqual(res.statusCode, 400);
     assert.strictEqual(req.session.workspaces.length, 10, 'no workspace added on overflow');
   });
+
+  // LIN-2300 (8th sibling of LIN-2266/LIN-2267): the local identity `scope`
+  // is a freshly-random urlKey, so `findAccountByIdentity` always misses and
+  // `established.conflict` can never be truthy here — only the unknown-account
+  // shape is reachable, via a stale session.accountId that no longer resolves
+  // to a real account (deleted account, restored/repointed datastore). This
+  // route never regenerates the session, so an uncleared stale id would 500
+  // every subsequent create attempt for as long as the session lives. The
+  // existing 500/generic-message response is unchanged — only the session
+  // cleanup is new.
+  test('clears a stale, unresolvable session.accountId on the unknown-account failure, preserving the existing 500/message (LIN-2300)', async () => {
+    const store = new LocalStore({ collection: makeCollection() });
+    const handler = getHandler(createWorkspaceRoutes({ localStore: store, ...freshAccountStores() }));
+    const { req, res } = makeReqRes({
+      body: { name: 'My Notes' },
+      session: {
+        accountId: 'acct-DELETED',
+        identityAuthenticatedAt: Date.now(),
+        oauthState: 'state-abc',
+        oauthIntent: { mode: 'new' },
+      },
+    });
+
+    await handler(req, res);
+
+    assert.strictEqual(res.statusCode, 500);
+    assert.match(res.sentBody, /Could not set up your workspace account\. Please try again\./);
+    assert.strictEqual(req.session.accountId, undefined, 'stale accountId cleared');
+    assert.strictEqual(req.session.identityAuthenticatedAt, undefined, 'freshness stamp cleared');
+    assert.strictEqual(req.session.oauthState, undefined, 'OAuth state cleared');
+    assert.strictEqual(req.session.oauthIntent, undefined, 'OAuth intent cleared');
+  });
 });

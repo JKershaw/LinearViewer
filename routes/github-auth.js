@@ -24,7 +24,7 @@ import { getProvider } from '../lib/providers/registry.js'
 import { renderErrorPage, renderGitHubRepoSelectPage } from '../lib/render-pages.js'
 import { githubErrorDiagnostic } from '../lib/errors.js'
 import { getMissingGitHubConfig, getGitHubConfigProblems, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../lib/providers/github/app-auth.js'
-import { establishAccount } from '../lib/account-session.js'
+import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 import {
   upsertWorkspace,
@@ -421,6 +421,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
         // user id, never the installation account (`creds.userId`).
         const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', humanId, { login: creds.login }, workspace.id)
         if (!established.ok) {
+          if (!established.conflict) clearUnresolvableAccountSession(req.session)
           return res.status(409).send(renderErrorPage('Account Conflict', 'This GitHub account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
             action: 'Go to homepage', actionUrl: '/'
           }))
@@ -442,6 +443,7 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
       if (existing) {
         const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', humanId, { login: creds.login }, existing.id)
         if (!established.ok) {
+          if (!established.conflict) clearUnresolvableAccountSession(req.session)
           return res.status(409).send(renderErrorPage('Account Conflict', 'This GitHub account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
             action: 'Go to homepage', actionUrl: '/'
           }))
