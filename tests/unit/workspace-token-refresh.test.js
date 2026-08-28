@@ -69,7 +69,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { selectExpiredOwnerRow, selectOwnerWorkspaceToken, selectOwnerWorkspaceRow } from '../../lib/workspace-token-resolver.js';
+import { selectExpiredOwnerRow, selectOwnerWorkspaceToken, selectOwnerWorkspaceRow, selectOwnerSessionRow } from '../../lib/workspace-token-resolver.js';
 import { refreshOwnerWorkspaceToken, refreshOwnerCredential, _resetInflightForTests } from '../../lib/workspace-token-refresh.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
 import { REFRESH_STRATEGY, refreshStrategyFor } from '../../lib/refresh-strategy.js';
@@ -1304,5 +1304,66 @@ describe('resolveWorkspaceAccess refresh-on-resolve gate (LIN-2097, Block I — 
   test('I4: refreshOnResolveGate is constructed once at module scope via createRefreshOnResolveGate, mirroring rejectedCredentialRegistry\'s own single-shared-instance pattern', () => {
     assert.match(SERVER_SRC, /const refreshOnResolveGate = createRefreshOnResolveGate\(\)/);
     assert.match(SERVER_SRC, /import \{ createRefreshOnResolveGate \} from '\.\/lib\/refresh-on-resolve-gate\.js'/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block K (LIN-2278) — pure sibling selector `selectOwnerSessionRow`. Its
+// only production consumer is `headlessRefreshProvider`
+// (lib/workspace-token-refresh.js), which reads the winning row's `provider`
+// to choose the durable refresh partition. Before this fix it ranked
+// candidates on raw `expiry > bestExpiry` from a `-Infinity` seed, so a
+// sentinel expiry (Number.MAX_SAFE_INTEGER) could win permanently over a
+// fresh, finite one — the same LIN-1982/LIN-2275 defect shape Block G closed
+// for `selectOwnerWorkspaceRow`. The fix is a LOCAL three-tier rule (finite >
+// sentinel > no recorded expiry), applied with no liveness filter (unlike
+// Block G's selector), mirroring the G9/G10 shape at :1085/:1095.
+// ---------------------------------------------------------------------------
+
+describe('selectOwnerSessionRow (LIN-2278, Block K — pure selector)', () => {
+  test('K1 (G9 witness, LIN-2278): a fresh, finite Linear row wins over a co-resident sentinel (Jira Basic) row for the SAME owner — fails against the pre-fix raw-expiry ranking (sentinel is Number.MAX_SAFE_INTEGER and always wins a raw compare)', () => {
+    const SENTINEL_MS = Number.MAX_SAFE_INTEGER;
+    const sessions = [
+      sessionRow('sid-linear', 'account-A', 'acme', { accessToken: 'tok-linear-fresh', expiresAt: NOW + FAR_FUTURE_MS, provider: 'linear' }),
+      sessionRow('sid-jira', 'account-A', 'acme', { accessToken: 'tok-jira-sentinel', expiresAt: SENTINEL_MS, provider: 'jira' }),
+    ];
+    const row = selectOwnerSessionRow(sessions, 'acme', 'account-A');
+    assert.equal(row.sid, 'sid-linear', 'a finite, real expiry must outrank a sentinel one regardless of raw magnitude (LIN-1982 rule, applied here for LIN-2278)');
+  });
+
+  test('K2: a sentinel row is still selected when it is the ONLY eligible candidate — the ordinary Local/PAT/Basic-only case is unaffected, including when the row is itself expired (no liveness filter here)', () => {
+    const SENTINEL_MS = Number.MAX_SAFE_INTEGER;
+    const sessions = [
+      sessionRow('sid-1', 'account-A', 'acme', { accessToken: 'tok-local', expiresAt: SENTINEL_MS, provider: 'local' }),
+    ];
+    const row = selectOwnerSessionRow(sessions, 'acme', 'account-A');
+    assert.equal(row.sid, 'sid-1');
+  });
+
+  test('K3 (C1 pin, LIN-2278): a row with NO recorded expiry does not outrank a co-resident sentinel — "no information" stays ranked below "sentinel", so this fix introduces no new mis-pick for the case the missing-tier bug would otherwise have created', () => {
+    const SENTINEL_MS = Number.MAX_SAFE_INTEGER;
+    const sessions = [
+      sessionRow('sid-noexpiry', 'account-A', 'acme', { accessToken: 'tok-github', provider: 'github' }), // tokenExpiresAt undefined
+      sessionRow('sid-jira', 'account-A', 'acme', { accessToken: 'tok-jira-sentinel', expiresAt: SENTINEL_MS, provider: 'jira' }),
+    ];
+    const row = selectOwnerSessionRow(sessions, 'acme', 'account-A');
+    assert.equal(row.sid, 'sid-jira', 'a missing tokenExpiresAt is tier 0 ("no information"), strictly below a sentinel\'s tier 1');
+  });
+
+  test('K4: no session row for this owner/urlKey at all -> null (no-candidate path, explicit since the seed here differs from the other selectors)', () => {
+    const sessions = [
+      sessionRow('sid-1', 'account-B', 'acme', { accessToken: 'tok', expiresAt: NOW + FAR_FUTURE_MS, provider: 'linear' }),
+    ];
+    assert.equal(selectOwnerSessionRow(sessions, 'acme', 'account-A'), null);
+  });
+
+  test('K5 (N1, plan-review non-blocking note): an EXPIRED finite row still outranks a sentinel — the new tier rule has no liveness gate, so it applies to expired rows too (by design: for a refresh-partition pick, an expired finite row is precisely the refreshable one)', () => {
+    const SENTINEL_MS = Number.MAX_SAFE_INTEGER;
+    const sessions = [
+      sessionRow('sid-expired-linear', 'account-A', 'acme', { accessToken: 'tok-linear-expired', expiresAt: NOW + PAST_MS, provider: 'linear' }),
+      sessionRow('sid-jira', 'account-A', 'acme', { accessToken: 'tok-jira-sentinel', expiresAt: SENTINEL_MS, provider: 'jira' }),
+    ];
+    const row = selectOwnerSessionRow(sessions, 'acme', 'account-A');
+    assert.equal(row.sid, 'sid-expired-linear', 'finite beats sentinel even when the finite row is expired — no liveness filter in this selector');
   });
 });
