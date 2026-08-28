@@ -234,6 +234,67 @@ test.describe('KPIs page', () => {
     });
   }
 
+  test('the top-endpoints "+N more" caption is range-aware: switching to 24h rewrites a stale 30d truncation claim, and switching back restores it (LIN-2325 F1)', async ({ page }) => {
+    // The review's exact repro needs a 30d/24h split the seed fixture above
+    // can't produce (both events are seeded "now", so they always agree) —
+    // a caption computed for the 30d truncation count carrying over unchanged
+    // to the 24h view. Intercept the real server response and patch ONLY the
+    // two topEndpoints*OtherCount figures (embedded payload + the matching
+    // server-rendered caption markup) to a case where 30d and 24h disagree on
+    // DISTINCT NONZERO counts (otherCount 12 vs 5) — every other byte of the
+    // page, including the real public/kpis.js client script and the real
+    // wireRangeToggle wiring, is untouched.
+    //
+    // Both counts are nonzero (not a hide-on-toggle case) so the assertion
+    // below can only pass if `updateTopEndpointsCaption`'s otherCount > 0
+    // branch actually ran and actually rewrote the text — a `+5 more`
+    // expectation cannot arise from the seed data or from a caption that was
+    // merely hidden. Each `body.replace` is asserted to have actually
+    // matched, so a patch regex drifting out of sync with the server's
+    // markup/payload shape fails the test loudly instead of silently
+    // leaving the unpatched (and therefore falsely passing) fixture in place.
+    await page.route('**/kpis', async (route) => {
+      const response = await route.fetch();
+      let body = await response.text();
+
+      const dataPattern = /"topEndpointsOtherCount":\d+,"topEndpointsHourlyOtherCount":\d+/;
+      if (!dataPattern.test(body)) {
+        throw new Error('LIN-2325 E2E fixture: topEndpointsOtherCount/topEndpointsHourlyOtherCount pattern not found in /kpis response body — patch target missing, test would silently pass against unpatched data');
+      }
+      body = body.replace(dataPattern, '"topEndpointsOtherCount":12,"topEndpointsHourlyOtherCount":5');
+
+      const captionPattern = /<span class="kpi-chart-caption" id="chart-top-endpoints-caption"[^>]*>[^<]*<\/span>/;
+      if (!captionPattern.test(body)) {
+        throw new Error('LIN-2325 E2E fixture: chart-top-endpoints-caption span not found in /kpis response body — patch target missing, test would silently pass against unpatched markup');
+      }
+      body = body.replace(captionPattern, '<span class="kpi-chart-caption" id="chart-top-endpoints-caption">+12 more</span>');
+
+      await route.fulfill({ response, body });
+    });
+
+    await page.goto('/kpis');
+
+    const caption = page.locator('#chart-top-endpoints-caption');
+    await expect(caption).toBeVisible();
+    await expect(caption).toHaveText('+12 more');
+
+    const toggle = page.locator('.kpi-range-toggle[data-chart="chart-top-endpoints"]');
+    await toggle.locator('[data-range="24h"]').click();
+    await expect(toggle.locator('.kpi-range-btn.is-active')).toHaveText('24h');
+
+    // The disclosure must match the DISPLAYED (24h) data, not the 30d claim
+    // still sitting in the DOM before the toggle wired this up.
+    await expect(caption).toBeVisible();
+    await expect(caption).toHaveText('+5 more');
+
+    // And switching back to 30d must restore the original claim rather than
+    // leaving the 24h text stuck on screen.
+    await toggle.locator('[data-range="30d"]').click();
+    await expect(toggle.locator('.kpi-range-btn.is-active')).toHaveText('30d');
+    await expect(caption).toBeVisible();
+    await expect(caption).toHaveText('+12 more');
+  });
+
   test('renders without horizontal overflow on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/kpis');

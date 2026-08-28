@@ -718,6 +718,34 @@ describe('computeTerminalMarkedTaskCost — LIN-2253: lane-landed, no-lineage ti
     assert.equal(result.costUsd, 5, 'LIN-841\'s in-flight spend stays out of costUsd (F4 — see inFlightUsd), never folded in nor invented as a noLineage $0');
     assert.equal(result.inFlightUsd, 4, 'LIN-841\'s own lineage spend is visible via the existing in-flight disclosure, not silently dropped');
   });
+
+  test('LIN-2325 F2: noLineageCount is always a subset of unpriced, never a disjoint exclusion bucket', () => {
+    // Combine both distinct causes of `unpriced` in one fixture so the
+    // containment is a strict subset, not a coincidental equality:
+    // - two lane-landed tickets with no lineage of their own (noLineage-flagged)
+    // - one separate anchor issue with a real lineage that simply never
+    //   posted usage (unpriced, but NOT noLineage — mirrors the "unpriced
+    //   exclusion" describe block above)
+    const lane = row({
+      id: 'inv-lane', issueIdentifier: 'LIN-900', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [
+        usageEntry({ costUsd: 5, days: 1.5 }),
+        ticketMarker('LIN-900', 'done', 1.2),
+        ticketMarker('LIN-901', 'done', 1),
+        ticketMarker('LIN-902', 'done', 0.9),
+        doneMarker(0.8)
+      ]
+    });
+    const neverPriced = row({
+      id: 'inv-unpriced', issueIdentifier: 'LIN-903', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [doneMarker(0.9)] // has its own (anchor) lineage, just never priced
+    });
+    const result = computeTerminalMarkedTaskCost([lane, neverPriced], NOW);
+    assert.equal(result.noLineageCount, 2, 'the two lane-landed tickets with no lineage of their own');
+    assert.equal(result.unpriced, 3, 'the two no-lineage tickets PLUS the separately-unpriced anchor');
+    assert.ok(result.unpriced > result.noLineageCount, 'fixture must exercise both unpriced causes, not just noLineage, to make the subset check non-vacuous');
+    assert.ok(result.noLineageCount <= result.unpriced, 'noLineageCount must never exceed unpriced — it is structurally a subset');
+  });
 });
 
 describe('computeTerminalMarkedTaskCost — naming discipline', () => {

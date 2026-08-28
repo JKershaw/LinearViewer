@@ -112,7 +112,7 @@ describe('collectKpiStats', () => {
     }
     assert.strictEqual(stats.dispatchByDay.days.length, ACTIVITY_WINDOW_DAYS);
     assert.deepStrictEqual(stats.dispatchByDay.kinds, []);
-    assert.deepStrictEqual(stats.funnel, { dispatched: 0, taken: 0, reported: 0, completed: 0 });
+    assert.deepStrictEqual(stats.funnel, { dispatched: 0, taken: 0, reported: 0, completed: 0, reportedIsLowerBound: true, completedIsLowerBound: true });
     assert.deepStrictEqual(stats.stepOutcomes, { completed: 0, failed: 0, blocked: 0, other: 0 });
     assert.deepStrictEqual(stats.dispatchKinds, []);
     assert.strictEqual(stats.hourOfDay.length, 24);
@@ -135,6 +135,12 @@ describe('collectKpiStats', () => {
 
     const stats = await collectKpiStats(collections, { now: NOW });
     assert.strictEqual(stats.totals.workspaces, 4); // acme, globex, initech, hooli
+    // M is genuinely unknowable (no workspace registry read) — a basis
+    // string, not a coverage share, is the honest disclosure (LIN-2325 F4).
+    assert.strictEqual(
+      stats.totals.workspacesBasis,
+      'workspaces with retained activity or stored preferences (older, quiet workspaces may be undercounted)'
+    );
   });
 
   test('counts only unexpired sessions as active', async () => {
@@ -226,6 +232,22 @@ describe('collectKpiStats', () => {
     assert.deepStrictEqual(stats.dispatchKinds[0], { label: 'autopilot', count: 2 });
     assert.deepStrictEqual(stats.dispatchKinds[1], { label: 'implementation', count: 2 });
     assert.strictEqual(stats.dispatchKinds.length, 4);
+    // Only 4 distinct kinds, well under the top-8 cut: nothing is dropped.
+    assert.strictEqual(stats.dispatchKindsOtherCount, 0);
+  });
+
+  test('discloses the count of distinct dispatch kinds the top-8 cut drops (LIN-2325)', async () => {
+    // 11 distinct kinds — 3 more than the top-8 cut keeps. dispatchKinds
+    // itself stays a plain array (existing consumers untouched); the drop is
+    // disclosed as a sibling count, not folded into the array shape.
+    const docs = Array.from({ length: 11 }, (_, i) => (
+      { _id: `h${i}`, kind: `kind-${i}`, status: 'taken', dispatchedAt: daysAgo(1) }
+    ));
+    const collections = buildCollections({ dispatchHistory: createMockCollection(docs) });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.dispatchKinds.length, 8);
+    assert.strictEqual(stats.dispatchKindsOtherCount, 3);
   });
 
   test('buckets dispatched work by kind into daily windows', async () => {
@@ -293,7 +315,12 @@ describe('collectKpiStats', () => {
     });
 
     const stats = await collectKpiStats(collections, { now: NOW });
-    assert.deepStrictEqual(stats.funnel, { dispatched: 5, taken: 3, reported: 2, completed: 1 });
+    assert.deepStrictEqual(stats.funnel, { dispatched: 5, taken: 3, reported: 2, completed: 1, reportedIsLowerBound: true, completedIsLowerBound: true });
+    // A non-reporting agent is structurally indistinguishable from an
+    // incomplete task, so reported/completed can only ever undercount the
+    // true totals — unconditionally true today (LIN-2325 F4).
+    assert.strictEqual(stats.funnel.reportedIsLowerBound, true);
+    assert.strictEqual(stats.funnel.completedIsLowerBound, true);
   });
 
   test('computes median queue→take latency minutes for taken items', async () => {
@@ -349,6 +376,20 @@ describe('collectKpiStats', () => {
     assert.deepStrictEqual(stats.topEndpoints[0], { label: '/api/proxy/issues/:id', count: 2 });
     assert.deepStrictEqual(stats.topEndpoints[1], { label: '/api/proxy/me', count: 2 });
     assert.deepStrictEqual(stats.topEndpoints[2], { label: '/api/proxy/recommend', count: 1 });
+    // Only 3 distinct endpoints, well under the top-8 cut: nothing is dropped.
+    assert.strictEqual(stats.topEndpointsOtherCount, 0);
+  });
+
+  test('discloses the count of distinct proxy endpoints the top-8 cut drops (LIN-2325)', async () => {
+    // 10 distinct endpoints — 2 more than the top-8 cut keeps.
+    const events = Array.from({ length: 10 }, (_, i) => (
+      { endpoint: `/api/proxy/endpoint-${i}`, method: 'GET', status: 200, timestamp: daysAgo(1) }
+    ));
+    const collections = buildCollections({ proxyEvents: createMockCollection(events) });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.topEndpoints.length, 8);
+    assert.strictEqual(stats.topEndpointsOtherCount, 2);
   });
 
   test('histograms all agent actions by UTC hour', async () => {
@@ -406,6 +447,9 @@ describe('collectKpiStats', () => {
     assert.strictEqual(stats.totals.localIssues, 2);
     assert.strictEqual(stats.totals.localProjects, 1);
     assert.strictEqual(stats.totals.roadmapReports, 1);
+    // M is knowable but capped — the store's own per-workspace retention
+    // limit, named rather than hand-restated so it can't drift (LIN-2325 F4).
+    assert.strictEqual(stats.totals.roadmapReportsBasis, 'newest 20 reports per workspace');
     assert.strictEqual(stats.totals.customPrompts, 1);
   });
 
@@ -558,7 +602,7 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
     });
 
     const stats = await collectKpiStats(collections, { now: NOW });
-    assert.deepStrictEqual(stats.funnel, { dispatched: 1, taken: 1, reported: 1, completed: 1 });
+    assert.deepStrictEqual(stats.funnel, { dispatched: 1, taken: 1, reported: 1, completed: 1, reportedIsLowerBound: true, completedIsLowerBound: true });
   });
 
   test('funnel counts a windowed dispatch as reported/completed even when its report timestamp falls outside a naive 30-day cutoff', async () => {
@@ -578,7 +622,7 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
     });
 
     const stats = await collectKpiStats(collections, { now: NOW });
-    assert.deepStrictEqual(stats.funnel, { dispatched: 1, taken: 1, reported: 1, completed: 1 });
+    assert.deepStrictEqual(stats.funnel, { dispatched: 1, taken: 1, reported: 1, completed: 1, reportedIsLowerBound: true, completedIsLowerBound: true });
   });
 
   test('excludes out-of-window agent-status reports from stepOutcomes', async () => {
@@ -638,7 +682,7 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
     const stats = await collectKpiStats(collections, { now: NOW });
     assert.strictEqual(stats.totals.dispatches, 0);
     assert.deepStrictEqual(stats.dispatchKinds, []);
-    assert.deepStrictEqual(stats.funnel, { dispatched: 0, taken: 0, reported: 0, completed: 0 });
+    assert.deepStrictEqual(stats.funnel, { dispatched: 0, taken: 0, reported: 0, completed: 0, reportedIsLowerBound: true, completedIsLowerBound: true });
     const chartTotal = stats.dispatchByDay.kinds
       .reduce((sum, series) => sum + series.counts.reduce((a, b) => a + b, 0), 0);
     assert.strictEqual(chartTotal, 0);
@@ -670,6 +714,26 @@ describe('collectKpiStats — hourly proxy siblings for the 24h toggle (LIN-1846
     // The 30h-old event still lands in the 30d fields, not the hourly ones
     assert.strictEqual(stats.proxyStatus.ok, 3);
     assert.strictEqual(stats.topEndpoints[0].count, 3);
+  });
+
+  test('discloses the top-8 truncation for the 24h window independently of 30d (LIN-2325 F1 review fix)', async () => {
+    // The review's exact repro: 10 distinct endpoints over 30d (2 dropped by
+    // the top-8 cut), but only 4 of them were hit in the last 24h — a
+    // caption computed from the 30d count would falsely claim truncation in
+    // the 24h view, which has none.
+    const hoursAgo = (n) => new Date(NOW.getTime() - n * 60 * 60 * 1000);
+    const event = (endpoint, hours) => ({ endpoint, method: 'GET', status: 200, timestamp: hoursAgo(hours) });
+    const events = [
+      ...Array.from({ length: 4 }, (_, i) => event(`/api/proxy/recent-${i}`, i)), // inside 24h
+      ...Array.from({ length: 6 }, (_, i) => event(`/api/proxy/older-${i}`, 48 + i)) // inside 30d only
+    ];
+    const collections = buildCollections({ proxyEvents: createMockCollection(events) });
+
+    const stats = await collectKpiStats(collections, { now: NOW });
+    assert.strictEqual(stats.topEndpoints.length, 8, '10 distinct endpoints over 30d, cut to top 8');
+    assert.strictEqual(stats.topEndpointsOtherCount, 2, '2 of the 10 distinct 30d endpoints are dropped');
+    assert.strictEqual(stats.topEndpointsHourly.length, 4, 'only the 4 recent endpoints fall inside 24h');
+    assert.strictEqual(stats.topEndpointsHourlyOtherCount, 0, '4 distinct endpoints is well under the top-8 cut — nothing dropped in the 24h view, unlike the 30d one');
   });
 });
 
@@ -1263,7 +1327,7 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
 
     const stats = await collectKpiStats(collections, { now: NOW });
     // h1 reported (2 feedback) + h2 reported (linked step) → reported: 2
-    assert.deepStrictEqual(stats.funnel, { dispatched: 5, taken: 3, reported: 2, completed: 1 });
+    assert.deepStrictEqual(stats.funnel, { dispatched: 5, taken: 3, reported: 2, completed: 1, reportedIsLowerBound: true, completedIsLowerBound: true });
     assert.strictEqual(stats.totals.feedbackNotes, 2); // only h1's two notes, counted via $size
   });
 

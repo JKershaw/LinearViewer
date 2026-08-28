@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderKpisPage } from '../../lib/render-kpis.js';
+import { renderKpisPage, renderChartBox } from '../../lib/render-kpis.js';
 
 function buildStats(overrides = {}) {
   return {
@@ -131,6 +131,31 @@ describe('renderKpisPage', () => {
     assert.ok(html.includes('<span class="kpi-card-label">'), 'label span hook preserved');
   });
 
+  test('a stat card with no basis renders the original two-span body byte-identically (LIN-2325 regression guard)', () => {
+    // The default fixture sets no *Basis field on any total, so every card
+    // must fall back to the pre-LIN-2325 two-span form exactly.
+    const html = renderKpisPage(buildStats());
+    assert.ok(
+      html.includes('<span class="kpi-card-value">4</span><span class="kpi-card-label">workspaces</span></div>'),
+      'a falsy basis must render no third span at all'
+    );
+    assert.ok(!html.includes('kpi-card-basis'), 'no basis span anywhere when no total carries a basis string');
+  });
+
+  test('a truthy basis renders the third disclosure span beside the stat card it belongs to (LIN-2325)', () => {
+    const html = renderKpisPage(buildStats({
+      totals: {
+        workspaces: 4, users: 12, activeSessions: 3, agentActions: 1234, dispatches: 56,
+        autopilotRuns: 8, feedbackNotes: 7, aiSummaries: 89, roadmapReports: 10, customPrompts: 2,
+        localIssues: 5, localProjects: 1, activeTokens: 6,
+        workspacesBasis: 'workspaces with retained activity or stored preferences',
+        roadmapReportsBasis: 'newest 20 reports per workspace'
+      }
+    }));
+    assert.ok(html.includes('<span class="kpi-card-basis">workspaces with retained activity or stored preferences</span>'));
+    assert.ok(html.includes('<span class="kpi-card-basis">newest 20 reports per workspace</span>'));
+  });
+
   test('chart boxes ride on the shared boxed .section primitive alongside kpi-* hooks', () => {
     const html = renderKpisPage(buildStats());
 
@@ -180,6 +205,69 @@ describe('renderKpisPage', () => {
     // Hero chart + proxy responses + top endpoints: exactly these three, and
     // no other chart (the volume-led scope decision — LIN-1846).
     assert.strictEqual(html.match(/kpi-range-toggle/g).length, 3);
+  });
+
+  test('omits the truncation caption on dispatch-kinds when nothing was dropped, but always renders a (hidden) captioned slot for the range-toggled top-endpoints chart (LIN-2325 F1/F4)', () => {
+    // chart-funnel always carries its own unconditional caption (see below),
+    // so scope the assertion to the two top-8 chart titles specifically
+    // rather than the whole page. Unlike dispatch-kinds (no range toggle),
+    // top-endpoints is range-toggled, so its caption slot is always present
+    // — id'd, so the client can rewrite it per view — even when the active
+    // (30d) view has nothing to disclose (LIN-2325 F1 review fix).
+    const html = renderKpisPage(buildStats({ dispatchKindsOtherCount: 0, topEndpointsOtherCount: 0 }));
+    assert.ok(html.includes('<span class="kpi-tree-glyph">├─</span> dispatch kinds · 30d</span></h3>'), 'no caption span after the dispatch-kinds title');
+    assert.ok(html.includes('<span class="kpi-tree-glyph">├─</span> top proxy endpoints · 30d</span><span class="kpi-chart-caption" id="chart-top-endpoints-caption" style="display:none"></span><span class="kpi-range-toggle"'), 'top-endpoints caption slot present but hidden when otherCount is 0');
+  });
+
+  test('renders "+N more" captions on dispatch-kinds/top-endpoints charts when the top-8 cut drops values (LIN-2325 F4)', () => {
+    const html = renderKpisPage(buildStats({ dispatchKindsOtherCount: 3, topEndpointsOtherCount: 2 }));
+    // The caption lives in the TITLE area (emptyUnless() replaces `body`
+    // wholesale, which would destroy a caption living there instead).
+    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> dispatch kinds · 30d</span><span class="kpi-chart-caption">+3 more</span>'));
+    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> top proxy endpoints · 30d</span><span class="kpi-chart-caption" id="chart-top-endpoints-caption">+2 more</span>'));
+  });
+
+  test('the top-endpoints caption is range-aware: the 24h view does not inherit the 30d truncation count (LIN-2325 F1)', () => {
+    // Regression guard for the review's exact repro: 30d has more than 8
+    // distinct endpoints (truncated), but 24h has 8 or fewer (nothing
+    // dropped in the narrower window) — the two counts must be able to
+    // disagree, and each must be independently available to the renderer.
+    const html = renderKpisPage(buildStats({ topEndpointsOtherCount: 4, topEndpointsHourlyOtherCount: 0 }));
+    assert.ok(html.includes('<span class="kpi-chart-caption" id="chart-top-endpoints-caption">+4 more</span>'), 'initial (30d) view discloses its own truncation');
+    // The 24h count is published in the embedded payload (asserted below)
+    // for the client-side range toggle to read; wireRangeToggle's caption
+    // rewrite itself is a client-side interaction, verified in
+    // tests/e2e/kpis.spec.js, not here (node:test cannot execute browser JS).
+    assert.ok(html.includes('"topEndpointsHourlyOtherCount":0'), 'the 24h count must be published so the toggle can rewrite the caption honestly');
+  });
+
+  test('renders the funnel lower-bound caption unconditionally (LIN-2325 F4)', () => {
+    // A non-reporting agent is structurally indistinguishable from an
+    // incomplete task, so the caveat holds regardless of the funnel's own
+    // counts — no *OtherCount gate, unlike the top-list captions above.
+    const html = renderKpisPage(buildStats());
+    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> work funnel · 30d</span><span class="kpi-chart-caption">reported/completed are lower bounds</span>'));
+  });
+
+  test('renderChartBox rejects a static caption on a range-toggled chart with no dynamicCaption (LIN-2325 close-out ledger item 3)', () => {
+    // A static `caption` computed for one range (e.g. 30d) is only true of
+    // that range — the exact F1 class this ticket exists to close. The
+    // honest fixes are a `dynamicCaption` updater or dropping the caption;
+    // do NOT auto-upgrade to dynamicCaption here, since that would render
+    // the slot with no client updater wired, leaving the stale-claim risk
+    // intact under a different name.
+    assert.throws(() => {
+      renderChartBox('chart-example', 'example chart', { ranges: ['30d', '24h'], caption: '+3 more' });
+    }, /static caption/i);
+  });
+
+  test('renderChartBox permits a static caption on a non-toggled chart, and a dynamicCaption on a toggled chart with no static caption', () => {
+    assert.doesNotThrow(() => {
+      renderChartBox('chart-example', 'example chart', { caption: '+3 more' });
+    });
+    assert.doesNotThrow(() => {
+      renderChartBox('chart-example', 'example chart', { ranges: ['30d', '24h'], dynamicCaption: true });
+    });
   });
 
   test('titles the newly-windowed charts honestly (LIN-1846)', () => {
@@ -282,6 +370,19 @@ describe('renderKpisPage', () => {
       vanity: { busiestDay: null, readsPerWrite: null, medianQueueToTakeMinutes: 150, dbBackend: null }
     }));
     assert.ok(html.includes('median queue→take latency: <strong>2.5h</strong>'));
+  });
+
+  test('the subtitle discloses the real age of generatedAt instead of a false cache-TTL claim (LIN-2325 F3)', () => {
+    // server.js's SWR cache can serve an unboundedly stale snapshot on a
+    // repeated refresh failure, so "cached for 60s" was a claim the serving
+    // mechanism does not guarantee. The subtitle must render the actual age
+    // of stats.generatedAt instead, reusing formatRelativeTime (lib/render.js)
+    // rather than a fourth duplicate formatter.
+    const html = renderKpisPage(buildStats({
+      generatedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString() // 5 minutes ago
+    }));
+    assert.ok(!html.includes('cached for 60s'), 'the false TTL claim must be gone');
+    assert.ok(html.includes('collected 5m ago'), 'the subtitle must reflect the real age');
   });
 
   test('omits empty vanity stats when there is no activity', () => {
@@ -493,7 +594,27 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     // story that DOES cover whole-lineage capture loss, unlike
     // pricedLineageShare — so a reader of "unknown harness 100%" can see the
     // N it is a share of, not just the bare ratio.
-    assert.ok(html.includes('<span class="kpi-cost-sample">14 terminal-marked issues · 3 unpriced (excluded)</span>'));
+    assert.ok(html.includes('<span class="kpi-cost-sample">14 terminal-marked issues · 3 unpriced (excluded), of which 0 never observed (no lineage)</span>'));
+  });
+
+  test('renders noLineageCount so lane-landed issues that were never observed are distinguished from pricing exclusions (LIN-2325 F1)', () => {
+    // The compute layer (lib/terminal-marked-task-cost.js, LIN-2253) already
+    // emits noLineageCount and publishes it in the embedded __KPI_DATA__
+    // payload; this card is the one place that must actually render it, so a
+    // public reader can tell "never observed" apart from "unpriced".
+    // noLineageCount is always a subset of unpriced (lib/terminal-marked-task-cost.js) —
+    // 8 unpriced, 7 of which were never observed at all; unpriced > noLineageCount so the
+    // fixture also exercises the "unpriced but had a lineage" remainder (LIN-2325 F2).
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 10, unpriced: 8, noLineageCount: 7, costUsd: 176.4,
+        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
+        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
+        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
+        pricedLineageShare: 0.8, attributableLineageShare: 0.95
+      }
+    }));
+    assert.ok(html.includes('<span class="kpi-cost-sample">10 terminal-marked issues · 8 unpriced (excluded), of which 7 never observed (no lineage)</span>'));
   });
 
   test('captureRateShare (LIN-1959) renders beside pricedLineageShare and discloses the capture loss pricedLineageShare cannot see', () => {

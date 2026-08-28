@@ -274,8 +274,28 @@
     };
   }
   const endpoints = data.topEndpoints || [];
-  const endpointViews = { '30d': endpointView(endpoints) };
-  if (data.topEndpointsHourly) endpointViews['24h'] = endpointView(data.topEndpointsHourly);
+  // otherCount rides beside each view's labels/data so the range toggle can
+  // keep the "+N more" truncation caption honest for whichever window is
+  // actually showing, rather than leaving the 30d count on screen after a
+  // switch to 24h (LIN-2325 F1 review fix).
+  const endpointViews = { '30d': Object.assign(endpointView(endpoints), { otherCount: data.topEndpointsOtherCount || 0 }) };
+  if (data.topEndpointsHourly) {
+    endpointViews['24h'] = Object.assign(endpointView(data.topEndpointsHourly), { otherCount: data.topEndpointsHourlyOtherCount || 0 });
+  }
+  // Keeps the server-rendered #chart-top-endpoints-caption span (always
+  // present, hidden via inline style when the count is 0 — see
+  // renderChartBox's dynamicCaption option) in sync with whichever view the
+  // toggle just applied.
+  function updateTopEndpointsCaption(otherCount) {
+    const captionEl = document.getElementById('chart-top-endpoints-caption');
+    if (!captionEl) return;
+    if (otherCount > 0) {
+      captionEl.textContent = '+' + otherCount.toLocaleString('en-US') + ' more';
+      captionEl.style.display = '';
+    } else {
+      captionEl.style.display = 'none';
+    }
+  }
   if (!emptyUnless('chart-top-endpoints', endpoints.length)) {
     const topEndpointsChart = new Chart(document.getElementById('chart-top-endpoints'), {
       type: 'bar',
@@ -293,6 +313,7 @@
       }
     });
     wireRangeToggle('chart-top-endpoints', topEndpointsChart, endpointViews, function (chart, view) {
+      updateTopEndpointsCaption(view.otherCount);
       chart.data.labels = view.labels;
       chart.data.datasets[0].data = view.data;
     });
