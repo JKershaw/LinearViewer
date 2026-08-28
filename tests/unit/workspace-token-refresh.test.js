@@ -1367,3 +1367,24 @@ describe('selectOwnerSessionRow (LIN-2278, Block K — pure selector)', () => {
     assert.equal(row.sid, 'sid-expired-linear', 'finite beats sentinel even when the finite row is expired — no liveness filter in this selector');
   });
 });
+
+describe('selectOwnerSessionRow within-tier tie-break (LIN-2278 F2, Block K)', () => {
+  test('K6: among two SAME-tier (both finite) candidates the later raw expiry wins, whichever order they are scanned in — pins the docstring\'s "within a tier, the latest raw expiry wins" clause, which no Block K case exercised (inverting the comparison left all 8315 unit tests green)', () => {
+    const rows = {
+      soon: sessionRow('sid-soon', 'account-A', 'acme', { accessToken: 'tok-soon', expiresAt: NOW + FAR_FUTURE_MS, provider: 'linear' }),
+      later: sessionRow('sid-later', 'account-A', 'acme', { accessToken: 'tok-later', expiresAt: NOW + FAR_FUTURE_MS * 2, provider: 'jira' }),
+    };
+    assert.equal(selectOwnerSessionRow([rows.soon, rows.later], 'acme', 'account-A').sid, 'sid-later');
+    assert.equal(selectOwnerSessionRow([rows.later, rows.soon], 'acme', 'account-A').sid, 'sid-later',
+      'scan order must not decide it — the later expiry wins from either direction');
+  });
+
+  test('K7: when every candidate ties (two sentinels, same tier AND same raw expiry) the FIRST one scanned wins — pins the docstring\'s tie clause, which a `>` -> `>=` slip would silently invert to last-scanned', () => {
+    const SENTINEL_MS = Number.MAX_SAFE_INTEGER;
+    const first = sessionRow('sid-first', 'account-A', 'acme', { accessToken: 'tok-a', expiresAt: SENTINEL_MS, provider: 'jira' });
+    const second = sessionRow('sid-second', 'account-A', 'acme', { accessToken: 'tok-b', expiresAt: SENTINEL_MS, provider: 'local' });
+    assert.equal(selectOwnerSessionRow([first, second], 'acme', 'account-A').sid, 'sid-first');
+    assert.equal(selectOwnerSessionRow([second, first], 'acme', 'account-A').sid, 'sid-second',
+      'symmetric: "first scanned" is positional, so reversing the input reverses the winner');
+  });
+});
