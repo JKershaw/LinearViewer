@@ -25,6 +25,7 @@ import { renderErrorPage, renderGitHubRepoSelectPage } from '../lib/render-pages
 import { githubErrorDiagnostic } from '../lib/errors.js'
 import { getMissingGitHubConfig, getGitHubConfigProblems, withTimeout, GITHUB_VIEWER_TIMEOUT_MS } from '../lib/providers/github/app-auth.js'
 import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
+import { respondToAccountConflict } from '../lib/account-conflict.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 import {
   upsertWorkspace,
@@ -521,25 +522,23 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
 
             const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', humanId, { login: creds.login }, workspace.id)
             if (!established.ok) {
-              // LIN-2267 (review F1 + F2): this conflict branch is now reachable
-              // because accountId survives regenerate above — before it was
-              // always wiped, so establishAccount could never see a stale one.
-              // Apply the same post-conflict hygiene routes/auth.js's
-              // respondToAccountConflict already applies on its non-mergeable
-              // branch: clear the stale accountId/freshness stamp (or the SAME
-              // stale id is carried into every retry, a permanent login lockout
-              // per LIN-2266) and OAuth state, and restore session.workspaces to
-              // its pre-login snapshot (or the arriving unconfirmed workspace's
-              // live credentials leak into a session that belongs to another
-              // account).
-              delete req.session.accountId
-              delete req.session.identityAuthenticatedAt
-              delete req.session.oauthState
-              delete req.session.oauthIntent
+              // LIN-2304: route this conflict through the shared merge-offer
+              // seam instead of the old dead-end 409 — a MERGEABLE conflict
+              // (established.conflict present) needs session.accountId to
+              // survive as canonicalAccountId, so the identity-clear below is
+              // conditional on `!established.conflict` (inside
+              // respondToAccountConflict's non-mergeable arm), not
+              // unconditional as it was before. Restoring
+              // session.workspaces to its pre-login snapshot stays
+              // unconditional and at the call site (LIN-2267 F2) — the
+              // arriving unconfirmed workspace's live credentials must not
+              // leak into a session that belongs to another account, whether
+              // or not the conflict turns out to be mergeable.
               req.session.workspaces = workspacesBeforeLogin
-              return res.status(409).send(renderErrorPage('Account Conflict', 'This GitHub account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
-                action: 'Go to homepage', actionUrl: '/'
-              }))
+              return await respondToAccountConflict({
+                req, res, established, workspace, mode: 'new', returnUrlKey: workspace.urlKey,
+                identityLabel: 'GitHub', reauthUrl: '/auth/github', provider: 'github'
+              })
             }
 
             // LIN-1353 S9: regenerate() wiped the session, so rehydrate durable

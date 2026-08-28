@@ -659,6 +659,65 @@ describe('GitHub Projects auth routes', () => {
     assert.ok(!JSON.stringify(session.workspaces).includes('ghs_inst'), 'the arriving credential does not leak into the session');
   });
 
+  // === LIN-2304: mode:'new' regenerate branch reaches the shared merge offer ===
+  // Mirrors tests/unit/github-auth.test.js's equivalent coverage. GitHub App
+  // (Issues) and GitHub Projects share ONE identity provider ('github'), so
+  // the offer's identityLabel says "GitHub", never "GitHub Projects".
+
+  test('POST link (new) reaches the shared merge offer — not the old dead-end 409 — when the GitHub identity already belongs to a DIFFERENT account, preserving session.accountId as the canonical id (LIN-2304)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const canonicalAccount = await accountStore.createAccount();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
+
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+    const session = makeSession({
+      accountId: canonicalAccount._id,
+      identityAuthenticatedAt: Date.now(),
+      githubHumanId: 'human-other',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    const res = makeRes();
+    await handler({ body: { board: 'octocat/5' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Merge these accounts\?/, 'the shared merge offer, not the old dead-end "Account Conflict" page');
+    assert.match(res.body, /This GitHub account/, 'identityLabel says GitHub, not GitHub Projects — one shared identity provider');
+    assert.ok(session.pendingMerge, 'a pending merge offer is stored — but nothing written yet');
+    assert.strictEqual(session.pendingMerge.canonicalAccountId, canonicalAccount._id, 'canonicalAccountId is session.accountId — never undefined');
+    assert.strictEqual(session.pendingMerge.mergedAccountId, otherAccount._id);
+    assert.strictEqual(session.accountId, canonicalAccount._id, 'session.accountId (the canonical id) is preserved, not cleared');
+    assert.strictEqual((await accountStore.getAccount(canonicalAccount._id)).mergedInto, undefined, 'nothing written yet — offer only');
+    assert.strictEqual((await accountStore.getAccount(otherAccount._id)).mergedInto, undefined);
+  });
+
+  test('POST link (new) refuses a one-click merge and offers re-auth instead when the canonical session is LIVE but STALE (LIN-2304)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const canonicalAccount = await accountStore.createAccount();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
+
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+    const session = makeSession({
+      accountId: canonicalAccount._id,
+      identityAuthenticatedAt: Date.now() - 60 * 60 * 1000,
+      githubHumanId: 'human-other',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    const res = makeRes();
+    await handler({ body: { board: 'octocat/5' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Sign in again to confirm/);
+    assert.strictEqual(session.pendingMerge, undefined, 'no pending merge is offered when the canonical side is not fresh');
+    assert.strictEqual((await accountStore.getAccount(canonicalAccount._id)).mergedInto, undefined);
+    assert.strictEqual((await accountStore.getAccount(otherAccount._id)).mergedInto, undefined);
+  });
+
   // Mirrors tests/unit/github-auth.test.js's add-source conflict test — the
   // GitHub Projects half of the LIN-1329 review's finding 2 (the auth-route.test.js
   // note claims this file's add-source mode covers the conflict branch).

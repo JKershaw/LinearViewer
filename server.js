@@ -85,6 +85,7 @@ import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, remo
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from './lib/refresh-strategy.js'
 import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/jira/oauth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
+import { createAccountMergeRoutes } from './routes/account-merge.js'
 import { createEnsurePATSession } from './lib/pat-session.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
@@ -1074,6 +1075,12 @@ for (const provider of getAllProviders()) {
   }
   app.use(authRouter)
 }
+// LIN-2304: the merge confirm/decline routes are shared across every
+// provider's conflict-offer flow — mounted exactly ONCE here, never
+// per-provider (every provider router mounts at root too, so a per-provider
+// registration of these same paths would be shadowed by whichever router
+// mounts first).
+app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore }))
 app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
