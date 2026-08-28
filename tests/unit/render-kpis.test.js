@@ -131,6 +131,31 @@ describe('renderKpisPage', () => {
     assert.ok(html.includes('<span class="kpi-card-label">'), 'label span hook preserved');
   });
 
+  test('a stat card with no basis renders the original two-span body byte-identically (LIN-2325 regression guard)', () => {
+    // The default fixture sets no *Basis field on any total, so every card
+    // must fall back to the pre-LIN-2325 two-span form exactly.
+    const html = renderKpisPage(buildStats());
+    assert.ok(
+      html.includes('<span class="kpi-card-value">4</span><span class="kpi-card-label">workspaces</span></div>'),
+      'a falsy basis must render no third span at all'
+    );
+    assert.ok(!html.includes('kpi-card-basis'), 'no basis span anywhere when no total carries a basis string');
+  });
+
+  test('a truthy basis renders the third disclosure span beside the stat card it belongs to (LIN-2325)', () => {
+    const html = renderKpisPage(buildStats({
+      totals: {
+        workspaces: 4, users: 12, activeSessions: 3, agentActions: 1234, dispatches: 56,
+        autopilotRuns: 8, feedbackNotes: 7, aiSummaries: 89, roadmapReports: 10, customPrompts: 2,
+        localIssues: 5, localProjects: 1, activeTokens: 6,
+        workspacesBasis: 'workspaces with retained activity or stored preferences',
+        roadmapReportsBasis: 'newest 20 reports per workspace'
+      }
+    }));
+    assert.ok(html.includes('<span class="kpi-card-basis">workspaces with retained activity or stored preferences</span>'));
+    assert.ok(html.includes('<span class="kpi-card-basis">newest 20 reports per workspace</span>'));
+  });
+
   test('chart boxes ride on the shared boxed .section primitive alongside kpi-* hooks', () => {
     const html = renderKpisPage(buildStats());
 
@@ -180,6 +205,31 @@ describe('renderKpisPage', () => {
     // Hero chart + proxy responses + top endpoints: exactly these three, and
     // no other chart (the volume-led scope decision — LIN-1846).
     assert.strictEqual(html.match(/kpi-range-toggle/g).length, 3);
+  });
+
+  test('omits the truncation caption on dispatch-kinds/top-endpoints charts when nothing was dropped (LIN-2325 F4)', () => {
+    // chart-funnel always carries its own unconditional caption (see below),
+    // so scope the assertion to the two top-8 chart titles specifically
+    // rather than the whole page.
+    const html = renderKpisPage(buildStats({ dispatchKindsOtherCount: 0, topEndpointsOtherCount: 0 }));
+    assert.ok(html.includes('<span class="kpi-tree-glyph">├─</span> dispatch kinds · 30d</span></h3>'), 'no caption span after the dispatch-kinds title');
+    assert.ok(html.includes('<span class="kpi-tree-glyph">├─</span> top proxy endpoints · 30d</span><span class="kpi-range-toggle"'), 'no caption span before the top-endpoints range toggle');
+  });
+
+  test('renders "+N more" captions on dispatch-kinds/top-endpoints charts when the top-8 cut drops values (LIN-2325 F4)', () => {
+    const html = renderKpisPage(buildStats({ dispatchKindsOtherCount: 3, topEndpointsOtherCount: 2 }));
+    // The caption lives in the TITLE area (emptyUnless() replaces `body`
+    // wholesale, which would destroy a caption living there instead).
+    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> dispatch kinds · 30d</span><span class="kpi-chart-caption">+3 more</span>'));
+    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> top proxy endpoints · 30d</span><span class="kpi-chart-caption">+2 more</span>'));
+  });
+
+  test('renders the funnel lower-bound caption unconditionally (LIN-2325 F4)', () => {
+    // A non-reporting agent is structurally indistinguishable from an
+    // incomplete task, so the caveat holds regardless of the funnel's own
+    // counts — no *OtherCount gate, unlike the top-list captions above.
+    const html = renderKpisPage(buildStats());
+    assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> work funnel · 30d</span><span class="kpi-chart-caption">reported/completed are lower bounds</span>'));
   });
 
   test('titles the newly-windowed charts honestly (LIN-1846)', () => {
@@ -282,6 +332,19 @@ describe('renderKpisPage', () => {
       vanity: { busiestDay: null, readsPerWrite: null, medianQueueToTakeMinutes: 150, dbBackend: null }
     }));
     assert.ok(html.includes('median queue→take latency: <strong>2.5h</strong>'));
+  });
+
+  test('the subtitle discloses the real age of generatedAt instead of a false cache-TTL claim (LIN-2325 F3)', () => {
+    // server.js's SWR cache can serve an unboundedly stale snapshot on a
+    // repeated refresh failure, so "cached for 60s" was a claim the serving
+    // mechanism does not guarantee. The subtitle must render the actual age
+    // of stats.generatedAt instead, reusing formatRelativeTime (lib/render.js)
+    // rather than a fourth duplicate formatter.
+    const html = renderKpisPage(buildStats({
+      generatedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString() // 5 minutes ago
+    }));
+    assert.ok(!html.includes('cached for 60s'), 'the false TTL claim must be gone');
+    assert.ok(html.includes('collected 5m ago'), 'the subtitle must reflect the real age');
   });
 
   test('omits empty vanity stats when there is no activity', () => {
@@ -493,7 +556,24 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     // story that DOES cover whole-lineage capture loss, unlike
     // pricedLineageShare — so a reader of "unknown harness 100%" can see the
     // N it is a share of, not just the bare ratio.
-    assert.ok(html.includes('<span class="kpi-cost-sample">14 terminal-marked issues · 3 unpriced (excluded)</span>'));
+    assert.ok(html.includes('<span class="kpi-cost-sample">14 terminal-marked issues · 3 unpriced (excluded) · 0 never observed (no lineage)</span>'));
+  });
+
+  test('renders noLineageCount so lane-landed issues that were never observed are distinguished from pricing exclusions (LIN-2325 F1)', () => {
+    // The compute layer (lib/terminal-marked-task-cost.js, LIN-2253) already
+    // emits noLineageCount and publishes it in the embedded __KPI_DATA__
+    // payload; this card is the one place that must actually render it, so a
+    // public reader can tell "never observed" apart from "unpriced".
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 10, unpriced: 3, noLineageCount: 7, costUsd: 176.4,
+        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
+        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
+        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
+        pricedLineageShare: 0.8, attributableLineageShare: 0.95
+      }
+    }));
+    assert.ok(html.includes('<span class="kpi-cost-sample">10 terminal-marked issues · 3 unpriced (excluded) · 7 never observed (no lineage)</span>'));
   });
 
   test('captureRateShare (LIN-1959) renders beside pricedLineageShare and discloses the capture loss pricedLineageShare cannot see', () => {
