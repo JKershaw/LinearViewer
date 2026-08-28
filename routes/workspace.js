@@ -6,7 +6,7 @@ import { Router } from 'express'
 import { randomUUID } from 'node:crypto'
 import { removeWorkspace, upsertWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, URL_KEY_REGEX, linkProvider } from '../lib/workspace.js'
 import { badRequest, notFound, serverError } from '../lib/errors.js'
-import { establishAccount } from '../lib/account-session.js'
+import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
 import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
 
 /**
@@ -113,6 +113,7 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
     // across two humans the way a shared resource address would.
     const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'local', urlKey, {}, workspace.id)
     if (!established.ok) {
+      if (!established.conflict) clearUnresolvableAccountSession(req.session)
       return serverError.html(res, 'Could not set up your workspace account. Please try again.')
     }
 
