@@ -85,3 +85,84 @@ describe('fetchAll — cache-hit path with a pre-existing cache entry (LIN-1984 
     assert.deepEqual(skipped, []);
   });
 });
+
+describe('fetchAll — H12 scope guard: every /dispatch list URL carries a non-empty issueIdentifier (LIN-2043 N1)', () => {
+  let realFetch;
+  let cacheDir;
+  afterEach(() => { globalThis.fetch = realFetch; rmSync(cacheDir, { recursive: true, force: true }); });
+  beforeEach(() => {
+    realFetch = globalThis.fetch;
+    // A real cache path is required even under noCache: true —
+    // fetchIssuePlanReviewShape:196 computes join(cache, …) unconditionally,
+    // before the noCache check runs, so cache: undefined throws a TypeError
+    // from path.join and would pass this test for the wrong reason.
+    cacheDir = mkdtempSync(join(tmpdir(), 'plan-review-round-trips-cache-test-'));
+  });
+
+  test('a valid row: every /dispatch LIST url carries a non-empty issueIdentifier, and detail urls are not mistaken for list urls', async () => {
+    const calls = [];
+    globalThis.fetch = async (url) => {
+      calls.push(url);
+      const u = new URL(url);
+      if (u.pathname === '/issues/issue-1') {
+        return { ok: true, status: 200, json: async () => ({ id: 'issue-1', identifier: 'LIN-1', description: '', comments: [] }) };
+      }
+      if (u.pathname === '/dispatch') {
+        return {
+          ok: true, status: 200,
+          json: async () => ({ items: [{ id: 'row-1', kind: 'plan-review', status: 'taken', dispatchedAt: '2026-08-01T00:00:00Z', completedAt: null }] }),
+        };
+      }
+      if (u.pathname === '/dispatch/row-1') {
+        return { ok: true, status: 200, json: async () => ({ feedback: ['DONE: ok'] }) };
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    };
+
+    const row = { id: 'issue-1', identifier: 'LIN-1', state: { type: 'started' } };
+    const { issues, skipped } = await fetchAll(
+      [row],
+      { base: 'https://proxy.example', token: 'tok', cache: cacheDir, noCache: true },
+    );
+
+    assert.equal(issues.length, 1);
+    assert.deepEqual(skipped, []);
+
+    // Only /dispatch LIST urls (no further path segment) carry issueIdentifier
+    // as a query param — /dispatch/{rowId} detail urls carry no query params
+    // at all and must not be swept into this assertion (LIN-2043 review NB-3).
+    const listUrls = calls.map((c) => new URL(c)).filter((u) => u.pathname === '/dispatch');
+    assert.ok(listUrls.length > 0, 'expected at least one /dispatch list call');
+    for (const u of listUrls) {
+      assert.ok(u.searchParams.get('issueIdentifier'), `list url missing non-empty issueIdentifier: ${u}`);
+    }
+
+    const detailUrls = calls.map((c) => new URL(c)).filter((u) => u.pathname === '/dispatch/row-1');
+    assert.equal(detailUrls.length, 1);
+    assert.equal(detailUrls[0].searchParams.get('issueIdentifier'), null);
+  });
+
+  test('a falsy identifier (list row AND fetched detail both empty) rejects before any /dispatch read', async () => {
+    const calls = [];
+    globalThis.fetch = async (url) => {
+      calls.push(url);
+      const u = new URL(url);
+      if (u.pathname === '/issues/issue-2') {
+        return { ok: true, status: 200, json: async () => ({ id: 'issue-2', identifier: '', description: '', comments: [] }) };
+      }
+      throw new Error(`fetchAll should not reach /dispatch for an unscoped row: ${url}`);
+    };
+
+    const row = { id: 'issue-2', identifier: '', state: { type: 'started' } };
+    await assert.rejects(
+      () => fetchAll(
+        [row],
+        { base: 'https://proxy.example', token: 'tok', cache: cacheDir, noCache: true },
+      ),
+      /issueIdentifier/,
+    );
+
+    const dispatchCalls = calls.map((c) => new URL(c)).filter((u) => u.pathname.startsWith('/dispatch'));
+    assert.deepEqual(dispatchCalls, []);
+  });
+});

@@ -214,8 +214,12 @@ async function fetchIssuePlanReviewShape(row, { base, token, cache, noCache }, c
   // feedback" — that was the two previously-invisible skip sites.
   const shapeSkips = [];
 
+  const scopeIdentifier = detail.identifier || row.identifier;
+  if (!scopeIdentifier) {
+    throw new Error(`plan-review-round-trips: refusing an unscoped /dispatch read — row ${row.id} carries no issueIdentifier (H12 scope guard, LIN-2043)`);
+  }
   const listUrl = new URL(`${base}/dispatch`);
-  listUrl.searchParams.set('issueIdentifier', detail.identifier || row.identifier);
+  listUrl.searchParams.set('issueIdentifier', scopeIdentifier);
   listUrl.searchParams.set('limit', '250');
   const dispatchList = await getJson(listUrl.toString(), token, { tolerate: true });
   counters.fetched++;
