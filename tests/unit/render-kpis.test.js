@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderKpisPage } from '../../lib/render-kpis.js';
+import { renderKpisPage, renderChartBox } from '../../lib/render-kpis.js';
 
 function buildStats(overrides = {}) {
   return {
@@ -247,6 +247,27 @@ describe('renderKpisPage', () => {
     // counts — no *OtherCount gate, unlike the top-list captions above.
     const html = renderKpisPage(buildStats());
     assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">├─</span> work funnel · 30d</span><span class="kpi-chart-caption">reported/completed are lower bounds</span>'));
+  });
+
+  test('renderChartBox rejects a static caption on a range-toggled chart with no dynamicCaption (LIN-2325 close-out ledger item 3)', () => {
+    // A static `caption` computed for one range (e.g. 30d) is only true of
+    // that range — the exact F1 class this ticket exists to close. The
+    // honest fixes are a `dynamicCaption` updater or dropping the caption;
+    // do NOT auto-upgrade to dynamicCaption here, since that would render
+    // the slot with no client updater wired, leaving the stale-claim risk
+    // intact under a different name.
+    assert.throws(() => {
+      renderChartBox('chart-example', 'example chart', { ranges: ['30d', '24h'], caption: '+3 more' });
+    }, /static caption/i);
+  });
+
+  test('renderChartBox permits a static caption on a non-toggled chart, and a dynamicCaption on a toggled chart with no static caption', () => {
+    assert.doesNotThrow(() => {
+      renderChartBox('chart-example', 'example chart', { caption: '+3 more' });
+    });
+    assert.doesNotThrow(() => {
+      renderChartBox('chart-example', 'example chart', { ranges: ['30d', '24h'], dynamicCaption: true });
+    });
   });
 
   test('titles the newly-windowed charts honestly (LIN-1846)', () => {
