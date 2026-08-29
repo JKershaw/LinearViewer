@@ -116,7 +116,9 @@ Status: 1 issue(s) to fix before proceeding
 
 Correctly treats missing OAuth credentials as **optional**, never fatal — better guidance than README prose alone gives (README doesn't distinguish "needed to run" from "needed for OAuth login" as clearly). But independently re-running the flagged command (`npx playwright install chromium --with-deps`) after the reported blocker showed it **had already succeeded** (exit 0, 0.6s, browsers present at `~/Library/Caches/ms-playwright`) — `env:check`'s own Playwright detection (`scripts/env-check.sh:95-101`) checks `node_modules/playwright-core/.local-browsers`, `$HOME/.cache/ms-playwright` (Linux), `/ms-playwright`, and `$PLAYWRIGHT_BROWSERS_PATH`, but **never `$HOME/Library/Caches/ms-playwright`** (the actual macOS cache path). The tool perpetually reports a blocker that isn't one, on macOS, even right after its own successful setup run.
 
-**Verdict:** `npm run setup` — proceeded; `npm run env:check` — **had to guess** (false blocker required independently re-running the "fix" to discover it already worked) → **Fix-task candidate F-2** (§6). Behaviourally better than J3's manual path on credential guidance, worse on this one platform-detection bug.
+**Compounding defect, surfaced by the adversarial second-read (§8) and independently confirmed here:** `scripts/env-check.sh` contains **no `exit` statement anywhere in its 154 lines**. Running it directly against a real, uncontrived blocker confirms this: it prints `⚠️ ACTION REQUIRED` and `Status: 1 issue(s) to fix before proceeding`, and still returns exit code **0**. This is not macOS-specific — it holds on every platform, for every blocker category (missing Node/npm, missing dependencies, missing Playwright). It matters beyond the CLI: `.claude/settings.json`'s `SessionStart` hook runs `npm run setup` (which chains into `env:check` as its last step) on every Claude Code session start in this repo — including, per `simple-dispatcher`'s own "Summarise" step (R1), every dispatched worker session. A genuinely broken cold environment prints a blocker banner that nothing downstream can act on, because the process that ran it sees a clean exit and has no signal to stop on.
+
+**Verdict:** `npm run setup` — proceeded; `npm run env:check` — **had to guess** on the macOS path bug, and **hard-blocked as an enforcement mechanism** on the exit-code bug (it cannot ever gate anything that trusts its exit status rather than parsing its prose) → **Fix-task candidate F-1** (§6, scope widened after the adversarial second-read). Behaviourally better than J3's manual path on credential guidance, worse on both the platform-detection gap and, more seriously, on having no enforceable failure signal at all.
 
 ### J5 — Programmatic / agent consumer (bootstrap lane)
 Two distinct flows exist under this persona, walked separately:
@@ -165,7 +167,7 @@ Walked directly against the existing (unmodified, no `.env` present) checkout's 
 
 | ID | Finding | Class | Severity | Journey |
 |---|---|---|---|---|
-| **B-1** | `scripts/env-check.sh` never checks macOS's actual Playwright cache path (`$HOME/Library/Caches/ms-playwright`), so it reports a persistent false blocker even immediately after its own successful setup run on macOS. | Objective breakage (self-verification bug) | **High** | J4 |
+| **B-1** | `scripts/env-check.sh` has two compounding defects: (a) it never checks macOS's actual Playwright cache path (`$HOME/Library/Caches/ms-playwright`), so it reports a persistent false blocker even immediately after its own successful setup run on macOS; (b) more seriously, **it contains no `exit` statement at all** — it returns exit code 0 on every platform regardless of how many blockers it reports, so nothing that trusts its exit status (including the `.claude/settings.json` `SessionStart` hook that runs it on every session start, per R1's dispatched-worker path) can actually gate on it. (b) surfaced via the mandatory adversarial second-read (§8), not the original walk. | Objective breakage (self-verification bug; no enforcement) | **High** | J4 |
 | **B-2** | Landing page markets 5 backends (`One cockpit, whatever tracks the work`); only 3 (Linear/GitHub/Jira) have any reachable entry point. Local (needing *no* third-party account) and GitHub Projects have zero path in from the page. | Advertised-but-unreachable entry | **Medium-High** | J2 |
 | D1 | Destination divergence: `README.md:3` states a materially narrower purpose ("collapsible tree viewer") than the live landing page's execution-control-plane framing frozen as this run's destination (§1). | Destination divergence | Medium (advisory) | cross-cutting |
 | F1 | Ordering trap + circular discoverability in the standalone bootstrap-token lane: Quick Start precedes Bootstrap Tokens in `docs/proxy-integration.md` with no forward-reference, and the live generic-401 error gives no guidance toward the exchange step. Not a hard block (resolvable by reading further); the broker-delivered variant (J5a) sidesteps this entirely and is what this session itself experienced. | Ordering trap / circular discoverability | Medium (advisory) | J5b |
@@ -199,7 +201,7 @@ Walked directly against the existing (unmodified, no `.env` present) checkout's 
 
 Two tasks minted — both objective, reproducible, code-level breakage; nothing else in §4 clears the bar (friction/divergence items are advisory only and stay in this report for the next run to weigh):
 
-1. **F-1 — `scripts/env-check.sh` reports a false Playwright blocker on macOS** (B-1 above). Scope: add a macOS cache-path check (`$HOME/Library/Caches/ms-playwright`) alongside the existing Linux/env-var checks at `scripts/env-check.sh:95-101`.
+1. **F-1 — `scripts/env-check.sh` reports a false Playwright blocker on macOS, and never enforces any blocker via its exit code on any platform** (B-1 above; scope widened post adversarial-second-read). Scope: (a) add a macOS cache-path check (`$HOME/Library/Caches/ms-playwright`) alongside the existing Linux/env-var checks at `scripts/env-check.sh:95-101`; (b) add a non-zero `exit` when any blocker is reported, so the `.claude/settings.json` `SessionStart` hook (and anything else invoking this script) can actually detect and act on a broken environment instead of always seeing a clean exit.
 2. **F-2 — Landing page advertises Local and GitHub Projects backends with no reachable entry point** (B-2 above). Scope: either give Local a genuine entry CTA (it needs no OAuth) and clarify how GitHub Projects access is actually granted, or remove them from the provider list until they are.
 
 ---
@@ -211,7 +213,7 @@ Two tasks minted — both objective, reproducible, code-level breakage; nothing 
 | J1 — hosted visitor sign-in | Clean | baseline |
 | J2 — advertised vs. reachable backends | Medium-High | baseline |
 | J3 — README-literal self-hoster | Clean | baseline |
-| J4 — repo-scripts self-hoster | High (env-check bug) | baseline |
+| J4 — repo-scripts self-hoster | High (env-check macOS gap + no-enforcement exit-code bug) | baseline |
 | J5a — broker-delivered bootstrap | Clean | baseline |
 | J5b — standalone bootstrap exchange | Medium (advisory) | baseline |
 | J6 — free-tier first action | Low-Medium (advisory) | baseline |
@@ -225,17 +227,21 @@ Two tasks minted — both objective, reproducible, code-level breakage; nothing 
 
 ## 8 · Adversarial Second-Read
 
-*(completed after this report and its follow-up tasks were written — see the mandatory comment on LIN-2382 for the same three fields in the engine-readable form)*
+**Tier used:** Tier 2 — a fresh-context sub-agent with no memory of this report-writing session, given the finished report and read-only repo/live-site access but not this conversation's history.
 
-**Tier used:** Tier 2 — a fresh-context sub-agent with no memory of this report-writing session, given the finished report and repo access but not this conversation's history.
+**Question posed:** *"What is the largest item in this window (cold-start onboarding review scope) that this report missed or misfiled?"*
 
-**Question posed:** *"What is the largest item in this window that this report missed or misfiled?"*
+**Reader's answer (in full):**
 
-**Reader's answer (in full):** *(filled in below once the second-read completes)*
+> `scripts/env-check.sh` never sets a non-zero exit code, on any platform, for any blocker category (missing Node, missing npm, missing dependencies, or the Playwright check the report examined). Confirmed by running it directly: `bash scripts/env-check.sh; echo $?` → `0`, even with the "ACTION REQUIRED" block printed. The whole script has no `exit` statement at all (154 lines, checked). This matters specifically because CLAUDE.md documents it as running "automatically via Claude Code hook" — `.claude/settings.json`'s `SessionStart` hook runs `npm run setup`, which chains into `npm run env:check` as its last step. Since env-check can never fail its own exit code, the "blocker" gate this review's J4 walk relied on to characterize the cold-start self-hoster/agent experience is cosmetic text, not an enforced gate, on every platform — not just macOS. The report's B-1 (§4, top row) diagnoses only the macOS cache-path detection gap and scopes the fix-task (F-1, §6) to adding that one path. Neither the finding nor the fix addresses that a genuinely broken environment (no deps installed, no Playwright at all) would print "ACTION REQUIRED" and still exit 0 — meaning any downstream automation, hook, or agent that trusts this script's exit status rather than parsing its prose would sail through a real blocker undetected. This is squarely in-remit (same journey, same file, objective/behavioural breakage, zero capability-gating — it was sitting right there in J4's own fresh clone) and wasn't checked.
+>
+> This doesn't overturn B-1 as the top-ranked row — if anything it confirms env-check.sh is the single most consequential artifact this review touched — but it means B-1's severity write-up and F-1's fix scope both understate the actual defect.
 
-**Verdict:** *(AGREE / DISAGREE — filled in below)*
-**Differed from top finding:** *(YES / NO — filled in below)*
-**Disposition:** *(fixed in place / escalated / no change — filled in below)*
+**Verdict:** DISAGREE (narrow/targeted) — the reader looked for a bigger structural gap elsewhere (persona coverage, capability-gating calls, deferred-item routing) and found none competing with this; the disagreement is that the report's own top-ranked finding was underscoped, not that the ranking or overall structure is wrong.
+
+**Differed from top finding:** YES — the reader's answer is adjacent to but distinct from B-1 as originally written (a universal no-enforcement defect vs. a macOS-specific detection gap in the same file); it was not mentioned anywhere in the original walk log, findings table, or fix-task scope.
+
+**Disposition:** fixed in place — independently re-verified (`grep -n "exit" scripts/env-check.sh` → no matches; direct run against a real blocker → exit 0) before acting. B-1's description and F-1's fix scope (§4, §6, and the J4 walk-log entry above) were widened in this report, and the linked Linear follow-up task (LIN-2386) was updated to cover both defects, before this task was moved to Done.
 
 ---
 
