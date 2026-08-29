@@ -158,13 +158,22 @@ describe('LIN-2353 — enqueueFeedbackTriage (workspace-api.js:2862) threads pro
   });
 
   test('byte parity: a linear-shaped provider queues the same bytes as the DEFAULT_PROMPT_UI fallback', async () => {
+    // Scoped to the generatePrompt(...) BODY, same split point the GitHub test
+    // above uses — the appended proxy-context preamble is a distinct surface
+    // (LIN-2354) that now legitimately diverges here: BARE_NAME is a registered
+    // provider with no declared `ui.displayName`, so its preamble correctly
+    // renders the unresolved/neutral "currently backed by X" clause (omitted),
+    // while LINEAR_SHAPED_NAME's declared 'Linear' displayName renders it. That
+    // is this fix's OWN parity property being exercised on this fixture — a
+    // fallback shape that is not the Linear-shaped provider's identity — not a
+    // regression of THIS test's body-only claim.
     async function queuedPrompt(provider) {
       const dispatch = capturingDispatchStore();
       const app = buildApp({ provider, dispatchQueueStore: dispatch, features: { feedbackTriage: true } });
       const { status } = await submit(app, 'acme', { message: 'Something is broken' });
       assert.strictEqual(status, 201);
       assert.strictEqual(dispatch.items.length, 1);
-      return dispatch.items[0].item.prompt;
+      return dispatch.items[0].item.prompt.split('You have a workspace API proxy')[0];
     }
 
     // `ui` threaded (real-Linear-shaped) vs no `ui` at all (the pre-fix fallback).

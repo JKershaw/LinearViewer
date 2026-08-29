@@ -6,7 +6,7 @@ This guide explains how to build a consumer that interacts with a workspace's is
 
 The Proxy API allows external consumers (AI agents, automation tools, custom services) to read and write workspace data (issues, projects, comments, relations, labels, cycles) on behalf of a workspace. Users create proxy tokens from the web interface, and consumers use those tokens to query issues, create tasks, manage labels, view cycles, and more.
 
-The API is **source-neutral**: it exposes one provider-backed contract (flat shapes, no provider-specific URLs) rather than a passthrough to any single backend. Workspaces are currently backed by Linear, but consumers should code to the documented shapes here, not to Linear specifics.
+The API is **source-neutral**: it exposes one provider-backed contract (flat shapes, no provider-specific URLs) rather than a passthrough to any single backend. Workspaces may be backed by Linear, GitHub, Jira, or a Local provider; consumers should code to the documented shapes here, not to any one provider's specifics.
 
 **Key features:**
 - Token-based authentication (Bearer tokens)
@@ -1475,9 +1475,10 @@ Content-Type: application/json
 | `newString` | string | Yes | Replacement (may be empty to delete the span) |
 
 Surgical, single-occurrence edit with the same `old_string`/`new_string`
-semantics as a code editor. Matching is **normalised**: the backing store (currently Linear) stores markdown
-punctuation backslash-escaped (e.g. `\#\#`, `\*\*`), so quoting either the
-escaped bytes returned by GET or the rendered text both work.
+semantics as a code editor. Matching is **normalised**: on a Linear-backed workspace, Linear stores
+markdown punctuation backslash-escaped (e.g. `\#\#`, `\*\*`), so quoting either the
+escaped bytes returned by GET or the rendered text both work — a storage quirk specific to Linear,
+not a cross-provider guarantee.
 
 It **fails loud — never a silent no-op**:
 

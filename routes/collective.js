@@ -24,6 +24,7 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { normalizeYapChannel, nickFromWorkspaceName, randomChannelName } from '../lib/yap-client.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
+import { getProvider } from '../lib/providers/registry.js';
 import { jsonError, notFound } from '../lib/errors.js';
 import {
   buildCollectiveParticipantPrompt,
@@ -265,6 +266,12 @@ export function createCollectiveRoutes({
     const dispatched = [];
     for (const { ws, character, raw, nick, isFacilitator } of entries) {
 
+      // Declared provider identity for this seat's bound workspace (LIN-2354).
+      // `ws.provider` is the raw, uncoerced field — `getProvider` (unlike
+      // `getProviderForWorkspace`) carries no legacy-Linear fallback, so an
+      // undeclared provider correctly yields `null` here rather than "Linear".
+      const providerDisplayName = getProvider(ws.provider)?.ui?.displayName ?? null;
+
       // Build the participant/facilitator prompt for a given proxy token pair.
       // Hoisted so finalizePrompt can build it either WITHOUT a token (claude-code,
       // where the credential travels out-of-band) or WITH the inline Linear-access
@@ -281,6 +288,7 @@ export function createCollectiveRoutes({
           proxyToken: pToken,
           character,
           roster: rosterLines,
+          providerDisplayName,
         };
         return isFacilitator
           ? buildCollectiveFacilitatorPrompt({
@@ -334,6 +342,7 @@ export function createCollectiveRoutes({
                 issueIdentifier: null,
                 prompt: buildPrompt({ proxyBaseUrl: null, proxyToken: null }),
                 label: 'collective',
+                providerDisplayName,
                 harness: resolvedHarness,
                 // LIN-1376: stamp the initiating account so the exchanged token
                 // resolves under LIN-1366 owner-scoping (token ownership keys on
@@ -511,6 +520,11 @@ export function createCollectiveRoutes({
       ? pickCharacterFields(rawCharacter)
       : null;
 
+    // providerDisplayName (LIN-2354) is deliberately left unthreaded here: preview
+    // builds one representative prompt with a placeholder token, not scoped to any
+    // single bound workspace (sampleNick's fallback is illustrative only, not a
+    // real binding), so there is no single declared provider to name — the access
+    // block correctly renders the provider-neutral form.
     const prompt = buildCollectiveParticipantPrompt({
       channel,
       nick: sampleNick,

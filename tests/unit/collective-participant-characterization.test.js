@@ -99,6 +99,45 @@ describe('buildCollectiveParticipantPrompt — HEAD characterization (LIN-1047)'
   });
 });
 
+// LIN-2354: the provider-identity seam on the appended access block. The pinned
+// with-token.txt fixture above is captured with NO providerDisplayName (an
+// unresolved call) and correctly renders the neutral form; these assert the
+// three properties a residual-string count cannot express — positively that a
+// resolved identity is named, negatively that an unresolved one is never
+// guessed as Linear.
+describe('buildCollectiveParticipantPrompt — providerDisplayName (LIN-2354)', () => {
+  const WITH_TOKEN = {
+    channel: '#collective-2026-07-05',
+    nick: 'harbour',
+    topic: 'how far could these projects go together?',
+    yapBaseUrl: 'https://yap.example.com',
+    proxyBaseUrl: 'https://app.example.com/',
+    proxyToken: 'tok_abc123',
+  };
+
+  test('Linear byte-parity: providerDisplayName "Linear" reproduces the historical sentence', () => {
+    const text = buildCollectiveParticipantPrompt({ ...WITH_TOKEN, providerDisplayName: 'Linear' });
+    assert.ok(text.includes('(source-neutral; currently backed by Linear). Base:'));
+  });
+
+  test('discrimination: a non-Linear provider names itself, and no residual "Linear" survives', () => {
+    const text = buildCollectiveParticipantPrompt({ ...WITH_TOKEN, providerDisplayName: 'GitHub Issues' });
+    assert.ok(text.includes('(source-neutral; currently backed by GitHub Issues). Base:'));
+    assert.ok(!text.includes('Linear'), 'no residual "Linear" for a GitHub-backed workspace');
+  });
+
+  test('unresolved (omitted/null): the clause is dropped, not hedged', () => {
+    for (const text of [
+      buildCollectiveParticipantPrompt(WITH_TOKEN),
+      buildCollectiveParticipantPrompt({ ...WITH_TOKEN, providerDisplayName: null }),
+    ]) {
+      assert.ok(text.includes('(source-neutral). Base:'), 'drops the clause entirely, no hedge');
+      assert.ok(!text.includes('currently backed by'), 'no backing-provider claim at all when unresolved');
+      assert.ok(!text.includes('Linear'), 'never guesses Linear for an unresolved identity');
+    }
+  });
+});
+
 describe('buildCollectiveParticipantPrompt — persona seam (LIN-1047, beat 2)', () => {
   const DEFAULT_INPUT = { ...SHARED, yapBaseUrl: 'https://yap.example.com/' };
 

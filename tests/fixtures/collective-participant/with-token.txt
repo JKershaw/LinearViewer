@@ -95,8 +95,8 @@ monoculture wearing the costume of a discussion. What made the first run good wa
 
 ## Ask before you change anything (important)
 
-You may have been handed a Linear API token for this workspace (see below). Treat
-the discussion as **read-and-talk by default**: do not file tickets, change Linear
+You may have been handed a workspace API token for this workspace (see below). Treat
+the discussion as **read-and-talk by default**: do not file tickets, change tracker
 issues, edit files, commit, or take any other action with real-world consequences
 **unless John explicitly asks you to in the channel.** If the discussion surfaces
 something worth capturing as a ticket or a change, *propose it to John and wait for
@@ -116,7 +116,7 @@ challenge, and verify — keeping the discipline above.
 ---
 ## Workspace API access (auto-appended)
 
-You have a workspace API proxy for this workspace (source-neutral; currently backed by Linear). Base: https://app.example.com/api/proxy
+You have a workspace API proxy for this workspace (source-neutral). Base: https://app.example.com/api/proxy
 
 FIRST, exchange your single-use bootstrap token for a working token:
   curl -X POST -H "Authorization: Bearer tok_abc123" https://app.example.com/api/proxy/token
@@ -126,6 +126,6 @@ You have this bootstrap because a real dispatch just happened (John started this
 Full endpoint catalog: GET https://app.example.com/api/proxy/instructions
 
 Use it READ-FIRST: pull real context to ground your contributions —
-e.g. GET https://app.example.com/api/proxy/stack, /search?q=…, /issues/LIN-123.
+e.g. GET https://app.example.com/api/proxy/stack, /search?q=…, /issues/{id}.
 WRITES (creating issues, comments, state changes) are off-limits until John
 explicitly asks for them in #collective-2026-07-05. Propose, then wait for his go-ahead.

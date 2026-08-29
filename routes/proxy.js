@@ -844,7 +844,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
         // duplicated the fingerprint stamp on this branch — a reused
         // `req`-shaped object in a test harness must never read a stale
         // provider name from a prior request.
-        req.resolvedProvider = { name: localProvider.name, displayName: localProvider.ui.displayName };
+        // LIN-2354: `declared` mirrors the general branch below — this branch is
+        // always resolved (a real local-provider identity, never a fallback).
+        req.resolvedProvider = { name: localProvider.name, displayName: localProvider.ui.displayName, declared: localProvider.name };
       }
       return { provider: localProvider, token: urlKey, reason: 'ok' };
     }
@@ -878,7 +880,21 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // (no `.ui` getter) via `injectedProvider` — this must not throw for
       // those, so it falls back to the machine name, the same fallback
       // `ui.displayName` itself uses for a real provider with no override.
-      req.resolvedProvider = { name: activeProvider.name, displayName: activeProvider.ui?.displayName ?? activeProvider.name };
+      //
+      // LIN-2354: `declared` is the PRE-FALLBACK name — `providerName` as
+      // returned by `resolveWorkspaceAccess`, before `getProviderForWorkspace`
+      // applies `LEGACY_DEFAULT_PROVIDER`. Unlike `displayName` (which always
+      // names SOME provider, Linear included, once a fallback applies),
+      // `declared` is `null` exactly when nothing was actually declared for this
+      // workspace/resolution — the discriminator an identity-asserting sentence
+      // needs to distinguish "really Linear" from "unresolved, defaulted to
+      // Linear". Additive only: the sole existing reader (`graphqlErrorDetail`,
+      // below) reads `.displayName` and is unaffected.
+      req.resolvedProvider = {
+        name: activeProvider.name,
+        displayName: activeProvider.ui?.displayName ?? activeProvider.name,
+        declared: providerName ?? null
+      };
     }
     // Record WHICH credential this resolution handed out, so a later 401 from the
     // upstream can name it (see recordCredentialResolution / logEvent). Secret-safe
@@ -1399,6 +1415,23 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * `resolveProviderAccess` resolves) the wording stays provider-neutral
    * rather than guessing `'Linear'`.
    */
+
+  /**
+   * The declared provider's display name for identity-asserting prose (LIN-2354:
+   * the "currently backed by X" clause), or `null` when nothing was actually
+   * declared. Deliberately gated on `req.resolvedProvider.declared`, NOT a bare
+   * read of `.displayName` — `.displayName` always names some provider (Linear
+   * included) once `resolveProviderAccess`'s legacy fallback applies, which is
+   * exactly the "unresolved workspace reads as Linear" defect this ticket fixes.
+   * `.declared` is the pre-fallback name, `null` only when truly unresolved.
+   *
+   * @param {import('express').Request} req
+   * @returns {string|null}
+   */
+  function declaredProviderDisplayName(req) {
+    return req?.resolvedProvider?.declared ? req.resolvedProvider.displayName : null;
+  }
+
   function graphqlErrorDetail(err, req) {
     const displayName = req?.resolvedProvider?.displayName;
     if (err.name === 'TimeoutError' || err.name === 'AbortError') {
@@ -1732,10 +1765,29 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * GET /api/proxy/instructions
    * Returns agent-readable instructions for using the proxy API.
    * Authenticated so token is validated and base URL is known.
+   *
+   * PROVIDER IDENTITY (LIN-2354): this route was synchronous and zero-IO before
+   * this change — the one thing that made it the route an agent could always
+   * fetch even when a workspace's credential store was degraded. Resolving the
+   * declared provider (for the "currently backed by X" clause and the two
+   * provider-conditional notes below) adds the route's first IO and its first
+   * failure surface. The resolve is wrapped so ANY failure — thrown exception,
+   * unexpected shape — degrades to the neutral/unresolved wording, never a 5xx:
+   * this route's whole purpose is to answer, not to be the most accurate answer.
    */
-  router.get('/api/proxy/instructions', authenticateProxyToken, (req, res) => {
+  router.get('/api/proxy/instructions', authenticateProxyToken, async (req, res) => {
     const scope = req.proxyTokenScope;
     const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    let declaredDisplayName = null;
+    let isDeclaredLinear = false;
+    try {
+      await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      declaredDisplayName = declaredProviderDisplayName(req);
+      isDeclaredLinear = req.resolvedProvider?.declared === 'linear';
+    } catch {
+      // Stays neutral/unresolved — see the reliability note above.
+    }
 
     logEvent(req, '/api/proxy/instructions', 200);
 
@@ -1969,7 +2021,7 @@ POST ${baseUrl}/api/proxy/brief/{identifier}
 GET ${baseUrl}/api/proxy/issues/{identifier}/cost   (alias: /api/proxy/cost/{identifier})
   → API-equivalent USD cost for one task: joins worker dispatch usage telemetry with
     app-side (OpenRouter) LLM call-log spend attributed to this issue. Pure read, no
-    LLM call, no Linear fetch.
+    LLM call, no provider fetch.
   → {identifier} MUST be the issue identifier (e.g. "LIN-1770"), NOT a UUID — this
     route never resolves through the provider, and a UUID matches zero rows. A
     UUID-shaped {identifier} is rejected with 400.
@@ -2076,6 +2128,21 @@ GET ${baseUrl}/api/proxy/passage-runner/prompt
   → Passage Runner kickoff prompt (plain text, not JSON) — the pasteable body
     of docs/passage-runner-prompt.md. Fetch here to re-read a part mid-run.`;
 
+    // LIN-2354, Layer B: provider-conditional, never renamed. A blanket
+    // Linear->displayName rename here would assert "GitHub's NATIVE scale"
+    // (GitHub refuses "priority" outright, per the field-support note a few
+    // lines below) and "GitHub stores markdown punctuation backslash-escaped"
+    // — both false. So these two notes are shown only when the resolved
+    // provider is DECLARED Linear, and dropped (not reworded) otherwise; the
+    // provider-neutral remainder of each sentence (priorityLevel's canonical
+    // scale; the normalised-matching guarantee) stays for every provider.
+    const priorityScaleNote = isDeclaredLinear
+      ? '"priority" is Linear\'s NATIVE scale (DESCENDING urgency): 0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low. '
+      : '';
+    const markdownEscapingNote = isDeclaredLinear
+      ? ' Linear stores markdown punctuation backslash-escaped (e.g. \\#\\#, \\*\\*), so quoting either the escaped bytes or the rendered text works.'
+      : ' quoting either the stored bytes or the rendered text works.';
+
     const writeEndpoints = scope === 'readWrite' ? `
 
 ## Write Endpoints
@@ -2091,7 +2158,7 @@ short window: a repeat of the same (issue + body) returns the original comment w
 
 POST ${baseUrl}/api/proxy/issues
   Body: { "teamId": "...", "title": "...", "description": "...", "projectId": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "..." }
-  → "priority" is Linear's NATIVE scale (DESCENDING urgency): 0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low. Prefer "priorityLevel" instead: the canonical ASCENDING scale shared across every provider — 0 = unknown, 1 = lowest … 4 = highest (Linear: 4 = Urgent). Both map to the same underlying field; sending both in one request is refused 400.
+  → ${priorityScaleNote}Prefer "priorityLevel" instead: the canonical ASCENDING scale shared across every provider — 0 = unknown, 1 = lowest … 4 = highest (Linear: 4 = Urgent). Both map to the same underlying field; sending both in one request is refused 400.
   → Create a new issue; set parentId (UUID) to create as a sub-issue. Returns 201:
   → { "success": true, "issue": { /* the SAME flat shape as GET /issues/{id} (minus children/comments/relations): id, identifier, title, description, state, labels, priority, priorityLabel, priorityLevel, team, teamId, project, parent, cycle, estimate, dueDate, … */ } }
   → Optional fields your workspace's provider doesn't support are refused with 400, never silently dropped (GitHub-backed: no stateId/assigneeId/priority/priorityLevel/cycleId/parentId; Local-backed: no assigneeId/cycleId). Whatever the response DOES echo is self-verifying — it reflects the post-write state of every field the request set, so you do NOT need a follow-up GET to confirm those landed.
@@ -2112,7 +2179,7 @@ POST ${baseUrl}/api/proxy/issues/{issueId}/description/append
 
 POST ${baseUrl}/api/proxy/issues/{issueId}/description/replace
   Body: { "oldString": "...", "newString": "..." }
-  → Replace ONE occurrence of "oldString" with "newString" in the description (surgical edit). Same old_string/new_string semantics as a code editor: quote a span you copied from GET /issue/{id}. Matching is normalised — Linear stores markdown punctuation backslash-escaped (e.g. \\#\\#, \\*\\*), so quoting either the escaped bytes or the rendered text works.
+  → Replace ONE occurrence of "oldString" with "newString" in the description (surgical edit). Same old_string/new_string semantics as a code editor: quote a span you copied from GET /issue/{id}. Matching is normalised —${markdownEscapingNote}
   → Fails LOUD, never a silent no-op: 422 { "code": "NOT_FOUND" } if the span is absent, 422 { "code": "NOT_UNIQUE", "matchCount": N } if it appears more than once (quote a longer, unique span). On NOT_FOUND, re-read the description; to swap many occurrences at once, rewrite the whole body via PATCH instead.
   → Returns { "success": true, "issue": {...} }.
 
@@ -2183,7 +2250,7 @@ POST ${baseUrl}/api/proxy/dispatch
   → "model" (optional) is the EXECUTION model the runner should use to RUN this prompt — the value it passes to its own CLI (e.g. "claude --model") — NOT the server-side generation model that WRITES prompts. Use the OpenRouter naming convention: "provider/model" IDs like "anthropic/claude-opus-4.8" or "openai/gpt-5.4-mini". Treated as an opaque string (length + safety validated, no registry check) and forwarded blindly; translating it to the agent's own flag is the runner's job (Claude Code maps "anthropic/claude-opus-4.8" → "--model opus"; OpenRouter-native runners pass it through). Omit it (or null) to keep the consumer's current default (e.g. Opus). See LIN-438.
   → "harness" (optional) is the EXECUTION harness the runner should use to RUN this prompt — e.g. "claude-code" (the default) or "opencode". Like "model" it is an opaque string (length + safety validated, no registry check) and forwarded blindly; the runner owns its own harness registry and defaulting. Combine with "model" to run a specific OpenRouter-backed model through a non-default harness (e.g. "harness": "opencode", "model": "openai/gpt-5.4-mini"). Omit it (or null) to keep the consumer's own default/precedence chain — Harbour does not interpose a per-workspace default here. See LIN-1084.
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
-  → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update Linear/git); any wobble → dispatch a fresh session instead.
+  → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update the workspace/git); any wobble → dispatch a fresh session instead.
   → "force" (optional, default false) overrides a guard, so it is meaningful alongside a verb that HAS one — and ONLY such a verb (a bare "force": true with no "followUpTo", no "abort" and no "issueIdentifier" is rejected 400 "force requires followUpTo, abort, or an issueIdentifier", because there would be no guard for it to override): (1) with "followUpTo" it bypasses the active-session guard so a follow-up can resume a session wedged or sleeping in an active phase (Claude infra wobble, long-running sleep) — asserting the prior process is effectively dead (see LIN-546); (2) with a single "abort" it is the escape hatch that force-closes even a human-continued session the runner would otherwise skip (see cascade + "[skipped]" below); (3) OPERATOR RESCUE HATCH — on an issue-scoped fresh dispatch it bypasses the duplicate guard below, for a human recovering a wedged task who has confirmed the colliding dispatch is not doing the work. This is NOT the answer to a 409 you were just handed: adopt the returned "id" and watch it, as that refusal says. Mutually exclusive with "cascade" (a cascade emits its own plain, unforced aborts): "force" + "cascade" is rejected (400). The runner reads it as "item.force" off the polled/claimed item. See LIN-559/LIN-946/LIN-1656.
   → "abort" (optional, default false) requests an abort/cancel/close of an existing session instead of running a prompt: set "abort": true and "abortTo" to the "id" of the dispatch whose session should be cancelled. "prompt" is NOT required for an abort, and the consumer flips the running session to a terminal cancelled state. The abort item's OWN "target" must be poll-eligible (cli/web/dash) — eligibility is the abort item's target, NOT the substrate of the session being aborted (so you can abort a "dash" session with a "cli" abort item). Mutually exclusive with "followUpTo". See LIN-743.
   → "abortTo" (required when "abort" is true) is the dispatch id (UUID) of the session to abort. Stored + forwarded blindly; the consumer owns session liveness.
@@ -2257,7 +2324,7 @@ When posting bodies with markdown (backticks, quotes, special chars), use a file
 
     const text = `# Workspace API Proxy
 
-Use this proxy to read and modify the issues, projects, and related data of the workspace that issued your token. The API is source-neutral — one contract across providers; this workspace is currently backed by Linear.
+Use this proxy to read and modify the issues, projects, and related data of the workspace that issued your token. The API is source-neutral — one contract across providers${declaredDisplayName ? `; this workspace is currently backed by ${declaredDisplayName}` : ''}.
 
 ## Authentication
 
@@ -5928,7 +5995,13 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
               prompt: kickoff,
               label: 'kickoff-bootstrap',
               harness: resolvedHarness,
-              createdBy: req.proxyCreatedBy || null
+              createdBy: req.proxyCreatedBy || null,
+              // LIN-2354: only resolved when this was a SCOPED kickoff (the
+              // `if (issueIdentifier)` block above called resolveProviderAccess,
+              // stamping req.resolvedProvider); a goal-only kickoff resolves no
+              // provider and correctly stays neutral rather than triggering a
+              // fresh resolve just to fill this sentence.
+              providerDisplayName: declaredProviderDisplayName(req)
             });
           }
           return { prompt: kickoff, bootstrapToken: null };
@@ -6283,7 +6356,12 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
               prompt,
               label: 'dispatch-bootstrap',
               harness: resolvedHarness,
-              createdBy: req.proxyCreatedBy || null
+              createdBy: req.proxyCreatedBy || null,
+              // LIN-2354: only resolved when the dangling-referent guard above ran
+              // resolveProviderAccess (`!isAbort && issueIdentifier`), stamping
+              // req.resolvedProvider — an unscoped dispatch resolves no provider
+              // and correctly stays neutral rather than triggering a fresh resolve.
+              providerDisplayName: declaredProviderDisplayName(req)
             });
           }
           // LIN-1429: the prose block may be suppressed for a warm follow-up
@@ -6562,7 +6640,11 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
                   prompt: generated.prompt,
                   label: 'dispatch-bootstrap',
                   harness: resolvedHarness,
-                  createdBy: req.proxyCreatedBy || null
+                  createdBy: req.proxyCreatedBy || null,
+                  // LIN-2354: resolveProviderAccess runs unconditionally near the
+                  // top of this route, so req.resolvedProvider is always stamped
+                  // here.
+                  providerDisplayName: declaredProviderDisplayName(req)
                 });
               }
               return { prompt: generated.prompt, bootstrapToken: null };
@@ -6748,7 +6830,11 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
                 prompt: rec.prompt,
                 label: 'dispatch-bootstrap',
                 harness: resolvedHarness,
-                createdBy: req.proxyCreatedBy || null
+                createdBy: req.proxyCreatedBy || null,
+                // LIN-2354: resolveProviderAccess runs unconditionally near the
+                // top of this route, so req.resolvedProvider is always stamped
+                // here.
+                providerDisplayName: declaredProviderDisplayName(req)
               });
             }
             return { prompt: rec.prompt, bootstrapToken: null };

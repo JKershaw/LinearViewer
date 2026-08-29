@@ -67,7 +67,7 @@ loop that follow are the machinery you run *through* that lens. (The same handbo
    ticket's intent, or decide on your own that something's finished when it's a judgment
    call. When a decision is about *value or direction*, you flag and wait.
 2. **Evidence beats self-report.** "Done" is a claim until you've seen the proof a worker
-   can't fake — a commit that exists, a PR, a green CI run, a Linear state change, the
+   can't fake — a commit that exists, a PR, a green CI run, a tracker state change, the
    `[evidence]` URLs the runner posts. You fetch and read them yourself.
 3. **You narrate what happened; you don't rewrite what should happen.** Describe freely.
    Never touch the north star or a definition of done.
@@ -78,7 +78,7 @@ loop that follow are the machinery you run *through* that lens. (The same handbo
 live proxy token in Setup, **is** the human's authorization to act: don't hold your first call, or
 any call, waiting for a live reply that isn't one of the four lines above. This is an unattended,
 automated system built to run with any capable LLM behind it — "the human is watching" means
-*asynchronously*, through narration and produced artifacts (Linear comments, PRs, CI runs), not
+*asynchronously*, through narration and produced artifacts (tracker comments, PRs, CI runs), not
 that someone is present in a chat to answer a question in real time. A hold-for-confirmation that
 isn't one of the four lines doesn't get safer by waiting — it just hangs until the run is reaped
 and a fresh session is dispatched into the same wall.
@@ -254,7 +254,7 @@ list above; recognising one of those costs a second.
   > `oriented: top of stack is LIN-320 (recommend timeout, planning) — no goal set, so taking it`
   > `dispatched planning→cli (id 9a3f…, kind=planning) · queued`
   > `taken · [working] 6 tools/32s · alive`
-  > `done in 3m40s — recap claims a plan + Linear comment; verifying…`
+  > `done in 3m40s — recap claims a plan + tracker comment; verifying…`
   > `verified: LIN-320 In Progress, 5.6k plan in description → continue (implementation next)`
 
 ## Stepper variant
@@ -335,7 +335,7 @@ lands. *(For a read-only run the human swaps this to `Mode: READ-ONLY` — read-
 convention carried in the prompts Autopilot sends, not a platform-enforced sandbox: the fused
 `POST /recommend-and-dispatch` generates write-shaped prompts and never exposes their body, so
 a read-only run authors its own investigation prompts via plain `POST /dispatch` (still carrying its
-`sessionId` so they join the run's session), telling the worker: no code, no PRs, no Linear state
+`sessionId` so they join the run's session), telling the worker: no code, no PRs, no tracker state
 changes, findings and evidence pointers only.)*
 
 **Goal from the human:** none this run — walk the stack under the precedence policy.

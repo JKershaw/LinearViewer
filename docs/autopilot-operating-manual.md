@@ -151,7 +151,7 @@ the named issue with no descent and skips the engine entirely.
 
 Use it the way you'd use any override: rarely, and only on a *demonstrable* miss. The bar is "the engine's
 verb is clearly wrong and I can say why," not "I'd have chosen differently." Every override is recorded
-so the heuristic can be improved — so when you reach for it, leave a one-line note (a Linear comment) on
+so the heuristic can be improved — so when you reach for it, leave a one-line note (a tracker comment) on
 *why* the engine's pick was wrong; that note is the raw material for closing the 10% gap. If you find
 yourself overriding the same task repeatedly, that's no longer a verb wobble — it's a task problem, and
 the move is to pull up and flag it, not to keep pinning verbs.
@@ -177,7 +177,7 @@ workspace). The fit is narrow on purpose: a clean session holds the context a fr
 rebuild, so a small confirmatory nudge is cheaper than a re-dispatch. Good uses are tight and
 self-suggesting — *"confirm CI went green and report the run URL"* (or, in a repo with no CI, *"confirm
 the no-CI substitute run and record its result"* — never assume CI exists), *"the work's in; now update
-Linear and push the branch"*.
+the tracker and push the branch"*.
 
 This is an exception, not a new default, and it does **not** soften the rule that you can't coach the
 worker. The bar is *flawless and self-suggesting* — **any** wobble, ambiguity, or "while you're in
