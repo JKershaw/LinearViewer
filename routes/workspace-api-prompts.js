@@ -9,6 +9,8 @@
  */
 import { Router } from 'express';
 import { badRequest, jsonError, notFound } from '../lib/errors.js';
+import { getProviderForWorkspace } from '../lib/providers/registry.js';
+import { EMPTY_PROVIDER_CONTEXT } from '../lib/prompt-trace-store.js';
 
 /**
  * @param {Object} deps
@@ -28,13 +30,18 @@ export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, custom
    */
   router.get('/workspace/:urlKey/api/prompt-traces', workspaceFromUrl, async (req, res) => {
     if (!promptTraceStore) {
-      return res.json({ items: [], total: 0 });
+      return res.json({ items: [], total: 0, providerContext: EMPTY_PROVIDER_CONTEXT });
     }
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
       const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+      // Sequential, not Promise.all: listTraces must run (and throw, if it's
+      // going to) before summarizeProviderContext is ever called, so the
+      // store-throw path below stays byte-identical to its pre-LIN-2357 body.
       const result = await promptTraceStore.listTraces(req.workspace.urlKey, { limit, offset });
-      res.json(result);
+      const expectedUi = getProviderForWorkspace(req.workspace)?.ui || null;
+      const providerContext = await promptTraceStore.summarizeProviderContext(req.workspace.urlKey, { expectedUi });
+      res.json({ ...result, providerContext });
     } catch (err) {
       console.error('Error listing prompt traces:', err);
       res.status(500).json({ error: 'Failed to list prompt traces' });

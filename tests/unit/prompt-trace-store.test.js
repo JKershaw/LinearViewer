@@ -10,7 +10,11 @@
  */
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert';
-import { PromptTraceStore } from '../../lib/prompt-trace-store.js';
+import { PromptTraceStore, providerContextVerdict, EMPTY_PROVIDER_CONTEXT } from '../../lib/prompt-trace-store.js';
+import { resolvePromptUi } from '../../lib/prompt-formatters.js';
+
+const GITHUB_UI = { write: true, comments: false, estimates: true, subtasks: false, displayName: 'GitHub Issues' };
+const LINEAR_UI = { write: true, comments: true, estimates: true, subtasks: true, displayName: 'Linear' };
 
 // Minimal in-memory mock of the MongoDB/MangoDB collection surface (same shape as
 // the llm-call-log test mock — supports $gt (list) and $lt (cleanup) on expiresAt).
@@ -228,5 +232,138 @@ describe('PromptTraceStore.clear', () => {
     assert.strictEqual(removed, 1);
     assert.strictEqual((await store.listTraces('acme')).total, 0);
     assert.strictEqual((await store.listTraces('other')).total, 1);
+  });
+});
+
+describe('providerContextVerdict (LIN-2357, pure fold)', () => {
+  test('a null providerUi on a Linear workspace is benign — identical to the real provider', () => {
+    const traces = [{ providerUi: null, featureFlags: {}, timestamp: new Date() }];
+    const result = providerContextVerdict(traces, LINEAR_UI);
+    assert.strictEqual(result.untracedContext, 1);
+    assert.strictEqual(result.divergent, 0);
+    assert.strictEqual(result.benign, 1);
+  });
+
+  test('a null providerUi on a GitHub workspace is divergent — regression signal', () => {
+    const traces = [{ providerUi: null, featureFlags: {}, timestamp: new Date() }];
+    const result = providerContextVerdict(traces, GITHUB_UI);
+    assert.strictEqual(result.untracedContext, 1);
+    assert.strictEqual(result.divergent, 1);
+    assert.strictEqual(result.benign, 0);
+  });
+
+  test('mixed old-null and new-with-ui traces: only nulls count toward untracedContext/divergent/benign', () => {
+    const traces = [
+      { providerUi: null, featureFlags: {}, timestamp: new Date('2026-08-01') },
+      { providerUi: GITHUB_UI, featureFlags: {}, timestamp: new Date('2026-08-29') },
+    ];
+    const result = providerContextVerdict(traces, GITHUB_UI);
+    assert.strictEqual(result.traces, 2);
+    assert.strictEqual(result.untracedContext, 1);
+    assert.strictEqual(result.divergent, 1);
+    assert.strictEqual(result.benign, 0);
+  });
+
+  test('newestUntracedContextAt picks the max timestamp among null-providerUi traces only', () => {
+    const traces = [
+      { providerUi: null, featureFlags: {}, timestamp: new Date('2026-08-01T00:00:00.000Z') },
+      { providerUi: null, featureFlags: {}, timestamp: new Date('2026-08-15T00:00:00.000Z') },
+      { providerUi: GITHUB_UI, featureFlags: {}, timestamp: new Date('2026-08-29T00:00:00.000Z') },
+    ];
+    const result = providerContextVerdict(traces, GITHUB_UI);
+    assert.strictEqual(result.newestUntracedContextAt, '2026-08-15T00:00:00.000Z');
+  });
+
+  test('no untraced-context traces ⇒ newestUntracedContextAt is null', () => {
+    const traces = [{ providerUi: GITHUB_UI, featureFlags: {}, timestamp: new Date() }];
+    const result = providerContextVerdict(traces, GITHUB_UI);
+    assert.strictEqual(result.newestUntracedContextAt, null);
+  });
+
+  test('a trace with featureFlags: null does not throw (falls back to {})', () => {
+    const traces = [{ providerUi: null, featureFlags: null, timestamp: new Date() }];
+    assert.doesNotThrow(() => providerContextVerdict(traces, GITHUB_UI));
+  });
+
+  test('empty input ⇒ all zero counts, no throw', () => {
+    const result = providerContextVerdict([], LINEAR_UI);
+    assert.deepStrictEqual(result, { traces: 0, untracedContext: 0, divergent: 0, benign: 0, newestUntracedContextAt: null });
+  });
+
+  test('the verdict is derived from resolvePromptUi, not restated — a flag that changes divergence outcome flips the fold too', () => {
+    // includeTracker is gated on write + the linearMcp flag (resolvePromptUi):
+    // with linearMcp:false, null (write:true) and github (write:true) both
+    // resolve includeTracker:false, but comments/subtasks/displayName still
+    // differ for github, so the trace stays divergent either way — proving
+    // the fold reads resolvePromptUi's full output, not a single field.
+    const traces = [{ providerUi: null, featureFlags: { linearMcp: false }, timestamp: new Date() }];
+    const withGithub = providerContextVerdict(traces, GITHUB_UI);
+    assert.strictEqual(withGithub.divergent, 1);
+    // Sanity: resolvePromptUi really does change shape under the flag, so this
+    // test is not accidentally passing regardless of featureFlags handling.
+    assert.notDeepStrictEqual(
+      resolvePromptUi({ linearMcp: false }, null),
+      resolvePromptUi({}, null)
+    );
+  });
+});
+
+describe('PromptTraceStore.summarizeProviderContext', () => {
+  let store;
+  let collection;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new PromptTraceStore({ collection });
+  });
+
+  test('no collection ⇒ EMPTY_PROVIDER_CONTEXT', async () => {
+    const result = await new PromptTraceStore({}).summarizeProviderContext('acme', { expectedUi: GITHUB_UI });
+    assert.deepStrictEqual(result, EMPTY_PROVIDER_CONTEXT);
+  });
+
+  test('missing urlKey ⇒ EMPTY_PROVIDER_CONTEXT', async () => {
+    const result = await store.summarizeProviderContext(undefined, { expectedUi: GITHUB_UI });
+    assert.deepStrictEqual(result, EMPTY_PROVIDER_CONTEXT);
+  });
+
+  test('reads the whole non-expired window, not a page — and names the expected provider', async () => {
+    await store.record({ urlKey: 'acme', feature: 'recommend', providerUi: null, featureFlags: {} });
+    await store.record({ urlKey: 'acme', feature: 'recommend', providerUi: null, featureFlags: {} });
+    await store.record({ urlKey: 'acme', feature: 'recommend', providerUi: GITHUB_UI, featureFlags: {} });
+    await store.record({ urlKey: 'other', feature: 'recommend', providerUi: null, featureFlags: {} });
+
+    const result = await store.summarizeProviderContext('acme', { expectedUi: GITHUB_UI });
+    assert.strictEqual(result.traces, 3);
+    assert.strictEqual(result.untracedContext, 2);
+    assert.strictEqual(result.divergent, 2);
+    assert.strictEqual(result.benign, 0);
+    assert.strictEqual(result.expectedDisplayName, 'GitHub Issues');
+    assert.strictEqual(result.basis, EMPTY_PROVIDER_CONTEXT.basis);
+  });
+
+  test('a benign-only Linear workspace reports zero divergent', async () => {
+    await store.record({ urlKey: 'acme', feature: 'recommend', providerUi: null, featureFlags: {} });
+    const result = await store.summarizeProviderContext('acme', { expectedUi: LINEAR_UI });
+    assert.strictEqual(result.untracedContext, 1);
+    assert.strictEqual(result.divergent, 0);
+    assert.strictEqual(result.benign, 1);
+  });
+
+  test('excludes expired traces from the summary (TTL window, same as listTraces)', async () => {
+    const expiredStore = new PromptTraceStore({ collection, ttl: -1 });
+    await expiredStore.record({ urlKey: 'acme', feature: 'recommend', providerUi: null, featureFlags: {} });
+    await store.record({ urlKey: 'acme', feature: 'recommend', providerUi: null, featureFlags: {} });
+
+    const result = await store.summarizeProviderContext('acme', { expectedUi: GITHUB_UI });
+    assert.strictEqual(result.traces, 1);
+  });
+
+  test('a query failure resolves to EMPTY_PROVIDER_CONTEXT, never throws', async () => {
+    const flaky = new PromptTraceStore({
+      collection: { find() { return { async toArray() { throw new Error('mongo down'); } }; } }
+    });
+    const result = await flaky.summarizeProviderContext('acme', { expectedUi: GITHUB_UI });
+    assert.deepStrictEqual(result, EMPTY_PROVIDER_CONTEXT);
   });
 });

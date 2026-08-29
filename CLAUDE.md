@@ -155,7 +155,7 @@ lib/
   unanswered-decisions.js  `collectUnansweredDecisions({loops, taskDecisions})` (LIN-1728/LIN-2197 Phase 3): the ONE predicate normalising both dispatch-loop decisions and scan-produced task decisions into the operator rulings feed's shape (`disposition`/`anchor`/`canReply`) — a task decision always resolves to `disposition: 'task-bound'`, comment-only reply (no dispatch item behind it)
   saved-chat-store.js  Durable saved task-chat transcripts (LIN-1008): private per {urlKey, accountId}, `{role,content}` transcript + auto-derived title, durable/count-capped (no TTL), hard-delete. Composes custom-prompts CRUD + task-snapshot durability + prompt-trace's session-auth-only privacy posture (content-bearing → deliberately NOT wired into proxy/workspace-api/kpis)
   llm-call-log.js      Append-only per-LLM-call metadata log (model, provider, tokens, cost, time; LIN-418)
-  prompt-trace-store.js  Prompt trace storage (LIN-578)
+  prompt-trace-store.js  Prompt trace storage + provider-context disclosure (LIN-578, LIN-2357)
   free-tier-store.js   Free tier usage tracking and rate limiting
   proxy-tokens.js      Proxy token hashing and validation
   proxy-events.js      Proxy event audit logging
