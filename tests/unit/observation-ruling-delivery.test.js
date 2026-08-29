@@ -132,12 +132,17 @@ function makeLi({ withFeedback = true } = {}) {
   return li;
 }
 
-function makeSandbox({ postComment, dispatchPrompt, deliverReply }) {
+// `elements` seeds document.getElementById (default: none, so it answers null
+// exactly as before — the delivery tests below never touch the document). The
+// ChatUI stub is likewise inert for those: only renderRulingRow calls
+// appendOptions, and only the LIN-2293 render test reaches it.
+function makeSandbox({ postComment, dispatchPrompt, deliverReply, elements = {} }) {
   const sandbox = {
     module: { exports: {} },
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
+      ChatUI: { appendOptions() {} },
       ReplyDelivery: {
         postComment,
         deliverReply,
@@ -148,8 +153,15 @@ function makeSandbox({ postComment, dispatchPrompt, deliverReply }) {
     document: {
       createElement: (tag) => new FakeElement(tag),
       addEventListener() {},
-      getElementById: () => null
+      getElementById: (id) => elements[id] || null
     },
+    // Browser globals common.js installs and observation.js references bare.
+    // Same faithful-copy/stub pattern tests/unit/observation-render.test.js
+    // already uses; only renderRulingRow reaches them from this file.
+    escapeHtml: (str) => (str === undefined || str === null ? '' : String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;')),
+    relativeTime: (ts) => (ts ? `stub-relative-time(${ts})` : ''),
     console: { warn() {}, error() {}, log() {} },
   };
   vm.createContext(sandbox);
@@ -573,5 +585,80 @@ describe('deliverRulingReply — cross-workspace decision_id collision (LIN-2293
     assert.equal(dispatchCallsB, 1);
     assert.ok(!rulingsPending.has(keyA));
     assert.ok(!rulingsPending.has(keyB));
+  });
+});
+
+// LIN-2293 review (F1) — the ticket's symptom has two halves: "acting on one
+// DISABLES and RE-RENDERS both". The describe above pins the disables half
+// (rulingsPending, via deliverRulingReply). This one pins the re-renders
+// half, which lives entirely in renderRulings' reuse lookup against
+// renderedRulingRows and had no guard at any level: the review's M2 mutation
+// reverted that lookup to bare decision_id keys and all 8375 tests stayed
+// green, so green CI could not distinguish the fixed render path from the
+// broken one. These assertions fail under exactly that mutation.
+describe('renderRulings — cross-workspace decision_id reuse (LIN-2293 review F1)', () => {
+  function makeRenderSandbox() {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p');
+    empty.hidden = false;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
+    });
+    return { module, list, empty };
+  }
+
+  test('two rows sharing decision_id in different workspaces get independent <li> nodes', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, renderedRulingRows, rulingKey } = module.exports;
+
+    const rowA = makeRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
+    const rowB = makeRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
+    const keyA = rulingKey('workspace-a', 'shared-decision');
+    const keyB = rulingKey('workspace-b', 'shared-decision');
+
+    renderRulings([rowA, rowB]);
+
+    // Pre-fix (bare decision_id) both rows collapse onto one map entry, so
+    // renderedRulingRows holds a single node and the second row's render
+    // clobbers the first's bookkeeping.
+    assert.equal(renderedRulingRows.size, 2, 'each workspace must keep its own renderedRulingRows entry');
+    assert.ok(renderedRulingRows.has(keyA) && renderedRulingRows.has(keyB));
+    assert.notEqual(
+      renderedRulingRows.get(keyA), renderedRulingRows.get(keyB),
+      'rows from different workspaces must not share one <li> merely for sharing decision_id'
+    );
+    assert.equal(list.children.length, 2, 'both rows must be attached');
+    assert.notEqual(list.children[0], list.children[1], 'the two attached nodes must be distinct');
+  });
+
+  test('a pending row is reused without the other workspace’s row reusing it too', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, renderedRulingRows, rulingsPending, rulingKey } = module.exports;
+
+    const rowA = makeRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
+    const rowB = makeRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
+    const keyA = rulingKey('workspace-a', 'shared-decision');
+    const keyB = rulingKey('workspace-b', 'shared-decision');
+
+    renderRulings([rowA, rowB]);
+    const firstA = renderedRulingRows.get(keyA);
+    const firstB = renderedRulingRows.get(keyB);
+
+    // Workspace A's row goes mid-flight; the next poll repaints. A's node must
+    // be REUSED (its buttons are disabled and its in-flight handler is bound
+    // to that node), while B's must be rebuilt fresh — pre-fix the shared bare
+    // key made B reuse A's node, which is the "re-renders both" symptom.
+    rulingsPending.add(keyA);
+    renderRulings([rowA, rowB]);
+
+    assert.equal(renderedRulingRows.get(keyA), firstA, 'the pending workspace-A row must be reused across the repaint');
+    assert.notEqual(renderedRulingRows.get(keyB), firstA, 'workspace B must not reuse workspace A’s pending node');
+    assert.notEqual(renderedRulingRows.get(keyB), firstB, 'workspace B is not pending, so it is rebuilt fresh');
+    assert.equal(list.children.length, 2);
+    assert.notEqual(list.children[0], list.children[1]);
+
+    rulingsPending.delete(keyA);
   });
 });

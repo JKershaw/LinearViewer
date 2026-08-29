@@ -2083,6 +2083,14 @@ if (typeof module !== 'undefined' && module.exports) {
     // test asserts against the SAME composite-key function these structures
     // use, not a hard-coded copy of its `::` separator.
     deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey,
+    // LIN-2293 review (F1): the collision has TWO halves — "disables both"
+    // (deliverRulingReply/rulingsPending, covered above) and "re-renders
+    // both", which lives entirely in renderRulings' reuse lookup against
+    // renderedRulingRows. Without these two on the seam that second half had
+    // no regression guard at any level: reverting renderRulings to bare
+    // decision_id keys left the whole suite green. Exposed so the reuse path
+    // is pinned by the same kind of unit test as the delivery path.
+    renderRulings, renderedRulingRows,
     // LIN-2243: expose the worker-lane ticket-walk seam (read off runs[], since
     // the session-level field is inert on this lean feed) for unit testing.
     laneTicketWalk, ticketProgressText,
