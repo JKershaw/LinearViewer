@@ -189,9 +189,9 @@ Two additional seed items from the ticket's own resolved-list were re-verified a
 
 | ticket | finding | why promoted |
 |---|---|---|
-| **(to be minted)** | **H1** — `/api/proxy/instructions` blob: 409/endpoint/capability drift vs. `docs/proxy-integration.md` | Highest consequence — misdirects the exact agent class this repo dispatches, on the exact transition this task itself must make |
-| **(to be minted)** | **H2 + H3 combined, one `CLAUDE.md` ticket** — Jira read-only/no-OAuth claim + residual Linear-only framing (proxy.js/proxy-integration.md/audit.js entries, `## Linear API` section, Settings copy mirror) | Same defect class (stale provider-framing prose) in one file; LIN-2248 is the template for the fix |
-| **(to be minted)** | **H4** — `content/landing.md`: 3-of-5 backend count + 14-vs-17 template count | Two-line subtractive fix on the only public, unauthenticated copy surface; same defect class LIN-2248/2250 already fixed elsewhere |
+| **[LIN-2390](https://linear.app/issue/LIN-2390)** | **H1** — `/api/proxy/instructions` blob: 409/endpoint/capability drift vs. `docs/proxy-integration.md` | Highest consequence — misdirects the exact agent class this repo dispatches, on the exact transition this task itself must make |
+| **[LIN-2391](https://linear.app/issue/LIN-2391)** | **H2 + H3 combined, one `CLAUDE.md` ticket** — Jira read-only/no-OAuth claim + residual Linear-only framing (proxy.js/proxy-integration.md/audit.js entries, `## Linear API` section, Settings copy mirror) | Same defect class (stale provider-framing prose) in one file; LIN-2248 is the template for the fix |
+| **[LIN-2392](https://linear.app/issue/LIN-2392)** | **H4** — `content/landing.md`: 3-of-5 backend count + 14-vs-17 template count | Two-line subtractive fix on the only public, unauthenticated copy surface; same defect class LIN-2248/2250 already fixed elsewhere |
 
 **Not minted, deliberately** (recorded above so the next run can promote what still matters):
 - **F2** — LIN-1856 already owns it; posted an updated measurement + cross-link there instead of duplicating.
