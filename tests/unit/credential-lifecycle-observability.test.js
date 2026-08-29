@@ -39,6 +39,8 @@ import { resolveWorkspaceIdMapFromSessions, findCredentialInvariantViolations, r
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROXY_SRC = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+// LIN-2360 Stage 1: logCredentialRejection moved into lib/proxy-credential-trail.js.
+const CREDENTIAL_TRAIL_SRC = readFileSync(join(__dirname, '../../lib/proxy-credential-trail.js'), 'utf8');
 
 const NOW = Date.now();
 const FAR_FUTURE_MS = 10_000_000;
@@ -224,10 +226,14 @@ describe('logEvent/logCredentialRejection widening (LIN-2236, L5.2 — witness, 
   });
 
   test('logCredentialRejection records credentialSource: \'none\' when no descriptor was ever resolved, rather than silently omitting the field', () => {
-    const start = PROXY_SRC.indexOf('function logCredentialRejection(req, endpoint) {');
+    // LIN-2360 Stage 1 moved this function into lib/proxy-credential-trail.js
+    // (a pure lib/ extraction, no routes/proxy.js call site changed), still
+    // nested at 2-space indent inside createCredentialTrail(), so this
+    // extraction is otherwise unchanged — only the source file moved.
+    const start = CREDENTIAL_TRAIL_SRC.indexOf('function logCredentialRejection(req, endpoint) {');
     assert.ok(start >= 0);
-    const end = PROXY_SRC.indexOf('\n  }', start);
-    const body = PROXY_SRC.slice(start, end);
+    const end = CREDENTIAL_TRAIL_SRC.indexOf('\n  }', start);
+    const body = CREDENTIAL_TRAIL_SRC.slice(start, end);
     assert.match(body, /\.\.\.\(descriptor \?\? \{ credentialSource: 'none' \}\)/);
   });
 });
