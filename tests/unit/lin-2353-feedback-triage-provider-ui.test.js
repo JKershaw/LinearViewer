@@ -27,9 +27,20 @@ import { registerProvider } from '../../lib/providers/registry.js';
 const PROVIDER_NAME = 'lin2353-feedback-github-fake';
 
 function makeGithubShapedProvider() {
+  return makeProvider(PROVIDER_NAME, { write: true, comments: true, estimates: false, subtasks: false, displayName: 'GitHub Issues' });
+}
+
+/**
+ * LIN-2353 close-out (implementation-review ledger item 4): sites 1-3 each got a
+ * Linear parity case, but this site (#5) originally had only the GitHub case plus
+ * the flag-gate case — no Linear-side and no bare-fixture counterpart. `ui`
+ * omitted entirely reproduces the pre-fix path exactly: `getProviderForWorkspace(
+ * workspace)?.ui || null` -> null -> DEFAULT_PROMPT_UI.
+ */
+function makeProvider(name, ui) {
   return {
-    name: PROVIDER_NAME,
-    ui: { write: true, comments: true, estimates: false, subtasks: false, displayName: 'GitHub Issues' },
+    name,
+    ...(ui ? { ui } : {}),
     supports: () => true,
     apiWriteFields: () => ['title', 'description', 'projectId'],
     async fetchTeams() { return [{ id: 'team-default', name: 'Default' }]; },
@@ -38,6 +49,12 @@ function makeGithubShapedProvider() {
     }
   };
 }
+
+const LINEAR_SHAPED_NAME = 'lin2353-feedback-linear-fake';
+const BARE_NAME = 'lin2353-feedback-bare-fake';
+// Identical on every key resolvePromptUi/applyPromptCapabilities reads, matching
+// the real registered Linear provider's ui (verified in the implementation review).
+const LINEAR_SHAPED_UI = { write: true, comments: true, estimates: true, subtasks: true, displayName: 'Linear' };
 
 function fakeProxyTokenStore(token = 'minted-rw-token') {
   return { async createToken(urlKey, options) { return { token, scope: options?.scope }; } };
@@ -54,7 +71,7 @@ function buildApp({ provider, dispatchQueueStore, features = {} }) {
   app.use(express.json({ limit: '250kb' }));
   const router = createWorkspaceApiRoutes({
     workspaceFromUrl: (req, res, next) => {
-      req.workspace = { urlKey: req.params.urlKey, provider: PROVIDER_NAME, accessToken: 'ws-token' };
+      req.workspace = { urlKey: req.params.urlKey, provider: provider.name, accessToken: 'ws-token' };
       req.session = { linearUserId: 'user-1', features };
       next();
     },
@@ -118,5 +135,46 @@ describe('LIN-2353 — enqueueFeedbackTriage (workspace-api.js:2862) threads pro
 
     assert.strictEqual(status, 201);
     assert.strictEqual(dispatch.items.length, 0, 'triage is opt-in — no flag, no explicit action, nothing enqueued');
+  });
+
+  // --- LIN-2353 close-out, ledger item 4: the missing Linear + bare-fixture pair ---
+
+  test('a linear-shaped workspace still renders Linear in the queued triage prompt', async () => {
+    const dispatch = capturingDispatchStore();
+    const app = buildApp({
+      provider: makeProvider(LINEAR_SHAPED_NAME, LINEAR_SHAPED_UI),
+      dispatchQueueStore: dispatch,
+      features: { feedbackTriage: true }
+    });
+
+    const { status } = await submit(app, 'acme', { message: 'Something is broken' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    const body = dispatch.items[0].item.prompt.split('You have a workspace API proxy')[0];
+    assert.match(body, /Triage/);
+    assert.ok(body.includes('Linear'), 'a Linear workspace must still say Linear');
+    assert.ok(!body.includes('GitHub Issues'), 'no other tracker name may leak in');
+  });
+
+  test('byte parity: a linear-shaped provider queues the same bytes as the DEFAULT_PROMPT_UI fallback', async () => {
+    async function queuedPrompt(provider) {
+      const dispatch = capturingDispatchStore();
+      const app = buildApp({ provider, dispatchQueueStore: dispatch, features: { feedbackTriage: true } });
+      const { status } = await submit(app, 'acme', { message: 'Something is broken' });
+      assert.strictEqual(status, 201);
+      assert.strictEqual(dispatch.items.length, 1);
+      return dispatch.items[0].item.prompt;
+    }
+
+    // `ui` threaded (real-Linear-shaped) vs no `ui` at all (the pre-fix fallback).
+    const threaded = await queuedPrompt(makeProvider(LINEAR_SHAPED_NAME, LINEAR_SHAPED_UI));
+    const fallback = await queuedPrompt(makeProvider(BARE_NAME, null));
+
+    assert.strictEqual(threaded, fallback, 'threading Linear ui must be a no-op for a Linear workspace');
+
+    // Not vacuous: the GitHub shape must genuinely diverge from that same fallback.
+    const github = await queuedPrompt(makeGithubShapedProvider());
+    assert.notStrictEqual(github, fallback, 'if these matched, the parity assertion would prove nothing');
   });
 });

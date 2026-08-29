@@ -42,7 +42,7 @@ function makeDispatchQueueStore() {
   };
 }
 
-function buildApp({ providerName, dispatchQueueStore } = {}) {
+function buildApp({ providerName, dispatchQueueStore, injectProvider = null } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -62,7 +62,12 @@ function buildApp({ providerName, dispatchQueueStore } = {}) {
     dispatchQueueStore: dispatchQueueStore || makeDispatchQueueStore(),
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
-    freeTierStore: { tryUse: async () => ({ allowed: true }) }
+    freeTierStore: { tryUse: async () => ({ allowed: true }) },
+    // TEST-ONLY provider override (LIN-581 seam, documented at routes/proxy.js:673).
+    // Used by the byte-parity block below to drive a provider that carries no
+    // `ui` at all, exercising the `provider?.ui || null` -> DEFAULT_PROMPT_UI
+    // fallback through the real route rather than by calling the formatter directly.
+    provider: injectProvider
   }));
   return app;
 }
@@ -98,7 +103,7 @@ describe('LIN-2353 — proxy.js deterministic sites thread provider?.ui into gen
       assert.ok(!body.prompt.includes('Existing Subtasks'), 'GitHub has no subtasks — the section must be stripped');
     });
 
-    test('a linear-backed workspace stays byte-identical (write on, subtasks on, displayName Linear)', async () => {
+    test('a linear-backed workspace still renders Linear and keeps subtasks (write on, subtasks on)', async () => {
       const app = buildApp({ providerName: 'linear' });
       const { status, body } = await call(app, '/api/proxy/issues/TEST-1/prompt/breakdown');
 
@@ -131,7 +136,7 @@ describe('LIN-2353 — proxy.js deterministic sites thread provider?.ui into gen
       assert.ok(!body.prompt.includes('Existing Subtasks'));
     });
 
-    test('a linear-backed workspace stays byte-identical', async () => {
+    test('a linear-backed workspace still renders Linear and keeps subtasks', async () => {
       const app = buildApp({ providerName: 'linear' });
       const { status, body } = await call(app, '/api/proxy/recommend/TEST-1?kind=breakdown');
 
@@ -158,7 +163,7 @@ describe('LIN-2353 — proxy.js deterministic sites thread provider?.ui into gen
       assert.ok(!prompt.includes('Existing Subtasks'));
     });
 
-    test('a linear-backed workspace queues a byte-identical dispatch item', async () => {
+    test('a linear-backed workspace queues an item that still renders Linear and keeps subtasks', async () => {
       const dispatchQueueStore = makeDispatchQueueStore();
       const app = buildApp({ providerName: 'linear', dispatchQueueStore });
       const { status, body } = await call(app, '/api/proxy/recommend-and-dispatch', {
@@ -171,6 +176,69 @@ describe('LIN-2353 — proxy.js deterministic sites thread provider?.ui into gen
       const { prompt } = dispatchQueueStore.items[0];
       assert.ok(prompt.includes('Linear'));
       assert.ok(prompt.includes('Existing Subtasks'));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // LIN-2353 close-out — implementation-review ledger item 3.
+  //
+  // The three Linear-side tests above were originally NAMED "stays
+  // byte-identical" but assert only substring presence (`includes('Linear')`,
+  // `includes('Existing Subtasks')`). They are now named for what they assert;
+  // this block pins the byte-parity property itself, which nothing in-repo
+  // covered at these sites: the LIN-177 pin uses a synthetic
+  // `{...DEFAULT_PROMPT_UI}` object and never drives the REAL registered Linear
+  // provider through a route.
+  //
+  // The property: threading the real Linear provider's `ui` must emit exactly
+  // the same bytes as the pre-fix `providerUi = null` fallback to
+  // DEFAULT_PROMPT_UI — i.e. this fix is a no-op for Linear workspaces, on
+  // every template kind, not just the one `breakdown` case sampled above. The
+  // no-`ui` provider is injected through the documented LIN-581 test seam, so
+  // the comparison runs end-to-end through the route rather than against the
+  // formatter in isolation.
+  // ---------------------------------------------------------------------------
+  describe('byte parity — real Linear provider.ui vs the DEFAULT_PROMPT_UI fallback', () => {
+    // Every kind the reviewer measured, spanning both the subtask-rendering and
+    // tracker-write branches of applyPromptCapabilities.
+    const KINDS = ['breakdown', 'plan', 'research', 'implementation', 'review', 'triage', 'plan-review'];
+    // No `ui` key at all -> `provider?.ui || null` -> null -> DEFAULT_PROMPT_UI,
+    // which is exactly the pre-fix behaviour at all three sites.
+    const bareProvider = { name: 'lin2353-bare-no-ui', supports: () => true };
+
+    test('site 1 — /prompt/:kind is byte-identical for every template kind', async () => {
+      for (const kind of KINDS) {
+        const threaded = await call(buildApp({ providerName: 'linear' }), `/api/proxy/issues/TEST-1/prompt/${kind}`);
+        const fallback = await call(buildApp({ providerName: 'linear', injectProvider: bareProvider }), `/api/proxy/issues/TEST-1/prompt/${kind}`);
+
+        assert.equal(threaded.status, 200, `threaded ${kind}: ${JSON.stringify(threaded.body)}`);
+        assert.equal(fallback.status, 200, `fallback ${kind}: ${JSON.stringify(fallback.body)}`);
+        assert.equal(threaded.body.prompt, fallback.body.prompt, `kind ${kind} must be byte-identical for a Linear workspace`);
+      }
+    });
+
+    test('site 3 — the queued dispatch prompt is byte-identical for every template kind', async () => {
+      for (const kind of KINDS) {
+        const threadedStore = makeDispatchQueueStore();
+        const fallbackStore = makeDispatchQueueStore();
+        const post = { method: 'POST', body: { issueIdentifier: 'TEST-1', kind, appendProxyContext: false } };
+
+        const threaded = await call(buildApp({ providerName: 'linear', dispatchQueueStore: threadedStore }), '/api/proxy/recommend-and-dispatch', post);
+        const fallback = await call(buildApp({ providerName: 'linear', dispatchQueueStore: fallbackStore, injectProvider: bareProvider }), '/api/proxy/recommend-and-dispatch', post);
+
+        assert.equal(threaded.status, 201, `threaded ${kind}: ${JSON.stringify(threaded.body)}`);
+        assert.equal(fallback.status, 201, `fallback ${kind}: ${JSON.stringify(fallback.body)}`);
+        assert.equal(threadedStore.items[0].prompt, fallbackStore.items[0].prompt, `kind ${kind} must queue a byte-identical prompt for a Linear workspace`);
+      }
+    });
+
+    test('the probe is not vacuous: a github-backed workspace DOES differ from the fallback', async () => {
+      const threaded = await call(buildApp({ providerName: 'github' }), '/api/proxy/issues/TEST-1/prompt/breakdown');
+      const fallback = await call(buildApp({ providerName: 'github', injectProvider: bareProvider }), '/api/proxy/issues/TEST-1/prompt/breakdown');
+
+      assert.equal(threaded.status, 200, JSON.stringify(threaded.body));
+      assert.equal(fallback.status, 200, JSON.stringify(fallback.body));
+      assert.notEqual(threaded.body.prompt, fallback.body.prompt, 'if these matched, the probe would prove nothing');
     });
   });
 });
