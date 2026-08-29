@@ -2535,6 +2535,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/projects', reason);
       }
+      if (denyIfUnsupported(provider, 'projects', req, res, '/api/proxy/projects')) return;
 
       const projectList = await provider.projects(token);
       logEvent(req, '/api/proxy/projects', 200);
@@ -2556,6 +2557,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
+      if (denyIfUnsupported(provider, 'issues', req, res, '/api/proxy/issues')) return;
 
       let teamId = req.query.teamId || null;
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 250);
@@ -2654,6 +2656,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/search', reason);
       }
+      if (denyIfUnsupported(provider, 'search', req, res, '/api/proxy/search')) return;
 
       const query = req.query.q;
       if (!query || typeof query !== 'string') {
@@ -2686,6 +2689,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/states', reason);
       }
+      if (denyIfUnsupported(provider, 'states', req, res, '/api/proxy/states')) return;
 
       const { teamId } = req.params;
       // LIN-2025: no local format gate — an invalid/unmatched team id is
@@ -2713,6 +2717,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/labels', reason);
       }
+      if (denyIfUnsupported(provider, 'labels', req, res, '/api/proxy/labels')) return;
 
       let teamId = req.query.teamId || null;
       // LIN-2025: fail loud on a well-formed-but-unmatched team id rather
@@ -2746,6 +2751,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/cycles', reason);
       }
+      if (denyIfUnsupported(provider, 'cycles', req, res, '/api/proxy/cycles')) return;
 
       let teamId = req.query.teamId || null;
       // LIN-2025: fail loud on a well-formed-but-unmatched team id rather
@@ -2780,6 +2786,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/cycle', reason);
       }
+      if (denyIfUnsupported(provider, 'cycleDetail', req, res, '/api/proxy/cycle')) return;
 
       const { cycleId } = req.params;
       if (!UUID_REGEX.test(cycleId)) {
@@ -2815,6 +2822,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/relations', reason);
       }
+      if (denyIfUnsupported(provider, 'relations', req, res, '/api/proxy/relations')) return;
 
       const { issueId } = req.params;
       if (!isValidIssueId(issueId)) {
