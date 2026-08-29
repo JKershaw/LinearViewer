@@ -2439,6 +2439,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/me', reason);
       }
+      if (denyIfUnsupported(provider, 'viewer', req, res, '/api/proxy/me')) return;
 
       const user = await provider.viewer(token);
       logEvent(req, '/api/proxy/me', 200);
@@ -2605,6 +2606,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
+      if (denyIfUnsupported(provider, 'issueDetail', req, res, '/api/proxy/issues/:id')) return;
 
       const { issueId } = req.params;
 
