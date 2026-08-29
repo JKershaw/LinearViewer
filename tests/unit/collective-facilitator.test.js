@@ -83,6 +83,22 @@ describe('shares the participant blocks (single source of truth)', () => {
     assert.ok(withToken.includes('Workspace API access (auto-appended)'));
     assert.ok(withToken.includes('Authorization: Bearer tok_xyz'));
   });
+
+  // LIN-2354: same providerDisplayName contract as the participant builder.
+  test('providerDisplayName (LIN-2354): named when resolved, dropped when not — never guessed', () => {
+    const args = { ...BASE, roster: ROSTER, proxyBaseUrl: 'https://app.test', proxyToken: 'tok_xyz' };
+    const linear = buildCollectiveFacilitatorPrompt({ ...args, providerDisplayName: 'Linear' });
+    assert.ok(linear.includes('(source-neutral; currently backed by Linear). Base:'));
+
+    const github = buildCollectiveFacilitatorPrompt({ ...args, providerDisplayName: 'GitHub Issues' });
+    assert.ok(github.includes('(source-neutral; currently backed by GitHub Issues). Base:'));
+    assert.ok(!github.includes('Linear'), 'no residual "Linear" for a GitHub-backed workspace');
+
+    const unresolved = buildCollectiveFacilitatorPrompt(args);
+    assert.ok(unresolved.includes('(source-neutral). Base:'), 'drops the clause, no hedge');
+    assert.ok(!unresolved.includes('currently backed by'));
+    assert.ok(!unresolved.includes('Linear'));
+  });
 });
 
 describe('the seven facilitator behaviors are present', () => {

@@ -548,7 +548,10 @@ describe('buildAutopilotKickoff (read-only mode)', () => {
   test('restricts the worker to findings-only and names the boundary', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, mode: 'readonly' });
     assert.ok(text.includes('READ-ONLY'));
-    assert.ok(text.includes('no code changes, no PRs, no Linear state changes'));
+    // LIN-2354: provider-neutral rewording — "Linear state changes" named no
+    // particular workspace's provider and is not true for a non-Linear one.
+    assert.ok(text.includes('no code changes, no PRs, no tracker state changes'));
+    assert.ok(!text.includes('Linear'), 'read-only mode text must carry no literal "Linear"');
     assert.ok(!text.includes('WRITE, merge-gated'));
   });
 

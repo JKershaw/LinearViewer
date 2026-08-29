@@ -95,8 +95,8 @@ monoculture wearing the costume of a discussion. What made the first run good wa
 
 ## Ask before you change anything (important)
 
-You may have been handed a Linear API token for this workspace (see below). Treat
-the discussion as **read-and-talk by default**: do not file tickets, change Linear
+You may have been handed a workspace API token for this workspace (see below). Treat
+the discussion as **read-and-talk by default**: do not file tickets, change tracker
 issues, edit files, commit, or take any other action with real-world consequences
 **unless John explicitly asks you to in the channel.** If the discussion surfaces
 something worth capturing as a ticket or a change, *propose it to John and wait for

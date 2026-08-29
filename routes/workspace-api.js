@@ -10,7 +10,7 @@
  */
 import { Router, json } from 'express';
 import { badRequest, jsonError, notFound, unauthorized } from '../lib/errors.js';
-import { getProviderForWorkspace } from '../lib/providers/registry.js';
+import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { createRoadmapRoutes } from './workspace-api-roadmap.js';
 import { createPromptsRoutes } from './workspace-api-prompts.js';
@@ -2901,6 +2901,9 @@ ${goal}`
           prompt: basePrompt,
           label: 'feedback-triage',
           harness: resolvedHarness,
+          // LIN-2354: declared provider identity, fallback-free (unlike the
+          // getProviderForWorkspace capability-shaping read above this function).
+          providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
           // LIN-1376: stamp the launching account so the dispatched session's
           // token resolves under LIN-1366 owner-scoping.
           createdBy: session?.accountId || null
@@ -2975,6 +2978,9 @@ ${goal}`
           prompt: kickoff,
           label: 'feedback-autopilot',
           harness: resolvedHarness,
+          // LIN-2354: declared provider identity, fallback-free (unlike the
+          // getProviderForWorkspace capability-shaping reads elsewhere here).
+          providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
           // LIN-1376: stamp the launching account so the dispatched session's
           // token resolves under LIN-1366 owner-scoping.
           createdBy: session?.accountId || null

@@ -32,7 +32,7 @@ import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '
 import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { isDanglingReferent, danglingReferentBody } from '../lib/dispatch-referent-guard.js';
-import { getProviderForWorkspace } from '../lib/providers/registry.js';
+import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope, AMBIGUOUS_CALL_SCOPE } from '../lib/workspace.js';
 import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField, applyDefaultDispatchHarness } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
@@ -468,6 +468,11 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
                   prompt,
                   label: 'dispatch-bootstrap',
                   harness: resolvedHarness,
+                  // LIN-2354: declared provider identity, fallback-free —
+                  // getProvider (unlike getProviderForWorkspace, used above for
+                  // capability shaping) never guesses Linear for an undeclared
+                  // workspace.
+                  providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
                   // LIN-1376: stamp the launching account so the dispatched
                   // session's token resolves under LIN-1366 owner-scoping.
                   createdBy: req.session?.accountId || null

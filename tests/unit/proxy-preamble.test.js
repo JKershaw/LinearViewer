@@ -89,13 +89,20 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
     // not a reflexive "fix the failing test". Decision A's guarantee still holds for
     // everything else in the block: the token/curl exchange and the gate sentence
     // stay byte-for-byte, and both are asserted below.
+    //
+    // NOTE (LIN-2354): this call passes no `providerDisplayName` — the caller has
+    // resolved no declared provider identity, which is exactly the "unresolved"
+    // case the fix must render neutrally rather than guessing "Linear". So the
+    // "currently backed by X" clause is now correctly ABSENT here; the Linear
+    // byte-parity case (a caller that HAS resolved Linear) is pinned separately
+    // below, passing `providerDisplayName: 'Linear'` explicitly.
     const expected = [
       '',
       '',
       '---',
       '## Workspace API access (auto-appended)',
       '',
-      'You have a workspace API proxy for this workspace (source-neutral; currently backed by Linear). Base: https://host/api/proxy',
+      'You have a workspace API proxy for this workspace (source-neutral). Base: https://host/api/proxy',
       '',
       'FIRST, exchange your single-use bootstrap token for a working token:',
       '  curl -X POST -H "Authorization: Bearer TOK123" https://host/api/proxy/token',
@@ -144,6 +151,39 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
       buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', tokenDelivery: 'prose' }),
       expected
     );
+  });
+
+  // LIN-2354: the provider-identity seam. Three properties, not one — a count of
+  // residual "Linear" text can pass while the output is worse than before (a
+  // blanket rename), so these assert POSITIVELY what the sentence should say and
+  // NEGATIVELY that an unresolved identity is never guessed.
+  describe('providerDisplayName (LIN-2354)', () => {
+    test('Linear byte-parity: passing providerDisplayName "Linear" reproduces the historical sentence exactly', () => {
+      const out = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerDisplayName: 'Linear' });
+      assert.ok(
+        out.includes('You have a workspace API proxy for this workspace (source-neutral; currently backed by Linear). Base: https://host/api/proxy'),
+        'a resolved Linear identity renders the byte-identical historical sentence'
+      );
+    });
+
+    test('discrimination: a non-Linear provider names itself, not Linear', () => {
+      const out = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerDisplayName: 'GitHub Issues' });
+      assert.ok(
+        out.includes('You have a workspace API proxy for this workspace (source-neutral; currently backed by GitHub Issues). Base: https://host/api/proxy'),
+        'names the resolved non-Linear provider'
+      );
+      assert.ok(!out.includes('Linear'), 'no residual "Linear" for a GitHub-backed workspace');
+    });
+
+    test('unresolved (omitted/null providerDisplayName): the clause is dropped, not hedged', () => {
+      const omitted = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42' });
+      const nulled = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerDisplayName: null });
+      for (const out of [omitted, nulled]) {
+        assert.ok(out.includes('(source-neutral). Base:'), 'drops the clause entirely — no "unknown provider" hedge either');
+        assert.ok(!out.includes('currently backed by'), 'no backing-provider claim at all when unresolved');
+        assert.ok(!out.includes('Linear'), 'never guesses Linear for an unresolved identity');
+      }
+    });
   });
 
   test('mcp mode embeds no token and no curl, but keeps context + evidence', () => {
@@ -364,6 +404,10 @@ describe('attachProxyContext — issueIdentifier shaping (unchanged from LIN-115
     const noId = await attachProxyContext({ proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://host', issueIdentifier: null, prompt: BASE });
     assert.ok(noId.prompt.includes('/api/proxy/stack'));
     assert.ok(!noId.prompt.includes('brief/null'));
+    // LIN-2354 (T4): the generic-discovery worked example is provider-neutral
+    // prose, not an illustrative payload shape — /issues/LIN-123 -> /issues/{id}.
+    assert.ok(noId.prompt.includes('/issues/{id}'), 'generic discovery uses the neutral {id} placeholder');
+    assert.ok(!noId.prompt.includes('LIN-123'), 'no literal Linear-identifier example in generic discovery');
   });
 });
 
