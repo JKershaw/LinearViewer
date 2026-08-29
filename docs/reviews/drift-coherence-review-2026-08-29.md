@@ -6,7 +6,7 @@
 
 **Why the loss keeps happening — first-party evidence, not speculation.** `lib/periodical-report-gate.js:9-11` states it outright: *"Three batches in a row (2026-06-25, 2026-07-11, 2026-08-23) produced tasks that reached Linear's Done state while their report survived only as a Linear comment."* **LIN-694** (the persistence gate) is Done, but by its own design (`lib/periodical-report-gate.js:16-33`) it only requires a comment citing a commit/PR/blob URL — it never verifies the file exists on disk, because the periodical registry is deliberately location-agnostic (LIN-1967). **The loss mode is narrowed by LIN-694, not closed** — this run adds a second, mechanical reason it keeps recurring (row 16 below).
 
-**Headline: a re-baseline, not a small delta.** ~973 commits landed in `LinearViewer/` and ~414 in `simple-dispatcher/` since 2026-06-25 — the provider family grew from 2 to 5 (linear, github, github-projects, jira, local), and this is the first edition to substantively audit `simple-dispatcher/` at all. Two structural regressions cross the promotion bar: a **new, latent import cycle** in `LinearViewer/lib/` (never seen in any prior edition) and the **fourth consecutive worsening** of the provider auth-router dependency inversion, whose standing fix (LIN-675) has sat in Backlog, untouched, across all four editions. A helper-signature mismatch has let a renderer-local duplication pattern escape into `lib/` itself, now at 17 sites. Against that, the two client-side duplication rows this series has tracked since its first edition remain fully resolved, and `simple-dispatcher`'s state-write discipline — its one prior open question — is confirmed clean.
+**Headline: a re-baseline, not a small delta.** ~973 commits landed in `LinearViewer/` and ~414 in `simple-dispatcher/` since 2026-06-25 — the provider family grew from 2 to 5 (linear, github, github-projects, jira, local), and this is the first edition to substantively audit `simple-dispatcher/` at all. **Two static import cycles are confirmed at HEAD** — a new one in `LinearViewer/lib/`'s KPI/budget modules, never seen in any prior edition, and a second, corrected by this run's required adversarial second-read, closing through the provider identity barrel (`lib/providers/index.js`) and `lib/render-pages.js` rather than the `registry.js` path every prior edition checked. Both are latent, not live. The **fourth consecutive worsening** of the provider auth-router dependency inversion (edge count 2→3→4) is the same seam as the second cycle; its standing fix (LIN-675) has sat in Backlog, untouched, across all four editions. A helper-signature mismatch has let a renderer-local duplication pattern escape into `lib/` itself, now at 17 sites. Against that, the two client-side duplication rows this series has tracked since its first edition remain fully resolved, and `simple-dispatcher`'s state-write discipline — its one prior open question — is confirmed clean.
 
 ---
 
@@ -30,7 +30,7 @@ All six edges are static top-level `import`s (confirmed by direct read, not a he
 
 **Promoted this run** — see Follow-ups.
 
-### 2. `provider-auth-router-upward-imports` — Medium-low — **worsened (4th consecutive run: 2 → 3 → 4)**
+### 2. `provider-auth-router-upward-imports` — Medium — **worsened (4th consecutive run: 2 → 3 → 4 edges); severity revised up post-second-read: a static cycle now closes**
 
 At HEAD there are **four** `lib/ → routes/` upward import edges (confirmed by direct read of each provider's `index.js`):
 
@@ -39,11 +39,21 @@ At HEAD there are **four** `lib/ → routes/` upward import edges (confirmed by 
 - `lib/providers/github-projects/index.js:60` → `routes/github-projects-auth.js` (`createGitHubProjectsAuthRoutes`) — landed since 07-12
 - `lib/providers/jira/index.js:98` → `routes/jira-auth.js` (`createJiraAuthRoutes`) — new this window
 
-**Still no static cycle:** `lib/providers/registry.js` has **zero** static imports (confirmed — runtime `Map` registration), so the would-be provider → auth-route → registry → provider loop never closes. **No `lib/ → server.js` edges** — every `server.js` string match inside `lib/` is a prose comment. A JSDoc `@param {import('../lib/providers/jira/index.js').JiraProvider}` type annotation at `routes/jira-auth.js:133` is a type-only annotation, not a runtime import — it does not count as an edge.
+**Correction from the adversarial second-read (accepted, verified independently — see Adversarial Second-Read below): the "no static cycle" claim in the initial draft of this finding was wrong.** The initial check only inspected `lib/providers/registry.js` (zero static imports, still true) but missed the **provider identity barrel**, `lib/providers/index.js` (LIN-2010, landed `0c0f5fc8`, 2026-08-20 — after every prior edition of this series). That barrel imports each provider's `index.js` at its own top level (`:31-34`), and three of the four auth routes import back into it indirectly via `lib/render-pages.js`, which imports `getProvider` from `lib/providers/index.js` (`render-pages.js:14`). Directly verified, three 4-node static cycles:
 
-**Cost, unchanged in kind, 4× in scale.** No provider can be imported — a unit test, a non-HTTP consumer, the registry itself — without transitively pulling in Express and that provider's full route stack. The inversion now scales 1:1 with provider count, and a fifth provider would add a fifth edge with no structural change required to do so.
+- `lib/providers/index.js:32` → `lib/providers/github/index.js:67` → `routes/github-auth.js:24` → `lib/render-pages.js:14` → `lib/providers/index.js`
+- `lib/providers/index.js:33` → `lib/providers/github-projects/index.js:60` → `routes/github-projects-auth.js:31` → `lib/render-pages.js:14` → `lib/providers/index.js`
+- `lib/providers/index.js:34` → `lib/providers/jira/index.js:98` → `routes/jira-auth.js:38` → `lib/render-pages.js:14` → `lib/providers/index.js`
 
-**LIN-675 is the standing, unlanded fix for this row and is updated by this review** rather than duplicated (see Follow-ups) — it has sat in Backlog with zero comments across all four editions this row has now appeared in, and its body still states "both … edges" (2), which is stale.
+(The linear edge does not close this particular cycle: `routes/auth.js` imports `lib/render.js`, not `lib/render-pages.js`, and `render.js` imports only from `providers/registry.js`/`state-map.js`/`models.js` — not the barrel.) The second reader's broader tool-assisted walk (madge + independent graph traversal) reports **9 provider-seam cycles / 11-12 total** across the wider set of `lib/providers/index.js` importers (`render-landing.js`, `render-settings.js`, `components/navbar.js`, `components/landing-hero.js` also import the barrel) — this review directly verified the 3 core cycles above by hand but did not independently reproduce the full enumerated count.
+
+**Severity re-checked, not assumed — same latent/live distinction as Finding 1.** `render-pages.js`'s `getProvider()` calls (`:77, :81, :84`) sit inside default-parameter expressions evaluated at function-call time, not at module top level, so there is no module-evaluation-time peer read and no TDZ failure today. The cycle is real and closed, but latent — which is why this is revised to **Medium** (up from medium-low) rather than High.
+
+**No `lib/ → server.js` edges** — every `server.js` string match inside `lib/` is a prose comment. A JSDoc `@param {import('../lib/providers/jira/index.js').JiraProvider}` type annotation at `routes/jira-auth.js:133` is a type-only annotation, not a runtime import — it does not count as an edge.
+
+**Cost, revised.** Beyond the original "no provider importable without pulling in Express" cost (now 4× in scale), the confirmed cycle means `lib/providers/index.js`, `lib/render-pages.js`, and each provider's `index.js`/auth-route pair form one closed dependency group — a future change that adds a module-scope read of a peer binding to any file in that group has no local signal warning it will fail at import time, the same invariant gap as Finding 1, but on the seam this series has been watching for four editions running.
+
+**LIN-675 is the standing, unlanded fix for this row and is updated by this review** rather than duplicated (see Follow-ups) — it has sat in Backlog with zero comments across all four editions this row has now appeared in, and its scope (move the auth-router factories under `lib/`) does not by itself address the `render-pages.js` ↔ `providers/index.js` leg of the now-confirmed cycle; the update adds this correction.
 
 ### 3. `provider-resolution-incantation` — Low → **worsened sharply (4 → 17 sites)**
 
@@ -196,18 +206,24 @@ Nothing in LIN-1923 remains live outside what this report already carries. **LIN
 
 ## Adversarial Second-Read
 
-**Tier used:** _(filled in after dispatch — see the companion Linear comment for the authoritative record)_
+**Tier used: Tier 1** — a wholly separate dispatched session (`POST /api/proxy/dispatch`, dispatch id `d9e91c9b-77ca-40b8-8c88-e9493a2d786e`, runner session `521ebe1e`), given only the cold question, the report path/PR link, and both HEAD SHAs — no memory of this run's drafting turn.
 
-**Question asked (verbatim, cold — no other context given):** *"What is the largest item in this window that this report missed or misfiled?"*
+**Question asked (verbatim, cold):** *"What is the largest item in this window that this report missed or misfiled?"*
 
-**Reader's full answer:** _(to be filled in verbatim)_
+**Reader's full answer (verbatim terminal report):**
+
+> Adversarial second-read delivered — DISAGREE with the report's top-ranked finding; verified at the stated HEADs that Finding 2's "still no static cycle" is false (madge + independent graph walk both find 9 provider-seam cycles closing through `lib/providers/index.js`/`lib/render-pages.js`, not `registry.js`, 11–12 total vs the report's 2), dated them to LIN-2010 `0c0f5fc8` via read-only `git archive` snapshots (0 → 0 → 1 → 6 → 11), demonstrated registration-order inversion under `routes/proxy.js` and `routes/test.js` entries, and confirmed the report's Findings 1/3/4 and all `simple-dispatcher` rows hold (plus 0 require-cycles there); no files edited, no tests or CI applicable to a read-only review, nothing left running.
+
+**Independent verification performed by this run before accepting the disagreement:** re-read `lib/providers/index.js:31-34`, `lib/render-pages.js:9-14,75-84`, and all four `routes/*-auth.js` import blocks directly. Confirmed: `lib/providers/index.js` imports each provider's `index.js` at its own top level; `render-pages.js` imports `getProvider` from the SAME barrel (`lib/providers/index.js`, not `registry.js`); three of the four auth routes (`github-auth.js`, `github-projects-auth.js`, `jira-auth.js`) import `render-pages.js`, closing three distinct 4-node static cycles (cited in Finding 2 above, with exact file:line edges). Confirmed the cycle is a genuine regression dated to LIN-2010 (`0c0f5fc8`, 2026-08-20), landed after every prior edition of this series checked only `registry.js`. Did not independently reproduce the second reader's full 9/11-12 cycle count (that required `madge`, unavailable in this pass) — accepted the core claim on the strength of the 3 directly-verified cycles, which is sufficient to falsify this report's original "still no static cycle" statement.
+
+**Disposition: fixed in place.** Finding 2 above has been rewritten with the corrected mechanism, the 3 directly-verified cycle paths, the corrected severity (medium-low → medium, following the same latent-not-live test as Finding 1), and the LIN-2010 provenance; the compact trend ledger and headline are updated to match; LIN-675 (Follow-ups) is updated to note the `render-pages.js` leg is outside its original scope.
 
 **Verdict fields (also posted as a single Linear comment on LIN-2380):**
 
 ```
-Adversarial second-read verdict: <AGREE|DISAGREE>
-Differed from top finding: <YES|NO>
-Disposition: <fixed in place|escalated|no change>
+Adversarial second-read verdict: DISAGREE
+Differed from top finding: YES
+Disposition: fixed in place
 ```
 
 ---
@@ -217,7 +233,7 @@ Disposition: <fixed in place|escalated|no change>
 | finding | severity | 06-25 | 07-12 (comment-ledger) | 08-29 (this run) | delta |
 |---|---|---|---|---|---|
 | `lib-import-cycles` | medium | clean | clean | **2 static cycles (latent)** | **new regression** |
-| `provider-auth-router-upward-imports` | medium-low | 2 edges | 3 edges | **4 edges** | **worsened (4th run)** |
+| `provider-auth-router-upward-imports` | medium (revised up post-second-read) | 2 edges, no cycle | 3 edges, no cycle | **4 edges; static cycle confirmed via `providers/index.js`↔`render-pages.js` (latent)** | **worsened (4th run); severity corrected by adversarial second-read** |
 | `provider-resolution-incantation` | low | 4 sites | 4 sites | **17 sites** | **worsened sharply** |
 | `production-to-test-fixture-imports` | medium-low | — | — | **7 sites** | **new** |
 | `routes-error-envelope-fragmentation` | medium | 5 importers, ~53 residue | 7 importers, ~66 residue | 15 importers, 68 residue; `dashboard.js` now a half-adopter | unchanged severity, shape worsened |
