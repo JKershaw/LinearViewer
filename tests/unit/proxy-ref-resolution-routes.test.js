@@ -29,6 +29,9 @@ function makeProvider(overrides = {}) {
     // optional fields against. Full contract by default, matching this fake's
     // "everything works" posture (mirrors real LinearProvider.apiWriteFields()).
     apiWriteFields: () => ['title', 'description', 'teamId', 'projectId', 'stateId', 'assigneeId', 'priority', 'parentId', 'cycleId'],
+    // LIN-2352: the create route's team-capability signal — this fixture's
+    // provider declares team support, matching its Linear-shaped apiWriteFields().
+    createFields: () => ['title', 'description', 'teamId', 'projectId', 'stateId', 'priority'],
     fetchTeams: async () => [{ id: TEAM_UUID, name: 'Linear Team', key: 'LIN' }],
     states: async (_t, teamId) => {
       calls.statesTeamId = teamId;

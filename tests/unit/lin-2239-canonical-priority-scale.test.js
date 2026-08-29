@@ -124,6 +124,8 @@ function makeProvider(overrides = {}) {
     name: 'fake',
     supports: () => true,
     apiWriteFields: overrides.apiWriteFields || (() => ['title', 'description', 'teamId', 'priority']),
+    // LIN-2352: the create route's team-capability signal.
+    createFields: () => ['title', 'description', 'teamId', 'priority'],
     fetchTeams: async () => [{ id: TEAM_UUID, name: 'Team' }],
     issueWriteGuard: async () => ({ id: ISSUE_UUID, trashed: false, team: { id: TEAM_UUID } }),
     async createIssue(_token, input) {

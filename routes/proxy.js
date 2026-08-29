@@ -1781,10 +1781,19 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
     let declaredDisplayName = null;
     let isDeclaredLinear = false;
+    // LIN-2352: requiresTeam mirrors the /api/proxy/issues route's own signal
+    // (provider.createFields().includes('teamId')) so this doc body can never
+    // claim a teamId contract the route doesn't enforce. Defaults false on an
+    // unresolved provider, same convention as isDeclaredLinear above — the
+    // false-branch wording below is written to be true whether the provider
+    // is genuinely teamless or merely unresolved, preserving the never-5xx
+    // neutral-degrade contract.
+    let requiresTeam = false;
     try {
-      await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
       declaredDisplayName = declaredProviderDisplayName(req);
       isDeclaredLinear = req.resolvedProvider?.declared === 'linear';
+      requiresTeam = provider.createFields().includes('teamId');
     } catch {
       // Stays neutral/unresolved — see the reliability note above.
     }
@@ -2142,6 +2151,14 @@ GET ${baseUrl}/api/proxy/passage-runner/prompt
     const markdownEscapingNote = isDeclaredLinear
       ? ' Linear stores markdown punctuation backslash-escaped (e.g. \\#\\#, \\*\\*), so quoting either the escaped bytes or the rendered text works.'
       : ' quoting either the stored bytes or the rendered text works.';
+    // LIN-2352: teamId's requirement is now conditional per-provider, so its
+    // note is split out of the projectId/stateId symbolic-ref sentence below
+    // (same isDeclaredLinear-style conditional pattern) rather than reworded
+    // globally — a provider that doesn't require it also refuses an explicit
+    // value with 400, which the old unconditional sentence would misstate.
+    const teamRequirementNote = requiresTeam
+      ? 'teamId is required for this workspace.'
+      : 'teamId is required only when your workspace\'s provider declares team support; an explicit value on a provider that doesn\'t is refused with 400.';
 
     const writeEndpoints = scope === 'readWrite' ? `
 
@@ -2161,8 +2178,8 @@ POST ${baseUrl}/api/proxy/issues
   → ${priorityScaleNote}Prefer "priorityLevel" instead: the canonical ASCENDING scale shared across every provider — 0 = unknown, 1 = lowest … 4 = highest (Linear: 4 = Urgent). Both map to the same underlying field; sending both in one request is refused 400.
   → Create a new issue; set parentId (UUID) to create as a sub-issue. Returns 201:
   → { "success": true, "issue": { /* the SAME flat shape as GET /issues/{id} (minus children/comments/relations): id, identifier, title, description, state, labels, priority, priorityLabel, priorityLevel, team, teamId, project, parent, cycle, estimate, dueDate, … */ } }
-  → Optional fields your workspace's provider doesn't support are refused with 400, never silently dropped (GitHub-backed: no stateId/assigneeId/priority/priorityLevel/cycleId/parentId; Local-backed: no assigneeId/cycleId). Whatever the response DOES echo is self-verifying — it reflects the post-write state of every field the request set, so you do NOT need a follow-up GET to confirm those landed.
-  → teamId/stateId/projectId accept symbolic refs, not just UUIDs: teamId as a team key (e.g. LIN) or name; stateId as a keyword (done/in-progress/todo/backlog/canceled/duplicate) or state name; projectId as a project name. Ambiguous or unknown names fail with 422 (UUID is the unambiguous escape hatch).
+  → Optional fields your workspace's provider doesn't support are refused with 400, never silently dropped (GitHub-backed: no teamId/stateId/assigneeId/priority/priorityLevel/cycleId/parentId; Local-backed: no teamId/assigneeId/cycleId). Whatever the response DOES echo is self-verifying — it reflects the post-write state of every field the request set, so you do NOT need a follow-up GET to confirm those landed.
+  → ${teamRequirementNote} On a provider that requires it, teamId/stateId/projectId accept symbolic refs, not just UUIDs: teamId as a team key (e.g. LIN) or name; stateId as a keyword (done/in-progress/todo/backlog/canceled/duplicate) or state name; projectId as a project name. Ambiguous or unknown names fail with 422 (UUID is the unambiguous escape hatch).
 
 PATCH ${baseUrl}/api/proxy/issues/{issueId}
   Body: { "title": "...", "description": "...", "stateId": "...", "assigneeId": "...", "priority": 0-4, "cycleId": "...", "parentId": "...|null" }
@@ -3265,10 +3282,18 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         return badRequest.json(res, 'Provide only one of priority (Linear-native) or priorityLevel (canonical ascending), not both');
       }
 
-      // teamId is required and may be a UUID, a team key (e.g. `LIN`), or a team
-      // name (LIN-556); the symbolic→id resolution happens once below so the
-      // resolved id can also scope the symbolic stateId.
-      if (!teamId || typeof teamId !== 'string') {
+      // LIN-2352: teamId is only required when the provider's create contract
+      // declares it — sourced from createFields() (LIN-1972's contract; NOT
+      // supports()/fetchTeams(), which a teamless-but-writable provider like
+      // GitHub/Local can still return non-empty/true for). A teamless
+      // provider must never be asked for one. When required, it may be a
+      // UUID, a team key (e.g. `LIN`), or a team name (LIN-556); the
+      // symbolic→id resolution happens once below so the resolved id can also
+      // scope the symbolic stateId.
+      const fields = provider.createFields();
+      const requiresTeam = fields.includes('teamId');
+
+      if (requiresTeam && (!teamId || typeof teamId !== 'string')) {
         logEvent(req, '/api/proxy/issues', 400);
         return badRequest.json(res, 'Valid teamId is required');
       }
@@ -3285,15 +3310,28 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         return badRequest.json(res, createFieldError);
       }
 
-      const resolvedTeamId = await resolveTeamInput(provider, token, teamId);
+      // LIN-2352: a create has no fetched issue to derive a team from, so
+      // supply provider.name directly when the contract excludes teamId — a
+      // real non-empty string every teamless states() implementation accepts
+      // and ignores (mirrors LIN-1972's workspace-api.js reference), keeping
+      // resolveStateInput's `if (!teamId) throw 422` guard untripped on
+      // either lane.
+      const resolvedTeamId = requiresTeam
+        ? await resolveTeamInput(provider, token, teamId)
+        : provider.name;
 
       // LIN-1557: `apiWriteFields()` — the provider's headless-door write
       // contract, deliberately separate from `createFields()` (the UI-form
-      // descriptor) — governs every OPTIONAL field below. A field the caller
-      // sent that the provider does not honour is refused with 400 instead of
-      // being silently forwarded and discarded on a false 201. teamId/title
-      // stay required unconditionally, unchanged (LIN-1976 owns teamless-
-      // create parity separately).
+      // descriptor) — governs every OTHER optional field below. A field the
+      // caller sent that the provider does not honour is refused with 400
+      // instead of being silently forwarded and discarded on a false 201.
+      // title stays required unconditionally. teamId is conditionally
+      // required per createFields() (LIN-2352, not LIN-1976 — LIN-1976
+      // instance 3 is the separate feedback-route lane); its stray-value
+      // refusal below is deliberately keyed on the SAME `requiresTeam` signal
+      // rather than on apiWriteFields(), since a provider disagreeing between
+      // the two lists would otherwise become uncreatable (required by one
+      // check, refused by the other).
       const writableFields = provider.apiWriteFields();
       const refuseUnwritable = (field) => {
         logEvent(req, '/api/proxy/issues', 400);
@@ -3301,7 +3339,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         return true;
       };
 
-      const input = { teamId: resolvedTeamId, title };
+      if (teamId !== undefined && !requiresTeam) return refuseUnwritable('teamId');
+
+      const input = { title };
+      if (requiresTeam) input.teamId = resolvedTeamId;
       if (description) input.description = description;
       // LIN-556: projectId / stateId accept symbolic names alongside UUIDs.
       // State is scoped to the just-resolved team so symbolic matches cannot

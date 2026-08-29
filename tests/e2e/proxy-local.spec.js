@@ -177,8 +177,9 @@ test.describe('Proxy API — local workspace e2e (LIN-584)', () => {
   // ---- Writes: issues + comments ------------------------------------------
 
   test('POST /issues creates an issue that then reads back (real data path)', async ({ request }) => {
+    // LIN-2352: Local's createFields() omits teamId — no fabricated UUID needed.
     const resp = await write(request, 'post', '/api/proxy/issues', {
-      teamId: ANY_UUID, title: 'Created over the proxy', description: 'fresh body',
+      title: 'Created over the proxy', description: 'fresh body',
     });
     expect(resp.status()).toBe(201);
     const body = await resp.json();
@@ -233,12 +234,35 @@ test.describe('Proxy API — local workspace e2e (LIN-584)', () => {
   // priority the request set, with no follow-up GET (LIN-589).
   test('POST echo is self-verifying: reflects the set priority + priorityLabel (LIN-589)', async ({ request }) => {
     const resp = await write(request, 'post', '/api/proxy/issues', {
-      teamId: ANY_UUID, title: 'Urgent thing', priority: 1,
+      title: 'Urgent thing', priority: 1,
     });
     expect(resp.status()).toBe(201);
     const issue = (await resp.json()).issue;
     expect(issue.priority).toBe(1);
     expect(issue.priorityLabel).toBe('Urgent');
+  });
+
+  // LIN-2352: state-resolution non-regression witness. resolveStateInput
+  // throws 422 when its teamId argument is falsy — a teamless create must
+  // pass provider.name as a real placeholder so a symbolic stateId still
+  // resolves, never regressing 201 → 422 now that teamId itself is optional.
+  test('POST /issues {stateId} with no teamId still resolves the symbolic state (LIN-2352)', async ({ request }) => {
+    const resp = await write(request, 'post', '/api/proxy/issues', {
+      title: 'State-scoped without a team', stateId: 'done',
+    });
+    expect(resp.status()).toBe(201);
+    const issue = (await resp.json()).issue;
+    expect(issue.state.type).toBe('completed');
+  });
+
+  // LIN-2352: Local's own instance of the stray-teamId refusal, complementing
+  // GitHub's in tests/unit/proxy-github-write-routes.test.js.
+  test('POST /issues with an explicit teamId on a teamless provider → 400 (LIN-2352)', async ({ request }) => {
+    const resp = await write(request, 'post', '/api/proxy/issues', {
+      title: 'Should not land', teamId: ANY_UUID,
+    });
+    expect(resp.status()).toBe(400);
+    expect((await resp.json()).error).toContain('teamId is not supported');
   });
 
   // LIN-1557: the write-contract gate composed with a REAL provider's own
@@ -247,7 +271,7 @@ test.describe('Proxy API — local workspace e2e (LIN-584)', () => {
   // an id), so the field is refused rather than silently dropped on a false 201.
   test('POST /issues refuses a field the real provider does not honour (LIN-1557)', async ({ request }) => {
     const resp = await write(request, 'post', '/api/proxy/issues', {
-      teamId: ANY_UUID, title: 'Refused before create', assigneeId: ANY_UUID,
+      title: 'Refused before create', assigneeId: ANY_UUID,
     });
     expect(resp.status()).toBe(400);
     expect((await resp.json()).error).toContain('assigneeId');

@@ -1304,10 +1304,10 @@ Success responses wrap the affected entity (e.g. `{ "success": true, "issue": {.
 
 Write inputs accept LLM-friendly references in addition to raw UUIDs — you no longer have to look up an id first. This is **input-only**: stored data and every read/response shape are unchanged, and existing UUID payloads behave exactly as before.
 
-- **States** (`stateId`): a UUID, a canonical state keyword — `done`/`completed`, `in-progress`/`started`, `todo`/`unstarted`, `backlog`, `canceled`/`cancelled`, `duplicate` — or the literal state name (case-insensitive). On update the state is scoped to the issue's own team; on create, to the `teamId` you pass.
+- **States** (`stateId`): a UUID, a canonical state keyword — `done`/`completed`, `in-progress`/`started`, `todo`/`unstarted`, `backlog`, `canceled`/`cancelled`, `duplicate` — or the literal state name (case-insensitive). On update the state is scoped to the issue's own team; on create, to the `teamId` you pass — this symbolic scoping only applies on a provider that requires a team (see Teams below; a teamless provider still resolves `stateId` correctly, just without team-scoping).
 - **Labels** (`labelId`, in the add/remove endpoints): a UUID or the label name (case-insensitive).
 - **Projects** (`projectId`): a UUID or the exact project name (case-insensitive).
-- **Teams** (`teamId`): a UUID, the team key (e.g. `LIN`), or the team name (case-insensitive).
+- **Teams** (`teamId`): a UUID, the team key (e.g. `LIN`), or the team name (case-insensitive) — but only on a provider that declares team support (see the Create Issue provider-compatibility note below). On a provider that doesn't, an explicit `teamId` — symbolic or UUID — is refused with `400` rather than resolved.
 
 Resolution order is **UUID → native identifier → symbolic name/type**, so a UUID is always an unambiguous escape hatch. If a symbolic reference matches more than one entity (e.g. two workflow states of the same type, or two labels differing only by case) the request fails with **`422`** and lists the candidate `{id, name}` pairs — pass the UUID to disambiguate. An unmatched name also fails with `422` rather than being silently dropped.
 
@@ -1336,7 +1336,7 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `teamId` | UUID / key / name | Yes | Team to create issue in (UUID, team key e.g. `LIN`, or name) |
+| `teamId` | UUID / key / name | Yes, if your workspace's provider declares team support (see Provider compatibility below); an explicit value is refused with `400` on a provider that doesn't | Team to create issue in (UUID, team key e.g. `LIN`, or name) |
 | `title` | string | Yes | Issue title (max 1000 chars) |
 | `description` | string | No | Markdown description (max 100K chars) |
 | `projectId` | UUID / name | No | Assign to project (UUID or exact project name) |
@@ -1349,8 +1349,8 @@ Content-Type: application/json
 
 **Provider compatibility.** Not every optional field above is honoured by every provider. An unsupported one is **refused with `400`** rather than silently dropped on a false `201` (a behavior change — earlier versions of this endpoint accepted and silently discarded these fields):
 
-- **GitHub-backed workspaces** do not support `stateId`, `assigneeId`, `parentId`, `cycleId`, `priority`/`priorityLevel` (both map to the same provider capability).
-- **Local-backed workspaces** do not support `assigneeId`, `cycleId`.
+- **GitHub-backed workspaces** do not support `teamId`, `stateId`, `assigneeId`, `parentId`, `cycleId`, `priority`/`priorityLevel` (both map to the same provider capability).
+- **Local-backed workspaces** do not support `teamId`, `assigneeId`, `cycleId`.
 - **Linear-backed workspaces** support every field above.
 
 Returns `201`. The echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus the `children` / `comments` / `relations` collections, which a create cannot set) — self-verifying, so you do **not** need a follow-up `GET` to confirm the fields the request set (an unsupported field never reaches this point, per the compatibility note above). `priorityLevel` is always present alongside `priority`/`priorityLabel` on every read and write echo, for every provider — it is derived, not something you have to request:

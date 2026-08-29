@@ -108,8 +108,8 @@ describe('GET /api/proxy/instructions — provider identity (LIN-2354)', () => {
 
     test('the field-support tables (create-refuses / patch-drops) are untouched by the conditioning', async () => {
       const { text } = await call(buildApp({ providerName: 'github' }), '/api/proxy/instructions');
-      assert.ok(text.includes('GitHub-backed: no stateId/assigneeId/priority/priorityLevel/cycleId/parentId'),
-        'the create-refuses enumeration for GitHub stays intact');
+      assert.ok(text.includes('GitHub-backed: no teamId/stateId/assigneeId/priority/priorityLevel/cycleId/parentId'),
+        'the create-refuses enumeration for GitHub stays intact (LIN-2352 adds teamId to it)');
       assert.ok(text.includes('GitHub-backed: priority/priorityLevel/assigneeId/parentId/cycleId are dropped'),
         'the patch-drops enumeration for GitHub stays intact');
     });
