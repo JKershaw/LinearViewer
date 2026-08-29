@@ -115,6 +115,65 @@ describe('GET /api/proxy/instructions — provider identity (LIN-2354)', () => {
     });
   });
 
+  // LIN-2352 plan-review Finding 1 (BLOCKER): the POST /api/proxy/issues
+  // symbolic-refs sentence conditioned teamId/stateId/projectId as one
+  // group on `requiresTeam`. That is correct for teamId (a teamless
+  // provider 400s on any explicit value) but false for stateId/projectId:
+  // this PR's own e2e coverage proves symbolic stateId resolves on a
+  // teamless (Local-backed) create, just without team-scoping. Neither
+  // branch of `teamRequirementNote` (nor the split it renders) was
+  // asserted anywhere before this — the coverage hole the review named.
+  describe('POST /api/proxy/issues symbolic-refs split (LIN-2352 review Finding 1)', () => {
+    test('a teamless (GitHub-backed) workspace keeps the teamless teamId policy but still documents symbolic stateId/projectId', async () => {
+      const { text } = await call(buildApp({ providerName: 'github' }), '/api/proxy/instructions');
+
+      assert.ok(
+        text.includes('teamId is required only when your workspace\'s provider declares team support; an explicit value on a provider that doesn\'t is refused with 400.'),
+        'teamless branch keeps stating the conditional-refusal teamId policy'
+      );
+      assert.ok(
+        !text.includes('teamId accepts a team key'),
+        'a teamless provider never claims teamId accepts a symbolic ref — it refuses any explicit teamId with 400'
+      );
+      assert.ok(
+        text.includes('stateId/projectId accept symbolic refs, not just UUIDs'),
+        'symbolic stateId/projectId support is documented unconditionally, not gated on team support'
+      );
+      assert.ok(
+        !/stateId as a keyword \([^)]*\) or state name, scoped to the team you pass/.test(text),
+        'a teamless provider must not claim team-scoped state resolution'
+      );
+    });
+
+    test('a teamless (Local-backed) workspace keeps the teamless teamId policy but still documents symbolic stateId/projectId', async () => {
+      const { text } = await call(buildApp({ providerName: 'local' }), '/api/proxy/instructions');
+
+      assert.ok(
+        text.includes('teamId is required only when your workspace\'s provider declares team support; an explicit value on a provider that doesn\'t is refused with 400.')
+      );
+      assert.ok(!text.includes('teamId accepts a team key'));
+      assert.ok(text.includes('stateId/projectId accept symbolic refs, not just UUIDs'));
+      assert.ok(!/stateId as a keyword \([^)]*\) or state name, scoped to the team you pass/.test(text));
+    });
+
+    test('a team-requiring (Linear-backed) workspace documents symbolic teamId support and team-scoped state resolution', async () => {
+      const { text } = await call(buildApp({ providerName: 'linear' }), '/api/proxy/instructions');
+
+      assert.ok(
+        text.includes('teamId is required for this workspace.'),
+        'team-requiring branch states teamId is required'
+      );
+      assert.ok(
+        text.includes('teamId accepts a team key (e.g. LIN) or name as well as a UUID.'),
+        'team-requiring branch documents symbolic teamId support'
+      );
+      assert.ok(
+        /stateId as a keyword \([^)]*\) or state name, scoped to the team you pass/.test(text),
+        'team-requiring branch documents state resolution as scoped to the team you pass'
+      );
+    });
+  });
+
   describe('Linear byte-parity — non-vacuity guard', () => {
     test('a linear-backed workspace still names Linear and keeps the priority-scale/markdown notes', async () => {
       const app = buildApp({ providerName: 'linear' });
