@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import http from 'http';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
+import { EMPTY_PROVIDER_CONTEXT } from '../../lib/prompt-trace-store.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
@@ -68,28 +69,31 @@ test('no promptTraceStore configured: 200 with an empty page, never 503', async 
   const app = buildApp({ promptTraceStore: null });
   const { status, body } = await get(app, '/workspace/test-workspace/api/prompt-traces');
   assert.equal(status, 200);
-  assert.deepEqual(body, { items: [], total: 0 });
+  assert.deepEqual(body, { items: [], total: 0, providerContext: EMPTY_PROVIDER_CONTEXT });
 });
 
 test('lists traces from the store, forwarding parsed limit/offset', async () => {
   const calls = [];
+  const providerContextFixture = { ...EMPTY_PROVIDER_CONTEXT, traces: 3, untracedContext: 1, divergent: 1, expectedDisplayName: 'Linear' };
   const promptTraceStore = {
     listTraces: async (urlKey, opts) => {
       calls.push({ urlKey, opts });
       return { items: [{ id: 't1' }], total: 1 };
-    }
+    },
+    summarizeProviderContext: async () => providerContextFixture
   };
   const app = buildApp({ promptTraceStore });
   const { status, body } = await get(app, '/workspace/test-workspace/api/prompt-traces?limit=10&offset=5');
   assert.equal(status, 200);
-  assert.deepEqual(body, { items: [{ id: 't1' }], total: 1 });
+  assert.deepEqual(body, { items: [{ id: 't1' }], total: 1, providerContext: providerContextFixture });
   assert.deepEqual(calls, [{ urlKey: 'test-workspace', opts: { limit: 10, offset: 5 } }]);
 });
 
 test('clamps limit to [1, 200] and offset to >= 0, defaulting to 50/0', async () => {
   const calls = [];
   const promptTraceStore = {
-    listTraces: async (urlKey, opts) => { calls.push(opts); return { items: [], total: 0 }; }
+    listTraces: async (urlKey, opts) => { calls.push(opts); return { items: [], total: 0 }; },
+    summarizeProviderContext: async () => EMPTY_PROVIDER_CONTEXT
   };
   const app = buildApp({ promptTraceStore });
   await get(app, '/workspace/test-workspace/api/prompt-traces?limit=9999&offset=-5');
@@ -101,6 +105,11 @@ test('clamps limit to [1, 200] and offset to >= 0, defaulting to 50/0', async ()
 });
 
 test('a store error surfaces as 500 { error }, not a crash', async () => {
+  // listTraces throws before summarizeProviderContext is ever reached (the
+  // route awaits them sequentially), so this fake needs no
+  // summarizeProviderContext stub — the assertion below stays byte-identical
+  // to the pre-LIN-2357 body on purpose; do not "fix" it into symmetry with
+  // the two tests above.
   const promptTraceStore = { listTraces: async () => { throw new Error('boom'); } };
   const app = buildApp({ promptTraceStore });
   const { status, body } = await get(app, '/workspace/test-workspace/api/prompt-traces');
