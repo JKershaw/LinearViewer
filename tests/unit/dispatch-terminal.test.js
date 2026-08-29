@@ -400,4 +400,78 @@ describe('deriveLifecycleStatus (LIN-2079)', () => {
       assert.equal(deriveLifecycleStatus(merged), 'blocked', 'a rootItemId-less post never joins the anchor lineage, so the row is stuck exactly as LIN-2268 found');
     });
   });
+
+  // LIN-2333: dispatcher.js's three resume-FAILURE markers (no-transcript, unmappable-model,
+  // resume-launch-failed) omitted rootItemId identically to LIN-2268's [working] resume post —
+  // same defect class, on the failure paths instead of the success path. The fix threads
+  // rootItemId when the target's pre-attempt phase was parked (BLOCKED/AWAITING_EXTERNAL). This
+  // is the mandatory consumer pin (plan-review F1): it drives deriveLifecycleStatus from the REAL
+  // mergeLineageFeedback/deriveLifecycleStatus exports over the real production message shapes,
+  // not the SD-side mirror, so a drift in this file's regex/derivation/merge logic fails here
+  // independently of the SD-side tests.
+  describe('resume-failure markers threaded with rootItemId on a parked anchor (LIN-2333)', () => {
+    const SINCE = '2026-08-20T00:00:00.000Z';
+    const ANCHOR = 'root-1';
+
+    function anchorParkedFeedback() {
+      return [
+        { message: '[blocked] needs a human decision', timestamp: '2026-08-20T01:00:00.000Z', rootItemId: ANCHOR }
+      ];
+    }
+
+    test('no-transcript [failed] (dispatcher.js:667), rootItemId threaded on a parked target, derives failed on the anchor', () => {
+      const followUpRow = {
+        feedback: [
+          {
+            message: '[failed] Cannot resume session sess1234: its transcript was never flushed to disk, so there is no conversation to resume.',
+            timestamp: '2026-08-20T02:00:00.000Z',
+            kind: 'status',
+            rootItemId: ANCHOR
+          }
+        ]
+      };
+      const merged = mergeLineageFeedback(anchorParkedFeedback(), [followUpRow], ANCHOR, SINCE);
+      assert.equal(deriveLifecycleStatus(merged), 'failed');
+    });
+
+    test('unmappable-model [failed] (dispatcher.js:687), rootItemId threaded on a parked target, derives failed on the anchor', () => {
+      const followUpRow = {
+        feedback: [
+          {
+            message: '[failed] Cannot resume session sess1234: opencode cannot run claude-3-x. Fix the workspace/dispatch routing so the model matches the harness — SD will not silently substitute one.',
+            timestamp: '2026-08-20T02:00:00.000Z',
+            kind: 'status',
+            rootItemId: ANCHOR
+          }
+        ]
+      };
+      const merged = mergeLineageFeedback(anchorParkedFeedback(), [followUpRow], ANCHOR, SINCE);
+      assert.equal(deriveLifecycleStatus(merged), 'failed');
+    });
+
+    test('resume-launch-failed [failed] (dispatcher.js:798), rootItemId threaded on a parked target, derives failed on the anchor', () => {
+      const followUpRow = {
+        feedback: [
+          {
+            message: '[failed] Failed to resume iTerm session: boom',
+            timestamp: '2026-08-20T02:00:00.000Z',
+            kind: 'status',
+            rootItemId: ANCHOR
+          }
+        ]
+      };
+      const merged = mergeLineageFeedback(anchorParkedFeedback(), [followUpRow], ANCHOR, SINCE);
+      assert.equal(deriveLifecycleStatus(merged), 'failed');
+    });
+
+    test('negative control: the SAME resume-launch-failed marker, unanchored (as dispatcher.js posts when the pre-attempt phase was NOT parked), never joins the anchor lineage', () => {
+      const followUpRow = {
+        feedback: [
+          { message: '[failed] Failed to resume iTerm session: boom', timestamp: '2026-08-20T02:00:00.000Z', kind: 'status' /* no rootItemId — active or already-terminal target */ }
+        ]
+      };
+      const merged = mergeLineageFeedback(anchorParkedFeedback(), [followUpRow], ANCHOR, SINCE);
+      assert.equal(deriveLifecycleStatus(merged), 'blocked', 'unanchored feedback is filtered out by mergeLineageFeedback, so the anchor stays on its own last marker');
+    });
+  });
 });
