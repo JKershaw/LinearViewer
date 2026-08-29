@@ -10,33 +10,25 @@
 
 # Findings, severity-ranked
 
-## H1 · **HIGH** — the `/api/proxy/instructions` blob understates the `409` contract on the exact transition this task must make, and is a drifting second representation of `docs/proxy-integration.md`
+## H1 · **MED** — the `/api/proxy/instructions` blob's quick-reference `409` table omits two codes it documents in full elsewhere, and is missing two gate codes and two endpoints entirely
 
-**What.** `routes/proxy.js:2388`, the sole documented `409` cause inside the `/api/proxy/instructions` plain-text blob:
+**Corrected after adversarial second-read — see appendix.** This finding originally shipped as **HIGH**, on the claim that `DUPLICATE_DISPATCH` and `BUDGET_EXHAUSTED` were "absent from the blob entirely." **That claim was wrong**, caught by this report's own required adversarial second-read: it rested on a mis-scoped citation (`routes/proxy.js:1794–2146`), which is only the `readEndpoints` half of the blob and stops one line before the `writeEndpoints`/dispatch sections begin. Re-checked against the full blob: `DUPLICATE_DISPATCH` (`routes/proxy.js:2263,2278,2292`) and `BUDGET_EXHAUSTED` (`routes/proxy.js:2294`) are each documented at length in the blob's dispatch-endpoint prose — arguably in more operational depth (retry guidance, "what to do," mutual-exclusion rules) than `docs/proxy-integration.md` itself — and that prose is concatenated into the served text (`routes/proxy.js:2355`, `${readEndpoints}${writeEndpoints}`) and sent verbatim (`:2473`). The correction is reflected here and in a scope-correction comment on the minted follow-up (LIN-2390).
+
+**What genuinely holds, re-verified at `292ac962`.** The blob's separate, consolidated `## Error Codes` quick-reference table (`routes/proxy.js:2388`) really does list only one `409` cause:
 
 ```
 409 - Refusing to modify a trashed (soft-deleted) issue (write endpoints)
 ```
 
-Re-verified directly at `292ac962`: the blob's read/write-endpoint sections (`routes/proxy.js:1794–2146`) contain no other 409 mention. At HEAD, `PATCH /api/proxy/issues/:id` and the dispatch-creation endpoints can answer `409` for **four** causes / **five** codes:
+— so a caller skimming only that summary table (rather than the fuller dispatch-endpoint prose, where both codes are in fact documented) gets an incomplete picture. And two causes are genuinely absent from the blob **everywhere**, not documented anywhere in it: `PERIODICAL_REPORT_NOT_PERSISTED` and `PERIODICAL_ADVERSARIAL_READ_NOT_RECORDED` (both thrown from `lib/periodical-report-gate.js`, on the exact `PATCH …→done` transition this task itself must make). These are real gaps in `docs/proxy-integration.md`'s favor, but narrower than originally claimed: a table omission plus a genuine two-code absence, not "three of five causes missing from the blob entirely."
 
-| cause | code | source |
-|---|---|---|
-| trashed target | — | documented (blob + guide) |
-| duplicate dispatch | `DUPLICATE_DISPATCH` | `routes/proxy.js:994`, `docs/proxy-integration.md:1731,1736,1966` |
-| task budget exhausted | `BUDGET_EXHAUSTED` | `routes/proxy.js:1035`, `docs/proxy-integration.md:1749,1754,1967` |
-| periodical report not persisted | `PERIODICAL_REPORT_NOT_PERSISTED` | `lib/periodical-report-gate.js` |
-| adversarial read not recorded | `PERIODICAL_ADVERSARIAL_READ_NOT_RECORDED` | `lib/periodical-report-gate.js` |
-
-`docs/proxy-integration.md:1763` explicitly instructs *"Branch on `code`, not on the status: `409` is also used by the trashed-issue refusal."* — three of the five causes are absent from the blob entirely, including the two an automated periodical-review agent (such as this one) can hit on the exact `PATCH …→done` transition that concludes this task.
-
-Same blob, same maintenance-asymmetry class, additional gaps confirmed present in `docs/proxy-integration.md` and absent from the blob at `292ac962`:
+Two endpoint gaps also independently hold, confirmed present in `docs/proxy-integration.md` and absent from the blob at `292ac962`:
 - `GET /api/proxy/issues/{identifier}/snapshots` (`routes/proxy.js:4669`) and `/snapshots/diff` (`:4702`) — zero hits in the blob's read-endpoints section.
-- `GET /api/proxy/issues/{identifier}/prompt/{templateKey}` — the blob's own task-automation line (`routes/proxy.js:1882`, *"task-automation endpoints (recommend/recap/brief/prompt)"*) names `prompt` as one of four, but documents only the other three's shapes.
+- `GET /api/proxy/issues/{identifier}/prompt/{templateKey}` — the blob's own task-automation line names `prompt` as one of four task-automation endpoints but documents only the other three's shapes.
 
-**The maintenance asymmetry is the real finding, and it is confirmed still true at HEAD.** `docs/proxy-integration.md` carries both new 409 codes and the snapshots endpoints in full; the blob carries neither. Two hand-maintained representations of one contract; only one is kept current.
+**Revised severity: MED, not HIGH.** The blob is not stale on the dispatch-creation 409s — that half of the original claim, which drove the HIGH ranking, does not hold. The real, narrower fix (add the two gate codes and the two endpoints; cross-reference `DUPLICATE_DISPATCH`/`BUDGET_EXHAUSTED` into the quick-reference table alongside the trashed-issue cause for skimmability) is still worth doing, just at lower severity and narrower scope than originally minted.
 
-**Confidence: verified at HEAD `292ac962`** — every line cited was re-read directly in this execution pass, not copied from the research comment.
+**Confidence: corrected at HEAD `292ac962` after independent adversarial re-verification; the original claim was verified-but-wrong, not carried-and-stale — the citation error was this pass's own, not inherited from research.**
 
 ---
 
@@ -189,7 +181,7 @@ Two additional seed items from the ticket's own resolved-list were re-verified a
 
 | ticket | finding | why promoted |
 |---|---|---|
-| **[LIN-2390](https://linear.app/issue/LIN-2390)** | **H1** — `/api/proxy/instructions` blob: 409/endpoint/capability drift vs. `docs/proxy-integration.md` | Highest consequence — misdirects the exact agent class this repo dispatches, on the exact transition this task itself must make |
+| **[LIN-2390](https://linear.app/issue/LIN-2390)** | **H1 (corrected scope — see appendix)** — `/api/proxy/instructions` blob: quick-reference 409 table + two gate codes + two endpoint gaps vs. `docs/proxy-integration.md` | Still worth fixing — the exact `PATCH …→done` transition this task itself must make is one of the two genuinely-undocumented causes — but at MED, not the original HIGH; a scope-correction comment was posted to the ticket |
 | **[LIN-2391](https://linear.app/issue/LIN-2391)** | **H2 + H3 combined, one `CLAUDE.md` ticket** — Jira read-only/no-OAuth claim + residual Linear-only framing (proxy.js/proxy-integration.md/audit.js entries, `## Linear API` section, Settings copy mirror) | Same defect class (stale provider-framing prose) in one file; LIN-2248 is the template for the fix |
 | **[LIN-2392](https://linear.app/issue/LIN-2392)** | **H4** — `content/landing.md`: 3-of-5 backend count + 14-vs-17 template count | Two-line subtractive fix on the only public, unauthenticated copy surface; same defect class LIN-2248/2250 already fixed elsewhere |
 
@@ -223,7 +215,7 @@ See §6 for the cross-link disposition of already-owned findings (F2, LIN-2177's
 
 | item | 08-23 | 08-29 | movement |
 |---|---|---|---|
-| `proxy-instructions-blob-409-drift` (H1) | not examined (H1 is new this run) | blob documents 1 of 5 409 causes; also missing snapshots/prompt-template endpoints | **new, high** |
+| `proxy-instructions-blob-409-drift` (H1) | not examined (H1 is new this run) | quick-reference table documents 1 of 3 table-worthy 409 causes; 2 gate codes genuinely undocumented anywhere; also missing snapshots/prompt-template endpoints. **Shipped first as HIGH, corrected to MED by this run's own required adversarial second-read** (see appendix) — the initial claim that `DUPLICATE_DISPATCH`/`BUDGET_EXHAUSTED` were wholly absent rested on a mis-scoped citation | **new, med (self-corrected within this run)** |
 | `claude-md-jira-readonly-claim` (H2) | not examined | contradicts source module, README, `.env.example`, and itself | **new, high** |
 | `claude-md-linear-only-framing` (H3) | not examined as a `CLAUDE.md`-specific finding | `:40/:240/:439` vs. `:494`'s own heading; README's equivalent (F1) is fixed, this twin is not | **new, high — the agent-facing counterpart of a fixed human-facing defect** |
 | `landing-md-backend-template-drift` (H4) | not examined (`content/landing.md` never previously reviewed) | 3 of 5 backends named; 14 vs. 17 templates | **new, med-high — same defect class as fixed F1/F4, on a newly-examined surface** |
@@ -240,14 +232,24 @@ See §6 for the cross-link disposition of already-owned findings (F2, LIN-2177's
 
 ## Adversarial Second-Read
 
-*(Filled in after the second-read dispatch — see the mandatory gate comment on LIN-2379 for the machine-readable form of these same three fields.)*
+**Tier:** Tier 2 — a fresh-context sub-agent, dispatched with no memory of this report-writing session, given only the published report file and full access to re-read both repos' source independently.
 
-**Tier:** _pending_
-**Question asked:** "What is the largest item in this window that this report missed or misfiled?"
-**Reader's answer in full:** _pending_
+**Question asked:** *"What is the largest item in this window that this report missed or misfiled?"*
+
+**Reader's answer in full:**
+
+> The report's own top-ranked finding, **H1** (originally minted as ticket LIN-2390), is itself materially misfiled — it overstates the `/api/proxy/instructions` blob's drift by mis-scoping its evidence. H1 claimed "the blob's read/write-endpoint sections (`routes/proxy.js:1794–2146`) contain no other 409 mention" and concluded "three of the five causes are absent from the blob entirely," specifically naming `DUPLICATE_DISPATCH` and `BUDGET_EXHAUSTED` among the absentees. This is factually wrong: the cited line range (1794–2146) stops literally at the opening of the `writeEndpoints` ternary (`routes/proxy.js:2146`) — one line before the `## Write Endpoints` header — and thus excludes the entire Write Endpoints and `## Dispatch Endpoints` sections that follow. Reading further shows `DUPLICATE_DISPATCH` is documented in exhaustive detail at `routes/proxy.js:2263` and `BUDGET_EXHAUSTED` at `routes/proxy.js:2294`, both inside `writeEndpoints`, which is concatenated into the actual served text at `routes/proxy.js:2355` and sent verbatim via `res.type('text/plain').send(text)` at `routes/proxy.js:2473`. So for exactly the read-write-scoped caller class capable of triggering these 409s, the blob documents both causes at length — arguably in more operational depth (retry guidance, "what to do," mutual-exclusion rules) than `docs/proxy-integration.md` itself. The one place a single-cause 409 line genuinely exists is the blob's separate, consolidated `## Error Codes` quick-reference table (`routes/proxy.js:2388`), which really does list only the trashed-issue cause — a real but much narrower and lower-severity gap (a summary-table omission, not "two hand-maintained representations of the same contract, only one of which is current"). The two periodical-report-gate codes are the only causes genuinely absent from the blob everywhere. Notably, the prior edition (`documentation-review-2026-08-23.md`, §6) explicitly checked this same blob and reported "No finding" — this edition's reversal into a HIGH, ticket-spawning finding rests on the mis-scoped citation described above.
+>
+> Verdict: AGREE — the rest of the report's findings (H2's Jira read-only/no-OAuth self-contradiction, H3's `CLAUDE.md` Linear-only framing, the landing.md backend/template counts, the view-tiers and file-map drift measurements, the simple-dispatcher cross-links) check out against source on independent spot-verification and the severity ordering among them looks sound. The report is generally trustworthy; H1 specifically was overstated.
+>
+> Differs from the report's own top-ranked finding (H1): YES. My finding is not a separate item elsewhere in the window — it is a correction of H1 itself, showing its central evidentiary claim (which drove its HIGH severity and its promotion to a minted ticket) is based on an incomplete read of the source file.
+>
+> Recommended disposition: escalated. This is not a trivial line-edit to the report prose — H1's overstatement directly inflated the severity and scope of a minted ticket, which as written asked for a fix to a "maintenance asymmetry" that mostly doesn't exist for the two causes it named most prominently. The follow-up ticket needs a scope-correcting comment: the real, narrower fix is (a) add duplicate-dispatch/budget-exhausted to the blob's own quick-reference table for cross-reference, and (b) add the two periodical-report-gate codes and the snapshots/`prompt/{templateKey}` endpoint gaps (which do independently check out) — not a broader rewrite implying the blob is stale on the dispatch-creation 409s, which it is not.
+
+**Disposition taken:** *fixed in place* in the report (H1's text above was rewritten in this same pass to carry the corrected, narrower MED-severity finding rather than the original HIGH claim) *and* **escalated** via a scope-correcting comment posted directly to the minted follow-up, [LIN-2390](https://linear.app/issue/LIN-2390) — narrowing its ask to the quick-reference-table cross-reference plus the two genuinely-undocumented gate codes and the two endpoint gaps, rather than a broader claim that the blob is stale on the dispatch-creation 409s.
 
 ```
-Adversarial second-read verdict: PENDING
-Differed from top finding: PENDING
-Disposition: PENDING
+Adversarial second-read verdict: AGREE
+Differed from top finding: YES
+Disposition: escalated
 ```
