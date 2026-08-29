@@ -56,9 +56,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 describe('ProviderInterface', () => {
   test('every declared method throws NotImplementedError by default', () => {
     const base = new ProviderInterface();
+    // Hand-enumerated rather than derived, because `ALL_SURFACE_METHODS` is
+    // module-private and not every group's members are throwing stubs. That
+    // makes a NEW group easy to forget: `apiReads` (LIN-2350) shipped
+    // unwitnessed — deleting all four of its base stubs broke nothing across
+    // 470+ provider tests — because it was declared without being added here.
+    // Its stubs are what turn an unimplemented `/api/proxy/projects`/`/issues`
+    // from a raw `TypeError` into a `NotImplementedError`, the premise
+    // LIN-2355's `NOT_IMPLEMENTED` -> 422 branch is built on. Add new groups here.
     const allMethods = [
       ...PROVIDER_SURFACE.reads,
       ...PROVIDER_SURFACE.readsHeadroom,
+      ...PROVIDER_SURFACE.apiReads,
       ...PROVIDER_SURFACE.writes,
     ];
     for (const method of allMethods) {
