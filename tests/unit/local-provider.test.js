@@ -37,6 +37,7 @@ describe('LocalProvider capability profile (LIN-356 step D)', () => {
       attachments: true,  // markdown bodies can embed upload links (LIN-771)
       priority: true,     // abstract default, not overridden (LIN-1886)
       displayName: 'Local',
+      fixedStates: null,  // abstract default, not overridden (LIN-2361) — no fixed state vocabulary declared
     });
   });
 

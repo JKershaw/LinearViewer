@@ -418,6 +418,7 @@ describe('provider.ui surface (LIN-332)', () => {
       attachments: false, // read-attachments opt-in, off by default (LIN-649)
       priority: true,     // abstract, default true (LIN-1886) — opt-out per provider
       displayName: base.name, // 'base' — the machine name, never undefined
+      fixedStates: null,  // abstract, default null (LIN-2361) — opt-in per provider, only when synchronously available
     });
     assert.strictEqual(base.ui.displayName, 'base');
   });
@@ -433,6 +434,7 @@ describe('provider.ui surface (LIN-332)', () => {
       attachments: true, // API read selects attachments + extracts md images (LIN-649)
       priority: true,   // abstract default, not overridden (LIN-1886)
       displayName: 'Linear',
+      fixedStates: null, // LIN-2361: states() is async/per-team — no synchronous vocabulary exists
     });
   });
 
@@ -493,7 +495,7 @@ describe('provider.ui surface (LIN-332)', () => {
     makeStubProvider({ write: true, displayName: 'Other' });
     // linearProvider.ui is unaffected by stub construction.
     assert.deepStrictEqual(linearProvider.ui, {
-      write: true, comments: true, inlineCreate: true, inlineEdit: true, estimates: true, subtasks: true, attachments: true, priority: true, displayName: 'Linear',
+      write: true, comments: true, inlineCreate: true, inlineEdit: true, estimates: true, subtasks: true, attachments: true, priority: true, displayName: 'Linear', fixedStates: null,
     });
   });
 });
