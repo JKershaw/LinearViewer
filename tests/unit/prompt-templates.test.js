@@ -1843,7 +1843,10 @@ import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.
 describe('resolvePromptUi (LIN-177 S4)', () => {
   test('no provider → Linear floor (every capability on, displayName Linear)', () => {
     assert.deepStrictEqual(resolvePromptUi({}, null), {
-      displayName: 'Linear', write: true, subtasks: true, comments: true, includeTracker: true
+      displayName: 'Linear', write: true, subtasks: true, comments: true, includeTracker: true,
+      // LIN-2361: null — Linear's real state vocabulary needs an async/per-team fetch, so no
+      // synchronous vocabulary is ever available here; the "Set status" wording is left as-is.
+      fixedStates: null
     });
   });
 

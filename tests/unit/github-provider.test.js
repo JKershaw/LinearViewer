@@ -110,6 +110,10 @@ describe('GitHubProvider capability profile (LIN-178)', () => {
       attachments: true,  // issue/comment bodies carry user-content uploads (LIN-771)
       priority: true,     // abstract default, not overridden (LIN-1886)
       displayName: 'GitHub Issues', // relabeled from 'GitHub' (LIN-702)
+      fixedStates: [      // LIN-2361: GITHUB_STATES, safe to surface synchronously (a fixed static array)
+        { id: 'open', name: 'Open', type: 'unstarted', position: 0 },
+        { id: 'closed', name: 'Closed', type: 'completed', position: 1 },
+      ],
     });
   });
 

@@ -112,6 +112,7 @@ describe('GitHubProjectsProvider capability profile (LIN-560)', () => {
       attachments: true,  // item body (issue/PR) carries user-content uploads (LIN-771)
       priority: true,     // abstract default, not overridden (LIN-1886)
       displayName: 'GitHub Projects',
+      fixedStates: null,  // abstract default, not overridden (LIN-2361) — no fixed state vocabulary declared
     });
   });
 
