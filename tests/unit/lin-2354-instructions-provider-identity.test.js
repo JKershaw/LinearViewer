@@ -143,6 +143,14 @@ describe('GET /api/proxy/instructions — provider identity (LIN-2354)', () => {
         !/stateId as a keyword \([^)]*\) or state name, scoped to the team you pass/.test(text),
         'a teamless provider must not claim team-scoped state resolution'
       );
+      assert.ok(
+        !text.includes('On a provider that requires it'),
+        'the teamless branch never qualifies symbolic stateId/projectId support on team support'
+      );
+      assert.ok(
+        !text.includes('teamId/stateId/projectId accept symbolic refs'),
+        'teamId is split OUT of the symbolic-refs group — an unanchored includes() cannot see this'
+      );
     });
 
     test('a teamless (Local-backed) workspace keeps the teamless teamId policy but still documents symbolic stateId/projectId', async () => {
@@ -154,6 +162,14 @@ describe('GET /api/proxy/instructions — provider identity (LIN-2354)', () => {
       assert.ok(!text.includes('teamId accepts a team key'));
       assert.ok(text.includes('stateId/projectId accept symbolic refs, not just UUIDs'));
       assert.ok(!/stateId as a keyword \([^)]*\) or state name, scoped to the team you pass/.test(text));
+      assert.ok(
+        !text.includes('On a provider that requires it'),
+        'the teamless branch never qualifies symbolic stateId/projectId support on team support'
+      );
+      assert.ok(
+        !text.includes('teamId/stateId/projectId accept symbolic refs'),
+        'teamId is split OUT of the symbolic-refs group — an unanchored includes() cannot see this'
+      );
     });
 
     test('a team-requiring (Linear-backed) workspace documents symbolic teamId support and team-scoped state resolution', async () => {
