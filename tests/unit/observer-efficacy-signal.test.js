@@ -478,6 +478,12 @@ describe('observer-efficacy-signal: compareArms', () => {
     assert.ok(bundle.caveats.some((c) => /diverge for most answered loops/i.test(c)), 'the N1 caveat must be broadened, not left describing only the narrow [skipped] case');
     // LIN-2310 (F6, cross-repo composition): findFirstBlockedMarker's [blocked] population is no longer guaranteed homogeneous.
     assert.ok(bundle.caveats.some((c) => /not guaranteed homogeneous in cause/i.test(c)), 'the cross-repo composition caveat must be present');
+    // LIN-2337: stale denylist-era prose (RUNNER_BOOKKEEPING_KINDS / isRunnerSelfTalkStatus,
+    // removed in LIN-2310) must not silently reappear in caller-facing caveats[]. Scoped to
+    // caveats[] only — the module's own comments legitimately narrate that removed mechanism
+    // as history and must not trip this.
+    assert.ok(!bundle.caveats.some((c) => /runner-emitted bookkeeping/i.test(c)), 'a caveat must not reintroduce the removed runner-emitted-bookkeeping denylist prose');
+    assert.ok(!bundle.caveats.some((c) => /self-talk/i.test(c)), 'a caveat must not reintroduce the removed self-talk denylist prose');
   });
 });
 
