@@ -2859,7 +2859,7 @@ ${goal}`
         priority,
         labels: []
       };
-      const generated = generatePrompt('triage', triageIssue, { project: null, parent: null, siblings: [] });
+      const generated = generatePrompt('triage', triageIssue, { project: null, parent: null, siblings: [] }, {}, getProviderForWorkspace(workspace)?.ui || null);
       const basePrompt = generated?.prompt;
       if (!basePrompt) return;
 

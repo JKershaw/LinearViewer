@@ -4158,7 +4158,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       // formatAttachmentsSection post-pass surfaces the worker-facing Attachments
       // section (LIN-776) — fetchIssueContext now carries it at top-level (LIN-772),
       // and dropping it here is what silently hid the section on this route.
-      const result = generatePrompt(templateKey, issue, { parent, siblings, project, children, comments, attachments }, {});
+      const result = generatePrompt(templateKey, issue, { parent, siblings, project, children, comments, attachments }, {}, provider?.ui || null);
 
       if (!result) {
         logEvent(req, '/api/proxy/prompt', 500);
@@ -4340,6 +4340,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
             apiKey: resolvedApiKey,
             model: selectedModel,
             featureFlags: {},
+            providerUi: provider?.ui || null,
             signal: AbortSignal.any([signal, hop.signal]),
             callMeta: { urlKey, feature: 'recommend', issueIdentifier: issue.identifier }
           }
@@ -4486,7 +4487,9 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
           // post-passes (appendGroundingSections: staleness / terminal-state /
           // all-subtasks-complete / bug-investigated, plus capability + attachments),
           // so every grounding section the LLM path emits is preserved here.
-          // `{}` for provider.ui keeps Linear output byte-identical to /prompt.
+          // provider?.ui is threaded through so a non-Linear provider renders
+          // capability-appropriate text (LIN-2353); Linear output stays
+          // byte-identical since its ui is the DEFAULT_PROMPT_UI floor.
           let ctx;
           try {
             ctx = await resolvePromptIssueContext(provider, accessToken, identifier, isTestMode);
@@ -4504,7 +4507,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
             return notFound.json(res, 'Issue not found');
           }
           const { issue, parent, siblings, project, children, comments, attachments } = ctx;
-          const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {});
+          const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {}, provider?.ui || null);
           if (!generated) {
             keepalive.stop();
             logEvent(req, '/api/proxy/recommend', 500);
@@ -6497,8 +6500,9 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       // override kind. The wobble this fixes is the *verb*, not the *target*, so
       // the override pins the named issue with NO descent. It is purely
       // deterministic (no OpenRouter call), so it bypasses the LLM-config gate
-      // and free-tier metering below. Linear output stays byte-identical to the
-      // /prompt endpoint by passing `{}` for provider.ui.
+      // and free-tier metering below. provider?.ui is threaded through (LIN-2353);
+      // Linear output stays byte-identical to the /prompt endpoint since its ui
+      // is the DEFAULT_PROMPT_UI floor.
       if (kind !== undefined) {
         let ctx;
         try {
@@ -6518,10 +6522,10 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         const { issue, parent, siblings, project, children, comments, attachments } = ctx;
         // Forward `attachments` (LIN-776): the verb-override dispatch path must
         // surface the same Attachments section as the LLM recommend-and-dispatch
-        // path, which already passes the full context. Keep `{}` for provider.ui —
-        // the Attachments section emits no "Linear" literal, so Linear output stays
-        // byte-identical.
-        const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {});
+        // path, which already passes the full context. provider?.ui is threaded
+        // through (LIN-2353) so a non-Linear provider renders capability-appropriate
+        // text; Linear output stays byte-identical.
+        const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {}, provider?.ui || null);
         if (!generated) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
           return jsonError(res, 500, 'Failed to generate prompt');
