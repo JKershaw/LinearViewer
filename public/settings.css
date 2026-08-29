@@ -435,6 +435,12 @@
   color: var(--green);
 }
 
+/* De-emphasized coverage-limitation sub-label (LIN-2357 provider-context disclosure). */
+.field-muted {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
 .provider-blocked {
   color: var(--fg-dim);
   font-style: italic;

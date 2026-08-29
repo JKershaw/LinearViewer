@@ -64,6 +64,70 @@ describe('renderSettingsPage — AI usage section', () => {
   });
 });
 
+describe('renderSettingsPage — provider context disclosure (LIN-2357)', () => {
+  const BASIS = 'recommend-path traces only; deterministic prompt generations (prompt template downloads, kind-override recommend, feedback triage) are not traced';
+
+  test('renders an empty state when providerContextSummary is omitted', () => {
+    const html = renderSettingsPage('Acme', BASE);
+    assert.match(html, /provider context:/);
+    assert.match(html, /no prompt traces recorded yet/);
+  });
+
+  test('renders an empty state for the empty-constant shape (traces: 0)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      providerContextSummary: { traces: 0, untracedContext: 0, divergent: 0, benign: 0, newestUntracedContextAt: null, expectedDisplayName: null, basis: BASIS }
+    });
+    assert.match(html, /no prompt traces recorded yet/);
+    assert.match(html, new RegExp(BASIS.slice(0, 30)));
+  });
+
+  test('a divergent-count render surfaces the divergent number distinctly from benign', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      providerContextSummary: {
+        traces: 10, untracedContext: 3, divergent: 2, benign: 1,
+        newestUntracedContextAt: '2026-08-20T12:00:00.000Z',
+        expectedDisplayName: 'GitHub Issues', basis: BASIS
+      }
+    });
+    assert.match(html, /3 of 10 traces missing/);
+    assert.match(html, /2 divergent/);
+    assert.match(html, /1 benign/);
+    assert.match(html, /2026-08-20T12:00:00/);
+  });
+
+  test('a benign-only (Linear) render does not read as an alarm: zero divergent, still states the count', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      providerContextSummary: {
+        traces: 5, untracedContext: 5, divergent: 0, benign: 5,
+        newestUntracedContextAt: '2026-08-20T12:00:00.000Z',
+        expectedDisplayName: 'Linear', basis: BASIS
+      }
+    });
+    assert.match(html, /5 of 5 traces missing/);
+    assert.match(html, /0 divergent/);
+    assert.match(html, /5 benign/);
+  });
+
+  test('newestUntracedContextAt renders only when untracedContext > 0', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      providerContextSummary: {
+        traces: 4, untracedContext: 0, divergent: 0, benign: 0,
+        newestUntracedContextAt: null, expectedDisplayName: 'Linear', basis: BASIS
+      }
+    });
+    assert.match(html, /0 of 4 traces missing/);
+    assert.doesNotMatch(html, /most recent:/);
+  });
+
+  test('does not throw when providerContextSummary is omitted', () => {
+    assert.doesNotThrow(() => renderSettingsPage('Acme', BASE));
+  });
+});
+
 describe('renderSettingsPage — model pricing hint (LIN-993)', () => {
   test('renders a pricing hint line for the current model, not inside option text', () => {
     const html = renderSettingsPage('Acme', {

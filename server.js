@@ -2817,6 +2817,15 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   // LLM usage KPIs (LIN-418): aggregate per-call metadata over the retained window.
   const llmStats = await llmCallLogStore.summarize(workspace.urlKey);
 
+  // Provider-context disclosure (LIN-2357): surfaces a null providerUi on a
+  // recorded prompt trace as counts + a coverage basis, so a future
+  // LIN-2353-class regression (a recording seam that stops threading
+  // provider.ui) doesn't sit unread in the trace store the way this one did.
+  const providerContextSummary = await promptTraceStore.summarizeProviderContext(
+    workspace.urlKey,
+    { expectedUi: getProviderForWorkspace(workspace)?.ui || null }
+  );
+
   // Provider bindings for the Providers management section (LIN-634). Shape each
   // binding with its provider's human displayName (registry); the masked-token
   // and active-marker presentation lives in the renderer. Mark the binding whose
@@ -2878,6 +2887,7 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     featureFlags: getFeatureFlags(req.session),
     workspaceFeatures,
     llmStats,
+    providerContextSummary,
     providerBindings,
     providerNotice,
     dispatchDefaults,
