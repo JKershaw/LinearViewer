@@ -208,6 +208,48 @@ describe('no-stamp fallback: a failure before the provider resolves gets neutral
     assert.equal(body.detail, 'The upstream provider request failed');
     assert.doesNotMatch(body.detail, /Linear/);
   });
+
+  test('resolveWorkspaceAccess throwing a TimeoutError yields the neutral timeout detail, never "Linear"', async () => {
+    const provider = new ThrowingProvider(GITHUB_PROVIDER_NAME, 'GitHub Issues');
+    const app = buildApp(provider, {
+      resolveWorkspaceAccess: async () => {
+        const err = new Error('credential resolution timed out');
+        err.name = 'TimeoutError';
+        throw err;
+      },
+    });
+    const { status, body } = await call(app, '/api/proxy/me');
+    assert.equal(status, 504, JSON.stringify(body));
+    assert.equal(
+      body.detail,
+      'The upstream request timed out — the response may be too large or the provider is slow. Try a more specific query.'
+    );
+    assert.doesNotMatch(body.detail, /Linear/);
+  });
+
+  test('resolveWorkspaceAccess throwing a no-stamp 401 logs the neutral "Provider auth error" line, never "Linear"', async () => {
+    const provider = new ThrowingProvider(GITHUB_PROVIDER_NAME, 'GitHub Issues');
+    const app = buildApp(provider, {
+      resolveWorkspaceAccess: async () => {
+        const err = new Error('credential resolution rejected');
+        err.response = { status: 401, errors: [{ message: 'bad credentials' }] };
+        throw err;
+      },
+    });
+
+    const originalError = console.error;
+    const logged = [];
+    console.error = (...args) => { logged.push(args.join(' ')); };
+    try {
+      await call(app, '/api/proxy/me');
+    } finally {
+      console.error = originalError;
+    }
+    const authLine = logged.find(l => l.includes('auth error (HTTP 401)'));
+    assert.ok(authLine, `expected an auth-error log line, got: ${JSON.stringify(logged)}`);
+    assert.match(authLine, /^Provider auth error \(HTTP 401\)/);
+    assert.doesNotMatch(authLine, /Linear/);
+  });
 });
 
 // ---------------------------------------------------------------------------
