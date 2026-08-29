@@ -544,9 +544,11 @@ describe('LIN-1980 anti-drift pin (production source, not the mirror)', () => {
     const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
     assert.doesNotMatch(flat, /recordByteIdenticalRejection\?\.\(`/, 'recordByteIdenticalRejection must never be called with a template-literal scope composite');
     assert.match(flat, /recordByteIdenticalRejection\?\.\(refreshedFingerprint\)/, 'recordByteIdenticalRejection must be called with the bare fingerprint');
-    // routes/proxy.js contains a NUL byte (an unrelated composite-key
-    // literal) — readFileSync('utf8') still returns a plain JS string the
-    // regexes below match fine; do not switch this to a NUL-unsafe tool.
+    // routes/proxy.js used to contain a raw NUL byte (an unrelated
+    // composite-key literal, lib/proxy-credential-trail.js's resolutionKey)
+    // that made plain grep treat the file as binary — LIN-2356 retyped it as
+    // the `\x00` escape sequence, so readFileSync('utf8') and the regexes
+    // below need no special handling any more.
     const proxySrc = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
     assert.doesNotMatch(proxySrc, /isPastByteIdenticalThreshold\?\.\([^)]*`/, 'isPastByteIdenticalThreshold must never be called with a template-literal scope composite');
     assert.match(proxySrc, /isPastByteIdenticalThreshold\?\.\(req\?\.resolvedCredentialFingerprint,\s*BYTE_IDENTICAL_ESCALATION_THRESHOLD\)/, 'isPastByteIdenticalThreshold must be called with the bare req-stamped fingerprint');
