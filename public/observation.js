@@ -71,11 +71,26 @@ let currentView = 'autopilot';
 // Rulings poll state (LIN-1728 Phase 4). Separate from sessionIndex/*Cards
 // above — a ruling row has no stable per-poll identity worth diffing against
 // (unlike a session, which persists across polls), so the rulings feed is
-// simply repainted wholesale on every poll, keyed by decision_id for the
-// in-flight "reply pending" guard below.
-const rulingsPending = new Set();          // decision_id currently mid-reply (disables its buttons)
-const preservedRulingRows = new Map();     // decision_id → <li> to reuse across a poll's repaint (partial-failure retry state)
-// decision_id → the <li> currently attached to #obs-rulings for it (LIN-1728
+// simply repainted wholesale on every poll, keyed by rulingKey(urlKey,
+// decision_id) for the in-flight "reply pending" guard below.
+//
+// LIN-2293: `decision_id` is short free text an agent invents (simple-
+// dispatcher/hook.js), not a UUID, and this feed is cross-workspace by
+// design (routes/dashboard.js merges every req.session.workspaces) — so two
+// cards from DIFFERENT workspaces sharing a decision_id would otherwise
+// collide in every structure below (acting on one disables/re-renders both).
+// `rulingKey` composes the same `${urlKey}::${decisionId}` shape the server
+// side already uses (lib/unanswered-decisions.js's shelfGate,
+// lib/shelved-rulings-store.js's own `_id`) so client and server keys can't
+// drift apart. Each row's `anchor.workspaceUrlKey` (never the viewing page's
+// own urlKey — see the deliverRulingReply cross-workspace-targeting note
+// below) supplies the workspace half.
+function rulingKey(urlKey, decisionId) {
+  return `${urlKey}::${decisionId}`;
+}
+const rulingsPending = new Set();          // rulingKey → currently mid-reply (disables its buttons)
+const preservedRulingRows = new Map();     // rulingKey → <li> to reuse across a poll's repaint (partial-failure retry state)
+// rulingKey → the <li> currently attached to #obs-rulings for it (LIN-1728
 // review F3). Populated on every renderRulings pass and consulted whenever a
 // row must be REUSED rather than rebuilt (pending or preserved) — the single
 // source of truth for "which node is a still-in-flight deliverRulingReply
@@ -1399,29 +1414,31 @@ function renderRulings(rulings) {
   const nodes = [];
   for (const row of rulings) {
     const decisionId = row?.decision?.decision_id;
-    const mustReuse = decisionId && (rulingsPending.has(decisionId) || preservedRulingRows.has(decisionId));
-    const existing = decisionId && renderedRulingRows.get(decisionId);
+    const urlKey = row?.anchor?.workspaceUrlKey;
+    const key = (decisionId && urlKey) ? rulingKey(urlKey, decisionId) : null;
+    const mustReuse = key && (rulingsPending.has(key) || preservedRulingRows.has(key));
+    const existing = key && renderedRulingRows.get(key);
     const li = (mustReuse && existing) ? existing : renderRulingRow(row);
     nodes.push(li);
-    if (decisionId) { seen.add(decisionId); renderedRulingRows.set(decisionId, li); }
+    if (key) { seen.add(key); renderedRulingRows.set(key, li); }
   }
   // A preserved or still-pending row whose decision already dropped out of
   // this poll's payload (the stamp landed server-side, or the payload just
   // hasn't caught up yet) still shows once more — dropping it here would be
   // the same silent-discard both preservation and pending-reuse exist to avoid.
-  for (const [decisionId, li] of preservedRulingRows) {
-    if (!seen.has(decisionId)) { nodes.push(li); seen.add(decisionId); }
+  for (const [key, li] of preservedRulingRows) {
+    if (!seen.has(key)) { nodes.push(li); seen.add(key); }
   }
-  for (const decisionId of rulingsPending) {
-    if (!seen.has(decisionId) && renderedRulingRows.has(decisionId)) {
-      nodes.push(renderedRulingRows.get(decisionId));
-      seen.add(decisionId);
+  for (const key of rulingsPending) {
+    if (!seen.has(key) && renderedRulingRows.has(key)) {
+      nodes.push(renderedRulingRows.get(key));
+      seen.add(key);
     }
   }
   // Drop bookkeeping for rows no longer worth remembering (answered and
   // neither pending nor mid partial-failure-retry).
-  for (const decisionId of Array.from(renderedRulingRows.keys())) {
-    if (!seen.has(decisionId)) renderedRulingRows.delete(decisionId);
+  for (const key of Array.from(renderedRulingRows.keys())) {
+    if (!seen.has(key)) renderedRulingRows.delete(key);
   }
 
   list.textContent = '';
@@ -1622,15 +1639,16 @@ function shelveRulingRow(row, li, reason, resurfaceInMs) {
   const pageUrlKey = observationData?.urlKey;
   const targetUrlKey = anchor?.workspaceUrlKey;
   const decisionId = decision?.decision_id;
-  if (!targetUrlKey || !decisionId || rulingsPending.has(decisionId)) return;
+  const key = (targetUrlKey && decisionId) ? rulingKey(targetUrlKey, decisionId) : null;
+  if (!targetUrlKey || !decisionId || rulingsPending.has(key)) return;
 
-  rulingsPending.add(decisionId);
+  rulingsPending.add(key);
   const controls = rulingRowControls(li);
   controls.forEach(el => { el.disabled = true; });
 
   const feedback = li.querySelector('.obs-ruling-feedback');
   const restore = () => {
-    rulingsPending.delete(decisionId);
+    rulingsPending.delete(key);
     controls.forEach(el => { el.disabled = false; });
   };
   const setFeedback = (text, isError) => {
@@ -1682,16 +1700,17 @@ function dismissRulingRow(row, li) {
   const pageUrlKey = observationData?.urlKey;
   const targetUrlKey = anchor?.workspaceUrlKey;
   const decisionId = decision?.decision_id;
+  const key = (targetUrlKey && decisionId) ? rulingKey(targetUrlKey, decisionId) : null;
   const isTaskBound = !anchor?.loopId && !!anchor?.taskDecisionId;
-  if (!targetUrlKey || !decisionId || rulingsPending.has(decisionId)) return;
+  if (!targetUrlKey || !decisionId || rulingsPending.has(key)) return;
 
-  rulingsPending.add(decisionId);
+  rulingsPending.add(key);
   const controls = rulingRowControls(li);
   controls.forEach(el => { el.disabled = true; });
 
   const feedback = li.querySelector('.obs-ruling-feedback');
   const restore = () => {
-    rulingsPending.delete(decisionId);
+    rulingsPending.delete(key);
     controls.forEach(el => { el.disabled = false; });
   };
   const setFeedback = (text, isError) => {
@@ -1758,6 +1777,7 @@ function deliverRulingReply(row, prompt, li) {
   const pageUrlKey = observationData?.urlKey;
   const targetUrlKey = anchor?.workspaceUrlKey;
   const decisionId = decision?.decision_id;
+  const key = (targetUrlKey && decisionId) ? rulingKey(targetUrlKey, decisionId) : null;
   const decisionLoopId = anchor?.loopId;
   const feedback = li.querySelector('.obs-ruling-feedback');
   // A task-bound row (LIN-2197 Phase 3) has no dispatch item behind it, so
@@ -1766,14 +1786,14 @@ function deliverRulingReply(row, prompt, li) {
   // option press on that row would hit this guard and return silently: no
   // comment, no dispatch, no feedback text, buttons left enabled (LIN-2215 F1,
   // a regression in kind on LIN-1728's G1, which at least said so out loud).
-  if (!targetUrlKey || !decisionId || (!decisionLoopId && disposition !== 'task-bound') || rulingsPending.has(decisionId)) return;
+  if (!targetUrlKey || !decisionId || (!decisionLoopId && disposition !== 'task-bound') || rulingsPending.has(key)) return;
 
-  rulingsPending.add(decisionId);
+  rulingsPending.add(key);
   const buttons = rulingRowControls(li);
   buttons.forEach(b => { b.disabled = true; });
 
   const restore = () => {
-    rulingsPending.delete(decisionId);
+    rulingsPending.delete(key);
     buttons.forEach(b => { b.disabled = false; });
   };
   const setFeedback = (text, isError) => {
@@ -1802,7 +1822,7 @@ function deliverRulingReply(row, prompt, li) {
   // reappearing, until the retry succeeds and releases it below.
   const makePartialFailureHandler = (label) => (err, retryRun) => {
     restore();
-    preservedRulingRows.set(decisionId, li);
+    preservedRulingRows.set(key, li);
     setFeedback(`Recorded. Could not ${label}: ${err.message}. `, true);
     if (feedback) {
       const retryBtn = document.createElement('button');
@@ -1814,7 +1834,7 @@ function deliverRulingReply(row, prompt, li) {
         setFeedback('retrying delivery…', false);
         retryRun().then(() => {
           setFeedback('recorded ✓', false);
-          preservedRulingRows.delete(decisionId);
+          preservedRulingRows.delete(key);
           refreshBadge();
         }).catch((e2) => {
           setFeedback(`Still could not ${label}: ${e2.message}. `, true);
@@ -2059,7 +2079,18 @@ if (typeof module !== 'undefined' && module.exports) {
     // the fresh run fails to start) is unit-testable against a hand-rolled
     // DOM/fetch-free shim — there is no fixture path in this harness for a
     // terminal, past-the-reap-window loop, per the review's own note.
-    deliverRulingReply, rulingsPending, preservedRulingRows,
+    // LIN-2293: also expose rulingKey itself, so a cross-workspace-collision
+    // test asserts against the SAME composite-key function these structures
+    // use, not a hard-coded copy of its `::` separator.
+    deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey,
+    // LIN-2293 review (F1): the collision has TWO halves — "disables both"
+    // (deliverRulingReply/rulingsPending, covered above) and "re-renders
+    // both", which lives entirely in renderRulings' reuse lookup against
+    // renderedRulingRows. Without these two on the seam that second half had
+    // no regression guard at any level: reverting renderRulings to bare
+    // decision_id keys left the whole suite green. Exposed so the reuse path
+    // is pinned by the same kind of unit test as the delivery path.
+    renderRulings, renderedRulingRows,
     // LIN-2243: expose the worker-lane ticket-walk seam (read off runs[], since
     // the session-level field is inert on this lean feed) for unit testing.
     laneTicketWalk, ticketProgressText,

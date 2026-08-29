@@ -132,12 +132,17 @@ function makeLi({ withFeedback = true } = {}) {
   return li;
 }
 
-function makeSandbox({ postComment, dispatchPrompt, deliverReply }) {
+// `elements` seeds document.getElementById (default: none, so it answers null
+// exactly as before — the delivery tests below never touch the document). The
+// ChatUI stub is likewise inert for those: only renderRulingRow calls
+// appendOptions, and only the LIN-2293 render test reaches it.
+function makeSandbox({ postComment, dispatchPrompt, deliverReply, elements = {} }) {
   const sandbox = {
     module: { exports: {} },
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
+      ChatUI: { appendOptions() {} },
       ReplyDelivery: {
         postComment,
         deliverReply,
@@ -148,8 +153,15 @@ function makeSandbox({ postComment, dispatchPrompt, deliverReply }) {
     document: {
       createElement: (tag) => new FakeElement(tag),
       addEventListener() {},
-      getElementById: () => null
+      getElementById: (id) => elements[id] || null
     },
+    // Browser globals common.js installs and observation.js references bare.
+    // Same faithful-copy/stub pattern tests/unit/observation-render.test.js
+    // already uses; only renderRulingRow reaches them from this file.
+    escapeHtml: (str) => (str === undefined || str === null ? '' : String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;')),
+    relativeTime: (ts) => (ts ? `stub-relative-time(${ts})` : ''),
     console: { warn() {}, error() {}, log() {} },
   };
   vm.createContext(sandbox);
@@ -222,12 +234,13 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
         return { id: 'dispatched-1' };
       }
     });
-    const { deliverRulingReply, rulingsPending, preservedRulingRows } = module.exports;
+    const { deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey } = module.exports;
     const li = makeLi();
     const row = makeRow();
+    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
 
     deliverRulingReply(row, 'Approve', li);
-    assert.ok(rulingsPending.has('d-gone-1'), 'expected the decision to be marked pending immediately');
+    assert.ok(rulingsPending.has(key), 'expected the decision to be marked pending immediately');
 
     // Flush postComment -> dispatchPrompt (rejects) -> onPartialFailure.
     await new Promise((r) => setImmediate(r));
@@ -238,8 +251,8 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     assert.equal(dispatchCalls, 1);
     // Partial failure restores the pending guard (matches the resumable
     // branch's existing behaviour) but the row is now tracked for reuse.
-    assert.ok(!rulingsPending.has('d-gone-1'));
-    assert.ok(preservedRulingRows.has('d-gone-1'), 'expected the row to be preserved across the next poll(s)');
+    assert.ok(!rulingsPending.has(key));
+    assert.ok(preservedRulingRows.has(key), 'expected the row to be preserved across the next poll(s)');
 
     const feedback = li.querySelector('.obs-ruling-feedback');
     assert.ok(feedback, 'expected a feedback element');
@@ -257,7 +270,7 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
 
     assert.equal(commentCalls, 1, 'the comment must NEVER be reposted by a delivery retry');
     assert.equal(dispatchCalls, 2, 'the retry must re-fire the dispatch call');
-    assert.ok(!preservedRulingRows.has('d-gone-1'), 'the preserved row is released once the retry succeeds');
+    assert.ok(!preservedRulingRows.has(key), 'the preserved row is released once the retry succeeds');
     assert.match(feedback.textContent, /recorded ✓/);
   });
 
@@ -268,8 +281,9 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
       postComment: async () => { commentCalls += 1; return { ok: false, status: 502, data: { error: 'upstream write rejected' } }; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; }
     });
-    const { deliverRulingReply, rulingsPending, preservedRulingRows } = module.exports;
+    const { deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey } = module.exports;
     const li = makeLi();
+    const key = rulingKey('the-ruling-workspace', 'd-gone-2');
 
     deliverRulingReply(makeRow({ decision: { decision_id: 'd-gone-2' } }), 'Approve', li);
     await new Promise((r) => setImmediate(r));
@@ -277,8 +291,8 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
 
     assert.equal(commentCalls, 1);
     assert.equal(dispatchCalls, 0, 'a failed comment write must never attempt the dispatch');
-    assert.ok(!rulingsPending.has('d-gone-2'));
-    assert.ok(!preservedRulingRows.has('d-gone-2'), 'a plain (non-partial) failure must not be treated as durably recorded');
+    assert.ok(!rulingsPending.has(key));
+    assert.ok(!preservedRulingRows.has(key), 'a plain (non-partial) failure must not be treated as durably recorded');
 
     const feedback = li.querySelector('.obs-ruling-feedback');
     assert.match(feedback.textContent, /reply failed/);
@@ -452,11 +466,12 @@ describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       deliverReply: () => { deliverReplyCalls += 1; }
     });
-    const { deliverRulingReply, rulingsPending } = module.exports;
+    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
     const li = makeLi();
+    const key = rulingKey('the-ruling-workspace', 'd-task-1');
 
     deliverRulingReply(makeTaskBoundRow(), 'Approve', li);
-    assert.ok(rulingsPending.has('d-task-1'), 'expected the decision to be marked pending immediately');
+    assert.ok(rulingsPending.has(key), 'expected the decision to be marked pending immediately');
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 
@@ -474,7 +489,7 @@ describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
 
     assert.equal(dispatchCalls, 0, 'a task-bound reply is comment-only — no run to start or resume');
     assert.equal(deliverReplyCalls, 0, 'must not route through the follow-up/dispatch delivery path either');
-    assert.ok(!rulingsPending.has('d-task-1'));
+    assert.ok(!rulingsPending.has(key));
 
     const feedback = li.querySelector('.obs-ruling-feedback');
     assert.match(feedback.textContent, /recorded ✓/);
@@ -484,14 +499,15 @@ describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
     const { module } = makeSandbox({
       postComment: async () => ({ ok: false, status: 502, data: { error: 'upstream write rejected' } })
     });
-    const { deliverRulingReply, rulingsPending } = module.exports;
+    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
     const li = makeLi();
+    const key = rulingKey('the-ruling-workspace', 'd-task-2');
 
     deliverRulingReply(makeTaskBoundRow({ decision: { decision_id: 'd-task-2' } }), 'Approve', li);
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 
-    assert.ok(!rulingsPending.has('d-task-2'), 'the pending guard must be released on failure');
+    assert.ok(!rulingsPending.has(key), 'the pending guard must be released on failure');
     const buttons = li.querySelectorAll('.chat-option-btn');
     buttons.forEach((b) => assert.equal(b.disabled, false, 'buttons must be re-enabled on failure'));
 
@@ -503,15 +519,146 @@ describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
     const { module } = makeSandbox({
       postComment: async () => { throw new Error('network offline'); }
     });
-    const { deliverRulingReply, rulingsPending } = module.exports;
+    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
     const li = makeLi();
+    const key = rulingKey('the-ruling-workspace', 'd-task-3');
 
     deliverRulingReply(makeTaskBoundRow({ decision: { decision_id: 'd-task-3' } }), 'Approve', li);
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 
-    assert.ok(!rulingsPending.has('d-task-3'));
+    assert.ok(!rulingsPending.has(key));
     const feedback = li.querySelector('.obs-ruling-feedback');
     assert.match(feedback.textContent, /reply failed: network offline/);
+  });
+});
+
+// LIN-2293 — `decision_id` is short free text an agent invents (not a UUID),
+// and the rulings feed is cross-workspace by construction, so two DIFFERENT
+// workspaces' rows can legitimately share one. Pre-fix, `rulingsPending` (and
+// `preservedRulingRows`) keyed on that bare `decision_id` alone, so a press on
+// one workspace's row marked BOTH rows pending — a same-key press on the
+// other workspace's row would then hit the "already pending" guard and
+// return silently, with no comment, no dispatch, no feedback, exactly the
+// symptom the ticket describes ("acting on one disables/re-renders both").
+describe('deliverRulingReply — cross-workspace decision_id collision (LIN-2293)', () => {
+  test('two rows sharing decision_id in different workspaces are independently pending and independently deliverable', async () => {
+    let commentCallsA = 0;
+    let commentCallsB = 0;
+    let dispatchCallsA = 0;
+    let dispatchCallsB = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey) => {
+        if (urlKey === 'workspace-a') commentCallsA += 1; else commentCallsB += 1;
+        return { ok: true, status: 201, data: {} };
+      },
+      dispatchPrompt: async (opts) => {
+        if (opts.urlKey === 'workspace-a') dispatchCallsA += 1; else dispatchCallsB += 1;
+        return { id: 'dispatched-1' };
+      }
+    });
+    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
+
+    const liA = makeLi();
+    const liB = makeLi();
+    const rowA = makeRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
+    const rowB = makeRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
+    const keyA = rulingKey('workspace-a', 'shared-decision');
+    const keyB = rulingKey('workspace-b', 'shared-decision');
+
+    deliverRulingReply(rowA, 'Approve', liA);
+    assert.ok(rulingsPending.has(keyA), 'workspace A row must be marked pending');
+    assert.ok(!rulingsPending.has(keyB), 'a press on workspace A must not also mark workspace B pending merely for sharing decision_id');
+
+    // Press B's row while A is still mid-flight. Pre-fix, the shared bare
+    // decision_id would trip the "already pending" guard here and this call
+    // would return silently — no comment, no dispatch, buttons left enabled.
+    deliverRulingReply(rowB, 'Approve', liB);
+    assert.ok(rulingsPending.has(keyB), 'workspace B row must be independently answerable while workspace A is still mid-flight');
+
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(commentCallsA, 1, 'workspace A reply must be delivered');
+    assert.equal(commentCallsB, 1, 'workspace B reply must be delivered — not silently dropped by the cross-workspace collision');
+    assert.equal(dispatchCallsA, 1);
+    assert.equal(dispatchCallsB, 1);
+    assert.ok(!rulingsPending.has(keyA));
+    assert.ok(!rulingsPending.has(keyB));
+  });
+});
+
+// LIN-2293 review (F1) — the ticket's symptom has two halves: "acting on one
+// DISABLES and RE-RENDERS both". The describe above pins the disables half
+// (rulingsPending, via deliverRulingReply). This one pins the re-renders
+// half, which lives entirely in renderRulings' reuse lookup against
+// renderedRulingRows and had no guard at any level: the review's M2 mutation
+// reverted that lookup to bare decision_id keys and all 8375 tests stayed
+// green, so green CI could not distinguish the fixed render path from the
+// broken one. These assertions fail under exactly that mutation.
+describe('renderRulings — cross-workspace decision_id reuse (LIN-2293 review F1)', () => {
+  function makeRenderSandbox() {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p');
+    empty.hidden = false;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
+    });
+    return { module, list, empty };
+  }
+
+  test('two rows sharing decision_id in different workspaces get independent <li> nodes', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, renderedRulingRows, rulingKey } = module.exports;
+
+    const rowA = makeRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
+    const rowB = makeRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
+    const keyA = rulingKey('workspace-a', 'shared-decision');
+    const keyB = rulingKey('workspace-b', 'shared-decision');
+
+    renderRulings([rowA, rowB]);
+
+    // Pre-fix (bare decision_id) both rows collapse onto one map entry, so
+    // renderedRulingRows holds a single node and the second row's render
+    // clobbers the first's bookkeeping.
+    assert.equal(renderedRulingRows.size, 2, 'each workspace must keep its own renderedRulingRows entry');
+    assert.ok(renderedRulingRows.has(keyA) && renderedRulingRows.has(keyB));
+    assert.notEqual(
+      renderedRulingRows.get(keyA), renderedRulingRows.get(keyB),
+      'rows from different workspaces must not share one <li> merely for sharing decision_id'
+    );
+    assert.equal(list.children.length, 2, 'both rows must be attached');
+    assert.notEqual(list.children[0], list.children[1], 'the two attached nodes must be distinct');
+  });
+
+  test('a pending row is reused without the other workspace’s row reusing it too', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, renderedRulingRows, rulingsPending, rulingKey } = module.exports;
+
+    const rowA = makeRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
+    const rowB = makeRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
+    const keyA = rulingKey('workspace-a', 'shared-decision');
+    const keyB = rulingKey('workspace-b', 'shared-decision');
+
+    renderRulings([rowA, rowB]);
+    const firstA = renderedRulingRows.get(keyA);
+    const firstB = renderedRulingRows.get(keyB);
+
+    // Workspace A's row goes mid-flight; the next poll repaints. A's node must
+    // be REUSED (its buttons are disabled and its in-flight handler is bound
+    // to that node), while B's must be rebuilt fresh — pre-fix the shared bare
+    // key made B reuse A's node, which is the "re-renders both" symptom.
+    rulingsPending.add(keyA);
+    renderRulings([rowA, rowB]);
+
+    assert.equal(renderedRulingRows.get(keyA), firstA, 'the pending workspace-A row must be reused across the repaint');
+    assert.notEqual(renderedRulingRows.get(keyB), firstA, 'workspace B must not reuse workspace A’s pending node');
+    assert.notEqual(renderedRulingRows.get(keyB), firstB, 'workspace B is not pending, so it is rebuilt fresh');
+    assert.equal(list.children.length, 2);
+    assert.notEqual(list.children[0], list.children[1]);
+
+    rulingsPending.delete(keyA);
   });
 });
