@@ -52,6 +52,7 @@ import {
   buildSweepPayload,
   sweepOneWorkspace,
   resolveRosterFromSessions,
+  mergeRosterUnion,
   createObserverSweepRun
 } from '../../lib/observer-sweep.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
@@ -668,13 +669,27 @@ describe('observer-sweep: createObserverSweepRun — the production tick closure
   function failingSessionsCollection(err = new Error('backend down')) {
     return { find: () => ({ toArray: () => Promise.reject(err) }) };
   }
-  function recordingRun(sessionsCollection, { now, intervalMs = INTERVAL_MS } = {}) {
+  // Default dispatch-store stub used by every pre-LIN-2146 test below —
+  // shared by reference (never re-typed) so the exact-deps assertion further
+  // down can deepStrictEqual against the SAME object, function identity
+  // included, rather than a hand-retyped literal with its own new arrow
+  // function (assert.deepStrictEqual compares functions by reference).
+  const DISPATCH_STORE_STUB = { id: 'dispatchStore', listObservedWorkspaceKeys: async () => [] };
+  const AGENT_STATUS_STORE_STUB = { id: 'agentStatusStore' };
+  const OBSERVER_STATE_STORE_STUB = { id: 'observerStateStore' };
+  function dispatchStoreOf(urlKeys) {
+    return { id: 'dispatchStore', listObservedWorkspaceKeys: async () => urlKeys };
+  }
+  function failingDispatchStore(err = new Error('dispatch-store backend down')) {
+    return { id: 'dispatchStore', listObservedWorkspaceKeys: () => Promise.reject(err) };
+  }
+  function recordingRun(sessionsCollection, { now, intervalMs = INTERVAL_MS, dispatchStore = DISPATCH_STORE_STUB } = {}) {
     const calls = [];
     const run = createObserverSweepRun({
       sessionsCollection,
-      dispatchStore: { id: 'dispatchStore' },
-      agentStatusStore: { id: 'agentStatusStore' },
-      observerStateStore: { id: 'observerStateStore' },
+      dispatchStore,
+      agentStatusStore: AGENT_STATUS_STORE_STUB,
+      observerStateStore: OBSERVER_STATE_STORE_STUB,
       intervalMs,
       now,
       sweep: async (urlKey, deps) => { calls.push({ urlKey, deps }); }
@@ -719,9 +734,9 @@ describe('observer-sweep: createObserverSweepRun — the production tick closure
     const { run, calls } = recordingRun(sessionsCollectionOf(threeWorkspaces), { now: () => now });
     await run();
     assert.deepStrictEqual(calls[0].deps, {
-      dispatchStore: { id: 'dispatchStore' },
-      agentStatusStore: { id: 'agentStatusStore' },
-      observerStateStore: { id: 'observerStateStore' },
+      dispatchStore: DISPATCH_STORE_STUB,
+      agentStatusStore: AGENT_STATUS_STORE_STUB,
+      observerStateStore: OBSERVER_STATE_STORE_STUB,
       now
     }, 'the deps object handed to sweepOneWorkspace is exactly the three injected stores plus the tick clock');
   });
@@ -738,6 +753,50 @@ describe('observer-sweep: createObserverSweepRun — the production tick closure
       await assert.doesNotReject(run);
       assert.strictEqual(calls.length, 0);
     }
+  });
+
+  // ─── LIN-2146: dispatch-observed roster population ───────────────────────
+
+  test('LIN-2146: a dispatch-only workspace (no browser session at all) IS swept — the population-gap regression test', async () => {
+    const { run, calls } = recordingRun(sessionsCollectionOf([]), {
+      now: () => 0,
+      dispatchStore: dispatchStoreOf(['ws-dispatch-only'])
+    });
+    await run();
+    assert.strictEqual(calls.length, 1, 'a workspace with dispatch rows and no session must enter the roster');
+    assert.strictEqual(calls[0].urlKey, 'ws-dispatch-only');
+  });
+
+  test('LIN-2146: a dispatch-store read failure still sweeps the session-derived half of the roster (independent fail-soft)', async () => {
+    const { run, calls } = recordingRun(sessionsCollectionOf(threeWorkspaces), {
+      now: () => 0,
+      dispatchStore: failingDispatchStore()
+    });
+    await assert.doesNotReject(run, 'a dispatch-store roster fault must not surface as a failed scheduler job');
+    assert.strictEqual(calls.length, 1, 'the session-derived half must still be swept');
+    assert.strictEqual(calls[0].urlKey, 'ws-a', 'sorted session roster, unaffected by the dispatch-store fault');
+  });
+
+  test('LIN-2146: a sessionsCollection read failure still sweeps the dispatch-derived half of the roster (independent fail-soft, the other direction)', async () => {
+    const { run, calls } = recordingRun(failingSessionsCollection(), {
+      now: () => 0,
+      dispatchStore: dispatchStoreOf(['ws-dispatch-only'])
+    });
+    await assert.doesNotReject(run, 'a session roster fault must not surface as a failed scheduler job');
+    assert.strictEqual(calls.length, 1, 'the dispatch-derived half must still be swept');
+    assert.strictEqual(calls[0].urlKey, 'ws-dispatch-only');
+  });
+
+  test('LIN-2146: a workspace present in BOTH sources is deduped to one sweep, not two', async () => {
+    const { run, calls } = recordingRun(sessionsCollectionOf(threeWorkspaces), {
+      now: () => 0,
+      dispatchStore: dispatchStoreOf(['ws-a', 'ws-dispatch-only'])
+    });
+    await run();
+    assert.strictEqual(calls.length, 1, 'exactly one workspace is still swept per tick');
+    // Union is ['ws-a','ws-b','ws-c','ws-dispatch-only'] sorted; index 0 at tick 0 is 'ws-a',
+    // proving the overlap collapsed to one entry rather than the roster growing to 5.
+    assert.strictEqual(calls[0].urlKey, 'ws-a');
   });
 
   test('a misconfigured intervalMs is refused at construction, not silently turned into a NaN index', () => {
@@ -804,5 +863,31 @@ describe('observer-sweep: resolveRosterFromSessions (LIN-2131)', () => {
   test('an empty roster (empty or missing sessions) returns [], not an error', () => {
     assert.deepStrictEqual(resolveRosterFromSessions([]), []);
     assert.deepStrictEqual(resolveRosterFromSessions(undefined), []);
+  });
+});
+
+describe('observer-sweep: mergeRosterUnion (LIN-2146)', () => {
+  test('dedupes and sorts across both sources', () => {
+    assert.deepStrictEqual(
+      mergeRosterUnion(['ws-c', 'ws-a'], ['ws-b', 'ws-a']),
+      ['ws-a', 'ws-b', 'ws-c']
+    );
+  });
+
+  test('a workspace present in BOTH sources appears exactly once', () => {
+    assert.deepStrictEqual(mergeRosterUnion(['ws-shared'], ['ws-shared']), ['ws-shared']);
+  });
+
+  test('tolerates [] / undefined on either side', () => {
+    assert.deepStrictEqual(mergeRosterUnion([], ['ws-a']), ['ws-a']);
+    assert.deepStrictEqual(mergeRosterUnion(['ws-a'], []), ['ws-a']);
+    assert.deepStrictEqual(mergeRosterUnion(undefined, ['ws-a']), ['ws-a']);
+    assert.deepStrictEqual(mergeRosterUnion(['ws-a'], undefined), ['ws-a']);
+    assert.deepStrictEqual(mergeRosterUnion(undefined, undefined), []);
+  });
+
+  test('session-only and dispatch-only inputs are both real contributions, not one masking the other', () => {
+    assert.deepStrictEqual(mergeRosterUnion(['ws-session-only'], []), ['ws-session-only']);
+    assert.deepStrictEqual(mergeRosterUnion([], ['ws-dispatch-only']), ['ws-dispatch-only']);
   });
 });
