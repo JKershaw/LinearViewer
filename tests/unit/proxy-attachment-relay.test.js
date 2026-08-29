@@ -323,10 +323,11 @@ describe('GET /api/proxy/attachments/:id — non-image file relay (LIN-750)', ()
     assert.equal(res.status, 413);
   });
 
-  test('SSRF guard still applies to file handles (non-Linear host rejected)', async () => {
+  test('SSRF guard still applies to file handles (non-allowlisted host rejected)', async () => {
     const res = await getAttachment(buildApp(), mdFile('https://evil.example.com/x', 'spec.md'));
     assert.equal(res.status, 400);
-    assert.match(res.bodyText, /from Linear/i);
+    assert.match(res.bodyText, /host not allowed/i);
+    assert.doesNotMatch(res.bodyText, /Linear/);
   });
 });
 
@@ -337,16 +338,23 @@ describe('GET /api/proxy/attachments/:id — SSRF guard (md: path)', () => {
     assert.match(res.bodyText, /HTTPS/i);
   });
 
-  test('rejects a non-Linear host', async () => {
+  // LIN-2351: the message used to say "must be from Linear" — wrong for every
+  // workspace, since the allowlist it guards (ATTACHMENT_ALLOWED_HOSTS) already
+  // spans providers (Linear hosts + GITHUB_UPLOAD_HOSTS). Now provider-neutral;
+  // the machine-readable `reason: 'host-not-allowed'` this guard maps from is
+  // untouched (asserted on the distinct att: 422 test below).
+  test('rejects a non-allowlisted host', async () => {
     const res = await getAttachment(buildApp(), md('https://evil.example.com/x.png'));
     assert.equal(res.status, 400);
-    assert.match(res.bodyText, /from Linear/i);
+    assert.match(res.bodyText, /host not allowed/i);
+    assert.doesNotMatch(res.bodyText, /Linear/);
   });
 
   test('rejects a look-alike host (no suffix bypass)', async () => {
     const res = await getAttachment(buildApp(), md('https://uploads.linear.app.evil.com/x.png'));
     assert.equal(res.status, 400);
-    assert.match(res.bodyText, /from Linear/i);
+    assert.match(res.bodyText, /host not allowed/i);
+    assert.doesNotMatch(res.bodyText, /Linear/);
   });
 
   test('rejects a pathname containing path-traversal', async () => {

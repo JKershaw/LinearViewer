@@ -147,7 +147,7 @@ One convention across every endpoint, so a consumer can branch on the same field
 - **Success is the HTTP status.** Any `2xx` is success; any non-`2xx` is failure. A write never returns `2xx` with a falsy `success`. A non-`2xx` write MAY mean the write partially landed rather than not at all — see `PARTIAL_WRITE` below. `2xx` still always means fully landed.
 - **Reads** return the data directly: a single resource *is* the object (`GET /me`, `GET /issues/{id}`, `GET /cycles/{id}`); a collection comes under a named key (`{ "issues": [...] }`, `{ "teams": [...] }`).
 - **Writes** return `{ "success": true, ... }`. Issue/comment/relation/label writes nest the affected entity under a named key (`{ "success": true, "issue": {...} }`); other writes (dispatch, token) carry their fields alongside `"success": true`. A write that does not land is a non-`2xx` (typically `502`), never a `2xx`.
-- **Errors** are always `{ "error": "<message>", "detail"?: "<upstream detail>" }` with a non-`2xx` status. `detail` carries the provider or AI upstream's own message when there is one.
+- **Errors** are always `{ "error": "<message>", "detail"?: "<upstream detail>" }` with a non-`2xx` status. `detail` carries the provider or AI upstream's own message when there is one, or a generic provider-attributed failure/timeout message (naming the workspace's actual provider, e.g. `"GitHub Issues API request failed"`) when it does not.
 
 #### Path conventions
 
@@ -197,9 +197,12 @@ The HTTP status stays `503` for all six — only the body distinguishes them. Ca
 **`LINEAR_AUTH`** (LIN-2216) is the second adopter, and applies to a DIFFERENT failure point than the six above. Every `WORKSPACE_*` code above fires *before* any call reaches Linear — no credential could be resolved at all. `LINEAR_AUTH` fires *after* a credential resolved and a request was actually sent — Linear itself rejected it:
 
 ```json
-{ "error": "Failed to fetch issue", "code": "LINEAR_AUTH", "category": "auth", "retryable": true,
-  "detail": "Linear rejected the request as unauthenticated." }
+{ "error": "Failed to fetch issue", "code": "LINEAR_AUTH", "category": "auth", "retryable": true }
 ```
+
+(`detail` is a separate, provider-derived field — see the Response Shapes convention above — and is
+omitted from this example because its exact text depends on which branch produced it: usually Linear's
+own upstream message, occasionally the generic provider-attributed fallback.)
 
 The HTTP status carries the meaning here, not just the body — `retryable` mirrors it exactly:
 
