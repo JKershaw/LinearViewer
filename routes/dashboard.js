@@ -1568,7 +1568,14 @@ export function createDashboardRoutes({
 
     const unansweredRows = unansweredRulings.map(row => {
       if (row.disposition === 'task-bound') {
-        const match = taskUnansweredRows.find(t => t.decision?.decision_id === row.decision?.decision_id);
+        // Keyed on (urlKey, decisionId), matching lib/unanswered-decisions.js's
+        // own shelfGate composite key (LIN-2262) — decisionId alone is
+        // agent-invented free text and not globally unique, so two workspaces
+        // sharing one would otherwise resolve to the wrong workspace's row
+        // and attach that row's raisedAt (LIN-2291).
+        const match = taskUnansweredRows.find(t =>
+          t.urlKey === row.anchor?.workspaceUrlKey && t.decision?.decision_id === row.decision?.decision_id
+        );
         return { decisionId: row.decision?.decision_id, raisedAt: match?.scannedAt || null };
       }
       const loop = loops.find(l => l.loopId === row.anchor?.loopId);

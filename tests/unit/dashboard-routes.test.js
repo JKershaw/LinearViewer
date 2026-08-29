@@ -730,6 +730,42 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
     assert.equal(res.jsonBody.unansweredAge.count, 1);
   });
 
+  test('LIN-2291: task-bound unansweredRows attributes raisedAt to the row\'s own workspace, not the first workspace sharing decision_id', async () => {
+    const staleMs = Date.now() - 30 * 60 * 60 * 1000; // 30h ago — stale under the 24h default
+    const freshMs = Date.now() - 60 * 60 * 1000; // 1h ago — not stale
+    const taskDecisionsStore = {
+      async listResolvedForWorkspaces() { return []; },
+      async listUnansweredForWorkspaces(urlKeys) {
+        assert.deepEqual(urlKeys, ['ws-a', 'ws-b']);
+        return [
+          {
+            id: 'scan_a', urlKey: 'ws-a', issueId: '11111111-1111-1111-1111-111111111111',
+            issueIdentifier: 'LIN-10', decision: { decision_id: 'proceed-or-abort', question: 'q?' },
+            scannedAt: new Date(staleMs).toISOString(), outcome: null, outcomeAt: null
+          },
+          {
+            id: 'scan_b', urlKey: 'ws-b', issueId: '22222222-2222-2222-2222-222222222222',
+            issueIdentifier: 'LIN-11', decision: { decision_id: 'proceed-or-abort', question: 'q?' },
+            scannedAt: new Date(freshMs).toISOString(), outcome: null, outcomeAt: null
+          }
+        ];
+      }
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] }, 'ws-b': { live: [], history: [], agentStatus: [] } };
+    const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Bravo' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.unansweredAge.count, 2);
+    // Both rows share decision_id 'proceed-or-abort'. A decision_id-only .find
+    // resolves BOTH to ws-a's stale row (the first match in listUnansweredForWorkspaces'
+    // return order), reporting staleCount 2. The correct composite-key match
+    // attributes ws-b's row to its own fresh scannedAt, so only ws-a is stale.
+    assert.equal(res.jsonBody.unansweredAge.staleCount, 1, 'only the ws-a row is stale — ws-b must not inherit ws-a\'s raisedAt via a decision_id-only match');
+  });
+
   test('windowDays is clamped to [1, 365] and defaults to 30 when absent/invalid', async () => {
     const router = makeKpiRouter({ 'ws-a': { live: [], history: [], agentStatus: [] } });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
