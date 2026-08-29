@@ -375,7 +375,15 @@ shared by two already-registered API boundaries, not a cross-module FLOW with no
   `lib/credential-invariant-sweep.js` (the lane's scheduled self-check, registered on `mod-scheduler`).
 
 **Roll-up lines (no new id, cited as delta evidence on an existing surface, one line each):**
-`lib/render-templates.js` (a new public, unauthenticated `/templates` page, LIN-1889 — rolls into
+`lib/dispatch-presets-store.js` (LIN-1390/1391/1400 — a fully production-wired preset CRUD store +
+REST surface `GET/POST/PATCH/DELETE /workspace/:urlKey/api/dispatch/presets`, imported by `server.js`,
+`routes/dispatch.js`, `routes/proxy.js`, `lib/dispatch-factory.js`, and `lib/render-settings.js`, with
+explicit routing-precedence resolution — incoming > selected preset > inherited anchor `presetConfig` >
+workspace defaults — added to `mod-dispatch-queue`. This module was missed by the report's original
+discovery sweep and its own R8-style "unconsumed module" check did not catch it because it *is*
+consumed; the required adversarial second-read below caught the gap, added here per its "fixed in
+place" disposition, not scored separately since it doesn't move either surface off its existing
+ceiling); `lib/render-templates.js` (a new public, unauthenticated `/templates` page, LIN-1889 — rolls into
 `mod-render-layer`); `lib/partial-write-error.js` (a shared write-error classifier imported by
 `routes/proxy.js`/`routes/workspace-api.js`/the Jira provider — rolls into `api-workspace-proxy`'s
 error-handling evidence, sibling-owned); `lib/credential-state.js` (per-session credential display
@@ -569,7 +577,7 @@ not-applicable. Confidence is this run's own honesty check, not a maturity score
 | `mod-prompt-template-system` | Deterministic + AI-generated prompt system, shared grounding post-pass | 4 | N/A* | High | unchanged |
 | `mod-roadmap-trajectory` | Deterministic velocity/execution-order/milestone layer + narrative pipeline | 3 | 3 | Medium/Low | unchanged (`lib/north-star-resolver.js` rolls in — delta line, not a score move) |
 | `mod-render-layer` | ~20+ server-side page renderers, tiered first-class/experimental/power-user | 4 / 2-3 (experimental) | N/A* | Medium | unchanged (`lib/render-templates.js` new public `/templates` page rolls in — delta line; Ship Journey/Passage Planner/task-edit/task-create explicitly registered separately, outside this tier, not double-counted here) |
-| `mod-dispatch-queue` | Queue storage + wake propagation, documented schema, TTL, loop guards | 4 | 4 | High | unchanged, cited evidence for no movement — real hardening landed (LIN-1656 duplicate-dispatch guard, LIN-1948 dangling-referent refusal, LIN-1751/2147 `maxTasks` trim, LIN-2297 wake guard) while already at ceiling |
+| `mod-dispatch-queue` | Queue storage + wake propagation, documented schema, TTL, loop guards | 4 | 4 | High | unchanged, cited evidence for no movement — real hardening landed (LIN-1656 duplicate-dispatch guard, LIN-1948 dangling-referent refusal, LIN-1751/2147 `maxTasks` trim, LIN-2297 wake guard); `lib/dispatch-presets-store.js` (LIN-1390/1391) rolls in as new CFG evidence, added after the adversarial second-read caught its omission — see Surface registration section |
 | `mod-observation-materializer` | Durable read-model store + materializer; documented best-effort/live-fallback | 3 | N/A* | Medium | unchanged |
 | `mod-kpi-audit` | Public KPI aggregation (privacy-boundary'd) + workspace audit report | 4 / 3 (audit) | N/A* | Medium | unchanged (`lib/escalation-kpis.js` rolls in as a new cross-cutting consumer of the decisions lane via `routes/dashboard.js`'s join — delta line, not a score move) |
 | `mod-live-console` | Ambient cross-workspace activity feed (status stream + lean loops + timeline/zoom) | 4 | N/A* | Medium | new |
@@ -690,18 +698,104 @@ changes.
 *Filled in after the report draft above was complete, per LIN-2323's structural gate — see the
 required Linear comment for the summary the engine reads.*
 
-**Tier used:** _pending_
+**Tier used:** Tier 2 — a fresh-context sub-agent, dispatched from within the report-writing session,
+carrying no memory of the report-writing turn (a `general-purpose` agent given only the report path,
+the baseline path, and the repo location, with instructions to independently inspect the live tree
+rather than trust the report's own citations).
 
 **Question posed, verbatim:** *"What is the largest item in this window that this report missed or
 misfiled?"*
 
-**Reader's full answer:** _pending_
+**Reader's full answer, verbatim:**
 
-**Adversarial second-read verdict:** _pending_ (AGREE / DISAGREE)
+> I read both reports, skimmed `CLAUDE.md`, and independently spot-checked the live tree at HEAD
+> (`b07c8774`, one commit past the report's stated `292ac962`, which is the report-commit itself —
+> consistent with the branch description).
+>
+> **Verification of the report's own headline claims.** I did not rubber-stamp — I re-derived the
+> evidence myself:
+>
+> - **R7 (Done-gate bypass, `routes/workspace-api.js:3450`).** I grepped every `provider.updateIssue(`
+>   call site across `routes/*.js`. There are exactly three: `routes/proxy.js:3487` (gated, confirmed —
+>   `checkPeriodicalReportGate`/`extractPeriodicalGateId` imported at `proxy.js:58` and invoked at
+>   `:3446-3465`), `routes/proxy.js:3556` (a description-only rewrite inside `applyDescriptionEdit`, no
+>   `stateId`, correctly excluded), and `routes/workspace-api.js:3450` (no gate import anywhere in that
+>   file, confirmed by grep). The claim "exactly two routes can set a state on an issue... enumerated
+>   exhaustively" holds up exactly as written. This is a real, serious, cheap-to-fix finding.
+> - **R5 (free-tier double-prefixed key).** I read `lib/free-tier-store.js` directly. `tryUse()` (the
+>   only production caller) computes `hourKey = \`global:${this._getHourKey()}\`` then writes to
+>   `globalId = \`global:${hourKey}\`` — literally `global:global:<hour>`. The read checks
+>   `global:<hour>` (single-prefixed). The correctly-keyed writer, `recordUsage()`, is called only from
+>   `routes/test.js:882`. This is exactly what the report claims, verified byte-for-byte — the global
+>   hourly cap is genuinely, currently unenforced in production.
+> - **R9** (`periodicalId`/`repo` dropped at `formatDispatchWatch`) and **R2** (`listHistory({silentSince})`
+>   unconsumed) both checked out against the live tree as described.
+>
+> Given all four of the report's most load-bearing citations survive independent re-derivation, the
+> report is factually careful, not just internally consistent.
+>
+> **What I found that the report missed.** Diffing `lib/`+`routes/` files added between the baseline
+> (`ae00c61b7`) and this run's HEAD (`292ac962`) against everything the report's inventory, folds, and
+> rollups account for, one substantial addition is entirely absent from the report:
+> **`lib/dispatch-presets-store.js` and its wiring** — "Dispatch Presets," LIN-1390/1391 (5 commits:
+> `1cd5e1d5` S1 store, `b64c7ba8` S3 factory routing precedence, `a13880b4` S6+S8 entry
+> points/wiring, `935536d4` LIN-1391 authoring/selection UI, `7aa7d9d7` LIN-1400 `byKind` UI). This is
+> not a stub — it's a fully production-wired, tested, user-facing feature: a Mongo/Mango-backed CRUD
+> store (`list`/`get`/`createCustom`/`update`/`delete`), a full REST surface
+> (`GET/POST/PATCH/DELETE /workspace/:urlKey/api/dispatch/presets`), factory-level routing-precedence
+> resolution in `lib/dispatch-factory.js` (explicit incoming > selected preset > inherited anchor
+> `presetConfig` > workspace defaults), and a client authoring UI. It is imported by `server.js`,
+> `routes/dispatch.js`, `routes/proxy.js`, `lib/dispatch-factory.js`, and `lib/render-settings.js`, and
+> covered by 6+ unit tests plus an E2E spec.
+>
+> I grepped the report text for "preset" and for "1390"/"1391" — zero hits. It isn't registered as a
+> new id, isn't folded as CFG evidence into `api-dispatch`/`mod-dispatch-queue` (the way the report does
+> fold the smaller `lib/ownerless-token-policy.js` and `lib/dispatch-referent-guard.js` into those exact
+> two surfaces' CFG evidence this run), isn't in the "~468 commits of new surfaces" discovery list, and
+> isn't in the surface-registration disposition table. It is, by any reasonable reading, a
+> **configuration mechanism** — the review's own stated exclusive first-party remit — landed squarely
+> on the dispatch surface this review already scores. It would not have been caught by the report's own
+> R8-style "landed but consumed by nothing" sweep either, since it *is* consumed — it needed the
+> complementary check ("is there a new production surface this run hasn't registered yet"), which is
+> exactly what the discovery mandate asked for and didn't happen here.
+>
+> I read the store and factory code closely looking for a functional bug in the same shape as R5's
+> double-prefix defect (a plausible place for a second "wired but wrong" instance, since it's new and
+> unaudited) — I didn't find one; the code is clean, validated, and tested. So this is a
+> coverage/completeness gap in the report, not a live functional defect the maintainer needs to act on
+> urgently.
+>
+> **Secondary, minor note (not the headline miss):** `routes/task-create.js` submits to
+> `POST /workspace/:urlKey/api/issues` (create, not update), which is a third code path that can, in
+> principle, set an issue's initial `stateId` at creation time with no gate check — if someone crafted a
+> create request carrying a Done-type state plus a pre-formed periodical-gate marker in the description,
+> it would bypass R7's gate entirely via a different door. This is real but far more theoretical than
+> R7 (periodical tasks aren't normally minted through this human-facing form), so I don't think it rises
+> to "the largest miss" — I mention it only because the report's own R7 language ("exactly two routes...
+> enumerated exhaustively") is true for *updates* but slightly overstates completeness for *state-setting*
+> in the broadest sense.
 
-**Differed from top finding:** _pending_ (YES / NO)
+**Adversarial second-read verdict: DISAGREE.** The report's individual findings (R1–R9) are accurate
+and well-cited wherever the reader checked. But its explicit completeness claims — "scope was widened,
+not narrowed," "12 new ids registered with cited evidence," a "behavior-based sweep... for modules
+landed-but-consumed-by-nothing" — were undercut by a real, multi-commit, fully-wired configuration
+feature on the review's own home-turf surface (dispatch) that did not appear anywhere in the original
+draft.
 
-**Disposition:** _pending_ (fixed in place / escalated / no change)
+**Differed from top finding: YES.** The reader's answer (the missing `dispatch-presets-store`
+coverage) names something different from the report's own #1-ranked finding (R7, the Done-gate bypass).
+The reader independently re-verified R7 and found it accurate and correctly ranked given the checks run
+— the disagreement is about a coverage gap elsewhere, not about R7's own validity or priority.
+
+**Disposition: fixed in place.** `lib/dispatch-presets-store.js` (LIN-1390/1391/1400) has been added as
+new CFG evidence on `api-dispatch` and `mod-dispatch-queue` in the Surface registration section and the
+Trend Ledger's `mod-dispatch-queue` delta column, per the reader's own recommendation (a
+citation-completeness fix, not a rescoring — it doesn't move either surface off its existing ceiling of
+4). The secondary note on `routes/task-create.js` as a theoretical third state-setting path is recorded
+here for the record; it is not folded into R7's own text, since the reader itself judged it
+"far more theoretical" and not the largest miss, and this report does not mint a tenth finding for a
+theoretical path with no cited exploit and no maintainer action implied beyond what R7 already
+recommends.
 
 ---
 
