@@ -90,16 +90,19 @@ Three other threads run through this report:
    kind of divergence, which this report calls out as the honest counterweight (R8).
 3. **A field the ledger depends on is invisible at the layer that would prove it.** `periodicalId` —
    minted specifically to replace a fragile title-matching join — is written correctly end-to-end and
-   then dropped at the public route response allow-list, the fourth documented instance of exactly this
-   drop pattern in the same file (R9). Whether live rows actually carry it is **unresolvable from any
+   then dropped at the public route response allow-list — the fourth instance of a drop pattern
+   `PERIODICAL_PROJECTION` documents three prior cases of, this one a layer up and itself undocumented
+   (R9). Whether live rows actually carry it is **unresolvable from any
    API surface available to this review**, and this report does not assert either way.
 
 Reliability ([LIN-1040](https://linear.app/linearviewer/issue/LIN-1040)) and Observability
 ([LIN-1041](https://linear.app/linearviewer/issue/LIN-1041)) reviews still do not exist (R3, unchanged
-since baseline) — five of this review's twelve dimensions remain fully unowned. Of the five with a
-named owner whose evidence was stale at baseline, **four have since refreshed** (code-quality, design,
-documentation, headwinds); security, API quality, test coverage, dependency/supply-chain, stability,
-and drift-coherence have not (R6, now genuinely mixed rather than uniformly stale).
+since baseline) — five of this review's twelve dimensions remain fully unowned. Of the five correctives
+the baseline named as stale, **one has since refreshed** (documentation) and four have not (security,
+API quality, test coverage, dependency/supply-chain); four further siblings outside that five have also
+refreshed (code-quality, design, headwinds, drift-coherence), while stability — a fifth 2026-06-25
+report the baseline's list omitted — has not. Five sibling reports current, five still at 2026-06-25
+(R6, now genuinely mixed rather than uniformly stale).
 
 ---
 
@@ -160,12 +163,16 @@ is genuinely yes for the mechanism as a whole — but three verified gaps hold i
 - **(a) The ledger measures dispatch, not review.** `recent`/`never` are computed from
   `lastDispatchedAt` against cadence — the module's own header calls `never` a *bounded* claim ("no
   evidence in the full window the store can still hold"), never "never ran." Cross-tabbed against
-  `docs/reviews/` at HEAD: **8 of 15** live ledger states misdescribe report-production status, in
-  *both* directions — `drift-coherence` and `onboarding-journey` read `recent` with a 65-day-old report
-  and no report at all respectively, while `security-review`/`api-quality-review`/`test-coverage-gap`/
+  `docs/reviews/` at this report's stated HEAD (`292ac962`): **8 of 15** live ledger states misdescribe
+  report-production status, in *both* directions — `drift-coherence` and `onboarding-journey` read
+  `recent` with a 65-day-old report and no report at all respectively, while
+  `security-review`/`api-quality-review`/`test-coverage-gap`/
   `stability-review`/`dependency-supply-chain-review`/`comprehension-debt-review` all read `never`
-  despite having reports on disk. Nothing in the tree reads `docs/reviews/` at runtime — the Stage-2
-  measurement gap is total, not partial.
+  despite having reports on disk. **At merge time the figure is 7 of 15**: `drift-coherence` dropped out
+  of the mismatch set when `drift-coherence-review-2026-08-29` landed on `main` in `cb2fbb5a`, 33
+  minutes before this PR's own final commit (see R6). The remaining seven are unchanged, and the
+  direction of the finding is unaffected. Nothing in the tree reads `docs/reviews/` at runtime — the
+  Stage-2 measurement gap is total, not partial.
 - **(b) The gate covers one of two write paths** — see R7.
 - **(c) The `periodicalId` join key is unverifiable in practice** — see R9.
 
@@ -234,11 +241,13 @@ Confidence: High*
 The write path for `periodicalId` **is** wired end-to-end — `lib/render.js:499,518` →
 `data-periodical-id` → `public/app.js`/`public/common.js` → `routes/dispatch.js:292,548` →
 `lib/dispatch-store.js:343,840` → both list formatters. But the field is **dropped again at the public
-route response allow-list**: `formatDispatchWatch` (`routes/proxy.js:569-605`) is an explicit allow-list
-that does not carry `periodicalId` or `repo`, and the code's own comment at `:602-605` records that this
-is deliberate. `PERIODICAL_PROJECTION`'s own comments in `lib/dispatch-store.js` record `followUpTo`,
-`abort`, and `repo` each having been silently dropped and restored once already — `periodicalId` is a
-**fourth** documented instance of the same class, one layer up, still open. The correction this report
+route response allow-list**: `formatDispatchWatch` (`routes/proxy.js:569-632`) is an explicit allow-list
+that does not carry `periodicalId` or `repo`, and nothing in that function records the omission as
+deliberate — its one such comment (`:600-605`) is about `dispatchedBy` (LIN-1948) and the *list/poll*
+re-projection, not these two fields. `PERIODICAL_PROJECTION`'s own comments
+(`lib/dispatch-store.js:75-89`) record `followUpTo`, `abort`, and `repo` each having been silently
+dropped and restored once already — `periodicalId` is a **fourth** instance of that documented class,
+one layer up, still open and itself undocumented. The correction this report
 makes to the baseline's first-pass read: whether live rows actually carry `periodicalId` cannot be
 determined from any first-party API surface available to this review (a detail read on a periodical row
 returns 22 keys, neither `periodicalId` nor `repo` among them) — this report does not assert either
@@ -296,18 +305,23 @@ should carry both.
 
 *Surface: META / portfolio · Confidence: High*
 
-At baseline, five siblings were uniformly ~22 days stale. Now: **refreshed since baseline** —
-`code-quality-review-2026-08-23`, `design-interface-review-2026-08-23`,
-`documentation-review-2026-08-23`, `recent-headwinds-review-2026-08-23` and `-2026-08-29`. **Still
+At baseline, R6 named five correctives as uniformly ~22 days stale: Security, API Quality,
+Documentation, Test Coverage Gap, and Dependency & Supply-Chain. Of those five, **one has refreshed**
+(`documentation-review-2026-08-23`) and **four have not**. Four *further* siblings outside the
+baseline's five have also refreshed since — `code-quality-review-2026-08-23`,
+`design-interface-review-2026-08-23`, `recent-headwinds-review-2026-08-23`/`-2026-08-29`, and
+`drift-coherence-review-2026-08-29` (landed on `main` in `cb2fbb5a`, after this report's own stated HEAD
+of `292ac962`; see the note below) — so **five sibling reports in total are now current**. **Still
 2026-06-25** (~9 weeks, 337 `lib/`+`routes/` commits behind) — `security-review`, `api-quality-review`,
-`test-coverage-gap`, `dependency-supply-chain-review`, `stability-review`, `drift-coherence-review`.
-`comprehension-debt-review` is 2026-07-01. **Never written** — `performance-scale`,
+`test-coverage-gap`, `dependency-supply-chain-review`, and `stability-review`: five, of which the first
+four are the baseline's own unrefreshed correctives and `stability-review` is a fifth 2026-06-25 report
+the baseline's list did not name. `comprehension-debt-review` is 2026-07-01. **Never written** — `performance-scale`,
 `data-fetch-architecture`, `onboarding-journey`. Several non-registry reports have also landed since
 baseline and carry usable evidence: `lane-run-review-2026-08-23`, `outward-validation-run-2026-08-28`,
 `capacity-test-run-review-2026-08-14`, `capacity-levers-map-2026-08-15`,
 `context-efficiency-ceiling-review-2026-08-15`, `intra-session-efficiency-review-2026-08-14`.
 
-**Action (for a human to weigh):** refresh the six still-stale correctives, prioritizing Security
+**Action (for a human to weigh):** refresh the five still-stale correctives, prioritizing Security
 (auth & credentials feeds the new `api-jira-rest` and `flow-account-connection-workspace-credential`
 surfaces below) and Test Coverage Gap (owns confirming/fixing R5).
 
@@ -379,7 +393,10 @@ shared by two already-registered API boundaries, not a cross-module FLOW with no
 REST surface `GET/POST/PATCH/DELETE /workspace/:urlKey/api/dispatch/presets`, imported by `server.js`,
 `routes/dispatch.js`, `routes/proxy.js`, `lib/dispatch-factory.js`, and `lib/render-settings.js`, with
 explicit routing-precedence resolution — incoming > selected preset > inherited anchor `presetConfig` >
-workspace defaults — added to `mod-dispatch-queue`. This module was missed by the report's original
+workspace defaults — added as CFG evidence to **both** `api-dispatch` and `mod-dispatch-queue`. The
+split is not decorative: the four preset routes are registered in `routes/dispatch.js:1115-1205`, which
+is exactly what `api-dispatch` is defined as, so the exposed REST surface belongs on that row while the
+store and its precedence rule belong on `mod-dispatch-queue`. This module was missed by the report's original
 discovery sweep and its own R8-style "unconsumed module" check did not catch it because it *is*
 consumed; the required adversarial second-read below caught the gap, added here per its "fixed in
 place" disposition, not scored separately since it doesn't move either surface off its existing
@@ -599,7 +616,7 @@ not-applicable. Confidence is this run's own honesty check, not a maturity score
 | `api-yap-chat-client` | HTTP client for the experimental Collective's chat server | 3 | 4 | Medium/High | unchanged |
 | `api-egress-proxy-fetch` | Outbound HTTP proxy wrapper for corporate proxy environments | 3 | 4 | Medium/High | unchanged |
 | `api-workspace-proxy` | Harbour's exposed source-neutral consumer API (`routes/proxy.js`) | 4 | 4 | High | unchanged, cited evidence for no movement — 47→55 routes, differentiated rate limiting, 320 `logEvent` sites, `lib/dispatch-validation.js`; new CFG evidence: `lib/ownerless-token-policy.js`, `lib/dispatch-referent-guard.js` |
-| `api-dispatch` | Harbour's exposed Dispatch API (`routes/dispatch.js`) | 4 | 4 | High | unchanged; same new CFG evidence as above, plus dispatch-hardening evidence under `mod-dispatch-queue` |
+| `api-dispatch` | Harbour's exposed Dispatch API (`routes/dispatch.js`) | 4 | 4 | High | unchanged; same new CFG evidence as above, plus the dispatch-presets REST surface (`routes/dispatch.js:1115-1205`, `lib/dispatch-presets-store.js`, LIN-1390/1391/1400) as new CFG evidence, and dispatch-hardening evidence under `mod-dispatch-queue` |
 | `api-jira-rest` | Jira Cloud provider — read-only issue/project MVP (LIN-1885/2011/2018) | 4 | 4 | High | new |
 
 ### FLOW surfaces
@@ -678,11 +695,12 @@ closed a version of this exact risk before it could bite. Worth remembering that
 once in a codebase this size: some seams get left half-wired, and some team members are actively hunting
 for and closing that exact class of gap.
 
-Reliability and Observability reviews still don't exist, six weeks on. Of the five sibling reviews that
-were stale at baseline, four have since refreshed; the other six (security, API quality, test coverage,
-dependency/supply-chain, stability, drift-coherence) have not, and security is now the most consequential
-gap given two brand-new credential/auth surfaces this run had to score with no fresh sibling evidence at
-all.
+Reliability and Observability reviews still don't exist, six weeks on. Of the five sibling reviews the
+baseline flagged as stale, only one (documentation) has been refreshed since. Four other siblings have
+been refreshed in the same window, so five of the portfolio's reports are current — but five (security,
+API quality, test coverage, dependency/supply-chain, stability) are still sitting at 2026-06-25, and
+security is the most consequential of those given two brand-new credential/auth surfaces this run had
+to score with no fresh sibling evidence at all.
 
 **If you act on one thing:** close R7 — it's a two-line fix at an existing call site, and it's the gate
 this very review is itself subject to. **If you act on two:** progress R5 — `lib/free-tier-store.js` has
@@ -788,8 +806,8 @@ The reader independently re-verified R7 and found it accurate and correctly rank
 — the disagreement is about a coverage gap elsewhere, not about R7's own validity or priority.
 
 **Disposition: fixed in place.** `lib/dispatch-presets-store.js` (LIN-1390/1391/1400) has been added as
-new CFG evidence on `api-dispatch` and `mod-dispatch-queue` in the Surface registration section and the
-Trend Ledger's `mod-dispatch-queue` delta column, per the reader's own recommendation (a
+new CFG evidence on `api-dispatch` and `mod-dispatch-queue` in the Surface registration section and in
+both surfaces' Trend Ledger delta columns, per the reader's own recommendation (a
 citation-completeness fix, not a rescoring — it doesn't move either surface off its existing ceiling of
 4). The secondary note on `routes/task-create.js` as a theoretical third state-setting path is recorded
 here for the record; it is not folded into R7's own text, since the reader itself judged it
