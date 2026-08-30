@@ -72,7 +72,7 @@ import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals } from '../lib/periodicals.js';
 import { foldPeriodicalRuns, DEFAULT_HORIZON_MS } from '../lib/periodical-runs.js';
-import { PERIODICAL_PROJECTION } from '../lib/dispatch-store.js';
+import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION } from '../lib/dispatch-store.js';
 import { parseRepoFromDescription, resolveDispatchRepo, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext, shouldUseMcpTokenField, provisionBootstrapToken } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS, WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
@@ -2114,8 +2114,10 @@ GET ${baseUrl}/api/proxy/periodicals
         "repos": [{ "repo": "repo-a" | null, "label": "repo-a" | "none",
           "isDefault": false | true, "state": "due" | "recent" | "never" | "unknown",
           "lastDispatchedAt": "2026-07-24T10:00:00Z" | null, "daysSince": 10 | null }] }] }
-  → "state": "recent" means a live queue row OR a history run inside its cadence
-    window; "due" means the cadence has elapsed since the last run; "never" means
+  → "state": "recent" means a live queue row OR a history run that is BOTH "taken" AND
+    carries a terminal done/complete feedback marker, inside its cadence window
+    (LIN-2385 — a claim that was taken and then failed, or never reported, does not
+    count); "due" means the cadence has elapsed since the last run; "never" means
     NO EVIDENCE IN THE FULL RETAINED HISTORY WINDOW — not "ever ran". The window
     is min(this route's fixed 30-day horizon, the store's retention).
     "unknown" — absence not conclusive — appears only when the horizon is
@@ -2296,12 +2298,13 @@ POST ${baseUrl}/api/proxy/dispatch
   → DUPLICATE GUARD — a FRESH dispatch for an issue+kind already dispatched to this workspace within the last 5 MINUTES is refused 409: { "error": "...", "code": "DUPLICATE_DISPATCH", "id": "<the live dispatch>", "issueIdentifier": "LIN-42", "kind": "plan", "dispatchedAt": "...", "retryAfter": 163 } (plus a "Retry-After" header). Someone else — another orchestrator, or a human on the board — already started this exact step. WHAT TO DO: adopt the "id" in the body and WATCH that dispatch via GET /dispatch/{id} exactly as if you had dispatched it yourself. Do NOT retry, do NOT re-word the prompt and resend, do NOT treat it as a failure or an instrument breakage. The window is self-clearing: "retryAfter" is the seconds until it lifts, if you genuinely still need a second run. Never refused: a "followUpTo" beat, an "abort", a different "kind" on the same issue (the normal research → plan → implementation pipeline), the same issue+kind in a different workspace, or a dispatch carrying no "issueIdentifier". Match on "code" — 409 alone is ambiguous, the trashed-issue refusal uses it too. See LIN-1656.
 
 POST ${baseUrl}/api/proxy/recommend-and-dispatch
-  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "model": "anthropic/claude-opus-4.8", "harness": "opencode", "appendProxyContext": true, "noDescend": false, "kind": "review", "sessionId": "...", "waitForFollowUps": false }
+  Body: { "issueIdentifier": "LIN-42", "target": "cli|web|dash", "repo": "...", "model": "anthropic/claude-opus-4.8", "harness": "opencode", "appendProxyContext": true, "noDescend": false, "kind": "review", "sessionId": "...", "periodicalId": "...", "waitForFollowUps": false }
   → Fused verb: runs /recommend and forwards the recommended prompt straight into a dispatch, server-side. "issueIdentifier" is required; target defaults to "cli".
   → "model" (optional) is threaded onto the dispatched item, same meaning as on POST /dispatch — the EXECUTION model the runner passes to its own CLI (OpenRouter "provider/model" convention, e.g. "anthropic/claude-opus-4.8"), opaque and forwarded blindly. Set it to route a cheaper/pricier model per task (e.g. Sonnet for implementation, Opus for review); omit to keep the consumer default. See LIN-438.
   → "harness" (optional) is threaded onto the dispatched item, same meaning as on POST /dispatch — the EXECUTION harness the runner should use (e.g. "opencode"), opaque and forwarded blindly. Combine with "model" to pick a specific OpenRouter-backed model for a non-default harness; omit to keep the consumer's own default. See LIN-1084.
   → "repo" (optional) overrides the project's "repo=" inheritance for the dispatched item. An opaque string: max 1000 characters (UTF-16 code units), no control characters — violating either returns a 400 naming the constraint, and the received length when the length cap is the cause. Omitted or explicit "null" are both accepted as absent, so the project-derived "repo=" (or none) is used instead. See LIN-2075.
   → "sessionId" (optional) is the autopilot dispatch id driving this run; stamp it on every fan-out so the whole multi-task run reconstructs as one session. An OPAQUE string, not a UUID (LIN-1118): non-empty, max 128 chars, no control characters, "__meta__" reserved; existing UUIDs stay valid. Any target. See LIN-591.
+  → "periodicalId" (optional) is the periodical-template join key: pass the id of the periodicals-registry template (e.g. "documentation-review") this dispatch was minted from. Stamped once at dispatch time, never maintained — it does NOT propagate to a "followUpTo" beat or a wake. Validated against the live registry: an unknown/typo id is rejected 400. Stored + forwarded blindly, and does not affect execution. See LIN-1825/LIN-2385.
   → The prompt body NEVER returns to you — you only get the task header. This keeps the prompt out of your context (the point of the verb); learn what was chosen from "kind"/"promptName", then watch the item via GET /dispatch/{id}.
   → "kind" is derived from the recommendation's own action signal (falling back to "custom") — no need to read the prompt to classify the task.
   → Set "noDescend": true to dispatch the named issue's OWN next step and NOT descend into an open child (deterministic). Use it to drive a parent whose deliverables live in its own description while a child is out of scope / separately tracked; the dispatched item then references the parent, and "deferredVia" is just [parent].
@@ -5028,20 +5031,37 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
    * Read safety is TWO obligations, not one (LIN-1829 research, corrected
    * 2026-08-03 — this ticket originally conflated them):
    *
-   *  (a) PROJECTION. Both reads carry PERIODICAL_PROJECTION so the multi-KB-
-   *      to-10MB `prompt`/`feedback[]` fields never transfer — the documented
-   *      cause of the LIN-1030 H12/503 incidents. A projection is a column
-   *      filter, NOT a row cap (lib/dispatch-store.js:55-78).
+   *  (a) PROJECTION. The queue read carries PERIODICAL_PROJECTION and the
+   *      history read carries PERIODICAL_HISTORY_PROJECTION (LIN-2385: adds
+   *      `feedback: 1`, needed to require a terminal marker — see below) —
+   *      the multi-KB-to-10MB `prompt` field never transfers on either read,
+   *      and `feedback[]` never transfers on the queue read at all, since
+   *      `listItems` has no row-bounding predicate to make that read safe. A
+   *      projection is a column filter, NOT a row cap (lib/dispatch-store.js
+   *      :55-78).
    *  (b) ROW BOUNDING. `limit` is ruled out permanently: listHistory's `limit`
    *      path sorts on `resolvedAt`, not `dispatchedAt` (lib/dispatch-store.js
    *      :918-940), so it can silently drop or wrongly retain a periodical's
-   *      only run. Bounding instead comes from the JS-side `kind === 'periodical'`
-   *      filter below (neither store method has a `kind` filter) — measured
-   *      safe today (~7,183 history rows workspace-wide for an O(15) answer).
-   *      REVISIT TRIGGER: workspace dispatch-history row count materially
-   *      exceeding ~25-30k, or this route's own latency approaching the 30s
-   *      router ceiling — whichever comes first — push `kind` into the store
-   *      query instead (deferred out of this ticket; not done here).
+   *      only run. Bounding instead comes from the JS-side
+   *      `kind === 'periodical' || periodicalId != null` filter below (a
+   *      registry-validated `periodicalId` needs no `kind` guard — LIN-2385).
+   *      The history read additionally pushes the same row set down into the
+   *      store query itself (`listHistory`'s `periodicalEvidenceRow` option,
+   *      lib/dispatch-store.js) — measured safe today (~7,183 history rows
+   *      workspace-wide for an O(15) answer). REVISIT TRIGGER: workspace
+   *      dispatch-history row count materially exceeding ~25-30k, or this
+   *      route's own latency approaching the 30s router ceiling — whichever
+   *      comes first — push the same predicate into the queue read too
+   *      (deferred out of this ticket; not done here).
+   *
+   * RUN EVIDENCE (LIN-2385): a history row counts as a completed run only when
+   * `status === 'taken'` (excludes `cancelled`/`expired`) AND its `feedback[]`
+   * carries a terminal `done`/`complete` marker (via lib/dispatch-terminal.js's
+   * `deriveTerminalStatus`, applied in lib/periodical-runs.js) — a claim that
+   * was `taken` and then `[failed]`/never reported no longer resets the
+   * cadence clock. A LIVE queue row still reads `recent` unconditionally
+   * (queue docs carry no `status`/`feedback` at all) — that anti-double-
+   * dispatch guard is unchanged.
    *
    * historyTtl is stored in SECONDS (lib/dispatch-store.js:142); the fold
    * wants milliseconds. This is a correctness gate, not a style point — a
@@ -5087,17 +5107,31 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
           // this belt-and-suspenders `since` is supposed to trim the read,
           // never break it.
           since: new Date(now - effectiveHorizonMs),
-          projection: PERIODICAL_PROJECTION
+          projection: PERIODICAL_HISTORY_PROJECTION,
+          // LIN-2385: push the same row set the JS-side filter below admits
+          // (kind:'periodical' OR periodicalId != null) down into the store
+          // query, BEFORE the projection above widens to include `feedback` —
+          // narrow rows first, then widen columns. The queue read (`listItems`)
+          // gets no such predicate: it never gains `feedback` (see the read-
+          // safety note above), so it needs no row-bounding for this purpose.
+          periodicalEvidenceRow: true
         })
       ]);
 
-      // JS-side kind filter — neither store method has one (see the read-
-      // safety note above). This is a CORRECTNESS guard (stops a human
-      // prompt titled like a template from counting as run evidence via the
-      // fold's title fallback), never a cost bound — see the revisit trigger
-      // above before adding a query-side `kind` predicate.
-      const filteredQueue = queueRows.filter(row => row.kind === 'periodical');
-      const filteredHistory = history.items.filter(row => row.kind === 'periodical');
+      // JS-side admission filter — a CORRECTNESS guard (stops a human prompt
+      // titled like a template from counting as run evidence via the fold's
+      // title fallback), never a cost bound — see the revisit trigger above
+      // before adding a query-side predicate to the queue read too. Admits a
+      // row whose `kind` is the mint's own `'periodical'` OR whose
+      // `periodicalId` is stamped (LIN-2385: batch/lane dispatches that
+      // discharge a periodical's remit carry a registry-validated
+      // `periodicalId` but a different `kind`, e.g. `implementation`) — a
+      // stamped `periodicalId` needs no `kind` guard, since it is validated
+      // against the live registry at write time (routes/dispatch.js,
+      // routes/proxy.js's `POST /dispatch` and `POST /recommend-and-dispatch`).
+      const isPeriodicalRow = row => row.kind === 'periodical' || row.periodicalId != null;
+      const filteredQueue = queueRows.filter(isPeriodicalRow);
+      const filteredHistory = history.items.filter(isPeriodicalRow);
 
       const results = foldPeriodicalRuns(getPeriodicals(), {
         queueRows: filteredQueue,
@@ -6538,6 +6572,15 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
    * "autopilot picks the verb, never the words." The body is still server-
    * generated and never returned; only the verb key is caller-supplied. Omitting
    * `kind` leaves the original LLM-driven behaviour byte-identical.
+   *
+   * `periodicalId` (LIN-1825/LIN-2385): optional periodical-template join key,
+   * registry-validated exactly like `POST /api/proxy/dispatch`'s field of the
+   * same name. Stamped onto BOTH `createDispatchItem` fields blocks below —
+   * the verb-override branch AND the recommendation-derived one — because
+   * this fused verb, not `POST /dispatch`, is what every autopilot loop
+   * actually calls to continue a tracked task (see `lib/prompts/
+   * autopilot-kickoff.js`'s "Trigger the next step"), and the normal trigger
+   * carries no `kind`, landing on the recommendation-derived branch.
    */
   router.post('/api/proxy/recommend-and-dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     if (!dispatchQueueStore) {
@@ -6546,7 +6589,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
     }
 
     try {
-      const { issueIdentifier, target, repo, repoInherited, model, harness, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
+      const { issueIdentifier, target, repo, repoInherited, model, harness, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription, periodicalId } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -6623,6 +6666,17 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
       if (kind !== undefined && (typeof kind !== 'string' || !hasPrompt(kind))) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, `kind must be a valid prompt template key: ${Object.keys(PROMPT_TEMPLATES).join(', ')}`);
+      }
+      // Periodical-template join key (LIN-1825/LIN-2385): registry-membership
+      // check, mirroring POST /api/proxy/dispatch's identical guard above and
+      // routes/dispatch.js's. This is the fused verb every autopilot loop
+      // actually uses to continue a tracked task, so it needs the same
+      // stamping capability POST /dispatch already has (LIN-2385 B1) — without
+      // it, a periodical's Stage-2 batch/lane dispatch has no way to stamp
+      // `periodicalId` on the verb it actually takes.
+      if (periodicalId !== undefined && !getPeriodicals().map(p => p.id).includes(periodicalId)) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, 'periodicalId must be one of the known periodical template ids');
       }
       // Autopilot session reference (LIN-591): the autopilot dispatchId that is
       // driving this run, stamped onto the spawned worker so the dashboard can
@@ -6750,6 +6804,8 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
               // own project repo wins over it instead (repoInherited: true).
               repo: resolveDispatchRepo(repo, parseRepoFromDescription(project?.description), { inherited: repoInherited === true }),
               sessionId: sessionId || null,
+              // Periodical-template join key (LIN-1825/LIN-2385): validated above.
+              periodicalId: periodicalId || null,
               // Push-comms: `subscription` is the declared edge (LIN-900 §6),
               // `terminal-only` unless the caller declares `everything`; queueIfBusy
               // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
@@ -6943,6 +6999,11 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
             // the worker runs in the child project's repo, not the parent's (LIN-1210).
             repo: resolveDispatchRepo(repo, rec.repo, { inherited: repoInherited === true }),
             sessionId: sessionId || null,
+            // Periodical-template join key (LIN-1825/LIN-2385): validated above.
+            // This is the branch autopilot actually takes on the normal
+            // Stage-2-opening trigger (no `kind` override) — see the route's
+            // own doc comment above for why both fields blocks must carry it.
+            periodicalId: periodicalId || null,
             // Opt-in completion hold (LIN-797), forwarded blindly to the runner.
             waitForFollowUps: waitForFollowUps === true,
             // Push-comms: `subscription` is the declared edge (LIN-900 §6),

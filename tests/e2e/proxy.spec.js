@@ -2968,15 +2968,24 @@ test.describe('Proxy API - Periodicals (real-server wiring, LIN-1829)', () => {
 
     // Take: the real consumer path this endpoint must read back through.
     // takeItem() archives the row into HISTORY with status 'taken'
-    // immediately (lib/dispatch-store.js) — the shape foldPeriodicalRuns
-    // treats as real run evidence. (A live, un-taken QUEUE row would ALSO
-    // read `recent` under fold rule 1 — taking it is what actually proves
-    // the history read-back path this route depends on, not just the
+    // immediately (lib/dispatch-store.js). (A live, un-taken QUEUE row would
+    // ALSO read `recent` under fold rule 1 — taking it is what actually
+    // proves the history read-back path this route depends on, not just the
     // live-queue one.)
     const take = await request.post(`/api/dispatch/take/${id}`, {
       headers: { Authorization: `Bearer ${consumerToken}` }
     });
     expect(take.status()).toBe(200);
+
+    // LIN-2385: a 'taken' row alone is no longer sufficient run evidence —
+    // the fold also requires a terminal done/complete feedback marker. Post
+    // one through the real consumer feedback path before the read-back, so
+    // this stays the real production shape (mint -> take -> REPORT -> read).
+    const feedback = await request.post(`/api/dispatch/feedback/${id}`, {
+      headers: { Authorization: `Bearer ${consumerToken}`, 'Content-Type': 'application/json' },
+      data: { message: '[done] Task completed' }
+    });
+    expect(feedback.status()).toBe(200);
 
     const resp = await request.get('/api/proxy/periodicals', {
       headers: { Authorization: `Bearer ${readToken}` }
@@ -3026,6 +3035,13 @@ test.describe('Proxy API - Periodicals (real-server wiring, LIN-1829)', () => {
       headers: { Authorization: `Bearer ${otherConsumer.token}` }
     });
     expect(take.status()).toBe(200);
+
+    // LIN-2385: 'taken' alone is no longer sufficient run evidence.
+    const feedback = await request.post(`/api/dispatch/feedback/${id}`, {
+      headers: { Authorization: `Bearer ${otherConsumer.token}`, 'Content-Type': 'application/json' },
+      data: { message: '[done] Task completed' }
+    });
+    expect(feedback.status()).toBe(200);
 
     // Workspace B's own read: `recent`.
     const bResp = await request.get('/api/proxy/periodicals', {
