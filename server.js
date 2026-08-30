@@ -23,7 +23,7 @@ import { ensureIndexes } from './lib/db-indexes.js'
 import { Scheduler } from './lib/scheduler.js'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
-import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
+import { getWorkspaceOpenRouterKey as resolveOpenRouterKey, getUnattendedOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { getWorkspaceNorthStar as resolveNorthStar, getWorkspaceNorthStarDocVersion as resolveNorthStarDocVersion } from './lib/north-star-resolver.js'
 import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken, refreshOwnerCredential } from './lib/workspace-token-refresh.js'
@@ -647,6 +647,27 @@ scheduler.register({
 // intervalMs, mirroring that same precedent's 15min/5min ratio.
 const OBSERVER_PASS_INTERVAL_MS = 15 * 60 * 1000 // 15 minutes
 const OBSERVER_PASS_LEASE_MS = 5 * 60 * 1000
+
+// resolveUnattendedOpenRouterKey: thin server-env wrapper around the new
+// consent-gated, env-free unattended resolver (lib/openrouter-key-resolver.js,
+// LIN-2412) — observer-pass's sole unattended LLM consumer. Mirrors
+// getWorkspaceOpenRouterKey's test-workspace short-circuit above for the same
+// reason: a server/test-env concern outside the resolver's own injectable
+// seam. Wired in below as the `getPaidEnvKey` deps-object key (renamed in
+// meaning, not in name, so createObserverPassRun's destructuring is
+// untouched) — it no longer reads an env var; it resolves a durable,
+// consent-gated, per-account key via urlKey -> owning account, only ever
+// falling through to the existing `llm-unavailable` degrade on any miss.
+async function resolveUnattendedOpenRouterKey(urlKey) {
+  if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
+    return null
+  }
+  return getUnattendedOpenRouterKey(
+    { userPreferencesStore, sessionsCollection, accountWorkspaceStore, accountStore },
+    { urlKey }
+  )
+}
+
 scheduler.register({
   name: 'observer-pass',
   intervalMs: OBSERVER_PASS_INTERVAL_MS,
@@ -657,7 +678,7 @@ scheduler.register({
     observerStateStore,
     workspacePreferencesStore,
     streamChatWithTools,
-    getPaidEnvKey,
+    getPaidEnvKey: resolveUnattendedOpenRouterKey,
     intervalMs: OBSERVER_PASS_INTERVAL_MS
   })
 // Same discipline as observer-sweep's own registration above: not awaited
@@ -2875,6 +2896,15 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   const openRouterSource = getOpenRouterSource(req);
   const deployInfo = getDeployInfo();
 
+  // Durable unattended-use consent state (LIN-2412) — a FRESH read of the
+  // current account's own durable preferences, never from req.session (the
+  // interactive chain above never reads this field, and this route must not
+  // start mirroring it into the session either). renderSettingsPage has no
+  // store access of its own, so the route fetches and threads it in.
+  const openRouterConsentedAt = req.session.accountId
+    ? await userPreferencesStore.getOpenRouterConsent(req.session.accountId)
+    : null;
+
   // Get current workspace model selection (helper handles default)
   const currentModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore });
 
@@ -2950,6 +2980,7 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   const html = renderSettingsPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(openRouterSource === 'oauth' || openRouterSource === 'env'),
     openRouterSource,
+    openRouterConsentedAt,
     deployInfo,
     currentModel,
     availableModels: AVAILABLE_MODELS,

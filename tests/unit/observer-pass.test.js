@@ -401,6 +401,74 @@ describe('observer-pass: runObserverPass', () => {
     assert.strictEqual(ensureSeededCalls, 3, 'ensureSeeded must run on every tick, including every quiet no-op tick');
   });
 
+  test('LIN-2412 F1: getPaidEnvKey is genuinely awaited — a deliberately async, single-arg fake that resolves after a timer tick still reaches the model call and the resolved (not Promise) apiKey', async () => {
+    const observerStateStore = freshStore();
+    const urlKey = `ws-async-key-${randomUUID()}`;
+    await observerStateStore.ensureSeeded(`sweep:v1:${urlKey}`, nonEmptyCensus);
+
+    const seenApiKeys = [];
+    const seenUrlKeys = [];
+    // Deliberately async AND single-arg — a regression back to a sync,
+    // zero-arg treatment (the pre-LIN-2412 shape) must fail this test: it
+    // would receive `undefined` for urlKey and pass a Promise object as
+    // apiKey to streamChatWithTools instead of the resolved string below.
+    const asyncGetPaidEnvKey = (calledUrlKey) => {
+      seenUrlKeys.push(calledUrlKey);
+      return new Promise((resolve) => setTimeout(() => resolve('resolved-async-key'), 5));
+    };
+    const fakeStreamChatWithTools = async (messages, options, onEvent) => {
+      seenApiKeys.push(options.apiKey);
+      onEvent('token', { token: JSON.stringify({ narrative: 'Reached the model with a resolved key.', flags: [] }) });
+      onEvent('done', { finishReason: 'stop' });
+    };
+
+    const result = await runObserverPass(urlKey, {
+      observerStateStore,
+      workspacePreferencesStore: fakeWorkspacePreferencesStore(),
+      streamChatWithTools: fakeStreamChatWithTools,
+      getPaidEnvKey: asyncGetPaidEnvKey,
+      now: Date.now()
+    });
+
+    assert.deepStrictEqual(seenUrlKeys, [urlKey], 'getPaidEnvKey must be called with the tick\'s own urlKey');
+    assert.strictEqual(seenApiKeys.length, 1, 'the model must actually be called — proves the await did not skip past it');
+    assert.strictEqual(seenApiKeys[0], 'resolved-async-key', 'apiKey must be the AWAITED string, never a Promise object');
+    assert.strictEqual(result.quiet, false);
+  });
+
+  test('LIN-2412 F1: a resolver that resolves to null (async miss) still reaches the llm-unavailable degrade — an un-awaited Promise (truthy) would wrongly let this call through', async () => {
+    const observerStateStore = freshStore();
+    const urlKey = `ws-async-miss-${randomUUID()}`;
+    await observerStateStore.ensureSeeded(`sweep:v1:${urlKey}`, nonEmptyCensus);
+
+    // A real streamChatWithTools IS injected here (unlike the "no caller at
+    // all" quiet-degrade cases above) specifically so this test can only pass
+    // by way of the awaited apiKey being null — an un-awaited call would hand
+    // this fake a truthy Promise object as apiKey and call it regardless.
+    const modelCalls = [];
+    const fakeStreamChatWithTools = async (messages, options, onEvent) => {
+      modelCalls.push(options.apiKey);
+      onEvent('token', { token: JSON.stringify({ narrative: 'should not be reached', flags: [] }) });
+      onEvent('done', { finishReason: 'stop' });
+    };
+
+    const net = guardNetwork();
+    const result = await runObserverPass(urlKey, {
+      observerStateStore,
+      workspacePreferencesStore: fakeWorkspacePreferencesStore(),
+      streamChatWithTools: fakeStreamChatWithTools,
+      getPaidEnvKey: (calledUrlKey) => new Promise((resolve) => setTimeout(() => resolve(null), 5)),
+      now: Date.now()
+    });
+    assert.strictEqual(net.attempts.length, 0);
+    net.restore();
+
+    assert.strictEqual(modelCalls.length, 0, 'the model must NOT be called when the awaited key resolves to null');
+    assert.strictEqual(result.quiet, false);
+    const doc = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKey}`);
+    assert.deepStrictEqual(doc.state.report.degraded, { reason: 'llm-unavailable' }, 'a resolved-null key must still degrade honestly, exactly as a synchronous miss would');
+  });
+
   test('deps.now is required — a missing/non-finite clock is refused loudly BEFORE any write, never persisted as a wrong diagnosis', async () => {
     const observerStateStore = freshStore();
     for (const bad of [undefined, null, NaN, '123']) {

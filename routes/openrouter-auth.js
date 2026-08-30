@@ -3,7 +3,9 @@
  * Implements PKCE flow:
  * 1. /auth/openrouter - Initiates OAuth by redirecting to OpenRouter
  * 2. /auth/openrouter/callback - Exchanges code for API key
- * 3. /auth/openrouter/disconnect - Removes stored API key
+ * 3. /auth/openrouter/disconnect - Removes stored API key (and durable consent)
+ * 4. /auth/openrouter/consent - (LIN-2412) Grants durable unattended-use consent
+ *    for an already-connected account
  */
 import crypto from 'crypto'
 import { Router } from 'express'
@@ -62,6 +64,12 @@ export function createOpenRouterAuthRoutes({ userPreferencesStore } = {}) {
 
     // Store code verifier in session for later exchange
     req.session.openRouterCodeVerifier = codeVerifier
+    // Consent beat (LIN-2412): this route is only reachable via the Settings
+    // "connect" affordance, whose copy states the unattended-use blast radius
+    // (lib/render-settings.js) — arriving here IS the consent action. Stash
+    // intent alongside the verifier so the callback can record durable
+    // consent in the same write as the durable key.
+    req.session.openRouterPendingConsent = true
 
     // Build callback URL from environment or derive from request
     const callbackUrl = process.env.OPENROUTER_REDIRECT_URI ||
@@ -147,12 +155,19 @@ export function createOpenRouterAuthRoutes({ userPreferencesStore } = {}) {
       // session field is just a request-scoped mirror for existing readers.
       if (userPreferencesStore && req.session.accountId) {
         await userPreferencesStore.setOpenRouterApiKey(req.session.accountId, data.key)
+        // Consent beat (LIN-2412): only record consent when this connect
+        // flow actually stashed the pending-consent intent above — never
+        // inferred from the key write alone.
+        if (req.session.openRouterPendingConsent) {
+          await userPreferencesStore.setOpenRouterConsent(req.session.accountId)
+        }
       }
 
       // Store API key in session (permanent key, no expiry)
       req.session.openRouterApiKey = data.key
-      // Clean up code verifier
+      // Clean up code verifier and consent intent
       delete req.session.openRouterCodeVerifier
+      delete req.session.openRouterPendingConsent
 
       await saveSession(req.session)
 
@@ -182,11 +197,39 @@ export function createOpenRouterAuthRoutes({ userPreferencesStore } = {}) {
 
     // Clear from BOTH the durable store (source of truth) and the session
     // mirror, so the disconnect is not silently undone on the next re-auth.
+    // clearOpenRouterApiKey also clears the durable consent flag in the same
+    // read-merge write (LIN-2412) — consent has no meaning without a key.
     if (userPreferencesStore && req.session.accountId) {
       await userPreferencesStore.clearOpenRouterApiKey(req.session.accountId)
     }
     delete req.session.openRouterApiKey
     await saveSession(req.session)
+    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`)
+  })
+
+  /**
+   * Step 4: Retroactive consent (LIN-2412)
+   * Grants durable unattended-use consent for an ALREADY-connected account —
+   * the connect-flow consent beat above only covers a fresh OAuth round trip.
+   * Requires Linear authentication and an existing durable key; a session-only
+   * (env/free) or disconnected account has nothing to consent for.
+   */
+  router.post('/auth/openrouter/consent', async (req, res) => {
+    const workspace = getActiveWorkspace(req.session)
+    if (!workspace) {
+      return res.redirect('/')
+    }
+
+    if (!userPreferencesStore || !req.session.accountId) {
+      return res.status(400).json({ error: 'no_account', message: 'No account to grant consent for.' })
+    }
+
+    const existingKey = await userPreferencesStore.getOpenRouterApiKey(req.session.accountId)
+    if (!existingKey) {
+      return res.status(409).json({ error: 'not_connected', message: 'Connect OpenRouter before granting unattended-use consent.' })
+    }
+
+    await userPreferencesStore.setOpenRouterConsent(req.session.accountId)
     res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`)
   })
 
