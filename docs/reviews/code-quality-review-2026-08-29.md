@@ -91,6 +91,23 @@ Three of these five already have a decomposition ticket (LIN-2360, LIN-2246, LIN
 
 # Findings, severity-ranked
 
+**The `F<n>` labels are stable identifiers, not ranks** — they are cited by the minted tickets and by the LIN-2071 comment, so they are not renumbered. Document order below follows the identifiers; **severity order is this table**, and it is the one that decided the mint set.
+
+| rank | finding | severity | surface | disposition |
+|---|---|---|---|---|
+| 1 | **F1** | HIGH | `routes/proxy.js` (1,309,368) | cross-link **LIN-2360** — owner is live, stages held |
+| 2 | **F2** | HIGH | `lib/dispatch-store.js` (126,324) | **minted LIN-2398** |
+| 3 | **F9** | MED-HIGH | `github-auth` ↔ `github-projects-auth` (79% verbatim) | **minted LIN-2397** |
+| 4 | **F5** | MED-HIGH | `ship-layout` mirror, 2 confirmed divergences | evidence to **LIN-2071** — owner of the class |
+| 5 | **F3** | MED-HIGH | `lib/providers/jira/index.js` ADF codec (801 lines) | **minted LIN-2399** |
+| 6 | **F6** | MED | `routes/dashboard.js` (109,710) | recorded, deferred — see §3 |
+| 7 | **F4** | MED | 30-site `isTestMode` repetition | recorded, deferred |
+| 8 | **F7** | MED | `routes/dispatch.js` (62,484) | recorded, deferred — see §3 |
+| 9 | **F8** | MED-LOW | `lib/pipeline-loops.js` (42,444) | recorded, deferred |
+
+**Why the mint set is F2, F9, F3 and not the top three by severity.** F1 and F5 rank 1st and 4th but are **unmintable by construction** — each already has a live owner (LIN-2360, LIN-2071), and minting against either would be the duplicate-ticket failure this review's §7 contract exists to prevent. The three minted are the three highest-severity findings **that no ticket owns**.
+
+
 ## F1 · **HIGH** — the `routes/proxy.js` decomposition is being outrun by the file's own growth while its stages are held
 
 **What.** `routes/proxy.js` is **7,356 lines / 178 commits = 1,309,368** — the #1 risk×churn surface by **2.0×** over #2, and the widest margin any edition of this series has measured. It holds **55 endpoint registrations** inside one 6,676-line `createProxyRoutes` closure (`:681`), which is **91% of the file**.
@@ -192,6 +209,8 @@ The lib copy of `resolveCollisions` takes a `padding` argument its own caller pa
 
 **That is, verbatim, the shape LIN-1208 was created to eliminate — and the shape LIN-2071 records it as having eliminated.**
 
+**The seam is the limiting factor, and that makes the fix cheap.** `public/ship.js:1855` already carries the `module.exports` test seam LIN-1208 added — but it exports **exactly the three parity-tested names** and nothing else. Extending the battery from 3 to 14 is therefore a matter of widening that export list and adding cases, with no new seam work. By cost-to-close this is plausibly the cheapest item in LIN-2071's list; `public/swim.js`, its item (1), has no seam at all yet.
+
 **Cross-link, not a rival — and a correction to the owner's premise.** **LIN-2071** (*"Close the live/mirror divergence class: public/swim.js ↔ lib/swim-lanes.js and siblings"*, Backlog) **owns this class** and lists its siblings worst-first, with `public/swim.js` ↔ `lib/swim-lanes.js` as item (1). Its framing is that LIN-1208 *closed* the ship pair. **This run's measurement says it did not:** the parity battery bound 3 of 14 names, and the unbound remainder has since drifted in at least two contract-level ways. The ship pair belongs **back in LIN-2071's list**, and it arrives with something item (1) does not yet have — **measured, not assumed, drift**.
 
 **No ticket is minted for this.** LIN-2071 is the owner; the evidence is posted there instead (see §7), which is what "add evidence to the existing ticket, do not compete with it" means in practice.
@@ -252,7 +271,7 @@ The lib copy of `resolveCollisions` takes a `padding` argument its own caller pa
 
 ---
 
-## F9 · **MED** — `routes/github-auth.js` ↔ `routes/github-projects-auth.js`: 79% of one file appears verbatim in the other, in two security-adjacent OAuth flows
+## F9 · **MED-HIGH** — `routes/github-auth.js` ↔ `routes/github-projects-auth.js`: 79% of one file appears verbatim in the other, in two security-adjacent OAuth flows
 
 **What.** **577 and 526 lines; 17 and 13 commits/90d.** Of `github-auth.js`'s **302 significant lines (comments and blanks excluded), 241 — 79% — appear verbatim in the sibling**, including **11 contiguous runs of ≥6 lines, 86 lines in total**:
 
@@ -287,7 +306,15 @@ Ticket §1 asked for three widening calls and required the report to say which w
 
 ### a. Test-file *maintainability* → **IN SCOPE, and it yields exactly one bounded finding**
 
-The premise needed correcting before it could be acted on. The suite's size distribution is **healthier than `lib/`'s**: `tests/unit/*.js` n=386, median **214**, p90 806, 9 files over 1,500; `lib/**/*.js` n=228, median 205, p90 712, **17 over 800**. 162k test lines against 121k source lines is a ratio, not a defect. **File length is not the predictive signal here.**
+The premise needed correcting before it could be acted on. Re-measured at HEAD, the suite's size distribution is **healthier than `lib/`'s**:
+
+| corpus | n | median | p90 | outliers |
+|---|---|---|---|---|
+| `tests/unit/*.js` | 390 | **213** | 772 | 9 over 1,500 |
+| `tests/e2e/*.js` | 73 | 226 | 873 | — |
+| `lib/**/*.js` | 228 | 204 | 711 | **17 over 800** |
+
+**166,516 test lines against 123,403 non-test source lines** is a ratio, not a defect — and `lib/` has nearly twice as many outliers as `tests/unit/` despite being the smaller corpus. **File length is not the predictive signal here.**
 
 The predictive signal is **fixture duplication**, and it is measurable in the top outlier. `tests/unit/prompt-templates.test.js` — **4,063 lines, 61 commits/90d, the repo's highest-churn test file** — contains **29 inline `const issue = {` literals** and **3 helper functions in 4,063 lines**. Meanwhile `tests/fixtures/` is an established convention with **137 importing test files** and 14 modules, and offers **no issue/context factory**.
 
@@ -368,6 +395,12 @@ Per ticket §6c, nothing found is lost, so the next run can promote what still m
 - **`tests/unit/prompt-templates.test.js` fixture duplication** — 4,063 lines, 61 commits/90d, **29 inline `const issue = {` literals**, 3 helpers; `tests/fixtures/` has 137 importers and no issue factory. §3a's single bounded test-maintainability finding.
 - **`public/swim.js` connector duplication — re-verified unchanged, and the churn argument has now decided it.** `drawBlockingConnectors` (`:1659`) and `drawBlockingConnectorsVertical` (`:2045`), **375 lines each**, ~223 of A's lines verbatim in B, `grep -rn drawBlockingConnectors tests/` → **0**. Churn is **4 commits/90d** — the lowest of anything in this report. Real duplication under near-zero change pressure: the 08-23 run recorded it, this run re-verified it, and on the evidence it should stay unpromoted until its churn rises. *(Note: `public/swim.js` ↔ `lib/swim-lanes.js` is LIN-2071 item 1 — a different, larger finding on the same file.)*
 - **Three genuinely dead exports** — re-verified: each has **exactly one reference tree-wide, its own definition**. `lib/harbour-spawn.js:42 isHarbourAvailable`, `lib/prompt-templates.js:328 getPromptCategory`, `lib/prompt-templates.js:393 getAllPromptsByCategory`. **Calibration:** the 08-23 run found 2 dead CSS classes in 4,340 lines and correctly called it a non-finding; **3 dead exports in 121,432 lines grades the same way.** Recorded, not promoted.
+- **`lib/periodical-report-gate.js`'s adversarial predicate is satisfied by a comment that merely *quotes* it — found empirically during this run.** `hasAdversarialReadEvidenceComment` requires all three regexes in one body: `/Adversarial second-read verdict:\s*(AGREE|DISAGREE)\b/i` and siblings (`:116-:118`). **The Step 1 research comment on LIN-2378 satisfies all three** — not by containing a verdict, but by quoting the three patterns verbatim while *describing* the gate. `(AGREE|DISAGREE)` matches the literal text `AGREE|DISAGREE`, because `\b` holds between `E` and `|`. This run discovered it by arming a watcher on the same predicates and getting an immediate false positive on a comment written eight hours before any second-read existed, then **confirmed it against the exported function itself** — `hasAdversarialReadEvidenceComment([{body: <text that only quotes the three patterns>}])` returns **`true`**. The proposed `(?!\s*\|)` guard was checked the same way: it rejects the quotation and still accepts a real verdict.
+
+  **Why it matters:** any periodical whose research or planning pass quotes its own Done-gate — a natural thing to do, and the 2026-08-29 run did it unprompted — pre-satisfies that gate before the work it guards has happened. The module's header already concedes it *"is not full verification"* and cannot tell a rubber stamp from a real second opinion; this is a step further, and one it does not claim: the gate can pass with **no second opinion at all**. A `(?!\s*\|)` guard on each alternation, or requiring the match outside a code span, would close it.
+
+  **Not minted, and not because it is small.** The cap is 3 and this run's three slots went to higher-severity product findings; more importantly the module is owned by **LIN-694** and **LIN-2323** (both Done), so the correct next step is a bug against that owner rather than a rival ticket minted from a review of a different repo surface. It is arguably a *correctness* finding rather than a maintainability one and therefore slightly off this review's altitude — **recorded here in full rather than dropped, because discovering it and losing it would be the worse error.** Flagged to the operator in this run's summary comment.
+
 - **`lib/render-settings.js`** (1,289/52; `renderSettingsPage` 311 lines at `:979`) and **`lib/prompt-template-defs.js`** (1,303/47) — high churn, flat template/data structure, no nesting, no duplication found. Baselines hold; still below the line.
 - **`simple-dispatcher` first pass** — §3b. Recorded with a recommendation for its own lane; deliberately no LinearViewer-lane tickets.
 
