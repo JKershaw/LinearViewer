@@ -65,13 +65,23 @@ test.describe('KPIs page', () => {
 
     // The four bias/coverage shares are load-bearing disclosures (the
     // ruling's condition for publishing the number at all) — assert they are
-    // actually VISIBLE, not merely present somewhere in the DOM.
-    const shares = card.locator('.kpi-cost-shares');
-    await expect(shares).toBeVisible();
-    await expect(shares).toHaveText(/close-out linked/);
-    await expect(shares).toHaveText(/evidence linked/);
-    await expect(shares).toHaveText(/opencode summed/);
-    await expect(shares).toHaveText(/unknown harness/);
+    // actually VISIBLE, not merely present somewhere in the DOM. LIN-2418
+    // split the former single `.kpi-cost-shares` span into a goodness group
+    // (still over issueCount) and an ignorance group with its own basis
+    // span naming the excluded population — both must still be asserted.
+    const sharesGoodness = card.locator('.kpi-cost-shares-goodness');
+    await expect(sharesGoodness).toBeVisible();
+    await expect(sharesGoodness).toHaveText(/close-out linked/);
+    await expect(sharesGoodness).toHaveText(/evidence linked/);
+
+    const sharesIgnorance = card.locator('.kpi-cost-shares-ignorance');
+    await expect(sharesIgnorance).toBeVisible();
+    await expect(sharesIgnorance).toHaveText(/opencode summed/);
+    await expect(sharesIgnorance).toHaveText(/unknown harness/);
+
+    const sharesIgnoranceBasis = card.locator('.kpi-cost-shares-ignorance-basis');
+    await expect(sharesIgnoranceBasis).toBeVisible();
+    await expect(sharesIgnoranceBasis).toHaveText(/with a lineage/);
 
     const coverage = card.locator('.kpi-cost-coverage');
     await expect(coverage).toBeVisible();

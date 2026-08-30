@@ -460,7 +460,8 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
         pricedLineageShare: null, attributableLineageShare: null, captureRateShare: null
       }
     }));
-    assert.ok(nullHtml.includes('close-out linked — · evidence linked — · opencode summed — · unknown harness —'), 'null shares render as dashes');
+    assert.ok(nullHtml.includes('close-out linked — · evidence linked —'), 'null goodness shares render as dashes');
+    assert.ok(nullHtml.includes('opencode summed — · unknown harness —'), 'null ignorance shares render as dashes');
     assert.ok(nullHtml.includes('priced lineages — · capture rate — · attributable lineages —'), 'null coverage ratios render as dashes');
 
     const zeroHtml = renderKpisPage(buildStats({
@@ -472,7 +473,8 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
         pricedLineageShare: 0, attributableLineageShare: 0, captureRateShare: 0
       }
     }));
-    assert.ok(zeroHtml.includes('close-out linked 0% · evidence linked 0% · opencode summed 0% · unknown harness 0%'), 'a genuine 0 must render as 0%, not be conflated with null');
+    assert.ok(zeroHtml.includes('close-out linked 0% · evidence linked 0%'), 'a genuine 0 must render as 0%, not be conflated with null (goodness group)');
+    assert.ok(zeroHtml.includes('opencode summed 0% · unknown harness 0%'), 'a genuine 0 must render as 0%, not be conflated with null (ignorance group) — this is the P2 real-0-vs-null render pin');
     assert.ok(zeroHtml.includes('priced lineages 0% · capture rate 0% · attributable lineages 0%'), 'a genuine 0 coverage ratio must render as 0%');
   });
 
@@ -560,7 +562,8 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     delete stats.terminalMarkedTaskCost;
     const html = renderKpisPage(stats);
     assert.ok(html.includes('<span class="kpi-cost-value">—</span>'));
-    assert.ok(html.includes('close-out linked — · evidence linked — · opencode summed — · unknown harness —'));
+    assert.ok(html.includes('close-out linked — · evidence linked —'));
+    assert.ok(html.includes('opencode summed — · unknown harness —'));
     assert.ok(html.includes('unresolved — · resolved overhead —'));
   });
 
@@ -615,6 +618,48 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
       }
     }));
     assert.ok(html.includes('<span class="kpi-cost-sample">10 terminal-marked issues · 8 unpriced (excluded), of which 7 never observed (no lineage)</span>'));
+  });
+
+  test('pins the exact ignorance-basis string, so the render layer\'s own lineageBearingCount derivation cannot drift (LIN-2418 review F1)', () => {
+    // The compute layer denominates opencodeSummedShare/unknownHarnessShare
+    // over `issueCount - noLineageCount` but deliberately publishes no
+    // `lineageBearingCount` field (LIN-2418 step 5: no new wire field), so
+    // this card RE-DERIVES that denominator locally at
+    // lib/render-kpis.js:217. Nothing else pins it: the e2e spec matches only
+    // /with a lineage/, and the review measured that mutating the derivation
+    // to a bare `issueCount` leaves the whole unit suite AND kpis.spec.js
+    // green while the card renders 'of 25 with a lineage (23 no-lineage
+    // excluded)' — a basis line that contradicts its own parenthetical and
+    // misstates the population the two shares are over. That is this
+    // ticket's own thesis one layer up, so the numbers themselves are pinned
+    // here, not just the wording.
+    //
+    // Fixture is the ticket's own Measured table at N = 23 (25 terminal-marked
+    // issues, 23 of them lane-landed with no lineage at all), which is exactly
+    // the issueCount !== noLineageCount case that makes the two candidate
+    // derivations produce different strings.
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 25, unpriced: 23, noLineageCount: 23, costUsd: 176.4,
+        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
+        closeOutLineageShare: 0.08, evidenceLinkedShare: 0.08,
+        opencodeSummedShare: 0.5, unknownHarnessShare: 0.5,
+        pricedLineageShare: 0.8, attributableLineageShare: 0.95
+      }
+    }));
+    assert.ok(
+      html.includes('<span class="kpi-cost-shares-ignorance-basis">of 2 with a lineage (23 no-lineage excluded)</span>'),
+      'the ignorance basis must name the lineage-bearing population (issueCount - noLineageCount = 2), not the headline count'
+    );
+    // Kills the exact mutation the review measured as surviving CI.
+    assert.ok(
+      !html.includes('of 25 with a lineage'),
+      'the basis must never re-use issueCount as its own denominator — that is the undisclosed-basis bug this ticket fixes'
+    );
+    // Non-vacuity: the fixture must genuinely distinguish the two
+    // derivations, i.e. noLineageCount > 0 and issueCount !== noLineageCount,
+    // both readable straight off the sample line beside it.
+    assert.ok(html.includes('<span class="kpi-cost-sample">25 terminal-marked issues · 23 unpriced (excluded), of which 23 never observed (no lineage)</span>'));
   });
 
   test('captureRateShare (LIN-1959) renders beside pricedLineageShare and discloses the capture loss pricedLineageShare cannot see', () => {
