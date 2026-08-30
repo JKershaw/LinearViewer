@@ -23,18 +23,22 @@ import { renderFlightCompanionPage } from '../lib/render-flight-companion.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildFlightCompanionKickoff } from '../lib/prompts/flight-companion-kickoff.js';
+import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
 
 /**
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl    - middleware: session + req.workspace
  * @param {Function} deps.getOpenRouterSource - (req) → 'oauth'|'env'|'free'|null
  * @param {Function} deps.getDeployInfo       - () → deploy metadata
+ * @param {import('../lib/observer-state-store.js').ObserverStateStore} [deps.observerStateStore] -
+ *   LIN-2395: read-only source for the latest observer-pass report panel.
+ *   Optional so this route keeps working (empty-state panel) if omitted.
  * @returns {Router}
  */
-export function createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }) {
+export function createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore }) {
   const router = Router();
 
-  router.get('/workspace/:urlKey/flight-companion', workspaceFromUrl, (req, res) => {
+  router.get('/workspace/:urlKey/flight-companion', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const featureFlags = getFeatureFlags(req.session);
 
@@ -46,8 +50,14 @@ export function createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSou
     try {
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       const prompt = buildFlightCompanionKickoff({ baseUrl });
+      // Read-only: readCurrent ONLY. This route must never be able to write
+      // observer state — there is no ensureSeeded/advance call reachable
+      // from request/render handling (LIN-2395).
+      const observerReportDoc = observerStateStore
+        ? await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${workspace.urlKey}`)
+        : null;
       const html = renderFlightCompanionPage(
-        { prompt },
+        { prompt, observerReportDoc },
         {
           deployInfo: getDeployInfo(),
           urlKey: workspace.urlKey,

@@ -57,6 +57,7 @@ import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
 import { createObserverSweepRun } from './lib/observer-sweep.js'
+import { createObserverPassRun } from './lib/observer-pass.js'
 import { ObserverShadowLogStore } from './lib/observer-shadow-log.js'
 import { createCredentialInvariantSweepRun } from './lib/credential-invariant-sweep.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
@@ -129,7 +130,7 @@ import { buildSessionCounts } from './lib/sessions-view.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
-import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, hasPaidEnvKey, getFreeTierModelConfigWarning } from './lib/openrouter.js'
+import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, hasPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
 import { resolveWorkspaceModel, resolveAiOperationModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults, AI_OPERATION_KINDS } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 import { DISPATCH_DEFAULT_KINDS } from './lib/prompt-templates.js'
@@ -624,6 +625,45 @@ scheduler.register({
 // caller, so the shape sets the precedent.
 }).catch((err) => {
   console.error(`[observer-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
+})
+
+// Cloud observer LLM judgement pass (LIN-2395, P2-1 of the LIN-2114
+// observer-harness epic). A second, independently-scheduled job — it cannot
+// live inside observer-sweep's own tick (that module's static-import test
+// pins its imports to exactly four specifiers; see lib/observer-pass.js's
+// own header). Reuses observerStateStore under a NEW instance key
+// (`pass:v1:<urlKey>`, never a second store) and reads observer-sweep's
+// already-written census read-only — no fourth fleet summary.
+//
+// Report-only: no relay write, no wake sink, no dispatch/kick authority. The
+// `observerAuthority` workspace feature (default OFF) has no acting branch
+// in this ticket — see lib/observer-pass.js's header.
+//
+// Cadence: 15 minutes, the in-tree precedent for an infrequent job
+// (credential-invariant-sweep below) — an LLM pass has no reason to run at
+// the census sweep's free 60s cadence. leaseMs is 5 minutes, comfortably
+// above a single small-context LLM call's worst case and well under
+// intervalMs, mirroring that same precedent's 15min/5min ratio.
+const OBSERVER_PASS_INTERVAL_MS = 15 * 60 * 1000 // 15 minutes
+const OBSERVER_PASS_LEASE_MS = 5 * 60 * 1000
+scheduler.register({
+  name: 'observer-pass',
+  intervalMs: OBSERVER_PASS_INTERVAL_MS,
+  leaseMs: OBSERVER_PASS_LEASE_MS,
+  run: createObserverPassRun({
+    sessionsCollection,
+    dispatchStore: dispatchQueueStore,
+    observerStateStore,
+    workspacePreferencesStore,
+    streamChatWithTools,
+    getPaidEnvKey,
+    intervalMs: OBSERVER_PASS_INTERVAL_MS
+  })
+// Same discipline as observer-sweep's own registration above: not awaited
+// (a failed seed write must not abort server boot), with a purpose-written
+// catch so a silent-never-runs state is diagnosable rather than inferred.
+}).catch((err) => {
+  console.error(`[observer-pass] scheduler.register failed — the pass will NOT run this boot: ${err.message}`)
 })
 
 // Credential-lifecycle invariant sweep (LIN-2236, L5.4 of the LIN-2231
@@ -2384,7 +2424,7 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, reportHistoryStore }))
 
 // Mount flight-companion routes (experimental prototype for LIN-751 realtime chat — LIN-922).
-app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
+app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore }))
 
 // Mount passage-planner routes (experimental one-click kickoff prompt, Flight Companion parity — LIN-1849).
 app.use(createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
