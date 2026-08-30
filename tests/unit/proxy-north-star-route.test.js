@@ -14,7 +14,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
-import { getWorkspaceNorthStar } from '../../lib/north-star-resolver.js';
+import { getWorkspaceNorthStar, getWorkspaceNorthStarDocVersion, getNorthStarDocVersion } from '../../lib/north-star-resolver.js';
 
 const NOW = Date.now();
 const daysAgo = n => new Date(NOW - n * 86400000).toISOString();
@@ -37,14 +37,17 @@ function report(overrides = {}) {
 
 function buildApp({
   northStarByWorkspace = { acme: 'Ship a self-serve onboarding flow by Q3.' },
+  northStarDocVersionByWorkspace = {},
   creatorId = 'creator-1',
   latestReport = report(),
   reportHistoryStore: reportHistoryStoreOverride,
-  getWorkspaceNorthStar: getWorkspaceNorthStarOverride
+  getWorkspaceNorthStar: getWorkspaceNorthStarOverride,
+  getNorthStarDocVersionForWorkspace: getNorthStarDocVersionForWorkspaceOverride,
+  omitDocVersionDependency = false
 } = {}) {
   const userPreferencesStore = {
     getUserPreferences: async (accountId) =>
-      accountId === creatorId ? { northStarByWorkspace } : {}
+      accountId === creatorId ? { northStarByWorkspace, northStarDocVersionByWorkspace } : {}
   };
 
   const reportHistoryStore = reportHistoryStoreOverride === null
@@ -63,6 +66,10 @@ function buildApp({
     getWorkspaceOpenRouterKey: async () => null,
     getWorkspaceNorthStar: getWorkspaceNorthStarOverride
       || ((urlKey, accountId) => getWorkspaceNorthStar(userPreferencesStore, urlKey, accountId)),
+    ...(omitDocVersionDependency ? {} : {
+      getNorthStarDocVersionForWorkspace: getNorthStarDocVersionForWorkspaceOverride
+        || ((urlKey, accountId) => getWorkspaceNorthStarDocVersion(userPreferencesStore, urlKey, accountId))
+    }),
     reportHistoryStore,
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {} },
@@ -253,5 +260,68 @@ describe('GET /api/proxy/north-star', () => {
     }));
     const { body } = await get(app, '/api/proxy/north-star');
     assert.equal(body.northStar, null);
+  });
+});
+
+describe('GET /api/proxy/north-star — docVersion (LIN-2254)', () => {
+  test('docVersion.current always reflects the real, live doc hash, independent of any stamp', async () => {
+    const { app } = buildApp();
+    const { body } = await get(app, '/api/proxy/north-star');
+    const real = getNorthStarDocVersion();
+    assert.deepEqual(body.docVersion.current, real);
+  });
+
+  test('docVersion.stamped/drift are null when no stamp is on record (the default/most-tenants case)', async () => {
+    const { app } = buildApp({ northStarDocVersionByWorkspace: {} });
+    const { body } = await get(app, '/api/proxy/north-star');
+    assert.equal(body.docVersion.stamped, null);
+    assert.equal(body.docVersion.drift, null);
+  });
+
+  test('drift: false when the stamped hash equals the real current doc hash', async () => {
+    const real = getNorthStarDocVersion();
+    const { app } = buildApp({
+      northStarDocVersionByWorkspace: { acme: { hash: real.hash, title: real.title } }
+    });
+    const { body } = await get(app, '/api/proxy/north-star');
+    assert.deepEqual(body.docVersion.stamped, { hash: real.hash, title: real.title });
+    assert.equal(body.docVersion.drift, false);
+  });
+
+  test('drift: true when the stamped hash differs from the real current doc hash (the LIN-2254 bug scenario)', async () => {
+    const real = getNorthStarDocVersion();
+    const staleStamp = { hash: 'a-stale-hash-that-does-not-match', title: 'North star — v1' };
+    assert.notEqual(staleStamp.hash, real.hash);
+    const { app } = buildApp({
+      northStarDocVersionByWorkspace: { acme: staleStamp }
+    });
+    const { body } = await get(app, '/api/proxy/north-star');
+    assert.deepEqual(body.docVersion.stamped, staleStamp);
+    assert.equal(body.docVersion.drift, true);
+  });
+
+  test('docVersion.stamped/drift are null when getNorthStarDocVersionForWorkspace is not injected at all (backward-compat)', async () => {
+    const real = getNorthStarDocVersion();
+    const { app } = buildApp({
+      northStarDocVersionByWorkspace: { acme: { hash: real.hash, title: real.title } },
+      omitDocVersionDependency: true
+    });
+    const { status, body } = await get(app, '/api/proxy/north-star');
+    assert.equal(status, 200);
+    assert.equal(body.docVersion.stamped, null);
+    assert.equal(body.docVersion.drift, null);
+    // The doc-content itself is still readable independent of the injected dependency.
+    assert.deepEqual(body.docVersion.current, real);
+  });
+
+  test('a creator-less token gets no doc-version stamp either', async () => {
+    const real = getNorthStarDocVersion();
+    const { app } = buildApp({
+      creatorId: null,
+      northStarDocVersionByWorkspace: { acme: { hash: real.hash, title: real.title } }
+    });
+    const { body } = await get(app, '/api/proxy/north-star');
+    assert.equal(body.docVersion.stamped, null);
+    assert.equal(body.docVersion.drift, null);
   });
 });

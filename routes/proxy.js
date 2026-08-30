@@ -62,6 +62,7 @@ import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../li
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS } from '../lib/next-run.js';
+import { getNorthStarDocVersion } from '../lib/north-star-resolver.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
@@ -665,6 +666,10 @@ function dispatchWatchChanged(baseline, item) {
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
  * @param {Function} [options.getWorkspaceNorthStar] - Function(urlKey, accountId) resolving the proxy
  *   token creator's durable north-star intent (LIN-1810). Absent → GET /api/proxy/north-star 503s.
+ * @param {Function} [options.getNorthStarDocVersionForWorkspace] - Function(urlKey, accountId)
+ *   resolving the doc-hash stamp recorded for this workspace's northStar, if any (LIN-2254). Optional
+ *   and backward-compatible: absent → GET /api/proxy/north-star's `docVersion.stamped`/`drift` degrade
+ *   to `null` rather than 503ing (unlike getWorkspaceNorthStar/reportHistoryStore above).
  * @param {Object} [options.reportHistoryStore] - Durable per-workspace roadmap report history store
  *   (LIN-1810). Absent → GET /api/proxy/north-star 503s.
  * @param {Object} [options.dispatchPresetsStore] - Dispatch presets store (LIN-1390), used by the
@@ -678,7 +683,7 @@ function dispatchWatchChanged(baseline, item) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null }) {
   const router = Router();
 
   /**
@@ -2066,6 +2071,9 @@ GET ${baseUrl}/api/proxy/north-star
                     "text": "…", "gap": "…", "ageDays": 2 | null },
       "roadmap": { "state": "fresh" | "stale" | "absent" | "unscored",
                     "narrative": "…" | null, "ageDays": 2 | null },
+      "docVersion": { "current": { "hash": "…" | null, "title": "…" | null },
+                       "stamped": { "hash": "…", "title": "…" } | null,
+                       "drift": true | false | null },
       "reportGeneratedAt": "2026-08-01T10:00:00Z" | null,
       "maxAgeDays": 14 }
   → "northStar" is the LIVE durable intent (never a report-time snapshot); null
@@ -2086,6 +2094,14 @@ GET ${baseUrl}/api/proxy/north-star
     freshness state — which means it can be non-null while both states read
     "absent", if that stored value is itself unparseable; "maxAgeDays" is the
     freshness window so callers don't hardcode it.
+  → "docVersion" (LIN-2254) makes the "northStar" value's freshness
+    falsifiable instead of asserted. "current" is always the live hash+title
+    of Harbour's own docs/north-star.md. "stamped" is the doc hash recorded
+    when THIS workspace's northStar was pasted — null for the (typical)
+    workspace whose northStar has nothing to do with that doc, since a stamp
+    is only ever recorded on a byte-identical paste. "drift" is
+    true/false only when a stamp exists to compare, else null — "no claim
+    made," never a fabricated staleness signal against unrelated text.
 
 GET ${baseUrl}/api/proxy/periodicals
   → Per-template periodical run state, derived from the live dispatch queue +
@@ -4887,6 +4903,25 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
    * No write path, no feature-flag gate (see LIN-1810 research §6): the
    * workspace-scoped, creator-bound, audit-logged token is the
    * authorization, same as every other read verb on this router.
+   *
+   * docVersion (LIN-2254, additive): makes the `northStar` value's freshness
+   * a falsifiable claim instead of an assertion. `current` is always the
+   * real, live hash+title of docs/north-star.md (Harbour's own normative
+   * doc — read via a local file, never Linear); `stamped` is whatever doc
+   * hash was recorded at paste time for THIS workspace's stored
+   * northStarByWorkspace value, `null` for the (typical) case where that
+   * value isn't sourced from the doc at all; `drift` is `true`/`false` only
+   * when a stamp exists to compare against `current`, else `null` — "no
+   * claim made," never a fabricated staleness signal against arbitrary
+   * pasted text. Resolved off the SAME account+workspace identity as
+   * `northStar` (req.proxyCreatedBy/req.proxyUrlKey), independently of
+   * `signal`/`reading`/`roadmap` — it fails closed on its own for a
+   * creator-less token. `getNorthStarDocVersionForWorkspace` is an OPTIONAL
+   * dependency: when a caller constructs this router without it, `stamped`
+   * and `drift` degrade to `null` rather than widening the existing
+   * `!reportHistoryStore || !getWorkspaceNorthStar` 503 gate — this route
+   * stays Harbour-local-only (no resolveWorkspaceAccess, no provider fetch,
+   * no capability gating) either way.
    */
   router.get('/api/proxy/north-star', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
@@ -4895,9 +4930,12 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         return jsonError(res, 503, 'Roadmap report history is not configured');
       }
 
-      const [northStar, report] = await Promise.all([
+      const [northStar, report, docStamp] = await Promise.all([
         getWorkspaceNorthStar(req.proxyUrlKey, req.proxyCreatedBy),
-        reportHistoryStore.getLatest(req.proxyUrlKey)
+        reportHistoryStore.getLatest(req.proxyUrlKey),
+        getNorthStarDocVersionForWorkspace
+          ? getNorthStarDocVersionForWorkspace(req.proxyUrlKey, req.proxyCreatedBy)
+          : Promise.resolve(null)
       ]);
 
       // One report fetch feeds both resolvers, exactly as lib/next-run.js:905-910
@@ -4938,6 +4976,9 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         ? reportState // 'absent' | 'stale'
         : (narrative ? 'fresh' : 'unscored');
 
+      const currentDocVersion = getNorthStarDocVersion();
+      const drift = (!docStamp || currentDocVersion.hash === null) ? null : docStamp.hash !== currentDocVersion.hash;
+
       logEvent(req, '/api/proxy/north-star', 200);
       res.json({
         northStar: signal ? signal.northStar : null,
@@ -4951,6 +4992,11 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
           state: roadmapState,
           narrative: narrative ? narrative.text : null,
           ageDays: narrative ? narrative.ageDays : null
+        },
+        docVersion: {
+          current: currentDocVersion,
+          stamped: docStamp || null,
+          drift
         },
         reportGeneratedAt: report?.generatedAt || null,
         maxAgeDays: ROADMAP_REPORT_MAX_AGE_DAYS

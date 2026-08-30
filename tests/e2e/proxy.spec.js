@@ -2740,7 +2740,7 @@ test.describe('Proxy API - North Star (real-server wiring, LIN-1810)', () => {
   // Every key the endpoint documents in docs/proxy-integration.md and
   // /api/proxy/instructions. Asserted as an exact set so a silently added or
   // dropped field fails here rather than surprising a token-only consumer.
-  const DOCUMENTED_KEYS = ['northStar', 'reading', 'roadmap', 'reportGeneratedAt', 'maxAgeDays'];
+  const DOCUMENTED_KEYS = ['northStar', 'reading', 'roadmap', 'docVersion', 'reportGeneratedAt', 'maxAgeDays'];
 
   let token;
 
@@ -2792,6 +2792,42 @@ test.describe('Proxy API - North Star (real-server wiring, LIN-1810)', () => {
     expect(body.roadmap.state).toBe('absent');
     expect(body.roadmap.narrative).toBeNull();
     expect(body.reportGeneratedAt).toBeNull();
+
+    // docVersion (LIN-2254): NORTH_STAR is arbitrary, unrelated text — not a
+    // paste of docs/north-star.md — so no stamp was recorded and both
+    // stamped/drift read null. current is still the real, live doc hash,
+    // proving the getNorthStarDocVersion() primitive itself is wired,
+    // independent of any per-workspace stamp.
+    expect(body.docVersion.stamped).toBeNull();
+    expect(body.docVersion.drift).toBeNull();
+    expect(typeof body.docVersion.current.hash).toBe('string');
+    expect(body.docVersion.current.hash.length).toBeGreaterThan(0);
+  });
+
+  test('docVersion stamps and reports drift:false through the real server on a byte-identical doc paste', async ({ request }) => {
+    // Reads the REAL, live docs/north-star.md content straight off disk — no
+    // doc-content mocking, so this stays valid across any future doc edit.
+    const fs = await import('fs');
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const docPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs', 'north-star.md');
+    const docText = fs.readFileSync(docPath, 'utf-8');
+
+    const put = await request.put(`/workspace/${URL_KEY}/api/roadmap/north-star`, {
+      data: { northStar: docText }
+    });
+    expect(put.status()).toBe(200);
+
+    const resp = await request.get('/api/proxy/north-star', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const body = await resp.json();
+
+    // Proves the server.js getNorthStarDocVersionForWorkspace wrapper (and
+    // the workspace-api-roadmap.js write-side stamping) are really wired
+    // end-to-end, not just at the unit level.
+    expect(body.docVersion.stamped).toEqual(body.docVersion.current);
+    expect(body.docVersion.drift).toBe(false);
   });
 
   test('the route is admitted by the real auth chain as a read verb', async ({ request }) => {
