@@ -1,0 +1,243 @@
+[
+  {
+    "page": "merge-reauth",
+    "title": "Sign in again to confirm - Projects",
+    "visibleTitle": "Sign in again to confirm",
+    "visibleTitleTag": "DIV",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "roleHeading": 0,
+    "nButtons": 1,
+    "btnTag": "A",
+    "btnFont": "16px",
+    "btnCursor": "pointer",
+    "btnBg": "rgb(13, 148, 136)",
+    "btnColor": "rgb(255, 255, 255)",
+    "bodyFont": "16px",
+    "hasFooter": false,
+    "homeLink": true,
+    "formClasses": [],
+    "btnContrast": 3.74
+  },
+  {
+    "page": "merge-expired-1",
+    "title": "Merge Expired - Projects",
+    "visibleTitle": "Merge Expired",
+    "visibleTitleTag": "DIV",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "roleHeading": 0,
+    "nButtons": 1,
+    "btnTag": "A",
+    "btnFont": "16px",
+    "btnCursor": "pointer",
+    "btnBg": "rgb(13, 148, 136)",
+    "btnColor": "rgb(255, 255, 255)",
+    "bodyFont": "16px",
+    "hasFooter": false,
+    "homeLink": true,
+    "formClasses": [],
+    "btnContrast": 3.74
+  },
+  {
+    "page": "merge-expired-2",
+    "title": "Merge Expired - Projects",
+    "visibleTitle": "Merge Expired",
+    "visibleTitleTag": "DIV",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "roleHeading": 0,
+    "nButtons": 1,
+    "btnTag": "A",
+    "btnFont": "16px",
+    "btnCursor": "pointer",
+    "btnBg": "rgb(13, 148, 136)",
+    "btnColor": "rgb(255, 255, 255)",
+    "bodyFont": "16px",
+    "hasFooter": false,
+    "homeLink": true,
+    "formClasses": [],
+    "btnContrast": 3.74
+  },
+  {
+    "page": "merge-failed",
+    "title": "Merge Failed - Projects",
+    "visibleTitle": "Merge Failed",
+    "visibleTitleTag": "DIV",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "roleHeading": 0,
+    "nButtons": 1,
+    "btnTag": "A",
+    "btnFont": "16px",
+    "btnCursor": "pointer",
+    "btnBg": "rgb(13, 148, 136)",
+    "btnColor": "rgb(255, 255, 255)",
+    "bodyFont": "16px",
+    "hasFooter": false,
+    "homeLink": true,
+    "formClasses": [],
+    "btnContrast": 3.74
+  },
+  {
+    "page": "workspace-limit",
+    "title": "Workspace Limit Reached - Projects",
+    "visibleTitle": "Workspace Limit Reached",
+    "visibleTitleTag": "DIV",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "roleHeading": 0,
+    "nButtons": 1,
+    "btnTag": "A",
+    "btnFont": "16px",
+    "btnCursor": "pointer",
+    "btnBg": "rgb(13, 148, 136)",
+    "btnColor": "rgb(255, 255, 255)",
+    "bodyFont": "16px",
+    "hasFooter": false,
+    "homeLink": true,
+    "formClasses": [],
+    "btnContrast": 3.74
+  },
+  {
+    "page": "account-conflict",
+    "title": "Account Conflict - Projects",
+    "visibleTitle": "Account Conflict",
+    "visibleTitleTag": "DIV",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "roleHeading": 0,
+    "nButtons": 1,
+    "btnTag": "A",
+    "btnFont": "16px",
+    "btnCursor": "pointer",
+    "btnBg": "rgb(13, 148, 136)",
+    "btnColor": "rgb(255, 255, 255)",
+    "bodyFont": "16px",
+    "hasFooter": false,
+    "homeLink": false,
+    "formClasses": [],
+    "btnContrast": 3.74
+  },
+  {
+    "page": "github-repo",
+    "title": "Choose a repository - Projects",
+    "visibleTitle": "Choose a GitHub repository",
+    "visibleTitleTag": "DIV",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "roleHeading": 0,
+    "nButtons": 1,
+    "btnTag": "BUTTON",
+    "btnFont": "13.3333px",
+    "btnCursor": "default",
+    "btnBg": "rgb(13, 148, 136)",
+    "btnColor": "rgb(255, 255, 255)",
+    "bodyFont": "16px",
+    "hasFooter": false,
+    "homeLink": false,
+    "formClasses": [
+      "github-repo-form"
+    ],
+    "btnContrast": 3.74
+  },
+  {
+    "page": "github-projects",
+    "title": "Choose a project board - Projects",
+    "visibleTitle": "Choose a GitHub project board",
+    "visibleTitleTag": "DIV",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "roleHeading": 0,
+    "nButtons": 1,
+    "btnTag": "BUTTON",
+    "btnFont": "13.3333px",
+    "btnCursor": "default",
+    "btnBg": "rgb(13, 148, 136)",
+    "btnColor": "rgb(255, 255, 255)",
+    "bodyFont": "16px",
+    "hasFooter": false,
+    "homeLink": false,
+    "formClasses": [
+      "github-repo-form"
+    ],
+    "btnContrast": 3.74
+  },
+  {
+    "page": "jira-sites",
+    "title": "Choose a Jira site",
+    "visibleTitle": "Choose a Jira site",
+    "visibleTitleTag": "DIV",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "roleHeading": 0,
+    "nButtons": 1,
+    "btnTag": "BUTTON",
+    "btnFont": "13.3333px",
+    "btnCursor": "default",
+    "btnBg": "rgb(13, 148, 136)",
+    "btnColor": "rgb(255, 255, 255)",
+    "bodyFont": "16px",
+    "hasFooter": false,
+    "homeLink": false,
+    "formClasses": [
+      "github-repo-form"
+    ],
+    "btnContrast": 3.74
+  },
+  {
+    "page": "workspace-notfound",
+    "title": "Workspace Not Found - Projects",
+    "visibleTitle": "Workspace Not Found",
+    "visibleTitleTag": "DIV",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "roleHeading": 0,
+    "nButtons": 1,
+    "btnTag": "A",
+    "btnFont": "16px",
+    "btnCursor": "pointer",
+    "btnBg": "rgb(13, 148, 136)",
+    "btnColor": "rgb(255, 255, 255)",
+    "bodyFont": "16px",
+    "hasFooter": false,
+    "homeLink": true,
+    "formClasses": [
+      "local-workspace-cta"
+    ],
+    "btnContrast": 3.74
+  },
+  {
+    "page": "login-DEAD",
+    "title": "Login - Projects",
+    "visibleTitle": null,
+    "visibleTitleTag": null,
+    "headings": [
+      "H1:Harbour"
+    ],
+    "roleHeading": 0,
+    "nButtons": 1,
+    "btnTag": "A",
+    "btnFont": "16px",
+    "btnCursor": "pointer",
+    "btnBg": "rgb(13, 148, 136)",
+    "btnColor": "rgb(255, 255, 255)",
+    "bodyFont": "16px",
+    "hasFooter": false,
+    "homeLink": false,
+    "formClasses": [
+      "local-workspace-cta"
+    ],
+    "btnContrast": 3.74
+  }
+]

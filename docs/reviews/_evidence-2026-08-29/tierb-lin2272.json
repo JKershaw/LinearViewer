@@ -1,0 +1,80 @@
+[
+  {
+    "width": 390,
+    "url": "/workspace/test-workspace/live-console",
+    "hasMore": true,
+    "hasFab": true,
+    "scrollWidth": 375,
+    "clientWidth": 390,
+    "more": {
+      "x": 30,
+      "y": 5542,
+      "w": 203,
+      "h": 30
+    },
+    "morePadRight": "112px",
+    "moreText": "view earlier activity ↓",
+    "moreScrollW": 201,
+    "moreClientW": 201,
+    "fab": {
+      "x": 276,
+      "y": 796,
+      "w": 83,
+      "h": 32
+    },
+    "intersects": false,
+    "clearanceX": 43
+  },
+  {
+    "width": 360,
+    "url": "/workspace/test-workspace/live-console",
+    "hasMore": true,
+    "hasFab": true,
+    "scrollWidth": 345,
+    "clientWidth": 360,
+    "more": {
+      "x": 28,
+      "y": 7525,
+      "w": 177,
+      "h": 47
+    },
+    "morePadRight": "112px",
+    "moreText": "view earlier activity ↓",
+    "moreScrollW": 175,
+    "moreClientW": 175,
+    "fab": {
+      "x": 246,
+      "y": 796,
+      "w": 83,
+      "h": 32
+    },
+    "intersects": false,
+    "clearanceX": 41
+  },
+  {
+    "width": 320,
+    "url": "/workspace/test-workspace/live-console",
+    "hasMore": true,
+    "hasFab": true,
+    "scrollWidth": 305,
+    "clientWidth": 320,
+    "more": {
+      "x": 28,
+      "y": 7580,
+      "w": 137,
+      "h": 47
+    },
+    "morePadRight": "112px",
+    "moreText": "view earlier activity ↓",
+    "moreScrollW": 135,
+    "moreClientW": 135,
+    "fab": {
+      "x": 206,
+      "y": 796,
+      "w": 83,
+      "h": 32
+    },
+    "intersects": false,
+    "clearanceX": 41
+  }
+]

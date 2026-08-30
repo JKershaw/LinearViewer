@@ -1,0 +1,7 @@
+{
+  "url": "http://localhost:3199/templates",
+  "lighthouseVersion": "13.4.1",
+  "fetchTime": "2026-08-30T06:25:38.595Z",
+  "accessibilityScore": 1,
+  "failingAudits": {}
+}

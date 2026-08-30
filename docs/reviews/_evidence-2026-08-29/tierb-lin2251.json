@@ -1,0 +1,14 @@
+{
+  "found": true,
+  "url": "/workspace/test-workspace/escalation-kpis",
+  "cls": "kpi-window-select",
+  "bg": "rgb(22, 24, 29)",
+  "color": "rgb(230, 230, 230)",
+  "font": "Inter, -apple-system, \"system-ui\", \"Sego",
+  "size": "14.4px",
+  "h": 34,
+  "w": 96,
+  "bodyBg": "rgb(22, 24, 29)",
+  "bodyColor": "rgb(230, 230, 230)",
+  "htmlClass": "theme-dark"
+}
