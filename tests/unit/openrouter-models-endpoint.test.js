@@ -13,6 +13,11 @@ import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { MOCK_CATALOG_MODELS, _resetCatalogCacheForTests } from '../../lib/openrouter-catalog.js';
 
+// getModelCatalog({mock:true}) normalizes MOCK_CATALOG_MODELS (LIN-2384 F2),
+// so the wire response carries the widened {id, name, pricing} shape rather
+// than the raw {id, name} literal.
+const NORMALIZED_MOCK_CATALOG_MODELS = MOCK_CATALOG_MODELS.map(m => ({ id: m.id, name: m.name, pricing: null }));
+
 before(() => { process.env.NODE_ENV = 'test'; });
 
 /** Mount the workspace-api router with a workspace of the given shape. */
@@ -83,7 +88,7 @@ test('test-token workspace (mock-gated) returns the canned catalog without a liv
   const app = buildApp({ accessToken: 'test-token', urlKey: 'test-workspace' });
   const { status, body } = await get(app, '/workspace/test-workspace/api/openrouter/models');
   assert.equal(status, 200);
-  assert.deepEqual(body.models, MOCK_CATALOG_MODELS);
+  assert.deepEqual(body.models, NORMALIZED_MOCK_CATALOG_MODELS);
 });
 
 test('local-provider workspace (mock-gated) returns the canned catalog without a live fetch', async () => {
@@ -91,7 +96,7 @@ test('local-provider workspace (mock-gated) returns the canned catalog without a
   const app = buildApp({ provider: 'local', urlKey: 'test-workspace' });
   const { status, body } = await get(app, '/workspace/test-workspace/api/openrouter/models');
   assert.equal(status, 200);
-  assert.deepEqual(body.models, MOCK_CATALOG_MODELS);
+  assert.deepEqual(body.models, NORMALIZED_MOCK_CATALOG_MODELS);
 });
 
 test('a non-mocked workspace hits the real (mocked-fetch) catalog path', async () => {

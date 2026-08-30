@@ -111,6 +111,18 @@ describe('createPricingConformanceSweepRun', () => {
     assert.strictEqual(calls.error.length, 0);
   });
 
+  test('non-empty catalog with zero checkable rows ⇒ warn branch identifying that condition, never a silent all-clear (LIN-2384 F1)', async () => {
+    const { logger, calls } = fakeLogger();
+    // Non-empty catalog, but no id overlaps MODEL_PRICING at all — checked stays 0.
+    const catalog = [{ id: 'unrelated/model-not-in-table', name: 'x', pricing: { prompt: '0.000001' } }];
+    const run = createPricingConformanceSweepRun({ getCatalog: async () => catalog, logger });
+    await run();
+    assert.strictEqual(calls.warn.length, 1);
+    assert.match(calls.warn[0][0], /not verified this tick/);
+    assert.match(calls.warn[0][0], /zero checkable rows/);
+    assert.strictEqual(calls.error.length, 0);
+  });
+
   test('verified with zero violations ⇒ no log at all (steady state)', async () => {
     const { logger, calls } = fakeLogger();
     const run = createPricingConformanceSweepRun({ getCatalog: async () => catalogRawFromTable(), logger });

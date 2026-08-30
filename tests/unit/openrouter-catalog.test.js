@@ -38,7 +38,19 @@ describe('getModelCatalog', () => {
   test('mock:true returns the canned catalog without touching the network', async () => {
     global.fetch = () => { throw new Error('must not be called'); };
     const models = await getModelCatalog({ mock: true });
-    assert.deepEqual(models, MOCK_CATALOG_MODELS);
+    assert.deepEqual(models, MOCK_CATALOG_MODELS.map(m => ({ id: m.id, name: m.name, pricing: null })));
+  });
+
+  test('mock:true entries satisfy the same normalized {id, name, pricing} shape as the real path (LIN-2384 F2)', async () => {
+    global.fetch = () => { throw new Error('must not be called'); };
+    const models = await getModelCatalog({ mock: true });
+    assert.ok(models.length > 0);
+    for (const model of models) {
+      assert.strictEqual(typeof model.id, 'string');
+      assert.strictEqual(typeof model.name, 'string');
+      assert.ok('pricing' in model, 'entry must carry a pricing key, even if null');
+      assert.strictEqual(model.pricing, null);
+    }
   });
 
   test('mock:true never pollutes the shared cache used by real calls', async () => {
