@@ -954,6 +954,123 @@ describe('computeTerminalMarkedTaskCost — LIN-2253 (narrowed): pricedTicketCou
   });
 });
 
+describe('computeTerminalMarkedTaskCost — LIN-2253 review F1 (Request Changes): headline numerator/denominator population parity', () => {
+  test('pricedTicketCostUsd is null (never costUsd\'s leftover) when the only component is excluded — the headline must go dark, not read a stale number', () => {
+    const lane = row({
+      id: 'f1-blackout-lane', issueIdentifier: 'LIN-9410', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [
+        usageEntry({ costUsd: 6, days: 1.5 }),
+        ticketMarker('LIN-9410', 'done', 1.2),
+        ticketMarker('LIN-9411', 'done', 1),
+        doneMarker(0.9)
+      ]
+    });
+    const unpricedOwnLineage = row({
+      id: 'f1-blackout-own', rootItemId: 'f1-blackout-own', issueIdentifier: 'LIN-9411', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [doneMarker(0.8)] // DONE, no usage ever posted
+    });
+    const result = computeTerminalMarkedTaskCost([lane, unpricedOwnLineage], NOW);
+    assert.equal(result.pricedTicketCount, 0, 'the merged {LIN-9410, LIN-9411} component has an unpriced member, so it is excluded');
+    assert.equal(result.costUsd, 6, 'costUsd (the per-issue fold) still counts LIN-9410\'s own fully-priced anchor issue');
+    assert.equal(result.pricedTicketCostUsd, null, 'the headline numerator must be null here — NOT costUsd\'s 6 — there is no included component to attribute it to');
+  });
+
+  test('contaminated vs. control: a sibling\'s own unpriced lineage must not let its excluded component\'s spend leak into the headline numerator', () => {
+    // Contaminated: LIN-9420's lane lands LIN-9421, which ALSO has its own
+    // separate, unpriced lineage — the whole {LIN-9420,LIN-9421} component is excluded
+    // from pricedTicketCount, but F20's $6 stays in the per-issue-fold
+    // costUsd via its own anchor issue (a DIFFERENT inclusion rule). Three
+    // clean, $10-each anchors sit alongside it, never merged into any lane —
+    // the true cost of every INCLUDED ticket is exactly $10.
+    function buildFleet({ contaminated }) {
+      const lane = row({
+        id: 'f1-c-lane', issueIdentifier: 'LIN-9420', harness: 'claude-code', dispatchedAt: daysAgo(2),
+        feedback: [
+          usageEntry({ costUsd: 6, days: 1.5 }),
+          ticketMarker('LIN-9420', 'done', 1.2),
+          ticketMarker('LIN-9421', 'done', 1),
+          doneMarker(0.9)
+        ]
+      });
+      const rows = [lane];
+      if (contaminated) {
+        rows.push(row({
+          id: 'f1-c-own', rootItemId: 'f1-c-own', issueIdentifier: 'LIN-9421', harness: 'claude-code', dispatchedAt: daysAgo(1),
+          feedback: [doneMarker(0.8)] // DONE, no usage ever posted — the contaminating sibling
+        }));
+      }
+      for (const n of [1, 2, 3]) {
+        rows.push(row({
+          id: `f1-c-clean${n}`, issueIdentifier: `LIN-F3${n}`, harness: 'claude-code', dispatchedAt: daysAgo(1),
+          feedback: [usageEntry({ costUsd: 10, days: 1 }), doneMarker(0.9)]
+        }));
+      }
+      return rows;
+    }
+
+    const contaminated = computeTerminalMarkedTaskCost(buildFleet({ contaminated: true }), NOW);
+    // costUsd (per-issue fold): 6 (LIN-9420's own anchor) + 30 (3 clean) = 36.
+    assert.equal(contaminated.costUsd, 36);
+    // pricedTicketCount (component fold): the {LIN-9420,LIN-9421} component is
+    // excluded (F21's own lineage is unpriced) — only the 3 clean singleton
+    // components count.
+    assert.equal(contaminated.pricedTicketCount, 3);
+    // The pre-fix bug, reproduced: costUsd(36) / pricedTicketCount(3) =
+    // $12.00 — F20's $6 stayed in the numerator despite its component being
+    // excluded from the denominator, overstating the true $10/ticket rate.
+    assert.equal(contaminated.costUsd / contaminated.pricedTicketCount, 12);
+    // The fix: pricedTicketCostUsd sums ONLY the INCLUDED components — the 3
+    // clean anchors' $30, never F20's excluded $6 — so the headline reads
+    // the true $10.00/ticket rate the clean population actually costs.
+    assert.equal(contaminated.pricedTicketCostUsd, 30);
+    assert.equal(contaminated.pricedTicketCostUsd / contaminated.pricedTicketCount, 10);
+
+    const control = computeTerminalMarkedTaskCost(buildFleet({ contaminated: false }), NOW);
+    // Control: LIN-9421 has no lineage of its own at all, so the {LIN-9420,LIN-9421}
+    // component has only ONE member lineage (F20's, fully priced) — the
+    // component IS included, contributing both of its tickets.
+    assert.equal(control.pricedTicketCount, 5, '{LIN-9420,LIN-9421} (2 tickets) plus 3 clean singletons');
+    assert.equal(control.costUsd, 36, 'same $36 as the contaminated shape — F21 as noLineage contributes $0 either way');
+    // No population mismatch in the control shape: costUsd and
+    // pricedTicketCostUsd cover the SAME included population here, so the
+    // old (buggy) division and the fixed one coincide exactly — proving the
+    // fix changes nothing when there is nothing to fix.
+    assert.equal(control.pricedTicketCostUsd, 36);
+    assert.equal(
+      control.costUsd / control.pricedTicketCount,
+      control.pricedTicketCostUsd / control.pricedTicketCount,
+      'uncontaminated: the old and fixed division must agree exactly'
+    );
+  });
+});
+
+describe('computeTerminalMarkedTaskCost — LIN-2253 review F4: issue-less overhead lineages must never join a priced component', () => {
+  test('an issue-less DONE lineage with [ticket] markers contributes its spend to overheadUsd only, and its landed tickets never enter pricedTicketCount/pricedTicketCostUsd', () => {
+    // The invariant is enforced only by statement ordering in the
+    // implementation (the component-eligible push happens strictly after
+    // the issue-less `continue`) — this fixture is the regression guard the
+    // review found unpinned (mutation M6 survived): reordering those two
+    // lines must break this test.
+    const bareLane = row({
+      id: 'f4-bare-lane', issueIdentifier: undefined, harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [
+        usageEntry({ costUsd: 15, days: 0.95 }),
+        ticketMarker('LIN-9440', 'done', 0.9),
+        ticketMarker('LIN-9441', 'done', 0.9),
+        doneMarker(0.8)
+      ]
+    });
+    const result = computeTerminalMarkedTaskCost([bareLane], NOW);
+    assert.equal(result.issueCount, 2, 'both landed tickets still count in T, per the existing ticket-marker walk');
+    assert.equal(result.unpriced, 2, 'both are noLineage — neither is ever fullyPriced');
+    assert.equal(result.laneLandedCount, 2);
+    assert.equal(result.costUsd, null, 'no anchored (issueIdentifier-carrying) lineage exists — nothing enters the per-issue fold');
+    assert.equal(result.overheadUsd, 15, 'the bare lane\'s spend is disclosed as overhead, never priced');
+    assert.equal(result.pricedTicketCount, 0, 'the issue-less lineage must never found or join a priced component');
+    assert.equal(result.pricedTicketCostUsd, null, 'no included component exists to attribute any cost to');
+  });
+});
+
 describe('computeTerminalMarkedTaskCost — naming discipline', () => {
   test('no "verified" or reserved synonym appears in any emitted field name', () => {
     const result = computeTerminalMarkedTaskCost([], NOW);
