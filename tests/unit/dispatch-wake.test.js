@@ -1064,6 +1064,48 @@ describe('addFeedback wake — LIN-2331 regression: two-row production topology'
       'guard keys are R1#blocked and R2#blocked — distinct producing rows each win their own once-only slot'
     );
   });
+
+  test('N=3 blocked lineage: R1 [blocked], R2 (followUpTo=R1) [blocked], R3 (followUpTo=R2) [blocked] — THREE wakes, guard keys R1#blocked / R2#blocked / R3#blocked', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const PARENT = 'parent-S1';
+
+    const r1 = await store.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42',
+      sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r1._id, URL_KEY, 'token-r1');
+    await store.addFeedback(r1._id, URL_KEY, { message: '[blocked] need a human' }, 'token-r1');
+    await drain();
+
+    const r2 = await store.addItem(URL_KEY, {
+      prompt: 'resume after unblock', kind: 'implementation', issueIdentifier: 'LIN-42',
+      followUpTo: r1._id, sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r2._id, URL_KEY, 'token-r2');
+    await store.addFeedback(r2._id, URL_KEY, { message: '[blocked] blocked on something NEW' }, 'token-r2');
+    await drain();
+
+    const r3 = await store.addItem(URL_KEY, {
+      prompt: 'resume after second unblock', kind: 'implementation', issueIdentifier: 'LIN-42',
+      followUpTo: r2._id, sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r3._id, URL_KEY, 'token-r3');
+    await store.addFeedback(r3._id, URL_KEY, { message: '[blocked] blocked on something ELSE AGAIN' }, 'token-r3');
+    await drain();
+
+    const wakes = wakesTo(collection, historyCollection, PARENT);
+    assert.equal(wakes.length, 3,
+      'a third re-block, on a third follow-up row, mints a THIRD wake — the once-only witness does not saturate past two blocked rows');
+    assert.match(wakes[2].prompt, /Outcome:\s*\[blocked\] blocked on something ELSE AGAIN/,
+      "the acceptance witness: the THIRD wake's Outcome line carries R3's NEW blocked reason, not a stale echo of R1's or R2's");
+
+    const edgeDoc = await store.historyCollection.findOne({ _id: r1._id });
+    assert.deepEqual(
+      [...(edgeDoc.terminalWakeItems || [])].sort(),
+      [`${r1._id}#blocked`, `${r2._id}#blocked`, `${r3._id}#blocked`].sort(),
+      'guard keys are R1#blocked, R2#blocked and R3#blocked — three distinct producing rows each win their own once-only slot'
+    );
+  });
 });
 
 // ── LIN-2331: lineage-sibling terminal contract ─────────────────────────────
@@ -1113,6 +1155,48 @@ describe('addFeedback wake — LIN-2331 regression: lineage-sibling done->failed
       [...(edgeDoc.terminalWakeItems || [])].sort(),
       [r1._id, r2._id].sort(),
       'guard keys are the BARE row ids R1 and R2 — a lineage-sibling status change, not a same-row re-report'
+    );
+  });
+
+  test('N=3 bare lineage: R1 [done], R2 (followUpTo=R1) [failed], R3 (followUpTo=R2) [done] — THREE wakes, bare guard keys R1 / R2 / R3', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const PARENT = 'parent-S1';
+
+    const r1 = await store.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42',
+      sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r1._id, URL_KEY, 'token-r1');
+    await store.addFeedback(r1._id, URL_KEY, { message: '[done] shipped' }, 'token-r1');
+    await drain();
+
+    const r2 = await store.addItem(URL_KEY, {
+      prompt: 'follow-up after done', kind: 'implementation', issueIdentifier: 'LIN-42',
+      followUpTo: r1._id, sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r2._id, URL_KEY, 'token-r2');
+    await store.addFeedback(r2._id, URL_KEY, { message: '[failed] the follow-up failed' }, 'token-r2');
+    await drain();
+
+    const r3 = await store.addItem(URL_KEY, {
+      prompt: 'follow-up after failed', kind: 'implementation', issueIdentifier: 'LIN-42',
+      followUpTo: r2._id, sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r3._id, URL_KEY, 'token-r3');
+    await store.addFeedback(r3._id, URL_KEY, { message: '[done] the retry shipped' }, 'token-r3');
+    await drain();
+
+    const wakes = wakesTo(collection, historyCollection, PARENT);
+    assert.equal(wakes.length, 3,
+      'a third lineage sibling on a third row mints a THIRD wake — the once-only witness does not saturate past two bare-keyed rows');
+    assert.match(wakes[2].prompt, /Outcome:\s*\[done\] the retry shipped/,
+      "the acceptance witness: the THIRD wake's Outcome line carries R3's genuine [done] outcome, not a stale echo of R1's or R2's");
+
+    const edgeDoc = await store.historyCollection.findOne({ _id: r1._id });
+    assert.deepEqual(
+      [...(edgeDoc.terminalWakeItems || [])].sort(),
+      [r1._id, r2._id, r3._id].sort(),
+      'guard keys are the BARE row ids R1, R2 and R3 — three distinct lineage-sibling status changes, not same-row re-reports'
     );
   });
 
