@@ -103,7 +103,7 @@ test('a non-mocked workspace hits the real (mocked-fetch) catalog path', async (
   const app = buildApp({ accessToken: 'real-linear-token', urlKey: 'test-workspace' });
   const { status, body } = await get(app, '/workspace/test-workspace/api/openrouter/models');
   assert.equal(status, 200);
-  assert.deepEqual(body.models, [{ id: 'openai/gpt-x', name: 'GPT X' }]);
+  assert.deepEqual(body.models, [{ id: 'openai/gpt-x', name: 'GPT X', pricing: null }]);
 });
 
 test('degrades to 200 {models: []} — never 500s — when the live catalog is unreachable', async () => {

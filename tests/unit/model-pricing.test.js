@@ -135,7 +135,7 @@ describe('computeUsageCostUsd — 1h cache-write split (LIN-2113)', () => {
       cacheCreationInputTokens: 100,
       cacheCreation1hInputTokens: 0,
     });
-    assert.strictEqual(cost, (1 * 30.00 + 100 * 6.25) / 1e6);
+    assert.strictEqual(cost, (1 * 10.00 + 100 * 2.50) / 1e6);
   });
 
   for (const [label, oneHour] of [
@@ -296,15 +296,17 @@ describe('rate table shape (LIN-1495)', () => {
     }
   });
 
-  test('gpt-5.6-sol carries the cache tiers the live catalog exposes for it (LIN-1763 review finding)', () => {
-    // The catalog exposes input_cache_read/input_cache_write for this id; the
-    // row originally omitted them, which the LIN-1763 review flagged as an
-    // undercount for any worker session that actually uses this model.
+  test('gpt-5.6-sol matches the live catalog rate (LIN-2384 — corrected a 2.5-3x transcription error)', () => {
+    // LIN-1763 landed this row character-identical to the openai/gpt-5.5 row
+    // above it, under a same-commit "verified" claim the copy-down error
+    // survived. Re-verified against https://openrouter.ai/api/v1/models on
+    // 2026-08-30 (LIN-2384): prompt/cacheRead/cacheWrite were 2.5x overstated,
+    // completion was 3x overstated.
     assert.deepStrictEqual(MODEL_PRICING['openai/gpt-5.6-sol'], {
-      prompt: 5.00,
-      completion: 30.00,
-      cacheRead: 0.50,
-      cacheWrite: 6.25,
+      prompt: 2.00,
+      completion: 10.00,
+      cacheRead: 0.20,
+      cacheWrite: 2.50,
     });
   });
 
@@ -341,7 +343,7 @@ describe('AVAILABLE_MODELS derives its pricing from this table (LIN-993 charter 
     'anthropic/claude-opus-5': { prompt: 5.00, completion: 25.00 },
     'anthropic/claude-fable-5': { prompt: 10.00, completion: 50.00 },
     'anthropic/claude-haiku-4.5': { prompt: 1.00, completion: 5.00 },
-    'openai/gpt-5.6-sol': { prompt: 5.00, completion: 30.00 },
+    'openai/gpt-5.6-sol': { prompt: 2.00, completion: 10.00 },
   };
 
   test('every curated entry deep-equals its known-good pricing', () => {
@@ -372,7 +374,7 @@ describe('AVAILABLE_MODELS derives its pricing from this table (LIN-993 charter 
       'anthropic/claude-opus-5': '$5.00 in / $25.00 out per 1M tokens',
       'anthropic/claude-fable-5': '$10.00 in / $50.00 out per 1M tokens',
       'anthropic/claude-haiku-4.5': '$1.00 in / $5.00 out per 1M tokens',
-      'openai/gpt-5.6-sol': '$5.00 in / $30.00 out per 1M tokens',
+      'openai/gpt-5.6-sol': '$2.00 in / $10.00 out per 1M tokens',
     };
     for (const m of AVAILABLE_MODELS) {
       assert.strictEqual(formatModelPricing(m), expected[m.id], `${m.id} hint is byte-identical`);
