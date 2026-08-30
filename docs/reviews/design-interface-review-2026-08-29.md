@@ -9,7 +9,7 @@
 | **Method** | Fresh renders + programmatic measurement against a live server on `:3199`. No screenshot diffing — `_evidence-2026-08-23/` was never recovered, so every Tier-B claim is re-measured, not inherited. |
 | **Renders** | ~124 captures over **55 distinct surfaces** — 14 cold, 11 pre-auth error/consent, 5 upstream-error variants, 23 authenticated pages, plus Tier-B geometry — both themes, 1400×1000 and 390×844, with 360/320 sweeps where geometry was in question |
 | **Correction** | The **authenticated capture pass was initially skipped**; the fresh-context adversarial reader caught it and it was then run in full. See §10 — the report you are reading is the post-correction version. |
-| **Evidence** | `docs/reviews/_evidence-2026-08-29/` — 42 artifacts (PNGs + the raw measurement JSON behind every number below) |
+| **Evidence** | `docs/reviews/_evidence-2026-08-29/` — **60 artifacts** (48 PNGs + 12 measurement JSON files carrying the computed values behind the numbers below) |
 | **Result** | **8 findings** (6 objective breakage, 2 copy/consistency). **3 follow-ups minted** (§7). Two inherited "no finding" claims **overturned with numbers** (§9). |
 
 > **Review-only.** No product code, stylesheet, config or doc under review was modified. The report file and its evidence PNGs are the sole artifacts committed.
