@@ -405,49 +405,121 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     );
   });
 
-  test('the per-task figure divides by the FULLY-PRICED denominator (issueCount - unpriced), not issueCount', () => {
-    // costUsd 176.4 over 10 issues, 2 unpriced: the correct per-task figure
-    // divides by the 8 fully-priced issues (176.4 / 8 = 22.05). Dividing by
-    // issueCount instead (176.4 / 10 = 17.64) is the exact regression this
-    // guards against — a "simplification" that drops `- unpriced` produces a
+  test('LIN-2253 (narrowed): the per-task figure divides by pricedTicketCount, NOT (issueCount - unpriced)', () => {
+    // costUsd 176.4 over pricedTicketCount 30 (a lane-heavy window: far more
+    // priced tickets than the old issueCount/unpriced pair would suggest —
+    // 176.4 / 30 = 5.88. The OLD formula (issueCount 10 - unpriced 2 = 8,
+    // 176.4 / 8 = 22.05) is the exact regression this guards against: a
+    // "simplification" that reverts to the old denominator produces a
     // DIFFERENT number, so this test fails loudly if that happens.
     const html = renderKpisPage(buildStats({
       terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 10, unpriced: 2, costUsd: 176.4,
+        windowDays: 30, issueCount: 10, unpriced: 2, pricedTicketCount: 30, costUsd: 176.4,
         cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
         closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
         opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
         pricedLineageShare: 0.8, attributableLineageShare: 0.95
       }
     }));
-    assert.ok(html.includes('<span class="kpi-cost-value">$22.05</span>'), 'must divide by the fully-priced denominator');
-    assert.ok(!html.includes('$17.64'), 'must NOT divide by the raw issueCount');
+    assert.ok(html.includes('<span class="kpi-cost-value">$5.88</span>'), 'must divide by pricedTicketCount');
+    assert.ok(!html.includes('$22.05'), 'must NOT divide by the old (issueCount - unpriced) denominator');
   });
 
-  test('renders "—" when the fully-priced denominator is zero (all issues unpriced)', () => {
+  test('LIN-2253 review F1 (Request Changes): the headline divides pricedTicketCostUsd by pricedTicketCount, NEVER costUsd by pricedTicketCount', () => {
+    // A contaminated-component shape: costUsd (the per-issue fold) includes a
+    // sibling issue's own priced spend that pricedTicketCount's component
+    // fold excludes (or vice versa) — the exact F1 mismatch. costUsd=180 /
+    // pricedTicketCount=10 would render $18.00 (the wrong, per-issue-fold
+    // numerator); pricedTicketCostUsd=120 / 10 is the correct $12.00.
     const html = renderKpisPage(buildStats({
       terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 5, unpriced: 5, costUsd: null,
+        windowDays: 30, issueCount: 11, unpriced: 1, pricedTicketCount: 10,
+        costUsd: 180, pricedTicketCostUsd: 120,
+        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
+        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
+        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
+        pricedLineageShare: 0.8, attributableLineageShare: 0.95
+      }
+    }));
+    assert.ok(html.includes('<span class="kpi-cost-value">$12.00</span>'), 'must divide pricedTicketCostUsd (120) by pricedTicketCount (10)');
+    assert.ok(!html.includes('$18.00'), 'must NOT divide costUsd (180, a different inclusion population) by pricedTicketCount');
+  });
+
+  test('renders "—" when pricedTicketCostUsd is explicitly null even though costUsd is a real number', () => {
+    // The compute layer emits pricedTicketCostUsd: null (never a fallback to
+    // costUsd) when there is no included component to sum over — the render
+    // layer's `= costUsd` default must apply only when the field is ABSENT
+    // (a caller/fixture predating this field), never override an explicit null.
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 5, unpriced: 1, pricedTicketCount: 4,
+        costUsd: 40, pricedTicketCostUsd: null,
+        cashUsd: 40, unknownLaneUsd: 0, inFlightUsd: null, overheadUsd: null,
+        closeOutLineageShare: 0, evidenceLinkedShare: 0,
+        opencodeSummedShare: 0, unknownHarnessShare: 0,
+        pricedLineageShare: 0, attributableLineageShare: 0
+      }
+    }));
+    assert.ok(html.includes('<span class="kpi-cost-value">—</span>'), 'an explicit null pricedTicketCostUsd must render a dash, never fall back to costUsd');
+    assert.ok(!html.includes('$10.00'), 'must not silently compute 40/4 from the unrelated costUsd field');
+  });
+
+  test('renders "—" when pricedTicketCount is zero (no priced lane/ticket to divide by)', () => {
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 5, unpriced: 5, pricedTicketCount: 0, costUsd: null,
         cashUsd: null, unknownLaneUsd: null, inFlightUsd: null, overheadUsd: null,
         closeOutLineageShare: 0, evidenceLinkedShare: 0,
         opencodeSummedShare: 0, unknownHarnessShare: 0,
         pricedLineageShare: 0, attributableLineageShare: 0
       }
     }));
-    assert.ok(html.includes('<span class="kpi-cost-value">—</span>'), 'zero fully-priced issues must render a dash, never $0/NaN');
+    assert.ok(html.includes('<span class="kpi-cost-value">—</span>'), 'zero pricedTicketCount must render a dash, never $0/NaN');
   });
 
-  test('renders "—" when costUsd is null even though issueCount - unpriced > 0', () => {
+  test('renders "—" when costUsd is null even though pricedTicketCount > 0', () => {
     const html = renderKpisPage(buildStats({
       terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 10, unpriced: 2, costUsd: null,
+        windowDays: 30, issueCount: 10, unpriced: 2, pricedTicketCount: 8, costUsd: null,
         cashUsd: null, unknownLaneUsd: null, inFlightUsd: null, overheadUsd: null,
         closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
         opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
         pricedLineageShare: 0.8, attributableLineageShare: 0.95
       }
     }));
-    assert.ok(html.includes('<span class="kpi-cost-value">—</span>'), 'a null costUsd must render a dash regardless of the denominator');
+    assert.ok(html.includes('<span class="kpi-cost-value">—</span>'), 'a null costUsd must render a dash regardless of a non-zero pricedTicketCount');
+  });
+
+  test('LIN-2253 (narrowed): renders ticketsPerPricedLane as the amortisation factor beside the rate', () => {
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 33, unpriced: 3, pricedTicketCount: 33, ticketsPerPricedLane: 3.3, costUsd: 150,
+        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
+        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
+        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
+        pricedLineageShare: 0.8, attributableLineageShare: 0.95
+      }
+    }));
+    assert.ok(
+      html.includes('<span class="kpi-cost-tickets-per-lane">3.3 tickets per priced lane</span>'),
+      'the amortisation factor must render beside the rate'
+    );
+  });
+
+  test('LIN-2253 (narrowed): renders "—" for the amortisation factor when null (no included lane)', () => {
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 5, unpriced: 5, pricedTicketCount: 0, ticketsPerPricedLane: null, costUsd: null,
+        cashUsd: null, unknownLaneUsd: null, inFlightUsd: null, overheadUsd: null,
+        closeOutLineageShare: 0, evidenceLinkedShare: 0,
+        opencodeSummedShare: 0, unknownHarnessShare: 0,
+        pricedLineageShare: 0, attributableLineageShare: 0
+      }
+    }));
+    assert.ok(
+      html.includes('<span class="kpi-cost-tickets-per-lane">— tickets per priced lane</span>'),
+      'a null factor must render a dash, never $0/NaN'
+    );
   });
 
   test('null renders "—" for all four shares plus both coverage ratios, distinct from a genuine 0 rendering "0%"', () => {
@@ -597,27 +669,50 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     // story that DOES cover whole-lineage capture loss, unlike
     // pricedLineageShare — so a reader of "unknown harness 100%" can see the
     // N it is a share of, not just the bare ratio.
-    assert.ok(html.includes('<span class="kpi-cost-sample">14 terminal-marked issues · 3 unpriced (excluded), of which 0 never observed (no lineage)</span>'));
+    assert.ok(html.includes('<span class="kpi-cost-sample">14 terminal-marked issues · 3 unpriced (excluded), of which 0 never observed (no lineage) · headline ÷ 0 priced tickets</span>'));
   });
 
-  test('renders noLineageCount so lane-landed issues that were never observed are distinguished from pricing exclusions (LIN-2325 F1)', () => {
+  test('renders laneLandedCount so lane-landed issues that were never observed are distinguished from pricing exclusions (LIN-2325 F1)', () => {
     // The compute layer (lib/terminal-marked-task-cost.js, LIN-2253) already
-    // emits noLineageCount and publishes it in the embedded __KPI_DATA__
+    // emits laneLandedCount and publishes it in the embedded __KPI_DATA__
     // payload; this card is the one place that must actually render it, so a
     // public reader can tell "never observed" apart from "unpriced".
-    // noLineageCount is always a subset of unpriced (lib/terminal-marked-task-cost.js) —
-    // 8 unpriced, 7 of which were never observed at all; unpriced > noLineageCount so the
+    // laneLandedCount is always a subset of unpriced (lib/terminal-marked-task-cost.js) —
+    // 8 unpriced, 7 of which were never observed at all; unpriced > laneLandedCount so the
     // fixture also exercises the "unpriced but had a lineage" remainder (LIN-2325 F2).
     const html = renderKpisPage(buildStats({
       terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 10, unpriced: 8, noLineageCount: 7, costUsd: 176.4,
+        windowDays: 30, issueCount: 10, unpriced: 8, laneLandedCount: 7, costUsd: 176.4,
         cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
         closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
         opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
         pricedLineageShare: 0.8, attributableLineageShare: 0.95
       }
     }));
-    assert.ok(html.includes('<span class="kpi-cost-sample">10 terminal-marked issues · 8 unpriced (excluded), of which 7 never observed (no lineage)</span>'));
+    assert.ok(html.includes('<span class="kpi-cost-sample">10 terminal-marked issues · 8 unpriced (excluded), of which 7 never observed (no lineage) · headline ÷ 0 priced tickets</span>'));
+  });
+
+  test('LIN-2253 review F2: renders laneLandedCount, NOT the deprecated noLineageCount alias, when both are present with different values', () => {
+    // Real __KPI_DATA__ never disagrees (laneLandedCount/noLineageCount are
+    // derived from the SAME filter) — this fixture deliberately sets them
+    // apart to prove the render layer reads the canonical field, closing the
+    // "migrate in-repo consumers off the deprecated alias" review finding.
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 10, unpriced: 8, laneLandedCount: 7, noLineageCount: 999, costUsd: 176.4,
+        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
+        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
+        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
+        pricedLineageShare: 0.8, attributableLineageShare: 0.95
+      }
+    }));
+    // Scoped to the rendered sample span, not the whole document — the
+    // embedded __KPI_DATA__ JSON payload legitimately contains the raw
+    // `noLineageCount: 999` field (it republishes the whole stats object),
+    // which is not a render decision and must not fail this test.
+    const sample = html.match(/<span class="kpi-cost-sample">([^<]*)<\/span>/)[1];
+    assert.ok(sample.includes('7 never observed (no lineage)'), 'must read laneLandedCount (7)');
+    assert.ok(!sample.includes('999'), 'must never render the deprecated noLineageCount alias (999)');
   });
 
   test('pins the exact ignorance-basis string, so the render layer\'s own lineageBearingCount derivation cannot drift (LIN-2418 review F1)', () => {
@@ -640,7 +735,7 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     // derivations produce different strings.
     const html = renderKpisPage(buildStats({
       terminalMarkedTaskCost: {
-        windowDays: 30, issueCount: 25, unpriced: 23, noLineageCount: 23, costUsd: 176.4,
+        windowDays: 30, issueCount: 25, unpriced: 23, laneLandedCount: 23, costUsd: 176.4,
         cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
         closeOutLineageShare: 0.08, evidenceLinkedShare: 0.08,
         opencodeSummedShare: 0.5, unknownHarnessShare: 0.5,
@@ -649,7 +744,7 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     }));
     assert.ok(
       html.includes('<span class="kpi-cost-shares-ignorance-basis">of 2 with a lineage (23 no-lineage excluded)</span>'),
-      'the ignorance basis must name the lineage-bearing population (issueCount - noLineageCount = 2), not the headline count'
+      'the ignorance basis must name the lineage-bearing population (issueCount - laneLandedCount = 2), not the headline count'
     );
     // Kills the exact mutation the review measured as surviving CI.
     assert.ok(
@@ -657,9 +752,9 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
       'the basis must never re-use issueCount as its own denominator — that is the undisclosed-basis bug this ticket fixes'
     );
     // Non-vacuity: the fixture must genuinely distinguish the two
-    // derivations, i.e. noLineageCount > 0 and issueCount !== noLineageCount,
+    // derivations, i.e. laneLandedCount > 0 and issueCount !== laneLandedCount,
     // both readable straight off the sample line beside it.
-    assert.ok(html.includes('<span class="kpi-cost-sample">25 terminal-marked issues · 23 unpriced (excluded), of which 23 never observed (no lineage)</span>'));
+    assert.ok(html.includes('<span class="kpi-cost-sample">25 terminal-marked issues · 23 unpriced (excluded), of which 23 never observed (no lineage) · headline ÷ 0 priced tickets</span>'));
   });
 
   test('captureRateShare (LIN-1959) renders beside pricedLineageShare and discloses the capture loss pricedLineageShare cannot see', () => {
