@@ -996,3 +996,237 @@ describe('addFeedback wake — LIN-2297 class-aware once-only guard', () => {
       "the witness's mintedWakeId is unchanged by the suppressed repeat — still the FIRST [blocked] wake's row id");
   });
 });
+
+// ── LIN-2331: within-class terminal-wake collisions, pinned against the
+// PRODUCTION topology ──────────────────────────────────────────────────────
+//
+// LIN-2297 (above) made the once-only guard class-aware, but only within ONE
+// row. A single-row probe run against LIN-2297's own fix surfaced two
+// apparent within-class gaps — a `[blocked]` -> resume -> `[blocked]`
+// re-block, and a `[done]` -> `[failed]` double-terminal — that each
+// collapsed to one wake. LIN-2331's research (see the ticket) found BOTH
+// gaps are artifacts of that single-row probe: production never re-posts a
+// second wake-worthy marker onto the SAME row.
+//
+//  - Every writer that resumes a blocked session (dispatcher.js's
+//    resumeSession/signalFollowUp) repoints itemMetadata.itemId onto a
+//    FOLLOW-UP item before the session can re-block, so the re-block lands
+//    on a distinct row (`R2.followUpTo = R1`), not back on R1.
+//  - The read-layer's documented done->failed sequence
+//    (docs/proxy-integration.md) is scoped to a LATER LINEAGE SIBLING —
+//    again a distinct row — never a same-row status change.
+//
+// These tests pin that two-row topology directly, guarding against
+// re-deriving "one wake" from a single-row reproduction a third time. They
+// assert NO behavioural change: `wakeGuardKey` (lib/dispatch-store.js:1868)
+// is untouched by this ticket (see LIN-2414 for the one remaining excluded
+// carrier, the stall-failsafe refire over a blocked hold).
+describe('addFeedback wake — LIN-2331 regression: two-row production topology', () => {
+  const wakesTo = (collection, historyCollection, target) =>
+    wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
+
+  test('re-block across a follow-up repoint: R1 [blocked], resume onto R2 (followUpTo=R1), R2 [blocked] — TWO wakes, guard keys R1#blocked / R2#blocked', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const PARENT = 'parent-S1';
+
+    const r1 = await store.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42',
+      sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r1._id, URL_KEY, 'token-r1');
+
+    await store.addFeedback(r1._id, URL_KEY, { message: '[blocked] need a human' }, 'token-r1');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 1, 'R1 [blocked] wakes the parent once');
+
+    // Production repoint (dispatcher.js resumeSession/signalFollowUp): the
+    // resumed session's feedback now lands on a NEW follow-up row, not back
+    // on R1 — this is what the single-row probe missed.
+    const r2 = await store.addItem(URL_KEY, {
+      prompt: 'resume after unblock', kind: 'implementation', issueIdentifier: 'LIN-42',
+      followUpTo: r1._id, sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r2._id, URL_KEY, 'token-r2');
+
+    await store.addFeedback(r2._id, URL_KEY, { message: '[blocked] blocked on something NEW' }, 'token-r2');
+    await drain();
+
+    const wakes = wakesTo(collection, historyCollection, PARENT);
+    assert.equal(wakes.length, 2,
+      'the re-block on the follow-up row mints a SECOND wake — the collision reported against a single row does not reproduce under the two-row production topology');
+    assert.match(wakes[1].prompt, /Outcome:\s*\[blocked\] blocked on something NEW/,
+      "the acceptance witness: the SECOND wake's Outcome line carries R2's NEW blocked reason, not a stale echo of R1's");
+
+    const edgeDoc = await store.historyCollection.findOne({ _id: r1._id });
+    assert.deepEqual(
+      [...(edgeDoc.terminalWakeItems || [])].sort(),
+      [`${r1._id}#blocked`, `${r2._id}#blocked`].sort(),
+      'guard keys are R1#blocked and R2#blocked — distinct producing rows each win their own once-only slot'
+    );
+  });
+
+  test('N=3 blocked lineage: R1 [blocked], R2 (followUpTo=R1) [blocked], R3 (followUpTo=R2) [blocked] — THREE wakes, guard keys R1#blocked / R2#blocked / R3#blocked', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const PARENT = 'parent-S1';
+
+    const r1 = await store.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42',
+      sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r1._id, URL_KEY, 'token-r1');
+    await store.addFeedback(r1._id, URL_KEY, { message: '[blocked] need a human' }, 'token-r1');
+    await drain();
+
+    const r2 = await store.addItem(URL_KEY, {
+      prompt: 'resume after unblock', kind: 'implementation', issueIdentifier: 'LIN-42',
+      followUpTo: r1._id, sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r2._id, URL_KEY, 'token-r2');
+    await store.addFeedback(r2._id, URL_KEY, { message: '[blocked] blocked on something NEW' }, 'token-r2');
+    await drain();
+
+    const r3 = await store.addItem(URL_KEY, {
+      prompt: 'resume after second unblock', kind: 'implementation', issueIdentifier: 'LIN-42',
+      followUpTo: r2._id, sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r3._id, URL_KEY, 'token-r3');
+    await store.addFeedback(r3._id, URL_KEY, { message: '[blocked] blocked on something ELSE AGAIN' }, 'token-r3');
+    await drain();
+
+    const wakes = wakesTo(collection, historyCollection, PARENT);
+    assert.equal(wakes.length, 3,
+      'a third re-block, on a third follow-up row, mints a THIRD wake — the once-only witness does not saturate past two blocked rows');
+    assert.match(wakes[2].prompt, /Outcome:\s*\[blocked\] blocked on something ELSE AGAIN/,
+      "the acceptance witness: the THIRD wake's Outcome line carries R3's NEW blocked reason, not a stale echo of R1's or R2's");
+
+    const edgeDoc = await store.historyCollection.findOne({ _id: r1._id });
+    assert.deepEqual(
+      [...(edgeDoc.terminalWakeItems || [])].sort(),
+      [`${r1._id}#blocked`, `${r2._id}#blocked`, `${r3._id}#blocked`].sort(),
+      'guard keys are R1#blocked, R2#blocked and R3#blocked — three distinct producing rows each win their own once-only slot'
+    );
+  });
+});
+
+// ── LIN-2331: lineage-sibling terminal contract ─────────────────────────────
+//
+// The read layer (docs/proxy-integration.md, routes/proxy.js) documents that
+// a row which already reached `done` can later read `failed` when a LATER
+// LINEAGE SIBLING fails. That is a distinct-rows statement, and the store
+// already honours it: two rows carry two guard keys and mint two wakes. This
+// pins that contract directly so it cannot be mistaken for the same-row
+// `[done]` -> `[failed]` case (LIN-1357's own suppression, correctly
+// unchanged) that the single-row probe conflated it with.
+describe('addFeedback wake — LIN-2331 regression: lineage-sibling done->failed contract', () => {
+  const wakesTo = (collection, historyCollection, target) =>
+    wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
+
+  test('lineage sibling: R1 [done], R2 (followUpTo=R1) [failed] — TWO wakes, bare guard keys R1 / R2', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const PARENT = 'parent-S1';
+
+    const r1 = await store.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42',
+      sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r1._id, URL_KEY, 'token-r1');
+
+    await store.addFeedback(r1._id, URL_KEY, { message: '[done] shipped' }, 'token-r1');
+    await drain();
+    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 1, 'R1 [done] wakes the parent once');
+
+    const r2 = await store.addItem(URL_KEY, {
+      prompt: 'follow-up after done', kind: 'implementation', issueIdentifier: 'LIN-42',
+      followUpTo: r1._id, sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r2._id, URL_KEY, 'token-r2');
+
+    await store.addFeedback(r2._id, URL_KEY, { message: '[failed] the follow-up failed' }, 'token-r2');
+    await drain();
+
+    const wakes = wakesTo(collection, historyCollection, PARENT);
+    assert.equal(wakes.length, 2,
+      'a lineage-sibling [failed] after [done] mints a SECOND wake — distinct rows, distinct guard keys, matching the documented read-layer contract');
+    assert.match(wakes[1].prompt, /Outcome:\s*\[failed\] the follow-up failed/,
+      "the acceptance witness: the SECOND wake's Outcome line carries the sibling's genuine [failed] outcome");
+
+    const edgeDoc = await store.historyCollection.findOne({ _id: r1._id });
+    assert.deepEqual(
+      [...(edgeDoc.terminalWakeItems || [])].sort(),
+      [r1._id, r2._id].sort(),
+      'guard keys are the BARE row ids R1 and R2 — a lineage-sibling status change, not a same-row re-report'
+    );
+  });
+
+  test('N=3 bare lineage: R1 [done], R2 (followUpTo=R1) [failed], R3 (followUpTo=R2) [done] — THREE wakes, bare guard keys R1 / R2 / R3', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const PARENT = 'parent-S1';
+
+    const r1 = await store.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42',
+      sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r1._id, URL_KEY, 'token-r1');
+    await store.addFeedback(r1._id, URL_KEY, { message: '[done] shipped' }, 'token-r1');
+    await drain();
+
+    const r2 = await store.addItem(URL_KEY, {
+      prompt: 'follow-up after done', kind: 'implementation', issueIdentifier: 'LIN-42',
+      followUpTo: r1._id, sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r2._id, URL_KEY, 'token-r2');
+    await store.addFeedback(r2._id, URL_KEY, { message: '[failed] the follow-up failed' }, 'token-r2');
+    await drain();
+
+    const r3 = await store.addItem(URL_KEY, {
+      prompt: 'follow-up after failed', kind: 'implementation', issueIdentifier: 'LIN-42',
+      followUpTo: r2._id, sessionId: PARENT, subscription: 'everything'
+    });
+    await store.takeItem(r3._id, URL_KEY, 'token-r3');
+    await store.addFeedback(r3._id, URL_KEY, { message: '[done] the retry shipped' }, 'token-r3');
+    await drain();
+
+    const wakes = wakesTo(collection, historyCollection, PARENT);
+    assert.equal(wakes.length, 3,
+      'a third lineage sibling on a third row mints a THIRD wake — the once-only witness does not saturate past two bare-keyed rows');
+    assert.match(wakes[2].prompt, /Outcome:\s*\[done\] the retry shipped/,
+      "the acceptance witness: the THIRD wake's Outcome line carries R3's genuine [done] outcome, not a stale echo of R1's or R2's");
+
+    const edgeDoc = await store.historyCollection.findOne({ _id: r1._id });
+    assert.deepEqual(
+      [...(edgeDoc.terminalWakeItems || [])].sort(),
+      [r1._id, r2._id, r3._id].sort(),
+      'guard keys are the BARE row ids R1, R2 and R3 — three distinct lineage-sibling status changes, not same-row re-reports'
+    );
+  });
+
+  test('negative control (unchanged): a genuine same-row re-report stays suppressed — [done] -> [done] on ONE row mints only one wake', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const PARENT = 'parent-S1';
+    const child = await takenChild(store, { sessionId: PARENT });
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
+    await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped (re-reported)' }, 'token-a');
+    await drain();
+
+    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 1,
+      "LIN-1357's original purpose survives: a genuine re-report of the SAME row's terminal is still suppressed, not re-derived into a second wake");
+  });
+
+  test('negative control (unchanged): [pending] -> [pending] on one row stays deliberately unguarded — mints two wakes', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const PARENT = 'parent-S1';
+    const child = await takenChild(store, { sessionId: PARENT });
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[pending] beat 1 done' }, 'token-a');
+    await store.addFeedback(child._id, URL_KEY, { message: '[pending] beat 2 done' }, 'token-a');
+    await drain();
+
+    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 2,
+      'PENDING-external stays deliberately unguarded (LIN-843) — this must not be swept up by any re-keying of the terminal/blocked guard');
+
+    const edgeDoc = await store.historyCollection.findOne({ _id: child._id });
+    assert.equal((edgeDoc.terminalWakeItems || []).includes(child._id), false,
+      '[pending] never touches the terminal witness set at all');
+  });
+});
