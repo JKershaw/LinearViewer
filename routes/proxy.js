@@ -2039,7 +2039,7 @@ GET ${baseUrl}/api/proxy/issues/{identifier}/cost   (alias: /api/proxy/cost/{ide
   → {identifier} MUST be the issue identifier (e.g. "LIN-1770"), NOT a UUID — this
     route never resolves through the provider, and a UUID matches zero rows. A
     UUID-shaped {identifier} is rejected with 400.
-  → { "identifier": "LIN-1770", "pricedUsd": 22.78, "totalUsd": 22.83,
+  → { "identifier": "LIN-1770", "pricedUsd": 22.78, "totalUsd": 22.83, "noLineage": false,
       "workerSessions": [{ "rootItemId": "...", "kind": "implementation",
         "dispatchedAt": "...", "model": "claude-sonnet-5", "costUsd": 4.90 }],
       "appCalls": { "calls": 9, "costUsd": 0.05, "unpricedCalls": 0,
@@ -2047,11 +2047,18 @@ GET ${baseUrl}/api/proxy/issues/{identifier}/cost   (alias: /api/proxy/cost/{ide
       "unpriced": [], "noTelemetryCount": 0,
       "window": { "days": 30, "appCallsSince": "..." } }
   → "pricedUsd" is the worker-side sum of whatever IS priceable. "totalUsd" restates
-    "pricedUsd" plus "appCalls.costUsd" ONLY when "unpriced" is empty AND
-    "noTelemetryCount" is 0 AND "appCalls.unpricedCalls" is 0 — otherwise "totalUsd"
-    is null. Never a silent partial: an unpriced model, a "taken" dispatch with no
-    usage telemetry, or an unpriced app call each independently null the total while
-    "pricedUsd"/"appCalls.costUsd" stay populated with whatever is known.
+    "pricedUsd" plus "appCalls.costUsd" ONLY when "noLineage" is false AND "unpriced"
+    is empty AND "noTelemetryCount" is 0 AND "appCalls.unpricedCalls" is 0 — otherwise
+    "totalUsd" is null. Never a silent partial: an unpriced model, a "taken" dispatch
+    with no usage telemetry, an unpriced app call, or NO "taken" dispatch resolving to
+    this issue at all each independently null the total while "pricedUsd"/
+    "appCalls.costUsd" stay populated with whatever is known.
+  → "noLineage" is true when zero "taken" dispatch rows resolved to a lineage for this
+    issue at all — e.g. a ticket landed as a non-anchor ticket inside a multi-ticket
+    worker lane (LIN-2242) has no dispatch row of its own. Without this gate an empty
+    lineage set would vacuously satisfy every pricing check and read as a confirmed
+    "totalUsd: 0" rather than "this issue is invisible to this join" — "noLineage: true"
+    makes that distinction explicit instead.
   → A dispatch LINEAGE (a follow-up chain sharing one root session) is counted once,
     not once per row — cumulative worker usage snapshots would otherwise be
     multiply-counted by the lineage's dispatch count.

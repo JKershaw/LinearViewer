@@ -297,10 +297,19 @@ describe('computeTerminalMarkedTaskCost — zero-T degradation', () => {
     assert.equal(result.pricedLineageShare, null);
     assert.equal(result.attributableLineageShare, null);
     assert.equal(result.captureRateShare, null);
+    // LIN-2253 (narrowed): the component-fold denominator degrades the same
+    // way — pricedTicketCount is a genuine 0 (a count, like issueCount),
+    // never null; ticketsPerPricedLane (a ratio) is null, never 0/NaN, when
+    // there is nothing to divide by.
+    assert.equal(result.pricedTicketCount, 0);
+    assert.equal(result.ticketsPerPricedLane, null);
+    assert.equal(result.laneLandedCount, 0);
+    assert.equal(result.noLineageCount, 0);
     for (const key of [
       'costUsd', 'cashUsd', 'unknownLaneUsd', 'closeOutLineageShare', 'evidenceLinkedShare',
       'opencodeSummedShare', 'unknownHarnessShare', 'inFlightUsd', 'overheadUsd',
-      'pricedLineageShare', 'attributableLineageShare', 'captureRateShare'
+      'pricedLineageShare', 'attributableLineageShare', 'captureRateShare',
+      'pricedTicketCount'
     ]) {
       assert.ok(!Number.isNaN(result[key]), `${key} must not be NaN`);
     }
@@ -819,6 +828,129 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     // already pins it on the render side).
     assert.equal(result.unknownHarnessShare, null, 'must be null, not 0, over a population the system knows nothing about');
     assert.equal(result.opencodeSummedShare, null, 'must be null, not 0, over a population the system knows nothing about');
+  });
+});
+
+describe('computeTerminalMarkedTaskCost — LIN-2253 (narrowed): laneLandedCount rename', () => {
+  test('laneLandedCount is the canonical field; noLineageCount is a deprecated alias carrying the SAME value for one cycle', () => {
+    const lane = row({
+      id: 'rename-lane', issueIdentifier: 'LIN-950', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [
+        usageEntry({ costUsd: 9, days: 1.5 }),
+        ticketMarker('LIN-950', 'done', 1.2),
+        ticketMarker('LIN-951', 'done', 1),
+        doneMarker(0.8)
+      ]
+    });
+    const result = computeTerminalMarkedTaskCost([lane], NOW);
+    assert.equal(result.laneLandedCount, 1, 'LIN-951 is the one lane-landed, no-lineage-of-its-own ticket');
+    assert.equal(result.noLineageCount, result.laneLandedCount, 'the deprecated alias must never drift from the canonical field — same filter, same value');
+  });
+});
+
+describe('computeTerminalMarkedTaskCost — LIN-2253 (narrowed): pricedTicketCount / ticketsPerPricedLane', () => {
+  test('degenerate no-lane regression: with no lanes, pricedTicketCount is byte-identical to the old (issueCount - unpriced) denominator, and ticketsPerPricedLane is 1', () => {
+    const rows = [
+      row({
+        id: 'deg1', issueIdentifier: 'LIN-960', harness: 'claude-code', dispatchedAt: daysAgo(1),
+        feedback: [usageEntry({ costUsd: 4, days: 1 }), doneMarker(0.9)]
+      }),
+      row({
+        id: 'deg2', issueIdentifier: 'LIN-961', harness: 'claude-code', dispatchedAt: daysAgo(1),
+        feedback: [usageEntry({ costUsd: 6, days: 1 }), doneMarker(0.9)]
+      })
+    ];
+    const result = computeTerminalMarkedTaskCost(rows, NOW);
+    assert.equal(result.issueCount, 2);
+    assert.equal(result.unpriced, 0);
+    assert.equal(result.pricedTicketCount, result.issueCount - result.unpriced, 'no lane tickets exist, so every anchor founds its own single-ticket component');
+    assert.equal(result.ticketsPerPricedLane, 1, 'one ticket per one lineage when nothing lands via a lane');
+  });
+
+  test('lane pricing: an anchor + 3 lane-landed tickets, all priced through the one lineage, counts all 4 tickets', () => {
+    const lane = row({
+      id: 'lane-pricing', issueIdentifier: 'LIN-970', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [
+        usageEntry({ costUsd: 20, days: 1.5 }),
+        ticketMarker('LIN-970', 'done', 1.3),
+        ticketMarker('LIN-971', 'done', 1.2),
+        ticketMarker('LIN-972', 'done', 1.1),
+        ticketMarker('LIN-973', 'done', 1),
+        doneMarker(0.9)
+      ]
+    });
+    const result = computeTerminalMarkedTaskCost([lane], NOW);
+    assert.equal(result.pricedTicketCount, 4, 'the anchor plus its 3 lane-landed tickets — never lane ÷ 1');
+    assert.equal(result.ticketsPerPricedLane, 4, 'one lineage delivered all 4 tickets');
+  });
+
+  test('component transitivity: a lane sharing a ticket with a NOT-fully-priced lineage excludes the WHOLE component, not just the unpriced half', () => {
+    const lane = row({
+      id: 'transitivity-lane', issueIdentifier: 'LIN-980', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [
+        usageEntry({ costUsd: 6, days: 1.5 }),
+        ticketMarker('LIN-980', 'done', 1.2),
+        ticketMarker('LIN-981', 'done', 1),
+        doneMarker(0.9)
+      ]
+    });
+    // LIN-981 ALSO has its own separate lineage — DONE, but never priced.
+    const unpricedOwnLineage = row({
+      id: 'transitivity-own981', rootItemId: 'transitivity-own981', issueIdentifier: 'LIN-981', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [doneMarker(0.8)] // no usage posted at all
+    });
+    const result = computeTerminalMarkedTaskCost([lane, unpricedOwnLineage], NOW);
+    assert.equal(result.pricedTicketCount, 0, 'the merged {LIN-980, LIN-981} component has an unpriced member, so NEITHER ticket counts — never a partial numerator over a full-weight denominator');
+    assert.equal(result.ticketsPerPricedLane, null, 'no included component to divide by');
+  });
+
+  test('reconciliation identity holds exactly on the single-lane degenerate shape (the `:656`-style fixture: a lane-landed ticket that ALSO has its own separate, fully-priced lineage)', () => {
+    const lane = row({
+      id: 'recon-lane', issueIdentifier: 'LIN-990', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [
+        usageEntry({ costUsd: 8, days: 1.5 }),
+        ticketMarker('LIN-990', 'done', 1.2),
+        ticketMarker('LIN-991', 'done', 1),
+        doneMarker(0.9)
+      ]
+    });
+    const ownLineage = row({
+      id: 'recon-own991', rootItemId: 'recon-own991', issueIdentifier: 'LIN-991', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 3, days: 0.8 }), doneMarker(0.5)]
+    });
+    const result = computeTerminalMarkedTaskCost([lane, ownLineage], NOW);
+    assert.equal(result.costUsd, 11);
+    assert.equal(result.pricedTicketCount, 2, 'LIN-990 and LIN-991 merge into ONE component (they share LIN-991) — 2 tickets, not double-counted');
+    assert.equal(result.ticketsPerPricedLane, 1, '2 tickets across 2 distinct lineages');
+
+    const oldAnchorRate = result.costUsd / (result.issueCount - result.unpriced);
+    const newRate = result.costUsd / result.pricedTicketCount;
+    assert.equal(newRate * result.ticketsPerPricedLane, oldAnchorRate, 'the reconciliation identity holds exactly in this shape (one anchor, one merged lane-landed ticket, no cross-lineage issue duplication)');
+  });
+
+  test('reconciliation identity does NOT reduce to a simple factor when one issue carries two separate lineages — costUsd equality is the relationship that genuinely generalises', () => {
+    // Same shape as the "issue-level denominator" describe block above
+    // (LIN-12, j1+j2): one issue, two independently-dispatched DONE
+    // lineages, no lane markers at all.
+    const rows = [
+      row({
+        id: 'recon2-j1', issueIdentifier: 'LIN-995', harness: 'claude-code', dispatchedAt: daysAgo(5),
+        feedback: [usageEntry({ costUsd: 2, lane: 'api', days: 5 }), doneMarker(4.9)]
+      }),
+      row({
+        id: 'recon2-j2', rootItemId: 'recon2-j2', issueIdentifier: 'LIN-995', harness: 'claude-code', dispatchedAt: daysAgo(1),
+        feedback: [usageEntry({ costUsd: 3, lane: 'api', days: 1 }), doneMarker(0.9)]
+      })
+    ];
+    const result = computeTerminalMarkedTaskCost(rows, NOW);
+    assert.equal(result.costUsd, 5, 'both lineages sum into the one issue, same as the pre-existing per-issue fold');
+    assert.equal(result.pricedTicketCount, 1, 'both lineages deliver the SAME single ticket (LIN-995) — one ticket, not two');
+    assert.equal(result.ticketsPerPricedLane, 0.5, 'one ticket across two distinct lineages — a real value below 1, not a defect');
+
+    const oldAnchorRate = result.costUsd / (result.issueCount - result.unpriced);
+    const newRate = result.costUsd / result.pricedTicketCount;
+    assert.equal(newRate, oldAnchorRate, 'costUsd/pricedTicketCount happens to equal costUsd/(issueCount-unpriced) here too (1 ticket, 1 fully-priced issue) — the two denominators can coincide numerically even though what they COUNT differs');
+    assert.notEqual(newRate * result.ticketsPerPricedLane, oldAnchorRate, 'but the naive newRate × ticketsPerPricedLane reconciliation does NOT hold here (2.5 vs 5) — the simple factor is conditional on includedLineageCount == oldFullyPricedIssueCount, which this shape breaks (2 lineages, 1 issue)');
   });
 });
 
