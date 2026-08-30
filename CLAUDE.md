@@ -347,15 +347,30 @@ PAT mode:
 Users can connect their OpenRouter account for AI recommendations:
 
 ```
-GET /auth/openrouter           → Redirect to OpenRouter OAuth (with PKCE)
-GET /auth/openrouter/callback  → Exchange code for API key, store in session
-POST /auth/openrouter/disconnect → Remove stored API key
+GET  /auth/openrouter            → Consent interstitial (LIN-2412): grant or decline durable
+                                   unattended-use consent. Renders Harbour's own page — it does
+                                   NOT redirect off-site. Both choices proceed to /begin.
+POST /auth/openrouter/begin      → Begin the PKCE OAuth flow (S256). `consent=granted` stashes the
+                                   pending-consent intent; anything else clears it, so declining
+                                   still connects the key — only consent is withheld.
+GET  /auth/openrouter/callback   → Exchange code for API key; persist durably per account, and
+                                   record consent only when /begin stashed the intent
+POST /auth/openrouter/consent    → Retroactive consent for an ALREADY-connected account
+                                   (409 `not_connected` when no durable key exists)
+POST /auth/openrouter/disconnect → Remove stored API key (clears the consent flag in the same write)
 ```
 
 - Uses PKCE flow with S256 code challenge method
 - Returns a permanent API key (no expiry, no refresh needed)
-- API key stored in session alongside Linear workspace tokens
-- Falls back to `OPENROUTER_API_KEY` env var if no OAuth connection
+- API key persisted durably per account in `lib/user-preferences.js` as the single source of
+  truth (LIN-498); `req.session.openRouterApiKey` is only a request-scoped mirror
+- **Consent, not the key, is the opt-in bit** (LIN-2412). `openRouterDurableConsentAt` is a
+  sibling account-owned preference gating *unattended* use only; it is deliberately NEVER
+  mirrored into `req.session` (pinned by `tests/unit/settings-route-consent-census.test.js`)
+- Interactive requests fall back to the `OPENROUTER_API_KEY` env var if no OAuth connection.
+  Unattended consumers do NOT: `resolveConsentedKeyForGroup`
+  (`lib/openrouter-key-resolver.js`) requires key **and** consent and returns `null` on any
+  miss — never env, never free tier
 
 ### GitHub App (Installation)
 
