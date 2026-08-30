@@ -1,0 +1,218 @@
+[
+  {
+    "surface": "merge-confirm",
+    "theme": "light",
+    "vp": "desktop",
+    "status": 409,
+    "page": true,
+    "titleTag": "Confirm account merge - Projects",
+    "errorTitle": "Merge these accounts?",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "confirm": {
+      "text": "Yes, merge these accounts",
+      "cls": "login-button",
+      "tag": "BUTTON",
+      "bg": "rgb(13, 148, 136)",
+      "color": "rgb(255, 255, 255)",
+      "border": "rgb(13, 148, 136)",
+      "font": "13.3333px",
+      "weight": "400",
+      "pad": "12px 24px",
+      "cursor": "default",
+      "w": 221,
+      "h": 42
+    },
+    "decline": {
+      "text": "No, keep them separate",
+      "cls": "login-button",
+      "tag": "BUTTON",
+      "bg": "rgb(13, 148, 136)",
+      "color": "rgb(255, 255, 255)",
+      "border": "rgb(13, 148, 136)",
+      "font": "13.3333px",
+      "weight": "400",
+      "pad": "12px 24px",
+      "cursor": "default",
+      "w": 201,
+      "h": 42
+    },
+    "hasFooter": false,
+    "homeLink": false,
+    "container": "login-container",
+    "bodyFont": "16px",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "htmlClass": "",
+    "formClasses": [
+      "github-repo-form",
+      "github-repo-form"
+    ],
+    "confirmContrast": 3.74,
+    "declineContrast": 3.74,
+    "identical": false
+  },
+  {
+    "surface": "merge-confirm",
+    "theme": "light",
+    "vp": "mobile",
+    "status": 409,
+    "page": true,
+    "titleTag": "Confirm account merge - Projects",
+    "errorTitle": "Merge these accounts?",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "confirm": {
+      "text": "Yes, merge these accounts",
+      "cls": "login-button",
+      "tag": "BUTTON",
+      "bg": "rgb(13, 148, 136)",
+      "color": "rgb(255, 255, 255)",
+      "border": "rgb(13, 148, 136)",
+      "font": "13.3333px",
+      "weight": "400",
+      "pad": "12px 24px",
+      "cursor": "default",
+      "w": 221,
+      "h": 42
+    },
+    "decline": {
+      "text": "No, keep them separate",
+      "cls": "login-button",
+      "tag": "BUTTON",
+      "bg": "rgb(13, 148, 136)",
+      "color": "rgb(255, 255, 255)",
+      "border": "rgb(13, 148, 136)",
+      "font": "13.3333px",
+      "weight": "400",
+      "pad": "12px 24px",
+      "cursor": "default",
+      "w": 201,
+      "h": 42
+    },
+    "hasFooter": false,
+    "homeLink": false,
+    "container": "login-container",
+    "bodyFont": "13px",
+    "scrollW": 375,
+    "clientW": 390,
+    "htmlClass": "",
+    "formClasses": [
+      "github-repo-form",
+      "github-repo-form"
+    ],
+    "confirmContrast": 3.74,
+    "declineContrast": 3.74,
+    "identical": false
+  },
+  {
+    "surface": "merge-confirm",
+    "theme": "dark",
+    "vp": "desktop",
+    "status": 409,
+    "page": true,
+    "titleTag": "Confirm account merge - Projects",
+    "errorTitle": "Merge these accounts?",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "confirm": {
+      "text": "Yes, merge these accounts",
+      "cls": "login-button",
+      "tag": "BUTTON",
+      "bg": "rgb(45, 212, 191)",
+      "color": "rgb(22, 24, 29)",
+      "border": "rgb(45, 212, 191)",
+      "font": "13.3333px",
+      "weight": "400",
+      "pad": "12px 24px",
+      "cursor": "default",
+      "w": 221,
+      "h": 42
+    },
+    "decline": {
+      "text": "No, keep them separate",
+      "cls": "login-button",
+      "tag": "BUTTON",
+      "bg": "rgb(45, 212, 191)",
+      "color": "rgb(22, 24, 29)",
+      "border": "rgb(45, 212, 191)",
+      "font": "13.3333px",
+      "weight": "400",
+      "pad": "12px 24px",
+      "cursor": "default",
+      "w": 201,
+      "h": 42
+    },
+    "hasFooter": false,
+    "homeLink": false,
+    "container": "login-container",
+    "bodyFont": "16px",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "htmlClass": "theme-dark",
+    "formClasses": [
+      "github-repo-form",
+      "github-repo-form"
+    ],
+    "confirmContrast": 9.54,
+    "declineContrast": 9.54,
+    "identical": false
+  },
+  {
+    "surface": "merge-confirm",
+    "theme": "dark",
+    "vp": "mobile",
+    "status": 409,
+    "page": true,
+    "titleTag": "Confirm account merge - Projects",
+    "errorTitle": "Merge these accounts?",
+    "headings": [
+      "H1:Harbour"
+    ],
+    "confirm": {
+      "text": "Yes, merge these accounts",
+      "cls": "login-button",
+      "tag": "BUTTON",
+      "bg": "rgb(45, 212, 191)",
+      "color": "rgb(22, 24, 29)",
+      "border": "rgb(45, 212, 191)",
+      "font": "13.3333px",
+      "weight": "400",
+      "pad": "12px 24px",
+      "cursor": "default",
+      "w": 221,
+      "h": 42
+    },
+    "decline": {
+      "text": "No, keep them separate",
+      "cls": "login-button",
+      "tag": "BUTTON",
+      "bg": "rgb(45, 212, 191)",
+      "color": "rgb(22, 24, 29)",
+      "border": "rgb(45, 212, 191)",
+      "font": "13.3333px",
+      "weight": "400",
+      "pad": "12px 24px",
+      "cursor": "default",
+      "w": 201,
+      "h": 42
+    },
+    "hasFooter": false,
+    "homeLink": false,
+    "container": "login-container",
+    "bodyFont": "13px",
+    "scrollW": 375,
+    "clientW": 390,
+    "htmlClass": "theme-dark",
+    "formClasses": [
+      "github-repo-form",
+      "github-repo-form"
+    ],
+    "confirmContrast": 9.54,
+    "declineContrast": 9.54,
+    "identical": false
+  }
+]

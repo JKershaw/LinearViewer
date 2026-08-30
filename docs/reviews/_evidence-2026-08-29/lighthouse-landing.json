@@ -1,0 +1,12 @@
+{
+  "url": "http://localhost:3199/",
+  "lighthouseVersion": "13.4.1",
+  "fetchTime": "2026-08-30T06:25:27.446Z",
+  "accessibilityScore": 0.96,
+  "failingAudits": {
+    "color-contrast": {
+      "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+      "score": 0
+    }
+  }
+}

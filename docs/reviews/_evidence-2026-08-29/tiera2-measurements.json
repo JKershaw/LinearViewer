@@ -1,0 +1,78 @@
+{
+  "kpis_light": {
+    "nCards": 0,
+    "nBasis": 2,
+    "cardClasses": [],
+    "basisSample": [
+      {
+        "t": "workspaces with retained activity or sto",
+        "color": "rgb(26, 26, 26)",
+        "size": "16px"
+      },
+      {
+        "t": "newest 20 reports per workspace",
+        "color": "rgb(26, 26, 26)",
+        "size": "16px"
+      }
+    ],
+    "noLineage": "no lineage)"
+  },
+  "obs_light": {
+    "hasTicketChip": false,
+    "chipText": null,
+    "hasParked": false,
+    "h1": [
+      "Observation ● live"
+    ],
+    "nHeadings": 5,
+    "title": "Observation"
+  },
+  "tokens_light": {
+    "redDim": "#b91c1c",
+    "red": "#cc0000",
+    "slateDim": "#475569",
+    "greenDim": "#15803d",
+    "amber": "#FFB224",
+    "pillError": "rgb(185, 28, 28)",
+    "pillOk": "rgb(102, 102, 102)",
+    "pillWarn": "rgb(102, 102, 102)"
+  },
+  "kpis_dark": {
+    "nCards": 0,
+    "nBasis": 2,
+    "cardClasses": [],
+    "basisSample": [
+      {
+        "t": "workspaces with retained activity or sto",
+        "color": "rgb(230, 230, 230)",
+        "size": "16px"
+      },
+      {
+        "t": "newest 20 reports per workspace",
+        "color": "rgb(230, 230, 230)",
+        "size": "16px"
+      }
+    ],
+    "noLineage": "no lineage)"
+  },
+  "obs_dark": {
+    "hasTicketChip": false,
+    "chipText": null,
+    "hasParked": false,
+    "h1": [
+      "Observation ● live"
+    ],
+    "nHeadings": 5,
+    "title": "Observation"
+  },
+  "tokens_dark": {
+    "redDim": "#ff9b9b",
+    "red": "#ff6b6b",
+    "slateDim": "#cbd5e1",
+    "greenDim": "#4ade80",
+    "amber": "#ffc04d",
+    "pillError": "rgb(255, 155, 155)",
+    "pillOk": "rgb(154, 160, 166)",
+    "pillWarn": "rgb(154, 160, 166)"
+  }
+}

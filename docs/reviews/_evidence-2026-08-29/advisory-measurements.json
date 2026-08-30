@@ -1,0 +1,59 @@
+{
+  "presets": [
+    {
+      "t": "3m",
+      "w": 37,
+      "h": 24
+    },
+    {
+      "t": "15m",
+      "w": 44,
+      "h": 24
+    },
+    {
+      "t": "1h",
+      "w": 37,
+      "h": 24
+    },
+    {
+      "t": "6h",
+      "w": 37,
+      "h": 24
+    },
+    {
+      "t": "fit",
+      "w": 44,
+      "h": 24
+    },
+    {
+      "t": "1h",
+      "w": 37,
+      "h": 24
+    },
+    {
+      "t": "24h",
+      "w": 44,
+      "h": 24
+    }
+  ],
+  "collectiveConnected": {
+    "text": "● live",
+    "color": "rgb(102, 102, 102)"
+  },
+  "collectiveOffline": {
+    "text": "● disconnected",
+    "color": "rgb(102, 102, 102)"
+  },
+  "kpis": {
+    "sectionHeaders": [],
+    "h3": [],
+    "h2": [],
+    "nSectionHeader": 0
+  },
+  "escalation": {
+    "sectionHeaders": [],
+    "h3": [],
+    "h2": [],
+    "nSectionHeader": 0
+  }
+}
