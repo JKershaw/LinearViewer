@@ -63,6 +63,17 @@ test.describe('KPIs page', () => {
     await expect(card.locator('.kpi-cost-sample')).toBeVisible();
     await expect(card.locator('.kpi-cost-sample')).toHaveText(/\d+ terminal-marked issues · \d+ unpriced \(excluded\)/);
 
+    // LIN-2253 close-out, ledger item 3. The headline's divisor and the
+    // amortisation factor beside it are the two spans LIN-2253 added, and
+    // unit coverage was their ONLY guard — the sample-line regex above stops
+    // before the new clause, so an E2E-visible regression in either could
+    // land green. Both are disclosures the headline is unreadable without
+    // (it divides by a population the card must state), so they are asserted
+    // on the rendered page, not merely in the renderer's return value.
+    await expect(card.locator('.kpi-cost-sample')).toHaveText(/· headline ÷ \d+ priced tickets/);
+    await expect(card.locator('.kpi-cost-tickets-per-lane')).toBeVisible();
+    await expect(card.locator('.kpi-cost-tickets-per-lane')).toHaveText(/(\d+(\.\d+)?|—) tickets per priced lane/);
+
     // The four bias/coverage shares are load-bearing disclosures (the
     // ruling's condition for publishing the number at all) — assert they are
     // actually VISIBLE, not merely present somewhere in the DOM. LIN-2418
