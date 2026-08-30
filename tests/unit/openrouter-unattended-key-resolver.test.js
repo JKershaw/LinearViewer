@@ -202,18 +202,18 @@ describe('getUnattendedOpenRouterKey: C1 tier 2 (urlKey) + C2 dedup', () => {
       consents: { 'acct-1': 'yes', 'acct-2': 'yes' }
     });
     const accountWorkspaceStore = fakeAccountWorkspaceStore({ edges: { 'ws-1': ['acct-1', 'acct-2'] } });
-    const warnCalls = [];
-    const originalWarn = console.warn;
-    console.warn = (...args) => warnCalls.push(args);
+    const infoCalls = [];
+    const originalInfo = console.info;
+    console.info = (...args) => infoCalls.push(args);
     try {
       const result = await getUnattendedOpenRouterKey(
         { userPreferencesStore, sessionsCollection: fakeSessionsCollection(sessions), accountWorkspaceStore, accountStore: fakeAccountStore() },
         { urlKey: 'acme' }
       );
       assert.equal(result, null);
-      assert.ok(warnCalls.some((c) => String(c[0]).includes('multiple-consented-accounts')), 'must log a distinct internal reason for the ambiguity');
+      assert.ok(infoCalls.some((c) => String(c[0]).includes('multiple-consented-accounts')), 'must log a distinct internal reason for the ambiguity');
     } finally {
-      console.warn = originalWarn;
+      console.info = originalInfo;
     }
   });
 
@@ -291,6 +291,92 @@ describe('getUnattendedOpenRouterKey: C1 tier 2 (urlKey) + C2 dedup', () => {
       );
       assert.equal(result, null);
     });
+  });
+});
+
+describe('getUnattendedOpenRouterKey: per-reason miss logging (LIN-2412 F5 / review ledger item 6)', () => {
+  const sessions = [sessionRow([{ id: 'ws-1', urlKey: 'acme' }])];
+
+  function spyInfo() {
+    const calls = [];
+    const original = console.info;
+    console.info = (...args) => calls.push(args);
+    return { calls, restore: () => { console.info = original; } };
+  }
+
+  test('urlKey matched no live session logs "no-live-session-for-url-key", noting the session-derived bound', async () => {
+    const spy = spyInfo();
+    try {
+      const result = await getUnattendedOpenRouterKey(
+        { ...NO_WORKSPACE_DEPS, sessionsCollection: fakeSessionsCollection(sessions) },
+        { urlKey: 'not-a-real-workspace' }
+      );
+      assert.equal(result, null);
+      assert.ok(spy.calls.some((c) => String(c[0]).includes('no-live-session-for-url-key')), 'must name this distinct miss reason');
+    } finally {
+      spy.restore();
+    }
+  });
+
+  test('zero workspace owners logs "no-workspace-owners"', async () => {
+    const spy = spyInfo();
+    try {
+      const accountWorkspaceStore = fakeAccountWorkspaceStore({ edges: { 'ws-1': [] } });
+      const result = await getUnattendedOpenRouterKey(
+        { userPreferencesStore: fakeUserPreferencesStore(), sessionsCollection: fakeSessionsCollection(sessions), accountWorkspaceStore, accountStore: fakeAccountStore() },
+        { urlKey: 'acme' }
+      );
+      assert.equal(result, null);
+      assert.ok(spy.calls.some((c) => String(c[0]).includes('no-workspace-owners')), 'must name this distinct miss reason');
+    } finally {
+      spy.restore();
+    }
+  });
+
+  test('candidates exist but none consented logs "no-consented-owner", distinct from "no-workspace-owners"', async () => {
+    const spy = spyInfo();
+    try {
+      const userPreferencesStore = fakeUserPreferencesStore({ keys: { 'acct-1': 'sk-or-v1-nope' }, consents: {} });
+      const accountWorkspaceStore = fakeAccountWorkspaceStore({ edges: { 'ws-1': ['acct-1'] } });
+      const result = await getUnattendedOpenRouterKey(
+        { userPreferencesStore, sessionsCollection: fakeSessionsCollection(sessions), accountWorkspaceStore, accountStore: fakeAccountStore() },
+        { urlKey: 'acme' }
+      );
+      assert.equal(result, null);
+      assert.ok(spy.calls.some((c) => String(c[0]).includes('no-consented-owner')), 'must name this distinct miss reason');
+      assert.ok(!spy.calls.some((c) => String(c[0]).includes('no-workspace-owners')), 'must not conflate "owners exist, unconsented" with "no owners at all"');
+    } finally {
+      spy.restore();
+    }
+  });
+
+  test('dispatchedBy canonicalization failure logs "dispatcher-canonical-resolution-failed"', async () => {
+    const spy = spyInfo();
+    try {
+      const accountStore = fakeAccountStore({ throwsFor: ['acct-broken'] });
+      const result = await getUnattendedOpenRouterKey(
+        { userPreferencesStore: fakeUserPreferencesStore(), sessionsCollection: fakeSessionsCollection([]), accountWorkspaceStore: fakeAccountWorkspaceStore(), accountStore },
+        { dispatchedBy: 'acct-broken' }
+      );
+      assert.equal(result, null);
+      assert.ok(spy.calls.some((c) => String(c[0]).includes('dispatcher-canonical-resolution-failed')), 'must name this distinct miss reason');
+    } finally {
+      spy.restore();
+    }
+  });
+
+  test('a dispatchedBy account with no key/consent logs "dispatcher-no-consent-or-key"', async () => {
+    const spy = spyInfo();
+    try {
+      const result = await getUnattendedOpenRouterKey(
+        { userPreferencesStore: fakeUserPreferencesStore(), sessionsCollection: fakeSessionsCollection([]), accountWorkspaceStore: fakeAccountWorkspaceStore(), accountStore: fakeAccountStore() },
+        { dispatchedBy: 'acct-no-key' }
+      );
+      assert.equal(result, null);
+      assert.ok(spy.calls.some((c) => String(c[0]).includes('dispatcher-no-consent-or-key')), 'must name this distinct miss reason');
+    } finally {
+      spy.restore();
+    }
   });
 });
 

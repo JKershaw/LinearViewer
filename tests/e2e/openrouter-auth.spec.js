@@ -224,3 +224,27 @@ test.describe('OpenRouter Auth Callback', () => {
     await expect(page.locator('.error-title')).toHaveText('Session Expired');
   });
 });
+
+// LIN-2412 F1 correction: GET /auth/openrouter must render a real
+// grant/decline choice rather than redirecting straight to OpenRouter. This
+// drives the actual browser render (not just the unit-level fake-router
+// tests in tests/unit/openrouter-auth.test.js), closing the review's noted
+// gap that no E2E covered the consent affordance at all.
+test.describe('OpenRouter consent interstitial (LIN-2412)', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearSession(page);
+    await setupSession(page);
+  });
+
+  test('GET /auth/openrouter renders a real grant/decline choice, not an immediate redirect to OpenRouter', async ({ page }) => {
+    const response = await page.goto('/auth/openrouter');
+
+    // Must render Harbour's own interstitial page, never navigate off-site.
+    expect(new URL(page.url()).hostname).not.toBe('openrouter.ai');
+    expect(response.ok()).toBeTruthy();
+
+    await expect(page.getByTestId('openrouter-consent-page')).toBeVisible();
+    await expect(page.getByTestId('openrouter-consent-grant-submit')).toBeVisible();
+    await expect(page.getByTestId('openrouter-consent-decline-submit')).toBeVisible();
+  });
+});

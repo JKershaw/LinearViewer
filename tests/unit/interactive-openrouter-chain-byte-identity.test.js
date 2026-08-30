@@ -19,6 +19,20 @@
  * None of these files, nor server.js's getOpenRouterSource, are touched by
  * this ticket's implementation.
  *
+ * routes/workspace-api.js correction (LIN-2412 review finding F3): the
+ * original version of this file claimed ONE occurrence of the shared
+ * `sessionApiKey || getPaidEnvKey() || freeTierKey` expression in
+ * routes/workspace-api.js and stopped there, describing that as the whole
+ * family's presence in the file. In fact routes/workspace-api.js carries SIX
+ * interactive resolution sites, not one: the pinned occurrence (the
+ * feedback-title path) plus FIVE more using a distinct shape,
+ * `apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)`
+ * (recommend, recommend-stream, recap, brief, scan). The constraint held as a
+ * matter of fact either way (the file was untouched by this ticket's diff),
+ * but the claim over-stated what was pinned. This revision pins all six, per
+ * the review's "extend the census" resolution rather than merely narrowing
+ * the claim's wording.
+ *
  * Run with: node --test tests/unit/interactive-openrouter-chain-byte-identity.test.js
  */
 import { test, describe } from 'node:test';
@@ -49,6 +63,13 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412)', () => 
       const actualCount = src.split(SHARED_CHAIN_EXPR).length - 1;
       assert.equal(actualCount, expectedCount, `${relPath}: expected ${expectedCount} occurrence(s) of the shared chain expression, found ${actualCount}`);
     }
+  });
+
+  test('routes/workspace-api.js: the remaining FIVE interactive sites carry the "apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)" shape (LIN-2412 F3 correction)', () => {
+    const src = read('routes/workspace-api.js');
+    const SITE_SHAPE = 'apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)';
+    const actualCount = src.split(SITE_SHAPE).length - 1;
+    assert.equal(actualCount, 5, `expected exactly 5 occurrence(s) of the apiKeyToUse shape (recommend/recommend-stream/recap/brief/scan), found ${actualCount} — routes/workspace-api.js therefore carries 6 total interactive resolution sites (1 pinned above + these 5), not the 1 this census originally over-claimed as the whole file`);
   });
 
   test('routes/dashboard.js carries its own distinct shape at BOTH call sites (run-summary + session-summary), untouched', () => {
