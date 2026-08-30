@@ -748,6 +748,80 @@ describe('computeTerminalMarkedTaskCost — LIN-2253: lane-landed, no-lineage ti
   });
 });
 
+describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLineage issues', () => {
+  // Fixture per the ticket's own Measured table: one lane whose anchor
+  // (LIN-9000) runs on an unknown harness (and also lands N no-lineage
+  // extras as its worker-lane ticket walk), plus one separate `opencode`
+  // anchor (LIN-9001). Base fleet (N=0) is exactly these two anchors, so
+  // base.issueCount === 2 and base.noLineageCount === 0.
+  function buildFleet(n) {
+    const laneExtras = [];
+    for (let i = 0; i < n; i++) {
+      laneExtras.push(ticketMarker(`LIN-92${String(i).padStart(2, '0')}`, 'done', 1));
+    }
+    const lane = row({
+      id: 'lin2418-lane', issueIdentifier: 'LIN-9000', harness: null, dispatchedAt: daysAgo(2),
+      feedback: [
+        usageEntry({ costUsd: 10, days: 1.5 }),
+        ticketMarker('LIN-9000', 'done', 1.2),
+        ...laneExtras,
+        doneMarker(0.8)
+      ]
+    });
+    const opencodeAnchor = row({
+      id: 'lin2418-opencode', issueIdentifier: 'LIN-9001', harness: 'opencode', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 5, lane: 'api', days: 0.9 }), doneMarker(0.5)]
+    });
+    return [lane, opencodeAnchor];
+  }
+
+  test('P1 — unknownHarnessShare/opencodeSummedShare are invariant under a growing noLineage population', () => {
+    const base = computeTerminalMarkedTaskCost(buildFleet(0), NOW);
+
+    const results = [0, 2, 23].map(n => ({ n, result: computeTerminalMarkedTaskCost(buildFleet(n), NOW) }));
+
+    // Mandatory non-vacuity guard: without this, a degenerate "fix" that
+    // simply stops counting lane-landed tickets in T would pass the
+    // invariance assertions below and silently undo LIN-2253.
+    for (const { n, result } of results) {
+      assert.equal(result.issueCount, base.issueCount + n, `issueCount must grow by N at N=${n}`);
+      assert.equal(result.noLineageCount, n, `noLineageCount must equal N at N=${n}`);
+    }
+
+    const [n0, n2, n23] = results;
+    assert.equal(n2.result.unknownHarnessShare, n0.result.unknownHarnessShare, 'unknownHarnessShare must not move as noLineage tickets are added (N=2 vs N=0)');
+    assert.equal(n23.result.unknownHarnessShare, n0.result.unknownHarnessShare, 'unknownHarnessShare must not move as noLineage tickets are added (N=23 vs N=0)');
+    assert.equal(n2.result.opencodeSummedShare, n0.result.opencodeSummedShare, 'opencodeSummedShare must not move as noLineage tickets are added (N=2 vs N=0)');
+    assert.equal(n23.result.opencodeSummedShare, n0.result.opencodeSummedShare, 'opencodeSummedShare must not move as noLineage tickets are added (N=23 vs N=0)');
+  });
+
+  test('P2 — a fleet where every issue is noLineage publishes null, never 0, for both shares', () => {
+    // A bare worker-lane kickoff with no issueIdentifier on the dispatch row
+    // (legal: ticketMarkers are harvested before the issue-less `continue`)
+    // lands 3 tickets whose own lineage never existed — T is entirely
+    // noLineage, so the denominator this ticket fixes is exactly 0.
+    const bareLane = row({
+      id: 'lin2418-bare-lane', issueIdentifier: undefined, harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [
+        ticketMarker('LIN-9300', 'done', 0.9),
+        ticketMarker('LIN-9301', 'done', 0.9),
+        ticketMarker('LIN-9302', 'done', 0.9),
+        doneMarker(0.8)
+      ]
+    });
+    const result = computeTerminalMarkedTaskCost([bareLane], NOW);
+
+    assert.equal(result.issueCount, 3, 'non-vacuity: the fleet must genuinely contain issues');
+    assert.equal(result.noLineageCount, 3, 'non-vacuity: every issue in T must be noLineage — the point of this fixture');
+
+    // `!== 0` is explicitly not sufficient — the distinction between a
+    // genuine 0 and an absent value is the point (render-kpis.test.js:475
+    // already pins it on the render side).
+    assert.equal(result.unknownHarnessShare, null, 'must be null, not 0, over a population the system knows nothing about');
+    assert.equal(result.opencodeSummedShare, null, 'must be null, not 0, over a population the system knows nothing about');
+  });
+});
+
 describe('computeTerminalMarkedTaskCost — naming discipline', () => {
   test('no "verified" or reserved synonym appears in any emitted field name', () => {
     const result = computeTerminalMarkedTaskCost([], NOW);
