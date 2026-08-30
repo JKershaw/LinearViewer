@@ -108,10 +108,85 @@ describe('GET /api/proxy/instructions — provider identity (LIN-2354)', () => {
 
     test('the field-support tables (create-refuses / patch-drops) are untouched by the conditioning', async () => {
       const { text } = await call(buildApp({ providerName: 'github' }), '/api/proxy/instructions');
-      assert.ok(text.includes('GitHub-backed: no stateId/assigneeId/priority/priorityLevel/cycleId/parentId'),
-        'the create-refuses enumeration for GitHub stays intact');
+      assert.ok(text.includes('GitHub-backed: no teamId/stateId/assigneeId/priority/priorityLevel/cycleId/parentId'),
+        'the create-refuses enumeration for GitHub stays intact (LIN-2352 adds teamId to it)');
       assert.ok(text.includes('GitHub-backed: priority/priorityLevel/assigneeId/parentId/cycleId are dropped'),
         'the patch-drops enumeration for GitHub stays intact');
+    });
+  });
+
+  // LIN-2352 plan-review Finding 1 (BLOCKER): the POST /api/proxy/issues
+  // symbolic-refs sentence conditioned teamId/stateId/projectId as one
+  // group on `requiresTeam`. That is correct for teamId (a teamless
+  // provider 400s on any explicit value) but false for stateId/projectId:
+  // this PR's own e2e coverage proves symbolic stateId resolves on a
+  // teamless (Local-backed) create, just without team-scoping. Neither
+  // branch of `teamRequirementNote` (nor the split it renders) was
+  // asserted anywhere before this — the coverage hole the review named.
+  describe('POST /api/proxy/issues symbolic-refs split (LIN-2352 review Finding 1)', () => {
+    test('a teamless (GitHub-backed) workspace keeps the teamless teamId policy but still documents symbolic stateId/projectId', async () => {
+      const { text } = await call(buildApp({ providerName: 'github' }), '/api/proxy/instructions');
+
+      assert.ok(
+        text.includes('teamId is required only when your workspace\'s provider declares team support; an explicit value on a provider that doesn\'t is refused with 400.'),
+        'teamless branch keeps stating the conditional-refusal teamId policy'
+      );
+      assert.ok(
+        !text.includes('teamId accepts a team key'),
+        'a teamless provider never claims teamId accepts a symbolic ref — it refuses any explicit teamId with 400'
+      );
+      assert.ok(
+        text.includes('stateId/projectId accept symbolic refs, not just UUIDs'),
+        'symbolic stateId/projectId support is documented unconditionally, not gated on team support'
+      );
+      assert.ok(
+        !/stateId as a keyword \([^)]*\) or state name, scoped to the team you pass/.test(text),
+        'a teamless provider must not claim team-scoped state resolution'
+      );
+      assert.ok(
+        !text.includes('On a provider that requires it'),
+        'the teamless branch never qualifies symbolic stateId/projectId support on team support'
+      );
+      assert.ok(
+        !text.includes('teamId/stateId/projectId accept symbolic refs'),
+        'teamId is split OUT of the symbolic-refs group — an unanchored includes() cannot see this'
+      );
+    });
+
+    test('a teamless (Local-backed) workspace keeps the teamless teamId policy but still documents symbolic stateId/projectId', async () => {
+      const { text } = await call(buildApp({ providerName: 'local' }), '/api/proxy/instructions');
+
+      assert.ok(
+        text.includes('teamId is required only when your workspace\'s provider declares team support; an explicit value on a provider that doesn\'t is refused with 400.')
+      );
+      assert.ok(!text.includes('teamId accepts a team key'));
+      assert.ok(text.includes('stateId/projectId accept symbolic refs, not just UUIDs'));
+      assert.ok(!/stateId as a keyword \([^)]*\) or state name, scoped to the team you pass/.test(text));
+      assert.ok(
+        !text.includes('On a provider that requires it'),
+        'the teamless branch never qualifies symbolic stateId/projectId support on team support'
+      );
+      assert.ok(
+        !text.includes('teamId/stateId/projectId accept symbolic refs'),
+        'teamId is split OUT of the symbolic-refs group — an unanchored includes() cannot see this'
+      );
+    });
+
+    test('a team-requiring (Linear-backed) workspace documents symbolic teamId support and team-scoped state resolution', async () => {
+      const { text } = await call(buildApp({ providerName: 'linear' }), '/api/proxy/instructions');
+
+      assert.ok(
+        text.includes('teamId is required for this workspace.'),
+        'team-requiring branch states teamId is required'
+      );
+      assert.ok(
+        text.includes('teamId accepts a team key (e.g. LIN) or name as well as a UUID.'),
+        'team-requiring branch documents symbolic teamId support'
+      );
+      assert.ok(
+        /stateId as a keyword \([^)]*\) or state name, scoped to the team you pass/.test(text),
+        'team-requiring branch documents state resolution as scoped to the team you pass'
+      );
     });
   });
 

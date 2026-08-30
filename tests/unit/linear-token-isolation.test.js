@@ -633,6 +633,8 @@ function fakeLinearProvider() {
     // unconditionally; a full permissive contract keeps this fixture's
     // existing "everything works" posture.
     apiWriteFields() { return ['title', 'description', 'teamId', 'projectId', 'stateId', 'assigneeId', 'priority', 'parentId', 'cycleId']; },
+    // LIN-2352: the create route's team-capability signal.
+    createFields() { return ['title', 'description', 'teamId', 'projectId', 'stateId', 'assigneeId', 'priority', 'parentId', 'cycleId']; },
     async issues() { calls.push({ fn: 'issues' }); return { nodes: [], pageInfo: {} }; },
     async createIssue(token, input) {
       calls.push({ fn: 'createIssue', token, input });

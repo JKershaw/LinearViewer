@@ -26,12 +26,13 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 const TEAM_UUID = '11111111-1111-1111-1111-111111111111';
 const OTHER_UUID = '22222222-2222-2222-2222-222222222222';
 
-function makeProvider({ apiWriteFields }) {
+function makeProvider({ apiWriteFields, createFields = apiWriteFields }) {
   const calls = { createIssue: [] };
   const provider = {
     name: 'fake',
     supports: () => true,
     apiWriteFields: () => apiWriteFields,
+    createFields: () => createFields,
     fetchTeams: async () => [{ id: TEAM_UUID, name: 'Team' }],
     async createIssue(_token, input) {
       calls.createIssue.push(input);
@@ -87,7 +88,7 @@ describe('POST /api/proxy/issues — optional-field write contract (LIN-1557)', 
   test('refuses stateId (400) for a provider whose apiWriteFields() excludes it', async () => {
     const { provider, calls } = makeProvider({ apiWriteFields: GITHUB_SHAPED });
     const { status, body } = await post(buildApp(provider), {
-      teamId: TEAM_UUID, title: 'x', stateId: 'done',
+      title: 'x', stateId: 'done',
     });
     assert.equal(status, 400);
     assert.match(body.error, /stateId is not supported/);
@@ -97,7 +98,7 @@ describe('POST /api/proxy/issues — optional-field write contract (LIN-1557)', 
   test('refuses assigneeId (400) for a provider whose apiWriteFields() excludes it', async () => {
     const { provider, calls } = makeProvider({ apiWriteFields: GITHUB_SHAPED });
     const { status, body } = await post(buildApp(provider), {
-      teamId: TEAM_UUID, title: 'x', assigneeId: OTHER_UUID,
+      title: 'x', assigneeId: OTHER_UUID,
     });
     assert.equal(status, 400);
     assert.match(body.error, /assigneeId is not supported/);
@@ -107,7 +108,7 @@ describe('POST /api/proxy/issues — optional-field write contract (LIN-1557)', 
   test('refuses priority (400) for a provider whose apiWriteFields() excludes it', async () => {
     const { provider, calls } = makeProvider({ apiWriteFields: GITHUB_SHAPED });
     const { status, body } = await post(buildApp(provider), {
-      teamId: TEAM_UUID, title: 'x', priority: 2,
+      title: 'x', priority: 2,
     });
     assert.equal(status, 400);
     assert.match(body.error, /priority is not supported/);
@@ -117,7 +118,7 @@ describe('POST /api/proxy/issues — optional-field write contract (LIN-1557)', 
   test('refuses parentId (400) for a provider whose apiWriteFields() excludes it', async () => {
     const { provider, calls } = makeProvider({ apiWriteFields: GITHUB_SHAPED });
     const { status, body } = await post(buildApp(provider), {
-      teamId: TEAM_UUID, title: 'x', parentId: OTHER_UUID,
+      title: 'x', parentId: OTHER_UUID,
     });
     assert.equal(status, 400);
     assert.match(body.error, /parentId is not supported/);
@@ -127,7 +128,7 @@ describe('POST /api/proxy/issues — optional-field write contract (LIN-1557)', 
   test('refuses cycleId (400) for a provider whose apiWriteFields() excludes it', async () => {
     const { provider, calls } = makeProvider({ apiWriteFields: GITHUB_SHAPED });
     const { status, body } = await post(buildApp(provider), {
-      teamId: TEAM_UUID, title: 'x', cycleId: OTHER_UUID,
+      title: 'x', cycleId: OTHER_UUID,
     });
     assert.equal(status, 400);
     assert.match(body.error, /cycleId is not supported/);
@@ -136,13 +137,13 @@ describe('POST /api/proxy/issues — optional-field write contract (LIN-1557)', 
 
   test('refuses assigneeId/cycleId (400) for a Local-shaped provider, but stateId/priority/parentId still work', async () => {
     const { provider, calls } = makeProvider({ apiWriteFields: LOCAL_SHAPED });
-    const assignee = await post(buildApp(provider), { teamId: TEAM_UUID, title: 'x', assigneeId: OTHER_UUID });
+    const assignee = await post(buildApp(provider), { title: 'x', assigneeId: OTHER_UUID });
     assert.equal(assignee.status, 400);
-    const cycle = await post(buildApp(provider), { teamId: TEAM_UUID, title: 'x', cycleId: OTHER_UUID });
+    const cycle = await post(buildApp(provider), { title: 'x', cycleId: OTHER_UUID });
     assert.equal(cycle.status, 400);
     assert.equal(calls.createIssue.length, 0);
 
-    const ok = await post(buildApp(provider), { teamId: TEAM_UUID, title: 'x', priority: 1, parentId: OTHER_UUID });
+    const ok = await post(buildApp(provider), { title: 'x', priority: 1, parentId: OTHER_UUID });
     assert.equal(ok.status, 201);
   });
 
@@ -167,16 +168,37 @@ describe('POST /api/proxy/issues — optional-field write contract (LIN-1557)', 
     // gate at all — even for a provider that supports the field.
     const { provider, calls } = makeProvider({ apiWriteFields: GITHUB_SHAPED });
     const { status } = await post(buildApp(provider), {
-      teamId: TEAM_UUID, title: 'x', assigneeId: 'not-a-uuid',
+      title: 'x', assigneeId: 'not-a-uuid',
     });
     assert.equal(status, 201);
     assert.equal(calls.createIssue[0].assigneeId, undefined);
   });
 
-  test('teamId stays required and ungated regardless of the write contract', async () => {
-    const { provider } = makeProvider({ apiWriteFields: GITHUB_SHAPED });
+  // LIN-2352: teamId's requirement is conditional on createFields(), not a
+  // blanket rule — three cases replace the old single always-required one.
+  test('createFields() includes teamId (Linear-shaped): missing teamId is refused 400', async () => {
+    const { provider } = makeProvider({ apiWriteFields: FULL });
     const { status, body } = await post(buildApp(provider), { title: 'x' });
     assert.equal(status, 400);
     assert.match(body.error, /teamId/);
+  });
+
+  test('createFields() excludes teamId (GitHub-shaped): create succeeds with no teamId, and the placeholder never reaches createIssue', async () => {
+    // Two-lane agreement (LIN-1976 acceptance criterion 1): the identical
+    // teamless-success shape is asserted on the session lane by
+    // tests/unit/issue-write-routes.test.js's LIN-1972 describe block.
+    const { provider, calls } = makeProvider({ apiWriteFields: GITHUB_SHAPED });
+    const { status, body } = await post(buildApp(provider), { title: 'x' });
+    assert.equal(status, 201);
+    assert.equal(body.success, true);
+    assert.equal(calls.createIssue[0].teamId, undefined);
+  });
+
+  test('createFields() excludes teamId (GitHub-shaped): an explicit teamId anyway is refused 400', async () => {
+    const { provider, calls } = makeProvider({ apiWriteFields: GITHUB_SHAPED });
+    const { status, body } = await post(buildApp(provider), { title: 'x', teamId: TEAM_UUID });
+    assert.equal(status, 400);
+    assert.match(body.error, /teamId is not supported/);
+    assert.equal(calls.createIssue.length, 0);
   });
 });

@@ -205,6 +205,26 @@ describe('GitHub-backed proxy writes land (were 500 "Linear API request failed")
     const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/999/description/append', { block: 'x' });
     assert.equal(status, 404);
   });
+
+  // LIN-2352: the primary acceptance witness — GitHub's createFields() omits
+  // teamId, so a real create must succeed with none supplied, and the
+  // outcome must be a round-tripped read, not a bare status (a fabricated
+  // UUID teamId was already enough for a bare 201 before this fix).
+  test('POST /issues {title} with no teamId → 201 and the issue reads back out of the fake store', async () => {
+    const { status, body } = await call(buildApp(), 'POST', '/api/proxy/issues', { title: 'Filed via the proxy' });
+    assert.equal(status, 201);
+    assert.equal(body.success, true);
+    const created = await fake.getIssue(REPO, Number(body.issue.id));
+    assert.equal(created.title, 'Filed via the proxy');
+  });
+
+  test('POST /issues {title, teamId} on GitHub → 400, an explicit teamId is refused, and nothing is written', async () => {
+    const before = (await fake.listIssues(REPO)).length;
+    const { status, body } = await call(buildApp(), 'POST', '/api/proxy/issues', { title: 'x', teamId: UUID });
+    assert.equal(status, 400);
+    assert.match(body.error, /teamId is not supported/);
+    assert.equal((await fake.listIssues(REPO)).length, before);
+  });
 });
 
 // ---------------------------------------------------------------------------
