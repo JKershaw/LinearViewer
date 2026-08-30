@@ -60,6 +60,7 @@ import { createObserverSweepRun } from './lib/observer-sweep.js'
 import { createObserverPassRun } from './lib/observer-pass.js'
 import { ObserverShadowLogStore } from './lib/observer-shadow-log.js'
 import { createCredentialInvariantSweepRun } from './lib/credential-invariant-sweep.js'
+import { createPricingConformanceSweepRun } from './lib/pricing-conformance-sweep.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
@@ -93,7 +94,7 @@ import { createDispatchRoutes } from './routes/dispatch.js'
 import { createProxyRoutes } from './routes/proxy.js'
 import { createTestRoutes } from './routes/test.js'
 import { createWorkspaceApiRoutes, shouldMockAi } from './routes/workspace-api.js'
-import { getModelCatalog } from './lib/openrouter-catalog.js'
+import { getModelCatalog, CATALOG_CACHE_TTL_MS } from './lib/openrouter-catalog.js'
 import { createLegacyRedirects } from './routes/legacy-redirects.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
 import { swimSampleData } from './tests/fixtures/swim-sample-data.js'
@@ -692,6 +693,27 @@ scheduler.register({
 // catch so a silent-never-runs state is diagnosable rather than inferred.
 }).catch((err) => {
   console.error(`[credential-invariant-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
+})
+
+// Pricing conformance sweep (LIN-2384): diffs every lib/model-pricing.js
+// MODEL_PRICING row against the live OpenRouter catalog's own pricing (via
+// lib/openrouter-catalog.js, which retains it as of this ticket), converting
+// silent table drift — like the openai/gpt-5.6-sol transcription error this
+// ticket found and fixed — into a loud, periodic signal instead. Interval
+// matches CATALOG_CACHE_TTL_MS: no value polling faster than the catalog
+// itself refreshes.
+const PRICING_CONFORMANCE_SWEEP_INTERVAL_MS = CATALOG_CACHE_TTL_MS
+const PRICING_CONFORMANCE_SWEEP_LEASE_MS = 15 * 60 * 1000
+scheduler.register({
+  name: 'pricing-conformance-sweep',
+  intervalMs: PRICING_CONFORMANCE_SWEEP_INTERVAL_MS,
+  leaseMs: PRICING_CONFORMANCE_SWEEP_LEASE_MS,
+  run: createPricingConformanceSweepRun({ getCatalog: getModelCatalog })
+// Same discipline as the two sweeps above: not awaited (a failed seed write
+// must not abort server boot), with a purpose-written catch so a
+// silent-never-runs state is diagnosable rather than inferred.
+}).catch((err) => {
+  console.error(`[pricing-conformance-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
 })
 
 // =============================================================================
