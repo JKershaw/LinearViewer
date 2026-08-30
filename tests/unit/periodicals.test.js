@@ -132,7 +132,7 @@ describe('shared two-stage contract (all periodicals)', () => {
         // (LIN-386 — leaving it In Progress looped on `review` forever).
         assert.match(prompt, /conclude this task|move the task to its done|done\/completed state/i);
         assert.match(prompt, /summary of the report/i);
-        assert.match(prompt, /do not leave it open|left open/i);
+        assert.match(prompt, /do not leave it open/i);
         // Producing the report still changes no code.
         assert.match(prompt, /review-only/i);
       });
@@ -229,7 +229,12 @@ describe('shared two-stage contract (all periodicals)', () => {
         assert.match(prompt, /AGREE and DISAGREE both conclude this task normally/i);
         assert.match(prompt, /a DISAGREE verdict is itself the escalation/i);
         assert.match(prompt, /never a reason to leave this task open pending a human/i);
-        assert.match(prompt, /an open, not-yet-merged report pull request already satisfies/i);
+        assert.match(prompt, /owns merging its own report PR/i);
+        assert.match(prompt, /required CI checks are green, merge it before the Done transition/i);
+        assert.match(prompt, /genuinely impossible.*may this task conclude with that PR left open/i);
+        assert.match(prompt, /explicit handoff naming what blocks the merge/i);
+        assert.match(prompt, /never as ordinary completion/i);
+        assert.match(prompt, /is not a normal terminal state/i);
       });
     });
   }
