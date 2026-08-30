@@ -1081,6 +1081,12 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
       return item;
     }
 
+    // The row-count assertion alone cannot tell a pushed-down `$or` from a
+    // JS-side re-filter — both return the same two rows. So this test pins the
+    // property in BOTH halves: the query object the storage engine actually
+    // receives carries the `$or`, AND the real engine resolves it to exactly
+    // the two admitted rows. Dropping the clause from `listHistory` fails the
+    // first assertion; an engine that ignored `$or` would fail the second.
     test('pushdown: the $or clause reaches the query the engine receives, not a JS-side re-filter', async () => {
       const store = freshStore();
       // Three archived rows: one admitted on kind, one admitted on periodicalId
@@ -1089,8 +1095,36 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
       await archivedRow(store, { kind: 'periodical', periodicalId: null });
       await archivedRow(store, { kind: 'implementation', periodicalId: 'documentation-review' });
       await archivedRow(store, { kind: 'implementation', periodicalId: null });
+
+      // Observe, don't stub: the real `find` still runs, so the row assertions
+      // below remain a genuine real-engine round trip.
+      const queriesSeen = [];
+      const realFind = store.historyCollection.find.bind(store.historyCollection);
+      store.historyCollection.find = (query, opts) => {
+        queriesSeen.push(query);
+        return realFind(query, opts);
+      };
+
       const { items } = await store.listHistory(URL_KEY, { periodicalEvidenceRow: true });
+
+      assert.equal(queriesSeen.length, 1, 'the unlimited history path issues exactly one find');
+      assert.deepEqual(
+        queriesSeen[0].$or,
+        [{ kind: 'periodical' }, { periodicalId: { $ne: null } }],
+        'the admission predicate is pushed into the query, not applied after the read'
+      );
+
       assert.equal(items.length, 2, 'exactly the kind:periodical row and the periodicalId-stamped row are selected');
+      assert.deepEqual(
+        items
+          .map(row => ({ kind: row.kind, periodicalId: row.periodicalId ?? null }))
+          .sort((a, b) => a.kind.localeCompare(b.kind)),
+        [
+          { kind: 'implementation', periodicalId: 'documentation-review' },
+          { kind: 'periodical', periodicalId: null }
+        ],
+        'and they are the kind-admitted and periodicalId-admitted rows specifically'
+      );
     });
 
     test('(b) a kind: "periodical" row is admitted', async () => {
