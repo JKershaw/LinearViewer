@@ -63,11 +63,17 @@ a.kpi-headline-value:hover {
 /* Cost-per-terminal-marked-task card (LIN-1958) — a second bespoke headline-
    style card, sitting above the grid alongside `.kpi-headline` but with its
    own rules: `.kpi-headline*` stays specific to the outcome headline. The
-   bias/coverage disclosures (`.kpi-cost-shares`/`.kpi-cost-coverage`) and the
-   `.kpi-cost-usd-lines` are load-bearing content the 2026-08-03 ruling
-   requires alongside the number, not fine print — they get the same legible
-   treatment as `.kpi-headline-slices`/`.kpi-headline-coverage`, never
-   display:none or near-invisible sizing at any breakpoint. */
+   bias/coverage disclosures (`.kpi-cost-shares-goodness`/
+   `.kpi-cost-shares-ignorance`/`.kpi-cost-shares-ignorance-basis`/
+   `.kpi-cost-coverage`) and the `.kpi-cost-usd-lines` are load-bearing
+   content the 2026-08-03 ruling requires alongside the number, not fine
+   print — they get the same legible treatment as
+   `.kpi-headline-slices`/`.kpi-headline-coverage`, never display:none or
+   near-invisible sizing at any breakpoint. LIN-2418 split the former single
+   `.kpi-cost-shares` span in two: the goodness group stays denominated over
+   `issueCount` (named by the sample line above it), while the ignorance
+   group carries its own basis span naming the `lineageBearingCount`
+   denominator it actually uses. */
 .kpi-cost-card {
   display: flex;
   flex-direction: column;
@@ -97,7 +103,9 @@ a.kpi-headline-value:hover {
   color: var(--fg-dim);
 }
 
-.kpi-cost-shares,
+.kpi-cost-shares-goodness,
+.kpi-cost-shares-ignorance,
+.kpi-cost-shares-ignorance-basis,
 .kpi-cost-coverage,
 .kpi-cost-usd-lines {
   font-family: var(--font-structural);
@@ -293,12 +301,15 @@ a.kpi-headline-value:hover {
     font-size: 1.75rem;
   }
 
-  /* The four shares + two coverage ratios + two USD lines are the ruling's
-     required disclosures, not decoration — they must stay fully legible
-     (never truncated, never nowrap-and-scroll) down to narrow viewports.
-     Normal wrapping at the existing " · " word breaks is enough on its own,
-     but the line-height is opened up here so wrapped lines don't crowd. */
-  .kpi-cost-shares,
+  /* The four shares (now two goodness + two ignorance, LIN-2418) + two
+     coverage ratios + two USD lines are the ruling's required disclosures,
+     not decoration — they must stay fully legible (never truncated, never
+     nowrap-and-scroll) down to narrow viewports. Normal wrapping at the
+     existing " · " word breaks is enough on its own, but the line-height is
+     opened up here so wrapped lines don't crowd. */
+  .kpi-cost-shares-goodness,
+  .kpi-cost-shares-ignorance,
+  .kpi-cost-shares-ignorance-basis,
   .kpi-cost-coverage,
   .kpi-cost-usd-lines {
     line-height: 1.6;

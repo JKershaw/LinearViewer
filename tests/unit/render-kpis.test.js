@@ -460,7 +460,8 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
         pricedLineageShare: null, attributableLineageShare: null, captureRateShare: null
       }
     }));
-    assert.ok(nullHtml.includes('close-out linked — · evidence linked — · opencode summed — · unknown harness —'), 'null shares render as dashes');
+    assert.ok(nullHtml.includes('close-out linked — · evidence linked —'), 'null goodness shares render as dashes');
+    assert.ok(nullHtml.includes('opencode summed — · unknown harness —'), 'null ignorance shares render as dashes');
     assert.ok(nullHtml.includes('priced lineages — · capture rate — · attributable lineages —'), 'null coverage ratios render as dashes');
 
     const zeroHtml = renderKpisPage(buildStats({
@@ -472,7 +473,8 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
         pricedLineageShare: 0, attributableLineageShare: 0, captureRateShare: 0
       }
     }));
-    assert.ok(zeroHtml.includes('close-out linked 0% · evidence linked 0% · opencode summed 0% · unknown harness 0%'), 'a genuine 0 must render as 0%, not be conflated with null');
+    assert.ok(zeroHtml.includes('close-out linked 0% · evidence linked 0%'), 'a genuine 0 must render as 0%, not be conflated with null (goodness group)');
+    assert.ok(zeroHtml.includes('opencode summed 0% · unknown harness 0%'), 'a genuine 0 must render as 0%, not be conflated with null (ignorance group) — this is the P2 real-0-vs-null render pin');
     assert.ok(zeroHtml.includes('priced lineages 0% · capture rate 0% · attributable lineages 0%'), 'a genuine 0 coverage ratio must render as 0%');
   });
 
@@ -560,7 +562,8 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     delete stats.terminalMarkedTaskCost;
     const html = renderKpisPage(stats);
     assert.ok(html.includes('<span class="kpi-cost-value">—</span>'));
-    assert.ok(html.includes('close-out linked — · evidence linked — · opencode summed — · unknown harness —'));
+    assert.ok(html.includes('close-out linked — · evidence linked —'));
+    assert.ok(html.includes('opencode summed — · unknown harness —'));
     assert.ok(html.includes('unresolved — · resolved overhead —'));
   });
 
