@@ -40,3 +40,68 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* Latest observer report panel (read-only, LIN-2395). */
+
+.flight-companion-observer-report {
+  color: var(--text);
+}
+
+.flight-companion-observer-narrative {
+  margin: 0 0 0.6rem;
+}
+
+.flight-companion-observer-lanes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+}
+
+.fc-obs-lane-name {
+  color: var(--muted);
+}
+
+.fc-obs-lane-count {
+  font-weight: 600;
+}
+
+.flight-companion-observer-flags {
+  margin: 0 0 0.6rem;
+  padding-left: 1.25rem;
+}
+
+.fc-obs-attention {
+  margin: 0 0 0.6rem;
+  padding-left: 1.25rem;
+  font-size: 0.9em;
+}
+
+.fc-obs-attention-lane {
+  color: var(--muted);
+}
+
+.fc-obs-attention-issue {
+  font-weight: 600;
+}
+
+.fc-obs-attention-overflow {
+  color: var(--muted);
+  font-size: 0.85em;
+  margin: 0 0 0.6rem;
+}
+
+.flight-companion-observer-meta {
+  color: var(--muted);
+  font-size: 0.85em;
+  margin: 0;
+}
+
+.flight-companion-observer-empty {
+  color: var(--muted);
+  margin: 0;
+}

@@ -66,6 +66,20 @@ describe('workspace feature defaults', () => {
     assert.ok(FEATURE_KEYS.includes(FEATURES.LINEAR_MCP));
     assert.ok(FEATURE_KEYS.includes(FEATURES.PROXY));
   });
+
+  // LIN-2395: the cloud observer pass's authority toggle. Ship the toggle,
+  // not an acting path — default OFF, on the workspace-scoped path only.
+  test('observerAuthority is a workspace feature, default off', () => {
+    assert.strictEqual(WORKSPACE_FEATURES.OBSERVER_AUTHORITY, 'observerAuthority');
+    assert.strictEqual(WORKSPACE_FEATURE_DEFAULTS.observerAuthority, false);
+    assert.ok(WORKSPACE_FEATURE_KEYS.includes('observerAuthority'));
+    assert.ok(isValidWorkspaceFeatureKey('observerAuthority'));
+  });
+
+  test('observerAuthority does not leak into the per-user FEATURES set', () => {
+    assert.strictEqual(isValidFeatureKey('observerAuthority'), false);
+    assert.strictEqual(FEATURE_KEYS.includes('observerAuthority'), false);
+  });
 });
 
 describe('isWorkspaceFeatureEnabled', () => {
