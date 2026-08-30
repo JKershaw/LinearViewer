@@ -23,7 +23,9 @@ Two consecutive editions failed to land an artifact on time. That is the single 
 
 ## 1. Risk × churn at HEAD — re-measured, not trusted
 
-`wc -l` × `git log --since=90.days --oneline -- <file>`, all tracked non-test `.js`/`.css`.
+`wc -l` × `git log --since=90.days --oneline -- <file>`, over **every tracked `.js`/`.css` in the repo, tests included**.
+
+> **This table was rebuilt after the adversarial second-read.** As first published it covered *"all tracked non-test `.js`/`.css`"* — which silently made "in scope" and "on the board" two different things, because §3a rules test-file *maintainability* **in scope**. The Tier-1 reader caught it (see the final section of this report), and the consequences were real: two in-remit files ranking above three graded surfaces carried no verdict at all, and §3a's stated deferral reason was false on this very metric. The board below is the corrected instrument; the findings and deferral reasons downstream were re-derived from it.
 
 | # | file | lines | 90d commits | risk×churn | structural owner |
 |---|---|---|---|---|---|
@@ -31,19 +33,26 @@ Two consecutive editions failed to land an artifact on time. That is the single 
 | 2 | **`server.js`** | 3,788 | 170 | 643,960 | LIN-1249 (Backlog) |
 | 3 | **`routes/workspace-api.js`** | 3,498 | 91 | 318,318 | LIN-2246 (In Progress, partial) |
 | 4 | `public/style.css` | 4,343 | 68 | 295,324 | — (08-23: no dead CSS; clean) |
-| 5 | **`lib/dispatch-store.js`** | 2,178 | 58 | 126,324 | **none — F2 mints one** |
-| 6 | **`routes/dashboard.js`** | 2,070 | 53 | 109,710 | **none — F6, deferred, see §3** |
-| 7 | `public/common.js` | 2,114 | 45 | 95,130 | LIN-2071 (mirror class) |
-| 8 | `lib/providers/linear/index.js` | 2,326 | 36 | 83,736 | LIN-1251 (Backlog) |
-| 9 | `routes/test.js` | 1,463 | 53 | 77,539 | — (test-only, not production surface) |
-| 10 | `public/app.js` | 2,271 | 34 | 77,214 | — (graded non-finding) |
-| 11 | `lib/render-settings.js` | 1,289 | 52 | 67,028 | — (baseline, below the line) |
-| 12 | `lib/openrouter.js` | 1,875 | 35 | 65,625 | LIN-1250 (Backlog) |
-| 13 | **`routes/dispatch.js`** | 1,524 | 41 | 62,484 | **none — F7, deferred, see §3** |
-| 14 | `lib/prompt-template-defs.js` | 1,303 | 47 | 61,241 | — (baseline) |
-| 15 | `public/observation.js` | 2,101 | 28 | 58,828 | — (clean result) |
-| 16 | **`lib/pipeline-loops.js`** | 1,572 | 27 | 42,444 | **none — F8, deferred, see §3** |
-| 17 | **`lib/providers/jira/index.js`** | 2,244 | 14 | 31,416 | **none — F3 mints one** |
+| **5** | **`tests/unit/prompt-templates.test.js`** | **4,063** | **61** | **247,843** | **none — §3a, deferred** |
+| **6** | **`tests/e2e/proxy.spec.js`** | **3,012** | **52** | **156,624** | **none — F10, added post-review** |
+| **7** | **`tests/unit/dashboard-routes.test.js`** | **3,415** | **42** | **143,430** | — (**clean result**, see F10) |
+| 8 | **`lib/dispatch-store.js`** | 2,178 | 58 | 126,324 | **none — F2 mints one** |
+| 9 | **`routes/dashboard.js`** | 2,070 | 53 | 109,710 | **none — F6, deferred, see §3** |
+| 10 | `public/common.js` | 2,114 | 45 | 95,130 | LIN-2071 (mirror class) |
+| 11 | `tests/unit/openrouter.test.js` | 2,431 | 39 | 94,809 | — (clean result, see F10) |
+| 12 | `lib/providers/linear/index.js` | 2,326 | 36 | 83,736 | LIN-1251 (Backlog) |
+| 13 | `routes/test.js` | 1,463 | 53 | 77,539 | — (test-only, not production surface) |
+| 14 | `public/app.js` | 2,271 | 34 | 77,214 | — (graded non-finding) |
+| 15 | `lib/render-settings.js` | 1,289 | 52 | 67,028 | — (baseline, below the line) |
+| 16 | `lib/openrouter.js` | 1,875 | 35 | 65,625 | LIN-1250 (Backlog) |
+| 17 | **`routes/dispatch.js`** | 1,524 | 41 | 62,484 | **none — F7, deferred, see §3** |
+| 18 | `lib/prompt-template-defs.js` | 1,303 | 47 | 61,241 | — (baseline) |
+| 19 | `public/observation.js` | 2,101 | 28 | 58,828 | — (clean result) |
+| 20 | **`lib/render.js`** | 1,147 | 45 | 51,615 | **none — F11, graded below** |
+| 21 | **`lib/pipeline-loops.js`** | 1,572 | 27 | 42,444 | **none — F8, deferred, see §3** |
+| 22 | **`lib/providers/jira/index.js`** | 2,244 | 14 | 31,416 | **none — F3 mints one** |
+
+**Net growth over the window tells the same story the ranking does.** By lines added minus deleted in 90 days: `routes/proxy.js` **+4,569**, then `tests/unit/dashboard-routes.test.js` **+3,415**, `tests/unit/jira-provider.test.js` **+3,200**, `tests/unit/prompt-templates.test.js` **+3,119**, `tests/e2e/proxy.spec.js` **+2,483**, `server.js` **+2,327**. **Four of the six fastest-growing files in the repo are test files** — precisely the mass the original board excluded.
 
 **The dominant complexity shape in this repo is the route-factory closure, and it recurs five times.** The largest genuine units in the tree are not handlers or algorithms — they are the closures that hold them:
 
@@ -104,8 +113,12 @@ Three of these five already have a decomposition ticket (LIN-2360, LIN-2246, LIN
 | 7 | **F4** | MED | 30-site `isTestMode` repetition | recorded, deferred |
 | 8 | **F7** | MED | `routes/dispatch.js` (62,484) | recorded, deferred — see §3 |
 | 9 | **F8** | MED-LOW | `lib/pipeline-loops.js` (42,444) | recorded, deferred |
+| — | **F10** | MED-HIGH | `tests/e2e/proxy.spec.js` (156,624) — **ranks 3rd** | **recorded — top unpromoted candidate** |
+| — | **F11** | LOW | `lib/render.js` (51,615) | recorded, below the line |
 
-**Why the mint set is F2, F9, F3 and not the top three by severity.** F1 and F5 rank 1st and 4th but are **unmintable by construction** — each already has a live owner (LIN-2360, LIN-2071), and minting against either would be the duplicate-ticket failure this review's §7 contract exists to prevent. The three minted are the three highest-severity findings **that no ticket owns**.
+**Why the mint set is F2, F9, F3.** F1 and F5 rank 1st and 4th but are **unmintable by construction** — each already has a live owner (LIN-2360, LIN-2071), and minting against either would be the duplicate-ticket failure this review's §7 contract exists to prevent.
+
+**F10 is the honest exception, and it is a process failure rather than a judgment call.** It ranks **3rd overall**, is unowned, and would have displaced F3 — but it was found by the **Tier-1 adversarial reader after the three tickets were already minted**, because §1's board excluded test files while §3a declared them in scope. The cap is 3 and the three that exist are sound, so F10 is recorded rather than minted, and named here and in §7 as the top candidate for the next run.
 
 
 ## F1 · **HIGH** — the `routes/proxy.js` decomposition is being outrun by the file's own growth while its stages are held
@@ -156,7 +169,7 @@ Three of these five already have a decomposition ticket (LIN-2360, LIN-2246, LIN
 
 **What.** Lines **`:220–:1020`** of `lib/providers/jira/index.js` — **801 of 2,244 lines, 36% of the file** — are a self-contained bidirectional Atlassian-Document-Format ↔ Markdown converter: `adfToMarkdown` (`:342`), `markdownToAdf` (`:565`), `adfHasUnrenderableContent` (`:982`), plus ~20 escaper / parser / renderer internals and three escape-pattern constants (`:220`–`:227`).
 
-**Second site.** `grep` over the whole tree returns **zero consumers of those three exports outside this file and `tests/unit/jira-provider.test.js`**. The codec has no caller in `routes/`, `lib/` or `public/` — it is used only through the provider methods that wrap it, and directly by its own test.
+**Second site.** `grep` over the whole tree returns **no consumer of those three exports in `routes/`, `lib/` or `public/`** — the codec has no production caller at all; it is reached only through the provider methods that wrap it. *(Correction, from the Tier-1 read: this report first wrote "zero consumers outside this file and `tests/unit/jira-provider.test.js`". That understated the test surface — the exports are also referenced by `tests/unit/proxy-jira-write-routes.test.js`, `tests/fixtures/jira-harness.js` and `tests/e2e/jira-provider.spec.js`. All four are tests, so the substantive claim — no production consumer, extraction is mechanical — stands; the count did not.)*
 
 **Why the extraction is mechanical and low-risk.** `lib/providers/jira/` **already demonstrates the convention**: it is a four-file directory (`index.js`, `client.js`, `fake-client.js`, `oauth.js`). Adding `adf.js` follows a split the directory has already made, not a new pattern. The region has a clean top and bottom boundary — the next symbol after it, `issuetypeIsEpic` (`:1021`), is unrelated provider logic.
 
@@ -302,6 +315,51 @@ The lib copy of `resolveCollisions` takes a `padding` argument its own caller pa
 
 ---
 
+## F10 · **MED-HIGH** — `tests/e2e/proxy.spec.js`: the #6 surface in the repo, 53 repeated blocks, and 3 helpers in 3,012 lines
+
+*Added after the Tier-1 adversarial second-read, which named it as the largest thing this report had missed. Every figure below was independently re-measured before it was written in.*
+
+**What.** **3,012 lines / 52 commits = 156,624 — #6 on the corrected board**, above the minted F2 (126,324), F3 (31,416) and F9 (16,647). It holds **145 tests, 19 `describe`s, 13 `beforeEach`s — and exactly 3 helper functions**, all three declared late and nested in one block: `:2487 expiresAtFor`, `:2541 seedEvent`, `:2550 seedDeadCredential`. **Lines 1–2,486 — roughly 130 tests — contain no extracted helper at all.**
+
+**Second site, measured with this review's own highest-yield instrument.** Running the same duplicate-block detection that produced F9, pointed *within* this one file: **53 distinct repeated ≥6-line verbatim blocks, covering 374 of its 2,218 significant lines (16%)**. For scale, **F9 — which this review minted — is 11 runs and 86 lines.** This single file carries **4.8× F9's run count and 4.3× its duplicated-line volume.**
+
+The dominant repeated block is a protocol contract written out by hand a dozen times (`:1880, :1901, :1930, :1960, :1985, :2007, :2029, :2213, :2279, :2382, :2430, …`):
+
+```js
+const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
+const { token: dispatchToken } = await tokenResponse.json();
+const pollResp = await request.get('/api/dispatch/poll', {
+  headers: { Authorization: `Bearer ${dispatchToken}` }
+});
+const { items } = await pollResp.json();
+```
+
+Alongside it: **215 hand-written `Bearer ${…}` authorization header lines** and **52 `/test/*` seam calls** in one file.
+
+**Why it is a cost and not merely a large number — the coupling measurement.** **45 of its 52 commits in the window (86%) also touched `routes/proxy.js` or `routes/dispatch.js` in the same commit.** This is the test surface that every change to the repo's #1 churn file drags along with it. Changing the dispatch-poll contract — the exact class **LIN-2160** exists to monitor on `routes/dispatch.js` — is a twelve-site hand-edit here, with no seam to change instead.
+
+**The in-repo counter-example that settles it.** This is **not** "e2e tests are just repetitive." `tests/unit/dashboard-routes.test.js` is **larger** (3,415 lines, 42 commits, #7 on the board) and carries **21 named factory helpers** — `getHandler:71`, `makeReqRes:77`, `makeRouter:93`, `activeItem:51`, `historyItem:54`, `decisionItem:240`, `scopedStore:2890`, … A 3,000-line test file in this repo has a demonstrated house structure, and `dashboard-routes.test.js` follows it. **`proxy.spec.js` is the outlier against its own repo's convention** — while importing only 2 of the 15 `tests/fixtures/` modules that **137 other test files** use.
+
+**Growth.** **+2,483 lines net in 90 days**, more than the minted F2's `lib/dispatch-store.js` (+1,686).
+
+**Not minted, and the reason is a process failure this report owns.** The ≤3 cap was spent on F2, F9 and F3 before the corrected board existed — had F10 been on the board at ranking time it would have displaced F3. Un-minting sound tickets to re-order them would churn the queue without changing what gets fixed, so **F10 and `tests/unit/prompt-templates.test.js` are recorded as the two top unpromoted candidates for the next run.**
+
+**Clean results found alongside it, so the verdict on test files is not one-sided:** `tests/unit/dashboard-routes.test.js` (143,430, #7) and `tests/unit/openrouter.test.js` (94,809, #11) are both **graded clean** — large and high-churn, but factored to the house convention.
+
+**Confidence: verified at HEAD, independently of the reader's measurements.**
+
+---
+
+## F11 · **LOW** — `lib/render.js` sits above a graded finding on the board and had never been weighed
+
+**What.** **1,147 lines / 45 commits = 51,615** — above **F8**'s `lib/pipeline-loops.js` (42,444), which this report does grade. It appeared in the original document only as a mirror *target* ("`lib/render.js` ×10" in §3c), never as a surface in its own right. Its largest unit is `renderDetailsContent` at **317 lines (`:804`)** — the same shape as F8's `_buildLoops` (384).
+
+**Verdict: below the promotion line, but recorded rather than omitted.** One large function in an otherwise well-factored render module, with churn below the top of the board. Raised because the Tier-1 reader used it to show the pool boundary was leaking in more than one direction — which it was.
+
+**Confidence: verified at HEAD.**
+
+---
+
 ## 3. Scope decisions — every widening candidate, decided and justified
 
 Ticket §1 asked for three widening calls and required the report to say which way each went and why. Operator ruling 2 added a fourth surface, and plan-review F1 added two more. All six are decided here.
@@ -320,7 +378,13 @@ The premise needed correcting before it could be acted on. Re-measured at HEAD, 
 
 The predictive signal is **fixture duplication**, and it is measurable in the top outlier. `tests/unit/prompt-templates.test.js` — **4,063 lines, 61 commits/90d, the repo's highest-churn test file** — contains **29 inline `const issue = {` literals** and **3 helper functions in 4,063 lines**. Meanwhile `tests/fixtures/` is an established convention with **137 importing test files** and 14 modules, and offers **no issue/context factory**.
 
-**Concrete cost:** adding a field to the recommendation-context contract means hand-editing ~29 fixtures in one file. **Recorded as a finding, not promoted** — it is a single bounded seam against an existing source of truth, and it does not out-rank F1–F3, F9. **This is deliberately not a licence to open a test-hygiene front**, and test *adequacy* remains Test Coverage Gap's.
+**Concrete cost:** adding a field to the recommendation-context contract means hand-editing ~29 fixtures in one file.
+
+**Recorded as a finding, not promoted — and the reason first given for that was wrong.** This report originally deferred it on the ground that *"it does not out-rank F1–F3, F9."* **On this review's own metric that is false**, and the Tier-1 reader was right to call it: `tests/unit/prompt-templates.test.js` is **247,843**, out-ranking the minted **F2** (126,324) by 2.0×, **F3** (31,416) by 7.9× and **F9** (16,647 combined) by 14.9×. The claim could not have been checked when it was made, because §1's board excluded the very file being ranked.
+
+**The honest reason it stays unpromoted** is not rank: the ≤3 cap was already spent on F2, F9 and F3 by the time the corrected board existed, and un-minting three sound tickets to re-order them would churn the queue for no gain in what actually gets fixed. Ticket §6c's *"a real finding that waits one cycle"* is the intended outcome for exactly this case. **It is recorded as a top unpromoted candidate for the next run**, jointly with F10.
+
+**This remains deliberately not a licence to open a test-hygiene front**, and test *adequacy* remains Test Coverage Gap's.
 
 ### b. The co-located `simple-dispatcher` repo → **IN SCOPE as a bounded first pass; recommend it gets its own lane**
 
@@ -403,6 +467,8 @@ Per ticket §6c, nothing found is lost, so the next run can promote what still m
 
   **Not minted, and not because it is small.** The cap is 3 and this run's three slots went to higher-severity product findings; more importantly the module is owned by **LIN-694** and **LIN-2323** (both Done), so the correct next step is a bug against that owner rather than a rival ticket minted from a review of a different repo surface. It is arguably a *correctness* finding rather than a maintainability one and therefore slightly off this review's altitude — **recorded here in full rather than dropped, because discovering it and losing it would be the worse error.** Flagged to the operator in this run's summary comment.
 
+- **F10 — `tests/e2e/proxy.spec.js`** (156,624; 53 repeated ≥6-line blocks over 16% of its significant lines; 3 helpers in 3,012 lines; 86% commit-coupled to `routes/proxy.js`/`routes/dispatch.js`). **The top unpromoted candidate for the next run**, jointly with the `prompt-templates.test.js` fixture finding above.
+- **F11 — `lib/render.js`** (51,615; `renderDetailsContent` 317 lines at `:804`) — above F8 on the board, below the promotion line on structure.
 - **`lib/render-settings.js`** (1,289/52; `renderSettingsPage` 311 lines at `:979`) and **`lib/prompt-template-defs.js`** (1,303/47) — high churn, flat template/data structure, no nesting, no duplication found. Baselines hold; still below the line.
 - **`simple-dispatcher` first pass** — §3b. Recorded with a recommendation for its own lane; deliberately no LinearViewer-lane tickets.
 
@@ -434,14 +500,15 @@ Two prior runs judged LIN-681 already resolved and recommended closing it; it is
 |---|---|---|
 | **LIN-2397** | **F9** — factor the shared GitHub App OAuth/installation flow out of `routes/github-auth.js` ↔ `routes/github-projects-auth.js` | 79% verbatim duplication in **two authentication flows**; a CSRF/expiry/account-establishment fix must currently land twice. Unowned, and invisible to four prior runs of size-ranking. |
 | **LIN-2398** | **F2** — decompose `lib/dispatch-store.js` (`addFeedback` 288 lines) | The **highest-ranked surface in the repo with no structural owner** (126,324, #5). Third consecutive run measuring it worsen; the 08-23 run explicitly named it as the next mint and ran out of cap. |
-| **LIN-2399** | **F3** — extract the 801-line ADF↔Markdown codec from `lib/providers/jira/index.js` | 36% of a provider module is a second concern with **zero consumers outside its own file and test**; `lib/providers/jira/` already demonstrates the split convention. The cheapest, highest-confidence structural win available. |
+| **LIN-2399** | **F3** — extract the 801-line ADF↔Markdown codec from `lib/providers/jira/index.js` | 36% of a provider module is a second concern with **no production consumer at all** (its only referencers are four test files); `lib/providers/jira/` already demonstrates the split convention. The cheapest, highest-confidence structural win available. |
 
 **Deliberately not minted, each with its reason on the record:**
 
 - **F1 (`routes/proxy.js`)** — **LIN-2360 owns it and is In Progress.** Cross-linked, never rivalled; no `routes/proxy.js` split is re-minted *(operator ruling 1)*.
 - **F5 (mirror divergence)** — **LIN-2071 owns the class.** The evidence, including the correction to its premise that LIN-1208 closed the ship pair, is posted to that ticket instead of a rival (comment `a54a9dbf`, 2026-08-30).
 - **F4, F6, F7, F8** — recorded in full; F6/F7/F8's deferral reason is in §3 (three tickets for the identical class are already open and unactioned; the bottleneck is capacity, not coverage).
-- **Test fixtures, `swim.js` connectors, 3 dead exports, `render-settings.js`, `simple-dispatcher`** — all below the promotion line, all recorded in §5.
+- **F10 (`tests/e2e/proxy.spec.js`) and the `prompt-templates.test.js` fixture finding** — **both out-rank minted findings on the corrected board** (156,624 and 247,843 against F3's 31,416 and F9's 16,647). Neither is minted because the cap was already spent when the Tier-1 adversarial read exposed the board error that hid them. **These two are the top unpromoted candidates for the next run** — see `## Adversarial Second-Read` for the full account of how this happened.
+- **F11 (`lib/render.js`), `swim.js` connectors, 3 dead exports, `render-settings.js`, `simple-dispatcher`, and the `periodical-report-gate` predicate defect** — all below the promotion line or outside this review's mint channel, all recorded in §5.
 - **LIN-681** — closed, not re-ticketed.
 
 All three were created in the **Backlog** (default) state so normal operations pick them up, and each carries its own negative search showing it duplicates no existing ticket.
@@ -483,16 +550,107 @@ All three were created in the **Backlog** (default) state so normal operations p
 
 ## Adversarial Second-Read
 
-*(completed after the report and follow-ups were written, before this task moved to Done — see the matching comment on LIN-2378)*
+**Tier used: Tier 1** — a wholly separate dispatched session (dispatch `598278fe-6f6b-4765-91fe-3bd999d04ea0`) with no memory of this run: it did not see the research pass, the plan, either plan-review, the escalation or the operator ruling. It was given only the report and the repo, and re-measured the repo itself at HEAD `b78c4499`. Its answer is on LIN-2378 as comment `88e860d5` and is reproduced **in full and unedited** below. *(Tier 3 — this session re-reading its own report — was not used and is not accepted.)*
 
-**Tier used:** *(recorded at completion — see below)*
+**The exact question put to it, cold:**
 
-**The exact question put to the reader, cold:**
+> **What is the largest item in this window that this report missed or misfiled?**
 
-> "What is the largest item in this window that this report missed or misfiled?"
+### The reader's full answer, verbatim
 
-**The reader's full answer:** *(recorded at completion — see below)*
 
-**Adversarial second-read verdict:** *(recorded at completion)*
-**Differed from top finding:** *(recorded at completion)*
-**Disposition:** *(recorded at completion)*
+I am a **separate session with no memory of the run that wrote this report**. I did not see its research, plan, plan-reviews or operator rulings. I read `docs/reviews/code-quality-review-2026-08-29.md` on `feat/lin-2378-code-quality-review-2026-08-29` (PR #1297) and re-measured the repo myself at HEAD `b78c4499`.
+
+**First, the calibration:** every non-test figure I independently re-measured matched exactly. The whole §1 risk×churn table reproduces to the digit. F2's method spans are right (`addFeedback` `lib/dispatch-store.js:1748`→`:2035` = **288**; `addItem` `:254`→`:435` = **182**; `_archiveItem` `:808`→`:946` = **139** — my first naive brace-counter said 260/157/70 and *it* was wrong, the report was right). F9 reproduces exactly: `routes/github-auth.js` has **302** significant lines, **241 (79.8%)** appear verbatim in `routes/github-projects-auth.js`, in **11 contiguous runs ≥6 lines totalling 86 lines**. This is a careful report. What follows is not a quibble about its arithmetic.
+
+---
+
+### The answer: the report's ranking instrument excludes half of its own declared remit, and the largest thing that fell through is `tests/e2e/proxy.spec.js` — never named once.
+
+**The misfiling is structural.** §1 builds the board — the instrument every promotion, deferral and "does not out-rank" call in this report is decided against — from *"all tracked non-test `.js`/`.css`"*. §3a then rules **test-file maintainability IN SCOPE**. So the report graded a scope it had excluded from its own ranking, and substituted an unranked size-distribution argument for it (*"file length is not the predictive signal here"*). That argument was run over `tests/unit/` only. **`tests/e2e/` — 73 files, 27,873 lines — was never examined at all** (`grep -c e2e` over the report → 1 hit, and it is a passing mention of LIN-2030).
+
+**Same metric, same command, same SHA, test files included:**
+
+| rank | file | lines | 90d | risk×churn | in report? |
+|---|---|---|---|---|---|
+| 1 | `routes/proxy.js` | 7,356 | 178 | 1,309,368 | F1 |
+| 2 | `server.js` | 3,788 | 170 | 643,960 | §4 |
+| 3 | `routes/workspace-api.js` | 3,498 | 91 | 318,318 | §2 |
+| 4 | `public/style.css` | 4,343 | 68 | 295,324 | §6 |
+| **5** | **`tests/unit/prompt-templates.test.js`** | **4,063** | **61** | **247,843** | §3a/§5, **unranked** |
+| **6** | **`tests/e2e/proxy.spec.js`** | **3,012** | **52** | **156,624** | **absent — 0 mentions** |
+| **7** | **`tests/unit/dashboard-routes.test.js`** | **3,415** | **42** | **143,430** | **absent — 0 mentions** |
+| 8 | `lib/dispatch-store.js` | 2,178 | 58 | 126,324 | **F2 — minted (LIN-2398)** |
+| 9 | `routes/dashboard.js` | 2,070 | 53 | 109,710 | F6 — deferred |
+| 13 | `routes/dispatch.js` | 1,524 | 41 | 62,484 | F7 — deferred |
+| 16 | `lib/pipeline-loops.js` | 1,572 | 27 | 42,444 | F8 — deferred |
+| 17 | `lib/providers/jira/index.js` | 2,244 | 14 | 31,416 | **F3 — minted (LIN-2399)** |
+| — | `routes/github-auth.js` + sibling | 577+526 | 17+13 | **16,647** | **F9 — minted (LIN-2397)** |
+
+**Three in-remit files out-rank the report's own #2 and #3 mints. Two of them are not named anywhere in the document.**
+
+#### 1. The deferral whose stated reason does not hold
+
+§3a promotes nothing from tests and states the reason: *"it does not out-rank F1–F3, F9."* On the report's own metric, of `tests/unit/prompt-templates.test.js`, **that is false** — 247,843 out-ranks F2 (126,324) by 2.0×, F3 (31,416) by 7.9×, and F9 (16,647 combined) by 14.9×. The finding may still deserve deferral, but not for the reason given, and the report could not have known because it never computed the number.
+
+#### 2. The miss: `tests/e2e/proxy.spec.js`, 3,012 lines / 52 commits / 156,624
+
+This clears the report's own three-part bar — `file:line` at HEAD, a second site or measured delta, and a change that would be risky.
+
+- **145 tests, 19 `describe`s, 14 `beforeEach`s — and exactly 3 helper functions**, all three nested inside one late block: `:2487 expiresAtFor`, `:2541 seedEvent`, `:2550 seedDeadCredential`. Lines 1–2,486 (≈130 tests) have **zero** extracted helpers.
+- **Ran the report's own highest-yield signal on it** — the cross-file duplicate-block detector that produced F9, pointed within one file: **53 distinct ≥6-line verbatim repeated blocks, covering 389 of 2,218 significant lines (18%)**. For scale, F9 — minted — is **11 runs / 86 lines**. This is **4.8× F9's run count and 4.5× its duplicated-line volume, inside a single file.**
+- **The dominant block is a protocol contract written out 12 times**, at `:1880, :1901, :1930, :1960, :1985, :2007, :2029, :2213, :2279, :2382, :2430, …`:
+  ```
+  const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
+  const { token: dispatchToken } = await tokenResponse.json();
+  const pollResp = await request.get('/api/dispatch/poll', {
+    headers: { Authorization: `Bearer ${dispatchToken}` }
+  });
+  const { items } = await pollResp.json();
+  ```
+  Plus **215 hand-written `Authorization: \`Bearer ${…}\`** header lines and **37** `/test/*-proxy-token` seam calls in one file.
+- **The measured coupling, which is what makes it a cost rather than a lead: 45 of its 52 commits in the window (87%) also touched `routes/proxy.js` or `routes/dispatch.js` in the same commit.** This is the test surface that every change to the repo's #1 churn file drags along. Changing the dispatch-poll contract — the exact class LIN-2160 exists to monitor on `routes/dispatch.js` — is a 12-site hand-edit here with no seam.
+- **Second site, in-repo, and it is the one that settles it:** `tests/unit/dashboard-routes.test.js` is **larger** (3,415 lines, 42 commits) and has **21 named factory helpers** — `getHandler:71`, `makeReqRes:77`, `makeRouter:93`, `activeItem:51`, `historyItem:54`, `decisionItem:240`, `scopedStore:2890` … So this is **not** "tests are just repetitive." A 3,000-line test file in this repo has a demonstrated house structure; `proxy.spec.js` is the outlier against it, while importing only 2 of the 15 `tests/fixtures/` modules that **138** other test files use.
+- **The growth delta.** Net **+2,483 lines in 90 days** — more than the minted F2's `lib/dispatch-store.js` (+1,686) and more than `server.js` (+2,327). Ranked by net growth in this window, **4 of the repo's top 5 files are test files** — and the instrument excluded all four.
+
+#### 3. A smaller supporting instance of the same blind spot
+
+`lib/render.js` — **1,147 × 45 = 51,615**, above F8 (42,444) which *was* graded — is mentioned once, only as a mirror target ("`lib/render.js` ×10"), never weighed. `renderDetailsContent` is **317 lines at `:804`**, the same shape as F8's `_buildLoops` (384). Not the headline; it just shows the pool boundary is leaking in more than one direction.
+
+---
+
+### What I am *not* claiming
+
+F1 is correctly handled — it is 8.4× my item on risk×churn, but it is neither missed nor misfiled: LIN-2360 owns it, the Stage 1 attribution correction for `lib/proxy-credential-trail.js` is right, and the erasure measurement (7,180 → 7,356, +176 since Stage 1) reproduces. F9's severity argument survives scrutiny. F5's `resolveCollisions` / `computeShipDimensions` divergences are real. F3's "zero consumers" is very slightly overstated — the exports are also referenced by `tests/e2e/jira-provider.spec.js`, `tests/fixtures/jira-harness.js` and `tests/unit/proxy-jira-write-routes.test.js`, not just `tests/unit/jira-provider.test.js` — but all are tests, so the substantive claim (no consumer in `routes/`, `lib/`, `public/`) holds and the finding stands.
+
+### Why this is DISAGREE and not a note
+
+Two things have to change for the report to be sound as it stands: §3a's stated deferral reason is factually false on the report's own metric, and the #6 surface in the repo by that metric — inside the declared remit, tightly coupled to the #1 surface — carries no verdict at all. §3 required a recorded verdict for every in-scope surface; `tests/e2e/` never got one because §1's pool boundary silently made "in scope" and "on the board" two different things. The fix is small and mechanical: build §1's table over the whole tracked tree, then defer explicitly with reasons that hold.
+
+I did not modify any file, open any PR, or change any ticket state.
+
+### What this report did in response
+
+The reader's central claim was **verified independently before any of it was written in**: the full-tree board reproduces exactly, `tests/e2e/proxy.spec.js` is 3,012 × 52 = 156,624, its 53 repeated ≥6-line blocks cover 374 of 2,218 significant lines, its three helpers are all at `:2487`/`:2541`/`:2550`, and **45 of its 52 commits (86%) also touch `routes/proxy.js` or `routes/dispatch.js`**. The criticism was correct, and is now fixed in the artifact:
+
+1. **§1's board was rebuilt over the whole tracked tree, tests included.** The original *"all tracked non-test `.js`/`.css`"* pool silently made "in scope" and "on the board" two different things while §3a declared test-file maintainability in scope. That was the root cause of everything else the reader found.
+2. **§3a's deferral reason was withdrawn as false.** *"It does not out-rank F1–F3, F9"* is wrong on this review's own metric — `tests/unit/prompt-templates.test.js` at 247,843 out-ranks F2 by 2.0×, F3 by 7.9× and F9 by 14.9×. The honest reason (the cap was spent before the corrected board existed) replaces it.
+3. **`tests/e2e/proxy.spec.js` was graded as F10**, with `tests/unit/dashboard-routes.test.js` (21 named helpers) recorded as the in-repo counter-example that makes it a genuine outlier rather than "tests are repetitive", and `tests/unit/openrouter.test.js` graded clean alongside it.
+4. **`lib/render.js` was graded as F11**, the reader's supporting instance of the same leaking pool boundary.
+5. **F3's "zero consumers" was corrected.** The ADF exports are referenced by four test files, not one. The substantive claim — no production consumer — stands; the count did not.
+
+**What did not change.** The reader explicitly did not dispute F1's handling, F9's severity argument, or F5's two confirmed divergences, and independently confirmed F2's method spans and F9's duplication figures. Those findings stand as written.
+
+**The cost this leaves on the record.** F10 ranks 3rd and would have displaced F3 in the mint set had the board been correct at ranking time. The ≤3 cap was already spent, and un-minting three sound tickets to re-order them would churn the queue without changing what gets fixed — so F10 and the `prompt-templates.test.js` fixture finding are carried as the two top unpromoted candidates for the next run. **This is a real cost of the instrument error, recorded rather than smoothed over.**
+
+### The three required fields, as the reader recorded them
+
+The reader's own values, reproduced unaltered — this report does not get to soften its own second-read:
+
+```
+Adversarial second-read verdict: DISAGREE
+Differed from top finding: YES
+Disposition: escalated
+```
+
+**A DISAGREE concludes this task normally.** Per ticket §6d the disagreement *is* the escalation — visible here and in comment `88e860d5` — and is not a reason to leave LIN-2378 open pending a human. The reader recorded `Disposition: escalated` from its own vantage, before this report acted; the five amendments above are what that escalation produced.
