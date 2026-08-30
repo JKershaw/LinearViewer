@@ -79,6 +79,22 @@
   color: var(--red);
 }
 
+/* Unattended-use consent status (LIN-2412) — distinct from .connected/
+   .disconnected above so a connected-and-consented render never puts two
+   elements under the same selector (openrouter-auth.spec.js locates the
+   connection status by `.settings-value.connected` alone). */
+.settings-value.consent-granted {
+  color: var(--green);
+}
+
+.settings-value.consent-pending {
+  color: var(--fg-dim);
+}
+
+.consent-notice {
+  max-width: 60ch;
+}
+
 .settings-form {
   display: inline;
   margin: 0;

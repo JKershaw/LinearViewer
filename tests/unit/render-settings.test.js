@@ -762,6 +762,53 @@ describe('renderSettingsPage — User/Workspace Settings groups (LIN-1399)', () 
   });
 });
 
+describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', () => {
+  test('oauth + no consent: shows the not-enabled status and an enable form posting to /auth/openrouter/consent, plus the blast-radius notice', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth', openRouterConsentedAt: null });
+    assert.match(html, /data-testid="settings-openrouter-consent-status"[^>]*>○ not enabled/);
+    assert.match(html, /action="\/auth\/openrouter\/consent" method="POST"/);
+    assert.match(html, /data-testid="settings-openrouter-consent-grant"/);
+    assert.match(html, /data-testid="settings-openrouter-consent-notice"/);
+    assert.match(html, /unattended work in every workspace/);
+  });
+
+  test('oauth + granted consent: shows the enabled status, no grant form, connection status locator stays single-match', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth', openRouterConsentedAt: '2026-08-01T00:00:00.000Z' });
+    assert.match(html, /data-testid="settings-openrouter-consent-status"[^>]*>✓ enabled/);
+    assert.doesNotMatch(html, /data-testid="settings-openrouter-consent-grant"/);
+    // openrouter-auth.spec.js locates the connection status by `.settings-value.connected`
+    // alone — the consent badge must never also carry that exact class pair.
+    const connectedMatches = html.match(/class="settings-value connected"/g) || [];
+    assert.equal(connectedMatches.length, 1, 'exactly one element may carry "settings-value connected" — the connection status, not the consent badge');
+  });
+
+  test('not connected: connect link is present alongside the blast-radius notice (no consent grant form — there is no key yet)', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: null });
+    assert.match(html, /class="action-btn connect"/);
+    assert.match(html, /data-testid="settings-openrouter-consent-notice"/);
+    assert.doesNotMatch(html, /data-testid="settings-openrouter-consent-grant"/);
+    assert.doesNotMatch(html, /data-testid="settings-openrouter-consent-status"/);
+  });
+
+  test('free tier: connect-for-unlimited link is present alongside the blast-radius notice', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'free' });
+    assert.match(html, /connect for unlimited/);
+    assert.match(html, /data-testid="settings-openrouter-consent-notice"/);
+  });
+
+  test('env source: no consent affordance and no blast-radius notice — there is no per-account durable key to consent for', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'env' });
+    assert.doesNotMatch(html, /data-testid="settings-openrouter-consent-status"/);
+    assert.doesNotMatch(html, /data-testid="settings-openrouter-consent-grant"/);
+    assert.doesNotMatch(html, /data-testid="settings-openrouter-consent-notice"/);
+  });
+
+  test('defaults to not-enabled when openRouterConsentedAt is omitted entirely (a caller that forgets to thread it fails closed, never silently "enabled")', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'oauth' });
+    assert.match(html, /○ not enabled/);
+  });
+});
+
 describe('renderSettingsPage — Dispatch preset per-kind (byKind) overrides (LIN-1400)', () => {
   test('the top-level config row is wrapped in a scoping marker distinct from per-kind rows', () => {
     const html = renderSettingsPage('Acme', {

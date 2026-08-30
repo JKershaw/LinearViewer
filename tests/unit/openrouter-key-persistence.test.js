@@ -111,6 +111,79 @@ describe('UserPreferencesStore OpenRouter key persistence', () => {
   });
 });
 
+// Durable unattended-use consent (LIN-2412) — mirrors the openRouterApiKey
+// round-trip tests above, since the two fields share the same read-merge
+// idiom and the same store.
+describe('UserPreferencesStore OpenRouter durable consent', () => {
+  let store;
+
+  beforeEach(() => {
+    store = new UserPreferencesStore({ collection: createMockCollection() });
+  });
+
+  test('getOpenRouterConsent returns null when nothing is stored', async () => {
+    assert.strictEqual(await store.getOpenRouterConsent(USER_ID), null);
+  });
+
+  test('set then get round-trips a non-null ISO timestamp', async () => {
+    await store.setOpenRouterConsent(USER_ID);
+    const consentedAt = await store.getOpenRouterConsent(USER_ID);
+    assert.ok(consentedAt, 'consent timestamp should be truthy');
+    assert.ok(!Number.isNaN(Date.parse(consentedAt)), 'consent timestamp should be a valid ISO-8601 string');
+  });
+
+  test('setOpenRouterConsent read-merges, preserving other preferences including the key', async () => {
+    await store.saveUserPreferences(USER_ID, {
+      features: { collective: true },
+      openRouterApiKey: 'sk-or-v1-keep',
+    });
+
+    await store.setOpenRouterConsent(USER_ID);
+
+    const prefs = await store.getUserPreferences(USER_ID);
+    assert.ok(prefs.openRouterDurableConsentAt);
+    assert.strictEqual(prefs.openRouterApiKey, 'sk-or-v1-keep');
+    assert.deepStrictEqual(prefs.features, { collective: true });
+  });
+
+  test('setOpenRouterConsent re-grant refreshes the timestamp (idempotent, not additive)', async () => {
+    await store.setOpenRouterConsent(USER_ID);
+    const first = await store.getOpenRouterConsent(USER_ID);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await store.setOpenRouterConsent(USER_ID);
+    const second = await store.getOpenRouterConsent(USER_ID);
+    assert.notStrictEqual(first, second, 're-granting should refresh the stored timestamp');
+  });
+
+  test('clearOpenRouterApiKey ALSO clears consent, in the same write, leaving other prefs intact', async () => {
+    await store.saveUserPreferences(USER_ID, {
+      features: { collective: true },
+      openRouterApiKey: 'sk-or-v1-drop',
+      openRouterDurableConsentAt: '2026-08-01T00:00:00.000Z',
+    });
+
+    await store.clearOpenRouterApiKey(USER_ID);
+
+    const prefs = await store.getUserPreferences(USER_ID);
+    assert.ok(!('openRouterApiKey' in prefs), 'key field should be removed');
+    assert.ok(!('openRouterDurableConsentAt' in prefs), 'consent field should be removed alongside the key');
+    assert.deepStrictEqual(prefs.features, { collective: true });
+    assert.strictEqual(await store.getOpenRouterConsent(USER_ID), null);
+  });
+
+  test('clearOpenRouterApiKey clears a lingering consent flag even when no key is present', async () => {
+    // Defensive case: consent without a key shouldn't survive a clear either.
+    await store.saveUserPreferences(USER_ID, { openRouterDurableConsentAt: '2026-08-01T00:00:00.000Z' });
+    await store.clearOpenRouterApiKey(USER_ID);
+    assert.strictEqual(await store.getOpenRouterConsent(USER_ID), null);
+  });
+
+  test('getOpenRouterConsent/setOpenRouterConsent return falsy/false for a missing accountId', async () => {
+    assert.strictEqual(await store.getOpenRouterConsent(undefined), null);
+    assert.strictEqual(await store.setOpenRouterConsent(undefined), false);
+  });
+});
+
 describe('applyUserPreferencesToSession (re-auth rehydration)', () => {
   test('re-auth survival: rehydrates openRouterApiKey into a regenerated session', () => {
     // A fresh, post-regenerate session has none of the durable fields.
