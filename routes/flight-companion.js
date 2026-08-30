@@ -54,7 +54,7 @@ export function createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSou
       // observer state — there is no ensureSeeded/advance call reachable
       // from request/render handling (LIN-2395).
       const observerReportDoc = observerStateStore
-        ? await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${workspace.urlKey}`)
+        ? await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${workspace.urlKey}`).catch(() => null)
         : null;
       const html = renderFlightCompanionPage(
         { prompt, observerReportDoc },

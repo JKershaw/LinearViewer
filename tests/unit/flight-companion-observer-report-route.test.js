@@ -209,4 +209,28 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
     assert.strictEqual(status, 200);
     assert.match(text, /No observer pass has run for this workspace yet\./);
   });
+
+  test('LIN-2410: a rejecting readCurrent degrades to the empty-state panel and still carries the kickoff prompt, instead of 500ing the whole page', async () => {
+    const observerStateStore = {
+      calls: [],
+      async readCurrent(instanceKey) {
+        this.calls.push({ method: 'readCurrent', instanceKey });
+        throw new Error('store unavailable');
+      },
+      async ensureSeeded() {
+        throw new Error('the Flight Companion route must never call ensureSeeded — read-only');
+      },
+      async advance() {
+        throw new Error('the Flight Companion route must never call advance — read-only');
+      }
+    };
+    const app = buildApp({ observerStateStore });
+    const { status, text } = await get(app, '/workspace/acme/flight-companion');
+    assert.strictEqual(status, 200);
+    assert.match(text, /No observer pass has run for this workspace yet\./);
+    // The page's primary deliverable — the kickoff prompt — must survive a
+    // rejecting observer-state read, not just the empty-state panel.
+    assert.match(text, /id="flight-companion-prompt"/);
+    assert.deepStrictEqual(observerStateStore.calls, [{ method: 'readCurrent', instanceKey: 'pass:v1:acme' }]);
+  });
 });
