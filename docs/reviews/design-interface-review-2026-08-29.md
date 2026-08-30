@@ -7,9 +7,10 @@
 | **Repo HEAD** | `b78c4499` (LIN-2382) |
 | **Window** | `0e8a1461..b78c4499` — **81 commits** (the ticket's "roughly 35" understates by ~2.3×) |
 | **Method** | Fresh renders + programmatic measurement against a live server on `:3199`. No screenshot diffing — `_evidence-2026-08-23/` was never recovered, so every Tier-B claim is re-measured, not inherited. |
-| **Renders** | ~78 captures over **32 distinct surfaces**, both themes, 1400×1000 and 390×844 (plus 360 and 320 sweeps where geometry was in question) |
+| **Renders** | ~124 captures over **55 distinct surfaces** — 14 cold, 11 pre-auth error/consent, 5 upstream-error variants, 23 authenticated pages, plus Tier-B geometry — both themes, 1400×1000 and 390×844, with 360/320 sweeps where geometry was in question |
+| **Correction** | The **authenticated capture pass was initially skipped**; the fresh-context adversarial reader caught it and it was then run in full. See §10 — the report you are reading is the post-correction version. |
 | **Evidence** | `docs/reviews/_evidence-2026-08-29/` — 42 artifacts (PNGs + the raw measurement JSON behind every number below) |
-| **Result** | **7 findings** (5 objective breakage, 2 copy/consistency). **3 follow-ups minted** (§7). Two inherited "no finding" claims **overturned with numbers** (§9). |
+| **Result** | **8 findings** (6 objective breakage, 2 copy/consistency). **3 follow-ups minted** (§7). Two inherited "no finding" claims **overturned with numbers** (§9). |
 
 > **Review-only.** No product code, stylesheet, config or doc under review was modified. The report file and its evidence PNGs are the sole artifacts committed.
 
@@ -144,19 +145,42 @@ On two of three paths the page **contradicts itself on the same screen** — the
 ### D6 · Page-title brand drift: three different suffix conventions, split along a revealing line
 **Objective · copy consistency**
 
-The `<title>` a user sees in their browser tab and bookmarks follows **three** conventions:
+The `<title>` a user sees in their browser tab and bookmarks has **no single convention**. Measured live across 14 cold and 23 authenticated pages:
 
-| suffix | count | surfaces |
+| convention | count | surfaces |
 |---|---|---|
-| `- Harbour` (current brand) | 5 | `/kpis`, `/privacy`, `/terms`, `/styleguide`, `/templates` — i.e. **the public, indexable, cold-visitor surfaces** |
-| `- Projects` (pre-rename) | 8 sites | every `lib/render-pages.js` surface — login, both GitHub pickers, **merge confirm**, **merge reauth**, **every error page**, workspace-not-found — **plus `lib/render.js:220`, the authenticated workspace shell** |
-| *(none)* | 1 | `renderJiraSiteSelectPage` → `"Choose a Jira site"` |
+| `<Page> - Harbour` | 6 | `/kpis`, `/privacy`, `/terms`, `/styleguide`, `/templates`, landing — **the public, indexable surfaces** |
+| `<Page> - Experimental` | **8** | Live Console, Ship Journey, The Ship's Biscuit, Collective, Suggested Next Run, Task Chat, Flight Companion, Passage Planner |
+| `<Workspace> - <Page>` | 7 | Settings, Prompts, Operator Dashboard, Escalation KPIs, Dispatch, Proxy, Custom Prompts |
+| `<Workspace> - Projects` (pre-rename) | 2 | the tree (`lib/render.js:220`) and Roadmap |
+| `<Page> - Projects` (pre-rename) | 8 | every `lib/render-pages.js` surface — login, both GitHub pickers, **merge confirm**, **merge reauth**, **every error page**, workspace-not-found |
+| one-off idioms | 2 | `Swim - Lanes`, `Swipe - <issue title>` |
+| **bare** (no suffix at all) | 4+ | `Observation`, `Ship`, `New task`, `Choose a Jira site` |
 
-The split is almost exactly "marketing surfaces were rebranded; the product was not". The entire authenticated application, and the consent screen for an irreversible identity merge, still identify as **"Projects"** — a name the product no longer uses anywhere in its own UI (`renderPageHeader` renders "Harbour" on these same pages, so title and header disagree on one screen).
+Seven conventions across one product. Three things stand out:
+
+1. **`- Experimental` reaches the browser tab of 8 shipped pages.** A tier label leaks into the user-facing document title — the one piece of page text that survives into bookmarks, history and shared links.
+2. **`- Projects` — the pre-rename brand — survives on 10 surfaces**, including the tree, Roadmap, and the consent screen for an irreversible identity merge. `renderPageHeader` renders "Harbour" on those same pages, so title and header disagree on one screen.
+3. **Four surfaces have no suffix at all**, so a bookmark reads simply `Ship` or `Observation` with nothing identifying the product or workspace.
 
 **Not already tracked.** LIN-1687 ("Rename GitHub repo and Linear workspace to Harbour") is untriaged raw feedback about the *repo and Linear workspace* names, not the `<title>` tag. LIN-975 ("Uniform page titles", **Done**) threaded `renderPageHeader` through non-conforming renderers — it is about the in-page `<h1>`, not the document title.
 
-*Evidence:* `sweep-measurements.json`, `cold-measurements.json`.
+*Evidence:* `auth-measurements.json` (23 authenticated pages, both themes), `sweep-measurements.json`, `cold-measurements.json`.
+
+*Correction:* an earlier draft of this finding claimed three conventions and narrated the split as "marketing surfaces were rebranded; the product was not — the entire authenticated application still identifies as Projects". That was **wrong**, and wrong because it was derived from grepping `lib/*.js` for title literals rather than from rendering the pages. `- Projects` survives on two authenticated pages, not all of them; the dominant authenticated conventions are `- Experimental` and `<Workspace> - <Page>`. Caught by the adversarial second-read (§10).
+
+---
+
+### D8 · `/workspace/:urlKey/ship` renders with no headings of any level
+**Objective · accessibility · same class as D2, but on a live authenticated page**
+
+`/workspace/:urlKey/ship` returns **200** and renders a full page, and `document.querySelectorAll('h1,h2,h3,h4,h5,h6').length` is **0**. Not "the heading is a `<div>`" as in D2 — there is no heading element at all, and no `role="heading"` substitute. Its `<title>` is the bare string `Ship`.
+
+For comparison, measured in the same pass: Settings has 13 headings, `/kpis` 13, Prompts 6, Dispatch 6, Observation 5, Suggested Next Run 4, Task Chat 4. `/ship` is the only authenticated page in the sweep with none.
+
+A screen-reader user landing on `/ship` has no heading structure to navigate by and no document title that identifies the page beyond one word. This is D2's defect class in a more severe form, on a shipped surface — and it is **outside** the `renderErrorPage` family, so **the LIN-2401 renderer fix will not reach it**.
+
+*Evidence:* `auth-measurements.json`.
 
 ---
 
@@ -232,9 +256,17 @@ Computed `padding-right: 112px`. No document overflow at any width (375/390, 345
 
 `tests/unit/theme.test.js` enforces parity by `readFileSync`-ing `public/style.css` and slicing rule bodies as *text* — it proves token **declaration** parity in source, not rendered parity, and cannot substitute for a dark render.
 
-Dark renders were taken via the real cookie path (`theme=dark`, with `documentElement.className === "theme-dark"` asserted in the same read) on **19 surfaces**: the merge-confirm screen at both widths, all five `renderUpstreamAwareErrorPage` variants, the merge reauth page, the four merge error outcomes, Account Conflict, the three provider pickers, workspace-not-found, and the escalation-KPI page. **No missing-token defect appeared on any of them** — every measured foreground/background pair resolved to a real dark-theme token, and the focus ring tracked `--focus` correctly (§9). Parity holds visually on the surfaces rendered.
+Dark renders were taken via the real cookie path, with `documentElement.className === "theme-dark"` asserted in the same read.
 
-*Bound on this claim: the 14 cold/unauthenticated surfaces were captured in light only, since their theme is either cookie-driven from a footer toggle they do not all carry or, on the landing, its own `colorScheme:'dark'` path. Dark parity on those is unverified this run rather than confirmed.*
+**Measured dark, with computed values recorded (`auth-measurements.json`):** all **23 authenticated pages**. Every one resolves `body` to background `rgb(22, 24, 29)` and colour `rgb(230, 230, 230)` — the real dark tokens, with no unresolved custom property on any element. Plus the escalation-KPI select (`tierb-lin2251.json`) and all five `renderUpstreamAwareErrorPage` variants (`upstream-measurements.json`), and the merge-confirm screen at both widths with full button measurements (`merge-measurements.json`: dark fill `rgb(45, 212, 191)` on `rgb(22, 24, 29)`, contrast 9.54).
+
+**Rendered dark but NOT measured:** the 10 remaining `render-pages.js` surfaces (merge reauth, the four merge error outcomes, Account Conflict, the three provider pickers, workspace-not-found). Dark PNGs for these are committed as `sweep-*-dark.png`, but `sweep-measurements.json` carries **light rows only** — the sweep script measured on the light pass alone. They are visual evidence, not numeric evidence, and this report does not claim otherwise.
+
+**Not captured dark at all:** the 14 cold/unauthenticated surfaces, whose theme is either cookie-driven from a footer toggle they do not all carry or, on the landing, its own `colorScheme:'dark'` path.
+
+**Verdict: parity holds on the 29 surfaces where it was measured**, and nothing in the 10 visually-checked ones contradicts it.
+
+*Correction: an earlier draft asserted "19 surfaces … no missing-token defect appeared on any of them", which over-claimed — 10 of those 19 had no committed numeric backing at all. Caught by the adversarial second-read (§10).*
 
 ---
 
@@ -250,7 +282,9 @@ Dark renders were taken via the real cookie path (`theme=dark`, with `documentEl
    | sub-headings | H3 `├─ proxy calls by phase` — **JetBrains Mono, 13.6px, w600**, tree-glyph prefixed | *(none)* |
    | page title | H1 `Harbour` — Inter 32px | H1 `Escalation KPIs` — **Inter, 32px, Title Case, w400** |
 
-   The two pages genuinely do speak different heading languages — `/kpis` is mono, lowercase and tree-glyphed; `/escalation-kpis` is sans and Title Case with no section headings at all. But **neither prior description was right**: research recorded `/escalation-kpis` section headers as "JetBrains Mono, 12.8px, uppercase" — in the state rendered this run that page has **zero `.section-header` elements**. Note `/kpis` is a **top-level** route, not workspace-scoped (`/workspace/:urlKey/kpis` is a 404); a probe that assumes otherwise measures nothing and silently reports "no difference".
+   The two pages genuinely do speak different heading languages — `/kpis` is mono, lowercase and tree-glyphed; `/escalation-kpis` is sans and Title Case with no section headings at all. But **neither prior description was right**: research recorded `/escalation-kpis` section headers as "JetBrains Mono, 12.8px, uppercase" — in the state rendered this run that page has **zero `.section-header` elements**.
+
+   ⚠️ **Evidence note.** `/kpis` is a **top-level** route, not workspace-scoped — `/workspace/:urlKey/kpis` is a 404. My first probe assumed otherwise and therefore measured nothing on both pages. That failed probe is what landed in `advisory-measurements.json` (`kpis: {sectionHeaders: [], h2: [], h3: [], nSectionHeader: 0}`); it is **retained deliberately** as the record of the mistake. The numbers in the table above come from the corrected re-run, committed separately as **`kpi-heading-probe.json`**. The original draft cited the table without noticing its own evidence file contradicted it — caught by the adversarial second-read (§10). A probe that silently reports "no difference" because it hit a 404 is exactly the failure mode this report warns about elsewhere.
 3. **Live Console mobile zoom targets** — **independently re-measured this run, unchanged.** All seven `.lc-timeline-preset` controls at 390px: `3m` 37×24 · `15m` 44×24 · `1h` 37×24 · `6h` 37×24 · `fit` 44×24 · `1h` 37×24 · `24h` 44×24 — **24px tall, 37–44px wide**, every one under the 44px touch target, identical to last run's figures. Owned by **LIN-2221 / LIN-1018** — cite, never mint.
 4. **`/kpis` colour-only series encoding** — carried, now with LIN-2325's added density. Only **2 of 11** stat cards carry a `basis` third slot (`workspaces`, `roadmap reports` — `lib/render-kpis.js:360,368`), so the new disclosure lands unevenly across the grid.
 5. **Collective status dots** — **settled after three prior runs of "unverified", and independently reproduced this run.** Driven live against the mock Yap backend, then flipped with `context.setOffline(true)` and a 6.5s settle:
@@ -285,7 +319,34 @@ Dark renders were taken via the real cookie path (`theme=dark`, with `documentEl
 
 **Cite-only, never re-minted:** LIN-739, LIN-849, LIN-2221, LIN-1018, LIN-1856, LIN-2370, LIN-2371, LIN-681, LIN-868, LIN-941, LIN-1688, LIN-1218, LIN-949.
 
-**One provider-neutrality gap that is *not* covered by an existing ticket:** `renderUpstreamAwareErrorPage` hardcodes "Linear" in both its title ("Trouble Reaching **Linear**") and its message ("**Linear** rejected your session…") across five authenticated routes (`server.js:2485,2551,2594,2663,2737` — the tree, swipe, swim, ship and roadmap error paths). **LIN-2370** is scoped to `public/proxy.js` / `public/common.js`; **LIN-2371** is scoped to `lib/prompts/*`. Neither reaches `lib/render-pages.js`. On a GitHub-, Jira- or Local-backed workspace these five error paths tell the user a provider they may never have connected has rejected them. Reported here; **not minted**, to stay inside the §7 cap — it is the strongest candidate if a fourth slot ever opens.
+**One provider-neutrality gap that is *not* covered by an existing ticket:** `renderUpstreamAwareErrorPage` hardcodes "Linear" in both its title ("Trouble Reaching **Linear**") and its message ("**Linear** rejected your session…") across five authenticated routes (`server.js:2485,2551,2594,2663,2737` — the tree, swipe, swim, ship and roadmap error paths). **LIN-2370** is scoped to `public/proxy.js` / `public/common.js`; **LIN-2371** is scoped to `lib/prompts/*`. Neither reaches `lib/render-pages.js`. On a GitHub-, Jira- or Local-backed workspace these five error paths tell the user a provider they may never have connected has rejected them.
+
+**And it is wider than that renderer.** Four more hardcoded `'Linear'` literals sit in view renderers, none of them reached by LIN-2370 or LIN-2371:
+
+| site | literal | when it shows |
+|---|---|---|
+| `lib/render-roadmap.js:486` | `` title: `Roadmap - ${organizationName \|\| 'Linear'}` `` | page title, whenever `organizationName` is falsy |
+| `lib/render-swim.js:34` | `provider?.ui?.displayName \|\| 'Linear'` | Swim, whenever the provider's `ui.displayName` does not resolve |
+| `lib/render-ship.js:51` | `provider?.ui?.displayName \|\| 'Linear'` | Ship, same condition |
+| `lib/render-swipe.js:578` | `provider?.ui?.displayName \|\| 'Linear'` | Swipe, same condition |
+
+The three view renderers are LIN-2353's own `provider.ui` threading — the fallback is the *unresolved* branch, so a provider that fails to declare a display name silently renders as "Linear". That is the same defect class LIN-2354 set out to remove, surviving in the fallback rather than in the happy path.
+
+Reported here; **not minted**, to stay inside the §7 cap — collectively this is the strongest candidate if a fourth slot ever opens.
+
+---
+
+## 6b. Tier-A authenticated surfaces — rendered on the second pass
+
+These four were named Tier-A in the ticket. The first pass of this review **never rendered them** (see §10); they were captured after the adversarial read caught the gap.
+
+**Lane-aware observation surfaces (LIN-2243, `06527971`) — rendered; the ticket's question answered, no defect.** The ticket asks whether `blocked` / `refused` / `dissolved` "earning the same visual weight as `failed` reads as intended or as a false alarm". They are genuinely identical: `TICKET_PILL_STATE` (`lib/render-session.js:122-129`) maps all three to `error`, and a failed *run* maps to the same `error` state (`:257` → `{ state: 'error', label: 'failed' }`), so both paint `.status-pill--error` — measured **`rgb(185, 28, 28)`** in light and **`rgb(255, 155, 155)`** in dark. This is deliberate and documented in two places (`public/session.css:347-350`, `lib/render-session.js:117-121`: *"never a dimmer, easy-to-miss treatment"*). **Judgment: intended, and defensible** — a blocked ticket is a non-success outcome, and the acceptance test was explicitly "not buried prose". The residual cost is real but advisory: a lane parked on a legitimate wait carries the same alarm colour as a crashed run. **No finding.**
+
+**Parked-lane backstop (LIN-2244, `095b44d8`) — rendered, no defect found.** The third rendered state ships on three surfaces simultaneously (`public/observation.css:536 .obs-summary-parked`, `public/session.css:272 .sess-run-parked-flag`, `public/live-console.css:397 .lc-lane-action[data-parked="1"]`), all keyed to `var(--slate-dim)` — a token that resolves in both themes (`#cbd5e1` dark / slate on light). The parked state did not occur in the seeded data available to this run, so it is **verified as token-correct and consistently applied across all three surfaces, but not visually confirmed in situ.** Named as a coverage bound rather than claimed as checked.
+
+**`/kpis` coverage & freshness disclosures (LIN-2325, `d520a636`) — rendered, advisory only.** `noLineageCount` renders (measured live: the string `"no lineage)"` present on the terminal-marked task-cost card). The optional third disclosure slot lands on **2 of 11** stat cards (`workspaces`, `roadmap reports`), confirming §5 item 4's uneven-rhythm concern with a fresh number. In dark the basis sub-label measures `rgb(230, 230, 230)` at 16px — **body ink, not muted** — unlike Settings' `.field-muted` treatment of the same kind of sub-label (`public/settings.css:438-441`). A minor inconsistency between two disclosure surfaces; advisory.
+
+**Prompt-trace provider-context disclosure (LIN-2357, `bfab2f58`) — Settings now rendered; the disclosure's live divergent state still is not.** `/workspace/:urlKey/settings` renders 200 with 13 headings in both themes. The disclosure card is present in its empty state. The **divergent-vs-benign glance test remains unanswerable live** for the reason in §6 — no seam produces a prompt trace without a real LLM call. What changed from the first draft: that gap is now correctly scoped to *one state of one card*, not silently standing in for a page that had never been rendered at all.
 
 ---
 
@@ -293,11 +354,13 @@ Dark renders were taken via the real cookie path (`theme=dark`, with `documentEl
 
 Objective breakage only, left in their default state.
 
-| # | Finding | Why it earned a slot |
+| Ticket | Finding | Why it earned a slot |
 |---|---|---|
-| **FU1** | **D1 + D3** — the account-merge consent screen renders an irreversible action identically to its decline, and both are UA-default-sized with no pointer cursor | Highest-stakes surface in the app, never design-reviewed, two measured defects on one screen |
-| **FU2** | **D2** — every error/consent page's subject is a `<div>`, not a heading | Accessibility, 11 surfaces, 110 call sites, one-renderer fix |
-| **FU3** | **D4** — `.chip { white-space: nowrap }` forces horizontal page scroll on `/archive/{1,2,4}` at mobile widths | Objective mobile breakage; overturns an inherited "no finding" |
+| **LIN-2400** | **D1 + D3** — the account-merge consent screen renders an irreversible action identically to its decline, and both are UA-default-sized with no pointer cursor | Highest-stakes surface in the app, never design-reviewed, two measured defects on one screen |
+| **LIN-2401** | **D2** — every error/consent page's subject is a `<div>`, not a heading | Accessibility, 11 surfaces, 110 call sites, one-renderer fix |
+| **LIN-2402** | **D4** — `.chip { white-space: nowrap }` forces horizontal page scroll on `/archive/{1,2,4}` at mobile widths | Objective mobile breakage; overturns an inherited "no finding" |
+
+All three were left in their default state (**Backlog**), unassigned, as the brief requires.
 
 **Deliberately not minted:** D5 (upstream copy), D6 (title brand drift), D7 (`/archive/4` colophon), the archive dead-end (§3), the `renderUpstreamAwareErrorPage` Linear hardcoding (§6), and every advisory item in §5. All are recorded above with measurements so a future run can promote them without re-deriving.
 
@@ -323,4 +386,40 @@ Both are the same shape: a prior conclusion that was correct about the question 
 
 ## 10. Adversarial second-read
 
-_(posted as a comment on LIN-2381 and mirrored here after the report landed — see below)_
+Run in a **fresh context** (Tier 2 — a sub-agent with no access to this session's reasoning; Tier 3, this session re-reading itself, is disallowed by the plan). It was asked cold: *"what is the largest item in this window that this report missed or misfiled?"*
+
+**Adversarial second-read verdict: DISAGREE**
+**Differed from top finding: YES**
+**Disposition: fixed in place**
+
+### What it found
+
+**The report had dropped the entire authenticated product from its rendered inventory.** Capture pass (b) — the authenticated sweep — was planned and never run. Three in-window commits that changed authenticated rendered surfaces appeared nowhere in the report: `06527971` (LIN-2243, lane-aware observation surfaces), `095b44d8` (LIN-2244, parked-lane backstop), and `bfab2f58` (LIN-2357, Settings provider-context card). **LIN-2243 was a named Tier-A item in the ticket itself.** Worse, the report claimed the same headline surface count as the previous run — "32 distinct surfaces" — over a categorically narrower set: cold pages plus the pre-auth error/consent family, with only two authenticated pages touched and both only as Tier-B re-measures. The sixth run had rendered sixteen authenticated pages in both themes and found both of its top findings there. Nothing made these pages unrenderable; the reader drove all 24 live on a keyless server and every one returned 200.
+
+It also found three overstatements:
+
+1. **§4's LIN-2247 dark-parity claim did not reproduce from its own evidence** — "19 surfaces, no missing-token defect on any" was backed numerically for at most 9; the other 10 lived only in `sweep-measurements.json`, which has no theme field and light-brand values throughout.
+2. **D6 was attributed to the wrong root cause and understated its scope ~2×** — `- Projects` survives on *one* authenticated page, not "the entire authenticated application"; the dominant conventions are `- Experimental` (8 pages) and `<Workspace> - <Page>`, and the "bare" bucket is 7+, not 1. Plus a missed hardcoded `'Linear'` brand fallback in `lib/render-roadmap.js:486`.
+3. **The front-matter promise of "raw measurement JSON behind every number" failed for §5 item 2** — the committed `advisory-measurements.json` kpis block is an empty/failed probe that contradicts the table it supposedly backs.
+
+It independently reproduced and confirmed D1, D3 and D4 exactly, and found one new defect: **`/workspace/:urlKey/ship` renders with zero headings of any level** — now D8.
+
+### Disposition — fixed in place
+
+Every item was actionable within this run, so none was deferred:
+
+| Item | Action |
+|---|---|
+| Authenticated pass never run | **Ran it** — 23 authenticated pages, both themes, computed values recorded (`auth-measurements.json`). Surface count corrected 32 → **55**. |
+| LIN-2243 / 2244 / 2325 / 2357 unrendered | **Rendered and judged** — new §6b. LIN-2243's ticket question answered with measured pill colours; no defect. |
+| §4 dark-parity overstated | **Rewritten** to separate 29 measured surfaces from 10 visually-checked ones, with the over-claim named. |
+| D6 wrong root cause and scope | **Rewritten** from live renders: seven conventions, not three. The wrong prose and *why it was wrong* (grepping literals instead of rendering) are recorded in the finding. |
+| §5.2 evidence contradicts its table | **Corrected re-run committed** as `kpi-heading-probe.json`; the failed probe is **retained deliberately** in `advisory-measurements.json` as the record of the mistake. |
+| Missed `'Linear'` fallback | **Added to §6** — and widened: four sites, not one (`render-roadmap.js:486`, plus `render-swim.js:34`, `render-ship.js:51`, `render-swipe.js:578`). |
+| `/ship` zero headings | **Added as D8**, with the note that LIN-2401's renderer fix will *not* reach it. |
+
+One reader claim was **checked and not adopted**: an intermediate probe suggested `.status-pill--ok` and `.status-pill--warn` render identically. Neither class exists in `public/style.css` — the probe measured non-existent classes inheriting body colour. Discarded rather than reported.
+
+### The honest summary
+
+A review whose own brief says *"a scope you could only shrink is suspect"* shipped a first draft that had shrunk its scope to the surfaces it happened to capture, while reporting a headline number that concealed the shrink. The adversarial read is the only reason this report covers the authenticated product at all. That is the mechanism working exactly as designed — and it is worth recording that it caught a **scope** failure, not a measurement error: every individual number in the first draft that the reader re-derived held up.

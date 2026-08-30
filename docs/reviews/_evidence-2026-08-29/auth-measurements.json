@@ -1,0 +1,780 @@
+[
+  {
+    "page": "tree",
+    "theme": "light",
+    "status": 200,
+    "title": "Test Workspace - Projects",
+    "nHeadings": 1,
+    "h1": [
+      "Test Workspace"
+    ],
+    "firstHeading": "H1:Test Workspace",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "observation",
+    "theme": "light",
+    "status": 200,
+    "title": "Observation",
+    "nHeadings": 5,
+    "h1": [
+      "Observation ● live"
+    ],
+    "firstHeading": "H1:Observation ● live",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "settings",
+    "theme": "light",
+    "status": 200,
+    "title": "Test Workspace - Settings",
+    "nHeadings": 13,
+    "h1": [
+      "Settings"
+    ],
+    "firstHeading": "H1:Settings",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "live-console",
+    "theme": "light",
+    "status": 200,
+    "title": "Live Console - Experimental",
+    "nHeadings": 1,
+    "h1": [
+      "Live Console"
+    ],
+    "firstHeading": "H1:Live Console",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "roadmap",
+    "theme": "light",
+    "status": 200,
+    "title": "Test Workspace - Projects",
+    "nHeadings": 1,
+    "h1": [
+      "Test Workspace"
+    ],
+    "firstHeading": "H1:Test Workspace",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "dispatch",
+    "theme": "light",
+    "status": 200,
+    "title": "Test Workspace - Settings",
+    "nHeadings": 13,
+    "h1": [
+      "Settings"
+    ],
+    "firstHeading": "H1:Settings",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "prompts",
+    "theme": "light",
+    "status": 200,
+    "title": "Test Workspace - Prompts",
+    "nHeadings": 6,
+    "h1": [
+      "Prompts"
+    ],
+    "firstHeading": "H1:Prompts",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "custom-prompts",
+    "theme": "light",
+    "status": 404,
+    "title": "Error",
+    "nHeadings": 0,
+    "h1": [],
+    "firstHeading": null,
+    "htmlClass": "",
+    "bodyBg": "rgba(0, 0, 0, 0)",
+    "bodyColor": "rgb(0, 0, 0)",
+    "scrollW": 1400,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "proxy",
+    "theme": "light",
+    "status": 200,
+    "title": "Test Workspace - Settings",
+    "nHeadings": 13,
+    "h1": [
+      "Settings"
+    ],
+    "firstHeading": "H1:Settings",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "audit",
+    "theme": "light",
+    "status": 200,
+    "title": "Test Workspace - Operator Dashboard",
+    "nHeadings": 1,
+    "h1": [
+      "Operator Dashboard"
+    ],
+    "firstHeading": "H1:Operator Dashboard",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "escalation-kpis",
+    "theme": "light",
+    "status": 200,
+    "title": "Test Workspace - Escalation KPIs",
+    "nHeadings": 1,
+    "h1": [
+      "Escalation KPIs"
+    ],
+    "firstHeading": "H1:Escalation KPIs",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "swim",
+    "theme": "light",
+    "status": 200,
+    "title": "Swim - Lanes",
+    "nHeadings": 1,
+    "h1": [
+      "Swim"
+    ],
+    "firstHeading": "H1:Swim",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "swipe",
+    "theme": "light",
+    "status": 200,
+    "title": "Swipe - TEST-13 Login fails with special characters in password",
+    "nHeadings": 1,
+    "h1": [
+      "Swipe"
+    ],
+    "firstHeading": "H1:Swipe",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "ship",
+    "theme": "light",
+    "status": 200,
+    "title": "Test Workspace - Settings",
+    "nHeadings": 13,
+    "h1": [
+      "Settings"
+    ],
+    "firstHeading": "H1:Settings",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "ship-journey",
+    "theme": "light",
+    "status": 200,
+    "title": "Ship Journey - Experimental",
+    "nHeadings": 1,
+    "h1": [
+      "Ship Journey"
+    ],
+    "firstHeading": "H1:Ship Journey",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "ship-biscuit",
+    "theme": "light",
+    "status": 200,
+    "title": "The Ship's Biscuit - Experimental",
+    "nHeadings": 3,
+    "h1": [
+      "The Ship's Biscuit"
+    ],
+    "firstHeading": "H1:The Ship's Biscuit",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "collective",
+    "theme": "light",
+    "status": 200,
+    "title": "Collective - Experimental",
+    "nHeadings": 3,
+    "h1": [
+      "Collective"
+    ],
+    "firstHeading": "H1:Collective",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "next-run",
+    "theme": "light",
+    "status": 200,
+    "title": "Suggested Next Run - Experimental",
+    "nHeadings": 4,
+    "h1": [
+      "Suggested Next Run"
+    ],
+    "firstHeading": "H1:Suggested Next Run",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "task-chat",
+    "theme": "light",
+    "status": 200,
+    "title": "Task Chat - Experimental",
+    "nHeadings": 4,
+    "h1": [
+      "Task Chat"
+    ],
+    "firstHeading": "H1:Task Chat",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "flight-companion",
+    "theme": "light",
+    "status": 200,
+    "title": "Flight Companion - Experimental",
+    "nHeadings": 3,
+    "h1": [
+      "Flight Companion"
+    ],
+    "firstHeading": "H1:Flight Companion",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "passage-planner",
+    "theme": "light",
+    "status": 200,
+    "title": "Passage Planner - Experimental",
+    "nHeadings": 3,
+    "h1": [
+      "Passage Planner"
+    ],
+    "firstHeading": "H1:Passage Planner",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "task-create",
+    "theme": "light",
+    "status": 200,
+    "title": "New task",
+    "nHeadings": 2,
+    "h1": [
+      "New task"
+    ],
+    "firstHeading": "H1:New task",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "kpis-auth",
+    "theme": "light",
+    "status": 200,
+    "title": "KPIs - Harbour",
+    "nHeadings": 13,
+    "h1": [
+      "Harbour"
+    ],
+    "firstHeading": "H1:Harbour",
+    "htmlClass": "",
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(26, 26, 26)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "tree",
+    "theme": "dark",
+    "status": 200,
+    "title": "Test Workspace - Projects",
+    "nHeadings": 1,
+    "h1": [
+      "Test Workspace"
+    ],
+    "firstHeading": "H1:Test Workspace",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "observation",
+    "theme": "dark",
+    "status": 200,
+    "title": "Observation",
+    "nHeadings": 5,
+    "h1": [
+      "Observation ● live"
+    ],
+    "firstHeading": "H1:Observation ● live",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "settings",
+    "theme": "dark",
+    "status": 200,
+    "title": "Test Workspace - Settings",
+    "nHeadings": 13,
+    "h1": [
+      "Settings"
+    ],
+    "firstHeading": "H1:Settings",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "live-console",
+    "theme": "dark",
+    "status": 200,
+    "title": "Live Console - Experimental",
+    "nHeadings": 1,
+    "h1": [
+      "Live Console"
+    ],
+    "firstHeading": "H1:Live Console",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "roadmap",
+    "theme": "dark",
+    "status": 200,
+    "title": "Test Workspace - Projects",
+    "nHeadings": 1,
+    "h1": [
+      "Test Workspace"
+    ],
+    "firstHeading": "H1:Test Workspace",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "dispatch",
+    "theme": "dark",
+    "status": 200,
+    "title": "Test Workspace - Settings",
+    "nHeadings": 13,
+    "h1": [
+      "Settings"
+    ],
+    "firstHeading": "H1:Settings",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "prompts",
+    "theme": "dark",
+    "status": 200,
+    "title": "Test Workspace - Prompts",
+    "nHeadings": 6,
+    "h1": [
+      "Prompts"
+    ],
+    "firstHeading": "H1:Prompts",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "custom-prompts",
+    "theme": "dark",
+    "status": 404,
+    "title": "Error",
+    "nHeadings": 0,
+    "h1": [],
+    "firstHeading": null,
+    "htmlClass": "",
+    "bodyBg": "rgba(0, 0, 0, 0)",
+    "bodyColor": "rgb(0, 0, 0)",
+    "scrollW": 1400,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "proxy",
+    "theme": "dark",
+    "status": 200,
+    "title": "Test Workspace - Settings",
+    "nHeadings": 13,
+    "h1": [
+      "Settings"
+    ],
+    "firstHeading": "H1:Settings",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "audit",
+    "theme": "dark",
+    "status": 200,
+    "title": "Test Workspace - Operator Dashboard",
+    "nHeadings": 1,
+    "h1": [
+      "Operator Dashboard"
+    ],
+    "firstHeading": "H1:Operator Dashboard",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "escalation-kpis",
+    "theme": "dark",
+    "status": 200,
+    "title": "Test Workspace - Escalation KPIs",
+    "nHeadings": 1,
+    "h1": [
+      "Escalation KPIs"
+    ],
+    "firstHeading": "H1:Escalation KPIs",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "swim",
+    "theme": "dark",
+    "status": 200,
+    "title": "Swim - Lanes",
+    "nHeadings": 1,
+    "h1": [
+      "Swim"
+    ],
+    "firstHeading": "H1:Swim",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "swipe",
+    "theme": "dark",
+    "status": 200,
+    "title": "Swipe - TEST-13 Login fails with special characters in password",
+    "nHeadings": 1,
+    "h1": [
+      "Swipe"
+    ],
+    "firstHeading": "H1:Swipe",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "ship",
+    "theme": "dark",
+    "status": 200,
+    "title": "Test Workspace - Settings",
+    "nHeadings": 13,
+    "h1": [
+      "Settings"
+    ],
+    "firstHeading": "H1:Settings",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "ship-journey",
+    "theme": "dark",
+    "status": 200,
+    "title": "Ship Journey - Experimental",
+    "nHeadings": 1,
+    "h1": [
+      "Ship Journey"
+    ],
+    "firstHeading": "H1:Ship Journey",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "ship-biscuit",
+    "theme": "dark",
+    "status": 200,
+    "title": "The Ship's Biscuit - Experimental",
+    "nHeadings": 3,
+    "h1": [
+      "The Ship's Biscuit"
+    ],
+    "firstHeading": "H1:The Ship's Biscuit",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "collective",
+    "theme": "dark",
+    "status": 200,
+    "title": "Collective - Experimental",
+    "nHeadings": 3,
+    "h1": [
+      "Collective"
+    ],
+    "firstHeading": "H1:Collective",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "next-run",
+    "theme": "dark",
+    "status": 200,
+    "title": "Suggested Next Run - Experimental",
+    "nHeadings": 4,
+    "h1": [
+      "Suggested Next Run"
+    ],
+    "firstHeading": "H1:Suggested Next Run",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "task-chat",
+    "theme": "dark",
+    "status": 200,
+    "title": "Task Chat - Experimental",
+    "nHeadings": 4,
+    "h1": [
+      "Task Chat"
+    ],
+    "firstHeading": "H1:Task Chat",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "flight-companion",
+    "theme": "dark",
+    "status": 200,
+    "title": "Flight Companion - Experimental",
+    "nHeadings": 3,
+    "h1": [
+      "Flight Companion"
+    ],
+    "firstHeading": "H1:Flight Companion",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "passage-planner",
+    "theme": "dark",
+    "status": 200,
+    "title": "Passage Planner - Experimental",
+    "nHeadings": 3,
+    "h1": [
+      "Passage Planner"
+    ],
+    "firstHeading": "H1:Passage Planner",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "task-create",
+    "theme": "dark",
+    "status": 200,
+    "title": "New task",
+    "nHeadings": 2,
+    "h1": [
+      "New task"
+    ],
+    "firstHeading": "H1:New task",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  },
+  {
+    "page": "kpis-auth",
+    "theme": "dark",
+    "status": 200,
+    "title": "KPIs - Harbour",
+    "nHeadings": 13,
+    "h1": [
+      "Harbour"
+    ],
+    "firstHeading": "H1:Harbour",
+    "htmlClass": "theme-dark",
+    "bodyBg": "rgb(22, 24, 29)",
+    "bodyColor": "rgb(230, 230, 230)",
+    "scrollW": 1385,
+    "clientW": 1400,
+    "unresolvedVars": 0
+  }
+]

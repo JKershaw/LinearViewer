@@ -1,0 +1,20 @@
+{
+  "note": "Re-run of the /kpis vs /escalation-kpis heading-language probe. The earlier attempt in advisory-measurements.json used /workspace/:urlKey/kpis, which is a 404 - /kpis is a TOP-LEVEL route. That failed probe is retained in advisory-measurements.json as the record of the mistake; these are the numbers cited in report section 5 item 2.",
+  "kpis": {
+    "route": "/kpis (top-level)", "httpStatus": 200, "title": "KPIs - Harbour", "totalHeadings": 13,
+    "headings": [
+      {"tag":"H1","text":"Harbour","font":"Inter","size":"32px","transform":"none","weight":"400"},
+      {"tag":"H2","text":"instance kpis","font":"JetBrains Mono","size":"19.2px","transform":"none","weight":"700"},
+      {"tag":"H3","text":"|- proxy calls by phase","font":"JetBrains Mono","size":"13.6px","transform":"none","weight":"600"},
+      {"tag":"H3","text":"|- weekly budget burn","font":"JetBrains Mono","size":"13.6px","transform":"none","weight":"600"},
+      {"tag":"H3","text":"|- work landed - weekly","font":"JetBrains Mono","size":"13.6px","transform":"none","weight":"600"},
+      {"tag":"H3","text":"|- dispatched work by lane","font":"JetBrains Mono","size":"13.6px","transform":"none","weight":"600"}
+    ]
+  },
+  "escalationKpis": {
+    "route": "/workspace/test-workspace/escalation-kpis", "httpStatus": 200,
+    "title": "Test Workspace - Escalation KPIs", "totalHeadings": 1,
+    "headings": [{"tag":"H1","text":"Escalation KPIs","font":"Inter","size":"32px","transform":"none","weight":"400"}],
+    "sectionHeaderElements": 0
+  }
+}
