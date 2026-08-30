@@ -24,7 +24,7 @@ import { Scheduler } from './lib/scheduler.js'
 import { MongoSessionStore } from './lib/session-store.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey } from './lib/openrouter-key-resolver.js'
-import { getWorkspaceNorthStar as resolveNorthStar } from './lib/north-star-resolver.js'
+import { getWorkspaceNorthStar as resolveNorthStar, getWorkspaceNorthStarDocVersion as resolveNorthStarDocVersion } from './lib/north-star-resolver.js'
 import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken, refreshOwnerCredential } from './lib/workspace-token-refresh.js'
 import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
@@ -2414,7 +2414,17 @@ async function getWorkspaceNorthStar(urlKey, accountId) {
   return resolveNorthStar(userPreferencesStore, urlKey, accountId);
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, rejectedCredentialRegistry }))
+// getNorthStarDocVersionForWorkspace (LIN-2254): same shape/rationale as
+// getWorkspaceNorthStar immediately above, over the sibling doc-version map.
+async function getNorthStarDocVersionForWorkspace(urlKey, accountId) {
+  if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
+    return null;
+  }
+
+  return resolveNorthStarDocVersion(userPreferencesStore, urlKey, accountId);
+}
+
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, getWorkspaceAccessToken, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, rejectedCredentialRegistry }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore }))

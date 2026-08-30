@@ -6,7 +6,9 @@
  * orientation bearings, and roadmap Q&A chat.
  */
 import { Router } from 'express';
+import { createHash } from 'crypto';
 import { badRequest, jsonError, notFound, unauthorized } from '../lib/errors.js';
+import { getNorthStarDocVersion } from '../lib/north-star-resolver.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { buildRoadmapNarrativeMessages } from '../lib/prompts/roadmap-narrative-template.js';
@@ -133,17 +135,39 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
     }
     req.session.northStarByWorkspace[req.workspace.urlKey] = northStar;
 
+    // Doc-version stamping (LIN-2254): a stamp is recorded ONLY when the
+    // pasted text byte-matches docs/north-star.md's current content — every
+    // other (typical, unrelated) workspace value gets no stamp at all,
+    // rather than a fabricated drift claim against arbitrary text. Always
+    // overwritten (including to null) so an edit that breaks a prior match
+    // doesn't leave a stale stamp behind.
+    const currentDoc = getNorthStarDocVersion();
+    const pastedHash = createHash('sha256').update(northStar).digest('hex');
+    const stampedDocVersion = (currentDoc.hash && pastedHash === currentDoc.hash)
+      ? { hash: currentDoc.hash, title: currentDoc.title }
+      : null;
+
+    if (!req.session.northStarDocVersionByWorkspace) {
+      req.session.northStarDocVersionByWorkspace = {};
+    }
+    req.session.northStarDocVersionByWorkspace[req.workspace.urlKey] = stampedDocVersion;
+
     // Best-effort write-through to user preferences for cross-device sync.
     // Non-fatal: session is authoritative.
     if (userPreferencesStore && req.session.accountId) {
       try {
         const existing = await userPreferencesStore.getUserPreferences(req.session.accountId);
         const existingMap = existing.northStarByWorkspace || {};
+        const existingDocVersionMap = existing.northStarDocVersionByWorkspace || {};
         await userPreferencesStore.saveUserPreferences(req.session.accountId, {
           ...existing,
           northStarByWorkspace: {
             ...existingMap,
             [req.workspace.urlKey]: northStar
+          },
+          northStarDocVersionByWorkspace: {
+            ...existingDocVersionMap,
+            [req.workspace.urlKey]: stampedDocVersion
           }
         });
       } catch (err) {

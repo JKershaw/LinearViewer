@@ -11,7 +11,7 @@ import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getWorkspaceNorthStar, getNorthStarDocVersion } from '../../lib/north-star-resolver.js';
+import { getWorkspaceNorthStar, getWorkspaceNorthStarDocVersion, getNorthStarDocVersion } from '../../lib/north-star-resolver.js';
 
 const DOC_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs', 'north-star.md');
 
@@ -57,6 +57,55 @@ describe('getWorkspaceNorthStar', () => {
   test('returns "" and does not throw when the store rejects', async () => {
     const store = { getUserPreferences: async () => { throw new Error('store down'); } };
     assert.equal(await getWorkspaceNorthStar(store, 'acme', 'creator-1'), '');
+  });
+});
+
+describe('getWorkspaceNorthStarDocVersion', () => {
+  test('resolves the creator-scoped, workspace-scoped stored stamp', async () => {
+    const stamp = { hash: 'abc123', title: 'North star — v2, the self-funding loop' };
+    const store = {
+      getUserPreferences: async (id) =>
+        id === 'creator-1' ? { northStarDocVersionByWorkspace: { acme: stamp } } : {}
+    };
+    const result = await getWorkspaceNorthStarDocVersion(store, 'acme', 'creator-1');
+    assert.deepEqual(result, stamp);
+  });
+
+  test('returns null when no stamp is stored for this workspace', async () => {
+    const store = { getUserPreferences: async () => ({ northStarDocVersionByWorkspace: {} }) };
+    assert.equal(await getWorkspaceNorthStarDocVersion(store, 'acme', 'creator-1'), null);
+  });
+
+  test('returns null when the creator has no stored preferences at all', async () => {
+    const store = { getUserPreferences: async () => ({}) };
+    assert.equal(await getWorkspaceNorthStarDocVersion(store, 'acme', 'creator-1'), null);
+  });
+
+  test('fails closed with no creatorId', async () => {
+    const store = { getUserPreferences: async () => ({ northStarDocVersionByWorkspace: { acme: { hash: 'x', title: 'y' } } }) };
+    assert.equal(await getWorkspaceNorthStarDocVersion(store, 'acme', null), null);
+  });
+
+  test('fails closed with no urlKey', async () => {
+    const store = { getUserPreferences: async () => ({ northStarDocVersionByWorkspace: { acme: { hash: 'x', title: 'y' } } }) };
+    assert.equal(await getWorkspaceNorthStarDocVersion(store, null, 'creator-1'), null);
+  });
+
+  test('returns null and does not throw when the store rejects', async () => {
+    const store = { getUserPreferences: async () => { throw new Error('store down'); } };
+    assert.equal(await getWorkspaceNorthStarDocVersion(store, 'acme', 'creator-1'), null);
+  });
+
+  test('two workspaces under the same creator hold independent stamps', async () => {
+    const stampA = { hash: 'hash-a', title: 'title-a' };
+    const stampB = { hash: 'hash-b', title: 'title-b' };
+    const store = {
+      getUserPreferences: async () => ({
+        northStarDocVersionByWorkspace: { a: stampA, b: stampB }
+      })
+    };
+    assert.deepEqual(await getWorkspaceNorthStarDocVersion(store, 'a', 'c1'), stampA);
+    assert.deepEqual(await getWorkspaceNorthStarDocVersion(store, 'b', 'c1'), stampB);
   });
 });
 

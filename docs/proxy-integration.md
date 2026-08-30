@@ -887,6 +887,11 @@ endpoint's copy is the best-effort cross-device mirror of it.
     "narrative": "Velocity is steady; three tasks landed this week…",
     "ageDays": 2
   },
+  "docVersion": {
+    "current": { "hash": "a1b2c3…", "title": "North star — v2, the self-funding loop" },
+    "stamped": { "hash": "a1b2c3…", "title": "North star — v2, the self-funding loop" },
+    "drift": false
+  },
   "reportGeneratedAt": "2026-08-01T10:00:00Z",
   "maxAgeDays": 14
 }
@@ -922,6 +927,17 @@ endpoint's copy is the best-effort cross-device mirror of it.
   defensively if you display it.
 - **`maxAgeDays`** is the freshness window (currently 14 days) so callers don't hardcode
   it.
+- **`docVersion`** (LIN-2254) makes the `northStar` value's freshness a **falsifiable**
+  claim instead of an assertion. `current` is always the live sha256 hash + first-line
+  title of Harbour's own `docs/north-star.md` (a local file read, never Linear-backed).
+  `stamped` is the doc hash recorded when this workspace's `northStar` was pasted via the
+  Roadmap page — `null` for the (typical) workspace whose north star has nothing to do
+  with that doc, since a stamp is only ever recorded on a byte-identical paste at write
+  time. `drift` is `true`/`false` only when a `stamped` value exists to compare against
+  `current`; otherwise `null` — "no claim made," never a fabricated staleness signal
+  against a workspace's own unrelated preference text. Backward-compatible: a deployment
+  whose proxy router doesn't wire this dependency still returns `stamped`/`drift: null`,
+  never a 503.
 - **503** when roadmap report history isn't configured on this deployment.
 
 #### Get Periodicals
