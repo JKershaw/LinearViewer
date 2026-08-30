@@ -253,7 +253,7 @@ describe('observer-pass: runObserverPass', () => {
     assert.ok(doc.state.report.censusGroundedAt, 'the census own updatedAt is carried through as the grounding stamp');
   });
 
-  test('two consecutive passes: an UNCHANGED census on tick 2 takes the quiet path (no second LLM call); a THIRD unchanged tick does not manufacture yet another transition', async () => {
+  test('two consecutive passes: an UNCHANGED census on tick 2 takes the quiet path (no second LLM call), preserves the prior substantive report/summary verbatim, and is a clean no-op; a THIRD unchanged tick does not manufacture yet another transition', async () => {
     const observerStateStore = freshStore();
     const urlKey = `ws-two-unchanged-${randomUUID()}`;
     await observerStateStore.ensureSeeded(`sweep:v1:${urlKey}`, nonEmptyCensus);
@@ -273,6 +273,7 @@ describe('observer-pass: runObserverPass', () => {
 
     await runObserverPass(urlKey, { ...deps, now: Date.now() });
     assert.strictEqual(callCount, 1);
+    const afterFirst = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKey}`);
 
     const net = guardNetwork();
     const secondResult = await runObserverPass(urlKey, { ...deps, now: Date.now() + 1000 });
@@ -282,11 +283,16 @@ describe('observer-pass: runObserverPass', () => {
     assert.strictEqual(callCount, 1, 'the census did not change — the second tick must not call the LLM again');
     assert.strictEqual(secondResult.quiet, true);
     const afterSecond = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKey}`);
-    // Tick 2 legitimately transitions the report itself (from the real
-    // observation's narrative to an honest "nothing changed" narrative) —
-    // that IS a genuine content change, so rev DOES advance here. The
-    // no-manufactured-transition claim is proven on tick 3 instead, where
-    // the quiet report is now byte-identical to tick 2's.
+    // LIN-2405: an `unchanged` quiet tick must NOT clobber the last
+    // substantive report/summary with the generic quiet placeholder — it
+    // carries the prior tick's report/summary forward verbatim, so the
+    // resulting state is byte-identical and advance()'s dedup-by-stateHash
+    // gate makes this a true no-op (rev does NOT advance).
+    assert.strictEqual(afterSecond.rev, afterFirst.rev, 'a genuinely no-op unchanged tick must not manufacture a transition');
+    assert.strictEqual(afterSecond.state.report.narrative, afterFirst.state.report.narrative, 'the real narrative survives an unchanged tick');
+    assert.strictEqual(afterSecond.state.summary, afterFirst.state.summary, 'the real summary survives an unchanged tick');
+    assert.notStrictEqual(afterSecond.state.report.narrative, 'No change in the fleet census since the last observation pass.', 'the generic quiet placeholder must not overwrite the real narrative');
+
     const thirdResult = await runObserverPass(urlKey, { ...deps, now: Date.now() + 2000 });
     assert.strictEqual(callCount, 1, 'still no LLM call on the third unchanged tick');
     assert.strictEqual(thirdResult.quiet, true);

@@ -82,7 +82,7 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
     assert.match(text, /No observer pass has run for this workspace yet\./);
   });
 
-  test('renders a real report: narrative, lane counts, flags, and TWO DISTINCT freshness stamps (report vs. census)', async () => {
+  test('renders a real report: narrative, lane counts, flags, attention rows, and TWO DISTINCT freshness stamps (report vs. census)', async () => {
     const reportDoc = {
       rev: 4,
       updatedAt: new Date('2026-08-30T07:15:00.000Z'),
@@ -93,6 +93,7 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
         report: {
           lanes: { working: 2, silent: 0, blocked: 1, terminal: 0, queued: 0, resolved: 0, unknown: 0 },
           attentionCount: 1,
+          attention: [{ loopId: 'l3', issue: 'LIN-3003', lane: 'blocked', stage: 'plan', since: '2026-08-30T05:33:11.858Z' }],
           narrative: 'Two loops working, one blocked on a decision.',
           flags: ['blocked-cluster'],
           degraded: null,
@@ -109,12 +110,70 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
     assert.match(text, /Two loops working, one blocked on a decision\./);
     assert.match(text, /blocked-cluster/);
     assert.match(text, /<code>off<\/code>/);
+    // The stored attention row must be visible — this is the read surface
+    // LIN-2405 closes.
+    assert.match(text, /LIN-3003/);
+    assert.match(text, /plan/);
+    assert.match(text, /2026-08-30T05:33:11\.858Z/);
     // The report's OWN freshness stamp (doc.updatedAt) ...
     assert.match(text, /2026-08-30T07:15:00\.000Z/);
     // ... and the census's freshness stamp (report.censusGroundedAt) must
     // BOTH appear, distinctly — never conflated into one timestamp.
     assert.match(text, /2026-08-30T07:00:00\.000Z/);
     assert.deepStrictEqual(observerStateStore.calls, [{ method: 'readCurrent', instanceKey: 'pass:v1:acme' }]);
+  });
+
+  test('renders attention row truncation via attentionCount when the array is capped', async () => {
+    const reportDoc = {
+      rev: 5,
+      updatedAt: new Date('2026-08-30T07:15:00.000Z'),
+      state: {
+        v: 1,
+        authority: 'off',
+        summary: 'Several blocked.',
+        report: {
+          lanes: { working: 0, silent: 0, blocked: 12, terminal: 0, queued: 0, resolved: 0, unknown: 0 },
+          attentionCount: 12,
+          attention: [{ loopId: 'l1', issue: 'LIN-1', lane: 'blocked', stage: 'implement', since: '2026-08-30T05:00:00.000Z' }],
+          narrative: 'A dozen loops are blocked.',
+          flags: [],
+          degraded: null,
+          censusGroundedAt: '2026-08-30T07:00:00.000Z',
+          censusRev: 12
+        }
+      }
+    };
+    const observerStateStore = readOnlyObserverStateStore(reportDoc);
+    const app = buildApp({ observerStateStore });
+    const { text } = await get(app, '/workspace/acme/flight-companion');
+    assert.match(text, /LIN-1/);
+    assert.match(text, /…and 11 more/);
+  });
+
+  test('a report with no attention field renders the empty state, not a crash', async () => {
+    const reportDoc = {
+      rev: 6,
+      updatedAt: new Date('2026-08-30T07:15:00.000Z'),
+      state: {
+        v: 1,
+        authority: 'off',
+        summary: 'Quiet.',
+        report: {
+          lanes: { working: 0, silent: 0, blocked: 0, terminal: 0, queued: 0, resolved: 0, unknown: 0 },
+          narrative: 'Nothing to report.',
+          flags: [],
+          degraded: null,
+          censusGroundedAt: '2026-08-30T07:00:00.000Z',
+          censusRev: 3
+          // no attention / attentionCount at all
+        }
+      }
+    };
+    const observerStateStore = readOnlyObserverStateStore(reportDoc);
+    const app = buildApp({ observerStateStore });
+    const { status, text } = await get(app, '/workspace/acme/flight-companion');
+    assert.strictEqual(status, 200);
+    assert.match(text, /No attention rows this tick\./);
   });
 
   test('an authority: on-unimplemented report still renders as plainly report-only (same lanes/narrative shape, only the stamp differs)', async () => {

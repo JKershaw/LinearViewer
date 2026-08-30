@@ -75,6 +75,26 @@
   padding-left: 1.25rem;
 }
 
+.fc-obs-attention {
+  margin: 0 0 0.6rem;
+  padding-left: 1.25rem;
+  font-size: 0.9em;
+}
+
+.fc-obs-attention-lane {
+  color: var(--muted);
+}
+
+.fc-obs-attention-issue {
+  font-weight: 600;
+}
+
+.fc-obs-attention-overflow {
+  color: var(--muted);
+  font-size: 0.85em;
+  margin: 0 0 0.6rem;
+}
+
 .flight-companion-observer-meta {
   color: var(--muted);
   font-size: 0.85em;
