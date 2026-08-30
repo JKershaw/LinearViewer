@@ -992,8 +992,10 @@ decide for itself whether a periodical is due.
   itself, never re-joined against the registry here — so this endpoint can never publish a
   `cadence` that disagrees with the one its own `due`/`recent` boundary actually used.
 - **`state`** (top-level) is one of four values: `"recent"` — a live (queued, not yet
-  resolved) dispatch for this template, OR a `taken` history run inside its cadence window;
-  `"due"` — the cadence has elapsed since the last run; `"never"` — **no evidence in the
+  resolved) dispatch for this template, OR a history run inside its cadence window that is
+  both `status: "taken"` **and** carries a terminal `done`/`complete` feedback marker
+  (LIN-2385) — a claim that was taken and then failed, or never reported, does not count and
+  does not reset the cadence clock; `"due"` — the cadence has elapsed since the last run; `"never"` — **no evidence in the
   full retained history window**, which is a *bounded* claim, not "ever ran" — a workspace
   that only recently started dispatching periodicals, or whose history retention is shorter
   than the read horizon, reads `"never"` the same as one that has genuinely never run this
@@ -1803,6 +1805,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 | `noDescend` | bool | No | Default `false`. When `true`, recommend and dispatch the **named issue's own** next step and never descend into an open child (see below) |
 | `kind` | string | No | **Verb override.** A prompt template key (e.g. `review`, `plan`, `implementation`). When supplied, the LLM recommendation + descent is bypassed and the body is generated deterministically for the **named issue** with that template (see below) |
 | `sessionId` | string (opaque) | No | The autopilot dispatch id driving this run. Stamp it on every fan-out so the whole multi-task run reconstructs as one session. An **opaque grouping key, not a UUID** (LIN-1118): non-empty, ≤128 chars, no control characters, `__meta__` reserved; existing UUIDs stay valid. Any target; stored and forwarded verbatim. See LIN-591 |
+| `periodicalId` | string | No | The periodical-template join key: the id of a periodicals-registry template (e.g. `documentation-review`) this dispatch was minted from. Stamped once at dispatch time, never maintained, and does **not** propagate to a `followUpTo` beat or a wake. Validated against the live registry — an unknown/typo id is rejected `400`. Stored and forwarded verbatim; inert to execution. Stamped onto whichever `createDispatchItem` call this route resolves to — the verb-override branch (`kind` set) and the recommendation-derived branch (`kind` omitted, the branch autopilot's normal trigger actually takes) both carry it. See LIN-1825/LIN-2385 |
 
 `kind` is derived server-side from the recommendation's own action signal, falling back to `custom` when the action can't be parsed. There is no `prompt` field to send (it is generated) and none in the response (it is withheld by design).
 

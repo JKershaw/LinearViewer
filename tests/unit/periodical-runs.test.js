@@ -51,7 +51,7 @@ import {
   DEFAULT_CADENCE_MS,
   DEFAULT_HORIZON_MS
 } from '../../lib/periodical-runs.js';
-import { PERIODICAL_PROJECTION, DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION, DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { PERIODICALS } from '../../lib/periodicals.js';
 
 const WEEK_MS = CADENCE_MS.weekly;
@@ -86,7 +86,15 @@ function queueRow(over = {}) {
   };
 }
 
-/** Mirrors `_formatHistoryItem`'s output (lib/dispatch-store.js:1301) as read under PERIODICAL_PROJECTION. */
+/**
+ * Mirrors `_formatHistoryItem`'s output (lib/dispatch-store.js:1301) as read
+ * under PERIODICAL_HISTORY_PROJECTION. Defaults to a terminal `[done]` marker
+ * (LIN-2385) so the ~38 existing positive-evidence call sites in this file
+ * keep passing under the new gate without each being individually touched —
+ * a call site that wants to exercise the negative (no-marker / non-`done`
+ * marker) direction passes `feedback` explicitly (see the evidence-rules
+ * describe block below).
+ */
 function historyRow(over = {}) {
   return {
     kind: 'custom',
@@ -96,6 +104,7 @@ function historyRow(over = {}) {
     status: 'taken',
     followUpTo: null,
     abort: false,
+    feedback: [{ message: '[done] Task completed', timestamp: '2026-07-01T00:05:00.000Z' }],
     ...over
   };
 }
@@ -288,9 +297,62 @@ describe('foldPeriodicalRuns — joins', () => {
 // ── Evidence rules ───────────────────────────────────────────────────────────
 
 describe('foldPeriodicalRuns — evidence rules', () => {
-  test("only a 'taken' history row counts as run evidence", () => {
+  // LIN-2385: the two-part rule. `status: 'taken'` is a permissive claim gate
+  // (rows below still exercise it for cancelled/expired exclusion); a taken
+  // row additionally needs a terminal `done`/`complete` feedback marker to
+  // count as REAL run evidence — a claim that was taken and then failed, or
+  // never reported, must not reset the cadence clock (the 2026-08-07
+  // false-`recent` incident this ticket exists to fix).
+  test("a 'taken' history row WITH a terminal [done] marker counts as run evidence", () => {
     const t = template();
     const rows = { historyRows: [historyRow({ periodicalId: t.id, status: 'taken', dispatchedAt: new Date(NOW - DAY_MS).toISOString() })] };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.runs, 1);
+    assert.equal(result.state, 'recent');
+  });
+
+  // Explicitly constructed, not relying on historyRow()'s default — the
+  // fixture the fix exists to close: a claim, no delivery.
+  test("a 'taken' history row with NO feedback marker at all does not count as run evidence", () => {
+    const t = template();
+    const rows = { historyRows: [historyRow({ periodicalId: t.id, status: 'taken', dispatchedAt: new Date(NOW - DAY_MS).toISOString(), feedback: [] })] };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.runs, 0);
+    assert.equal(result.lastDispatchedAt, null);
+    assert.equal(result.state, 'never');
+  });
+
+  // The regression case for the 2026-08-07 incident recorded in
+  // docs/reviews/recent-headwinds-review-2026-08-23.md:108 — a mint claimed
+  // and then [failed] was stored 'taken' and reset the cadence clock for a
+  // week under the pre-fix single-clause gate.
+  test("a 'taken' history row with a terminal [failed] marker does not count as run evidence", () => {
+    const t = template();
+    const rows = {
+      historyRows: [historyRow({
+        periodicalId: t.id,
+        status: 'taken',
+        dispatchedAt: new Date(NOW - DAY_MS).toISOString(),
+        feedback: [{ message: '[failed] remote-control never connected', timestamp: new Date(NOW - DAY_MS).toISOString() }]
+      })]
+    };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.runs, 0);
+    assert.equal(result.lastDispatchedAt, null);
+    assert.equal(result.state, 'never');
+  });
+
+  // Both accepted markers count, not just [done].
+  test("a 'taken' history row with a terminal [complete] marker also counts as run evidence", () => {
+    const t = template();
+    const rows = {
+      historyRows: [historyRow({
+        periodicalId: t.id,
+        status: 'taken',
+        dispatchedAt: new Date(NOW - DAY_MS).toISOString(),
+        feedback: [{ message: '[complete] done', timestamp: new Date(NOW - DAY_MS).toISOString() }]
+      })]
+    };
     const [result] = foldPeriodicalRuns([t], rows, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
     assert.equal(result.runs, 1);
     assert.equal(result.state, 'recent');
@@ -384,6 +446,17 @@ describe('foldPeriodicalRuns — queue precedence', () => {
     const row = queueRow({ periodicalId: t.id });
     assert.equal('status' in row, false);
     const [result] = foldPeriodicalRuns([t], { queueRows: [row] }, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(result.state, 'recent');
+  });
+
+  // Regression (LIN-2385): rule 1 (the live-queue-row -> `recent` anti-double-
+  // dispatch short-circuit) must survive the new terminal-marker gate on rule
+  // 2 unchanged — a queue row carries no `feedback` at all, so it must never
+  // be run through `deriveTerminalStatus`.
+  test('a live queue row still reads recent under the new terminal-marker gate, even with no history evidence at all', () => {
+    const t = template();
+    const rows = { queueRows: [queueRow({ periodicalId: t.id })], historyRows: [] };
+    const [result] = foldPeriodicalRuns([t], rows, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
     assert.equal(result.state, 'recent');
   });
 });
@@ -630,15 +703,27 @@ describe('foldPeriodicalRuns — determinism', () => {
 // ── Projection self-check ────────────────────────────────────────────────────
 
 describe('foldPeriodicalRuns — projection coverage', () => {
-  test('every row field the fold reads is a key of PERIODICAL_PROJECTION', () => {
-    // Ties this module to lib/dispatch-store.js's PERIODICAL_PROJECTION so a
-    // future field the fold starts reading, but the projection doesn't grant,
-    // fails loudly here rather than silently arriving as `undefined` in
-    // production — the exact silent-drop class both plan reviews caught for
-    // followUpTo/abort.
-    const fieldsTheFoldReads = ['periodicalId', 'promptName', 'dispatchedAt', 'status', 'followUpTo', 'abort', 'repo'];
-    for (const field of fieldsTheFoldReads) {
+  // LIN-2385: the queue read (`listItems`) never gains `feedback` (it has no
+  // row-bounding predicate of any kind — granting it would re-open the
+  // unbounded whole-workspace read PERIODICAL_PROJECTION exists to prevent),
+  // so the fields the fold reads off a QUEUE row must stay a subset of the
+  // narrower PERIODICAL_PROJECTION, not the widened history-only constant.
+  test('every field the fold reads off a QUEUE row is a key of PERIODICAL_PROJECTION', () => {
+    const fieldsTheFoldReadsFromQueueRows = ['periodicalId', 'promptName', 'followUpTo', 'abort', 'repo'];
+    for (const field of fieldsTheFoldReadsFromQueueRows) {
       assert.equal(PERIODICAL_PROJECTION[field], 1, `PERIODICAL_PROJECTION is missing '${field}'`);
+    }
+  });
+
+  // Ties this module to lib/dispatch-store.js's PERIODICAL_HISTORY_PROJECTION
+  // so a future field the fold starts reading off a HISTORY row, but the
+  // projection doesn't grant, fails loudly here rather than silently arriving
+  // as `undefined` in production — the exact silent-drop class both plan
+  // reviews caught for followUpTo/abort, now extended to `feedback` (LIN-2385).
+  test('every field the fold reads off a HISTORY row is a key of PERIODICAL_HISTORY_PROJECTION', () => {
+    const fieldsTheFoldReadsFromHistoryRows = ['periodicalId', 'promptName', 'dispatchedAt', 'status', 'followUpTo', 'abort', 'repo', 'feedback'];
+    for (const field of fieldsTheFoldReadsFromHistoryRows) {
+      assert.equal(PERIODICAL_HISTORY_PROJECTION[field], 1, `PERIODICAL_HISTORY_PROJECTION is missing '${field}'`);
     }
   });
 });
@@ -796,7 +881,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
   // that weaker assertion).
   test('LIN-1932 B1: two taken rows (repo-a, default) for one template split into two lanes, runs: 1 each — not one merged lane', async () => {
     const store = freshStore();
-    const repoProjection = { ...PERIODICAL_PROJECTION, repo: 1 };
+    const repoProjection = { ...PERIODICAL_HISTORY_PROJECTION, repo: 1 };
     const t = template({ id: 'documentation-review', title: 'Documentation Review' });
 
     const repoARow = await store.addItem(URL_KEY, {
@@ -807,6 +892,8 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
       repo: 'repo-a'
     });
     await store.takeItem(repoARow._id, URL_KEY, 'token-a');
+    // LIN-2385: the new gate needs a terminal marker, not just 'taken'.
+    await store.addFeedback(repoARow._id, URL_KEY, { message: '[done] done' }, 'token-a');
 
     // A small real delay, not a fabricated timestamp (mirrors the true-max
     // round-trip test below): addItem always stamps dispatchedAt from the
@@ -822,6 +909,7 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
       repo: null
     });
     await store.takeItem(defaultRow._id, URL_KEY, 'token-b');
+    await store.addFeedback(defaultRow._id, URL_KEY, { message: '[done] done' }, 'token-b');
     assert.ok(defaultRow.dispatchedAt.getTime() > repoARow.dispatchedAt.getTime(), 'test setup sanity: defaultRow must be strictly later than repoARow');
 
     const { items: historyRows } = await store.listHistory(URL_KEY, { projection: repoProjection });
@@ -874,9 +962,11 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
       repo: 'repo-b'
     });
     await store.takeItem(repoBRow._id, URL_KEY, 'token-b');
+    // LIN-2385: the new gate needs a terminal marker, not just 'taken'.
+    await store.addFeedback(repoBRow._id, URL_KEY, { message: '[done] done' }, 'token-b');
 
     const queueRows = await store.listItems(URL_KEY, { projection: PERIODICAL_PROJECTION });
-    const { items: historyRows } = await store.listHistory(URL_KEY, { projection: PERIODICAL_PROJECTION });
+    const { items: historyRows } = await store.listHistory(URL_KEY, { projection: PERIODICAL_HISTORY_PROJECTION });
     assert.equal(queueRows.length, 1);
     assert.equal(historyRows.length, 1);
 
@@ -960,9 +1050,11 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
 
     // Archive OLDEST-first — the failing direction for rows[0] (see comment above).
     await store.takeItem(older._id, URL_KEY, 'token-a');
+    await store.addFeedback(older._id, URL_KEY, { message: '[done] done' }, 'token-a');
     await store.takeItem(newer._id, URL_KEY, 'token-a');
+    await store.addFeedback(newer._id, URL_KEY, { message: '[done] done' }, 'token-a');
 
-    const { items: historyRows } = await store.listHistory(URL_KEY, { projection: PERIODICAL_PROJECTION });
+    const { items: historyRows } = await store.listHistory(URL_KEY, { projection: PERIODICAL_HISTORY_PROJECTION });
     assert.equal(historyRows.length, 2);
     assert.equal(historyRows[0].dispatchedAt, older.dispatchedAt.toISOString(), 'sanity: archive order put the non-max row first in the read');
 
@@ -972,5 +1064,90 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
     });
     assert.equal(result.lastDispatchedAt, newer.dispatchedAt.getTime());
     assert.equal(result.runs, 2);
+  });
+
+  // LIN-2385, B4: `listHistory`'s `periodicalEvidenceRow` option is a
+  // deliberate, scoped `$or` exception (see its own doc comment in
+  // lib/dispatch-store.js) — tests/fixtures/mock-collection.js cannot express
+  // `$or`, so this is exercised ONLY here, against a real MangoDB tmpdir
+  // instance, per the LIN-2079 precedent.
+  describe('listHistory periodicalEvidenceRow (LIN-2385, B4 — real engine only)', () => {
+    // `listHistory` reads the HISTORY collection — a row only lands there once
+    // archived (taken/cancelled/expired), never straight off `addItem`, so
+    // every case here takes its row first.
+    async function archivedRow(store, over) {
+      const item = await store.addItem(URL_KEY, { prompt: 'p', promptName: 'n', ...over });
+      await store.takeItem(item._id, URL_KEY, 'token-a');
+      return item;
+    }
+
+    // The row-count assertion alone cannot tell a pushed-down `$or` from a
+    // JS-side re-filter — both return the same two rows. So this test pins the
+    // property in BOTH halves: the query object the storage engine actually
+    // receives carries the `$or`, AND the real engine resolves it to exactly
+    // the two admitted rows. Dropping the clause from `listHistory` fails the
+    // first assertion; an engine that ignored `$or` would fail the second.
+    test('pushdown: the $or clause reaches the query the engine receives, not a JS-side re-filter', async () => {
+      const store = freshStore();
+      // Three archived rows: one admitted on kind, one admitted on periodicalId
+      // (with a NON-'periodical' kind — exactly the batch/lane shape Part A's
+      // JS-side relaxation targets), one excluded (neither).
+      await archivedRow(store, { kind: 'periodical', periodicalId: null });
+      await archivedRow(store, { kind: 'implementation', periodicalId: 'documentation-review' });
+      await archivedRow(store, { kind: 'implementation', periodicalId: null });
+
+      // Observe, don't stub: the real `find` still runs, so the row assertions
+      // below remain a genuine real-engine round trip.
+      const queriesSeen = [];
+      const realFind = store.historyCollection.find.bind(store.historyCollection);
+      store.historyCollection.find = (query, opts) => {
+        queriesSeen.push(query);
+        return realFind(query, opts);
+      };
+
+      const { items } = await store.listHistory(URL_KEY, { periodicalEvidenceRow: true });
+
+      assert.equal(queriesSeen.length, 1, 'the unlimited history path issues exactly one find');
+      assert.deepEqual(
+        queriesSeen[0].$or,
+        [{ kind: 'periodical' }, { periodicalId: { $ne: null } }],
+        'the admission predicate is pushed into the query, not applied after the read'
+      );
+
+      assert.equal(items.length, 2, 'exactly the kind:periodical row and the periodicalId-stamped row are selected');
+      assert.deepEqual(
+        items
+          .map(row => ({ kind: row.kind, periodicalId: row.periodicalId ?? null }))
+          .sort((a, b) => a.kind.localeCompare(b.kind)),
+        [
+          { kind: 'implementation', periodicalId: 'documentation-review' },
+          { kind: 'periodical', periodicalId: null }
+        ],
+        'and they are the kind-admitted and periodicalId-admitted rows specifically'
+      );
+    });
+
+    test('(b) a kind: "periodical" row is admitted', async () => {
+      const store = freshStore();
+      await archivedRow(store, { kind: 'periodical', periodicalId: null });
+      const { items } = await store.listHistory(URL_KEY, { periodicalEvidenceRow: true });
+      assert.equal(items.length, 1);
+      assert.equal(items[0].kind, 'periodical');
+    });
+
+    test('(c) a non-periodical-kind row with periodicalId != null is admitted', async () => {
+      const store = freshStore();
+      await archivedRow(store, { kind: 'implementation', periodicalId: 'documentation-review' });
+      const { items } = await store.listHistory(URL_KEY, { periodicalEvidenceRow: true });
+      assert.equal(items.length, 1);
+      assert.equal(items[0].periodicalId, 'documentation-review');
+    });
+
+    test('(d) a non-periodical-kind row with periodicalId == null is excluded', async () => {
+      const store = freshStore();
+      await archivedRow(store, { kind: 'implementation', periodicalId: null });
+      const { items } = await store.listHistory(URL_KEY, { periodicalEvidenceRow: true });
+      assert.equal(items.length, 0);
+    });
   });
 });

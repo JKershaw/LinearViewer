@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { getPeriodicals } from '../../lib/periodicals.js';
-import { PERIODICAL_PROJECTION } from '../../lib/dispatch-store.js';
+import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION } from '../../lib/dispatch-store.js';
 
 const TEMPLATES = getPeriodicals();
 const TEMPLATE = TEMPLATES[0]; // { id, title, mode, cadence: 'weekly', ... }
@@ -29,6 +29,9 @@ const HISTORY_TTL_SECONDS = 30 * 24 * 60 * 60; // store default (lib/dispatch-st
 const NOW = Date.now();
 const daysAgo = n => new Date(NOW - n * DAY_MS).toISOString();
 
+// Defaults to a terminal [done] marker (LIN-2385) so the existing
+// positive-evidence fixtures below keep passing under the new gate; a case
+// exercising the negative direction passes `feedback` explicitly.
 function historyRow(overrides = {}) {
   return {
     kind: 'periodical',
@@ -38,6 +41,7 @@ function historyRow(overrides = {}) {
     status: 'taken',
     followUpTo: null,
     abort: false,
+    feedback: [{ message: '[done] Task completed', timestamp: daysAgo(10) }],
     ...overrides
   };
 }
@@ -238,13 +242,31 @@ describe('GET /api/proxy/periodicals', () => {
 
   // -- read shape: projection / no-limit / workspace scoping ----------------
 
-  test('both reads carry PERIODICAL_PROJECTION', async () => {
+  // LIN-2385: the two reads DELIBERATELY diverge — the queue read never gains
+  // `feedback` (listItems has no row-bounding predicate of any kind, so
+  // widening it would re-open the LIN-1030 unbounded-read hazard), only the
+  // history read does, via the separate PERIODICAL_HISTORY_PROJECTION
+  // constant. A second reviewer should verify the split is real (queue truly
+  // never gets the wider projection) rather than assumed from the plan text.
+  test('the queue read carries PERIODICAL_PROJECTION and the history read carries PERIODICAL_HISTORY_PROJECTION', async () => {
     const { app, itemsCalls, historyCalls } = buildApp();
     await get(app);
     assert.equal(itemsCalls.length, 1);
     assert.equal(historyCalls.length, 1);
     assert.strictEqual(itemsCalls[0].projection, PERIODICAL_PROJECTION);
-    assert.strictEqual(historyCalls[0].projection, PERIODICAL_PROJECTION);
+    assert.strictEqual(historyCalls[0].projection, PERIODICAL_HISTORY_PROJECTION);
+    assert.notStrictEqual(PERIODICAL_HISTORY_PROJECTION, PERIODICAL_PROJECTION, 'sanity: the two constants must actually be distinct objects');
+  });
+
+  // LIN-2385, B4: the history read pushes the same row set the JS-side
+  // admission filter uses down into the store query, BEFORE the projection
+  // widens to grant `feedback` — narrow rows first, then widen columns. The
+  // queue read gets no such predicate (it needs no row-bounding for this).
+  test('the history read carries periodicalEvidenceRow:true; the queue read carries no such predicate', async () => {
+    const { app, itemsCalls, historyCalls } = buildApp();
+    await get(app);
+    assert.equal(historyCalls[0].periodicalEvidenceRow, true);
+    assert.equal('periodicalEvidenceRow' in itemsCalls[0], false);
   });
 
   test('the history read carries no `limit` — listHistory\'s limit path sorts on resolvedAt, not dispatchedAt', async () => {
@@ -374,5 +396,103 @@ describe('GET /api/proxy/periodicals', () => {
     assert.equal(item.state, 'due'); // weekly cadence, 10 days elapsed
     assert.equal(item.daysSince, 10);
     assert.notEqual(item.state, 'never');
+  });
+
+  // -- LIN-2385 Part A: row admission relaxation (falsifiable acceptance, B2) --
+  //
+  // Part A's route change is inert against the live workspace as of this
+  // writing — this is unit-level, falsifiable acceptance instead of a live-
+  // population re-check (see the plan's B2 resolution).
+
+  test('a non-periodical-kind history row carrying a valid periodicalId (and a non-matching promptName) is folded as a run', async () => {
+    const { app } = buildApp({
+      history: {
+        acme: [historyRow({
+          kind: 'implementation', // the batch/lane dispatch shape — never 'periodical'
+          periodicalId: TEMPLATE.id,
+          promptName: 'LIN-2385: fix the thing', // does not match any template title
+          dispatchedAt: daysAgo(1)
+        })]
+      }
+    });
+    const { body } = await get(app);
+    const item = findTemplateResult(body);
+    assert.equal(item.state, 'recent');
+    assert.notEqual(item.lastDispatchedAt, null);
+  });
+
+  // Regression: the title-fallback guard the relaxation must not weaken — a
+  // row with NO periodicalId and a non-'periodical' kind must not count just
+  // because its promptName happens to collide with a template title.
+  test('a non-periodical-kind history row with NO periodicalId is excluded even when promptName collides with a template title', async () => {
+    const { app } = buildApp({
+      history: {
+        acme: [historyRow({
+          kind: 'implementation',
+          periodicalId: null,
+          promptName: TEMPLATE.title,
+          dispatchedAt: daysAgo(1)
+        })]
+      }
+    });
+    const { body } = await get(app);
+    const item = findTemplateResult(body);
+    assert.equal(item.state, 'never');
+    assert.equal(item.lastDispatchedAt, null);
+  });
+
+  // -- LIN-2385 Part B: terminal-marker gate ---------------------------------
+
+  test('a taken row with NO feedback marker at all does not count as run evidence', async () => {
+    const { app } = buildApp({ history: { acme: [historyRow({ dispatchedAt: daysAgo(1), feedback: [] })] } });
+    const { body } = await get(app);
+    const item = findTemplateResult(body);
+    assert.equal(item.state, 'never');
+    assert.equal(item.lastDispatchedAt, null);
+  });
+
+  // The regression case for the 2026-08-07 incident: a claim that was taken
+  // and then [failed] must not reset the cadence clock.
+  test('a taken row with a terminal [failed] marker does not count as run evidence', async () => {
+    const { app } = buildApp({
+      history: {
+        acme: [historyRow({
+          dispatchedAt: daysAgo(1),
+          feedback: [{ message: '[failed] remote-control never connected', timestamp: daysAgo(1) }]
+        })]
+      }
+    });
+    const { body } = await get(app);
+    const item = findTemplateResult(body);
+    assert.equal(item.state, 'never');
+    assert.equal(item.lastDispatchedAt, null);
+  });
+
+  test('a taken row with a terminal [complete] marker counts as run evidence too, not just [done]', async () => {
+    const { app } = buildApp({
+      history: {
+        acme: [historyRow({
+          dispatchedAt: daysAgo(1),
+          feedback: [{ message: '[complete] all good', timestamp: daysAgo(1) }]
+        })]
+      }
+    });
+    const { body } = await get(app);
+    const item = findTemplateResult(body);
+    assert.equal(item.state, 'recent');
+    assert.notEqual(item.lastDispatchedAt, null);
+  });
+
+  // Regression: rule 1 (a live queue row reads `recent` unconditionally) must
+  // survive the new terminal-marker gate unchanged — a queue row carries no
+  // `feedback` at all, and must never be run through the marker check.
+  test('a live queue row still reads recent under the new gate, even with a taken-but-unmarked history row present', async () => {
+    const { app } = buildApp({
+      queued: { acme: [queueRow()] },
+      history: { acme: [historyRow({ dispatchedAt: daysAgo(30), feedback: [] })] }
+    });
+    const { body } = await get(app);
+    const item = findTemplateResult(body);
+    assert.equal(item.state, 'recent');
   });
 });

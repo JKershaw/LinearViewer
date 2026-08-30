@@ -209,3 +209,126 @@ describe('LIN-1825 Beat 2 — direct proxy dispatch (no UI) round-trips through 
     assert.equal(items[0].kind, 'periodical');
   });
 });
+
+// ---------------------------------------------------------------------------
+// LIN-2385 B6 — POST /api/proxy/recommend-and-dispatch has TWO
+// createDispatchItem `fields` blocks (the verb-override branch, `kind` set,
+// and the recommendation-derived branch, `kind` omitted — the branch every
+// autopilot loop's normal "Trigger the next step" call actually takes). Both
+// must carry `periodicalId`, or the stamping capability is wired onto the
+// rare path and silently dropped on the everyday one — reproducing, on the
+// fused verb, the exact defect this beat exists to close.
+//
+// TEST-1 / TEST-14 mirror tests/unit/proxy-dispatch-defaults.test.js's own
+// fixtures for these two branches: with `kind` set, the verb-override branch
+// short-circuits before the LLM; TEST-14 (no `kind`) resolves via the
+// test-token short-circuit to an `implement` action, landing on the
+// recommendation-derived branch.
+// ---------------------------------------------------------------------------
+
+function buildRecommendApp(captured) {
+  const app = express();
+  app.use(express.json());
+  app.use(createProxyRoutes({
+    proxyTokenStore: {
+      createToken: async () => ({ token: 'test-bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
+      validateToken: async () => ({
+        tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1'
+      })
+    },
+    proxyEventStore: { recordEvent: async () => {} },
+    resolveWorkspaceAccess: async () => ({ token: 'test-token', reason: 'ok' }),
+    getWorkspaceAccessToken: async () => 'test-token',
+    getWorkspaceOpenRouterKey: async () => null,
+    agentStatusStore: {},
+    recapCacheStore: { get: async () => null, set: async () => {} },
+    briefCacheStore: { get: async () => null, set: async () => {} },
+    dispatchQueueStore: {
+      addItem: async (urlKey, item) => {
+        captured.item = item;
+        return { _id: 'disp-1', dispatchedAt: '2026-08-30T00:00:00.000Z', ...item };
+      }
+    },
+    workspaceFromUrl: (req, res, next) => next(),
+    freeTierStore: { tryUse: async () => ({ allowed: true }) }
+  }));
+  return app;
+}
+
+describe('LIN-2385 B6 — POST /api/proxy/recommend-and-dispatch stamps periodicalId on BOTH createDispatchItem branches', () => {
+  test('verb-override branch (kind set): a valid periodicalId is persisted onto the fields block', async () => {
+    const captured = {};
+    const app = buildRecommendApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation', periodicalId: KNOWN_ID
+    }, AUTH);
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.ok(captured.item, 'verb-override path must dispatch an item');
+    assert.strictEqual(captured.item.periodicalId, KNOWN_ID);
+  });
+
+  test('verb-override branch (kind set): no periodicalId defaults to null', async () => {
+    const captured = {};
+    const app = buildRecommendApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation'
+    }, AUTH);
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.strictEqual(captured.item.periodicalId, null);
+  });
+
+  test('verb-override branch (kind set): an unknown/typo periodicalId is rejected 400, parity with POST /dispatch', async () => {
+    const captured = {};
+    const app = buildRecommendApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'implementation', periodicalId: UNKNOWN_ID
+    }, AUTH);
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, 'periodicalId must be one of the known periodical template ids');
+    assert.equal(captured.item, undefined, 'a rejected dispatch must never reach addItem');
+  });
+
+  // TEST-14: no `kind` in the request body — resolves via the test-token
+  // short-circuit to an `implement` action, landing on the
+  // recommendation-derived `createDispatchItem` call, never the
+  // verb-override one (see tests/unit/proxy-dispatch-defaults.test.js's own
+  // comment establishing this fixture's branch).
+  test('recommendation-derived branch (no kind — the everyday autopilot trigger): a valid periodicalId is persisted onto the fields block', async () => {
+    const captured = {};
+    const app = buildRecommendApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-14', periodicalId: KNOWN_ID
+    }, AUTH);
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.ok(captured.item, 'recommendation-derived path must dispatch an item');
+    assert.equal(captured.item.kind, 'implementation', 'sanity: this must be the recommendation-derived branch, not the override one');
+    assert.strictEqual(captured.item.periodicalId, KNOWN_ID);
+  });
+
+  test('recommendation-derived branch (no kind): no periodicalId defaults to null', async () => {
+    const captured = {};
+    const app = buildRecommendApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-14'
+    }, AUTH);
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.strictEqual(captured.item.periodicalId, null);
+  });
+
+  test('recommendation-derived branch (no kind): an unknown/typo periodicalId is rejected 400', async () => {
+    const captured = {};
+    const app = buildRecommendApp(captured);
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-14', periodicalId: UNKNOWN_ID
+    }, AUTH);
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, 'periodicalId must be one of the known periodical template ids');
+    assert.equal(captured.item, undefined, 'a rejected dispatch must never reach addItem');
+  });
+});
