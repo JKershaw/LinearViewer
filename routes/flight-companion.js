@@ -10,13 +10,18 @@
  * as tools). No new transport is invented; the prompt reuses the proven proxy
  * kickoff shape.
  *
- *   GET  /workspace/:urlKey/flight-companion        — page shell (gated)
- *   POST /workspace/:urlKey/api/flight-companion/turn — SSE chat turn (LIN-2432 §A.3)
+ *   GET  /workspace/:urlKey/flight-companion                  — page shell (gated)
+ *   POST /workspace/:urlKey/api/flight-companion/turn          — SSE chat turn (LIN-2432 §A.3)
+ *   POST /workspace/:urlKey/api/flight-companion/approve-follow-up — human-approved
+ *     enqueue of a follow-up the model proposed (LIN-2434 §A.6); see that route's
+ *     own header comment below for the full contract.
  *
- * There is intentionally no launch/dispatch endpoint in this V1: the prototype is
- * validated by pasting the prompt into a session by hand and watching it, which
- * also keeps the user-approval gate honest (nothing dispatches from this page). A
- * launch-via-dispatch button is a named, deferred follow-up.
+ * The kickoff prompt above is a SEPARATE, older mechanism (a session standing in
+ * for the model, its curls as tools) — pasted by hand, no dispatch of its own.
+ * The turn + approve-follow-up endpoints are the newer, in-page chat mechanism
+ * (LIN-751 Phase A): the model proposes a follow-up on an auto-wake turn, but can
+ * never dispatch it itself — only approve-follow-up, reached by an attended
+ * human click, can actually enqueue one (LIN-2434's whole guardrail).
  *
  * ## The turn endpoint (LIN-2432 §A.3) — trigger taxonomy
  *
@@ -65,11 +70,16 @@ import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
 import { COMPANION_INSTANCE_PREFIX, COMPANION_SEED_STATE, shouldSpendTurn, buildCompanionSnapshot } from '../lib/flight-companion-gate.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
-import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
+import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS, deriveFollowUpDispatch } from '../lib/chat-tools.js';
 import { sessionIsTerminal } from './dashboard.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
+import { getSessionsForWorkspace } from '../lib/pipeline-loops.js';
+import { createDispatchItem } from '../lib/dispatch-factory.js';
+import { provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
+import { dispatchQueueLimiter } from './dispatch.js';
+import { badRequest, unauthorized, notFound, jsonError, serverError } from '../lib/errors.js';
 
 // Duplicated, not imported — same house convention `lib/flight-companion-gate.js`'s
 // own header documents (each observer-pipeline-stage file restates its own
@@ -447,6 +457,150 @@ export function createFlightCompanionRoutes({
       console.error('Flight Companion turn error:', error);
       sendSSE(res, 'error', { message: 'Failed to generate a response' });
       res.end();
+    }
+  });
+
+  // ─── Approve follow-up (LIN-2434 §A.6) ─────────────────────────────────────
+  //
+  // The server-side approval counterpart to §A.4's `propose` branch in
+  // `lib/chat-tools.js`'s `send_follow_up` executor: that branch deliberately
+  // stops at `{ proposed: true, sessionId, prompt }` without deriving or
+  // enqueueing anything, precisely so derivation happens FRESH, here, from
+  // the session's then-current state — never carried over stale from
+  // whenever the model proposed it.
+  //
+  // Only `sessionId`/`prompt` are read from the body; a client-supplied
+  // `target`/`force`/`followUpTo` is never read at all, so there is nothing
+  // to overwrite. `followUpTo`/`target`/`force` come from
+  // `deriveFollowUpDispatch` (`lib/chat-tools.js`, LIN-2433) — the same
+  // helper `send_follow_up`'s own execute path calls, never re-derived or
+  // hand-copied — and the enqueue goes through `createDispatchItem`
+  // (`lib/dispatch-factory.js`), the same seam every other dispatch path
+  // uses, never `dispatchQueueStore.addItem` directly. No LLM call is made
+  // or re-entered here: once `sessionId` + `prompt` are known the effect is
+  // deterministic.
+  //
+  // R1 (the ratified operator hazard): `dispatchQueueLimiter` is applied
+  // explicitly, because this route lives on a different router/factory than
+  // routes/dispatch.js and inherits nothing from it by registration.
+  //
+  // R2: going through `createDispatchItem` does NOT preserve the LIN-1656
+  // duplicate-dispatch guard or the LIN-1751 `maxTasks` budget bound —
+  // `deriveFollowUpDispatch` always returns a non-null `followUpTo`, and
+  // both guards are entry-gated on `followUpTo == null`
+  // (`lib/dispatch-factory.js`), so neither can ever engage on this route.
+  // That is deliberate factory design (a `followUpTo` row IS the intended
+  // second dispatch), not a defect, and it changes nothing about the
+  // correctness of calling `createDispatchItem` here. What it actually
+  // contributes on this path: LIN-1139 workspace dispatch defaults, kind
+  // resolution, and the LIN-1431 `finalizePrompt` → `provisionBootstrapToken`
+  // hop (without which a resumed claude-code session lands with
+  // `bootstrapToken: null` and can't write back). The real bounds on this
+  // route are stronger anyway: byte-for-byte parity with `send_follow_up`'s
+  // own execute path, plus the human click, plus this route's own explicit
+  // rate limit above.
+  router.post('/workspace/:urlKey/api/flight-companion/approve-follow-up', dispatchQueueLimiter, workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const featureFlags = getFeatureFlags(req.session);
+
+    if (featureFlags.flightCompanion !== true) {
+      return jsonError(res, 403, 'Flight Companion feature is not enabled');
+    }
+
+    // Every write here stays behind an attended, session-authed request —
+    // the boundary the whole ticket exists to enforce is "who can reach
+    // createDispatchItem at all", not "who can see the page".
+    const dispatchedBy = req.session && req.session.accountId;
+    if (!dispatchedBy) {
+      return unauthorized.json(res, 'Authentication required to approve a follow-up');
+    }
+
+    const body = req.body || {};
+    const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
+    const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+
+    if (!sessionId) {
+      return badRequest.json(res, 'approve-follow-up requires a non-empty "sessionId" string');
+    }
+    if (!prompt) {
+      return badRequest.json(res, 'approve-follow-up requires a non-empty "prompt" string');
+    }
+    if (!dispatchQueueStore) {
+      return serverError.json(res, 'Flight Companion approve-follow-up is not configured for this workspace');
+    }
+
+    try {
+      // Same read `send_follow_up`'s executor uses (lib/chat-tools.js).
+      const sessions = await getSessionsForWorkspace(
+        workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore }
+      );
+      const session = sessions.find(s => s.sessionId === sessionId);
+
+      // The route's OWN guard, ahead of derivation: deriveFollowUpDispatch
+      // dereferences session.loops/session.sessionId unguarded by design
+      // (LIN-2433's review ledger, item 3) — without this check here, an
+      // unknown sessionId becomes a 500 instead of a clean 404.
+      if (!session) {
+        return notFound.json(res, `Session ${sessionId} not found`);
+      }
+
+      let followUpTo, target, force;
+      try {
+        ({ followUpTo, target, force } = deriveFollowUpDispatch(session));
+      } catch (deriveError) {
+        // deriveFollowUpDispatch throws for a dash/local anchor target
+        // (LIN-2433's review ledger, item 4). 422, not 409: this is not a
+        // transient state conflict a retry could resolve — a dash/local
+        // session structurally can never support a follow-up dispatch, the
+        // same "well-formed request, unsupported for this resource" shape
+        // routes/proxy.js's CAPABILITY_NOT_SUPPORTED already uses 422 for.
+        return jsonError(res, 422, deriveError.message);
+      }
+
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const item = await createDispatchItem({
+        store: dispatchQueueStore,
+        urlKey: workspace.urlKey,
+        workspacePreferencesStore,
+        applyDefaultHarness: false,
+        prompt,
+        // Byte-for-byte mirror of send_follow_up's own finalizePrompt
+        // (lib/chat-tools.js): the shouldUseMcpTokenField guard is
+        // load-bearing (LIN-1431 S3 #2) — minting for a prose harness that
+        // never rewrites the prompt would strand an unreferenceable
+        // credential on the item.
+        finalizePrompt: async (resolvedHarness) => {
+          if (shouldUseMcpTokenField(resolvedHarness)) {
+            const bootstrapToken = await provisionBootstrapToken({
+              proxyTokenStore,
+              urlKey: workspace.urlKey,
+              baseUrl,
+              label: 'dispatch-bootstrap',
+              harness: resolvedHarness,
+              createdBy: dispatchedBy
+            });
+            return { prompt, bootstrapToken };
+          }
+          return { prompt, bootstrapToken: null };
+        },
+        fields: {
+          followUpTo,
+          target,
+          force,
+          dispatchedBy,
+        }
+      });
+
+      res.json({
+        queued: true,
+        itemId: item._id,
+        sessionId: session.sessionId,
+        target,
+        force,
+      });
+    } catch (error) {
+      console.error('Flight Companion approve-follow-up error:', error);
+      serverError.json(res, 'Failed to approve follow-up');
     }
   });
 

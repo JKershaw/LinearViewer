@@ -544,8 +544,37 @@ describe('Flight Companion turn endpoint — source-text wiring (structural pins
     assert.doesNotMatch(ROUTE_SRC, /turnKind\s*===\s*'auto-wake'[^}]*phase:\s*'proposed'/s);
   });
 
-  test('createDispatchItem is never imported into this route — the ONLY door to it is deep inside lib/chat-tools.js\'s executor, already proven unreachable in propose mode by tests/unit/chat-tools.test.js', () => {
-    assert.doesNotMatch(ROUTE_SRC, /^import\s*\{[^}]*createDispatchItem/m);
+  test('createDispatchItem is never called from the TURN route\'s own handler — its only door there is deep inside lib/chat-tools.js\'s executor, already proven unreachable in propose mode by tests/unit/chat-tools.test.js', () => {
+    // LIN-2434 §A.6 legitimately added a SEPARATE route to this same file —
+    // POST .../approve-follow-up — that DOES import and call createDispatchItem
+    // directly (a human-approval-gated write, by design; see
+    // tests/unit/flight-companion-approve-follow-up-route.test.js for that
+    // route's own pins). So the invariant this test protects is scoped to the
+    // turn route's own handler body, not "this file never imports it".
+    const turnRouteStart = ROUTE_SRC.indexOf("router.post('/workspace/:urlKey/api/flight-companion/turn'");
+    assert.ok(turnRouteStart >= 0, 'expected to find the turn route registration in routes/flight-companion.js');
+    // The route registration's own closing `  });` (2-space indent, matching
+    // the router.post( call's own indent level) — NOT the next route's
+    // registration, whose preceding doc comment may legitimately mention
+    // createDispatchItem in prose (as approve-follow-up's does).
+    const closeIdx = ROUTE_SRC.indexOf('\n  });\n', turnRouteStart);
+    assert.ok(closeIdx > turnRouteStart, 'expected to find the turn route\'s own closing `  });`');
+    const turnRouteBody = ROUTE_SRC.slice(turnRouteStart, closeIdx);
+    // Hardening (LIN-2434 beat 3, Part D): if the `\n  });\n` search above
+    // ever matched EARLIER than the turn route's real closing brace (e.g. a
+    // future edit adds another 2-space-indented `});` inside the handler
+    // body before its end), `turnRouteBody` would silently truncate to a
+    // near-empty slice and the doesNotMatch assertion below would pass
+    // VACUOUSLY — proving nothing. Pin the slice as non-trivial and as
+    // actually reaching the handler's own end, via a marker string that
+    // exists ONLY in the turn route's own catch block.
+    assert.match(turnRouteBody, /Failed to generate a response/,
+      'the extracted slice must reach the turn handler\'s own closing catch block — a truncated/vacuous slice would silently pass the assertion below');
+    // A CALL (no space before the paren, this codebase's call style), not a
+    // prose mention — the turn route's own comment legitimately names
+    // createDispatchItem, parenthetically, when explaining why propose-mode
+    // never reaches it ("... createDispatchItem (lib/chat-tools.js, ...)").
+    assert.doesNotMatch(turnRouteBody, /createDispatchItem\(/);
   });
 
   test('no companion path ever issues a /api/dashboard/* request — a proxy-token session 401s there, and it would be a fourth read-model representation', () => {
