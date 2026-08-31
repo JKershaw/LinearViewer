@@ -107,7 +107,7 @@ async function withEnv(vars, fn) {
  * shared array the caller can pass in so gate-store calls and freeTierStore
  * calls interleave in one true call-order timeline.
  */
-function fakeObserverStateStore({ companionRev = 1, companionState = COMPANION_SEED_STATE, censusDoc = null, calls = [] } = {}) {
+function fakeObserverStateStore({ companionRev = 1, companionState = COMPANION_SEED_STATE, censusDoc = null, calls = [], advanceResult = true } = {}) {
   return {
     calls,
     async ensureSeeded(instanceKey) {
@@ -120,7 +120,7 @@ function fakeObserverStateStore({ companionRev = 1, companionState = COMPANION_S
     },
     async advance(instanceKey, expectedRev, nextState, meta) {
       calls.push({ store: 'observerState', method: 'advance', instanceKey, expectedRev });
-      return true;
+      return advanceResult;
     },
   };
 }
@@ -345,6 +345,133 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.2) — auto-wake gate ord
   });
 });
 
+describe('Flight Companion turn endpoint (LIN-2435 Commit 1) — advance() tri-state is consumed, never discarded', () => {
+  function chatClientThatMustNotBeCalled() {
+    return {
+      async streamChat() { throw new Error('streamChat must not be called — advance() denied the spend'); },
+      async streamChatWithTools() { throw new Error('streamChatWithTools must not be called — advance() denied the spend'); },
+    };
+  }
+
+  test('advance() === false (lost race) aborts before SSE/model work with reason: "lost-race"', async () => {
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc(), advanceResult: false });
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present'); } };
+    const app = buildApp({
+      observerStateStore, freeTierStore, chatClient: chatClientThatMustNotBeCalled(),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const { status, json, headers } = await post(app, '/workspace/acme/api/flight-companion/turn', {});
+
+    assert.strictEqual(status, 200);
+    assert.deepStrictEqual(json, { turnKind: 'auto-wake', spent: false, reason: 'lost-race' });
+    assert.doesNotMatch(headers.get('content-type') || '', /text\/event-stream/, 'a lost CAS must abort before SSE headers are set');
+  });
+
+  test('advance() === null (backend error) aborts with reason: "advance-error" and logs once, parity with sibling observer callers', async () => {
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc(), advanceResult: null });
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present'); } };
+    const app = buildApp({
+      observerStateStore, freeTierStore, chatClient: chatClientThatMustNotBeCalled(),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const originalError = console.error;
+    const errorCalls = [];
+    console.error = (...args) => { errorCalls.push(args); };
+    let status, json;
+    try {
+      ({ status, json } = await post(app, '/workspace/acme/api/flight-companion/turn', {}));
+    } finally {
+      console.error = originalError;
+    }
+
+    assert.strictEqual(status, 200);
+    assert.deepStrictEqual(json, { turnKind: 'auto-wake', spent: false, reason: 'advance-error' });
+    assert.strictEqual(errorCalls.length, 1, 'a null advance() must log exactly once');
+    assert.match(String(errorCalls[0][0]), /advance\(\) backend error/);
+  });
+
+  test('advance() === true (the ordinary case) proceeds to the model call unchanged', async () => {
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() }); // default advanceResult: true
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present'); } };
+    const calls = [];
+    const chatClient = {
+      async streamChat(messages, opts, onEvent) { calls.push('streamChat'); onEvent('done', {}); },
+      async streamChatWithTools(messages, opts, onEvent) { calls.push('streamChatWithTools'); onEvent('done', {}); },
+    };
+    const app = buildApp({ observerStateStore, freeTierStore, chatClient, session: { openRouterApiKey: 'sk-test-paid-key' } });
+
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {});
+    assert.strictEqual(status, 200);
+    assert.strictEqual(calls.length, 1, 'the model call must have been reached when advance() clears');
+  });
+});
+
+describe('Flight Companion turn endpoint (LIN-2435 Commit 1) — the gate\'s surface is emitted on the auto-wake done frame', () => {
+  function parseSSE(text) {
+    return text.split('\n\n').filter(Boolean).map((frame) => {
+      const type = /^event: (.*)$/m.exec(frame)?.[1];
+      const data = /^data: (.*)$/m.exec(frame)?.[1];
+      return { type, data: data ? JSON.parse(data) : null };
+    });
+  }
+
+  function censusDocWithAttention() {
+    return {
+      rev: 7,
+      stateHash: 'hash-attn',
+      state: {
+        lanes: { working: 1, silent: 0, blocked: 1, terminal: 0, queued: 0, resolved: 0, unknown: 0 },
+        attention: [{ loopId: 'l1', lane: 'blocked', stage: 'plan' }],
+      },
+    };
+  }
+
+  function chatClientEmittingDoneOnly() {
+    return {
+      async streamChat(messages, opts, onEvent) { onEvent('done', {}); },
+      async streamChatWithTools(messages, opts, onEvent) { onEvent('done', {}); },
+    };
+  }
+
+  test('surface:true — the ordinary case, any later spend with something worth telling the user', async () => {
+    const observerStateStore = fakeObserverStateStore({ censusDoc: censusDocWithAttention() });
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called'); } };
+    const app = buildApp({ observerStateStore, freeTierStore, chatClient: chatClientEmittingDoneOnly(), session: { openRouterApiKey: 'sk-test-paid-key' } });
+
+    const { status, text } = await post(app, '/workspace/acme/api/flight-companion/turn', {});
+    assert.strictEqual(status, 200);
+    const doneFrame = parseSSE(text).find(f => f.type === 'done');
+    assert.ok(doneFrame, 'expected a done frame on the SSE stream');
+    assert.strictEqual(doneFrame.data.surface, true);
+  });
+
+  test('surface:false — the narrow seed-turn edge case (priorSnapshot == null, attentionCount === 0), reachable only via a store double', async () => {
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() }); // attention: []
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called'); } };
+    const app = buildApp({ observerStateStore, freeTierStore, chatClient: chatClientEmittingDoneOnly(), session: { openRouterApiKey: 'sk-test-paid-key' } });
+
+    const { status, text } = await post(app, '/workspace/acme/api/flight-companion/turn', {});
+    assert.strictEqual(status, 200);
+    const doneFrame = parseSSE(text).find(f => f.type === 'done');
+    assert.ok(doneFrame);
+    assert.strictEqual(doneFrame.data.surface, false);
+  });
+
+  test('a user-initiated done frame carries no surface field at all', async () => {
+    const observerStateStore = fakeObserverStateStore();
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called'); } };
+    const app = buildApp({ observerStateStore, freeTierStore, chatClient: chatClientEmittingDoneOnly(), session: { openRouterApiKey: 'sk-test-paid-key' } });
+
+    const { status, text } = await post(app, '/workspace/acme/api/flight-companion/turn', { message: 'status please' });
+    assert.strictEqual(status, 200);
+    const doneFrame = parseSSE(text).find(f => f.type === 'done');
+    assert.ok(doneFrame);
+    assert.ok(!('surface' in doneFrame.data), 'user-initiated done frames must not carry a surface field');
+  });
+});
+
 describe('Flight Companion turn endpoint (LIN-2432 beat 4) — live-model-call seam (chatClient / createToolCatalog)', () => {
   // LIN-2432 beat 4, Job 1: beat 2 pinned these two acceptance-criteria
   // properties as source-text assertions (mock.module needs
@@ -475,7 +602,11 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.4) — the `phase: \'prop
       async streamChatWithTools(messages, opts, onEvent) {
         const call = { id: callId, name: 'send_follow_up', arguments: { sessionId: 'sess-1', prompt: 'keep going' } };
         const raw = await opts.executeTool(call);
-        onEvent('tool', { id: call.id, name: call.name, phase: 'result', result: raw });
+        // F2 (plan-review 1591ea1a): production stringifies a tool result
+        // (lib/openrouter.js's truncateToolResult) before it ever reaches
+        // onEvent — a raw object here would be a false witness the client's
+        // JSON.parse-based proposal parser never actually has to handle.
+        onEvent('tool', { id: call.id, name: call.name, phase: 'result', result: JSON.stringify(raw) });
         onEvent('done', {});
       },
     };
@@ -506,7 +637,7 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.4) — the `phase: \'prop
     assert.strictEqual(toolFrames[0].data.phase, 'proposed',
       'the proposal must NOT arrive as the generic phase: "result" — that is the one distinction §A.4 exists to make');
     assert.strictEqual(toolFrames[0].data.id, 'call_abc', 'the relabel must preserve the frame, rewriting only phase');
-    assert.deepStrictEqual(toolFrames[0].data.result, proposal, 'the proposal payload itself is passed through untouched');
+    assert.deepStrictEqual(JSON.parse(toolFrames[0].data.result), proposal, 'the proposal payload itself is passed through untouched (stringified, matching production)');
     // Belt-and-braces on the raw wire bytes: no consumer can see "result" for
     // this call id, and no NEW event kind was invented for the proposal.
     assert.doesNotMatch(text, /"phase":"result"/);

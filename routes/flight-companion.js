@@ -314,6 +314,13 @@ export function createFlightCompanionRoutes({
     // BEFORE the model or the free-tier quota is touched at all — ordering is
     // an acceptance criterion, not a style preference.
     let companionAdvance = null;
+    // LIN-2435 Commit 1: the gate's own computed `surface` (whether this
+    // spend is worth resetting the client's wake cadence for), hoisted the
+    // same way `companionAdvance` is — set inside the auto-wake block below,
+    // read by the `onEvent` closure's `done`-frame relabel further down. Only
+    // ever attached to an auto-wake turn's terminal frame; a user-initiated
+    // `done` carries no `surface` field at all.
+    let turnSurface = null;
     if (turnKind === 'auto-wake') {
       const companionInstanceKey = `${COMPANION_INSTANCE_PREFIX}${workspace.urlKey}`;
       const sweepInstanceKey = `${SWEEP_INSTANCE_PREFIX}${workspace.urlKey}`;
@@ -329,6 +336,7 @@ export function createFlightCompanionRoutes({
         // quota touched at all.
         return res.json({ turnKind, spent: false, reason: gate.reason });
       }
+      turnSurface = gate.surface;
       // Captured now (CAS'd against the rev we just read), but only actually
       // PERSISTED below once tryUse has also cleared — a config/quota failure
       // between here and there must not mark the floor as spent when no real
@@ -363,10 +371,24 @@ export function createFlightCompanionRoutes({
     }
 
     if (companionAdvance) {
-      await observerStateStore.advance(
+      // LIN-2435 Commit 1: consume advance()'s tri-state (mirroring
+      // lib/observer-sweep.js:281-284 / lib/observer-pass.js:371-374) — a
+      // lost CAS (`false`, another overlapping auto-wake turn won the race)
+      // or a backend error (`null`) must abort BEFORE the SSE headers below
+      // and before the model call, never silently proceed to a second
+      // billable spend against the same gate window. `null` denies the
+      // spend, the safe reading of observer-state-store's own "do not treat
+      // as safe to converge" contract.
+      const advanceResult = await observerStateStore.advance(
         companionAdvance.instanceKey, companionAdvance.expectedRev, companionAdvance.nextRecord,
         { reason: 'flight-companion-turn' }
       );
+      if (advanceResult !== true) {
+        if (advanceResult === null) {
+          console.error('Flight Companion turn: advance() backend error', { instanceKey: companionAdvance.instanceKey });
+        }
+        return res.json({ turnKind, spent: false, reason: advanceResult === null ? 'advance-error' : 'lost-race' });
+      }
     }
 
     // Start SSE.
@@ -386,6 +408,13 @@ export function createFlightCompanionRoutes({
       if (type === 'tool' && data.phase === 'result' && proposedCallIds.has(data.id)) {
         data = { ...data, phase: 'proposed' };
         proposedCallIds.delete(data.id);
+      }
+      // LIN-2435 Commit 1: surface the gate's already-computed `surface` on
+      // an auto-wake turn's terminal frame ONLY — the client's wake-cadence
+      // reset criterion (ruling 62bb3b4e). A user-initiated `done` is
+      // unchanged and carries no `surface` field at all.
+      if (type === 'done' && turnKind === 'auto-wake') {
+        data = { ...data, surface: turnSurface };
       }
       sendSSE(res, type, data);
       if (type === 'done' || type === 'error') {
