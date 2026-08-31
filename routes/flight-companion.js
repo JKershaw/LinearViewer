@@ -3,12 +3,15 @@
  * chat interface for work in flight" (LIN-922).
  *
  * Anchored at /workspace/:urlKey/flight-companion, reusing workspaceFromUrl + the
- * collective/task-chat/next-run feature-gate-redirect-to-settings pattern. The
- * page is a provider-free stub that surfaces the exact kickoff prompt
- * (buildFlightCompanionKickoff) for copy/paste into a real Claude Code session —
- * the prototype's whole mechanism (a session standing in for the model, its curls
- * as tools). No new transport is invented; the prompt reuses the proven proxy
- * kickoff shape.
+ * collective/task-chat/next-run feature-gate-redirect-to-settings pattern.
+ *
+ * LIN-2435 (Phase A §A.8) made this a live, in-page chat surface (below) —
+ * the page is no longer just a stub. It ALSO still serves the original, older
+ * kickoff-prompt mechanism (buildFlightCompanionKickoff) for copy/paste into a
+ * real Claude Code session, kept alongside the newer chat rather than replaced
+ * by it, for whoever wants a full agent session rather than a chat turn. No
+ * new transport is invented there; the prompt reuses the proven proxy kickoff
+ * shape.
  *
  *   GET  /workspace/:urlKey/flight-companion                  — page shell (gated)
  *   POST /workspace/:urlKey/api/flight-companion/turn          — SSE chat turn (LIN-2432 §A.3)

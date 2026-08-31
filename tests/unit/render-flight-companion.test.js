@@ -72,3 +72,18 @@ describe('renderFlightCompanionPage — LIN-2435 Commit 2: chat-thread render + 
     assert.match(html, /id="flight-companion-copy-feedback"/);
   });
 });
+
+describe('renderFlightCompanionPage — LIN-2435 Commit 4: on-page copy sync', () => {
+  test('the stale "paste it into a fresh Claude Code session" / "hand this kickoff prompt to a real Claude Code session" copy is gone from the page', () => {
+    const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
+    assert.doesNotMatch(html, /paste it into a fresh Claude Code session/i);
+    assert.doesNotMatch(html, /hand this kickoff prompt to a real Claude Code session/i);
+  });
+
+  test('the intro copy and subtitle now describe the live chat, not a copy/paste-only workflow', () => {
+    const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
+    assert.match(html, /checks in with you/);
+    assert.match(html, /Approve/);
+    assert.match(html, /Dismiss/);
+  });
+});
