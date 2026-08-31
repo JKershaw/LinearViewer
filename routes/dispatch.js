@@ -74,7 +74,11 @@ const feedbackLimiter = rateLimit({
 });
 
 // Dispatch queue: 30 requests per minute per IP (reasonable for adding prompts)
-const dispatchQueueLimiter = rateLimit({
+// Exported (LIN-2434 R1) so a dispatch-creating route on a different router/
+// factory (e.g. routes/flight-companion.js's approve-follow-up route) can
+// apply the SAME budget explicitly — mounting on a different router does not
+// inherit a limiter applied only within this one.
+export const dispatchQueueLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 30,
   standardHeaders: true,

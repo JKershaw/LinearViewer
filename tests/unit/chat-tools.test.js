@@ -10,10 +10,11 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA } from '../../lib/chat-tools.js';
+import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA, deriveFollowUpDispatch } from '../../lib/chat-tools.js';
 import { TOOL_RESULT_MAX_CHARS } from '../../lib/openrouter.js';
 import { hashContext } from '../../lib/recap-cache.js';
 import { snapshotFromContext } from '../../lib/task-snapshot-store.js';
+import { getSessionsForWorkspace } from '../../lib/pipeline-loops.js';
 
 // A recording fake of the pass-1 provider read surface. Every method records
 // the scope it was called with so tests can assert workspace-scoping, and
@@ -1286,6 +1287,91 @@ describe('LIN-1486: send_follow_up targets the lineage tail, not the session roo
       'targets the fallback anchor (session.loops[0]) itself, its own lineage tail');
     assert.strictEqual(dispatchQueueStore.calls[0].item.force, true,
       'w1 is done; the old every()-across-both-workers aggregate would have said false because w2 is still running');
+  });
+});
+
+// LIN-2434 beat 3, Part B — DIRECT unit coverage for the exported
+// `deriveFollowUpDispatch` helper itself (LIN-2433 review ledger item 2). At
+// LIN-2433's own merge it was proved only TRANSITIVELY through send_follow_up
+// (the 'LIN-1486' describe block just above, driving the same scenarios
+// through executeTool). As the helper's second consumer (LIN-2434's
+// approve-follow-up route), this ticket owes it direct tests: call the
+// helper itself and assert on ITS OWN return value.
+//
+// Realistic scenarios reuse the SAME fixtures/real getSessionsForWorkspace
+// reconstruction as the block above (multiWakeHistory/orphanMultiLoopHistory)
+// rather than re-deriving a parallel fixture set. The two edge cases the
+// JSDoc promises but that fixture set never happens to produce — the dash/
+// local throw (needs no real session shape at all) and the TRUE no-loops
+// orphan fallback (a documented contract of the pure function, per its own
+// JSDoc: "Falls back to session.sessionId/false when there's no anchor at
+// all") — use hand-built minimal session objects instead.
+describe('deriveFollowUpDispatch — direct unit coverage (LIN-2433 review ledger item 2)', () => {
+  async function realSession(history, sessionId) {
+    const stores = makeMockSessionStores({ history });
+    const sessions = await getSessionsForWorkspace(URL_KEY, {
+      dispatchStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
+    });
+    const session = sessions.find(s => s.sessionId === sessionId);
+    assert.ok(session, `expected a reconstructed session for ${sessionId}`);
+    return session;
+  }
+
+  test('targets the lineage TAIL (the wake), not the session root — LIN-1486', async () => {
+    const session = await realSession(multiWakeHistory(), 'sess-multi');
+    assert.strictEqual(deriveFollowUpDispatch(session).followUpTo, 'wake-1',
+      'must resume the live tail, not the long-finished root anchor');
+  });
+
+  test('force is the TAIL\'s own terminality, independent of the anchor\'s', async () => {
+    const runningTail = await realSession(multiWakeHistory(), 'sess-multi');
+    assert.strictEqual(deriveFollowUpDispatch(runningTail).force, false,
+      'the tail is still running — the done anchor must not leak into force');
+
+    const doneTail = await realSession(multiWakeHistory({
+      anchorFeedback: [{ message: '[working] 1 tools/2s · alive', timestamp: T_MULTI_ANCHOR_DISPATCHED }],
+      anchorResolvedAt: null,
+      tailFeedback: [{ message: '[done] Task completed in 5s', timestamp: T_MULTI_WAKE_DONE }],
+      tailResolvedAt: T_MULTI_WAKE_DONE,
+    }), 'sess-multi');
+    assert.strictEqual(deriveFollowUpDispatch(doneTail).force, true,
+      'the still-running anchor must not leak into force when the tail itself is done');
+  });
+
+  test('sibling-lineage isolation — a later-dispatched sibling worker is never chosen over the anchor\'s own tail', async () => {
+    const session = await realSession(multiWakeHistory(), 'sess-multi');
+    assert.strictEqual(deriveFollowUpDispatch(session).followUpTo, 'wake-1',
+      'the sibling worker w-side must never be targeted for the anchor\'s own follow-up');
+  });
+
+  test('anchorless multi-loop session — falls back to session.loops[0] as the anchor, targeting ITS OWN lineage tail', async () => {
+    const session = await realSession(orphanMultiLoopHistory(), 'sess-orphan');
+    const result = deriveFollowUpDispatch(session);
+    assert.strictEqual(result.followUpTo, 'w1', 'the fallback anchor (loops[0]) is its own single-loop lineage tail');
+    assert.strictEqual(result.force, true, 'w1 itself is done, independent of w2 still running');
+  });
+
+  test('throws for a dash anchor target — not supported for follow-up', () => {
+    const session = { sessionId: 'sess-dash', loops: [{ loopId: 'sess-dash', kind: 'autopilot', target: 'dash' }] };
+    assert.throws(() => deriveFollowUpDispatch(session), /dash\/local targets are not supported/);
+  });
+
+  test('throws for a local anchor target — not supported for follow-up', () => {
+    const session = { sessionId: 'sess-local', loops: [{ loopId: 'sess-local', kind: 'autopilot', target: 'local' }] };
+    assert.throws(() => deriveFollowUpDispatch(session), /dash\/local targets are not supported/);
+  });
+
+  test('a true orphan (no loops at all) falls back to session.sessionId with force:false, target defaulting to cli', () => {
+    const session = { sessionId: 'sess-empty', loops: [] };
+    assert.deepStrictEqual(deriveFollowUpDispatch(session), { followUpTo: 'sess-empty', target: 'cli', force: false });
+  });
+
+  test('a single-loop anchor with no follow-up wake yet targets itself, force from its OWN terminality', () => {
+    const nonTerminal = { sessionId: 'sess-solo', loops: [{ loopId: 'sess-solo', kind: 'autopilot', target: 'web' }] };
+    assert.deepStrictEqual(deriveFollowUpDispatch(nonTerminal), { followUpTo: 'sess-solo', target: 'web', force: false });
+
+    const terminal = { sessionId: 'sess-solo-2', loops: [{ loopId: 'sess-solo-2', kind: 'autopilot', target: 'web', terminalStatus: 'done' }] };
+    assert.deepStrictEqual(deriveFollowUpDispatch(terminal), { followUpTo: 'sess-solo-2', target: 'web', force: true });
   });
 });
 
