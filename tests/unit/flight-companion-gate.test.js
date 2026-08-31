@@ -15,6 +15,12 @@
  *   - The write-nothing-on-false invariant, structurally, over every
  *     non-spend case above.
  *   - The multi-turn sequence witness: the gate opens exactly once.
+ *   - The LANE_KEYS projection (close-out L1): the snapshot carries exactly
+ *     the 7 lanes of the record shape, whatever the producer emits.
+ *   - The injected-clock guard (close-out L2): a missing or non-finite `now`
+ *     THROWS rather than silently falling back to `Date.now()`. Mirrors the
+ *     precedent this module's header cites, tests/unit/observer-sweep.test.js's
+ *     'ledger 9' assert.rejects case for `sweepOneWorkspace`.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
@@ -72,6 +78,39 @@ describe('buildCompanionSnapshot', () => {
     const doc = census({ stateHash: 'h1', rev: 1 });
     assert.deepStrictEqual(buildCompanionSnapshot(doc).attentionKeys, []);
     assert.strictEqual(buildCompanionSnapshot(doc).attentionCount, 0);
+  });
+
+  // ── L1: the lane projection is through LANE_KEYS, not a wholesale copy ──
+  // Both cases below pass trivially under a `{ ...state.lanes }` spread only
+  // if the producer's object already happens to match the record shape; they
+  // are here precisely because it might not.
+
+  test('projects through LANE_KEYS: a producer-added lane key never reaches the snapshot', () => {
+    const doc = census({
+      stateHash: 'h1',
+      rev: 1,
+      lanesState: { ...lanes({ blocked: 2 }), zombie: 4, abandoned: 9 }
+    });
+    const snapshot = buildCompanionSnapshot(doc);
+    assert.deepStrictEqual(Object.keys(snapshot.lanes).sort(), ['blocked', 'queued', 'resolved', 'silent', 'terminal', 'unknown', 'working']);
+    assert.deepStrictEqual(snapshot.lanes, lanes({ blocked: 2 }));
+  });
+
+  test('projects through LANE_KEYS: an absent lane reads 0, never undefined — so terminalDelta stays a number', () => {
+    // A census missing `terminal` entirely. Under a wholesale spread this
+    // yields `terminal: undefined`, and `undefined - undefined` is NaN —
+    // `NaN <= 0` is false, so the `no-delta` fold would silently stop firing.
+    const doc = census({ stateHash: 'h1', rev: 1, lanesState: { working: 1 } });
+    const snapshot = buildCompanionSnapshot(doc);
+    assert.strictEqual(snapshot.lanes.terminal, 0);
+    assert.deepStrictEqual(snapshot.lanes, lanes({ working: 1 }));
+
+    // And the downstream consequence, asserted end-to-end rather than assumed:
+    // two such censuses still fold to `no-delta` instead of spending.
+    const companionDoc = companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: buildCompanionSnapshot(doc) });
+    const next = census({ stateHash: 'hNew', rev: 2, lanesState: { working: 1 } });
+    const result = shouldSpendTurn({ currentCensusDoc: next, companionDoc, now: 1000 });
+    assert.deepStrictEqual(result, { spend: false, surface: false, reason: 'no-delta', nextRecord: null });
   });
 });
 
@@ -290,5 +329,60 @@ describe('shouldSpendTurn: multi-turn sequence — the gate opens exactly once',
 describe('COMPANION_INSTANCE_PREFIX', () => {
   test('is the third instance-key family', () => {
     assert.strictEqual(COMPANION_INSTANCE_PREFIX, 'companion:v1:');
+  });
+});
+
+// ─── L2: the injected-clock guard ────────────────────────────────────────
+//
+// Close-out ledger item L2. The module's determinism rests entirely on `now`
+// being injected (§3: "never `Date.now()` read internally"), and the header
+// cites lib/observer-sweep.js:231-233 as its precedent — but that precedent
+// carries its own assert.rejects test and this module shipped without the
+// equivalent, so replacing the guard with a silent `Date.now()` fallback left
+// the suite green. These cases are that missing witness: under such a
+// fallback every `assert.throws` below fails, because the call returns a
+// perfectly ordinary result instead of refusing.
+
+describe('shouldSpendTurn: the injected clock is REQUIRED (L2)', () => {
+  const doc = census({ stateHash: 'hNew', rev: 2, lanesState: lanes({}), attention: [attentionRow('loop-1', 'blocked', 'review')] });
+  const companionDoc = companion({
+    lastCensusStateHash: 'hOld',
+    lastCensusSnapshot: { lanes: ZERO_LANES, attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 }
+  });
+
+  const badClocks = [undefined, null, NaN, Infinity, -Infinity, '1700000000000', 'not-a-date', '', new Date('nope'), {}, true, [] ];
+
+  for (const bad of badClocks) {
+    test(`now = ${String(bad) || JSON.stringify(bad)} throws instead of falling back to Date.now()`, () => {
+      assert.throws(
+        () => shouldSpendTurn({ currentCensusDoc: doc, companionDoc, now: bad }),
+        /now \(epoch ms or Date\) is required/,
+        `now = ${String(bad)} must throw`
+      );
+    });
+  }
+
+  test('the guard runs FIRST — it refuses before even the no-census branch can answer', () => {
+    // Ordering matters: were the guard below the branch table, a bad clock on
+    // a null census would quietly return `no-census` and the refusal would
+    // never be reached on the path that matters.
+    assert.throws(
+      () => shouldSpendTurn({ currentCensusDoc: null, companionDoc: null, now: undefined }),
+      /now \(epoch ms or Date\) is required/
+    );
+  });
+
+  test('the three accepted clock forms are NOT refused, and agree on the stamp', () => {
+    // The negative cases above are only meaningful if the guard is a real
+    // discriminator rather than a blanket throw. Epoch ms, a Date, and an ISO
+    // string are the module's documented inputs; all three must produce the
+    // same `lastTurnAt`.
+    const ms = 1788134400000;
+    const stamps = [ms, new Date(ms), new Date(ms).toISOString()].map((now) => {
+      const result = shouldSpendTurn({ currentCensusDoc: doc, companionDoc, now });
+      assert.strictEqual(result.spend, true, `now = ${String(now)} must not be refused`);
+      return result.nextRecord.lastTurnAt;
+    });
+    assert.deepStrictEqual(stamps, [new Date(ms).toISOString(), new Date(ms).toISOString(), new Date(ms).toISOString()]);
   });
 });
