@@ -607,6 +607,93 @@ describe('flight-companion.js — single-flight guard (client overlap)', () => {
     await flush();
     assert.strictEqual(sendBtn.disabled, false);
   });
+
+  test('N1: a pending auto-wake timer firing while a user turn is in flight makes no overlapping request', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    let resolveUserFetch;
+    const { exports: m, fetchCalls, questionInput } = loadClient({
+      fetchImpl: (url, opts) => {
+        const body = JSON.parse(opts.body);
+        if (body.message) return new Promise((resolve) => { resolveUserFetch = resolve; });
+        return jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' });
+      },
+    });
+
+    // User sends at t=10s, well before the initial auto-wake timer (scheduled
+    // for t=30s at load) is due.
+    t.mock.timers.tick(10000);
+    await flush();
+    questionInput.value = 'status please';
+    m.submitQuestion();
+    assert.strictEqual(fetchCalls.length, 1, 'the user turn is the only call so far');
+
+    // Advance to t=30s: the pending auto-wake timer fires while the user
+    // turn is still in flight. The `inFlight` guard in autoWakeTick must
+    // retry later rather than stacking a second concurrent request — the
+    // case the single-flight guard actually protects (deleting it, M9 in
+    // the LIN-2435 review, left the pre-existing overlap test green because
+    // no second timer exists while a call is in flight under this chained-
+    // timeout design; this is the witness that was missing).
+    t.mock.timers.tick(20000);
+    await flush();
+    assert.strictEqual(fetchCalls.length, 1, 'no overlapping auto-wake request while the user turn is in flight');
+
+    resolveUserFetch(sseResponse([sseFrame('done', {})]));
+    await flush();
+  });
+});
+
+describe('flight-companion.js — cadence resiliency across a hidden/visible transition mid-turn (LIN-2435 review B1)', () => {
+  test('a user-initiated failure that spans a hidden→visible transition mid-turn does not stall the cadence', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    let rejectUserFetch;
+    const { exports: m, fetchCalls, questionInput, doc } = loadClient({
+      fetchImpl: (url, opts) => {
+        const body = JSON.parse(opts.body);
+        if (body.message) return new Promise((_resolve, reject) => { rejectUserFetch = reject; });
+        return jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' });
+      },
+    });
+
+    // A user turn goes in flight (the pending auto-wake timer, scheduled at
+    // load for t=30s, is still armed).
+    questionInput.value = 'status please';
+    m.submitQuestion();
+    await flush();
+    assert.strictEqual(fetchCalls.length, 1);
+
+    // The tab goes hidden, then the pending auto-wake timer fires while
+    // hidden — autoWakeTick nulls timerId and bails on document.hidden
+    // before ever reaching the inFlight check.
+    doc.hidden = true;
+    doc.dispatch('visibilitychange');
+    t.mock.timers.tick(30000);
+    await flush();
+    assert.strictEqual(fetchCalls.length, 1, 'the hidden auto-wake tick must not fire a request');
+
+    // The tab regains visibility while the user turn is STILL in flight —
+    // onVisibilityChange's `!inFlight` clause bails, so nothing reschedules
+    // here either.
+    doc.hidden = false;
+    doc.dispatch('visibilitychange');
+    await flush();
+
+    // The user turn now fails on a plain user-initiated failure branch
+    // (network failure here; any of network/500/mid-stream-error/400/429
+    // reach the same no-cadence-effect finishTurn() path).
+    rejectUserFetch(new Error('network down'));
+    await flush();
+    assert.strictEqual(m.getCadenceState().stopped, false, 'a user-turn failure must not stop the cadence');
+
+    // Without a reschedule here the companion would never check in again
+    // short of a reload — assert the cadence actually resumes at its
+    // current delay (30s; no cadence effect was ever applied on this path).
+    t.mock.timers.tick(29999);
+    assert.strictEqual(fetchCalls.length, 1, 'auto-wake not due yet');
+    t.mock.timers.tick(1);
+    await flush();
+    assert.strictEqual(fetchCalls.length, 2, 'auto-wake resumes once the stalled sequence completes');
+  });
 });
 
 // ─── History ─────────────────────────────────────────────────────────────

@@ -386,6 +386,17 @@
   function finishTurn() {
     inFlight = false;
     setComposerBusy(false);
+    // A hidden→visible transition mid-turn leaves onVisibilityChange's
+    // `!inFlight` bail a no-op and the pending timer already consumed
+    // (autoWakeTick nulled timerId before bailing on document.hidden) — so a
+    // user-initiated failure branch here (which applies no cadence effect of
+    // its own) would otherwise leave the cadence neither stopped nor
+    // scheduled. Reschedule unconditionally on completion, same as
+    // live-console.js's `finally` idiom, guarded so it never doubles up on
+    // an effect applyCadenceEffect already scheduled above.
+    if (!cadence.stopped && !document.hidden && !timerId) {
+      scheduleAutoWake(cadence.delayMs);
+    }
   }
 
   function handleNonStreamOutcome(classification, turnKind, sentMessage) {
