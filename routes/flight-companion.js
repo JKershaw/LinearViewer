@@ -62,7 +62,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildFlightCompanionKickoff } from '../lib/prompts/flight-companion-kickoff.js';
 import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
-import { COMPANION_INSTANCE_PREFIX, COMPANION_SEED_STATE, shouldSpendTurn } from '../lib/flight-companion-gate.js';
+import { COMPANION_INSTANCE_PREFIX, COMPANION_SEED_STATE, shouldSpendTurn, buildCompanionSnapshot } from '../lib/flight-companion-gate.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat, streamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { createChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
@@ -82,24 +82,67 @@ function sendSSE(res, type, data) {
   res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
+// Restated, not imported, from lib/flight-companion-gate.js's own private
+// LANE_KEYS (which itself restates lib/observer-sweep.js's LANE_KEYS) — same
+// house convention its header documents: each consumer of the 7-lane census
+// vocabulary restates it rather than sharing a cross-module import.
+const CENSUS_LANE_KEYS = ['working', 'silent', 'blocked', 'terminal', 'queued', 'resolved', 'unknown'];
+
 /**
- * Placeholder turn messages — system framing + replayed history + the new turn.
- * §A.7 (a later beat) replaces the system message with the deterministic census
- * seed already read at this route's GET handler (`buildCompanionSnapshot` et al,
- * `lib/flight-companion-gate.js`); this beat wires the endpoint's plumbing only.
- * An auto-wake turn (no new user text) still needs a turn-shaped final message so
- * the model has something to react to — a fixed, neutral prompt stands in for a
- * real user turn.
+ * §A.7: the deterministic census seed, built from the SAME raw sweep census
+ * doc (`sweep:v1:<urlKey>`, via `buildCompanionSnapshot`) the auto-wake gate
+ * already reads. Every number below is interpolated straight from the
+ * snapshot with no rounding/reformatting/recomputation — copied verbatim, so
+ * a caller diffing this text against `buildCompanionSnapshot`'s own output
+ * finds the exact same values. The model is told explicitly to treat these as
+ * ground truth and narrate, never recompute or restate them differently; it
+ * can reach for `list_task_sessions`/`get_session` (via its tool catalog) for
+ * depth beyond these counts — never a `/api/dashboard/*` poll, which a
+ * proxy-token session can't reach anyway and which this route must not add.
+ *
+ * @param {Object|null} currentCensusDoc - `observerStateStore.readCurrent('sweep:v1:<urlKey>')`'s
+ *   result, or `null` when no sweep has ever run for this workspace.
+ * @returns {string}
  */
-function buildFlightCompanionMessages({ history, message }) {
+// Exported ONLY for direct unit testing of the verbatim guarantee (LIN-2432
+// §A.7) — `buildFlightCompanionMessages` itself stays local/unexported (per
+// beat-2 feedback: no premature lib/prompts/ extraction), the same
+// local-helper-plus-source-grep testing shape routes/task-chat.js already
+// uses for its own unexported sanitizeHistory. This is the one pure,
+// deterministic piece worth a real import-and-call test rather than a
+// source-text assertion.
+export function buildCensusSeedText(currentCensusDoc) {
+  if (!currentCensusDoc) {
+    return 'CURRENT CENSUS: not available yet for this workspace (no sweep has run).';
+  }
+  const snapshot = buildCompanionSnapshot(currentCensusDoc);
+  const laneLines = CENSUS_LANE_KEYS.map((key) => `  ${key}: ${snapshot.lanes[key]}`).join('\n');
+  return [
+    'CURRENT CENSUS (authoritative — these numbers are ground truth; narrate them, never recompute or restate them differently):',
+    laneLines,
+    `  attention items: ${snapshot.attentionCount}${snapshot.truncated ? ' (list truncated)' : ''}`,
+    `  census revision: ${snapshot.censusRev}`,
+  ].join('\n');
+}
+
+/**
+ * Turn messages: system framing (persona + the §A.7 census seed) + replayed
+ * history + the new turn. An auto-wake turn (no new user text) still needs a
+ * turn-shaped final message so the model has something to react to — a fixed,
+ * neutral prompt stands in for a real user turn.
+ */
+function buildFlightCompanionMessages({ history, message, censusDoc }) {
   const system = {
     role: 'system',
-    content:
+    content: [
       "You are the Flight Companion for this workspace — a friendly, up-to-speed colleague who " +
-      "watches work in flight and talks it through with the human. Use your tools (list_task_sessions, " +
-      "get_session, get_stack, and the rest of the read catalog) to orient before answering. You may " +
-      "call send_follow_up to reason about or request a follow-up on a session, but its write may not " +
-      "always execute immediately — respect whatever the tool itself reports back.",
+        "watches work in flight and talks it through with the human.",
+      buildCensusSeedText(censusDoc),
+      "Use your tools (list_task_sessions, get_session, get_stack, and the rest of the read catalog) " +
+        "when you want more depth than the census above gives you. You may call send_follow_up to " +
+        "reason about or request a follow-up on a session, but its write may not always execute " +
+        "immediately — respect whatever the tool itself reports back.",
+    ].join('\n\n'),
   };
   const turnMessage = {
     role: 'user',
@@ -120,28 +163,42 @@ function buildFlightCompanionMessages({ history, message }) {
  *   census read. Optional so the GET page keeps working (empty-state panel) if
  *   omitted; the turn endpoint's auto-wake path requires it.
  * @param {Object} [deps.freeTierStore] - LIN-2432 §A.3: free-tier usage store
- *   (`tryUse`), mirroring Task Chat's own gate. NOT YET wired at the
- *   `createFlightCompanionRoutes(...)` call site in server.js — beat 3 (§A.12)
- *   must add it there, or a free-tier request path throws on an undefined store.
+ *   (`tryUse`), mirroring Task Chat's own gate. Wired in server.js §A.12.
  * @param {Object} [deps.workspacePreferencesStore] - LIN-2432 §A.3/§A.4: model
  *   selection (`resolveWorkspaceModel`) AND threaded into `createChatToolCatalog`
- *   for the `send_follow_up` tool's dispatch-factory defaults (LIN-1139). NOT YET
- *   wired in server.js — beat 3 must add it.
+ *   for the `send_follow_up` tool's dispatch-factory defaults (LIN-1139) — this
+ *   is the one whose absence silently loses the LIN-1139 model/harness
+ *   inheritance a §A.6 approval-time enqueue would otherwise get, so its
+ *   presence here is load-bearing, not cosmetic. Wired in server.js §A.12.
  * @param {Object} [deps.recapCacheStore] - `get_recap` chat tool (cache-only).
- *   NOT YET wired in server.js — beat 3 must add it.
+ *   Wired in server.js §A.12.
  * @param {Object} [deps.briefCacheStore] - `get_brief` chat tool (cache-only).
- *   NOT YET wired in server.js — beat 3 must add it.
+ *   Wired in server.js §A.12.
  * @param {Object} [deps.dispatchQueueStore] - session read-model + the gated
- *   `send_follow_up` write (LIN-1073). NOT YET wired in server.js — beat 3 must
- *   add it.
+ *   `send_follow_up` write (LIN-1073). Wired in server.js §A.12.
  * @param {Object} [deps.agentStatusStore] - the other session read-model dep.
- *   NOT YET wired in server.js — beat 3 must add it.
+ *   Wired in server.js §A.12.
  * @param {Object} [deps.proxyTokenStore] - LIN-1431 bootstrap-token provisioning
  *   for an `execute`-mode follow-up resuming a claude-code session. Optional,
- *   same as Task Chat's own wiring — NOT YET wired in server.js; beat 3 should
- *   add it for parity with Task Chat, though its absence degrades cleanly
+ *   same as Task Chat's own wiring — absence degrades cleanly
  *   (`provisionBootstrapToken`'s own null/fail-closed contract) rather than
- *   crashing.
+ *   crashing. Wired in server.js §A.12.
+ *
+ * DELIBERATELY NOT a param here, unlike `createTaskChatRoutes`: `savedChatStore`.
+ * The ticket's §A.12 lists it parenthetically as "(§A.11)" — LIN-2437 ("Opt-in
+ * saved-chat for Flight Companion transcripts"), a SEPARATE, still-`Todo` ticket
+ * that is *blocked by* this one, i.e. depends on this one landing first, not the
+ * other way round. Nothing in this route reads or writes a saved-chat store —
+ * there is no `/api/flight-companion/saved` CRUD surface here the way Task
+ * Chat's LIN-1008 routes exist for it — and `createChatToolCatalog` itself
+ * accepts no `savedChatStore` param at all (verified against its actual
+ * signature, `lib/chat-tools.js`), so the ticket's "needed by
+ * createChatToolCatalog" framing does not hold for this one store at HEAD.
+ * Threading a store reference through with zero readers would be inert,
+ * untestable plumbing — worse than not passing it, since nothing would ever
+ * catch it going stale. LIN-2437 is the natural, sole owner of wiring
+ * `savedChatStore` alongside the CRUD routes it will add, the same one-piece
+ * shape LIN-1008 used for Task Chat.
  * @returns {Router}
  */
 export function createFlightCompanionRoutes({
@@ -216,6 +273,12 @@ export function createFlightCompanionRoutes({
 
     const safeHistory = filterChatTurns(body.history);
 
+    // §A.7: the deterministic census this route seeds the system turn from —
+    // populated below on BOTH turn shapes (the auto-wake gate needs it first
+    // and ahead of tryUse either way; a user-initiated turn reads it fresh,
+    // purely for orientation, no ordering constraint attached).
+    let currentCensusDoc = null;
+
     // §A.0/§A.2: an auto-wake turn must clear the deterministic pre-call gate
     // BEFORE the model or the free-tier quota is touched at all — ordering is
     // an acceptance criterion, not a style preference.
@@ -224,7 +287,7 @@ export function createFlightCompanionRoutes({
       const companionInstanceKey = `${COMPANION_INSTANCE_PREFIX}${workspace.urlKey}`;
       const sweepInstanceKey = `${SWEEP_INSTANCE_PREFIX}${workspace.urlKey}`;
       const companionDocEnvelope = await observerStateStore.ensureSeeded(companionInstanceKey, COMPANION_SEED_STATE);
-      const currentCensusDoc = await observerStateStore.readCurrent(sweepInstanceKey);
+      currentCensusDoc = await observerStateStore.readCurrent(sweepInstanceKey);
       const gate = shouldSpendTurn({
         currentCensusDoc,
         companionDoc: companionDocEnvelope ? companionDocEnvelope.state : null,
@@ -300,8 +363,17 @@ export function createFlightCompanionRoutes({
     };
 
     try {
+      // §A.7: user-initiated turns haven't read the census yet (only the
+      // auto-wake gate does, above) — read it fresh here, purely for
+      // orientation. Optional-guarded, mirroring the GET page handler: an
+      // absent observerStateStore degrades to the honest "not available" seed
+      // text rather than throwing.
+      if (currentCensusDoc === null && turnKind === 'user-initiated' && observerStateStore) {
+        currentCensusDoc = await observerStateStore.readCurrent(`${SWEEP_INSTANCE_PREFIX}${workspace.urlKey}`);
+      }
+
       const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
-      const messages = buildFlightCompanionMessages({ history: safeHistory, message: hasUserMessage ? rawMessage.trim() : null });
+      const messages = buildFlightCompanionMessages({ history: safeHistory, message: hasUserMessage ? rawMessage.trim() : null, censusDoc: currentCensusDoc });
       const callMeta = { urlKey: workspace.urlKey, feature: 'flight-companion' };
 
       if (isToolCapableModel(selectedModel)) {

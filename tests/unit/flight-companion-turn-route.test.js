@@ -39,6 +39,14 @@
  * "LIN-2432 §A.4: send_follow_up followUpMode" block (asserts on a
  * dispatchQueueStore spy). This file's job is only to pin that the route
  * wires the right mode for the right turn shape.
+ *
+ * LIN-2432 beat 3 adds: §A.12 server.js wiring (structural, against
+ * SERVER_SRC — the same idiom task-chat-route.test.js's own privacy-boundary
+ * test uses for exactly this "does the real call site pass the right deps"
+ * question) and §A.7's census-seed verbatim guarantee, tested by directly
+ * importing the one pure helper the route exports for this reason,
+ * `buildCensusSeedText` (see its own doc comment in routes/flight-companion.js
+ * for why it — and only it — is exported).
  */
 process.env.NODE_ENV = 'test';
 
@@ -48,11 +56,12 @@ import express from 'express';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { createFlightCompanionRoutes } from '../../routes/flight-companion.js';
-import { COMPANION_SEED_STATE } from '../../lib/flight-companion-gate.js';
+import { createFlightCompanionRoutes, buildCensusSeedText } from '../../routes/flight-companion.js';
+import { COMPANION_SEED_STATE, buildCompanionSnapshot } from '../../lib/flight-companion-gate.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROUTE_SRC = readFileSync(join(__dirname, '../../routes/flight-companion.js'), 'utf8');
+const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 // Set/restore env vars around one async body — mirrors
 // tests/unit/free-tier-model.test.js's withVar idiom, generalized to several
@@ -347,5 +356,120 @@ describe('Flight Companion turn endpoint — source-text wiring (untestable with
 
   test('createDispatchItem is never imported into this route — the ONLY door to it is deep inside lib/chat-tools.js\'s executor, already proven unreachable in propose mode by tests/unit/chat-tools.test.js', () => {
     assert.doesNotMatch(ROUTE_SRC, /^import\s*\{[^}]*createDispatchItem/m);
+  });
+
+  test('no companion path ever issues a /api/dashboard/* request — a proxy-token session 401s there, and it would be a fourth read-model representation', () => {
+    // Scoped to an actual call/fetch/URL construction, not any mention in
+    // prose (this file's own docblocks explain the constraint by NAME).
+    assert.doesNotMatch(ROUTE_SRC, /(fetch|axios|http|url|path)\s*\(\s*[`'"][^`'"]*\/api\/dashboard/i);
+    assert.doesNotMatch(ROUTE_SRC, /[`'"]\/api\/dashboard\/(sessions|[a-z-]+)[`'"]/);
+  });
+});
+
+describe('Flight Companion turn endpoint (LIN-2432 §A.12) — server.js store wiring', () => {
+  function flightCompanionCallLine() {
+    const line = SERVER_SRC.split('\n').find(l => l.includes('createFlightCompanionRoutes({'));
+    assert.ok(line, 'expected the createFlightCompanionRoutes(...) call site to exist in server.js');
+    return line;
+  }
+
+  test('every store the route needs is actually threaded through at the real call site — a route that would throw on a missing store at request time fails HERE, not in production', () => {
+    const line = flightCompanionCallLine();
+    for (const store of [
+      'observerStateStore', 'freeTierStore', 'workspacePreferencesStore',
+      'recapCacheStore', 'briefCacheStore', 'dispatchQueueStore', 'agentStatusStore', 'proxyTokenStore',
+    ]) {
+      assert.match(line, new RegExp(`\\b${store}\\b`), `${store} must be passed to createFlightCompanionRoutes`);
+    }
+  });
+
+  test('freeTierStore specifically is wired — closes the beat-2-flagged gap where an isFreeTier:true request would throw on tryUse against an undefined store', () => {
+    assert.match(flightCompanionCallLine(), /\bfreeTierStore\b/);
+  });
+
+  test('workspacePreferencesStore specifically is wired — without it, a later §A.6 enqueue reached through this catalog would silently lose the LIN-1139 model/harness inheritance send_follow_up\'s own executor gets', () => {
+    assert.match(flightCompanionCallLine(), /\bworkspacePreferencesStore\b/);
+  });
+
+  test('savedChatStore is deliberately NOT wired here — it belongs to §A.11/LIN-2437, a separate ticket, not silently dropped', () => {
+    const line = flightCompanionCallLine();
+    assert.doesNotMatch(line, /\bsavedChatStore\b/);
+    // The deviation is argued, not silent: routes/flight-companion.js's own
+    // JSDoc names LIN-2437 and the reasoning explicitly.
+    assert.match(ROUTE_SRC, /LIN-2437/);
+  });
+
+  test('createFlightCompanionRoutes creates no new store — every param wired is also a param createTaskChatRoutes already receives (mirrors it, adds nothing new)', () => {
+    const flightLine = flightCompanionCallLine();
+    const taskChatLine = SERVER_SRC.split('\n').find(l => l.includes('createTaskChatRoutes({'));
+    assert.ok(taskChatLine, 'expected the createTaskChatRoutes(...) call site to exist');
+    for (const store of ['freeTierStore', 'workspacePreferencesStore', 'recapCacheStore', 'briefCacheStore', 'dispatchQueueStore', 'agentStatusStore', 'proxyTokenStore']) {
+      if (new RegExp(`\\b${store}\\b`).test(flightLine)) {
+        assert.match(taskChatLine, new RegExp(`\\b${store}\\b`), `${store} is a pre-existing store — createTaskChatRoutes must already receive it too`);
+      }
+    }
+  });
+});
+
+describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic census seed, copied verbatim', () => {
+  test('renders every lane count, attentionCount, and censusRev straight from buildCompanionSnapshot with no transformation', () => {
+    const censusDoc = {
+      rev: 12,
+      stateHash: 'hash-xyz',
+      state: {
+        lanes: { working: 3, silent: 1, blocked: 2, terminal: 5, queued: 0, resolved: 7, unknown: 0 },
+        attention: [
+          { loopId: 'l1', lane: 'blocked', stage: 'plan', since: '2026-08-30T05:00:00.000Z' },
+          { loopId: 'l2', lane: 'blocked', stage: 'implement', since: '2026-08-30T06:00:00.000Z' },
+        ],
+        truncated: false,
+      },
+    };
+    const expectedSnapshot = buildCompanionSnapshot(censusDoc);
+    const text = buildCensusSeedText(censusDoc);
+
+    for (const [lane, count] of Object.entries(expectedSnapshot.lanes)) {
+      assert.match(text, new RegExp(`${lane}: ${count}\\b`), `lane ${lane} must appear with its exact count`);
+    }
+    assert.match(text, new RegExp(`attention items: ${expectedSnapshot.attentionCount}\\b`));
+    assert.match(text, new RegExp(`census revision: ${expectedSnapshot.censusRev}\\b`));
+    // Ground-truth framing must be present — the model is told not to
+    // recompute/restate these numbers itself.
+    assert.match(text, /authoritative/i);
+    assert.match(text, /never recompute or restate/i);
+  });
+
+  test('a truncated attention list is noted, not silently dropped', () => {
+    const censusDoc = {
+      rev: 1, stateHash: 'h',
+      state: { lanes: { working: 0, silent: 0, blocked: 12, terminal: 0, queued: 0, resolved: 0, unknown: 0 }, attention: [{ loopId: 'l1', lane: 'blocked', stage: 'x' }], truncated: true },
+    };
+    const text = buildCensusSeedText(censusDoc);
+    assert.match(text, /truncated/i);
+  });
+
+  test('an absent census (no sweep has ever run) renders an honest empty state, never a fabricated zero-everything snapshot', () => {
+    const text = buildCensusSeedText(null);
+    assert.match(text, /not available yet/i);
+    assert.doesNotMatch(text, /working: 0/);
+  });
+
+  test('the route\'s system message actually embeds buildCensusSeedText\'s own output unmodified, not a re-derived summary', () => {
+    // Source-text proof that buildFlightCompanionMessages composes the system
+    // content FROM buildCensusSeedText(censusDoc) directly — combined with the
+    // direct unit tests above (which prove that function's own output is
+    // verbatim), this closes the loop without needing a live model call.
+    const start = ROUTE_SRC.indexOf('function buildFlightCompanionMessages(');
+    assert.ok(start > 0, 'expected buildFlightCompanionMessages to exist');
+    const end = ROUTE_SRC.indexOf('\n}', start);
+    const fnSrc = ROUTE_SRC.slice(start, end);
+    assert.match(fnSrc, /buildCensusSeedText\(\s*censusDoc\s*\)/);
+  });
+
+  test('the turn handler passes a real censusDoc through to message-building on BOTH turn shapes (auto-wake\'s already-read doc, and a fresh read for user-initiated)', () => {
+    assert.match(ROUTE_SRC, /buildFlightCompanionMessages\(\{[^}]*censusDoc:\s*currentCensusDoc/s);
+    // The user-initiated branch must read it fresh (auto-wake already
+    // populated currentCensusDoc via the gate, above).
+    assert.match(ROUTE_SRC, /turnKind === 'user-initiated' && observerStateStore/);
   });
 });
