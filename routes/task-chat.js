@@ -26,6 +26,7 @@ import { sessionIsTerminal } from './dashboard.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
+import { filterChatTurns } from '../lib/chat-transcript.js';
 
 const MAX_QUESTION_LENGTH = 2000;
 
@@ -42,9 +43,7 @@ function sendSSE(res, type, data) {
  * out of a saved transcript.
  */
 function sanitizeHistory(history) {
-  return Array.isArray(history)
-    ? history.filter(h => h && (h.role === 'user' || h.role === 'assistant') && typeof h.content === 'string')
-    : [];
+  return filterChatTurns(history);
 }
 
 /**
