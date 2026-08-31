@@ -33,3 +33,42 @@ describe('renderFlightCompanionPage — +proxy toggle gating', () => {
     assert.ok(!html.includes('prompt-proxy-toggle'));
   });
 });
+
+describe('renderFlightCompanionPage — LIN-2435 Commit 2: chat-thread render + asset ordering', () => {
+  const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
+
+  test('renders an empty, hidden chat-thread and a composer (greenfield — no prior thread markup to migrate)', () => {
+    assert.match(html, /<ul class="chat-thread" id="flight-companion-thread" hidden><\/ul>/);
+    assert.match(html, /id="flight-companion-question"/);
+    assert.match(html, /id="flight-companion-send"/);
+    assert.match(html, /class="[^"]*\bchat-composer\b[^"]*"/);
+  });
+
+  test('loads /chat.css and /chat.js — the shared chat UI this page now consumes', () => {
+    assert.match(html, /<link rel="stylesheet" href="\/chat\.css">/);
+    assert.match(html, /<script src="\/chat\.js"/);
+  });
+
+  test('/chat.js loads BEFORE /flight-companion.js — the proposal control calls window.ChatUI', () => {
+    const chatJsIdx = html.indexOf('src="/chat.js"');
+    const fcJsIdx = html.indexOf('src="/flight-companion.js"');
+    assert.ok(chatJsIdx > -1 && fcJsIdx > -1, 'expected both scripts to be present');
+    assert.ok(chatJsIdx < fcJsIdx, 'chat.js must load before flight-companion.js');
+  });
+
+  test('every pre-existing +proxy gating assertion still passes unchanged (re-run against the extended markup)', () => {
+    const onHtml = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: true } });
+    assert.ok(onHtml.includes('data-proxy-feature="true"'));
+    assert.match(onHtml, /<button class="prompt-proxy-toggle" title="Append proxy API instructions to prompt">\+proxy<\/button>/);
+
+    const offHtml = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: false } });
+    assert.ok(!offHtml.includes('data-proxy-feature'));
+    assert.ok(!offHtml.includes('prompt-proxy-toggle'));
+  });
+
+  test('the narrowed freeze holds: the live e2e contract selectors are untouched', () => {
+    assert.match(html, /id="flight-companion-prompt"/);
+    assert.match(html, /id="flight-companion-copy"/);
+    assert.match(html, /id="flight-companion-copy-feedback"/);
+  });
+});
