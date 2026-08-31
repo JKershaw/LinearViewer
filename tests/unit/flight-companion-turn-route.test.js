@@ -20,6 +20,9 @@
  *   - An unconfigured AI key still 503s cleanly for both turn shapes,
  *     without ever reaching the auto-wake gate machinery on the
  *     user-initiated path.
+ *   - §A.4's `phase: 'proposed'` SSE relabel, asserted on the parsed wire
+ *     frames: a propose-mode result arrives as 'proposed', an executed one
+ *     stays 'result' (LIN-2432 close-out, review ledger item 1).
  *
  * LIN-2432 beat 4, Job 1: beat 2 originally pinned two acceptance-criteria
  * properties as source-text assertions, because the route calls
@@ -39,10 +42,14 @@
  * `isToolCapableModel` → plain `streamChat` degrade, and the `followUpMode`
  * wiring per turn shape (captured via a fake `createToolCatalog`, not
  * grepped from source). The remaining structural assertions (the
- * `'proposed'` SSE phase rewrite, the createDispatchItem-import guard, the
- * no-dashboard-poll guard) stay source-text — they were never blocked on
- * live invocation, just cheaper to pin that way, matching
- * task-chat-route.test.js's own mix. The deeper guarantee the followUpMode
+ * createDispatchItem-import guard, the no-dashboard-poll guard, and the
+ * "no second turnKind branch" shape of the SSE rewrite) stay source-text —
+ * they were never blocked on live invocation, just cheaper to pin that way,
+ * matching task-chat-route.test.js's own mix. The `'proposed'` SSE phase
+ * rewrite was in that list until close-out: the review showed a source-text
+ * regex cannot see the mechanism break (two semantic mutations left it green),
+ * and that the beat-4 seams above make it directly executable, so it now has
+ * its own describe block below. The deeper guarantee the followUpMode
  * test leans on — that `followUpMode: 'propose'` really can never reach
  * `createDispatchItem` — is proven separately, by REAL executable tests in
  * tests/unit/chat-tools.test.js's "LIN-2432 §A.4: send_follow_up
@@ -432,7 +439,103 @@ describe('Flight Companion turn endpoint (LIN-2432 beat 4) — live-model-call s
   });
 });
 
-describe('Flight Companion turn endpoint — source-text wiring (untestable without live network, see file header)', () => {
+describe('Flight Companion turn endpoint (LIN-2432 §A.4) — the `phase: \'proposed\'` SSE relabel, executable', () => {
+  // LIN-2432 close-out, review ledger item 1. §A.4 requires the `tool` SSE
+  // event to carry `phase: 'proposed'` (never a new event kind) when
+  // send_follow_up returns the propose-mode shape. That was pinned only by a
+  // source-text regex, and the review demonstrated the pin is not load-bearing:
+  // breaking the relabel two ways (neutering the `phase === 'result'` match, or
+  // never registering the call id) left the suite fully green while shipping an
+  // SSE stream that still says `phase: "result"` on a proposal. The seams these
+  // tests need (`chatClient` / `createToolCatalog`) already exist — added by
+  // beat 4 for the block above — so the block-header framing that this was
+  // "untestable without live network" stopped being true at beat 4 and is
+  // simply exercised here instead.
+
+  // Parse the SSE body into ordered {type, data} frames, so assertions are on
+  // the actual wire frames rather than a substring of the whole response.
+  function parseSSE(text) {
+    return text.split('\n\n').filter(Boolean).map((frame) => {
+      const type = /^event: (.*)$/m.exec(frame)?.[1];
+      const data = /^data: (.*)$/m.exec(frame)?.[1];
+      return { type, data: data ? JSON.parse(data) : null };
+    });
+  }
+
+  // A tool-capable stream that drives ONE tool call through the route's own
+  // executeTool wrapper and then emits the generic `phase: 'result'` frame the
+  // real lib/openrouter.js emits — i.e. exactly the input the relabel exists to
+  // rewrite. It never emits 'proposed' itself: whatever the client sees on that
+  // frame was put there by routes/flight-companion.js and nothing else.
+  function fakeToolCallingChatClient(callId) {
+    return {
+      async streamChat() {
+        throw new Error('streamChat must not be called — the model here is tool-capable');
+      },
+      async streamChatWithTools(messages, opts, onEvent) {
+        const call = { id: callId, name: 'send_follow_up', arguments: { sessionId: 'sess-1', prompt: 'keep going' } };
+        const raw = await opts.executeTool(call);
+        onEvent('tool', { id: call.id, name: call.name, phase: 'result', result: raw });
+        onEvent('done', {});
+      },
+    };
+  }
+
+  function catalogReturning(result) {
+    return () => ({
+      tools: [{ type: 'function', function: { name: 'send_follow_up' } }],
+      executeTool: async () => result,
+    });
+  }
+
+  test('an auto-wake proposal result is relabelled to phase: \'proposed\' on the wire — the client can tell a proposal from an executed write', async () => {
+    const proposal = { proposed: true, sessionId: 'sess-1', prompt: 'keep going' };
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: realCensusDoc() }), // spend:true
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present'); } },
+      chatClient: fakeToolCallingChatClient('call_abc'),
+      createToolCatalog: catalogReturning(proposal),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const { status, text } = await post(app, '/workspace/acme/api/flight-companion/turn', {}); // no message -> auto-wake -> followUpMode 'propose'
+
+    assert.strictEqual(status, 200);
+    const toolFrames = parseSSE(text).filter(f => f.type === 'tool');
+    assert.strictEqual(toolFrames.length, 1);
+    assert.strictEqual(toolFrames[0].data.phase, 'proposed',
+      'the proposal must NOT arrive as the generic phase: "result" — that is the one distinction §A.4 exists to make');
+    assert.strictEqual(toolFrames[0].data.id, 'call_abc', 'the relabel must preserve the frame, rewriting only phase');
+    assert.deepStrictEqual(toolFrames[0].data.result, proposal, 'the proposal payload itself is passed through untouched');
+    // Belt-and-braces on the raw wire bytes: no consumer can see "result" for
+    // this call id, and no NEW event kind was invented for the proposal.
+    assert.doesNotMatch(text, /"phase":"result"/);
+    assert.match(text, /^event: tool$/m);
+    assert.doesNotMatch(text, /^event: proposed$/m);
+  });
+
+  test('an executed (non-propose) tool result keeps phase: \'result\' — the relabel keys off the executor\'s return shape, so it cannot fire for a real write', async () => {
+    const executed = { ok: true, itemId: 'item-9', sessionId: 'sess-1' }; // no `proposed` key
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: realCensusDoc() }),
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present'); } },
+      chatClient: fakeToolCallingChatClient('call_xyz'),
+      createToolCatalog: catalogReturning(executed),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const { status, text } = await post(app, '/workspace/acme/api/flight-companion/turn', { message: 'send the follow-up' }); // user-initiated -> 'execute'
+
+    assert.strictEqual(status, 200);
+    const toolFrames = parseSSE(text).filter(f => f.type === 'tool');
+    assert.strictEqual(toolFrames.length, 1);
+    assert.strictEqual(toolFrames[0].data.phase, 'result',
+      'an executed write must stay the generic result phase — a blanket relabel would make the proposed signal meaningless');
+    assert.doesNotMatch(text, /"phase":"proposed"/);
+  });
+});
+
+describe('Flight Companion turn endpoint — source-text wiring (structural pins, see file header)', () => {
   test('the propose-mode SSE phase rewrite keys off the executor\'s OWN return shape ({proposed:true}), not a second turnKind branch', () => {
     assert.match(ROUTE_SRC, /raw\.proposed\s*===\s*true/);
     assert.match(ROUTE_SRC, /phase:\s*'proposed'/);
