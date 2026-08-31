@@ -1289,6 +1289,93 @@ describe('LIN-1486: send_follow_up targets the lineage tail, not the session roo
   });
 });
 
+// LIN-2432 §A.4: `followUpMode` ('execute'|'propose', default 'execute') lets a
+// call site built for a non-human-started turn (Flight Companion auto-wake)
+// stop `send_follow_up` short of any write. Default omission must be
+// byte-identical to pre-existing behaviour — the whole 'pass-3 write tool'
+// and 'LIN-1486' blocks above construct their catalogs with no followUpMode
+// argument at all and must keep passing unmodified.
+describe('LIN-2432 §A.4: send_follow_up followUpMode (execute/propose)', () => {
+  function makeFakeDispatchQueueStore(history) {
+    const calls = [];
+    const stores = makeMockSessionStores({ history });
+    return {
+      ...stores.dispatchQueueStore,
+      calls,
+      async addItem(urlKey, item) {
+        calls.push({ urlKey, item });
+        return { _id: 'queued-item-1', urlKey, ...item };
+      },
+    };
+  }
+
+  function makeCatalog({ history, followUpMode } = {}) {
+    const provider = makeFakeProvider();
+    const dispatchQueueStore = makeFakeDispatchQueueStore(history);
+    const catalog = createChatToolCatalog({
+      provider, scope: SCOPE, urlKey: URL_KEY,
+      dispatchQueueStore, agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
+      sessionIsTerminal: (session) => (session.loops || []).some(l => l.terminalStatus === 'done'),
+      followUpEnabled: true,
+      ...(followUpMode !== undefined ? { followUpMode } : {}),
+    });
+    return { ...catalog, dispatchQueueStore };
+  }
+
+  test('defaults to execute — omitting followUpMode entirely is byte-identical to today', async () => {
+    const { executeTool, dispatchQueueStore } = makeCatalog({ history: twoSessionHistory() });
+    const result = await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } });
+    assert.deepStrictEqual(result, { queued: true, itemId: 'queued-item-1', sessionId: 'sess-done', target: 'cli', force: true });
+    assert.strictEqual(dispatchQueueStore.calls.length, 1, 'createDispatchItem ran exactly as it does today');
+  });
+
+  test('followUpMode: "execute" explicitly behaves the same as the default', async () => {
+    const { executeTool, dispatchQueueStore } = makeCatalog({ history: twoSessionHistory(), followUpMode: 'execute' });
+    const result = await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } });
+    assert.deepStrictEqual(result, { queued: true, itemId: 'queued-item-1', sessionId: 'sess-done', target: 'cli', force: true });
+    assert.strictEqual(dispatchQueueStore.calls.length, 1);
+  });
+
+  test('followUpMode: "propose" never calls createDispatchItem (asserted on the store spy, not just the return value)', async () => {
+    const { executeTool, dispatchQueueStore } = makeCatalog({ history: twoSessionHistory(), followUpMode: 'propose' });
+    await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } });
+    assert.strictEqual(dispatchQueueStore.calls.length, 0, 'addItem (behind createDispatchItem) was never invoked');
+  });
+
+  test('followUpMode: "propose" returns exactly { proposed, sessionId, prompt } — no derived force/target/followUpTo', async () => {
+    const { executeTool } = makeCatalog({ history: twoSessionHistory(), followUpMode: 'propose' });
+    const result = await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } });
+    assert.deepStrictEqual(result, { proposed: true, sessionId: 'sess-done', prompt: 'ship it' });
+    assert.deepStrictEqual(Object.keys(result).sort(), ['prompt', 'proposed', 'sessionId']);
+  });
+
+  test('followUpMode: "propose" still validates and still 404s an unknown session, before proposing anything', async () => {
+    const { executeTool, dispatchQueueStore } = makeCatalog({ history: twoSessionHistory(), followUpMode: 'propose' });
+    await assert.rejects(
+      () => executeTool({ name: 'send_follow_up', arguments: { sessionId: 'no-such', prompt: 'hi' } }),
+      /Session no-such not found/,
+    );
+    await assert.rejects(
+      () => executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: '  ' } }),
+      /non-empty "prompt"/,
+    );
+    assert.strictEqual(dispatchQueueStore.calls.length, 0);
+  });
+
+  test('followUpMode: "propose" would have hit the dash/local guard in execute mode but never reaches it — proves derivation is skipped, not just its result discarded', async () => {
+    const history = [
+      ...twoSessionHistory(),
+      sessionHistoryItem({
+        id: 'sess-dash', kind: 'autopilot', issueIdentifier: 'LIN-502', target: 'dash',
+        feedback: [{ message: '[working] 1 tools/2s · alive', timestamp: '2026-04-11T11:05:00.000Z' }],
+      }),
+    ];
+    const { executeTool } = makeCatalog({ history, followUpMode: 'propose' });
+    const result = await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-dash', prompt: 'hi' } });
+    assert.deepStrictEqual(result, { proposed: true, sessionId: 'sess-dash', prompt: 'hi' });
+  });
+});
+
 describe('read-only invariant', () => {
   test('the catalog exposes no write/mutation tools', () => {
     const names = CHAT_TOOL_SCHEMAS.map(t => t.function.name);
