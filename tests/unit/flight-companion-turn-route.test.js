@@ -21,26 +21,34 @@
  *     without ever reaching the auto-wake gate machinery on the
  *     user-initiated path.
  *
- * What ISN'T covered by execution here, and why: once a turn clears every
- * gate above, the handler calls straight into `streamChat`/
- * `streamChatWithTools` (live OpenRouter calls, not dependency-injected —
- * same as `routes/task-chat.js`). Live-invocation arg capture isn't
- * available without opting the whole unit suite into Node's
- * `--experimental-test-module-mocks` flag (no test in this repo currently
- * uses it — confirmed absent even on Node 25). Matching
- * tests/unit/task-chat-route.test.js's own established idiom for exactly
- * this class of problem, those properties (the `isToolCapableModel` degrade
- * to plain `streamChat`, and the `followUpMode` wiring per turn shape) are
- * pinned as structural assertions against the route's own source text
- * instead — see the 'source-text wiring' describe block below. The deeper
- * guarantee those source assertions rely on — that `followUpMode: 'propose'`
- * really can never reach `createDispatchItem` — is proven by REAL executable
- * tests already, in tests/unit/chat-tools.test.js's
- * "LIN-2432 §A.4: send_follow_up followUpMode" block (asserts on a
- * dispatchQueueStore spy). This file's job is only to pin that the route
- * wires the right mode for the right turn shape.
+ * LIN-2432 beat 4, Job 1: beat 2 originally pinned two acceptance-criteria
+ * properties as source-text assertions, because the route calls
+ * `streamChat`/`streamChatWithTools` directly (live OpenRouter calls) and
+ * Node's `mock.module` needs `--experimental-test-module-mocks`, which
+ * nothing in this repo opts into (confirmed absent even on Node 25) — the
+ * same constraint tests/unit/task-chat-route.test.js documents and works
+ * around the same way. Beat 4 closes that gap differently: rather than force
+ * module mocking on, it adds ONE narrow, low-risk DI seam to
+ * routes/flight-companion.js — `chatClient` ({streamChat, streamChatWithTools})
+ * and `createToolCatalog` — both defaulting to the real imports, so every
+ * OTHER test in this file (which never passes either) is proof production
+ * behavior is unchanged. `isToolCapableModel` needed no seam at all: it's a
+ * pure, synchronous allowlist check with no network, so tests call the real
+ * one directly via a real (uncurated) model id. See the 'live-model-call
+ * seam' describe block below for both now-real executable tests: the
+ * `isToolCapableModel` → plain `streamChat` degrade, and the `followUpMode`
+ * wiring per turn shape (captured via a fake `createToolCatalog`, not
+ * grepped from source). The remaining structural assertions (the
+ * `'proposed'` SSE phase rewrite, the createDispatchItem-import guard, the
+ * no-dashboard-poll guard) stay source-text — they were never blocked on
+ * live invocation, just cheaper to pin that way, matching
+ * task-chat-route.test.js's own mix. The deeper guarantee the followUpMode
+ * test leans on — that `followUpMode: 'propose'` really can never reach
+ * `createDispatchItem` — is proven separately, by REAL executable tests in
+ * tests/unit/chat-tools.test.js's "LIN-2432 §A.4: send_follow_up
+ * followUpMode" block (asserts on a dispatchQueueStore spy).
  *
- * LIN-2432 beat 3 adds: §A.12 server.js wiring (structural, against
+ * LIN-2432 beat 3 added: §A.12 server.js wiring (structural, against
  * SERVER_SRC — the same idiom task-chat-route.test.js's own privacy-boundary
  * test uses for exactly this "does the real call site pass the right deps"
  * question) and §A.7's census-seed verbatim guarantee, tested by directly
@@ -120,7 +128,10 @@ function fakeFreeTierStore(result, calls = []) {
   };
 }
 
-function buildApp({ observerStateStore, freeTierStore, flightCompanionEnabled = true, session = {} } = {}) {
+function buildApp({
+  observerStateStore, freeTierStore, flightCompanionEnabled = true, session = {},
+  chatClient, createToolCatalog, workspacePreferencesStore,
+} = {}) {
   const app = express();
   app.use(express.json());
   app.use((req, res, next) => {
@@ -133,6 +144,14 @@ function buildApp({ observerStateStore, freeTierStore, flightCompanionEnabled = 
     getDeployInfo: () => ({}),
     observerStateStore,
     freeTierStore,
+    workspacePreferencesStore,
+    // LIN-2432 beat 4: the DI seam — omitted here (undefined) means every
+    // OTHER test in this file exercises createFlightCompanionRoutes' REAL
+    // default (the live lib/openrouter.js / lib/chat-tools.js functions),
+    // proving the seam is inert until a test opts in. Only the
+    // 'live-model-call seam' describe block below passes fakes.
+    ...(chatClient !== undefined ? { chatClient } : {}),
+    ...(createToolCatalog !== undefined ? { createToolCatalog } : {}),
   }));
   return app;
 }
@@ -319,33 +338,101 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.2) — auto-wake gate ord
   });
 });
 
+describe('Flight Companion turn endpoint (LIN-2432 beat 4) — live-model-call seam (chatClient / createToolCatalog)', () => {
+  // LIN-2432 beat 4, Job 1: beat 2 pinned these two acceptance-criteria
+  // properties as source-text assertions (mock.module needs
+  // --experimental-test-module-mocks, which nothing in this repo opts into —
+  // see the file header). This block converts BOTH to real executable tests
+  // by adding one narrow DI seam to routes/flight-companion.js: `chatClient`
+  // ({streamChat, streamChatWithTools}) and `createToolCatalog`, both
+  // defaulting to the real lib/openrouter.js / lib/chat-tools.js exports so
+  // production behavior is unchanged when omitted (proven by every OTHER
+  // describe block in this file, which never passes either). `isToolCapableModel`
+  // itself needs no seam — it's a pure, synchronous allowlist check with no
+  // network — so these tests call the REAL one via a real (non-network) model id.
+  function fakeChatClient(calls) {
+    return {
+      async streamChat(messages, opts, onEvent) {
+        calls.push({ fn: 'streamChat', model: opts.model, hasTools: false });
+        onEvent('token', { token: 'ok' });
+        onEvent('done', {});
+      },
+      async streamChatWithTools(messages, opts, onEvent) {
+        calls.push({ fn: 'streamChatWithTools', model: opts.model, hasTools: Array.isArray(opts.tools) && opts.tools.length > 0 });
+        onEvent('done', {});
+      },
+    };
+  }
+
+  function fakeCreateToolCatalog(calls) {
+    return (opts) => {
+      calls.push({
+        followUpEnabled: opts.followUpEnabled,
+        followUpMode: opts.followUpMode,
+        sessionIsTerminalType: typeof opts.sessionIsTerminal,
+      });
+      return { tools: [{ type: 'function', function: { name: 'noop' } }], executeTool: async () => ({}) };
+    };
+  }
+
+  test('an unknown-capability model degrades HONESTLY to chatClient.streamChat — never chatClient.streamChatWithTools, and never a silent model swap', async () => {
+    const calls = [];
+    const chatClient = fakeChatClient(calls);
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() });
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present, isFreeTier must be false'); } };
+    // A real, non-tool-capable model id (verified against the actual curated
+    // AVAILABLE_MODELS allowlist by using something NOT in it) — isToolCapableModel
+    // itself is the REAL function here, not faked.
+    const workspacePreferencesStore = { async getWorkspacePreferences() { return { modelId: 'some-vendor/uncurated-model' }; } };
+    const app = buildApp({
+      observerStateStore, freeTierStore, workspacePreferencesStore, chatClient,
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', { message: 'what is the state of things?' });
+
+    assert.strictEqual(status, 200);
+    assert.deepStrictEqual(calls, [{ fn: 'streamChat', model: 'some-vendor/uncurated-model', hasTools: false }]);
+  });
+
+  test('a tool-capable model wires followUpMode: \'execute\' for a user-initiated turn — captured via a fake createToolCatalog, not source text', async () => {
+    const catalogCalls = [];
+    const chatClient = fakeChatClient([]);
+    const createToolCatalog = fakeCreateToolCatalog(catalogCalls);
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() });
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present'); } };
+    // No workspacePreferencesStore override -> resolveWorkspaceModel falls
+    // back to DEFAULT_MODEL, which IS in the curated tool-capable allowlist.
+    const app = buildApp({ observerStateStore, freeTierStore, chatClient, createToolCatalog, session: { openRouterApiKey: 'sk-test-paid-key' } });
+
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', { message: 'status please' });
+
+    assert.strictEqual(status, 200);
+    assert.strictEqual(catalogCalls.length, 1);
+    assert.strictEqual(catalogCalls[0].followUpMode, 'execute');
+    assert.strictEqual(catalogCalls[0].followUpEnabled, true, 'the model must still be able to reason about/request a follow-up');
+    assert.strictEqual(catalogCalls[0].sessionIsTerminalType, 'function');
+  });
+
+  test('a tool-capable model wires followUpMode: \'propose\' for an auto-wake turn — the write-incapable posture, proven live', async () => {
+    const catalogCalls = [];
+    const chatClient = fakeChatClient([]);
+    const createToolCatalog = fakeCreateToolCatalog(catalogCalls);
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() }); // spend:true (seed-turn shape)
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present'); } };
+    const app = buildApp({ observerStateStore, freeTierStore, chatClient, createToolCatalog, session: { openRouterApiKey: 'sk-test-paid-key' } });
+
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {}); // no message -> auto-wake
+
+    assert.strictEqual(status, 200);
+    assert.strictEqual(catalogCalls.length, 1);
+    assert.strictEqual(catalogCalls[0].followUpMode, 'propose');
+    assert.strictEqual(catalogCalls[0].followUpEnabled, true, 'auto-wake can still REASON ABOUT a follow-up — only execution is withheld');
+    assert.strictEqual(catalogCalls[0].sessionIsTerminalType, 'function', 'the beat-1-flagged coupling: propose mode is gated by the SAME "not configured" check execute mode is');
+  });
+});
+
 describe('Flight Companion turn endpoint — source-text wiring (untestable without live network, see file header)', () => {
-  test('branches on isToolCapableModel and degrades honestly to plain streamChat for an unknown-capability model', () => {
-    assert.match(ROUTE_SRC, /isToolCapableModel\s*\(\s*selectedModel\s*\)/);
-    assert.match(ROUTE_SRC, /streamChatWithTools\s*\(/);
-    assert.match(ROUTE_SRC, /streamChat\s*\(/);
-    assert.match(ROUTE_SRC, /model:\s*selectedModel/);
-  });
-
-  test('wires followUpMode: execute for user-initiated, propose for auto-wake — the ONE line withholding execute-mode writes from an auto-wake turn', () => {
-    const start = ROUTE_SRC.indexOf('createChatToolCatalog({');
-    assert.ok(start > 0, 'expected the createChatToolCatalog call site to exist');
-    const end = ROUTE_SRC.indexOf('});', start);
-    const callSrc = ROUTE_SRC.slice(start, end);
-
-    assert.match(callSrc, /followUpEnabled:\s*true/, 'the model must still be able to reason about/request a follow-up on BOTH turn shapes');
-    assert.match(
-      callSrc,
-      /followUpMode:\s*turnKind\s*===\s*'user-initiated'\s*\?\s*'execute'\s*:\s*'propose'/,
-      'followUpMode must be derived from the SAME server-side turnKind everything else uses — never a second, independently-computed flag'
-    );
-    // sessionIsTerminal must be wired for BOTH turn shapes: chat-tools.js's
-    // shared "not configured" guard gates propose mode too, even though
-    // propose mode never calls it (LIN-2432 beat 1 report) — an auto-wake-only
-    // catalog missing this would throw "not configured" on every wake.
-    assert.match(callSrc, /sessionIsTerminal,/);
-  });
-
   test('the propose-mode SSE phase rewrite keys off the executor\'s OWN return shape ({proposed:true}), not a second turnKind branch', () => {
     assert.match(ROUTE_SRC, /raw\.proposed\s*===\s*true/);
     assert.match(ROUTE_SRC, /phase:\s*'proposed'/);

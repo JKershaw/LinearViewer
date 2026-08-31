@@ -64,8 +64,8 @@ import { buildFlightCompanionKickoff } from '../lib/prompts/flight-companion-kic
 import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
 import { COMPANION_INSTANCE_PREFIX, COMPANION_SEED_STATE, shouldSpendTurn, buildCompanionSnapshot } from '../lib/flight-companion-gate.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
-import { streamChat, streamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
-import { createChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
+import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
 import { sessionIsTerminal } from './dashboard.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
@@ -199,12 +199,33 @@ function buildFlightCompanionMessages({ history, message, censusDoc }) {
  * catch it going stale. LIN-2437 is the natural, sole owner of wiring
  * `savedChatStore` alongside the CRUD routes it will add, the same one-piece
  * shape LIN-1008 used for Task Chat.
+ * @param {{streamChat: Function, streamChatWithTools: Function}} [deps.chatClient] -
+ *   LIN-2432 beat 4: the ONLY seam this route adds beyond what
+ *   `routes/task-chat.js` has, and deliberately narrow — it overrides just the
+ *   two functions that make a live OpenRouter call, defaulting to the real
+ *   `lib/openrouter.js` exports so production behavior is byte-identical when
+ *   omitted. Exists so the `isToolCapableModel` → plain `streamChat` degrade
+ *   (an acceptance criterion) can be a REAL executable test — driving a fake
+ *   `chatClient` and asserting on the calls it recorded — rather than a
+ *   source-text assertion, without pulling the whole unit suite into Node's
+ *   `--experimental-test-module-mocks` flag (which nothing else here uses).
+ *   `isToolCapableModel` itself is NOT part of this seam: it is a pure,
+ *   synchronous allowlist membership check (`lib/openrouter.js`) with no
+ *   network of its own, so a test can call the real one directly.
+ * @param {Function} [deps.createToolCatalog] - Same reasoning, for
+ *   `createChatToolCatalog` (`lib/chat-tools.js`): defaults to the real one;
+ *   overriding it lets a test capture the exact `followUpMode` the route
+ *   passed in per turn shape — the OTHER acceptance criterion beat 2 could
+ *   only pin structurally — via a fake catalog factory, with no network
+ *   touched (the fake never has to actually call an LLM).
  * @returns {Router}
  */
 export function createFlightCompanionRoutes({
   workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore,
   freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore,
   dispatchQueueStore, agentStatusStore, proxyTokenStore,
+  chatClient = { streamChat: defaultStreamChat, streamChatWithTools: defaultStreamChatWithTools },
+  createToolCatalog = defaultCreateChatToolCatalog,
 }) {
   const router = Router();
 
@@ -379,7 +400,7 @@ export function createFlightCompanionRoutes({
       if (isToolCapableModel(selectedModel)) {
         const provider = getProviderForWorkspace(workspace);
         const scope = getWorkspaceCallScope(workspace);
-        const { tools, executeTool: catalogExecuteTool } = createChatToolCatalog({
+        const { tools, executeTool: catalogExecuteTool } = createToolCatalog({
           provider,
           scope,
           recapCacheStore,
@@ -405,7 +426,7 @@ export function createFlightCompanionRoutes({
           }
           return raw;
         };
-        await streamChatWithTools(
+        await chatClient.streamChatWithTools(
           messages,
           {
             apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, tools, executeTool, callMeta,
@@ -416,7 +437,7 @@ export function createFlightCompanionRoutes({
       } else {
         // Unknown-capability model: degrade to plain streaming with tools OFF,
         // exactly mirroring Task Chat — never a silent swap to a different model.
-        await streamChat(
+        await chatClient.streamChat(
           messages,
           { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, callMeta },
           onEvent
