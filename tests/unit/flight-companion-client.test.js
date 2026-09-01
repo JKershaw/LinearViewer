@@ -138,6 +138,24 @@ function makeChatUI() {
       calls.appendMessage.push(opts);
       const li = new FakeElement('li');
       li.className = 'chat-msg' + (opts.liClass ? ' ' + opts.liClass : '');
+      // The speaker pill (LIN-2443 AC4). Mirrors what public/chat.js:62-65,82
+      // actually bakes into the <li> via window.renderStatusPill: a
+      // .chat-msg__who pill carrying a .status-pill--<state> class and a
+      // .status-pill__char glyph node. Without this the shim emitted a body
+      // span only, and the pill transition was untestable here.
+      const who = new FakeElement('span');
+      who.className = 'status-pill '
+        + (opts.whoState ? 'status-pill--' + opts.whoState : 'status-pill--tag')
+        + ' chat-msg__who' + (opts.whoClass ? ' ' + opts.whoClass : '');
+      const charEl = new FakeElement('span');
+      charEl.className = 'status-pill__char';
+      charEl.textContent = opts.whoState === 'in-progress' ? '\u25d0' : '';
+      who.appendChild(charEl);
+      const labelEl = new FakeElement('span');
+      labelEl.className = 'status-pill__label';
+      labelEl.textContent = opts.who || '';
+      who.appendChild(labelEl);
+      li.appendChild(who);
       const body = new FakeElement('span');
       body.className = 'chat-msg__body' + (opts.textClass ? ' ' + opts.textClass : '');
       body.textContent = opts.text || '';
@@ -234,10 +252,13 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
 
   const thread = new FakeElement('ul');
   const emptyState = new FakeElement('p');
+  const checkIn = new FakeElement('p');
+  checkIn.hidden = true;
   const questionInput = new FakeElement('input');
   const sendBtn = new FakeElement('button');
   doc._byId['flight-companion-thread'] = thread;
   doc._byId['flight-companion-chat-empty'] = emptyState;
+  doc._byId['flight-companion-checkin'] = checkIn;
   doc._byId['flight-companion-question'] = questionInput;
   doc._byId['flight-companion-send'] = sendBtn;
 
@@ -282,7 +303,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
 
   return {
     exports: sandbox.module.exports,
-    doc, thread, emptyState, questionInput, sendBtn,
+    doc, thread, emptyState, checkIn, questionInput, sendBtn,
     chatUICalls: chatUI.calls,
     fetchCalls: fetchSpy.calls,
     apiCalls: apiSpy.calls,
@@ -736,14 +757,17 @@ describe('flight-companion.js — conversation history', () => {
   });
 
   test('the empty-done guard: an empty answer is never pushed to history (task-chat.js\'s own pattern)', async () => {
-    const { exports: m, thread } = loadClient({
+    // The history claim is unchanged. Its DOM witness moved to the AC1/AC2
+    // divergence pair below (auto-wake -> zero rows; user-initiated ->
+    // exactly one row), which is strictly stronger than the `/no response/`
+    // assertion it replaces — that literal is deliberately deleted by
+    // LIN-2443 AC1/AC2.
+    const { exports: m } = loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
     await flush();
     looseDeepEqual(m.getChatHistory(), []);
-    const lastLi = thread.children[thread.children.length - 1];
-    assert.match(lastLi.querySelector('.fc-msg-body').textContent, /no response/);
   });
 
   test('history cap: pushing 45 turns worth never exceeds 40 entries', () => {
@@ -751,6 +775,156 @@ describe('flight-companion.js — conversation history', () => {
     const history = m.getChatHistory();
     for (let i = 0; i < 45; i++) { history.push({ role: 'assistant', content: String(i) }); m.capHistory(history); }
     assert.strictEqual(history.length, 40);
+  });
+});
+
+// ─── Stream render lifecycle (LIN-2443) ─────────────────────────────────
+
+describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
+  test('AC1: a silent auto-wake done appends ZERO rows, leaves history empty, and shows the check-in line', async () => {
+    const { exports: m, thread, checkIn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(thread.children.length, 0, 'a silent tick must never paint a row');
+    looseDeepEqual(m.getChatHistory(), []);
+    assert.strictEqual(checkIn.hidden, false, 'the check-in line must be revealed');
+    assert.match(checkIn.textContent, /^checked in .+ \u00b7 nothing new$/);
+  });
+
+  test('AC2: an empty USER-initiated done appends exactly one assistant row with an honest no-reply sentence, still not in history', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    questionInput.value = 'anything to report?';
+    m.submitQuestion();
+    await flush();
+    // one user bubble + one assistant bubble
+    assert.strictEqual(thread.children.length, 2, 'the human asked and deserves exactly one answer row');
+    const answerLi = thread.children[1];
+    assert.strictEqual(answerLi.querySelector('.fc-msg-body').textContent, 'no reply \u2014 nothing to add');
+    assert.doesNotMatch(answerLi.querySelector('.fc-msg-body').textContent, /no response/, 'the bracket-code literal is deleted');
+    looseDeepEqual(m.getChatHistory(), [{ role: 'user', content: 'anything to report?' }],
+      'the display-only no-reply sentence must never be pushed to history');
+  });
+
+  test('AC3: an auto-wake tick emitting only tool call/result frames appends ZERO rows', async () => {
+    const { exports: m, thread, chatUICalls } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: '1', name: 'get_stack' }),
+        sseFrame('tool', { phase: 'result', id: '1', name: 'get_stack', result: '{}' }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(thread.children.length, 0, 'a tool-only tick must not paint an empty bubble');
+    assert.strictEqual(chatUICalls.appendMessage.length, 0, 'no bubble may be created for a tool-only turn');
+  });
+
+  test('AC3 preservation: a `proposed` event on a text-free turn still renders a wired Approve/Dismiss card (null-beforeLi fallback)', async () => {
+    const proposal = { proposed: true, sessionId: 'sess-1', prompt: 'go do the thing' };
+    const { exports: m, thread, apiCalls } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { id: 'c1', name: 'send_follow_up', phase: 'proposed', result: JSON.stringify(proposal) }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(thread.children.length, 1, 'the card is appended at thread level, with no bubble beside it');
+    const wrap = thread.children[0].querySelector('.fc-proposal');
+    assert.ok(wrap, 'expected the proposal control to render');
+    assert.strictEqual(wrap.querySelector('.fc-proposal-text').textContent, 'go do the thing');
+    wrap.querySelector('.fc-proposal-dismiss').dispatch('click');
+    assert.strictEqual(apiCalls.length, 0);
+    assert.ok(wrap.classList.contains('fc-proposal--resolved'), 'Approve/Dismiss must still be wired');
+  });
+
+  test('AC4: the pill leaves in-progress on done (\u2713) and on error (\u2715)', async () => {
+    const done = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: 'all quiet' }), sseFrame('done', { surface: true })]),
+    });
+    done.exports.autoWakeTick();
+    await flush();
+    let pill = done.thread.children[0].querySelector('.chat-msg__who');
+    assert.ok(!pill.classList.contains('status-pill--in-progress'), 'the amber in-progress state must not persist');
+    assert.ok(pill.classList.contains('status-pill--done'));
+    assert.strictEqual(pill.querySelector('.status-pill__char').textContent, '\u2713');
+
+    const failed = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: 'partial' }), sseFrame('error', { message: 'boom' })]),
+    });
+    failed.exports.autoWakeTick();
+    await flush();
+    pill = failed.thread.children[0].querySelector('.chat-msg__who');
+    assert.ok(!pill.classList.contains('status-pill--in-progress'));
+    assert.ok(pill.classList.contains('status-pill--failed'));
+    assert.strictEqual(pill.querySelector('.status-pill__char').textContent, '\u2715');
+  });
+
+  test('AC4: an error on a text-free turn still creates a bubble — a failure is never silent', async () => {
+    const { thread, exports: m } = loadClient({ fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]) });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(thread.children.length, 1, 'an error frame must surface a row even with no text');
+    assert.match(thread.children[0].querySelector('.fc-msg-body').textContent, /\[error: boom\]/);
+  });
+
+  test('AC1 non-stacking: two consecutive silent ticks update the SAME status node and still append no rows', async () => {
+    const { exports: m, thread, checkIn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    const firstNode = checkIn;
+    const firstText = checkIn.textContent;
+    assert.ok(firstText.length > 0);
+
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(checkIn, firstNode, 'the status line must be one node, overwritten — never a second row');
+    assert.strictEqual(checkIn.children.length, 0, 'the status line is textContent-only; nothing is ever appended to it');
+    assert.match(checkIn.textContent, /nothing new$/);
+    assert.strictEqual(thread.children.length, 0, 'consecutive silent ticks never append rows');
+  });
+
+  test('a gate-silent tick also refreshes the check-in line (and still appends no row)', async () => {
+    const { exports: m, thread, checkIn, chatUICalls } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'hash-identical' }),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(checkIn.hidden, false);
+    assert.match(checkIn.textContent, /nothing new$/);
+    assert.strictEqual(thread.children.length, 0);
+    assert.strictEqual(chatUICalls.appendNote.length, 0, 'gate-silent stays silent in the thread');
+  });
+
+  test('formatCheckIn is pure — same clock in, exact string out', () => {
+    const { exports: m } = loadClient();
+    const at = new Date('2026-09-01T22:03:00Z');
+    const expected = 'checked in ' + at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' \u00b7 nothing new';
+    assert.strictEqual(m.formatCheckIn(at), expected);
+    assert.strictEqual(m.formatCheckIn(at), m.formatCheckIn(at), 'pure: repeated calls agree');
+  });
+
+  test('a streamed answer still paints, records history and keeps the cursor discipline (the non-empty path is unchanged)', async () => {
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('token', { token: 'all ' }),
+        sseFrame('token', { token: 'quiet' }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(thread.children.length, 1);
+    const body = thread.children[0].querySelector('.fc-msg-body');
+    assert.strictEqual(body.textContent, 'all quiet');
+    assert.ok(!body.classList.contains('chat-cursor'), 'the streaming cursor is cleared on done');
+    looseDeepEqual(m.getChatHistory(), [{ role: 'assistant', content: 'all quiet' }]);
   });
 });
 

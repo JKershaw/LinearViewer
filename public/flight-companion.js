@@ -79,6 +79,7 @@
 
   var thread = document.getElementById('flight-companion-thread');
   var emptyState = document.getElementById('flight-companion-chat-empty');
+  var checkInEl = document.getElementById('flight-companion-checkin');
   var questionInput = document.getElementById('flight-companion-question');
   var sendBtn = document.getElementById('flight-companion-send');
 
@@ -182,6 +183,13 @@
     return { kind: 'server-error', message: 'Something went wrong (status ' + status + ').' };
   }
 
+  // The check-in status line's text (LIN-2443 AC1). Pure — the clock is an
+  // argument, never read here — so it sits on the test seam with the other
+  // pure helpers.
+  function formatCheckIn(date) {
+    return 'checked in ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' \u00b7 nothing new';
+  }
+
   // ─── DOM-touching glue ───────────────────────────────────────────────────
 
   function setEmptyVisible(visible) {
@@ -191,6 +199,35 @@
   function setComposerBusy(busy) {
     questionInput.disabled = busy;
     sendBtn.disabled = busy;
+  }
+
+  // AC4 (LIN-2443): ChatUI.appendMessage bakes the speaker pill into
+  // innerHTML and returns only the <li>, so there is no mutation API — but
+  // every state this needs already exists in the shared vocabulary
+  // (status-pill--done/--failed, public/style.css). Page-local on purpose:
+  // adding a setter to window.ChatUI would tax its four other consumers
+  // (session.js, task-chat.js, collective.js, observation.js) for a need
+  // only this page has today. Glyphs mirror STATUS_PILL_GLYPHS
+  // (public/common.js) — NOT a chat.css/chat.js fork.
+  var PILL_GLYPHS = { done: '\u2713', failed: '\u2715' };
+
+  function setBubbleState(li, state) {
+    if (!li) return;
+    var pill = li.querySelector('.chat-msg__who');
+    if (!pill) return;
+    pill.classList.remove('status-pill--in-progress');
+    pill.classList.add('status-pill--' + state);
+    var char = pill.querySelector('.status-pill__char');
+    if (char) char.textContent = PILL_GLYPHS[state] || '';
+  }
+
+  // AC1 (LIN-2443): ONE node, overwritten in place — non-stacking is
+  // structural here, not a convention: this only ever assigns textContent
+  // and never appendChild's a row.
+  function updateCheckInStatus() {
+    if (!checkInEl) return;
+    checkInEl.textContent = formatCheckIn(new Date());
+    checkInEl.hidden = false;
   }
 
   function appendAssistantBubble() {
@@ -402,8 +439,13 @@
   function handleNonStreamOutcome(classification, turnKind, sentMessage) {
     switch (classification.kind) {
       case 'gate-silent':
-        // Auto-wake only — nothing to report; no UI, counts as "nothing to
-        // report" for backoff.
+        // Auto-wake only — nothing to report; counts as "nothing to report"
+        // for backoff. From the reader's side a gate-silent tick IS the
+        // companion checking in and finding nothing, so it refreshes the
+        // same single status line an empty auto-wake `done` does (LIN-2443
+        // plan §2) rather than letting the line go stale while ticks are in
+        // fact happening. Still no row is ever appended.
+        updateCheckInStatus();
         applyCadenceEffect('double');
         break;
       case 'session-expired':
@@ -476,6 +518,20 @@
     var answerLi = null;
     var answerText = '';
 
+    // AC3 (LIN-2443): the bubble is created on demand rather than at stream
+    // open, so a silent or tool-only auto-wake tick never paints an empty
+    // row. `chat-cursor` therefore appears with the first token rather than
+    // at stream open; the composer is already disabled via setComposerBusy,
+    // so a user turn still has feedback during the pre-first-token wait.
+    function ensureAssistantBubble() {
+      if (!answerEl) {
+        answerEl = appendAssistantBubble();
+        answerEl.classList.add('chat-cursor');
+        answerLi = answerEl.closest('li');
+      }
+      return answerEl;
+    }
+
     // Raw fetch carve-out: this response may be a Server-Sent Events stream
     // consumed via the reader below; window.api() parses the body as JSON
     // and would break streaming — the non-stream branch reads the body
@@ -489,33 +545,59 @@
       var isEventStream = contentType.indexOf('text/event-stream') === 0;
 
       if (response.ok && isEventStream) {
-        answerEl = appendAssistantBubble();
-        answerEl.classList.add('chat-cursor');
-        answerLi = answerEl.closest('li');
         return readSSEStream(response, function (type, eventData) {
           if (type === 'tool') {
+            // Deliberately NOT a bubble-creation trigger — `proposed`
+            // included (LIN-2443 plan §10). Treating a bare call/result as
+            // one would re-create the empty bubble AC1/AC3 exist to remove
+            // on a tool-only tick. `beforeLi` may now be null; renderProposal
+            // (:269-270) and ChatUI.appendNote (chat.js:106) both already
+            // append at thread level in that case, so the Approve/Dismiss
+            // card renders identically — just appended rather than inserted.
             handleToolEvent(eventData, answerLi);
           } else if (type === 'token' || type === 'message') {
             var chunk = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
-            answerText += chunk;
-            answerEl.textContent = answerText;
-            thread.scrollTop = thread.scrollHeight;
+            // First NON-EMPTY chunk creates the bubble — text is the only
+            // thing that ever goes inside one.
+            if (chunk) {
+              ensureAssistantBubble();
+              answerText += chunk;
+              answerEl.textContent = answerText;
+              thread.scrollTop = thread.scrollHeight;
+            }
           } else if (type === 'done') {
-            answerEl.classList.remove('chat-cursor');
-            // The empty-done guard (task-chat.js's own pattern): never push
-            // an empty assistant turn into history — a text-free entry
-            // would be forwarded to the model on every subsequent turn.
+            // The empty-done guard (task-chat.js's own pattern) is unchanged:
+            // never push an empty assistant turn into history — a text-free
+            // entry would be forwarded to the model on every subsequent
+            // turn. Only the DOM effect of the empty case moves, and it now
+            // diverges by turn kind (AC1 vs AC2).
             if (answerText) {
+              answerEl.classList.remove('chat-cursor');
               chatHistory.push({ role: 'assistant', content: answerText });
               capHistory(chatHistory);
+              setBubbleState(answerLi, 'done');
+            } else if (turnKind === 'user-initiated') {
+              // AC2: the human asked and deserves a row. Display-only — this
+              // sentence is NEVER pushed to chatHistory (that is exactly what
+              // the guard above exists to prevent).
+              var replyEl = ensureAssistantBubble();
+              replyEl.classList.remove('chat-cursor');
+              replyEl.textContent = 'no reply \u2014 nothing to add';
+              setBubbleState(answerLi, 'done');
             } else {
-              answerEl.textContent = '[no response]';
+              // AC1: a silent auto-wake tick. No bubble was ever created and
+              // none is created now — only the one status line updates.
+              updateCheckInStatus();
             }
             applyCadenceEffect(doneCadenceEffect(turnKind, eventData && eventData.surface));
             finishTurn();
           } else if (type === 'error') {
-            answerEl.classList.remove('chat-cursor');
-            answerEl.textContent = answerText + '\n[error: ' + ((eventData && eventData.message) || 'failed') + ']';
+            // A mid-stream error is not the designed silence AC1 covers, so
+            // the bubble is created if absent — a failure is never silent.
+            var errEl = ensureAssistantBubble();
+            errEl.classList.remove('chat-cursor');
+            errEl.textContent = answerText + '\n[error: ' + ((eventData && eventData.message) || 'failed') + ']';
+            setBubbleState(answerLi, 'failed');
             if (turnKind === 'user-initiated') chatHistory.pop();
             else applyCadenceEffect('double');
             finishTurn();
@@ -606,7 +688,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
       capHistory, nextCadenceDelay, doneCadenceEffect, autoWakeErrorCadenceEffect,
-      advanceCadence, classifyTurnResponse, parseProposalResult,
+      advanceCadence, classifyTurnResponse, parseProposalResult, formatCheckIn,
       applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion,
       getCadenceState: function () { return cadence; },
       getChatHistory: function () { return chatHistory; },

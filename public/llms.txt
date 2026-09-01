@@ -351,21 +351,33 @@ main.task-chat-page[data-url-key]      - page container
 
 The Flight Companion page (`/workspace/{urlKey}/flight-companion`) is a live, in-page chat for LIN-751 ("realtime chat with work in flight"): a companion that watches the workspace's dispatch feed and checks in with you on its own client-driven cadence (visible-tab only, 30s base, doubling to a 180s cap on nothing-to-report ticks; the server's own pre-call gate is always the real spend authority), or answers directly when you send it a message. It renders through the shared chat UI (`chat.css`/`window.ChatUI`) and streams turns over SSE. On an auto-wake turn, a proposed follow-up renders an inline Approve/Dismiss control and only an Approve click can enqueue it — the model can never dispatch one unapproved there. On a turn you start yourself, though, the model's `send_follow_up` executes directly (no proposal card, no approval needed) — the approval gate is auto-wake-only, not a blanket guarantee. Requires the per-user `flightCompanion` feature flag; reached only via a link in Settings.
 
-The page also still surfaces a SEPARATE, older kickoff prompt (`lib/prompts/flight-companion-kickoff.js`) that you paste into a real Claude Code session with a `readWrite` proxy token — a standalone mechanism kept alongside the in-page chat (not replaced by it) for when a full agent session, not just chat, is wanted. It monitors the same dispatch feedback stream (`GET /api/proxy/dispatch?status=taken` — plus its companion `GET /api/proxy/dispatch?status=blocked` for runs parked waiting on a human, which since LIN-2079 no longer appear under `status=taken` — and `GET /api/proxy/dispatch/{id}`, NOT the browser-cookie observation endpoints). When the per-user `proxy` feature flag is also on, a `+proxy` toggle appears next to `copy prompt` (the shared `ProxyToggle` seam, LIN-1764): with it active, copy mints a single-use bootstrap token and appends the Workspace API access block automatically instead of requiring a manually-minted token.
+Chat is the FIRST section on the page (LIN-2443) — `How to use` and the kickoff prompt follow it, and the read-only observer report stays last. A silent auto-wake tick (one that completes with no text, the designed common outcome) paints NO chat bubble at all: it updates a single, non-stacking status line (`#flight-companion-checkin`, `aria-live="polite"`, hidden until first use) reading e.g. `checked in 22:03 · nothing new`, and consecutive silent ticks overwrite that one node rather than appending rows. A non-spend `gate-silent` tick refreshes the same line. An empty turn YOU started still renders a visible row carrying an honest `no reply — nothing to add`, so the two turn kinds diverge deliberately — neither is ever pushed into the conversation history. The assistant bubble is created on the first streamed token, never on stream open and never by a `tool` event (a `proposed` card renders at thread level in its own right), and its speaker pill leaves the in-progress state on `done`/`error`.
+
+The page also still surfaces a SEPARATE, older kickoff prompt (`lib/prompts/flight-companion-kickoff.js`) that you paste into a real Claude Code session with a `readWrite` proxy token — a standalone mechanism kept alongside the in-page chat (not replaced by it) for when a full agent session, not just chat, is wanted. It monitors the same dispatch feedback stream (`GET /api/proxy/dispatch?status=taken` — plus its companion `GET /api/proxy/dispatch?status=blocked` for runs parked waiting on a human, which since LIN-2079 no longer appear under `status=taken` — and `GET /api/proxy/dispatch/{id}`, NOT the browser-cookie observation endpoints). When the per-user `proxy` feature flag is also on, a `+proxy` toggle appears next to `copy prompt` (the shared `ProxyToggle` seam, LIN-1764): with it active, copy mints a single-use bootstrap token and appends the Workspace API access block automatically instead of requiring a manually-minted token. Since LIN-2443 the prompt TEXT sits inside a `<details class="disclosure">` collapsed by default; `copy prompt`, the `+proxy` toggle and the copy-status text stay OUTSIDE it and are always actionable, so copying never requires expanding the disclosure (the copy path reads the `<pre>`'s `textContent`, which a closed `<details>` still has).
 
 ### Flight Companion DOM Structure
 ```
 main.flight-companion-page[data-url-key]  - page container
-  #flight-companion-thread                - live chat thread (ul.chat-thread)
-  #flight-companion-question              - chat composer input
-  #flight-companion-send                  - send button
-  .fc-proposal                            - an inline model-proposed follow-up
-    .fc-proposal-approve                    - approve — POSTs to approve-follow-up
-    .fc-proposal-dismiss                    - dismiss — client-only, no request
-  #flight-companion-prompt                - the (separate, older) kickoff prompt (pre, copyable)
-  #flight-companion-copy                  - copy-to-clipboard button
-  .prompt-proxy-toggle                    - +proxy toggle (only when the proxy flag is on)
-  #flight-companion-copy-feedback         - copy status text
+  section.flight-companion-chat-section   - "Chat" — the FIRST section (LIN-2443)
+    #flight-companion-thread                - live chat thread (ul.chat-thread)
+    #flight-companion-chat-empty            - empty state, hidden once a row exists
+    #flight-companion-checkin               - the one check-in status line: empty +
+                                              hidden until a silent auto-wake or
+                                              gate-silent tick overwrites it in place
+                                              (aria-live=polite; never appended to)
+    #flight-companion-question              - chat composer input
+    #flight-companion-send                  - send button
+    .fc-proposal                            - an inline model-proposed follow-up
+      .fc-proposal-approve                    - approve — POSTs to approve-follow-up
+      .fc-proposal-dismiss                    - dismiss — client-only, no request
+  section (How to use)                    - short intro + the three steps
+  section (Kickoff prompt)                - the separate, older paste-to-Claude-Code path
+    #flight-companion-copy                  - copy-to-clipboard button (outside the collapse)
+    .prompt-proxy-toggle                    - +proxy toggle (only when the proxy flag is on)
+    #flight-companion-copy-feedback         - copy status text
+    details.disclosure                      - collapsed by default (rendered without `open`)
+      #flight-companion-prompt                - the kickoff prompt itself (pre, copyable)
+  section (Latest observer report)        - read-only observer-pass panel, stays last
 ```
 
 ### Flight Companion Endpoints

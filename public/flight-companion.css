@@ -7,7 +7,11 @@
 /* The page title + subtitle route through renderPageHeader (LIN-975); their
    look is owned by the canonical `.page-header` / `.page-header__subtitle`. */
 
+/* LIN-2443: the shortened intro reads as human copy, not a machine fact, so
+   it opts out of the page body's mono default (public/style.css) — the
+   mono-facts / sans-labels split (LIN-976). */
 .flight-companion-experimental {
+  font-family: var(--font-content);
   color: var(--muted);
   margin-bottom: 0.75rem;
 }
@@ -114,6 +118,15 @@
 
 .flight-companion-chat-empty {
   color: var(--muted);
+  margin: 0 0 var(--space-2);
+}
+
+/* Single, non-stacking check-in status line (LIN-2443) — the client
+   overwrites its textContent in place, never appends. */
+.fc-checkin-status {
+  font-family: var(--font-content);
+  color: var(--muted);
+  font-size: 0.85em;
   margin: 0 0 var(--space-2);
 }
 

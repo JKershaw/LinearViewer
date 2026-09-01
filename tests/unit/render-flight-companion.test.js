@@ -87,3 +87,45 @@ describe('renderFlightCompanionPage — LIN-2435 Commit 4: on-page copy sync', (
     assert.match(html, /Dismiss/);
   });
 });
+
+describe('renderFlightCompanionPage — LIN-2443: section order, prompt collapse, check-in mount', () => {
+  const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
+
+  test('section order is Chat -> How to use -> Kickoff prompt -> observer report', () => {
+    const chatIdx = html.indexOf('>Chat<');
+    const howToIdx = html.indexOf('>How to use<');
+    const promptHeadingIdx = html.indexOf('>Kickoff prompt<');
+    const observerIdx = html.indexOf('>Latest observer report (read-only)<');
+    assert.ok(chatIdx > -1 && howToIdx > -1 && promptHeadingIdx > -1 && observerIdx > -1, 'expected all four section headings to render');
+    assert.ok(chatIdx < howToIdx, 'Chat must render before How to use');
+    assert.ok(howToIdx < promptHeadingIdx, 'How to use must render before Kickoff prompt');
+    assert.ok(promptHeadingIdx < observerIdx, 'Kickoff prompt must render before the observer report');
+  });
+
+  test('the kickoff prompt <pre> is wrapped in a <details> disclosure rendered without `open`', () => {
+    const detailsOpenIdx = html.indexOf('<details class="disclosure"');
+    const detailsTagEnd = html.indexOf('>', detailsOpenIdx);
+    const detailsCloseIdx = html.indexOf('</details>');
+    const preIdx = html.indexOf('id="flight-companion-prompt"');
+    assert.ok(detailsOpenIdx > -1 && detailsCloseIdx > -1, 'expected a <details class="disclosure"> wrapper');
+    assert.ok(preIdx > detailsOpenIdx && preIdx < detailsCloseIdx, 'the prompt <pre> must render inside the <details>');
+    assert.doesNotMatch(html.slice(detailsOpenIdx, detailsTagEnd + 1), /\bopen\b/, 'the disclosure must render collapsed by default (no `open` attribute)');
+  });
+
+  test('#flight-companion-copy / #flight-companion-copy-feedback / .prompt-proxy-toggle render outside the <details>', () => {
+    const detailsOpenIdx = html.indexOf('<details class="disclosure"');
+    const copyIdx = html.indexOf('id="flight-companion-copy"');
+    const feedbackIdx = html.indexOf('id="flight-companion-copy-feedback"');
+    assert.ok(copyIdx > -1 && copyIdx < detailsOpenIdx, '#flight-companion-copy must render before the <details>');
+    assert.ok(feedbackIdx > -1 && feedbackIdx < detailsOpenIdx, '#flight-companion-copy-feedback must render before the <details>');
+
+    const proxyHtml = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: true } });
+    const proxyDetailsOpenIdx = proxyHtml.indexOf('<details class="disclosure"');
+    const toggleIdx = proxyHtml.indexOf('prompt-proxy-toggle');
+    assert.ok(toggleIdx > -1 && toggleIdx < proxyDetailsOpenIdx, '.prompt-proxy-toggle must render before the <details>');
+  });
+
+  test('renders the check-in status mount: present, empty, hidden, aria-live="polite"', () => {
+    assert.match(html, /<p class="fc-checkin-status" id="flight-companion-checkin" aria-live="polite" hidden><\/p>/);
+  });
+});
