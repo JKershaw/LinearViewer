@@ -168,7 +168,18 @@ feedback-marker line in this form:
 
 This is a lightweight, machine-parseable line for the surfaces that watch lanes (per-ticket
 observation, "ticket N of M", per-session walks) to key off, distinct from your close-out prose.
-**`[ticket] LIN-XXXX done` must be gated on exactly the same verified evidence as your close-out
+**The channel this line must reach is dispatch feedback (`dispatch-history.feedback[]`), never
+only a Linear comment.** Every reader that keys off this convention (`session-telemetry.js`'s
+`parseTicketMarkers`, the KPI cost-per-task denominator, Observation/Live Console lane chips)
+reads the dispatch feedback stream — a comment-only marker is invisible to all of them (LIN-2423
+measured this in production: markers were landing as comments while every reader read zero).
+You do not need to call anything extra to make this happen: write the marker as an isolated line
+— its own paragraph, nothing else on that line, never inside a fenced code block — in your
+ordinary turn text exactly as shown above, and `simple-dispatcher`'s runner relays it to the
+feedback channel for you automatically (`postTicketMarkerDelta` in `hook.js`, plus a live
+heartbeat-pass emitter in `reapers.js` for a long-running lane), tagged as a `status` feedback
+entry. Keep posting your close-out comment on the board as before — the marker is *additional*,
+never a replacement for it. **`[ticket] LIN-XXXX done` must be gated on exactly the same verified evidence as your close-out
 comment — a landed, CI-green, verified commit — never on "I merged" or "I think I'm finished."**
 An intent-gated marker would be a new premature-done surface, the same bug class the dispatcher
 has already spent real effort eliminating elsewhere. Non-success outcomes are first-class, not

@@ -715,6 +715,43 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
     assert.ok(!sample.includes('999'), 'must never render the deprecated noLineageCount alias (999)');
   });
 
+  test('LIN-2423: renders the marker-channel occupancy figure beside laneLandedCount', () => {
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 10, unpriced: 8, laneLandedCount: 7, costUsd: 176.4,
+        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
+        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
+        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
+        pricedLineageShare: 0.8, attributableLineageShare: 0.95,
+        markerOccupiedLineages: 4, markerOccupancyShare: 0.5
+      }
+    }));
+    assert.ok(
+      html.includes('<span class="kpi-cost-marker-occupancy">marker channel: 4 lineages occupied (50%) — distinguishes no lane-landed tickets from an empty channel</span>'),
+      'the occupancy figure must render with its count and share'
+    );
+  });
+
+  test('LIN-2423: destructuring-default safety — a stats payload with no occupancy fields renders 0/— rather than throwing', () => {
+    // Mirrors the laneLandedCount review precedent this card already follows: a field-rename
+    // upstream must degrade sanely (a stale card reading 0/—), never throw and blank the
+    // whole card.
+    const html = renderKpisPage(buildStats({
+      terminalMarkedTaskCost: {
+        windowDays: 30, issueCount: 10, unpriced: 8, laneLandedCount: 7, costUsd: 176.4,
+        cashUsd: 100, unknownLaneUsd: 10, inFlightUsd: 42.5, overheadUsd: 12.3,
+        closeOutLineageShare: 0.7, evidenceLinkedShare: 0.9,
+        opencodeSummedShare: 0.4, unknownHarnessShare: 0.05,
+        pricedLineageShare: 0.8, attributableLineageShare: 0.95
+        // markerOccupiedLineages/markerOccupancyShare deliberately omitted
+      }
+    }));
+    assert.ok(
+      html.includes('<span class="kpi-cost-marker-occupancy">marker channel: 0 lineages occupied (—) — distinguishes no lane-landed tickets from an empty channel</span>'),
+      'must degrade to the destructuring defaults, never throw'
+    );
+  });
+
   test('pins the exact ignorance-basis string, so the render layer\'s own lineageBearingCount derivation cannot drift (LIN-2418 review F1)', () => {
     // The compute layer denominates opencodeSummedShare/unknownHarnessShare
     // over `issueCount - noLineageCount` but deliberately publishes no

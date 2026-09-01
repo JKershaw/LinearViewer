@@ -1071,6 +1071,67 @@ describe('computeTerminalMarkedTaskCost — LIN-2253 review F4: issue-less overh
   });
 });
 
+describe('computeTerminalMarkedTaskCost — LIN-2423: marker-channel occupancy probe', () => {
+  test('the direct F4 regression: an in-flight (non-done) lineage carrying markers still counts as occupied', () => {
+    // The whole point of computing occupancy ABOVE the `status !== 'done'` gate: a lane that
+    // hasn't finished yet must not read as channel-empty just because it hasn't resolved.
+    const inFlight = row({
+      id: 'occ-inflight', issueIdentifier: 'LIN-9500', harness: 'claude-code', dispatchedAt: daysAgo(0.5),
+      feedback: [
+        ticketMarker('LIN-9500', 'started', 0.4)
+        // no terminal [done]/[failed]/etc — the lineage itself never resolved
+      ]
+    });
+    const result = computeTerminalMarkedTaskCost([inFlight], NOW);
+    assert.equal(result.issueCount, 0, 'unresolved lineages still contribute nothing to T — unchanged by this probe');
+    assert.equal(result.markerOccupiedLineages, 1, 'an in-flight lineage with a marker must count as occupied');
+    assert.equal(result.markerOccupancyShare, 1, 'the only ran lineage is occupied');
+  });
+
+  test('a DONE lineage with zero [ticket] markers does not count as occupied', () => {
+    const noMarkers = row({
+      id: 'occ-none', issueIdentifier: 'LIN-9501', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 1, days: 0.9 }), doneMarker(0.8)]
+    });
+    const result = computeTerminalMarkedTaskCost([noMarkers], NOW);
+    assert.equal(result.markerOccupiedLineages, 0);
+    assert.equal(result.markerOccupancyShare, 0, 'ranLineages is 1 (non-zero), so this is a real 0, not the null zero-ranLineages case');
+  });
+
+  test('markerOccupancyShare denominator is ranLineages — the SAME denominator attributableLineageShare uses', () => {
+    const occupied = row({
+      id: 'occ-a', issueIdentifier: 'LIN-9502', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [ticketMarker('LIN-9502', 'done', 1.5), doneMarker(1.4)]
+    });
+    const unoccupied = row({
+      id: 'occ-b', issueIdentifier: 'LIN-9503', harness: 'claude-code', dispatchedAt: daysAgo(1),
+      feedback: [doneMarker(0.9)]
+    });
+    const result = computeTerminalMarkedTaskCost([occupied, unoccupied], NOW);
+    assert.equal(result.markerOccupiedLineages, 1);
+    assert.equal(result.markerOccupancyShare, 0.5, '1 occupied of 2 ran lineages');
+  });
+
+  test('zero ranLineages degrades to count 0 / share null — never a divide-by-zero or a false $0-style zero', () => {
+    const result = computeTerminalMarkedTaskCost([], NOW);
+    assert.equal(result.markerOccupiedLineages, 0);
+    assert.equal(result.markerOccupancyShare, null, 'mirrors asShare\'s null-on-nothing-to-divide-by idiom, never a misleading 0');
+  });
+
+  test('resolves the exact ambiguity this probe exists for: occupancy > 0 while laneLandedCount stays 0 is an honest zero, not a silent channel gap', () => {
+    // Every landed ticket has its own separate lineage here (no lane-landed, no-lineage
+    // tickets at all), so laneLandedCount is a real 0 — but markers ARE flowing through the
+    // channel, which occupancy must show, distinguishing this from a channel-empty defect.
+    const lane = row({
+      id: 'occ-lane', issueIdentifier: 'LIN-9504', harness: 'claude-code', dispatchedAt: daysAgo(2),
+      feedback: [ticketMarker('LIN-9504', 'done', 1.5), doneMarker(1.4)]
+    });
+    const result = computeTerminalMarkedTaskCost([lane], NOW);
+    assert.equal(result.laneLandedCount, 0, 'no lane-landed ticket lacking its own lineage — an honest zero');
+    assert.equal(result.markerOccupiedLineages, 1, 'yet the marker channel is demonstrably non-empty');
+  });
+});
+
 describe('computeTerminalMarkedTaskCost — naming discipline', () => {
   test('no "verified" or reserved synonym appears in any emitted field name', () => {
     const result = computeTerminalMarkedTaskCost([], NOW);
