@@ -318,11 +318,16 @@ the LAST `feedback[]` entry ahead of a park status your own reader logic (e.g. a
 detector keying off the latest entry) depends on. A second emit site rides `reapers.js`'s
 in-flight heartbeat pass, so a long-running lane's markers surface live rather than only in one
 end-of-run batch. Because the hook process and the heartbeat daemon are separate OS processes
-racing on the same delta cursor, a **bounded, benign duplicate post** of the same marker line is
-possible and must be tolerated downstream — `parseTicketMarkers` already resolves it (last-
-array-position-wins per identifier), and `terminal-marked-task-cost.js` already dedupes its own
-per-lineage ticket set via a `Set` before counting, so a duplicate changes nothing observable.
-Never claim a stronger "no double post" guarantee than that.
+racing on the same delta cursor, a **bounded duplicate post** of the same marker line is possible
+and must be tolerated downstream. The bound is precise, not universal: `parseTicketMarkers`
+already resolves it harmlessly (last-array-position-wins per identifier), and
+`terminal-marked-task-cost.js` already dedupes its own per-lineage ticket set via a `Set` before
+counting — so a duplicate changes nothing observable for either of those identifier-keyed folds.
+It is **not** harmless for an order-sensitive reader that keys off only the LATEST feedback
+entry (e.g. a parked-wait detector): the ordering guarantee above only orders one process's own
+two calls, and cannot order a second process's concurrent, racing post — so such a reader can
+transiently see the duplicate marker in place of the status entry it expected there. Never claim
+a stronger "no double post" or "changes nothing observable on any consumer" guarantee than that.
 
 **`done` must be gated on exactly the same verified evidence as the lane's own close-out comment
 for that ticket — a landed, CI-green, verified commit — never on intent** ("I merged", "I think
