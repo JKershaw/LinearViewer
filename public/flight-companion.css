@@ -105,3 +105,67 @@
   color: var(--muted);
   margin: 0;
 }
+
+/* Chat thread + composer (LIN-2435). `.chat-thread`/`.chat-composer`
+   themselves need no new rules — chat.css already styles them; this is the
+   page-local proposal sub-component + a couple of thin composer hooks,
+   namespaced `.fc-proposal*` mirroring this file's existing `.fc-obs-*`
+   sub-component convention. Semantic-token-only (dark-safe). */
+
+.flight-companion-chat-empty {
+  color: var(--muted);
+  margin: 0 0 var(--space-2);
+}
+
+.fc-chat-composer {
+  margin-top: var(--space-1);
+}
+
+.fc-composer-input {
+  flex: 1 1 auto;
+}
+
+.fc-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+
+.fc-proposal-text {
+  margin: 0;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.fc-proposal-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.fc-proposal-approve,
+.fc-proposal-dismiss {
+  cursor: pointer;
+}
+
+.fc-proposal-approve:disabled,
+.fc-proposal-dismiss:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.fc-proposal-feedback {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+/* Once resolved (approved/dismissed/dropped), the action row hides — only
+   the feedback text (already updated in place) remains. */
+.fc-proposal--resolved .fc-proposal-actions {
+  display: none;
+}
