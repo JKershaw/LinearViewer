@@ -65,14 +65,17 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { MangoClient } from '@jkershaw/mangodb';
 import { createFlightCompanionRoutes, buildCensusSeedText } from '../../routes/flight-companion.js';
-import { COMPANION_SEED_STATE, buildCompanionSnapshot } from '../../lib/flight-companion-gate.js';
+import { COMPANION_SEED_STATE, buildCompanionSnapshot, RESERVATION_LEASE_MS, DEFAULT_COMPANION_FLOOR_MS } from '../../lib/flight-companion-gate.js';
+import { ObserverStateStore } from '../../lib/observer-state-store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROUTE_SRC = readFileSync(join(__dirname, '../../routes/flight-companion.js'), 'utf8');
@@ -100,27 +103,64 @@ async function withEnv(vars, fn) {
   }
 }
 
+// Deterministic, key-sorted stringify — enough for this fake's own dedup
+// fold below to agree with itself; it does not need bit-for-bit parity with
+// lib/observer-state-store.js's own hashState, only internal consistency.
+function stableStringify(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`;
+}
+
 /**
  * A fake ObserverStateStore covering BOTH instance families the turn route
  * touches: the companion's own `companion:v1:<urlKey>` (ensureSeeded/advance)
  * and the read-only `sweep:v1:<urlKey>` census (readCurrent). `calls` is a
  * shared array the caller can pass in so gate-store calls and freeTierStore
  * calls interleave in one true call-order timeline.
+ *
+ * LIN-2442 beat 3: this double GENUINELY tracks the companion record's `rev`
+ * and `state` now, mirroring lib/observer-state-store.js's own CAS/hash-dedup
+ * semantics (a `readCurrent` after an `advance()` reflects the real write; a
+ * rev mismatch loses the CAS; an identical-state write is a true no-op that
+ * does not bump `rev`) — before this beat, `readCurrent` returned a
+ * hardcoded `null` for every companion-family key, so beat 2's post-`done`
+ * commit `readCurrent`/`advance()` degraded through the "instance vanished"
+ * skip branch on every single test in this file: the 33/33 green reported
+ * then proved nothing about the commit path actually running. `advanceResult`
+ * still lets the LIN-2435 tri-state fixtures force a lost-race (`false`) or
+ * backend-error (`null`) result — but only for the very next `advance()`
+ * call, exactly reproducing what a real lost CAS or backend fault looks like
+ * (no state change) rather than a blanket override.
  */
-function fakeObserverStateStore({ companionRev = 1, companionState = COMPANION_SEED_STATE, censusDoc = null, calls = [], advanceResult = true } = {}) {
+function fakeObserverStateStore({ companionRev = 1, companionState = COMPANION_SEED_STATE, censusDoc = null, calls = [], advanceResult } = {}) {
+  let doc = { rev: companionRev, state: companionState };
+  let forcedNextResult = advanceResult; // consumed at most once
+
   return {
     calls,
     async ensureSeeded(instanceKey) {
       calls.push({ store: 'observerState', method: 'ensureSeeded', instanceKey });
-      return { _id: instanceKey, rev: companionRev, state: companionState };
+      return { _id: instanceKey, rev: doc.rev, state: doc.state };
     },
     async readCurrent(instanceKey) {
       calls.push({ store: 'observerState', method: 'readCurrent', instanceKey });
-      return instanceKey.startsWith('sweep:v1:') ? censusDoc : null;
+      if (instanceKey.startsWith('sweep:v1:')) return censusDoc;
+      return { _id: instanceKey, rev: doc.rev, state: doc.state, stateHash: stableStringify(doc.state) };
     },
-    async advance(instanceKey, expectedRev, nextState, meta) {
+    async advance(instanceKey, expectedRev, nextState) {
       calls.push({ store: 'observerState', method: 'advance', instanceKey, expectedRev });
-      return advanceResult;
+      if (forcedNextResult !== undefined) {
+        const result = forcedNextResult;
+        forcedNextResult = undefined;
+        return result;
+      }
+      if (expectedRev !== doc.rev) return false; // lost race / stale witness
+      const nextHash = stableStringify(nextState);
+      if (nextHash === stableStringify(doc.state)) return true; // duplicate no-op, rev unchanged
+      doc = { rev: doc.rev + 1, state: nextState };
+      return true;
     },
   };
 }
@@ -821,5 +861,380 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     // The user-initiated branch must read it fresh (auto-wake already
     // populated currentCensusDoc via the gate, above).
     assert.match(ROUTE_SRC, /turnKind === 'user-initiated' && observerStateStore/);
+  });
+});
+
+// ─── LIN-2442 beat 3: acceptance witnesses against a REAL ObserverStateStore ─
+//
+// Against a REAL MangoDB tmpdir instance (precedent: tests/unit/observer-
+// state-store.test.js, tests/unit/owner-credential-store.test.js) — the
+// in-memory `fakeObserverStateStore` above is honest about rev/CAS semantics
+// now (this beat's own fix), but witness (b) below is a genuine CONCURRENCY
+// claim, and a mock collection is atomic by construction (see
+// tests/fixtures/mock-collection.js's own header) — it would encode the
+// assumption instead of testing it. Witnesses (a) and (c) run on the same
+// real store for consistency, not because either needs real concurrency.
+describe('Flight Companion turn endpoint (LIN-2442) — acceptance witnesses, mutation-checked', () => {
+  let dbDir;
+  let client;
+  let counter = 0;
+
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'flight-companion-lease-'));
+    client = new MangoClient(dbDir);
+    await client.connect();
+  });
+
+  after(async () => {
+    if (client?.close) await client.close();
+    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+  });
+
+  function freshRealStore() {
+    const db = client.db(`fc_lease_${counter++}`);
+    return new ObserverStateStore({ collection: db.collection('observer-state') });
+  }
+
+  const COMPANION_KEY = 'companion:v1:acme';
+
+  function parseSSE(text) {
+    return text.split('\n\n').filter(Boolean).map((frame) => {
+      const type = /^event: (.*)$/m.exec(frame)?.[1];
+      const data = /^data: (.*)$/m.exec(frame)?.[1];
+      return { type, data: data ? JSON.parse(data) : null };
+    });
+  }
+
+  function censusWithAttention(stateHash, rev) {
+    return {
+      rev,
+      stateHash,
+      state: {
+        lanes: { working: 1, silent: 0, blocked: 1, terminal: 0, queued: 0, resolved: 0, unknown: 0 },
+        attention: [{ loopId: 'loop-lease', lane: 'blocked', stage: 'plan' }],
+      },
+    };
+  }
+
+  function throwingChatClient(message) {
+    return {
+      async streamChat() { throw new Error(message); },
+      async streamChatWithTools() { throw new Error(message); },
+    };
+  }
+
+  function doneOnlyChatClient() {
+    return {
+      async streamChat(messages, opts, onEvent) { onEvent('done', {}); },
+      async streamChatWithTools(messages, opts, onEvent) { onEvent('done', {}); },
+    };
+  }
+
+  // The real ObserverStateStore has no seeded sweep:v1: doc in these tests —
+  // nothing here ever runs a real sweep — so readCurrent(sweep key) must be
+  // pointed at a fixture census, exactly as the fake double's `censusDoc`
+  // option does elsewhere in this file. Returns a bound readCurrent that
+  // delegates to the real store for every other key (the companion key
+  // included), so callers can still read the genuine companion doc through
+  // `store.readCurrent(COMPANION_KEY)` unaffected.
+  function withCensus(store, census) {
+    const original = store.readCurrent.bind(store);
+    store.readCurrent = async (instanceKey) => (instanceKey.startsWith('sweep:v1:') ? census : original(instanceKey));
+    return store;
+  }
+
+  async function waitForCompanionState(store, predicate, { timeoutMs = 2000, intervalMs = 15 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    let last;
+    for (;;) {
+      last = await store.readCurrent(COMPANION_KEY);
+      if (predicate(last)) return last;
+      if (Date.now() > deadline) {
+        throw new Error(`waitForCompanionState: timed out; last doc = ${JSON.stringify(last)}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  }
+
+  // ── (a) the delta survives a post-advance model failure ──────────────────
+  //
+  // Two sub-cases, both cited by the research as the two ways the pre-fix
+  // bug's symptom actually shows up on a LATER turn, depending on whether the
+  // sweep ticks again in between: hash-identical (turn 2 sees the exact same
+  // census) and no-delta (turn 2 sees a hash-churned but companion-relevant-
+  // identical census). Under the FIX, neither must matter — the baseline
+  // never moved, so turn 2 must spend again in both cases.
+  async function deltaSurvivesFailureCase(turn2Census) {
+    const store = freshRealStore();
+    const censusA = censusWithAttention('hash-lease-a', 9);
+    withCensus(store, censusA);
+
+    const app1 = buildApp({
+      observerStateStore: store,
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present'); } },
+      chatClient: throwingChatClient('simulated model-call failure after the reservation landed'),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    // Turn 1: seed-turn spend, reservation write lands, the model call throws.
+    const turn1 = await post(app1, '/workspace/acme/api/flight-companion/turn', {});
+    assert.strictEqual(turn1.status, 200);
+    const turn1Frames = parseSSE(turn1.text);
+    assert.ok(turn1Frames.some((f) => f.type === 'error'), 'turn 1 must surface an error frame');
+    assert.ok(!turn1Frames.some((f) => f.type === 'done'), 'no done frame observed => no commit must be attempted');
+
+    const afterTurn1 = await store.readCurrent(COMPANION_KEY);
+    assert.strictEqual(afterTurn1.rev, 2, 'the eager reservation write must still bump rev (the double-spend guard stays live)');
+    assert.strictEqual(afterTurn1.state.lastCensusStateHash, null, 'the OLD (seed/null) baseline must be untouched by a failed turn');
+    assert.ok(afterTurn1.state.turnReservedUntil, 'a reservation lease must be recorded');
+
+    // Fast-forward past BOTH the 180s floor and the 600s lease the same way
+    // real elapsed time would read: by writing already-past deadlines
+    // through the store's OWN CAS (route has no injectable clock —
+    // Date.now() is read directly — this is the same wall-clock-simulation
+    // technique as the gate unit tests' floor-boundary cases, one layer up).
+    // Skipping the floor rewrite here would leave the (still-fresh)
+    // `lastTurnAt` blocking turn 2 on `floor` before the property under test
+    // (hash-identical/no-delta re-evaluation) is ever reached.
+    const wellPastFloor = new Date(Date.now() - (DEFAULT_COMPANION_FLOOR_MS + 1000)).toISOString();
+    const expired = { ...afterTurn1.state, lastTurnAt: wellPastFloor, turnReservedUntil: new Date(Date.now() - 1000).toISOString() };
+    const expireWrite = await store.advance(COMPANION_KEY, afterTurn1.rev, expired, { reason: 'test-fast-forward-lease-expiry' });
+    assert.strictEqual(expireWrite, true);
+
+    // Turn 2: still the OLD baseline, a genuinely different (or hash-churned
+    // but identical) census -> must spend again and actually deliver.
+    withCensus(store, turn2Census);
+    const app2 = buildApp({
+      observerStateStore: store,
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called'); } },
+      chatClient: doneOnlyChatClient(),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+    const turn2 = await post(app2, '/workspace/acme/api/flight-companion/turn', {});
+    assert.strictEqual(turn2.status, 200, 'turn 2 must NOT be short-circuited by hash-identical/no-delta under the fix');
+    const doneFrame = parseSSE(turn2.text).find((f) => f.type === 'done');
+    assert.ok(doneFrame, 'turn 2 must deliver a done frame — the delta must still be there to report');
+    assert.strictEqual(doneFrame.data.surface, true, 'the same genuine change must still surface');
+
+    const committed = await waitForCompanionState(store, (d) => d.state.lastCensusStateHash === turn2Census.stateHash);
+    assert.strictEqual(committed.state.lastCensusStateHash, turn2Census.stateHash, 'the baseline finally commits once the report actually lands');
+
+    return { store, censusA };
+  }
+
+  test('(a1) hash-identical re-evaluation: turn 2 sees the SAME census turn 1 saw', async () => {
+    const censusA = censusWithAttention('hash-lease-a', 9);
+    await deltaSurvivesFailureCase(censusA);
+  });
+
+  test('(a2) no-delta re-evaluation: turn 2 sees a hash-churned but companion-relevant-IDENTICAL census', async () => {
+    // Same lanes/attention as censusA (above), different raw stateHash/rev —
+    // exactly the "sweep ticked again, nothing companion-relevant changed"
+    // shape the research names as the no-delta branch's real trigger.
+    const censusB = censusWithAttention('hash-lease-b', 10);
+    await deltaSurvivesFailureCase(censusB);
+  });
+
+  // ── (b) overlapping auto-wake turns still cannot both bill ───────────────
+  test('(b) barrier-forced overlapping auto-wake turns against a REAL store: exactly one reaches the model call, the loser is lost-race, rev advances exactly once', async () => {
+    const store = freshRealStore();
+    const census = censusWithAttention('hash-overlap', 3);
+    const modelCalls = [];
+    const chatClient = {
+      async streamChat(messages, opts, onEvent) { modelCalls.push('streamChat'); onEvent('done', {}); },
+      async streamChatWithTools(messages, opts, onEvent) { modelCalls.push('streamChatWithTools'); onEvent('done', {}); },
+    };
+
+    // Barrier at ensureSeeded — the FIRST store call on the auto-wake path —
+    // so BOTH overlapping turns arrive before either proceeds, maximizing the
+    // CAS race window (mirrors the research's own barrier-forced overlap
+    // methodology against a real MangoDB tmpdir).
+    let arrived = 0;
+    let releaseBarrier;
+    const barrier = new Promise((resolve) => { releaseBarrier = resolve; });
+    const originalEnsureSeeded = store.ensureSeeded.bind(store);
+    store.ensureSeeded = async (...args) => {
+      arrived += 1;
+      if (arrived >= 2) releaseBarrier();
+      await barrier;
+      return originalEnsureSeeded(...args);
+    };
+
+    // Reuse the same census doc for both overlapping requests by wiring a
+    // trivial sweep-key readCurrent override at the store level (buildApp
+    // wires the same store to both apps below).
+    const originalReadCurrent = store.readCurrent.bind(store);
+    store.readCurrent = async (instanceKey) => (instanceKey.startsWith('sweep:v1:') ? census : originalReadCurrent(instanceKey));
+
+    const app = buildApp({
+      observerStateStore: store,
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present'); } },
+      chatClient,
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const [r1, r2] = await Promise.all([
+      post(app, '/workspace/acme/api/flight-companion/turn', {}),
+      post(app, '/workspace/acme/api/flight-companion/turn', {}),
+    ]);
+
+    const jsonResults = [r1, r2].map((r) => r.json).filter(Boolean);
+    assert.strictEqual(jsonResults.length, 1, 'exactly one turn must be denied via the plain-JSON short-circuit');
+    assert.strictEqual(jsonResults[0].spent, false);
+    assert.strictEqual(jsonResults[0].reason, 'lost-race');
+
+    const sseResults = [r1, r2].filter((r) => !r.json);
+    assert.strictEqual(sseResults.length, 1, 'exactly one turn must proceed to the SSE stream');
+    const doneFrame = parseSSE(sseResults[0].text).find((f) => f.type === 'done');
+    assert.ok(doneFrame, 'the winner must actually deliver a done frame');
+
+    assert.strictEqual(modelCalls.length, 1, 'exactly one model call must have been reached — the double-spend guard');
+
+    const finalDoc = await originalReadCurrent(COMPANION_KEY);
+    assert.strictEqual(finalDoc.rev, 2, 'rev must have advanced exactly once, never twice');
+  });
+
+  // ── (c) the lease outlasts a slow turn — first-ever run of this witness ──
+  test('(c) a turn still in flight past the 180s floor but inside the 600s lease is denied with reason: turn-in-flight', async () => {
+    const store = freshRealStore();
+    const census = censusWithAttention('hash-c', 4);
+    withCensus(store, census);
+
+    const app1 = buildApp({
+      observerStateStore: store,
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called'); } },
+      chatClient: throwingChatClient('simulated slow/failed turn — functionally identical for this witness to a turn still genuinely running'),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+    const turn1 = await post(app1, '/workspace/acme/api/flight-companion/turn', {});
+    assert.strictEqual(turn1.status, 200);
+
+    const afterTurn1 = await store.readCurrent(COMPANION_KEY);
+    assert.ok(afterTurn1.state.turnReservedUntil, 'a reservation lease must be recorded');
+
+    // Simulate more than the 180s floor having elapsed since the reservation
+    // was made. Both fields are rewritten together, consistently, off the
+    // SAME simulated elapsed time and the CURRENT RESERVATION_LEASE_MS
+    // constant — never bypassing the CAS, and never hand-waving turnReservedUntil
+    // to an arbitrary future value independent of when the reservation was
+    // "made". This is what makes the (c) mutation below actually bite: the
+    // mutation shortens RESERVATION_LEASE_MS, and this computation reflects
+    // whatever that constant is AT TEST-RUN TIME.
+    const elapsedMs = DEFAULT_COMPANION_FLOOR_MS + 5000;
+    const simulatedLastTurnAt = new Date(Date.now() - elapsedMs).toISOString();
+    const simulatedTurnReservedUntil = new Date(Date.now() - elapsedMs + RESERVATION_LEASE_MS).toISOString();
+    const stillReserved = { ...afterTurn1.state, lastTurnAt: simulatedLastTurnAt, turnReservedUntil: simulatedTurnReservedUntil };
+    const rewrote = await store.advance(COMPANION_KEY, afterTurn1.rev, stillReserved, { reason: 'test-fast-forward-past-floor' });
+    assert.strictEqual(rewrote, true);
+
+    const app2 = buildApp({
+      observerStateStore: store,
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called — turn-in-flight must deny before quota is ever touched'); } },
+      chatClient: throwingChatClient('must not be called — turn-in-flight must deny before any model call'),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+    const turn2 = await post(app2, '/workspace/acme/api/flight-companion/turn', {});
+    assert.strictEqual(turn2.status, 200);
+    assert.deepStrictEqual(turn2.json, { turnKind: 'auto-wake', spent: false, reason: 'turn-in-flight' });
+  });
+
+  // ── beat 3 item 6: the failed-commit consequence, actually verified ──────
+  //
+  // Makes every commit-tagged advance() (meta.reason: 'flight-companion-
+  // commit') return `false`, as if it always lost its CAS, while leaving the
+  // eager reservation write genuinely real. Proves beat 2's claim: the
+  // report already reached the user regardless, the failure is benign and
+  // logged, and the delta is delayed (re-surfaced later, exactly once the
+  // reservation's lease clears) rather than dropped.
+  function forceCommitFailure(store) {
+    const originalAdvance = store.advance.bind(store);
+    store.advance = async (instanceKey, expectedRev, nextState, meta) => {
+      if (meta && meta.reason === 'flight-companion-commit') return false;
+      return originalAdvance(instanceKey, expectedRev, nextState, meta);
+    };
+    return store;
+  }
+
+  test('(consequence) a failed commit is benign — the report still reaches the user, and the still-uncommitted delta re-surfaces later (worst case, after the full lease), never lost', async () => {
+    const store = freshRealStore();
+    const census = censusWithAttention('hash-consequence', 5);
+    withCensus(store, census);
+    forceCommitFailure(store);
+
+    const originalError = console.error;
+    const errorCalls = [];
+    console.error = (...args) => { errorCalls.push(args); };
+    let turn1;
+    try {
+      const app1 = buildApp({
+        observerStateStore: store,
+        freeTierStore: { async tryUse() { throw new Error('tryUse must not be called'); } },
+        chatClient: doneOnlyChatClient(),
+        session: { openRouterApiKey: 'sk-test-paid-key' },
+      });
+      turn1 = await post(app1, '/workspace/acme/api/flight-companion/turn', {});
+
+      // The commit runs AFTER res.end() (same house convention the research
+      // names for the pre-fix baseline write) — poll rather than assume it
+      // has landed the instant post() resolves. console.error must stay
+      // captured for this whole window, or a commit that logs AFTER the
+      // capture is torn down would be invisible to the assertion below.
+      const deadline = Date.now() + 2000;
+      while (!errorCalls.some((args) => /commit advance\(\) did not land/.test(String(args[0]))) && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 15));
+      }
+    } finally {
+      console.error = originalError;
+    }
+
+    // User-visible outcome #1: delivered, not dropped, not surfaced as an error.
+    assert.strictEqual(turn1.status, 200);
+    const turn1Frames = parseSSE(turn1.text);
+    const doneFrame = turn1Frames.find((f) => f.type === 'done');
+    assert.ok(doneFrame, 'the done frame must still reach the client even though the commit write is about to fail');
+    assert.strictEqual(doneFrame.data.surface, true);
+    assert.ok(!turn1Frames.some((f) => f.type === 'error'), 'a failed commit must never surface as a client-visible error');
+
+    // Logged, never thrown, never retried inline (beat 2's own convention).
+    assert.ok(
+      errorCalls.some((args) => /commit advance\(\) did not land/.test(String(args[0]))),
+      'a failed commit must be logged via the existing console.error convention'
+    );
+
+    // The baseline never actually moved.
+    const afterFailedCommit = await store.readCurrent(COMPANION_KEY);
+    assert.notStrictEqual(afterFailedCommit.state.lastCensusStateHash, census.stateHash, 'the NEW baseline must never land when the commit is lost');
+    assert.ok(afterFailedCommit.state.turnReservedUntil, 'the reservation from the eager write is still on record');
+
+    // Still within the lease: a second turn is DENIED (turn-in-flight), not
+    // silently re-billed and not told the change is gone.
+    const stillWithinLease = { ...afterFailedCommit.state, lastTurnAt: new Date(Date.now() - (DEFAULT_COMPANION_FLOOR_MS + 5000)).toISOString() };
+    const rewrote = await store.advance(COMPANION_KEY, afterFailedCommit.rev, stillWithinLease, { reason: 'test-simulate-past-floor-still-in-lease' });
+    assert.strictEqual(rewrote, true);
+    const app2 = buildApp({
+      observerStateStore: store,
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called'); } },
+      chatClient: doneOnlyChatClient(),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+    const turn2 = await post(app2, '/workspace/acme/api/flight-companion/turn', {});
+    assert.deepStrictEqual(turn2.json, { turnKind: 'auto-wake', spent: false, reason: 'turn-in-flight' }, 'still within the lease -> denied, not lost, not double-billed either');
+
+    // Worst case: only once the FULL lease (RESERVATION_LEASE_MS, 600s)
+    // elapses does the still-uncommitted delta finally re-surface — delayed
+    // by up to the lease's own duration, never permanently lost.
+    const afterTurn2 = await store.readCurrent(COMPANION_KEY);
+    const leaseExpired = { ...afterTurn2.state, turnReservedUntil: new Date(Date.now() - 1000).toISOString() };
+    await store.advance(COMPANION_KEY, afterTurn2.rev, leaseExpired, { reason: 'test-expire-lease' });
+    const app3 = buildApp({
+      observerStateStore: store,
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called'); } },
+      chatClient: doneOnlyChatClient(),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+    const turn3 = await post(app3, '/workspace/acme/api/flight-companion/turn', {});
+    assert.strictEqual(turn3.status, 200);
+    const turn3Done = parseSSE(turn3.text).find((f) => f.type === 'done');
+    assert.ok(turn3Done, 'once the lease fully expires, the still-uncommitted change is finally (re-)delivered — delayed, never lost');
   });
 });
