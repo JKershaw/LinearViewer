@@ -83,7 +83,7 @@
   // send() writes textContent into), so it's the text span, not the wrapper,
   // that toggles `.chat-cursor`.
   function appendBubble(role, text) {
-    var whoLabel = role === 'user' ? 'you' : (activeTask || 'task');
+    var whoLabel = role === 'user' ? 'you' : (maskFlightCompanionSentinel(activeTask) || 'task');
     var li = window.ChatUI.appendMessage(transcript, {
       who: whoLabel,
       whoState: role === 'user' ? undefined : 'in-progress',
@@ -155,6 +155,34 @@
 
   // ─── Saved chats (LIN-1008) ─────────────────────────────────────────────────
 
+  // LIN-2437: Flight Companion sessions save through this SAME endpoint under
+  // the sentinel task identifier 'flight-companion' (not a real task id — kept
+  // regex-clean so the existing resume/send validation path is untouched). The
+  // sentinel is never rewritten in storage; it is masked once, here, at render
+  // time, and every surface that echoes a saved chat's task identifier reuses
+  // this one helper so none of them can drift. The four render surfaces:
+  //   1. the saved-row meta chip (renderSavedRows);
+  //   2. the saved-row title, including its "Chat about …" auto-derived
+  //      fallback — deriveTitle() in lib/saved-chat-store.js, which an
+  //      assistant-only companion transcript hits because it has no user turn
+  //      to title itself from;
+  //   3. the active label set when a saved companion chat is resumed;
+  //   4. the speaker pill on every assistant bubble (appendBubble reads the
+  //      same `activeTask` openSavedChat sets, and the resume replay renders a
+  //      bubble per stored turn — so this is the LOUDEST surface, not the
+  //      quietest: an assistant-only transcript repeats it N times).
+  // `idInput.value` is deliberately NOT masked — the input holds a real,
+  // editable identifier that send() posts as an issue id, so masking it there
+  // would break the value rather than the label. That is a separate fix,
+  // routed to its own follow-up.
+  var FLIGHT_COMPANION_SENTINEL = 'flight-companion';
+  var FLIGHT_COMPANION_LABEL = 'Flight Companion';
+
+  function maskFlightCompanionSentinel(text) {
+    if (typeof text !== 'string' || text.indexOf(FLIGHT_COMPANION_SENTINEL) === -1) return text;
+    return text.split(FLIGHT_COMPANION_SENTINEL).join(FLIGHT_COMPANION_LABEL);
+  }
+
   // The save button appears once there is a non-empty conversation to save (and
   // only when saved chats are available at all — no button is rendered otherwise).
   function updateSaveVisibility() {
@@ -175,14 +203,15 @@
       li.className = 'task-chat-saved-item';
       li.setAttribute('data-saved-id', chat.id);
 
-      var meta = chat.taskIdentifier ? chat.taskIdentifier : 'chat';
+      var meta = chat.taskIdentifier ? maskFlightCompanionSentinel(chat.taskIdentifier) : 'chat';
+      var title = maskFlightCompanionSentinel(chat.title || 'Saved chat');
       var count = (chat.turnCount || 0) + ' turn' + (chat.turnCount === 1 ? '' : 's');
       var openBtn = '<button type="button" class="action-btn task-chat-saved-open" data-testid="task-chat-saved-open">open</button>';
       var delBtn = '<button type="button" class="action-btn task-chat-saved-delete" data-testid="task-chat-saved-delete">delete</button>';
 
       li.innerHTML =
         '<span class="task-chat-saved-meta">' + window.escapeHtml(meta) + '</span>' +
-        '<span class="task-chat-saved-title">' + window.escapeHtml(chat.title || 'Saved chat') + '</span>' +
+        '<span class="task-chat-saved-title">' + window.escapeHtml(title) + '</span>' +
         '<span class="task-chat-saved-count">' + window.escapeHtml(count) + '</span>' +
         '<span class="task-chat-saved-actions">' + openBtn + delBtn + '</span>';
 
@@ -229,7 +258,7 @@
         idInput.value = activeTask;
         transcript.innerHTML = '';
         chatHistory.forEach(function (turn) { appendBubble(turn.role, turn.content); });
-        if (activeLabel) activeLabel.textContent = activeTask ? 'talking to ' + activeTask : '';
+        if (activeLabel) activeLabel.textContent = activeTask ? 'talking to ' + maskFlightCompanionSentinel(activeTask) : '';
         if (resetBtn) resetBtn.classList.remove('hidden');
         setEmptyVisible(chatHistory.length === 0);
         updateSaveVisibility();

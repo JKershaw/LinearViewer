@@ -246,6 +246,49 @@ test.describe('Task Chat Page (experimental)', () => {
       const res = await page.request.get(`${CHAT_API}/saved`);
       expect(res.status()).toBe(401);
     });
+
+    test('a saved Flight Companion chat (sentinel taskIdentifier) renders a readable label, never the raw sentinel (LIN-2437)', async ({ page }) => {
+      // Flight Companion sessions save through this SAME saved-chat endpoint
+      // (not through the live send() flow), under the 'flight-companion'
+      // sentinel task identifier — and an assistant-only transcript (no user
+      // turn) hits the auto-derived title's "Chat about …" fallback, the
+      // exact leak this beat masks.
+      const saveRes = await page.request.post(`${CHAT_API}/saved`, {
+        data: {
+          taskIdentifier: 'flight-companion',
+          transcript: [{ role: 'assistant', content: 'Standing by — nothing needs your attention yet.' }]
+        }
+      });
+      expect(saveRes.ok()).toBeTruthy();
+
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+
+      // Surface 1 + 2: the saved-row meta chip and title never show the raw
+      // sentinel, and both read the masked "Flight Companion" label.
+      const item = page.locator('.task-chat-saved-item');
+      await expect(item).toHaveCount(1, { timeout: 5000 });
+      await expect(item).not.toContainText('flight-companion');
+      await expect(item.locator('.task-chat-saved-meta')).toContainText('Flight Companion');
+      await expect(item.locator('.task-chat-saved-title')).toContainText('Flight Companion');
+
+      // Surface 3: resuming it sets the active label to the same masked text.
+      await item.locator('[data-testid="task-chat-saved-open"]').click();
+      await expect(page.locator('.task-chat-msg-assistant')).toHaveCount(1, { timeout: 5000 });
+      const activeLabel = page.locator('#task-chat-active-label');
+      await expect(activeLabel).toContainText('Flight Companion');
+      await expect(activeLabel).not.toContainText('talking to flight-companion');
+
+      // Surface 4: the replayed bubbles themselves. appendBubble reads the same
+      // activeTask, so an assistant-only companion transcript would otherwise
+      // repeat the raw sentinel on the speaker pill of every bubble — the
+      // loudest surface of the four, underneath the one-line label above.
+      const speakerPill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(speakerPill).toContainText('Flight Companion');
+      await expect(speakerPill).not.toContainText('flight-companion');
+      // …and nothing anywhere in the rendered transcript leaks it either.
+      await expect(page.locator('#task-chat-transcript')).not.toContainText('flight-companion');
+    });
   });
 
   test.describe('Chat endpoint', () => {
