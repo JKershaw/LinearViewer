@@ -53,7 +53,7 @@ function fakeCollection() {
   };
 }
 
-function buildApp({ tokensById }) {
+function buildApp({ tokensById, viewer }) {
   const app = express();
   app.use(express.json());
   const proxyEventStore = new ProxyEventStore({ collection: fakeCollection() });
@@ -76,7 +76,7 @@ function buildApp({ tokensById }) {
     provider: {
       name: 'linear',
       supports: () => true,
-      viewer: async () => ({ id: 'u1', name: 'Alice' }),
+      viewer: viewer || (async () => ({ id: 'u1', name: 'Alice' })),
     },
   }));
   return { app, proxyEventStore };
@@ -107,6 +107,50 @@ test('logEvent persists stage:provider-lane and credentialFingerprint on a provi
   assert.equal(rows.length, 1);
   assert.equal(rows[0].stage, 'provider-lane');
   assert.equal(rows[0].credentialFingerprint, fingerprintCredential('linear-tok'));
+});
+
+/**
+ * LIN-2473 (re-review F1 / ledger item 1). The producer of Fix B's own input.
+ *
+ * `providerLaneOccupancy` counts a 503 as a fault only when the row carries
+ * BOTH `stage: 'provider-lane'` and a `credentialFingerprint`. The pin above
+ * proves `logEvent` stamps that pair — but it drives a 200, and the stage
+ * expression is status-independent, so mutating it to exclude 503s
+ * (`status !== 503 && fingerprint !== undefined`) left the entire suite green
+ * while restoring the exact symptom LIN-2473 exists to fix: `credential-health`
+ * reading `ok` through a live provider-lane rejection, because the row is
+ * skipped at `providerLaneOccupancy`'s very first statement.
+ *
+ * This drives the transient-503 path for real — an upstream 401 against a
+ * credential our own records still believe is live, which
+ * `isTransientProviderAuthFailure` reclassifies to a retryable 503 (LIN-2216)
+ * — through the real route and the real `logEvent`, and asserts the persisted
+ * row. Nothing is seeded.
+ */
+test('logEvent persists stage:provider-lane and the fingerprint on a TRANSIENT 503 — the row credential-health folds', async () => {
+  const upstream401 = Object.assign(new Error('Authentication required'), {
+    response: { status: 401, errors: [{ message: 'Authentication required' }] },
+  });
+  const { app, proxyEventStore } = buildApp({
+    tokensById: { 'agent-token': { tokenId: 'tok-a', urlKey: 'acme', label: 'autopilot', scope: 'readWrite', createdBy: 'acct-owner' } },
+    viewer: async () => { throw upstream401; },
+  });
+
+  const { status, body } = await request(app, '/api/proxy/me', 'agent-token');
+
+  // The credential resolved and reads live, so the upstream 401 is
+  // reclassified — this is the transient case, not a terminal one.
+  assert.equal(status, 503, 'expected the LIN-2216 transient reclassification, not a plain 401');
+  assert.equal(body.code, 'LINEAR_AUTH');
+  assert.equal(body.retryable, true);
+
+  const rows = proxyEventStore.collection.docs;
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].status, 503);
+  assert.equal(rows[0].stage, 'provider-lane',
+    'a 503 that DID resolve a credential is provider-lane evidence; stamping it proxy-token makes credential-health blind to the flap');
+  assert.equal(rows[0].credentialFingerprint, fingerprintCredential('linear-tok'),
+    'the fold needs the fingerprint to tell this from a bare resolution-failure 503');
 });
 
 test('logEvent persists stage:proxy-token (and null fingerprint) for a workspace-free call', async () => {
