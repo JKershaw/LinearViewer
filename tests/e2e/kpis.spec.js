@@ -137,6 +137,14 @@ test.describe('KPIs page', () => {
     // the other chart boxes.
     const chartOrEmpty = page.locator('#chart-weekly-budget, .kpi-chart-box:has-text("weekly budget burn") .kpi-chart-empty');
     await expect(chartOrEmpty.first()).toBeVisible();
+
+    // LIN-2404: the DEFAULT_USD_PER_POINT calibration date is visible on the
+    // rendered page, not just in a code comment — the constant stops looking
+    // timeless.
+    const calibration = card.locator('.kpi-budget-calibration');
+    await expect(calibration).toBeVisible();
+    await expect(calibration).toHaveText(/calibrated 2026-08-14/);
+    await expect(calibration).toHaveAttribute('title', /calibrated 2026-08-14/);
   });
 
   test('headlines the dispatch outcome rate with a coverage sub-label', async ({ page }) => {

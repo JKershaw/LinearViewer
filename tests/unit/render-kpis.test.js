@@ -930,4 +930,16 @@ describe('renderKpisPage: weekly-budget burn gauge card (LIN-2118)', () => {
     const html = renderKpisPage(buildStats());
     assert.ok(!/verified/i.test(html));
   });
+
+  test('carries the DEFAULT_USD_PER_POINT calibration provenance (window/sample/date) as a caption (LIN-2404)', () => {
+    const html = renderKpisPage(buildStats());
+    assert.ok(html.includes('class="kpi-budget-calibration"'));
+    assert.ok(html.includes('default $/point calibrated 2026-08-14'));
+    assert.ok(html.includes('from 27 weekly-window points'));
+    assert.ok(html.includes('against $1,070.58 spend'));
+    assert.ok(html.includes('LIN-2087'));
+    // Also carried as a title attribute, so it surfaces on hover even where
+    // the caption's small print goes unread.
+    assert.ok(html.includes('title="default $/point calibrated 2026-08-14'));
+  });
 });

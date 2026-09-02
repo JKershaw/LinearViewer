@@ -150,7 +150,8 @@ a.kpi-headline-value:hover {
 .kpi-budget-source,
 .kpi-budget-rate,
 .kpi-budget-window,
-.kpi-budget-coverage {
+.kpi-budget-coverage,
+.kpi-budget-calibration {
   font-family: var(--font-structural);
   font-size: 0.78rem;
   color: var(--fg-dim);
@@ -329,7 +330,8 @@ a.kpi-headline-value:hover {
   .kpi-budget-source,
   .kpi-budget-rate,
   .kpi-budget-window,
-  .kpi-budget-coverage {
+  .kpi-budget-coverage,
+  .kpi-budget-calibration {
     line-height: 1.6;
   }
 

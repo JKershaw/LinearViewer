@@ -10,7 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeWeeklyBudgetGauge, currentWindowStartMs, DEFAULT_USD_PER_POINT } from '../../lib/weekly-budget.js';
+import { computeWeeklyBudgetGauge, currentWindowStartMs, DEFAULT_USD_PER_POINT, DEFAULT_USD_PER_POINT_PROVENANCE } from '../../lib/weekly-budget.js';
 
 // 2026-08-20T06:00:00Z is a real Thursday reset instant (matches the
 // documented LIN-2087 checkpoint series' own reset day). NOW sits 6h into
@@ -28,6 +28,22 @@ function usageEntry({ costUsd, lane = null, at }) {
 function row({ id, rootItemId = id, issueIdentifier, harness = 'claude-code', dispatchedAt, feedback = [] }) {
   return { _id: id, rootItemId, issueIdentifier, harness, kind: 'implementation', status: 'taken', dispatchedAt, feedback };
 }
+
+describe('DEFAULT_USD_PER_POINT_PROVENANCE (LIN-2404)', () => {
+  test('records the calibration window, sample, and date the LIN-2087 correlation was derived from', () => {
+    assert.equal(DEFAULT_USD_PER_POINT_PROVENANCE.calibratedAt, '2026-08-14');
+    assert.equal(DEFAULT_USD_PER_POINT_PROVENANCE.windowPoints, 27);
+    assert.equal(DEFAULT_USD_PER_POINT_PROVENANCE.spendUsd, 1070.58);
+    assert.match(DEFAULT_USD_PER_POINT_PROVENANCE.source, /LIN-2087/);
+  });
+
+  test('DEFAULT_USD_PER_POINT is derived FROM the provenance record, not a second hand-typed copy', () => {
+    assert.equal(
+      DEFAULT_USD_PER_POINT,
+      DEFAULT_USD_PER_POINT_PROVENANCE.spendUsd / DEFAULT_USD_PER_POINT_PROVENANCE.windowPoints
+    );
+  });
+});
 
 describe('currentWindowStartMs', () => {
   test('a time just after the Thursday 06:00Z reset resolves to that same reset', () => {
