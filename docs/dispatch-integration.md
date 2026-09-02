@@ -303,6 +303,32 @@ card and Live Console lane chip and as a full walk on the per-session page — t
 makes a stalled tail in a long ticket list operator-visible instead of hiding behind a healthy-
 looking heartbeat.
 
+**Delivery mechanism (LIN-2423).** The marker line is text the agent writes in its ordinary turn
+output — it is never a separate API call the agent makes. A consumer is responsible for actually
+relaying that line into `dispatch-history.feedback[]` as its OWN entry (`kind:'status'`, an
+existing, already-recognized value — an unrecognized `kind` only drops the `kind` field at
+ingest, never the entry itself); a marker that only ever reaches a Linear/board comment never
+reaches `parseTicketMarkers` at all, since it reads feedback exclusively. `simple-dispatcher`'s
+reference implementation does this with a delta-cursor relay (`postTicketMarkerDelta` in
+`hook.js`, mirroring the existing tool-activity/assistant-text relay shape) wired at every
+`action.type` branch the Stop hook's `switch` handles (`block`/`self-check`/`zero-tool-
+challenge`/`defer`/`blocked`/`failed`/`complete` — there is no single tail every branch funnels
+through), placed BEFORE that branch's own terminal/park status post so a marker can never become
+the LAST `feedback[]` entry ahead of a park status your own reader logic (e.g. a parked-wait
+detector keying off the latest entry) depends on. A second emit site rides `reapers.js`'s
+in-flight heartbeat pass, so a long-running lane's markers surface live rather than only in one
+end-of-run batch. Because the hook process and the heartbeat daemon are separate OS processes
+racing on the same delta cursor, a **bounded duplicate post** of the same marker line is possible
+and must be tolerated downstream. The bound is precise, not universal: `parseTicketMarkers`
+already resolves it harmlessly (last-array-position-wins per identifier), and
+`terminal-marked-task-cost.js` already dedupes its own per-lineage ticket set via a `Set` before
+counting — so a duplicate changes nothing observable for either of those identifier-keyed folds.
+It is **not** harmless for an order-sensitive reader that keys off only the LATEST feedback
+entry (e.g. a parked-wait detector): the ordering guarantee above only orders one process's own
+two calls, and cannot order a second process's concurrent, racing post — so such a reader can
+transiently see the duplicate marker in place of the status entry it expected there. Never claim
+a stronger "no double post" or "changes nothing observable on any consumer" guarantee than that.
+
 **`done` must be gated on exactly the same verified evidence as the lane's own close-out comment
 for that ticket — a landed, CI-green, verified commit — never on intent** ("I merged", "I think
 I'm finished"). An intent-gated marker would be a new premature-completion surface. Non-success

@@ -198,6 +198,28 @@ describe('isWakeEvent', () => {
   });
 });
 
+// LIN-2423: a lane-marker relay now posts `[ticket] LIN-#### <state>` lines as their own
+// dispatch feedback entries — verified here (not just asserted in review prose) that the new
+// producer traffic can never be misread as a dispatch-level terminal/wake signal. Both regexes
+// anchor on `\[(done|complete|failed|...)\]`/`\[(done|complete|failed|...|blocked|pending)\]`
+// immediately after optional whitespace, and `[ticket]` is neither alternative.
+describe('LIN-2423: [ticket] marker lines never match the terminal/wake vocabulary', () => {
+  test('[ticket] LIN-900 done matches neither TERMINAL_FEEDBACK_REGEX nor WAKE_FEEDBACK_REGEX', () => {
+    const feedback = [{ message: '[ticket] LIN-900 done', timestamp: 't' }];
+    assert.equal(deriveTerminalStatus(feedback), null, 'must not be read as the dispatch\'s own terminal status');
+    assert.equal(findTerminalFeedback(feedback), null);
+    assert.equal(isWakeEvent(feedback[0].message), false, 'must not wake a parent as if it were a dispatch-level event');
+  });
+
+  test('every documented marker state ([ticket] LIN-XXXX started/done/blocked/refused/dissolved/trimmed) is inert to both regexes', () => {
+    for (const state of ['started', 'done', 'blocked', 'refused', 'dissolved', 'trimmed']) {
+      const message = `[ticket] LIN-2423 ${state}`;
+      assert.equal(deriveTerminalStatus([{ message }]), null, `"${message}" must not derive a terminal status`);
+      assert.equal(isWakeEvent(message), false, `"${message}" must not be a wake event`);
+    }
+  });
+});
+
 describe('findWakeEvent', () => {
   test('null when feedback is missing or not an array', () => {
     assert.equal(findWakeEvent(undefined), null);
