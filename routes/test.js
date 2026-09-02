@@ -679,9 +679,18 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         method: req.query.method || 'GET',
         endpoint: req.query.endpoint || '/api/proxy/me',
         status: req.query.status ? parseInt(req.query.status, 10) : 200,
-        note: req.query.note || null
+        note: req.query.note || null,
+        // LIN-2473: `stage` + `credentialFingerprint` are what distinguish a
+        // LIN-2216 transient provider-lane rejection (a credential DID
+        // resolve; the provider refused it anyway) from a bare resolution
+        // failure. `credential-health`'s occupancy fold now turns on exactly
+        // that pair, so a spec has to be able to seed the real shape —
+        // NODE_ENV=test short-circuits resolveProviderAccess, which is why the
+        // genuine row cannot be produced through the live proxy here.
+        stage: req.query.stage || null,
+        credentialFingerprint: req.query.credentialFingerprint || null
       })
-      res.json({ id: event._id, status: event.status, note: event.note })
+      res.json({ id: event._id, status: event.status, note: event.note, stage: event.stage, credentialFingerprint: event.credentialFingerprint })
     } catch (err) {
       res.status(500).json({ error: err.message })
     }

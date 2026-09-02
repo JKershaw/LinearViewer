@@ -16,6 +16,7 @@ import {
   OCCUPANCY_BUCKET_MS,
   STAGE_PROVIDER_LANE,
   STAGE_PROXY_TOKEN,
+  ProxyEventStore,
 } from '../../lib/proxy-events.js';
 
 const NOW = Date.parse('2026-08-16T20:45:00.000Z');
@@ -152,5 +153,92 @@ describe('providerLaneOccupancy', () => {
     assert.equal(result.verdict, 'ok');
     assert.equal(result.bucketsFaulting, 0);
     assert.equal(result.failedCalls, 0);
+  });
+});
+
+
+/**
+ * LIN-2473 (review B2). The three detector tests above hand-build their rows,
+ * which is exactly how the first revision of this fix shipped unreachable: the
+ * rule was right, but `listSelfCredentialHealth` — the ONLY production feeder
+ * for `GET /api/proxy/credential-health` — projected
+ * `{status, stage, note, timestamp}` and dropped `credentialFingerprint` at
+ * the query, so no real row could ever satisfy it and the endpoint went on
+ * answering `ok` through a live provider-lane rejection.
+ *
+ * These tests therefore drive the REAL store: the row is written by the real
+ * `recordEvent` in the exact shape `routes/proxy.js`'s `logEvent` writes for a
+ * LIN-2216 transient reclassification (a 503 that DID resolve a credential, so
+ * `stage` is stamped provider-lane and the fingerprint is carried), and read
+ * back through the real `listSelfCredentialHealth`. The fake collection below
+ * applies the projection the way Mongo does — that faithfulness is what makes
+ * this test able to fail.
+ */
+function projectionFaithfulCollection() {
+  const docs = [];
+  const applyProjection = (doc, projection) => {
+    if (!projection) return { ...doc };
+    const out = {};
+    for (const [field, include] of Object.entries(projection)) {
+      if (include && field in doc) out[field] = doc[field];
+    }
+    return out;
+  };
+  const matches = (doc, q) => {
+    if (q.urlKey !== undefined && doc.urlKey !== q.urlKey) return false;
+    if (q.tokenId !== undefined && doc.tokenId !== q.tokenId) return false;
+    if (q.expiresAt?.$gt !== undefined && !(doc.expiresAt > q.expiresAt.$gt)) return false;
+    if (q.timestamp?.$gt !== undefined && !(new Date(doc.timestamp) > q.timestamp.$gt)) return false;
+    if (q.$or && !q.$or.some(clause => Object.entries(clause).every(([k, v]) => doc[k] === v))) return false;
+    return true;
+  };
+  return {
+    _docs: docs,
+    async insertOne(doc) { docs.push(doc); return { insertedId: doc._id }; },
+    find(query = {}, options = {}) {
+      const rows = docs.filter(d => matches(d, query)).map(d => applyProjection(d, options.projection));
+      return { async toArray() { return rows; } };
+    },
+  };
+}
+
+describe('LIN-2473: the credential-health feeder must carry the fingerprint to the detector', () => {
+  /** Write the two rows a flapping lane really produces, then age one into an earlier bucket. */
+  async function seedFlap(store, collection, { credentialFingerprint }) {
+    await store.recordEvent({
+      urlKey: 'ws', tokenId: 'tok', tokenLabel: 'runner', method: 'GET', endpoint: '/api/proxy/issues/LIN-1',
+      status: 503, stage: STAGE_PROVIDER_LANE, credentialFingerprint,
+    });
+    await store.recordEvent({
+      urlKey: 'ws', tokenId: 'tok', tokenLabel: 'runner', method: 'GET', endpoint: '/api/proxy/issues/LIN-1',
+      status: 200, stage: STAGE_PROVIDER_LANE, credentialFingerprint,
+    });
+    // Two distinct buckets are required before any verdict is trusted; only
+    // the timestamp is adjusted, never the row shape under test.
+    collection._docs[1].timestamp = new Date(Date.now() - 35_000);
+  }
+
+  test('a real transient provider-lane 503 row makes credential-health read degraded, end to end through the store', async () => {
+    const collection = projectionFaithfulCollection();
+    const store = new ProxyEventStore({ collection });
+    await seedFlap(store, collection, { credentialFingerprint: 'a1b2c3d4e5f6' });
+
+    const { occupancy } = await store.listSelfCredentialHealth('ws', 'tok');
+
+    assert.equal(occupancy.verdict, 'degraded',
+      'the endpoint must not answer ok through a live provider-lane credential rejection');
+    assert.equal(occupancy.failedCalls, 1);
+    assert.equal(occupancy.bucketsFaulting, 1);
+  });
+
+  test('the same lane without a fingerprint (a bare resolution-failure 503) still reads ok — the fold is unchanged for that class', async () => {
+    const collection = projectionFaithfulCollection();
+    const store = new ProxyEventStore({ collection });
+    await seedFlap(store, collection, { credentialFingerprint: null });
+
+    const { occupancy } = await store.listSelfCredentialHealth('ws', 'tok');
+
+    assert.equal(occupancy.verdict, 'ok');
+    assert.equal(occupancy.failedCalls, 0);
   });
 });

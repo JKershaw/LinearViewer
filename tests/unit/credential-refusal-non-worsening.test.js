@@ -36,6 +36,11 @@ import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+// LIN-2473 (review B3): `attemptSuspectCredentialRefresh` moved out of
+// server.js into its own module so the REAL function could be unit-tested
+// (see tests/unit/lin-2473-adopt-before-exchange.test.js). The pins below
+// follow it — they assert the same behaviours, at its new address.
+const SUSPECT_REFRESH_SRC = readFileSync(join(__dirname, '../../lib/suspect-credential-refresh.js'), 'utf8');
 
 const URL_KEY = 'acme-suspect';
 const ACCOUNT = 'account-suspect';
@@ -411,8 +416,8 @@ function extractResolveWorkspaceAccessBody(src) {
 }
 
 function extractAttemptSuspectCredentialRefreshBody(src) {
-  const start = src.indexOf('async function attemptSuspectCredentialRefresh');
-  assert.ok(start >= 0, 'async function attemptSuspectCredentialRefresh not found in server.js');
+  const start = src.indexOf('export async function attemptSuspectCredentialRefresh');
+  assert.ok(start >= 0, 'attemptSuspectCredentialRefresh not found in lib/suspect-credential-refresh.js');
   const end = src.indexOf('\n}', start);
   assert.ok(end >= 0, "could not find attemptSuspectCredentialRefresh's top-level closing brace");
   return src.slice(start, end + 2);
@@ -502,15 +507,15 @@ describe('LIN-1980 anti-drift pin (production source, not the mirror)', () => {
   });
 
   test('attemptSuspectCredentialRefresh excludes UNSCOPED callers and never marks anything unselectable', () => {
-    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
+    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SUSPECT_REFRESH_SRC)).replace(/\s+/g, ' ');
     assert.match(flat, /ownerAccountId === UNSCOPED/, 'must preserve the owner-blind exclusion');
-    assert.match(flat, /rejectedCredentialRegistry\.isSuspect\(/);
-    assert.match(flat, /rejectedCredentialRegistry\.shouldAttemptRefresh\(/);
+    assert.match(flat, /registry\.isSuspect\(/);
+    assert.match(flat, /registry\.shouldAttemptRefresh\(/);
     assert.doesNotMatch(flat, /isSuspended/, 'this design must never reintroduce PR #1099\'s unselectable-credential predicate');
   });
 
   test('a same-fingerprint or null refresh result falls through untouched — never withholds the originally-selected credential', () => {
-    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
+    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SUSPECT_REFRESH_SRC)).replace(/\s+/g, ' ');
     assert.match(flat, /if \(!refreshed\) return null/);
     // LIN-2327: the byte-identical branch grew a block body (lifecycle event
     // + counter bump) before its return null. A loose open-brace...return
@@ -529,19 +534,23 @@ describe('LIN-1980 anti-drift pin (production source, not the mirror)', () => {
   });
 
   test('the byte-identical branch records a refresh_skip lifecycle event and bumps the byte-identical-rejection counter before falling through — LIN-2327', () => {
-    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
+    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SUSPECT_REFRESH_SRC)).replace(/\s+/g, ' ');
     assert.match(flat, /kind: CREDENTIAL_LIFECYCLE_EVENT_KINDS\.REFRESH_SKIP/);
     assert.match(flat, /branch: 'byte-identical-after-rejection'/);
-    assert.match(flat, /rejectedCredentialRegistry\.recordByteIdenticalRejection\?\.\(refreshedFingerprint\)/);
+    assert.match(flat, /registry\.recordByteIdenticalRejection\?\.\(refreshedFingerprint\)/);
   });
 
   test('the forced refresh call passes lifecycleEventStore — LIN-2327 (previously omitted at this call site)', () => {
-    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
-    assert.match(flat, /lifecycleEventStore:\s*credentialLifecycleEventStore/);
+    // The refresh core is still handed the store; since LIN-2473 the wiring
+    // is the server.js injection site rather than a literal inside the
+    // function, so the pin follows it there.
+    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SUSPECT_REFRESH_SRC)).replace(/\s+/g, ' ');
+    assert.match(flat, /lifecycleEventStore,/, 'the refresh core must still receive a lifecycle event store');
+    assert.match(SERVER_SRC, /lifecycleEventStore:\s*credentialLifecycleEventStore/, 'server.js must inject the real credentialLifecycleEventStore');
   });
 
   test('same-key anti-drift: the byte-identical counter call sites never key on scope, only on the bare fingerprint — LIN-2327 (C3)', () => {
-    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
+    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SUSPECT_REFRESH_SRC)).replace(/\s+/g, ' ');
     assert.doesNotMatch(flat, /recordByteIdenticalRejection\?\.\(`/, 'recordByteIdenticalRejection must never be called with a template-literal scope composite');
     assert.match(flat, /recordByteIdenticalRejection\?\.\(refreshedFingerprint\)/, 'recordByteIdenticalRejection must be called with the bare fingerprint');
     // routes/proxy.js used to contain a raw NUL byte (an unrelated
@@ -555,7 +564,7 @@ describe('LIN-1980 anti-drift pin (production source, not the mirror)', () => {
   });
 
   test('shouldAttemptRefresh is called with a (ownerAccountId, urlKey) scope key — review F1: bounds attempts across fingerprint churn, not just per-fingerprint', () => {
-    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SERVER_SRC)).replace(/\s+/g, ' ');
+    const flat = stripComments(extractAttemptSuspectCredentialRefreshBody(SUSPECT_REFRESH_SRC)).replace(/\s+/g, ' ');
     assert.match(flat, /shouldAttemptRefresh\(fingerprint,\s*`\$\{ownerAccountId\}:\$\{urlKey\}`\)/, 'a bare shouldAttemptRefresh(fingerprint) reintroduces the unbounded-rotation flaw F1 found');
   });
 
