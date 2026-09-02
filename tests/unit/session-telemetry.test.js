@@ -405,6 +405,26 @@ describe('parseUsage (LIN-1425)', () => {
     assert.strictEqual('cacheCreation1hInputTokens' in usage, false);
   });
 
+  test('LIN-2403: the stored read path is unchanged — parsed usage gains no key on an override-bearing model', () => {
+    // openai/gpt-5.6-sol now carries a MODEL_PRICING overrides array (LIN-2403);
+    // the parsed usage shape itself (the wire payload every stored row already
+    // carries) must stay exactly the same set of keys regardless.
+    const usage = parseUsage([{ message: usageMessage({ model: 'openai/gpt-5.6-sol' }), kind: 'usage' }]);
+    assert.deepEqual(
+      Object.keys(usage).sort(),
+      ['cacheCreationInputTokens', 'cacheReadInputTokens', 'costUsd', 'harness', 'inputTokens', 'lane', 'model', 'outputTokens'].sort()
+    );
+  });
+
+  test('LIN-2403: an existing claude-code stored row below the override threshold prices byte-identically before and after', () => {
+    // The default usageMessage() payload's prompt-side total (5529 + 4588835 +
+    // 145449 ≈ 4.7M) is on anthropic/claude-opus-4.8, which carries no override
+    // tier at all — so this is unaffected regardless of size, pinning that a
+    // pre-existing stored row's derived cost does not move.
+    const feedback = [{ message: usageMessage(), kind: 'usage' }];
+    assert.equal(parseUsage(feedback).costUsd, DEFAULT_PAYLOAD_COST);
+  });
+
   test('cumulative snapshot semantics: the LAST kind:"usage" entry wins, never summed', () => {
     const feedback = [
       { message: usageMessage({ inputTokens: 100, outputTokens: 200 }), kind: 'usage' },
