@@ -8,7 +8,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderLoginPage, renderGitHubRepoSelectPage, renderGitHubProjectSelectPage } from '../../lib/render-pages.js';
+import { renderLoginPage, renderGitHubRepoSelectPage, renderGitHubProjectSelectPage, renderMergeConfirmPage } from '../../lib/render-pages.js';
 
 describe('renderLoginPage — GitHub CTA gating (LIN-541)', () => {
   test('shows the GitHub button when GitHub OAuth is enabled', () => {
@@ -122,5 +122,24 @@ describe('renderGitHubRepoSelectPage (LIN-541)', () => {
     // Still submits only the repo slug — server maps repo -> installation.
     assert.match(html, /<option value="octocat\/hello-world">/);
     assert.match(html, /<option value="acme\/widgets">/);
+  });
+});
+
+describe('renderMergeConfirmPage — differentiated consent actions (LIN-2400)', () => {
+  test('the decline button carries the differentiated-secondary hook; the merge button stays the plain primary', () => {
+    const html = renderMergeConfirmPage({ identityLabel: 'Linear' });
+    // Mirrors the login-github assertion above: same chromeless-outline hook,
+    // reused here to keep the irreversible merge action from reading
+    // identically to its safe decline (both were plain .login-button before).
+    assert.match(html, /class="login-button" data-testid="merge-confirm-submit"/);
+    assert.match(html, /class="login-button login-button-secondary" data-testid="merge-decline-submit"/);
+  });
+
+  test('behaviour is unchanged: same routes, form structure, testids, and copy', () => {
+    const html = renderMergeConfirmPage({ identityLabel: 'Linear' });
+    assert.match(html, /<form action="\/auth\/merge\/confirm" method="POST" class="github-repo-form" data-testid="merge-confirm-form">/);
+    assert.match(html, /<form action="\/auth\/merge\/decline" method="POST" class="github-repo-form" data-testid="merge-decline-form">/);
+    assert.match(html, />Yes, merge these accounts</);
+    assert.match(html, />No, keep them separate</);
   });
 });
