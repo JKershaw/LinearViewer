@@ -5,11 +5,14 @@
  * storage (lib/saved-chat-store.js is untouched); it must instead be masked
  * at render time on every user-visible surface in public/task-chat.js that
  * echoes a saved chat's task identifier, via the ONE shared
- * `maskFlightCompanionSentinel` helper: the saved-row meta chip, the
- * saved-row title (including its "Chat about …" auto-derived fallback —
- * deriveTitle() in lib/saved-chat-store.js falls back to that when an
- * assistant-only companion transcript has no user turn to title itself
- * from), and the active label shown when a saved companion chat is resumed.
+ * `maskFlightCompanionSentinel` helper. The four surfaces: the saved-row meta
+ * chip, the saved-row title (including its "Chat about …" auto-derived
+ * fallback — deriveTitle() in lib/saved-chat-store.js falls back to that when
+ * an assistant-only companion transcript has no user turn to title itself
+ * from), the active label shown when a saved companion chat is resumed, and
+ * the speaker pill on every assistant bubble the resume replay renders
+ * (review finding 1 — the loudest of the four, since an assistant-only
+ * transcript repeats it once per stored turn).
  *
  * task-chat.js is a browser script (IIFE, not a module), so — following the
  * targeted-extraction technique in tests/unit/dispatch-feedback-entries.test.js
@@ -45,6 +48,18 @@ function extractRenderSavedRowsSrc() {
   return TASK_CHAT_JS_SRC.slice(start, end);
 }
 
+// `appendBubble` is declared ABOVE the mask helper in the file, so its slice is
+// taken separately and run into the same context after the mask slice — the
+// real file relies on hoisting for the same call, which a single contiguous
+// slice could not reproduce.
+function extractAppendBubbleSrc() {
+  const start = TASK_CHAT_JS_SRC.indexOf('  function appendBubble(role, text) {');
+  assert.notEqual(start, -1, 'appendBubble found in public/task-chat.js');
+  const end = TASK_CHAT_JS_SRC.indexOf('\n  function toolBreadcrumbLabel', start);
+  assert.notEqual(end, -1, 'the next top-level function marks the end of the slice');
+  return TASK_CHAT_JS_SRC.slice(start, end);
+}
+
 // ─── Minimal DOM shim (renderSavedRows only needs this much) ────────────────
 class FakeClassList {
   constructor(el) { this.el = el; this._set = new Set(); }
@@ -70,6 +85,30 @@ class FakeElement {
   get innerHTML() { return this._innerHTML; }
   set innerHTML(v) { this._innerHTML = v; if (v === '') this.children = []; }
   appendChild(child) { this.children.push(child); return child; }
+}
+
+// Sandbox for appendBubble: captures the opts handed to the shared ChatUI
+// helper, which is where the speaker-pill label (`who`) is decided.
+function makeBubbleSandbox(activeTask) {
+  const captured = [];
+  const sandbox = {
+    activeTask,
+    transcript: new FakeElement('ol'),
+    setEmptyVisible: () => {},
+    window: {
+      ChatUI: {
+        appendMessage: (_transcript, opts) => {
+          captured.push(opts);
+          return { querySelector: () => new FakeElement('span') };
+        },
+      },
+    },
+    console,
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(extractMaskFnSrc(), sandbox, { filename: 'task-chat.js-mask-slice' });
+  vm.runInContext(extractAppendBubbleSrc(), sandbox, { filename: 'task-chat.js-append-bubble-slice' });
+  return { sandbox, captured };
 }
 
 function makeSandbox(src) {
@@ -140,5 +179,35 @@ describe('renderSavedRows (LIN-2437 A.11) — saved-row meta + title surfaces', 
     const html = sandbox.savedList.children[0].innerHTML;
     assert.ok(html.includes('TEST-1'));
     assert.ok(html.includes('Where do you stand?'));
+  });
+});
+
+describe('appendBubble (LIN-2437 A.11 review finding 1) — assistant bubble speaker pill', () => {
+  test('a resumed companion chat renders the readable label on the speaker pill, not the raw sentinel', () => {
+    // openSavedChat sets activeTask to the raw sentinel and THEN replays every
+    // stored turn through appendBubble — so on an assistant-only companion
+    // transcript this pill is the loudest surface, repeated once per bubble.
+    const { sandbox, captured } = makeBubbleSandbox('flight-companion');
+    sandbox.appendBubble('assistant', 'Standing by.');
+
+    assert.equal(captured.length, 1);
+    assert.equal(captured[0].who, 'Flight Companion');
+    assert.ok(!String(captured[0].who).includes('flight-companion'), 'the raw sentinel must never reach the speaker pill');
+  });
+
+  test('an ordinary task chat still names the task on the pill', () => {
+    const { sandbox, captured } = makeBubbleSandbox('TEST-1');
+    sandbox.appendBubble('assistant', 'Here is where I stand.');
+    assert.equal(captured[0].who, 'TEST-1');
+  });
+
+  test("the user's own turn is unaffected, and an empty activeTask still falls back to 'task'", () => {
+    const { sandbox, captured } = makeBubbleSandbox('flight-companion');
+    sandbox.appendBubble('user', 'hello');
+    assert.equal(captured[0].who, 'you');
+
+    const empty = makeBubbleSandbox('');
+    empty.sandbox.appendBubble('assistant', 'hi');
+    assert.equal(empty.captured[0].who, 'task', 'the || fallback must survive the mask being applied first');
   });
 });

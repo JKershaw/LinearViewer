@@ -83,7 +83,7 @@
   // send() writes textContent into), so it's the text span, not the wrapper,
   // that toggles `.chat-cursor`.
   function appendBubble(role, text) {
-    var whoLabel = role === 'user' ? 'you' : (activeTask || 'task');
+    var whoLabel = role === 'user' ? 'you' : (maskFlightCompanionSentinel(activeTask) || 'task');
     var li = window.ChatUI.appendMessage(transcript, {
       who: whoLabel,
       whoState: role === 'user' ? undefined : 'in-progress',
@@ -160,11 +160,21 @@
   // regex-clean so the existing resume/send validation path is untouched). The
   // sentinel is never rewritten in storage; it is masked once, here, at render
   // time, and every surface that echoes a saved chat's task identifier reuses
-  // this one helper so none of them can drift: the saved-row meta chip, the
-  // saved-row title (including its "Chat about …" auto-derived fallback,
-  // deriveTitle() in lib/saved-chat-store.js — an assistant-only companion
-  // transcript has no user turn to title itself from, so it hits this leak
-  // path), and the active label shown when a saved companion chat is resumed.
+  // this one helper so none of them can drift. The four render surfaces:
+  //   1. the saved-row meta chip (renderSavedRows);
+  //   2. the saved-row title, including its "Chat about …" auto-derived
+  //      fallback — deriveTitle() in lib/saved-chat-store.js, which an
+  //      assistant-only companion transcript hits because it has no user turn
+  //      to title itself from;
+  //   3. the active label set when a saved companion chat is resumed;
+  //   4. the speaker pill on every assistant bubble (appendBubble reads the
+  //      same `activeTask` openSavedChat sets, and the resume replay renders a
+  //      bubble per stored turn — so this is the LOUDEST surface, not the
+  //      quietest: an assistant-only transcript repeats it N times).
+  // `idInput.value` is deliberately NOT masked — the input holds a real,
+  // editable identifier that send() posts as an issue id, so masking it there
+  // would break the value rather than the label. That is a separate fix,
+  // routed to its own follow-up.
   var FLIGHT_COMPANION_SENTINEL = 'flight-companion';
   var FLIGHT_COMPANION_LABEL = 'Flight Companion';
 

@@ -278,6 +278,16 @@ test.describe('Task Chat Page (experimental)', () => {
       const activeLabel = page.locator('#task-chat-active-label');
       await expect(activeLabel).toContainText('Flight Companion');
       await expect(activeLabel).not.toContainText('talking to flight-companion');
+
+      // Surface 4: the replayed bubbles themselves. appendBubble reads the same
+      // activeTask, so an assistant-only companion transcript would otherwise
+      // repeat the raw sentinel on the speaker pill of every bubble — the
+      // loudest surface of the four, underneath the one-line label above.
+      const speakerPill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(speakerPill).toContainText('Flight Companion');
+      await expect(speakerPill).not.toContainText('flight-companion');
+      // …and nothing anywhere in the rendered transcript leaks it either.
+      await expect(page.locator('#task-chat-transcript')).not.toContainText('flight-companion');
     });
   });
 
