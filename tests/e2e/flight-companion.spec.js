@@ -230,4 +230,41 @@ test.describe('Flight Companion Page (experimental)', () => {
       await expect(page.locator('#flight-companion-chat-empty')).toBeVisible();
     });
   });
+
+  test.describe('Sweep-liveness gate-silent tick (LIN-2438, page.clock)', () => {
+    // Same installation-order discipline as the plain silent-tick block
+    // above: page.clock before the flag-on navigation, its own describe so
+    // it never shares the layout block's beforeEach.
+    test('a gate-silent sweep-not-seen response updates the check-in line with the warning class and creates no bubble', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+
+      await page.clock.install();
+      await page.route('**/api/flight-companion/turn', (route) => {
+        if (route.request().method() !== 'POST') return route.continue();
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            turnKind: 'auto-wake',
+            spent: false,
+            reason: 'sweep-not-seen',
+            sweepLastSeenAt: '2026-09-02T20:00:00.000Z',
+          }),
+        });
+      });
+
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+
+      await page.clock.fastForward(30000);
+
+      const checkin = page.locator('#flight-companion-checkin');
+      await expect(checkin).toBeVisible();
+      await expect(checkin).toContainText('sweep last seen');
+      await expect(checkin).toHaveClass(/fc-checkin--warning/);
+
+      await expect(page.locator('.fc-msg-who')).toHaveCount(0);
+      await expect(page.locator('#flight-companion-chat-empty')).toBeVisible();
+    });
+  });
 });

@@ -470,6 +470,109 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
     const after2 = await observerStateStore.readCurrent(instanceKey);
     assert.notStrictEqual(after2.rev, after1.rev, 'the mutant keeps advancing on every tick — exactly the regression the real payload contract avoids by carrying no such field');
   });
+
+  // ─── Sweep-liveness heartbeat (LIN-2438) ───────────────────────────────
+  //
+  // The write-site measurement pin: a stale-lastSeenAt gate test can read
+  // green while the write side never actually refreshes the stamp on a real
+  // sweep run. These tests are what make that measurement valid.
+
+  test('LIN-2438 T10: a DUPLICATE tick (byte-identical census, advance() no-op) still refreshes the sweep instance\'s lastSeenAt', async () => {
+    const { dispatchStore, agentStatusStore, observerStateStore } = freshStores();
+    const urlKey = `ws-heartbeat-${randomUUID()}`;
+    await dispatchStore.addItem(urlKey, { prompt: 'p', issueIdentifier: 'LIN-1', promptName: 'implementation' });
+
+    const now = Date.now();
+    const deps = { dispatchStore, agentStatusStore, observerStateStore, now };
+    const instanceKey = `sweep:v1:${urlKey}`;
+
+    await sweepOneWorkspace(urlKey, deps);
+    const doc1 = await observerStateStore.readCurrent(instanceKey);
+    assert.ok(doc1, 'first sweep must seed and advance to a real document');
+
+    // Force lastSeenAt far into the past so a subsequent refresh is
+    // unambiguous — real-clock resolution alone could hide a same-tick
+    // no-op (precedent: tests/unit/observer-state-store.test.js:544/726).
+    const longAgo = new Date(Date.now() - 60 * 60 * 1000);
+    await observerStateStore.collection.updateOne({ _id: instanceKey }, { $set: { lastSeenAt: longAgo } });
+
+    // Second tick over the IDENTICAL fleet — advance()'s duplicate-tick
+    // branch makes no write at all, so only the heartbeat can move lastSeenAt.
+    await sweepOneWorkspace(urlKey, deps);
+    const doc2 = await observerStateStore.readCurrent(instanceKey);
+    assert.strictEqual(doc2.rev, doc1.rev, 'sanity: this must actually be a duplicate no-op, not a genuine transition');
+    assert.ok(doc2.lastSeenAt.getTime() > longAgo.getTime(), 'a duplicate tick must still refresh lastSeenAt via the heartbeat');
+  });
+
+  test('LIN-2438 T11: the heartbeat leaves rev, state, stateHash, updatedAt and ledger untouched', async () => {
+    const { dispatchStore, agentStatusStore, observerStateStore } = freshStores();
+    const urlKey = `ws-heartbeat-inert-${randomUUID()}`;
+    await dispatchStore.addItem(urlKey, { prompt: 'p', issueIdentifier: 'LIN-1', promptName: 'implementation' });
+
+    const now = Date.now();
+    const deps = { dispatchStore, agentStatusStore, observerStateStore, now };
+    const instanceKey = `sweep:v1:${urlKey}`;
+
+    await sweepOneWorkspace(urlKey, deps);
+    const doc1 = await observerStateStore.readCurrent(instanceKey);
+
+    const longAgo = new Date(Date.now() - 60 * 60 * 1000);
+    await observerStateStore.collection.updateOne({ _id: instanceKey }, { $set: { lastSeenAt: longAgo } });
+
+    await sweepOneWorkspace(urlKey, deps);
+    const doc2 = await observerStateStore.readCurrent(instanceKey);
+
+    assert.strictEqual(doc2.rev, doc1.rev, 'rev must be untouched by the heartbeat');
+    assert.deepStrictEqual(doc2.state, doc1.state, 'state must be untouched by the heartbeat');
+    assert.strictEqual(doc2.stateHash, doc1.stateHash, 'stateHash must be untouched by the heartbeat');
+    assert.strictEqual(doc2.updatedAt.getTime(), doc1.updatedAt.getTime(), 'updatedAt (last-CHANGED) must be untouched by the heartbeat');
+    assert.deepStrictEqual(doc2.ledger, doc1.ledger, 'the ledger must be untouched by the heartbeat');
+    assert.ok(doc2.lastSeenAt.getTime() > longAgo.getTime(), 'sanity: the heartbeat must have actually fired');
+  });
+
+  test('LIN-2438 T12: a tick that throws before advance() (rejecting getLoopsForWorkspace) writes no heartbeat', async () => {
+    const { dispatchStore, agentStatusStore, observerStateStore } = freshStores();
+    const urlKey = `ws-heartbeat-throw-${randomUUID()}`;
+    await dispatchStore.addItem(urlKey, { prompt: 'p', issueIdentifier: 'LIN-1', promptName: 'implementation' });
+
+    const now = Date.now();
+    const deps = { dispatchStore, agentStatusStore, observerStateStore, now };
+    const instanceKey = `sweep:v1:${urlKey}`;
+
+    // Seed the instance with a normal, successful tick first.
+    await sweepOneWorkspace(urlKey, deps);
+
+    const longAgo = new Date(Date.now() - 60 * 60 * 1000);
+    await observerStateStore.collection.updateOne({ _id: instanceKey }, { $set: { lastSeenAt: longAgo } });
+
+    const brokenDispatchStore = {
+      listItems: () => { throw new Error('boom: dispatch read failed'); },
+      listHistory: async () => []
+    };
+    await assert.rejects(
+      () => sweepOneWorkspace(urlKey, { dispatchStore: brokenDispatchStore, agentStatusStore, observerStateStore, now }),
+      /boom: dispatch read failed/
+    );
+
+    const doc = await observerStateStore.readCurrent(instanceKey);
+    assert.strictEqual(doc.lastSeenAt.getTime(), longAgo.getTime(), 'a tick that throws before advance() must not heartbeat — it must not look alive');
+  });
+
+  test('LIN-2438 T13: advance() === false (lost race) and === null (backend error) each write no heartbeat', async () => {
+    const { dispatchStore, agentStatusStore } = freshStores();
+    const urlKey = `ws-heartbeat-noadvance-${randomUUID()}`;
+
+    for (const advanceResult of [false, null]) {
+      const calls = [];
+      const observerStateStore = {
+        readCurrent: async () => { calls.push('readCurrent'); return { rev: 1 }; },
+        ensureSeeded: async () => { calls.push('ensureSeeded'); return { rev: 1 }; },
+        advance: async () => { calls.push('advance'); return advanceResult; }
+      };
+      await sweepOneWorkspace(urlKey, { dispatchStore, agentStatusStore, observerStateStore, now: Date.now() });
+      assert.deepStrictEqual(calls, ['readCurrent', 'advance'], `advance() === ${advanceResult} must not be followed by a heartbeat ensureSeeded call`);
+    }
+  });
 });
 
 // ─── D. Negative capability ────────────────────────────────────────────────

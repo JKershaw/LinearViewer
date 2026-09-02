@@ -336,8 +336,11 @@ export function createFlightCompanionRoutes({
       });
       if (!gate.spend) {
         // Nothing to report — a cheap response with no model call and no
-        // quota touched at all.
-        return res.json({ turnKind, spent: false, reason: gate.reason });
+        // quota touched at all. LIN-2438: `sweepLastSeenAt` is additive and
+        // only ever present when `gate.reason === 'sweep-not-seen'` (the
+        // gate's own relabel) — every other reason forwards `undefined`,
+        // which JSON.stringify omits, so no other client-visible shape changes.
+        return res.json({ turnKind, spent: false, reason: gate.reason, sweepLastSeenAt: gate.sweepLastSeenAt });
       }
       turnSurface = gate.surface;
       // Captured now (CAS'd against the rev we just read), but only actually

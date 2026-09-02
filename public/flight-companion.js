@@ -161,7 +161,13 @@
     var ok = params.ok, status = params.status, isEventStream = params.isEventStream, jsonBody = params.jsonBody;
     if (ok && isEventStream) return { kind: 'sse' };
     if (ok && jsonBody && jsonBody.spent === false) {
-      return { kind: 'gate-silent', reason: jsonBody.reason };
+      // LIN-2438: sweepLastSeenAt is additive and only ever present when
+      // reason === 'sweep-not-seen' — carried through only when the server
+      // actually sent it, never as an explicit `undefined` key, so a plain
+      // { kind: 'gate-silent', reason } shape is unchanged for every other reason.
+      var result = { kind: 'gate-silent', reason: jsonBody.reason };
+      if (jsonBody.sweepLastSeenAt) result.sweepLastSeenAt = jsonBody.sweepLastSeenAt;
+      return result;
     }
     if (status === 401) {
       return { kind: 'session-expired', message: 'Your session expired — reload to sign in again.' };
@@ -188,6 +194,15 @@
   // pure helpers.
   function formatCheckIn(date) {
     return 'checked in ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' \u00b7 nothing new';
+  }
+
+  // Sibling to formatCheckIn (LIN-2438). `date` is the sweep's own
+  // `sweepLastSeenAt` stamp (when the server sent one), never `new Date()` \u2014
+  // the whole point is to name WHEN the sweep was last seen, not when this
+  // tick ran. Pure \u2014 the clock is an argument, never read here.
+  function formatSweepNotSeen(date) {
+    if (!date) return 'sweep not seen recently \u00b7 the periodic scan may be down';
+    return 'sweep last seen ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' \u00b7 the periodic scan may be down';
   }
 
   // ─── DOM-touching glue ───────────────────────────────────────────────────
@@ -228,6 +243,17 @@
     if (!checkInEl) return;
     checkInEl.textContent = formatCheckIn(new Date());
     checkInEl.hidden = false;
+    checkInEl.classList.remove('fc-checkin--warning');
+  }
+
+  // Sibling to updateCheckInStatus (LIN-2438) — the SAME single, replaceable
+  // element (never a new node, never showInlineNote's append-a-row shape),
+  // carrying the sweep-not-seen warning text plus a class for styling.
+  function updateCheckInStatusSweepNotSeen(sweepLastSeenAt) {
+    if (!checkInEl) return;
+    checkInEl.textContent = formatSweepNotSeen(sweepLastSeenAt ? new Date(sweepLastSeenAt) : null);
+    checkInEl.hidden = false;
+    checkInEl.classList.add('fc-checkin--warning');
   }
 
   function appendAssistantBubble() {
@@ -445,7 +471,18 @@
         // same single status line an empty auto-wake `done` does (LIN-2443
         // plan §2) rather than letting the line go stale while ticks are in
         // fact happening. Still no row is ever appended.
-        updateCheckInStatus();
+        //
+        // LIN-2438: `reason: 'sweep-not-seen'` is the one gate-silent reason
+        // that means something OTHER than "checked, nothing new" — the sweep
+        // itself hasn't been seen recently, so say that instead. Cadence
+        // effect stays 'double' either way: nothing was surfaced by a model
+        // (never 'reset'), and a dead sweep can recover (never 'stop' —
+        // advanceCadence has no un-stop).
+        if (classification.reason === 'sweep-not-seen') {
+          updateCheckInStatusSweepNotSeen(classification.sweepLastSeenAt);
+        } else {
+          updateCheckInStatus();
+        }
         applyCadenceEffect('double');
         break;
       case 'session-expired':
@@ -688,7 +725,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
       capHistory, nextCadenceDelay, doneCadenceEffect, autoWakeErrorCadenceEffect,
-      advanceCadence, classifyTurnResponse, parseProposalResult, formatCheckIn,
+      advanceCadence, classifyTurnResponse, parseProposalResult, formatCheckIn, formatSweepNotSeen,
       applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion,
       getCadenceState: function () { return cadence; },
       getChatHistory: function () { return chatHistory; },

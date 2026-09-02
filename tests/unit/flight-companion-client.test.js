@@ -400,6 +400,21 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
     assert.strictEqual(m.classifyTurnResponse({ ok: false, status: 404, isEventStream: false, jsonBody: null }).kind, 'server-error');
   });
 
+  test('LIN-2438 T16: classifyTurnResponse carries reason "sweep-not-seen" through as gate-silent, with sweepLastSeenAt attached', () => {
+    const { exports: m } = loadClient();
+    looseDeepEqual(
+      m.classifyTurnResponse({
+        ok: true, status: 200, isEventStream: false,
+        jsonBody: { turnKind: 'auto-wake', spent: false, reason: 'sweep-not-seen', sweepLastSeenAt: '2026-09-02T20:00:00.000Z' }
+      }),
+      { kind: 'gate-silent', reason: 'sweep-not-seen', sweepLastSeenAt: '2026-09-02T20:00:00.000Z' }
+    );
+    // Every other reason must keep the exact pre-LIN-2438 shape — no
+    // sweepLastSeenAt key at all, not even set to undefined.
+    const ordinary = m.classifyTurnResponse({ ok: true, status: 200, isEventStream: false, jsonBody: { turnKind: 'auto-wake', spent: false, reason: 'hash-identical' } });
+    assert.deepStrictEqual(Object.keys(ordinary).sort(), ['kind', 'reason']);
+  });
+
   test('parseProposalResult: valid shape parses; a truncated/malformed payload fails safely, never throws', () => {
     const { exports: m } = loadClient();
     const ok = m.parseProposalResult(JSON.stringify({ proposed: true, sessionId: 'sess-1', prompt: 'go' }));
@@ -1066,6 +1081,45 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
     await flush();
     assert.strictEqual(chatUICalls.appendNote.length, 0);
     assert.strictEqual(m.getCadenceState().delayMs, 60000);
+  });
+
+  test('LIN-2438 T17: gate-silent + sweep-not-seen updates the single status line with the not-seen text, doubles the cadence, and appends no row', async () => {
+    const seenAt = '2026-09-02T20:00:00.000Z';
+    const { exports: m, thread, checkIn, chatUICalls } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'sweep-not-seen', sweepLastSeenAt: seenAt }),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(checkIn.hidden, false);
+    assert.strictEqual(checkIn.textContent, m.formatSweepNotSeen(new Date(seenAt)));
+    assert.strictEqual(checkIn.classList.contains('fc-checkin--warning'), true, 'the warning styling class must be applied');
+    assert.strictEqual(thread.children.length, 0, 'no row is ever appended to the thread');
+    assert.strictEqual(chatUICalls.appendNote.length, 0);
+    assert.strictEqual(m.getCadenceState().delayMs, 60000, 'doubles from the 30s base, same as any other gate-silent tick');
+    assert.strictEqual(m.getCadenceState().stopped, false, 'never stops for this reason — a dead sweep can recover');
+  });
+
+  test('LIN-2438 T18: gate-silent with any other reason still only refreshes the ordinary check-in line (LIN-2443 AC1 unchanged), no warning class', async () => {
+    const { exports: m, thread, checkIn, chatUICalls } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'floor' }),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.match(checkIn.textContent, /nothing new$/);
+    assert.strictEqual(checkIn.classList.contains('fc-checkin--warning'), false);
+    assert.strictEqual(thread.children.length, 0);
+    assert.strictEqual(chatUICalls.appendNote.length, 0);
+    assert.strictEqual(m.getCadenceState().delayMs, 60000);
+  });
+
+  test('an ordinary check-in clears a previously-set sweep-not-seen warning class (the line settles)', async () => {
+    const { exports: m, checkIn } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'hash-identical' }),
+    });
+    checkIn.classList.add('fc-checkin--warning'); // simulate a prior sweep-not-seen tick's leftover state
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(checkIn.classList.contains('fc-checkin--warning'), false, 'an ordinary check-in must clear the warning class');
   });
 
   test('403 flag-off: EITHER path stops the cadence entirely and shows a note', async () => {
