@@ -1356,6 +1356,112 @@ describe('GitHub auth routes', () => {
     assert.ok(res.body && /Could not link your GitHub repository/.test(res.body));
     assert.strictEqual(res.redirectedTo, null);
   });
+
+  // ---------------------------------------------------------------------------
+  // LIN-2397 stage A — characterization tests for gaps enumerated by the
+  // research comment (§3): none of these change production behavior; each one
+  // pins a branch the extraction in stage B must preserve byte-for-byte.
+  // ---------------------------------------------------------------------------
+
+  test('GET callback 400s Session Expired when state is missing entirely (not just mismatched) [LIN-2397 gap: missing state]', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    await handler({ query: { installation_id: '42' }, session: makeSession({ oauthState: 'real' }) }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body, /Session Expired/);
+  });
+
+  test('GET callback 400s Installation Cancelled with the cancellation copy when error=access_denied [LIN-2397 gap]', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    await handler({ query: { error: 'access_denied' }, session: makeSession() }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body, /Installation Cancelled/);
+    assert.match(res.body, /You cancelled the GitHub App installation request\./);
+    assert.match(res.body, /href="\/auth\/github"/);
+  });
+
+  test('GET callback 400s Installation Cancelled with the raw error value interpolated for a non-access_denied error [LIN-2397 gap]', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    await handler({ query: { error: 'server_error' }, session: makeSession() }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body, /Installation Cancelled/);
+    assert.match(res.body, /GitHub App installation failed: server_error/);
+  });
+
+  test('GET callback (install path) 500s Connection Error when listRepos fails [LIN-2397 gap]', async () => {
+    const provider = { ...fakeProvider(), listRepos: async () => { throw new Error('boom') } };
+    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    await handler({ query: { installation_id: '99', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
+    assert.equal(res.statusCode, 500);
+    assert.match(res.body, /Connection Error/);
+    assert.match(res.body, /Could not fetch your repositories from GitHub/);
+  });
+
+  test('GET callback (re-bind) 400s "Could not verify your GitHub account" when fetchViewer fails [LIN-2397 gap]', async () => {
+    const provider = { ...fakeProvider(), fetchViewer: async () => { throw new Error('viewer lookup failed') } };
+    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session: makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } }) }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body, /Authentication Failed/);
+    assert.match(res.body, /Could not verify your GitHub account/);
+  });
+
+  test('GET callback (install path) 500s Something Went Wrong from the outer catch on an unexpected post-mint failure [LIN-2397 gap]', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real' });
+    session.save = () => { throw new Error('session store unavailable') };
+    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+    assert.equal(res.statusCode, 500);
+    assert.match(res.body, /Something Went Wrong/);
+    assert.match(res.body, /An unexpected error occurred during GitHub authentication/);
+  });
+
+  test('GET /auth/github defaults mode to "new" in the session intent when ?mode is absent [LIN-2397 gap]', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github');
+    const res = makeRes();
+    const session = makeSession();
+    await handler({ query: {}, session }, res);
+    assert.deepEqual(session.oauthIntent, { mode: 'new', provider: 'github' });
+  });
+
+  test('GET /auth/github defaults mode to "new" in the session intent when ?mode is garbage [LIN-2397 gap]', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github');
+    const res = makeRes();
+    const session = makeSession();
+    await handler({ query: { mode: 'nonsense' }, session }, res);
+    assert.deepEqual(session.oauthIntent, { mode: 'new', provider: 'github' });
+  });
+
+  test('GET callback defaults pending.mode to "new" when oauthIntent.mode is absent [LIN-2397 gap]', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { provider: 'github' } });
+    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+    assert.equal(session.githubPending.mode, 'new');
+  });
+
+  test('GET callback defaults pending.mode to "new" when oauthIntent.mode is garbage [LIN-2397 gap]', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'nonsense', provider: 'github' } });
+    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+    assert.equal(session.githubPending.mode, 'new');
+  });
 });
 
 describe('githubErrorDiagnostic (LIN-746)', () => {
