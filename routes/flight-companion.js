@@ -344,8 +344,21 @@ export function createFlightCompanionRoutes({
       // PERSISTED below once tryUse has also cleared — a config/quota failure
       // between here and there must not mark the floor as spent when no real
       // turn happened.
+      //
+      // LIN-2442: two records travel together from here on. `reserveRecord`
+      // is what the eager advance() below writes — the prior census baseline
+      // re-emitted unchanged plus a reservation lease, so a turn that never
+      // reaches a terminal `done` frame leaves the baseline untouched and the
+      // lease self-expires. `commitRecord` (the gate's old `nextRecord`, the
+      // NEW baseline) is written later, only after `done` is actually
+      // observed — see the `sawDone` commit block below.
       if (companionDocEnvelope) {
-        companionAdvance = { instanceKey: companionInstanceKey, expectedRev: companionDocEnvelope.rev, nextRecord: gate.nextRecord };
+        companionAdvance = {
+          instanceKey: companionInstanceKey,
+          expectedRev: companionDocEnvelope.rev,
+          reserveRecord: gate.reserveRecord,
+          commitRecord: gate.nextRecord,
+        };
       }
     }
 
@@ -382,8 +395,13 @@ export function createFlightCompanionRoutes({
       // billable spend against the same gate window. `null` denies the
       // spend, the safe reading of observer-state-store's own "do not treat
       // as safe to converge" contract.
+      // LIN-2442: writes the RESERVATION record, not the new baseline — the
+      // baseline only commits after a terminal `done` frame (see the
+      // `sawDone` block below). This is still the same CAS, at the same call
+      // site, still bumping `rev` on every spend decision — the double-spend
+      // guard below is unaffected by the split.
       const advanceResult = await observerStateStore.advance(
-        companionAdvance.instanceKey, companionAdvance.expectedRev, companionAdvance.nextRecord,
+        companionAdvance.instanceKey, companionAdvance.expectedRev, companionAdvance.reserveRecord,
         { reason: 'flight-companion-turn' }
       );
       if (advanceResult !== true) {
@@ -407,6 +425,12 @@ export function createFlightCompanionRoutes({
     // turnKind branch threaded through SSE forwarding — it can never fire for
     // an execute-mode call, which never returns that shape.
     const proposedCallIds = new Set();
+    // LIN-2442: the ONLY signal that gates the post-stream baseline commit
+    // below — a throw, a dead-socket write, or a hard process crash all
+    // leave this `false`, and nothing releases the reservation explicitly on
+    // any of those paths (mirrors lib/scheduler.js:32-37's recorded rule
+    // against failure-path writes). The reservation self-expires instead.
+    let sawDone = false;
     const onEvent = (type, data) => {
       if (type === 'tool' && data.phase === 'result' && proposedCallIds.has(data.id)) {
         data = { ...data, phase: 'proposed' };
@@ -418,6 +442,9 @@ export function createFlightCompanionRoutes({
       // unchanged and carries no `surface` field at all.
       if (type === 'done' && turnKind === 'auto-wake') {
         data = { ...data, surface: turnSurface };
+      }
+      if (type === 'done') {
+        sawDone = true;
       }
       sendSSE(res, type, data);
       if (type === 'done' || type === 'error') {
@@ -484,6 +511,54 @@ export function createFlightCompanionRoutes({
           { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, callMeta },
           onEvent
         );
+      }
+
+      // LIN-2442: commit the NEW census baseline only now that a terminal
+      // `done` frame was actually observed — the report has already reached
+      // the user (the frame is sent and `res.end()`'d inside `onEvent`
+      // before we get here). A throw from either streaming call above skips
+      // this block entirely (it lands in the `catch` below instead), leaving
+      // `sawDone` false and the baseline untouched, exactly as designed.
+      //
+      // Fresh `readCurrent` rather than `expectedRev + 1`: the store's own
+      // duplicate-identical-state branch (lib/observer-state-store.js
+      // :397-406) returns `true` for a no-op write WITHOUT bumping `rev`, so
+      // assuming a strict +1 here would CAS against a stale witness on the
+      // very next tick.
+      //
+      // Isolated in its own try/catch — never the outer one, which would
+      // otherwise try to `sendSSE`/`res.end()` a response already ended by
+      // the `done` frame above.
+      if (sawDone && companionAdvance) {
+        try {
+          const currentEnvelope = await observerStateStore.readCurrent(companionAdvance.instanceKey);
+          if (currentEnvelope) {
+            const commitResult = await observerStateStore.advance(
+              companionAdvance.instanceKey, currentEnvelope.rev, companionAdvance.commitRecord,
+              { reason: 'flight-companion-commit' }
+            );
+            if (commitResult !== true) {
+              // Benign by design: the report already reached the user, so a
+              // lost CAS or backend error here only means the census
+              // baseline lags — the next eligible turn re-surfaces the same
+              // change once (via hash-identical no longer matching), never
+              // loses it. Logged, never retried, never thrown.
+              console.error('Flight Companion turn: commit advance() did not land', {
+                instanceKey: companionAdvance.instanceKey,
+                result: commitResult,
+              });
+            }
+          } else {
+            console.error('Flight Companion turn: commit skipped, instance vanished', {
+              instanceKey: companionAdvance.instanceKey,
+            });
+          }
+        } catch (commitError) {
+          console.error('Flight Companion turn: commit write threw', {
+            instanceKey: companionAdvance.instanceKey,
+            error: commitError,
+          });
+        }
       }
     } catch (error) {
       console.error('Flight Companion turn error:', error);

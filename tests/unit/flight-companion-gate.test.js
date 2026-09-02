@@ -25,7 +25,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 
-import { buildCompanionSnapshot, shouldSpendTurn, COMPANION_SEED_STATE, COMPANION_INSTANCE_PREFIX, DEFAULT_COMPANION_FLOOR_MS } from '../../lib/flight-companion-gate.js';
+import { buildCompanionSnapshot, shouldSpendTurn, COMPANION_SEED_STATE, COMPANION_INSTANCE_PREFIX, DEFAULT_COMPANION_FLOOR_MS, RESERVATION_LEASE_MS } from '../../lib/flight-companion-gate.js';
 
 const ZERO_LANES = { working: 0, silent: 0, blocked: 0, terminal: 0, queued: 0, resolved: 0, unknown: 0 };
 
@@ -163,6 +163,17 @@ describe('shouldSpendTurn: census-delta true/false', () => {
       lastCensusStateHash: 'hNew',
       lastCensusSnapshot: buildCompanionSnapshot(doc),
       lastTurnAt: new Date(5000).toISOString(),
+      turnReservedUntil: null,
+      notes: 'prior notes'
+    });
+    // LIN-2442: the reserve record re-emits the PRIOR baseline unchanged
+    // (not the new one), carries a fresh lastTurnAt, and opens a lease.
+    assert.deepStrictEqual(result.reserveRecord, {
+      v: 1,
+      lastCensusStateHash: 'hOld',
+      lastCensusSnapshot: priorSnapshot,
+      lastTurnAt: new Date(5000).toISOString(),
+      turnReservedUntil: new Date(5000 + RESERVATION_LEASE_MS).toISOString(),
       notes: 'prior notes'
     });
   });
@@ -207,6 +218,16 @@ describe('shouldSpendTurn: census-delta true/false', () => {
       lastCensusStateHash: 'hNew',
       lastCensusSnapshot: buildCompanionSnapshot(doc),
       lastTurnAt: new Date(1000).toISOString(),
+      turnReservedUntil: null,
+      notes: ''
+    });
+    // Seed turn: no prior baseline, so the reserve record's baseline stays null too.
+    assert.deepStrictEqual(result.reserveRecord, {
+      v: 1,
+      lastCensusStateHash: null,
+      lastCensusSnapshot: null,
+      lastTurnAt: new Date(1000).toISOString(),
+      turnReservedUntil: new Date(1000 + RESERVATION_LEASE_MS).toISOString(),
       notes: ''
     });
   });
@@ -255,12 +276,87 @@ describe('shouldSpendTurn: floor-interval boundary', () => {
   });
 });
 
+// ─── turn-in-flight precedence (LIN-2442) ────────────────────────────────
+
+describe('shouldSpendTurn: turn-in-flight precedence (LIN-2442)', () => {
+  test('a live reservation blocks even though the floor has already elapsed and the hash differs', () => {
+    const priorSnapshot = { lanes: lanes({}), attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 };
+    const companionDoc = companion({
+      lastCensusStateHash: 'hOld',
+      lastCensusSnapshot: priorSnapshot,
+      lastTurnAt: new Date(0).toISOString(),
+      turnReservedUntil: new Date(500_000).toISOString()
+    });
+    const doc = census({ stateHash: 'hNew', rev: 2, lanesState: lanes({}), attention: [attentionRow('loop-1', 'blocked', 'review')] });
+    // now is well past DEFAULT_COMPANION_FLOOR_MS (180_000) since lastTurnAt,
+    // so without the turn-in-flight branch this would fall through to spend.
+    const result = shouldSpendTurn({ currentCensusDoc: doc, companionDoc, now: 400_000, floorMs: DEFAULT_COMPANION_FLOOR_MS });
+    assert.deepStrictEqual(result, { spend: false, surface: false, reason: 'turn-in-flight', nextRecord: null });
+  });
+
+  test('turn-in-flight outranks hash-identical when both would otherwise match', () => {
+    const doc = census({ stateHash: 'h1' });
+    const companionDoc = companion({
+      lastCensusStateHash: 'h1',
+      lastCensusSnapshot: buildCompanionSnapshot(doc),
+      turnReservedUntil: new Date(2000).toISOString()
+    });
+    const result = shouldSpendTurn({ currentCensusDoc: doc, companionDoc, now: 1000 });
+    assert.strictEqual(result.reason, 'turn-in-flight');
+  });
+
+  test('now === turnReservedUntil -> lease has expired, does not block (all else permitting)', () => {
+    const priorSnapshot = { lanes: lanes({}), attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 };
+    const companionDoc = companion({
+      lastCensusStateHash: 'hOld',
+      lastCensusSnapshot: priorSnapshot,
+      lastTurnAt: new Date(0).toISOString(),
+      turnReservedUntil: new Date(500_000).toISOString()
+    });
+    const doc = census({ stateHash: 'hNew', rev: 2, lanesState: lanes({}), attention: [attentionRow('loop-1', 'blocked', 'review')] });
+    const result = shouldSpendTurn({ currentCensusDoc: doc, companionDoc, now: 500_000, floorMs: DEFAULT_COMPANION_FLOOR_MS });
+    assert.notStrictEqual(result.reason, 'turn-in-flight');
+    assert.strictEqual(result.spend, true);
+  });
+
+  test('turnReservedUntil: null -> never blocks, regardless of elapsed time', () => {
+    const priorSnapshot = { lanes: lanes({}), attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 };
+    const companionDoc = companion({
+      lastCensusStateHash: 'hOld',
+      lastCensusSnapshot: priorSnapshot,
+      lastTurnAt: new Date(0).toISOString(),
+      turnReservedUntil: null
+    });
+    const doc = census({ stateHash: 'hNew', rev: 2, lanesState: lanes({}), attention: [attentionRow('loop-1', 'blocked', 'review')] });
+    const result = shouldSpendTurn({ currentCensusDoc: doc, companionDoc, now: 400_000, floorMs: DEFAULT_COMPANION_FLOOR_MS });
+    assert.notStrictEqual(result.reason, 'turn-in-flight');
+    assert.strictEqual(result.spend, true);
+  });
+
+  test('COMPANION_SEED_STATE seeds turnReservedUntil: null alongside lastTurnAt: null', () => {
+    assert.strictEqual(COMPANION_SEED_STATE.turnReservedUntil, null);
+  });
+
+  test('RESERVATION_LEASE_MS is derived: DEFAULT_MAX_TOOL_ITERATIONS (4) x REQUEST_TIMEOUT_MS (120_000) + headroom', () => {
+    assert.strictEqual(RESERVATION_LEASE_MS, 600_000);
+    assert.ok(RESERVATION_LEASE_MS > 4 * 120_000, 'lease must outlast the worst-case 480s turn with headroom');
+  });
+});
+
 // ─── The write-nothing invariant, structurally ──────────────────────────
 
 describe('shouldSpendTurn: write-nothing-on-false invariant', () => {
   const nonSpendCases = [
     { name: 'no-census', args: { currentCensusDoc: null, companionDoc: COMPANION_SEED_STATE, now: 1000 } },
     { name: 'no-companion', args: { currentCensusDoc: census({ stateHash: 'h1' }), companionDoc: null, now: 1000 } },
+    {
+      name: 'turn-in-flight',
+      args: {
+        currentCensusDoc: census({ stateHash: 'h1' }),
+        companionDoc: companion({ turnReservedUntil: new Date(2000).toISOString() }),
+        now: 1000
+      }
+    },
     {
       name: 'hash-identical',
       args: (() => {
