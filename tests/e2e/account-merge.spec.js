@@ -58,3 +58,60 @@ test.describe('Account merge confirm flow (LIN-2285)', () => {
     await expect(page.locator('.nav-bar')).toBeVisible();
   });
 });
+
+// LIN-2400: before this fix both buttons were plain .login-button — identical
+// background/border/font-size/cursor in both themes, distinguishable only by
+// their (different-length) label text. Reads real browser-computed style on
+// the real merge-confirm page (same seam as above), in both themes — the
+// `theme` cookie drives the pre-paint `.theme-dark` class (lib/components/
+// page.js), so setting it before navigation is enough; no toggle UI to drive.
+test.describe('Account merge consent actions are visually differentiated (LIN-2400)', () => {
+  async function measureMergeButtons(page) {
+    return page.evaluate(() => {
+      const read = el => {
+        const s = getComputedStyle(el);
+        return {
+          backgroundColor: s.backgroundColor,
+          color: s.color,
+          borderColor: s.borderColor,
+          fontWeight: s.fontWeight,
+          fontSize: s.fontSize,
+          cursor: s.cursor,
+        };
+      };
+      return {
+        confirm: read(document.querySelector('[data-testid="merge-confirm-submit"]')),
+        decline: read(document.querySelector('[data-testid="merge-decline-submit"]')),
+      };
+    });
+  }
+
+  for (const theme of ['light', 'dark']) {
+    test(`${theme} theme: merge and decline read as visually distinct, and both are deliberately sized`, async ({ page }) => {
+      await page.goto('/test/clear-session');
+      if (theme === 'dark') {
+        await page.context().addCookies([{ name: 'theme', value: 'dark', url: 'http://localhost:3001' }]);
+      }
+
+      const response = await page.goto('/test/set-merge-conflict-session');
+      expect(response.status()).toBe(409);
+      if (theme === 'dark') {
+        await expect(page.locator('html')).toHaveClass(/theme-dark/);
+      }
+
+      const { confirm, decline } = await measureMergeButtons(page);
+
+      // The irreversible action and its decline no longer share a look.
+      expect(decline.backgroundColor).not.toBe(confirm.backgroundColor);
+      expect(decline.color).not.toBe(confirm.color);
+      expect(decline.borderColor).not.toBe(confirm.borderColor);
+
+      // Both are UA-default no more: 16px to match body text (not the UA
+      // default ~13.33px a bare <button> gets) and a pointer cursor.
+      expect(confirm.fontSize).toBe('16px');
+      expect(decline.fontSize).toBe('16px');
+      expect(confirm.cursor).toBe('pointer');
+      expect(decline.cursor).toBe('pointer');
+    });
+  }
+});

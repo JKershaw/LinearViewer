@@ -2035,6 +2035,13 @@ a.wordmark:hover {
   border: 1px solid var(--brand);
   border-radius: 4px;
   font-family: var(--font-content);
+  /* LIN-2400: on a <button> (unlike <a>) this class has no UA reset to
+     inherit from, so it rendered at the UA default 13.3333px/cursor:default
+     instead of matching the 16px/pointer look every <a class="login-button">
+     already had. Explicit here so every use site (merge confirm/decline,
+     GitHub/Jira/Projects pickers) gets deliberate sizing, not a UA default. */
+  font-size: 1rem;
+  cursor: pointer;
 }
 
 .login-button:hover {
@@ -2042,15 +2049,21 @@ a.wordmark:hover {
   border-color: color-mix(in srgb, var(--brand) 85%, black);
 }
 
-/* GitHub CTA — differentiated from the primary brand action: a chromeless
-   outline that sits below the filled Linear CTA so the two never look alike. */
-.login-button-github {
+/* Differentiated-secondary pattern: a chromeless outline that reads as
+   visually subordinate to the filled primary .login-button, so the two never
+   look alike. Originally the GitHub CTA's alternate-provider treatment;
+   LIN-2400 reuses it verbatim for the account-merge decline action so the
+   safe "keep them separate" choice is never visually identical to the
+   irreversible merge action beside it. */
+.login-button-github,
+.login-button-secondary {
   background: transparent;
   color: var(--fg);
   border-color: var(--border);
 }
 
-.login-button-github:hover {
+.login-button-github:hover,
+.login-button-secondary:hover {
   background: var(--card-h);
   border-color: var(--border-strong);
 }
