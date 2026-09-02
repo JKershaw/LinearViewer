@@ -130,6 +130,14 @@
   margin: 0 0 var(--space-2);
 }
 
+/* LIN-2438: the sweep-not-seen relabel of the SAME single check-in line
+   above — never a second element, never a stacking note. Reuses the
+   existing status-pill--failed token (--red) rather than inventing a new
+   warning color. */
+.fc-checkin-status.fc-checkin--warning {
+  color: var(--red);
+}
+
 .fc-chat-composer {
   margin-top: var(--space-1);
 }

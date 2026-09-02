@@ -74,7 +74,7 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { MangoClient } from '@jkershaw/mangodb';
 import { createFlightCompanionRoutes, buildCensusSeedText } from '../../routes/flight-companion.js';
-import { COMPANION_SEED_STATE, buildCompanionSnapshot, RESERVATION_LEASE_MS, DEFAULT_COMPANION_FLOOR_MS } from '../../lib/flight-companion-gate.js';
+import { COMPANION_SEED_STATE, buildCompanionSnapshot, RESERVATION_LEASE_MS, DEFAULT_COMPANION_FLOOR_MS, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../../lib/flight-companion-gate.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -382,6 +382,49 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.2) — auto-wake gate ord
     });
     assert.strictEqual(freeTierStore.calls.length, 0, 'no free-tier key configured means isFreeTier is false, so tryUse is never called');
     assert.ok(!observerStateStore.calls.some(c => c.method === 'advance'), 'a config failure must not mark the floor as spent');
+  });
+});
+
+describe('Flight Companion turn endpoint (LIN-2438) — sweep-liveness relabel forwarded on the no-spend JSON', () => {
+  test('T14: an auto-wake turn on an unchanged census with a stale sweep stamp answers {spent:false, reason:"sweep-not-seen"} with no model call, no SSE headers and no freeTier tryUse', async () => {
+    const calls = [];
+    const staleSeenAt = new Date(Date.now() - (DEFAULT_SWEEP_LIVENESS_HORIZON_MS + 1000));
+    const staleCensus = { ...realCensusDoc(), lastSeenAt: staleSeenAt };
+    // Match the companion's baseline to the census hash so the seven-branch
+    // chain lands on hash-identical BEFORE the liveness relabel is applied.
+    const companionState = { ...COMPANION_SEED_STATE, lastCensusStateHash: staleCensus.stateHash };
+    const observerStateStore = fakeObserverStateStore({ companionState, censusDoc: staleCensus, calls });
+    const freeTierStore = fakeFreeTierStore({ allowed: true }, calls);
+    const app = buildApp({ observerStateStore, freeTierStore });
+
+    const { status, json, headers } = await post(app, '/workspace/acme/api/flight-companion/turn', {});
+
+    assert.strictEqual(status, 200);
+    assert.deepStrictEqual(json, {
+      turnKind: 'auto-wake',
+      spent: false,
+      reason: 'sweep-not-seen',
+      sweepLastSeenAt: staleSeenAt.toISOString()
+    });
+    assert.ok(!(headers.get('content-type') || '').includes('text/event-stream'), 'a gate-silent turn must never open an SSE stream');
+    assert.ok(!calls.some((c) => c.store === 'freeTier'), 'a gate-silent turn must never touch the free-tier quota');
+    assert.ok(!calls.some((c) => c.method === 'advance'), 'a gate-silent turn must never write — the write-nothing-on-false invariant');
+  });
+
+  test('T15: every existing (pre-LIN-2438) fixture shape — a censusDoc built with no lastSeenAt field at all — still answers its original reason', async () => {
+    // realCensusDoc() carries no lastSeenAt, exactly like every OTHER test in
+    // this file. Route-boundary inertness: the new field being absent must
+    // not perturb a decision that pre-dates it.
+    const census = realCensusDoc();
+    const companionState = { ...COMPANION_SEED_STATE, lastCensusStateHash: census.stateHash };
+    const observerStateStore = fakeObserverStateStore({ companionState, censusDoc: census });
+    const freeTierStore = fakeFreeTierStore({ allowed: true });
+    const app = buildApp({ observerStateStore, freeTierStore });
+
+    const { status, json } = await post(app, '/workspace/acme/api/flight-companion/turn', {});
+
+    assert.strictEqual(status, 200);
+    assert.deepStrictEqual(json, { turnKind: 'auto-wake', spent: false, reason: 'hash-identical' });
   });
 });
 

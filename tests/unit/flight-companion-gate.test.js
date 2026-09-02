@@ -25,7 +25,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 
-import { buildCompanionSnapshot, shouldSpendTurn, COMPANION_SEED_STATE, COMPANION_INSTANCE_PREFIX, DEFAULT_COMPANION_FLOOR_MS, RESERVATION_LEASE_MS } from '../../lib/flight-companion-gate.js';
+import { buildCompanionSnapshot, shouldSpendTurn, COMPANION_SEED_STATE, COMPANION_INSTANCE_PREFIX, DEFAULT_COMPANION_FLOOR_MS, RESERVATION_LEASE_MS, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../../lib/flight-companion-gate.js';
 
 const ZERO_LANES = { working: 0, silent: 0, blocked: 0, terminal: 0, queued: 0, resolved: 0, unknown: 0 };
 
@@ -480,5 +480,190 @@ describe('shouldSpendTurn: the injected clock is REQUIRED (L2)', () => {
       return result.nextRecord.lastTurnAt;
     });
     assert.deepStrictEqual(stamps, [new Date(ms).toISOString(), new Date(ms).toISOString(), new Date(ms).toISOString()]);
+  });
+});
+
+// ─── shouldSpendTurn: sweep liveness (LIN-2438) ──────────────────────────
+//
+// A pure relabel of an ALREADY spend:false decision — see the module header
+// and lib/observer-sweep.js's post-advance() heartbeat. Applied at exactly
+// two return sites (hash-identical, no-delta); never on no-census,
+// no-companion, turn-in-flight or floor (T7). The F1 property this exists to
+// preserve — no branch may turn a real spend into a no-spend — is pinned
+// structurally by T4 below, parameterised over every spend-producing fixture
+// already in this file.
+
+describe('shouldSpendTurn: sweep liveness (LIN-2438)', () => {
+  const NOW_MS = 2_000_000; // well past DEFAULT_SWEEP_LIVENESS_HORIZON_MS (1_800_000) from epoch 0
+
+  function hashIdenticalArgs(censusOverrides = {}) {
+    const doc = { ...census({ stateHash: 'h1', lanesState: lanes({ working: 1 }) }), ...censusOverrides };
+    const companionDoc = companion({ lastCensusStateHash: 'h1', lastCensusSnapshot: buildCompanionSnapshot(census({ stateHash: 'h1', lanesState: lanes({ working: 1 }) })), lastTurnAt: null });
+    return { currentCensusDoc: doc, companionDoc, now: NOW_MS };
+  }
+
+  function noDeltaArgs(censusOverrides = {}) {
+    const priorSnapshot = { lanes: lanes({ terminal: 2 }), attentionKeys: [['loop-1', 'blocked', 'review']], attentionCount: 1, truncated: false, censusRev: 1 };
+    const companionDoc = companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null });
+    const doc = { ...census({ stateHash: 'hNew', rev: 2, lanesState: lanes({ terminal: 2 }), attention: [attentionRow('loop-1', 'blocked', 'review')] }), ...censusOverrides };
+    return { currentCensusDoc: doc, companionDoc, now: NOW_MS };
+  }
+
+  test('DEFAULT_SWEEP_LIVENESS_HORIZON_MS is derived: 30 x OBSERVER_SWEEP_INTERVAL_MS (server.js:597, 60_000)', () => {
+    // T9
+    assert.strictEqual(DEFAULT_SWEEP_LIVENESS_HORIZON_MS, 30 * 60_000);
+    assert.strictEqual(DEFAULT_SWEEP_LIVENESS_HORIZON_MS, 1_800_000);
+  });
+
+  test('hash-identical + lastSeenAt inside the horizon -> reason stays hash-identical (a genuinely quiet fleet)', () => {
+    // T1
+    const args = hashIdenticalArgs({ lastSeenAt: new Date(NOW_MS - (DEFAULT_SWEEP_LIVENESS_HORIZON_MS - 1)) });
+    const result = shouldSpendTurn(args);
+    assert.deepStrictEqual(result, { spend: false, surface: false, reason: 'hash-identical', nextRecord: null });
+  });
+
+  test('hash-identical + lastSeenAt past the horizon -> reason sweep-not-seen, spend false, surface false, nextRecord null', () => {
+    // T2
+    const seenAt = new Date(NOW_MS - (DEFAULT_SWEEP_LIVENESS_HORIZON_MS + 1));
+    const args = hashIdenticalArgs({ lastSeenAt: seenAt });
+    const result = shouldSpendTurn(args);
+    assert.deepStrictEqual(result, {
+      spend: false,
+      surface: false,
+      reason: 'sweep-not-seen',
+      sweepLastSeenAt: seenAt.toISOString(),
+      nextRecord: null
+    });
+  });
+
+  test('no-delta + lastSeenAt past the horizon -> reason sweep-not-seen', () => {
+    // T3
+    const seenAt = new Date(NOW_MS - (DEFAULT_SWEEP_LIVENESS_HORIZON_MS + 1));
+    const args = noDeltaArgs({ lastSeenAt: seenAt });
+    const result = shouldSpendTurn(args);
+    assert.strictEqual(result.spend, false);
+    assert.strictEqual(result.surface, false);
+    assert.strictEqual(result.reason, 'sweep-not-seen');
+    assert.strictEqual(result.sweepLastSeenAt, seenAt.toISOString());
+    assert.strictEqual(result.nextRecord, null);
+  });
+
+  test('F1 REGRESSION: an arbitrarily ancient lastSeenAt never turns a spend into a no-spend', () => {
+    // T4 — parameterised over every spend-producing fixture already in this
+    // file, each run twice (fresh stamp vs new Date(0)) and deepStrictEqual'd
+    // against each other. Red against any implementation that puts liveness
+    // anywhere in the precedence chain ahead of the spend decision.
+    const spendCases = [
+      // different hash, new attention tuple (line ~153 above)
+      () => {
+        const priorSnapshot = { lanes: lanes({ terminal: 0 }), attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 };
+        const companionDoc = companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null, notes: 'prior notes' });
+        const doc = census({ stateHash: 'hNew', rev: 2, lanesState: lanes({ terminal: 0 }), attention: [attentionRow('loop-1', 'blocked', 'review')] });
+        return { currentCensusDoc: doc, companionDoc, now: 5000 };
+      },
+      // terminal delta > 0 (line ~191 above)
+      () => {
+        const priorSnapshot = { lanes: lanes({ terminal: 1 }), attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 };
+        const companionDoc = companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null });
+        const doc = census({ stateHash: 'hNew', rev: 2, lanesState: lanes({ terminal: 3 }), attention: [] });
+        return { currentCensusDoc: doc, companionDoc, now: 1000 };
+      },
+      // seed turn, attentionCount === 0 (line ~210 above)
+      () => {
+        const doc = census({ stateHash: 'hNew', rev: 1, lanesState: lanes({}), attention: [] });
+        return { currentCensusDoc: doc, companionDoc: COMPANION_SEED_STATE, now: 1000 };
+      },
+      // seed turn, attentionCount > 0 (line ~235 above)
+      () => {
+        const doc = census({ stateHash: 'hNew', rev: 1, lanesState: lanes({}), attention: [attentionRow('loop-1', 'blocked', 'review')] });
+        return { currentCensusDoc: doc, companionDoc: COMPANION_SEED_STATE, now: 1000 };
+      }
+    ];
+
+    for (const buildArgs of spendCases) {
+      const freshArgs = buildArgs();
+      freshArgs.currentCensusDoc = { ...freshArgs.currentCensusDoc, lastSeenAt: new Date(freshArgs.now) };
+      const freshResult = shouldSpendTurn(freshArgs);
+
+      const ancientArgs = buildArgs();
+      // Genuinely past DEFAULT_SWEEP_LIVENESS_HORIZON_MS relative to THIS
+      // fixture's own `now` (not epoch 0) — several of these fixtures use a
+      // `now` in the single-digit thousands, far smaller than the 1.8M ms
+      // horizon, so an absolute `new Date(0)` would never actually cross it.
+      ancientArgs.currentCensusDoc = { ...ancientArgs.currentCensusDoc, lastSeenAt: new Date(ancientArgs.now - DEFAULT_SWEEP_LIVENESS_HORIZON_MS - 1) };
+      const ancientResult = shouldSpendTurn(ancientArgs);
+
+      assert.strictEqual(freshResult.spend, true, 'sanity: the fixture must actually be spend-producing');
+      assert.deepStrictEqual(ancientResult, freshResult, 'an ancient lastSeenAt must never change a spend decision');
+    }
+  });
+
+  test('boundary: now - lastSeenAt === horizonMs -> sweep-not-seen; === horizonMs - 1 -> unchanged', () => {
+    // T5
+    const justInside = hashIdenticalArgs({ lastSeenAt: new Date(NOW_MS - (DEFAULT_SWEEP_LIVENESS_HORIZON_MS - 1)) });
+    assert.strictEqual(shouldSpendTurn(justInside).reason, 'hash-identical');
+
+    const atBoundary = hashIdenticalArgs({ lastSeenAt: new Date(NOW_MS - DEFAULT_SWEEP_LIVENESS_HORIZON_MS) });
+    assert.strictEqual(shouldSpendTurn(atBoundary).reason, 'sweep-not-seen');
+  });
+
+  test('an absent or unparseable lastSeenAt leaves the decision untouched', () => {
+    // T6 — fixture-inertness / fail-safe guard.
+    const noStamp = hashIdenticalArgs({});
+    delete noStamp.currentCensusDoc.lastSeenAt;
+    assert.strictEqual(shouldSpendTurn(noStamp).reason, 'hash-identical');
+
+    const unparseable = hashIdenticalArgs({ lastSeenAt: 'not-a-date' });
+    assert.strictEqual(shouldSpendTurn(unparseable).reason, 'hash-identical');
+
+    const nullStamp = hashIdenticalArgs({ lastSeenAt: null });
+    assert.strictEqual(shouldSpendTurn(nullStamp).reason, 'hash-identical');
+  });
+
+  test('turn-in-flight, floor, no-companion and no-census are never relabelled, however stale the stamp', () => {
+    // T7
+    const ancientSeen = new Date(0);
+
+    const noCensus = shouldSpendTurn({ currentCensusDoc: null, companionDoc: COMPANION_SEED_STATE, now: NOW_MS });
+    assert.strictEqual(noCensus.reason, 'no-census');
+
+    const noCompanionDoc = { ...census({ stateHash: 'h1' }), lastSeenAt: ancientSeen };
+    const noCompanion = shouldSpendTurn({ currentCensusDoc: noCompanionDoc, companionDoc: null, now: NOW_MS });
+    assert.strictEqual(noCompanion.reason, 'no-companion');
+
+    const tifCensus = { ...census({ stateHash: 'hNew', rev: 2, lanesState: lanes({}), attention: [attentionRow('loop-1', 'blocked', 'review')] }), lastSeenAt: ancientSeen };
+    const tifCompanion = companion({
+      lastCensusStateHash: 'hOld',
+      lastCensusSnapshot: { lanes: ZERO_LANES, attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 },
+      lastTurnAt: new Date(0).toISOString(),
+      turnReservedUntil: new Date(NOW_MS + 500_000).toISOString()
+    });
+    const tif = shouldSpendTurn({ currentCensusDoc: tifCensus, companionDoc: tifCompanion, now: NOW_MS });
+    assert.strictEqual(tif.reason, 'turn-in-flight');
+
+    const floorCensus = { ...census({ stateHash: 'hNew', rev: 2, lanesState: lanes({}), attention: [attentionRow('loop-1', 'blocked', 'review')] }), lastSeenAt: ancientSeen };
+    const floorCompanion = companion({
+      lastCensusStateHash: 'hOld',
+      lastCensusSnapshot: { lanes: ZERO_LANES, attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 },
+      lastTurnAt: new Date(NOW_MS - 1).toISOString()
+    });
+    const floor = shouldSpendTurn({ currentCensusDoc: floorCensus, companionDoc: floorCompanion, now: NOW_MS, floorMs: DEFAULT_COMPANION_FLOOR_MS });
+    assert.strictEqual(floor.reason, 'floor');
+  });
+
+  test('write-nothing-on-false invariant: a sweep-not-seen relabel still carries nextRecord: null', () => {
+    // T8
+    const seenAt = new Date(NOW_MS - (DEFAULT_SWEEP_LIVENESS_HORIZON_MS + 1));
+    const result = shouldSpendTurn(hashIdenticalArgs({ lastSeenAt: seenAt }));
+    assert.strictEqual(result.spend, false);
+    assert.strictEqual(result.surface, false);
+    assert.strictEqual(result.nextRecord, null);
+  });
+
+  test('a custom sweepHorizonMs is honoured', () => {
+    const seenAt = new Date(NOW_MS - 500);
+    const tightHorizon = hashIdenticalArgs({ lastSeenAt: seenAt });
+    tightHorizon.sweepHorizonMs = 100;
+    assert.strictEqual(shouldSpendTurn(tightHorizon).reason, 'sweep-not-seen');
   });
 });
