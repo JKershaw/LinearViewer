@@ -401,6 +401,7 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `repo` | string | Repository hint (e.g. `"owner/name"`) for the consumer to operate in, or `null` (nullable) |
 | `model` | string | **Execution** model the consumer should use to *run* this prompt (the value it passes to its own CLI, e.g. `claude --model`), or `null`. OpenRouter `provider/model` naming convention (e.g. `"anthropic/claude-opus-4.8"`). Opaque and forwarded blindly; `null` keeps the consumer's current default. See [Execution model](#execution-model-model) (nullable) |
 | `harness` | string | **Execution** harness the consumer should use to *run* this prompt (e.g. `"claude-code"`, `"opencode"`), or `null`. Opaque and forwarded blindly; `null` keeps the consumer's own default. See [Harness](#harness-harness) (nullable) |
+| `terminal` | string | **Terminal-emulator driver** the consumer should launch this session in (e.g. `"terminal"`, `"iterm"`, `"kitty"`, `"tmux"`), or `null`. Opaque and forwarded blindly; `null` keeps the consumer's own default. See [Terminal](#terminal-terminal) (nullable) |
 | `followUpTo` | string | The `id` of an earlier dispatch whose session this item should resume, or `null`. See [Follow-ups](#follow-ups) (nullable) |
 | `force` | boolean | When `true`, the consumer should **override a runner-side guard**: on a follow-up it resumes even a wedged/sleeping session; on a single abort it force-closes even a human-continued session. Defaults to `false`; meaningful only alongside `followUpTo` **or** a single `abort`, and never with `cascade`. See [Follow-ups](#follow-ups) / [Cascade close](#cascade-close-closing-a-session-subtree) |
 | `abort` | boolean | When `true`, this item asks the consumer to cancel/close an existing session (named by `abortTo`) instead of running a prompt. Defaults to `false`. See [Aborting a session](#aborting-a-session) |
@@ -726,6 +727,35 @@ prompt** — e.g. `"claude-code"` (the default in Simple Dispatcher today) or `"
 
 Both dispatch write verbs accept `harness`, mirroring `model`: `POST /api/dispatch` (user/UI)
 and, on the proxy, `POST /api/proxy/dispatch` and `POST /api/proxy/recommend-and-dispatch`.
+
+## Terminal (`terminal`)
+
+`terminal` lets a dispatch specify **which terminal-emulator driver the consumer/runner should
+launch the session in** — e.g. `"terminal"` (Terminal.app), `"iterm"`, `"kitty"`, or `"tmux"`
+(the headless driver). It is optional and nullable; omit it (or send `null`) to keep the
+consumer's own configured driver. See LIN-2452.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `terminal` | string | No | Terminal-emulator driver name, e.g. `"terminal"`, `"iterm"`, `"kitty"`, `"tmux"`. `null`/omitted ⇒ consumer default. |
+
+- **Opaque at the server boundary, same rigor as `harness`.** The dispatch store records and
+  forwards `terminal` verbatim. Validation is the same loose opaque-string check used for
+  `model`/`harness` — a string within the length limit and free of dangerous control
+  characters — via the shared `validateOpaqueDispatchField` helper. The server does **not**
+  enforce a driver registry; the consumer owns which drivers it actually supports, how it
+  validates the name, and what it falls back to.
+- **No Harbour-side default tier.** Unlike `model`/`harness`, Harbour never resolves a blank
+  `terminal` against workspace dispatch defaults, presets, or a follow-up's anchor — it is a
+  pure payload passthrough. A blank/omitted value is stored and forwarded as `null`, and the
+  runner's own precedence (per-dispatch override → its global `SD_TERMINAL`-style default)
+  applies from there.
+- **Inert until the runner reads it.** A server-side `terminal` is a no-op until the (external)
+  consumer reads `item.terminal` and selects a driver accordingly; a `null` value preserves
+  today's default behaviour, so existing runners are unaffected.
+
+`terminal` is accepted on the two main dispatch write verbs: `POST /api/dispatch` (user/UI) and
+`POST /api/proxy/dispatch`.
 
 ## Dispatch-time UI (model/harness)
 

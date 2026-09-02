@@ -78,6 +78,37 @@ describe('validateDispatchPayload — model/harness (opaque)', () => {
   });
 });
 
+describe('validateDispatchPayload — terminal (opaque, LIN-2452)', () => {
+  // Same rule as model/harness: type + length + dangerous chars, never a
+  // registry check — the runner owns the driver registry.
+  test('a valid driver name passes', () => {
+    assert.strictEqual(validateDispatchPayload({ prompt: 'x', terminal: 'tmux' }), null);
+  });
+  test('an unknown driver name still passes (not registry-checked)', () => {
+    assert.strictEqual(validateDispatchPayload({ prompt: 'x', terminal: 'some-future-driver' }), null);
+  });
+  test('null/omitted is absent (valid)', () => {
+    assert.strictEqual(validateDispatchPayload({ prompt: 'x', terminal: null }), null);
+    assert.strictEqual(validateDispatchPayload({ prompt: 'x' }), null);
+  });
+  test('non-string terminal rejected', () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', terminal: 42 }),
+      { error: 'terminal must be a string' });
+  });
+  test('over-length terminal rejected', () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', terminal: 'a'.repeat(1001) }),
+      { error: 'terminal exceeds maximum length of 1000' });
+  });
+  test('terminal with a control char rejected', () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', terminal: 'tmux\x00' }),
+      { error: 'terminal contains invalid characters' });
+  });
+  test('terminal is checked after harness (first-error order)', () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', harness: 42, terminal: 42 }),
+      { error: 'harness must be a string' });
+  });
+});
+
 describe('validateDispatchPayload — dangerous chars', () => {
   test('prompt with a null byte', () => {
     assert.deepEqual(validateDispatchPayload({ prompt: 'bad\x00prompt' }),
