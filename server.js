@@ -26,7 +26,7 @@ import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-p
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey, getUnattendedOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { getWorkspaceNorthStar as resolveNorthStar, getWorkspaceNorthStarDocVersion as resolveNorthStarDocVersion } from './lib/north-star-resolver.js'
 import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
-import { refreshOwnerWorkspaceToken, refreshOwnerCredential } from './lib/workspace-token-refresh.js'
+import { refreshOwnerWorkspaceToken, refreshOwnerCredential, convergeOnStored } from './lib/workspace-token-refresh.js'
 import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
 import { CREDENTIAL_SOURCES, fingerprintCredential } from './lib/credential-diagnostics.js'
 import { createRejectedCredentialRegistry } from './lib/rejected-credentials.js'
@@ -2124,6 +2124,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
       fingerprint: cachedFingerprint,
       urlKey,
       ownerAccountId,
+      provider: cached.provider,
       loadSessions: () => sessionsCollection.find({}).toArray(),
     });
     if (recovered) {
@@ -2148,6 +2149,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
         fingerprint: selectedFingerprint,
         urlKey,
         ownerAccountId,
+        provider: selected.provider,
         loadSessions: () => Promise.resolve(sessions),
       });
       if (recovered) {
@@ -2298,12 +2300,47 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
  * every request (each new fingerprint starts with no attempt history of its
  * own), since `accept()` deletes the superseded fingerprint's cooldown entry.
  *
- * @param {{fingerprint: string|null, urlKey: string, ownerAccountId: string|symbol, loadSessions: () => Promise<Array>}} args
+ * @param {{fingerprint: string|null, urlKey: string, ownerAccountId: string|symbol, provider: string, loadSessions: () => Promise<Array>}} args
  * @returns {Promise<{token: *, expiresAt: number, provider: string, scope: *, credentialFingerprint: string}|null>}
  */
-async function attemptSuspectCredentialRefresh({ fingerprint, urlKey, ownerAccountId, loadSessions }) {
+async function attemptSuspectCredentialRefresh({ fingerprint, urlKey, ownerAccountId, provider, loadSessions }) {
   if (ownerAccountId === UNSCOPED) return null;
   if (!rejectedCredentialRegistry.isSuspect(fingerprint)) return null;
+
+  // LIN-2473 (Fix A): before spending the 60s-gated OAuth exchange below, do
+  // one durable point-read to see whether the store already holds a NEWER
+  // credential than the one that was just rejected — the self-sustaining
+  // rotate/reject/rotate cycle the diagnosis traced: a concurrent rotation
+  // winner (or a human re-login) supersedes the copy this lane cached/
+  // selected, and without this check the only remedy was to rotate AGAIN,
+  // invalidating whoever just superseded it. This spends no refresh token,
+  // never rotates, and never consumes the shouldAttemptRefresh cooldown
+  // below — a differing fingerprint is adopted for free. A store miss, a
+  // tokenless record, or a SAME fingerprint (nothing to adopt) falls through
+  // to today's gated exchange unchanged.
+  // LIN-2473 (Fix A): before spending the 60s-gated OAuth exchange below, do
+  // one durable point-read to see whether the store already holds a NEWER
+  // credential than the one that was just rejected — the self-sustaining
+  // rotate/reject/rotate cycle the diagnosis traced: a concurrent rotation
+  // winner (or a human re-login) supersedes the copy this lane cached/
+  // selected, and without this check the only remedy was to rotate AGAIN,
+  // invalidating whoever just superseded it. This spends no refresh token,
+  // never rotates, and never consumes the shouldAttemptRefresh cooldown
+  // below — a differing fingerprint is adopted for free. A store miss, a
+  // tokenless record, or a SAME fingerprint (nothing to adopt) falls through
+  // to today's gated exchange unchanged.
+  try {
+    const durable = await ownerCredentialStore.get(ownerAccountId, urlKey, provider);
+    if (durable?.token) {
+      const durableFingerprint = fingerprintCredential(durable.token);
+      if (durableFingerprint !== fingerprint) {
+        return { ...convergeOnStored(durable), credentialFingerprint: durableFingerprint };
+      }
+    }
+  } catch (err) {
+    console.error(`Durable point-read for suspect-credential adoption failed for workspace ${urlKey}:`, err);
+  }
+
   if (!rejectedCredentialRegistry.shouldAttemptRefresh(fingerprint, `${ownerAccountId}:${urlKey}`)) return null;
   try {
     const sessions = await loadSessions();

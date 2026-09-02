@@ -20,8 +20,8 @@ import {
 
 const NOW = Date.parse('2026-08-16T20:45:00.000Z');
 
-function row(offsetMsBeforeNow, status, stage = STAGE_PROVIDER_LANE) {
-  return { status, stage, timestamp: new Date(NOW - offsetMsBeforeNow) };
+function row(offsetMsBeforeNow, status, stage = STAGE_PROVIDER_LANE, credentialFingerprint = null) {
+  return { status, stage, timestamp: new Date(NOW - offsetMsBeforeNow), credentialFingerprint };
 }
 
 describe('resolveOccupancyWindow', () => {
@@ -121,5 +121,36 @@ describe('providerLaneOccupancy', () => {
 
   test('default bucket width is 30 seconds', () => {
     assert.equal(OCCUPANCY_BUCKET_MS, 30_000);
+  });
+
+  // LIN-2473: `credential-health` read 'ok' immediately after an observed
+  // provider-lane 503 rejection, because this detector only ever counted a
+  // 401 as faulting. LIN-2216 can reclassify a transient provider-lane
+  // rejection as a 503 (routes/proxy.js's logEvent labels this exact shape
+  // 'provider-503-transient' — a credential resolved and Linear rejected it
+  // anyway) — a fix that turns every 401 into one of these would otherwise
+  // make this endpoint read permanently green while the lane still flaps.
+  test('degraded when a provider-lane 503 carries a credentialFingerprint — the LIN-2216 transient-provider-auth shape', () => {
+    const rows = [row(1000, 503, STAGE_PROVIDER_LANE, 'fp-abc123'), row(35_000, 200), row(65_000, 200)];
+    const result = providerLaneOccupancy(rows, { now: NOW, windowMs: 120_000 });
+    assert.equal(result.verdict, 'degraded');
+    assert.equal(result.bucketsFaulting, 1);
+    assert.equal(result.failedCalls, 1);
+  });
+
+  test('a fingerprinted 503 counts toward failedCalls/callRatio exactly like a 401 does', () => {
+    const rows = [row(1000, 503, STAGE_PROVIDER_LANE, 'fp-abc123'), row(35_000, 200)];
+    const result = providerLaneOccupancy(rows, { now: NOW, windowMs: 120_000 });
+    assert.equal(result.totalCalls, 2);
+    assert.equal(result.failedCalls, 1);
+    assert.equal(result.callRatio, 0.5);
+  });
+
+  test('a provider-lane 503 with NO credentialFingerprint is not counted — a bare resolution failure is a different fault class, still invisible here by design', () => {
+    const rows = [row(1000, 503, STAGE_PROVIDER_LANE, null), row(35_000, 200), row(65_000, 200)];
+    const result = providerLaneOccupancy(rows, { now: NOW, windowMs: 120_000 });
+    assert.equal(result.verdict, 'ok');
+    assert.equal(result.bucketsFaulting, 0);
+    assert.equal(result.failedCalls, 0);
   });
 });
