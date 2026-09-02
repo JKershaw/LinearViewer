@@ -33,12 +33,12 @@ function catalogRawFromTable() {
 
 describe('findPricingConformanceViolations', () => {
   test('empty catalog ⇒ not verified, zero violations, zero checked — never reads as "all clear"', () => {
-    assert.deepStrictEqual(findPricingConformanceViolations([]), { verified: false, violations: [], checked: 0 });
+    assert.deepStrictEqual(findPricingConformanceViolations([]), { verified: false, violations: [], checked: 0, comparisons: 0 });
   });
 
   test('non-array input ⇒ not verified (defensive)', () => {
-    assert.deepStrictEqual(findPricingConformanceViolations(null), { verified: false, violations: [], checked: 0 });
-    assert.deepStrictEqual(findPricingConformanceViolations(undefined), { verified: false, violations: [], checked: 0 });
+    assert.deepStrictEqual(findPricingConformanceViolations(null), { verified: false, violations: [], checked: 0, comparisons: 0 });
+    assert.deepStrictEqual(findPricingConformanceViolations(undefined), { verified: false, violations: [], checked: 0, comparisons: 0 });
   });
 
   test('a catalog matching the table exactly ⇒ verified, zero violations', () => {
@@ -141,6 +141,32 @@ describe('createPricingConformanceSweepRun', () => {
     assert.strictEqual(calls.error.length, 1);
     assert.match(calls.error[0][0], /violation/);
     assert.match(calls.error[0][0], /gpt-5\.6-sol/);
+  });
+
+  test('rows matched but pricing fields renamed upstream ⇒ zero tier comparisons, warn branch, never a silent all-clear', async () => {
+    const { logger, calls } = fakeLogger();
+    // Every row matches by id and carries a non-null pricing object, but the
+    // field names inside it were renamed upstream — no TIER_MAP field lines
+    // up, so every tier is skipped and zero comparisons happen despite
+    // checked > 0.
+    const catalog = Object.entries(MODEL_PRICING).map(([id, rate]) => ({
+      id,
+      name: id,
+      pricing: {
+        input_price: String(rate.prompt / 1e6),
+        output_price: String(rate.completion / 1e6),
+      },
+    }));
+    const pure = findPricingConformanceViolations(catalog);
+    assert.ok(pure.checked > 0);
+    assert.strictEqual(pure.comparisons, 0);
+
+    const run = createPricingConformanceSweepRun({ getCatalog: async () => catalog, logger });
+    await run();
+    assert.strictEqual(calls.warn.length, 1);
+    assert.match(calls.warn[0][0], /not verified this tick/);
+    assert.match(calls.warn[0][0], /zero tier comparisons/);
+    assert.strictEqual(calls.error.length, 0);
   });
 
   test('a throwing getCatalog is swallowed — the wrapper never rejects', async () => {
