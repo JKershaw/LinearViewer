@@ -780,7 +780,7 @@ describe('renderKpisPage: cost-per-terminal-marked-task card (LIN-1958)', () => 
       }
     }));
     assert.ok(
-      html.includes('<span class="kpi-cost-shares-ignorance-basis">of 2 with a lineage (23 no-lineage excluded)</span>'),
+      html.includes('<span class="kpi-cost-shares-ignorance-basis">of 2 with a lineage (23 no-lineage excluded) · opencode share also excludes issues with no declared harness</span>'),
       'the ignorance basis must name the lineage-bearing population (issueCount - laneLandedCount = 2), not the headline count'
     );
     // Kills the exact mutation the review measured as surviving CI.

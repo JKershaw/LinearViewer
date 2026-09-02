@@ -73,7 +73,14 @@ a.kpi-headline-value:hover {
    `.kpi-cost-shares` span in two: the goodness group stays denominated over
    `issueCount` (named by the sample line above it), while the ignorance
    group carries its own basis span naming the `lineageBearingCount`
-   denominator it actually uses. */
+   denominator it actually uses. LIN-2419 widened `opencodeSummed`/
+   `unknownHarness` to a three-valued (`true|false|'unknown'`) domain, so the
+   two ignorance shares no longer share ONE denominator: `unknownHarnessShare`
+   is still exactly `lineageBearingCount`, but `opencodeSummedShare`'s known
+   population is narrower (a lineage with no declared harness is unknown for
+   that share too). The basis span states `lineageBearingCount` exactly and
+   qualifies the opencode share's narrower basis in words only — publishing
+   its exact count is a deferred follow-up, not a rule change here. */
 .kpi-cost-card {
   display: flex;
   flex-direction: column;

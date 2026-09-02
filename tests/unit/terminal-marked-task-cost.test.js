@@ -802,6 +802,100 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     assert.equal(n23.result.unknownHarnessShare, n0.result.unknownHarnessShare, 'unknownHarnessShare must not move as noLineage tickets are added (N=23 vs N=0)');
     assert.equal(n2.result.opencodeSummedShare, n0.result.opencodeSummedShare, 'opencodeSummedShare must not move as noLineage tickets are added (N=2 vs N=0)');
     assert.equal(n23.result.opencodeSummedShare, n0.result.opencodeSummedShare, 'opencodeSummedShare must not move as noLineage tickets are added (N=23 vs N=0)');
+
+    // LIN-2419: absolute anchors, so this fixture pins WHICH truthful value
+    // it is invariant at, not just that it doesn't move. The two-anchor base
+    // fleet is LIN-9000 (harness: null — provenance UNKNOWN for
+    // opencodeSummed, known-true for unknownHarness) and LIN-9001 (harness:
+    // 'opencode' — known-true for opencodeSummed, known-false for
+    // unknownHarness). opencodeSummedShare's known population is LIN-9001
+    // alone (1/1 = 1), a truthful narrowing from the pre-LIN-2419 0.5 that
+    // silently treated LIN-9000's unknown provenance as a known "not
+    // opencode-summed". unknownHarnessShare's known population is both
+    // anchors (1/2 = 0.5) — unchanged from the old LIN-2418 outcome.
+    assert.equal(n0.result.opencodeSummedShare, 1, 'of the one issue whose harness is known, all of it was opencode-summed');
+    assert.equal(n0.result.unknownHarnessShare, 0.5, 'must match the pre-LIN-2419 LIN-2418 outcome exactly');
+  });
+
+  test('P1b (LIN-2419) — opencodeSummedShare stays truthful as unknown-harness (but lineage-bearing) anchors grow; the regression LIN-2418 never covered', () => {
+    // Fleet: 1 opencode anchor + 1 claude-code anchor + M lineage-bearing
+    // anchors with harness: null, and ZERO noLineage tickets anywhere — this
+    // is the dimension LIN-2418's exclusion never touched (it only ever
+    // excluded lane-landed, no-lineage tickets). At HEAD (pre-LIN-2419) this
+    // fixture collapses opencodeSummedShare 0.5 -> 0.25 -> 0.04 across
+    // M = 0 -> 2 -> 23 — the same 12.5x dilution LIN-2253 Rev 2's R1 finding
+    // measured, live on `main` today with no lane-landed ticket in sight.
+    function buildFleet(m) {
+      const opencodeAnchor = row({
+        id: 'p1b-opencode', issueIdentifier: 'LIN-9400', harness: 'opencode', dispatchedAt: daysAgo(2),
+        feedback: [usageEntry({ costUsd: 1, lane: 'api', days: 1.9 }), doneMarker(1.8)]
+      });
+      const claudeAnchor = row({
+        id: 'p1b-claude', issueIdentifier: 'LIN-9401', harness: 'claude-code', dispatchedAt: daysAgo(2),
+        feedback: [usageEntry({ costUsd: 1, days: 1.9 }), doneMarker(1.8)]
+      });
+      const unknownAnchors = [];
+      for (let i = 0; i < m; i++) {
+        const id = `LIN-95${String(i).padStart(2, '0')}`;
+        unknownAnchors.push(row({
+          id: `p1b-unknown-${i}`, issueIdentifier: id, harness: null, dispatchedAt: daysAgo(1),
+          feedback: [usageEntry({ costUsd: 1, days: 0.9 }), doneMarker(0.8)]
+        }));
+      }
+      return [opencodeAnchor, claudeAnchor, ...unknownAnchors];
+    }
+
+    const results = [0, 2, 23].map(m => ({ m, result: computeTerminalMarkedTaskCost(buildFleet(m), NOW) }));
+
+    for (const { m, result } of results) {
+      // Non-vacuity: this must be a lineage-bearing population growing, not
+      // the LIN-2418 lane-landed one — a "fix" that only re-implements
+      // LIN-2418's exclusion cannot satisfy this and the share assertion
+      // below at the same time.
+      assert.equal(result.issueCount, 2 + m, `issueCount must grow by M at M=${m}`);
+      assert.equal(result.laneLandedCount, 0, `no lane-landed ticket anywhere in this fixture at M=${m}`);
+      assert.equal(result.opencodeSummedShare, 0.5, `opencodeSummedShare must stay truthful (1 of 2 known-harness anchors) at M=${m} — HEAD collapses this to 0.5/0.25/0.04`);
+    }
+
+    // Co-assertion the fixture is genuinely live and the two shares are
+    // independent: unknownHarnessShare DOES move as the unknown-harness
+    // population grows (it is denominated over ALL lineage-bearing issues,
+    // known-harness and unknown-harness alike), unlike opencodeSummedShare
+    // (denominated only over the known-harness subset).
+    const [m0, m2, m23] = results;
+    assert.equal(m0.result.unknownHarnessShare, 0, 'M=0: no unknown-harness anchors yet');
+    assert.equal(m2.result.unknownHarnessShare, 0.5, 'M=2: 2 of 4 anchors are unknown-harness');
+    assert.equal(m23.result.unknownHarnessShare, 0.92, 'M=23: 23 of 25 anchors are unknown-harness');
+  });
+
+  test('LIN-2419 fold — an issue carrying both an opencode lineage and a null-harness lineage stays known-true for opencodeSummed, never demoted to unknown', () => {
+    // Pins Kleene strong-OR against the rejected "unknown dominates true"
+    // variant: a genuinely known approximation must never be demoted to
+    // unknown by a sibling lineage's ignorance.
+    // Two SEPARATE lineages (distinct rootItemId) sharing one issueIdentifier
+    // — an issue can carry more than one DONE lineage (module doc, `:203-206`)
+    // — not two rows merged into one lineage (a single lineage's harness is
+    // captured from its earliest row only, kpi-stats.js `:515-521`, so two
+    // rows under one rootItemId could never disagree on harness).
+    const opencodeLineage = row({
+      id: 'fold-opencode', rootItemId: 'fold-opencode', issueIdentifier: 'LIN-9600', harness: 'opencode', dispatchedAt: daysAgo(2),
+      feedback: [usageEntry({ costUsd: 1, lane: 'api', days: 1.9 }), doneMarker(1.8)]
+    });
+    const unknownLineage = row({
+      id: 'fold-unknown', rootItemId: 'fold-unknown', issueIdentifier: 'LIN-9600', harness: null, dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 1, days: 0.9 }), doneMarker(0.8)]
+    });
+    const control = row({
+      id: 'fold-control', issueIdentifier: 'LIN-9601', harness: null, dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 1, days: 0.9 }), doneMarker(0.8)]
+    });
+    const result = computeTerminalMarkedTaskCost([opencodeLineage, unknownLineage, control], NOW);
+
+    assert.equal(result.issueCount, 2, 'non-vacuity: two distinct issues, one mixed-lineage and one control');
+    // The mixed issue (LIN-9600) is known-opencode-summed; the control
+    // (LIN-9601, harness: null only) is unknown — so the known population is
+    // exactly {LIN-9600}, and it is a known true.
+    assert.equal(result.opencodeSummedShare, 1, 'the mixed issue must count as known-true, not unknown — Kleene OR, true dominates');
   });
 
   test('P2 — a fleet where every issue is noLineage publishes null, never 0, for both shares', () => {
@@ -828,6 +922,27 @@ describe('computeTerminalMarkedTaskCost — LIN-2418: denominator excludes noLin
     // already pins it on the render side).
     assert.equal(result.unknownHarnessShare, null, 'must be null, not 0, over a population the system knows nothing about');
     assert.equal(result.opencodeSummedShare, null, 'must be null, not 0, over a population the system knows nothing about');
+  });
+
+  test('P2b (LIN-2419) — every issue HAS a lineage, but none declares a harness: opencodeSummedShare publishes null, never a confident 0', () => {
+    // The other decisive shape the ticket names: at HEAD (pre-LIN-2419) this
+    // fleet publishes opencodeSummedShare: 0 — a definite "no approximation
+    // anywhere" — beside unknownHarnessShare: 1, two mutually contradictory
+    // claims about the same population's provenance. Every issue here has a
+    // real lineage (laneLandedCount must be 0, unlike P2 above), so the old
+    // `lineageBearingCount` denominator would have included every one of
+    // them and averaged their known-false-by-seed opencodeSummed into a
+    // false, confident 0.
+    const anchors = [0, 1, 2].map(i => row({
+      id: `p2b-${i}`, issueIdentifier: `LIN-97${String(i).padStart(2, '0')}`, harness: null, dispatchedAt: daysAgo(1),
+      feedback: [usageEntry({ costUsd: 1, days: 0.9 }), doneMarker(0.8)]
+    }));
+    const result = computeTerminalMarkedTaskCost(anchors, NOW);
+
+    assert.equal(result.issueCount, 3, 'non-vacuity: the fleet must genuinely contain issues');
+    assert.equal(result.laneLandedCount, 0, 'non-vacuity: every issue has a real lineage — this is NOT the P2 shape');
+    assert.equal(result.unknownHarnessShare, 1, 'every declared lineage has no harness — a genuine, known 1');
+    assert.equal(result.opencodeSummedShare, null, 'must be null — the system has no known-harness issue to say yes or no about, never a confident 0');
   });
 });
 
