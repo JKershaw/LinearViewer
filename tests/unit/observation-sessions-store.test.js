@@ -92,9 +92,9 @@ test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it reb
   const store = new ObservationSessionsStore({ collection });
   await store.upsertSession(URL_KEY, makeSession('S1'));
 
-  // The pin tracks the CURRENT version (LIN-1789 moved it 6 → 7); a lingering v3
+  // The pin tracks the CURRENT version (LIN-2403 moved it 10 → 11); a lingering v3
   // archive doc from before LIN-1487 must still miss on both reads.
-  assert.equal(BUILDER_VERSION, 10, 'this bump-specific pin tracks the current version');
+  assert.equal(BUILDER_VERSION, 11, 'this bump-specific pin tracks the current version');
   const doc = collection._docs.find(d => d.type === 'session');
   doc.builderVersion = 3;
 
