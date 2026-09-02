@@ -2295,11 +2295,14 @@ body.is-landing {
 }
 
 .error-title {
+  /* Promoted from a <div> to a heading (LIN-2401) for screen-reader heading
+     navigation; reset the UA default heading margin so the render stays
+     byte-for-byte identical to the old div's zero margin. */
+  margin: 0 0 var(--space-3);
   font-family: var(--font-content);
   font-size: 1.25rem;
   font-weight: 500;
   color: var(--fg);
-  margin-bottom: var(--space-3);
 }
 
 .error-message {
