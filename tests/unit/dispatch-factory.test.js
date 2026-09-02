@@ -514,7 +514,7 @@ describe('createDispatchItem — field passthrough', () => {
     assert.deepEqual(store.captured.item, {
       promptName: 'Triage', issueIdentifier: 'LIN-9', target: 'cli',
       dispatchedBy: 'u1', force: true, waitForFollowUps: true,
-      prompt: 'x', kind: 'triage', model: null, harness: 'claude-code', bootstrapToken: null,
+      prompt: 'x', kind: 'triage', model: null, harness: 'claude-code', terminal: null, bootstrapToken: null,
       presetConfig: null, presetName: null,
     });
     assert.equal(store.captured.urlKey, 'acme');
@@ -1314,5 +1314,54 @@ describe('createDispatchItem — task-budget guard, entry gate (LIN-1751)', () =
     dupStore.getItemStatus = async (_urlKey, id) => (id === 'run-1' ? { maxTasks: null } : null);
     await freshDispatch(dupStore, { fields: { sessionId: 'run-1', force: true } });
     assert.equal(dupStore.lookupCalls, 0, 'force still bypasses the duplicate guard entry gate');
+  });
+});
+
+// LIN-2452 — `terminal` (the runner's terminal-emulator driver name) is a pure
+// payload passthrough at this seam. Unlike model/harness there is deliberately
+// NO precedence chain here: no preset, workspace-default, anchor inheritance or
+// interposed default — the runner owns the registry, validation and defaulting.
+describe('createDispatchItem — terminal passthrough (LIN-2452)', () => {
+  test('an explicit terminal is handed to addItem verbatim', async () => {
+    const store = capturingStore();
+    await createDispatchItem({ store, urlKey: 'acme', kind: 'implementation', terminal: 'tmux', prompt: 'x' });
+    assert.equal(store.captured.item.terminal, 'tmux');
+  });
+
+  test('an omitted terminal is null (never undefined)', async () => {
+    const store = capturingStore();
+    await createDispatchItem({ store, urlKey: 'acme', kind: 'implementation', prompt: 'x' });
+    assert.strictEqual(store.captured.item.terminal, null);
+  });
+
+  test('a blank terminal is null', async () => {
+    const store = capturingStore();
+    await createDispatchItem({ store, urlKey: 'acme', kind: 'implementation', terminal: '', prompt: 'x' });
+    assert.strictEqual(store.captured.item.terminal, null);
+  });
+
+  test('workspace dispatchDefaults and presets do NOT fill a blank terminal', async () => {
+    // Guard against a future "helpful" default: dispatchDefaults carry
+    // model/harness only, and the factory must not grow a terminal tier.
+    const store = capturingStore();
+    const prefs = await prefsWith({ model: 'ws-model', harness: 'ws-harness', terminal: 'ws-terminal' });
+    const presets = presetsStoreWith({
+      p1: { id: 'p1', name: 'P', config: { model: 'preset-model', harness: 'preset-harness', terminal: 'preset-terminal' } }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', workspacePreferencesStore: prefs, dispatchPresetsStore: presets,
+      presetId: 'p1', kind: 'autopilot', prompt: 'x'
+    });
+    assert.strictEqual(store.captured.item.terminal, null);
+  });
+
+  test('a follow-up does NOT inherit the anchor terminal', async () => {
+    const store = capturingStoreWithItems({
+      'anchor-1': { id: 'anchor-1', kind: 'implementation', harness: 'claude-code', terminal: 'kitty', issueIdentifier: 'LIN-1' }
+    });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'custom', prompt: 'x', fields: { followUpTo: 'anchor-1' }
+    });
+    assert.strictEqual(store.captured.item.terminal, null);
   });
 });

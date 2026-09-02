@@ -192,3 +192,92 @@ test('harness is opaque — survives verbatim alongside model', async () => {
   assert.equal(taken.harness, 'opencode');
   assert.equal(taken.model, 'openai/gpt-5.4-mini');
 });
+
+// `terminal` (LIN-2452) is the third opaque execution field: the terminal
+// emulator driver the runner should launch the session in. Same plumbing as
+// `harness` — stored + forwarded blindly, null when absent, never interpreted.
+const TERMINAL = 'tmux';
+
+test('addItem persists terminal on the stored doc', async () => {
+  const store = makeStore();
+
+  const doc = await store.addItem('acme', { prompt: 'run me', terminal: TERMINAL });
+
+  assert.equal(doc.terminal, TERMINAL);
+});
+
+test('addItem defaults terminal to null (not undefined) when absent', async () => {
+  const store = makeStore();
+
+  const doc = await store.addItem('acme', { prompt: 'fresh task' });
+
+  assert.strictEqual(doc.terminal, null);
+});
+
+test('addItem coerces a falsy/omitted terminal to null', async () => {
+  const store = makeStore();
+
+  const doc = await store.addItem('acme', { prompt: 'fresh task', terminal: '' });
+
+  assert.strictEqual(doc.terminal, null);
+});
+
+test('the _formatItem seam (poll/listItems) exposes terminal to the consumer', async () => {
+  const store = makeStore();
+  await store.addItem('acme', { prompt: 'run me', terminal: TERMINAL });
+
+  const items = await store.pollAvailable('acme');
+
+  assert.equal(items.length, 1);
+  assert.equal(items[0].terminal, TERMINAL);
+});
+
+test('takeItem (the other _formatItem path) hands terminal to the consumer', async () => {
+  const store = makeStore();
+  const created = await store.addItem('acme', { prompt: 'run me', terminal: TERMINAL });
+
+  const taken = await store.takeItem(created._id, 'acme');
+
+  assert.equal(taken.terminal, TERMINAL);
+});
+
+test('terminal is carried into history (watch status + history list)', async () => {
+  const store = makeStore();
+  const created = await store.addItem('acme', { prompt: 'run me', terminal: TERMINAL });
+
+  // takeItem archives the doc to history.
+  await store.takeItem(created._id, 'acme');
+
+  const status = await store.getItemStatus('acme', created._id);
+  assert.equal(status.terminal, TERMINAL);
+
+  const { items } = await store.listHistory('acme');
+  assert.equal(items.length, 1);
+  assert.equal(items[0].terminal, TERMINAL);
+});
+
+test('a dispatch with no terminal reads terminal:null at every seam', async () => {
+  const store = makeStore();
+  const created = await store.addItem('acme', { prompt: 'run me' });
+
+  const polled = await store.pollAvailable('acme');
+  assert.strictEqual(polled[0].terminal, null);
+
+  const taken = await store.takeItem(created._id, 'acme');
+  assert.strictEqual(taken.terminal, null);
+
+  const { items } = await store.listHistory('acme');
+  assert.strictEqual(items[0].terminal, null);
+});
+
+test('terminal is opaque — survives verbatim alongside model and harness', async () => {
+  const store = makeStore();
+  // The store must not parse, normalize, or registry-check the value; the
+  // runner owns the driver registry, validation and defaulting.
+  const created = await store.addItem('acme', { prompt: 'run me', terminal: 'kitty', harness: 'claude-code', model: 'some-provider/some-model' });
+
+  const taken = await store.takeItem(created._id, 'acme');
+  assert.equal(taken.terminal, 'kitty');
+  assert.equal(taken.harness, 'claude-code');
+  assert.equal(taken.model, 'some-provider/some-model');
+});

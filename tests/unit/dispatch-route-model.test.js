@@ -186,3 +186,71 @@ describe('LIN-1084 — user-facing /api/dispatch carries the execution harness',
     assert.equal(captured.item.harness, HARNESS);
   });
 });
+
+describe('LIN-2452 — user-facing /api/dispatch carries the opaque terminal driver', () => {
+  // Same shape as `harness` above: opaque string, length + safety validated,
+  // no registry check, forwarded blindly. No Harbour-side default — omitted
+  // stays null and the runner owns defaulting.
+  const TERMINAL = 'tmux';
+
+  test('an explicit terminal is forwarded to the dispatch item', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', PATH, { prompt: 'run me', terminal: TERMINAL });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.terminal, TERMINAL);
+  });
+
+  test('an omitted terminal becomes null', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', PATH, { prompt: 'run me' });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.strictEqual(captured.item.terminal, null);
+  });
+
+  test('a non-string terminal is rejected with 400', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', PATH, { prompt: 'run me', terminal: 42 });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /terminal must be a string/);
+  });
+
+  test('an over-length terminal is rejected with 400', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', PATH, { prompt: 'run me', terminal: 'x'.repeat(1001) });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /terminal exceeds maximum length/);
+  });
+
+  test('a terminal with dangerous control characters is rejected with 400', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', PATH, { prompt: 'run me', terminal: 'tmux\x00' });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /terminal contains invalid characters/);
+  });
+
+  test('terminal: 0 (a falsy non-string) is rejected with 400', async () => {
+    const app = buildApp({});
+    const res = await call(app, 'post', PATH, { prompt: 'run me', terminal: 0 });
+
+    assert.equal(res.status, 400, `expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.match(res.body.error, /terminal must be a string/);
+  });
+
+  test('model, harness and terminal are forwarded together', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', PATH, { prompt: 'run me', model: MODEL, harness: HARNESS, terminal: TERMINAL });
+
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.model, MODEL);
+    assert.equal(captured.item.harness, HARNESS);
+    assert.equal(captured.item.terminal, TERMINAL);
+  });
+});

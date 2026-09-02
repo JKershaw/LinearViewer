@@ -586,6 +586,7 @@ function formatDispatchWatch(item, meta = null) {
     target: item.target,
     model: item.model || null,
     harness: item.harness || null,
+    terminal: item.terminal || null,
     presetName: item.presetName || null,
     followUpTo: item.followUpTo || null,
     force: item.force === true,
@@ -2287,10 +2288,11 @@ POST ${baseUrl}/api/proxy/agent/status   (alias: /api/proxy/foreman/status — d
 ## Dispatch Endpoints
 
 POST ${baseUrl}/api/proxy/dispatch
-  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "model": "anthropic/claude-opus-4.8", "harness": "opencode", "followUpTo": "...", "force": false, "abort": false, "abortTo": "...", "cascade": false, "sessionId": "...", "periodicalId": "documentation-review", "waitForFollowUps": false, "appendProxyContext": true }
+  Body: { "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli|web|dash", "repo": "...", "model": "anthropic/claude-opus-4.8", "harness": "opencode", "terminal": "terminal", "followUpTo": "...", "force": false, "abort": false, "abortTo": "...", "cascade": false, "sessionId": "...", "periodicalId": "documentation-review", "waitForFollowUps": false, "appendProxyContext": true }
   → Queue a prompt for the workspace's dispatch consumer (the runner). Only "prompt" is required; target defaults to "cli". ("local"/Harbour OS is not available to proxy consumers.)
   → "model" (optional) is the EXECUTION model the runner should use to RUN this prompt — the value it passes to its own CLI (e.g. "claude --model") — NOT the server-side generation model that WRITES prompts. Use the OpenRouter naming convention: "provider/model" IDs like "anthropic/claude-opus-4.8" or "openai/gpt-5.4-mini". Treated as an opaque string (length + safety validated, no registry check) and forwarded blindly; translating it to the agent's own flag is the runner's job (Claude Code maps "anthropic/claude-opus-4.8" → "--model opus"; OpenRouter-native runners pass it through). Omit it (or null) to keep the consumer's current default (e.g. Opus). See LIN-438.
   → "harness" (optional) is the EXECUTION harness the runner should use to RUN this prompt — e.g. "claude-code" (the default) or "opencode". Like "model" it is an opaque string (length + safety validated, no registry check) and forwarded blindly; the runner owns its own harness registry and defaulting. Combine with "model" to run a specific OpenRouter-backed model through a non-default harness (e.g. "harness": "opencode", "model": "openai/gpt-5.4-mini"). Omit it (or null) to keep the consumer's own default/precedence chain — Harbour does not interpose a per-workspace default here. See LIN-1084.
+  → "terminal" (optional) is the TERMINAL-EMULATOR DRIVER the runner should launch this session in — e.g. "terminal" (Terminal.app), "iterm", "kitty" or "tmux" (headless). Like "harness" it is an opaque string (length + safety validated, no registry check) and forwarded blindly; the runner owns its own driver registry, validation and defaulting, and Harbour never interprets or defaults it (there is no workspace-default tier for this field). Omit it (or null) to keep the runner's own configured driver. See LIN-2452.
   → "kind" is a stable task classification (research/plan/implementation/review/etc. — the prompt-template keys, plus "custom"). Optional: when omitted it is derived from "promptName", falling back to "custom". Read it instead of inferring the task type from promptName or the prompt body.
   → "followUpTo" (optional) resumes an existing session: pass the "id" of an earlier dispatch and "prompt" becomes a follow-up instruction to that same session. cli/web only, same workspace. The runner owns session liveness — if the session is gone it posts terminal "[failed] no live session to resume". Use sparingly: only when the prior session ran cleanly and naturally suggests the next step (e.g. confirm CI is green, update the workspace/git); any wobble → dispatch a fresh session instead.
   → "force" (optional, default false) overrides a guard, so it is meaningful alongside a verb that HAS one — and ONLY such a verb (a bare "force": true with no "followUpTo", no "abort" and no "issueIdentifier" is rejected 400 "force requires followUpTo, abort, or an issueIdentifier", because there would be no guard for it to override): (1) with "followUpTo" it bypasses the active-session guard so a follow-up can resume a session wedged or sleeping in an active phase (Claude infra wobble, long-running sleep) — asserting the prior process is effectively dead (see LIN-546); (2) with a single "abort" it is the escape hatch that force-closes even a human-continued session the runner would otherwise skip (see cascade + "[skipped]" below); (3) OPERATOR RESCUE HATCH — on an issue-scoped fresh dispatch it bypasses the duplicate guard below, for a human recovering a wedged task who has confirmed the colliding dispatch is not doing the work. This is NOT the answer to a 409 you were just handed: adopt the returned "id" and watch it, as that refusal says. Mutually exclusive with "cascade" (a cascade emits its own plain, unforced aborts): "force" + "cascade" is rejected (400). The runner reads it as "item.force" off the polled/claimed item. See LIN-559/LIN-946/LIN-1656.
@@ -6275,7 +6277,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -6471,6 +6473,7 @@ Only the 403 is new behaviour you must handle: reads flow free, writes ask once.
         kind,
         model,
         harness,
+        terminal,
         finalizePrompt: async (resolvedHarness) => {
           const baseUrl = `${req.protocol}://${req.get('host')}`;
           if (prompt && shouldAppendProxyContext) {

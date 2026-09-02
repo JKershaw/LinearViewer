@@ -93,4 +93,31 @@ describe('LIN-1390 — watch echo honesty against a real store', () => {
     assert.equal(watchRes.body.harness, 'preset-harness');
     assert.equal(watchRes.body.presetName, 'Watch Preset');
   });
+
+  // LIN-2452: the opaque terminal driver rides the same two formatters, so the
+  // watch echo must agree with takeItem on it too — and read null, not
+  // undefined, when absent.
+  test('GET /api/proxy/dispatch/:id (watch) agrees with takeItem on terminal', async () => {
+    const dispatchQueueStore = new DispatchQueueStore({
+      collection: createMockCollection(),
+      historyCollection: createMockCollection()
+    });
+    const app = buildApp({ dispatchQueueStore, dispatchPresetsStore: null });
+
+    const withTerminal = await dispatchQueueStore.addItem('acme', { prompt: 'run me', terminal: 'tmux' });
+    const without = await dispatchQueueStore.addItem('acme', { prompt: 'run me too' });
+
+    const watchWith = await call(app, 'get', `/api/proxy/dispatch/${withTerminal._id}`);
+    assert.equal(watchWith.status, 200, JSON.stringify(watchWith.body));
+    const watchWithout = await call(app, 'get', `/api/proxy/dispatch/${without._id}`);
+    assert.equal(watchWithout.status, 200, JSON.stringify(watchWithout.body));
+
+    const takenWith = await dispatchQueueStore.takeItem(withTerminal._id, 'acme');
+    const takenWithout = await dispatchQueueStore.takeItem(without._id, 'acme');
+
+    assert.equal(watchWith.body.terminal, takenWith.terminal);
+    assert.equal(watchWith.body.terminal, 'tmux');
+    assert.strictEqual(watchWithout.body.terminal, null);
+    assert.strictEqual(takenWithout.terminal, null);
+  });
 });
