@@ -27,6 +27,7 @@ import { getWorkspaceOpenRouterKey as resolveOpenRouterKey, getUnattendedOpenRou
 import { getWorkspaceNorthStar as resolveNorthStar, getWorkspaceNorthStarDocVersion as resolveNorthStarDocVersion } from './lib/north-star-resolver.js'
 import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken, refreshOwnerCredential } from './lib/workspace-token-refresh.js'
+import { attemptSuspectCredentialRefresh as attemptSuspectCredentialRefreshImpl } from './lib/suspect-credential-refresh.js'
 import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
 import { CREDENTIAL_SOURCES, fingerprintCredential } from './lib/credential-diagnostics.js'
 import { createRejectedCredentialRegistry } from './lib/rejected-credentials.js'
@@ -2124,6 +2125,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
       fingerprint: cachedFingerprint,
       urlKey,
       ownerAccountId,
+      provider: cached.provider,
       loadSessions: () => sessionsCollection.find({}).toArray(),
     });
     if (recovered) {
@@ -2148,6 +2150,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
         fingerprint: selectedFingerprint,
         urlKey,
         ownerAccountId,
+        provider: selected.provider,
         loadSessions: () => Promise.resolve(sessions),
       });
       if (recovered) {
@@ -2276,73 +2279,32 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
 }
 
 /**
- * LIN-1980: attempt a forced refresh for a credential `resolveWorkspaceAccess`
- * just selected (cache-hit or session-scan) that the rejected-credential
- * registry has marked suspect. Strictly non-worsening by construction: on
- * `null` (nothing refreshable), a throw, or the SAME fingerprint coming back,
- * this returns `null` and the caller keeps serving the credential it already
- * selected, unchanged. Never attempted for UNSCOPED (owner-blind) callers —
- * the existing `ownerAccountId !== UNSCOPED` exclusion below mirrors the one
- * refresh-on-resolve already applies.
+ * LIN-1980 suspect-credential recovery, LIN-2473 adopt-before-exchange.
  *
- * `loadSessions` is a thunk rather than an eagerly-loaded array so the
- * cache-hit call site — whose whole reason to exist is avoiding a Mongo read
- * — never pays for `sessionsCollection.find({})` unless the fingerprint is
- * actually suspect AND due for a refresh attempt (both cheap, synchronous,
- * no-IO checks against the registry).
- *
- * LIN-1980 review F1: `shouldAttemptRefresh` is also given a `scopeKey`
- * (`${ownerAccountId}:${urlKey}`) so the attempt cap holds across fingerprint
- * churn — a credential that rotates to a new fingerprint on every refresh
- * while still being rejected would otherwise re-trigger a forced refresh on
- * every request (each new fingerprint starts with no attempt history of its
- * own), since `accept()` deletes the superseded fingerprint's cooldown entry.
- *
- * @param {{fingerprint: string|null, urlKey: string, ownerAccountId: string|symbol, loadSessions: () => Promise<Array>}} args
- * @returns {Promise<{token: *, expiresAt: number, provider: string, scope: *, credentialFingerprint: string}|null>}
+ * The logic lives in `lib/suspect-credential-refresh.js` and is unit-tested
+ * there against the real modules (LIN-2473 review B3 — while it lived here it
+ * was untestable, since this module connects to a database and starts
+ * listening at import, so its only coverage was a copy in the test file).
+ * This wrapper is the dependency injection and nothing else: every behaviour
+ * — the UNSCOPED exclusion, the suspect gate, the adopt arm, the
+ * `${ownerAccountId}:${urlKey}` cooldown scopeKey, the byte-identical
+ * escalation — is defined in that module.
  */
-async function attemptSuspectCredentialRefresh({ fingerprint, urlKey, ownerAccountId, loadSessions }) {
-  if (ownerAccountId === UNSCOPED) return null;
-  if (!rejectedCredentialRegistry.isSuspect(fingerprint)) return null;
-  if (!rejectedCredentialRegistry.shouldAttemptRefresh(fingerprint, `${ownerAccountId}:${urlKey}`)) return null;
-  try {
-    const sessions = await loadSessions();
-    const refreshed = await refreshOwnerWorkspaceToken({
-      sessions,
-      urlKey,
-      ownerAccountId,
-      refreshAccessToken,
-      persistSession: persistSessionRow,
-      resolveProvider: getProviderForWorkspace,
-      resolveExchange: refreshExchangeFor,
-      store: ownerCredentialStore,
-      lifecycleEventStore: credentialLifecycleEventStore
-    });
-    if (!refreshed) return null;
-    const refreshedFingerprint = fingerprintCredential(refreshed.scope ?? refreshed.token);
-    // The provider hasn't necessarily fixed anything — a re-mint/re-read can
-    // hand back the identical dead credential. Only a GENUINE replacement
-    // counts as recovery; anything else falls through untouched.
-    if (refreshedFingerprint === fingerprint) {
-      // LIN-2327: make the byte-identical loop visible (previously silent)
-      // and count it toward the escalation threshold that turns this
-      // fingerprint's provider-auth classification terminal — see
-      // isTransientProviderAuthFailure (routes/proxy.js). Fire-and-forget,
-      // secret-safe (fingerprint digest only, never token bytes), same
-      // `.catch` shape as this file's other REFRESH_SKIP sites.
-      credentialLifecycleEventStore.recordEvent({
-        accountId: ownerAccountId, urlKey, provider: refreshed.provider,
-        kind: CREDENTIAL_LIFECYCLE_EVENT_KINDS.REFRESH_SKIP,
-        detail: { branch: 'byte-identical-after-rejection', fingerprint: refreshedFingerprint }
-      }).catch(err => console.error('Failed to record credential-lifecycle event:', err));
-      rejectedCredentialRegistry.recordByteIdenticalRejection?.(refreshedFingerprint);
-      return null;
-    }
-    return { ...refreshed, credentialFingerprint: refreshedFingerprint };
-  } catch (err) {
-    console.error(`Suspect-credential forced refresh failed for workspace ${urlKey}:`, err);
-    return null;
-  }
+async function attemptSuspectCredentialRefresh({ fingerprint, urlKey, ownerAccountId, provider, loadSessions }) {
+  return attemptSuspectCredentialRefreshImpl({
+    fingerprint,
+    urlKey,
+    ownerAccountId,
+    provider,
+    loadSessions,
+    registry: rejectedCredentialRegistry,
+    store: ownerCredentialStore,
+    lifecycleEventStore: credentialLifecycleEventStore,
+    refreshAccessToken,
+    persistSession: persistSessionRow,
+    resolveProvider: getProviderForWorkspace,
+    resolveExchange: refreshExchangeFor,
+  });
 }
 
 // Thin wrapper preserving the token-only contract for existing callers

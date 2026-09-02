@@ -2673,6 +2673,66 @@ test.describe('Proxy credential-fault visibility (LIN-1586)', () => {
     });
   });
 
+  // LIN-2473 (review B2). The SELF-scoped consumer read — the endpoint the
+  // 2026-09-02 diagnosis watched answer `ok` while every Linear-backed call
+  // was failing. Its occupancy half only ever counted a 401, so once LIN-2216
+  // reclassified a transient provider-lane rejection as a 503 the endpoint
+  // went blind to it; the first attempt at the fix then died at the query,
+  // which projected the fingerprint away before the fold could read it.
+  //
+  // Honest limit: NODE_ENV=test short-circuits resolveProviderAccess, so the
+  // row cannot be produced by a live upstream rejection here — it is seeded in
+  // the exact shape routes/proxy.js's logEvent writes for that case (`stage`
+  // stamped provider-lane because a credential DID resolve, and its
+  // fingerprint carried). Everything downstream of the write is real: the
+  // store, the projection, the fold, and the route.
+  test.describe('LIN-2473 — a transient provider-lane 503 must degrade the self-scoped credential-health read', () => {
+    async function seedProviderLaneRow(page, { tokenId, status, credentialFingerprint }) {
+      const params = new URLSearchParams({
+        urlKey: URL_KEY, tokenId, tokenLabel: 'flapping-runner', method: 'GET',
+        endpoint: '/api/proxy/issues/LIN-1', status: String(status), stage: 'provider-lane',
+      });
+      if (credentialFingerprint) params.set('credentialFingerprint', credentialFingerprint);
+      const resp = await page.request.get(`/test/seed-proxy-event?${params}`);
+      expect(resp.status()).toBe(200);
+    }
+
+    test('the endpoint reports degraded, not ok, when the lane is rejecting a resolved credential', async ({ page }) => {
+      const minted = await (await page.goto(`/test/create-proxy-token?scope=read&label=flapping-runner&urlKey=${URL_KEY}`)).json();
+
+      await seedProviderLaneRow(page, { tokenId: minted.tokenId, status: 503, credentialFingerprint: 'a1b2c3d4e5f6' });
+      await seedProviderLaneRow(page, { tokenId: minted.tokenId, status: 200, credentialFingerprint: 'a1b2c3d4e5f6' });
+
+      const resp = await page.request.get('/api/proxy/credential-health', {
+        headers: { Authorization: `Bearer ${minted.token}` }
+      });
+      expect(resp.status()).toBe(200);
+      const body = await resp.json();
+
+      // Both rows land in the same 30s bucket, so the verdict itself stays
+      // `unknown` below the two-bucket floor — deliberately, and unchanged by
+      // this ticket. What must be true is that the 503 was COUNTED: before the
+      // fix `failedCalls` read 0 here, which is precisely how the endpoint
+      // reported a healthy lane through a live fault.
+      expect(body.failedCalls).toBe(1);
+      expect(body.totalCalls).toBe(2);
+      expect(body.verdict).not.toBe('ok');
+    });
+
+    test('a fingerprint-less 503 on the same lane is still not counted — that class is recentFailureReasons\' job', async ({ page }) => {
+      const minted = await (await page.goto(`/test/create-proxy-token?scope=read&label=flapping-runner&urlKey=${URL_KEY}`)).json();
+
+      await seedProviderLaneRow(page, { tokenId: minted.tokenId, status: 503 });
+      await seedProviderLaneRow(page, { tokenId: minted.tokenId, status: 200, credentialFingerprint: 'a1b2c3d4e5f6' });
+
+      const resp = await page.request.get('/api/proxy/credential-health', {
+        headers: { Authorization: `Bearer ${minted.token}` }
+      });
+      const body = await resp.json();
+      expect(body.failedCalls).toBe(0);
+    });
+  });
+
   test.describe('B6 — the health panel above the Event Log', () => {
     test('the panel sits above the Event Log and names the dead credential', async ({ page }) => {
       await seedDeadCredential(page);

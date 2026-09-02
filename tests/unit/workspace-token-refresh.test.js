@@ -1298,7 +1298,11 @@ describe('resolveWorkspaceAccess refresh-on-resolve gate (LIN-2097, Block I — 
   });
 
   test("I3: the new gate uses its OWN scopeKey/state — attemptSuspectCredentialRefresh's own cooldown gate (:1954-ish) is untouched, still calling shouldAttemptRefresh with its pre-existing scopeKey shape", () => {
-    assert.match(SERVER_SRC, /rejectedCredentialRegistry\.shouldAttemptRefresh\(fingerprint, `\$\{ownerAccountId\}:\$\{urlKey\}`\)/, "attemptSuspectCredentialRefresh's own gate must still be present, unmodified");
+    // LIN-2473 (review B3): the function moved to lib/suspect-credential-refresh.js
+    // so it could be unit-tested for real; the gate itself is unchanged, and
+    // this pin follows it rather than being dropped.
+    const suspectRefreshSrc = readFileSync(join(__dirname, '../../lib/suspect-credential-refresh.js'), 'utf8');
+    assert.match(suspectRefreshSrc, /registry\.shouldAttemptRefresh\(fingerprint, `\$\{ownerAccountId\}:\$\{urlKey\}`\)/, "attemptSuspectCredentialRefresh's own gate must still be present, unmodified");
   });
 
   test('I4: refreshOnResolveGate is constructed once at module scope via createRefreshOnResolveGate, mirroring rejectedCredentialRegistry\'s own single-shared-instance pattern', () => {
