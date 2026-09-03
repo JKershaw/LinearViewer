@@ -28,12 +28,12 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import '../../lib/providers/github/index.js'; // side effect: self-registers 'github'
 import '../../lib/providers/local/index.js'; // side effect: self-registers 'local'
 
-function buildApp({ providerName, resolveWorkspaceAccessImpl, injectProvider = null } = {}) {
+function buildApp({ providerName, resolveWorkspaceAccessImpl, injectProvider = null, scope = 'readWrite' } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
     proxyTokenStore: {
-      validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' })
+      validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope, createdBy: 'u1' })
     },
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: resolveWorkspaceAccessImpl
@@ -205,6 +205,34 @@ describe('GET /api/proxy/instructions — provider identity (LIN-2354)', () => {
       const linear = await call(buildApp({ providerName: 'linear' }), '/api/proxy/instructions');
       const github = await call(buildApp({ providerName: 'github' }), '/api/proxy/instructions');
       assert.notEqual(linear.text, github.text, 'if these matched, the parity assertion would prove nothing');
+    });
+  });
+
+  // LIN-2245: the `read` scope's exclusion of the write-only sections had no
+  // HTTP-level witness anywhere before this ticket — both existing scope-
+  // sensitive checks above always minted a `readWrite` token. This closes
+  // the wiring half of the seam (tests/unit/proxy-instructions.test.js
+  // covers the same gate directly against the builder, with no server): a
+  // builder-only test stays green even if the handler stops threading
+  // `scope` into buildInstructions, so only an HTTP round trip proves the
+  // route itself still wires it through.
+  describe('read scope — HTTP wiring (LIN-2245)', () => {
+    test('a read-scoped token omits the write-only sections over real HTTP', async () => {
+      const app = buildApp({ providerName: 'linear', scope: 'read' });
+      const { status, text } = await call(app, '/api/proxy/instructions');
+
+      assert.equal(status, 200);
+      assert.ok(!text.includes('## Write Endpoints'), 'read scope must not include Write Endpoints');
+      assert.ok(!text.includes('## Shell Tip'), 'read scope must not include the write-only Shell Tip section');
+      assert.ok(text.includes('(Read-only — you can query but not modify data)'));
+    });
+
+    test('a readWrite-scoped token still includes them (not vacuous)', async () => {
+      const app = buildApp({ providerName: 'linear', scope: 'readWrite' });
+      const { text } = await call(app, '/api/proxy/instructions');
+
+      assert.ok(text.includes('## Write Endpoints'));
+      assert.ok(text.includes('## Shell Tip'));
     });
   });
 
