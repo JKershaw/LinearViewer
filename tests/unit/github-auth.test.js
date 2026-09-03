@@ -1462,6 +1462,46 @@ describe('GitHub auth routes', () => {
     await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
     assert.equal(session.githubPending.mode, 'new');
   });
+
+  // LIN-2397 stage A, review finding (ledger item 1): `respondToAccountConflict`'s
+  // `reauthUrl` is surface-specific ('/auth/github' here, '/auth/github-projects' in
+  // the sibling router) but was pinned by NOTHING — cross-wiring it left all 9058
+  // unit tests green, the byte-parity golden harness included, because that harness
+  // excludes the account-conflict branches and the two existing merge-offer tests
+  // assert only `/This GitHub account/`, copy that is IDENTICAL on both surfaces.
+  // `lib/account-conflict.js:42` already names the trap ("never derived from
+  // `provider.entryCta.href`, which is `null` for GitHub Projects") — precisely the
+  // derivation a descriptor-shaped stage-B extraction invites. This closes the one
+  // reachable site where "a cross-wired refactor goes red" was still false.
+  test('POST link (new) reauth-required page links back to THIS surface\'s own reauthUrl, never the sibling router\'s [LIN-2397 gap: reauthUrl]', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const canonicalAccount = await accountStore.createAccount();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
+
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const session = makeSession({
+      accountId: canonicalAccount._id,
+      // Stale — well outside the 10-minute fresh-auth window — which is what
+      // routes this mergeable conflict to renderMergeReauthRequiredPage.
+      identityAuthenticatedAt: Date.now() - 60 * 60 * 1000,
+      githubHumanId: 'human-other',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    const res = makeRes();
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Sign in again to confirm/, 'the reauth-required arm was reached');
+    // The exact anchor the surface emits. The closing quote matters: without it
+    // this pattern would also match '/auth/github-projects'.
+    assert.match(res.body, /<a href="\/auth\/github" class="login-button">Sign in again<\/a>/,
+      'the Issues surface sends the user back to its OWN base path');
+    assert.doesNotMatch(res.body, /href="\/auth\/github-projects"/,
+      'never the GitHub Projects sibling\'s base path');
+  });
 });
 
 describe('githubErrorDiagnostic (LIN-746)', () => {

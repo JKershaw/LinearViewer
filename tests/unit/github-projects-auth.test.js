@@ -1183,4 +1183,44 @@ describe('GitHub Projects auth routes', () => {
     await handler({ query: { mode: 'add-source', workspace: 'not a valid key!' }, session }, res);
     assert.deepEqual(session.oauthIntent, { mode: 'add-source', provider: 'github-projects' });
   });
+
+  // LIN-2397 stage A, review finding (ledger item 1) — the Projects half, and the
+  // site the review actually cross-wired to prove the hole: `reauthUrl` at
+  // routes/github-projects-auth.js's respondToAccountConflict call was pinned by
+  // NOTHING, so pointing it at the Issues router's '/auth/github' left the whole
+  // 9058-test suite green, byte-parity goldens included. The existing merge-offer
+  // tests assert only `/This GitHub account/` — identityLabel copy that is
+  // deliberately identical on both surfaces — so they prove the branch is reached
+  // and nothing about which surface's URL it emits.
+  test('POST link (new) reauth-required page links back to THIS surface\'s own reauthUrl, never the sibling router\'s [LIN-2397 gap: reauthUrl]', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const canonicalAccount = await accountStore.createAccount();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
+
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+    const session = makeSession({
+      accountId: canonicalAccount._id,
+      // Stale — well outside the 10-minute fresh-auth window — which is what
+      // routes this mergeable conflict to renderMergeReauthRequiredPage.
+      identityAuthenticatedAt: Date.now() - 60 * 60 * 1000,
+      githubHumanId: 'human-other',
+      githubProjectsPending: { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    const res = makeRes();
+    await handler({ body: { board: 'octocat/5' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /Sign in again to confirm/, 'the reauth-required arm was reached');
+    assert.match(res.body, /<a href="\/auth\/github-projects" class="login-button">Sign in again<\/a>/,
+      'the Projects surface sends the user back to its OWN base path');
+    // The negative is the assertion that actually catches the cross-wire: the
+    // Issues base path is a strict prefix of this one, so only the closing quote
+    // distinguishes them.
+    assert.doesNotMatch(res.body, /href="\/auth\/github"/,
+      'never the GitHub Issues sibling\'s base path');
+  });
+
 });
