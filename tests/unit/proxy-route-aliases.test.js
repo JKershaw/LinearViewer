@@ -3,23 +3,41 @@
  * forgiving flat aliases.
  *
  * Each issue-scoped (and the cycle-scoped) endpoint now accepts two URLs that
- * resolve to ONE handler via Express array-path routing. This test pins both
- * halves of the contract for every alias pair the ticket called out:
+ * resolve to ONE handler via Express array-path routing. This test pins the
+ * contract for every alias pair the ticket called out, entirely through real
+ * HTTP requests (LIN-2505 — the router.stack structural walk this file used to
+ * run, plus its `path[0] === canonical` assertion, is gone; see below for why):
  *
- *  1. Same handler (structural): the mounted router exposes a single route whose
- *     path array contains BOTH the canonical and the alias path, for the right
- *     HTTP method. Because Express compiles an array path into one Route + one
- *     handler, this is a by-construction guarantee that the two URLs cannot drift
- *     onto different handlers.
+ *  1. Same handler, request-level: hitting the canonical URL and the alias URL
+ *     with identical input yields byte-identical status + body ("identical
+ *     payloads" below). Because Express compiles an array path into one Route +
+ *     one handler, two URLs that both resolve and agree on every probed input
+ *     are, for observable purposes, the same handler — the honest behavioural
+ *     reduction of the old structural guarantee. `path[0] === canonical` has NO
+ *     behavioural equivalent and is not recreated: nothing in routes/, lib/, or
+ *     server.js reads `req.route`, and Express 4 binds params by name, not
+ *     array position, so the array's internal order is unobservable on the wire.
  *
- *  2. Identical payload (behavioral): hitting the canonical URL and the alias URL
- *     with identical input yields byte-identical status + body. We drive each pair
- *     down a deterministic, network-free path (format validation 400s for the
- *     read/write GraphQL endpoints; test-mode "Issue not found" 404s for the
- *     LLM-backed endpoints) so the assertion is stable offline.
+ *  2. Param-echo probes ("mutation-teeth" below): the parity check above is
+ *     BLIND to a mutation that renames only the alias's `:param`, because every
+ *     probe below short-circuits on the SAME pre-network format validation
+ *     regardless of which literal string the (now-unbound) param resolves to —
+ *     for 6 of the 9 pairs a validly-formatted-but-nonexistent id still
+ *     produces a distinguishing 400-vs-404 divergence, but for the 3 pairs
+ *     whose validator treats an unbound param the same as a malformed one
+ *     (`relations`, `comments`, `cycle detail`), that divergence never
+ *     appears. Those 3 pairs additionally get a param-echoing probe, through a
+ *     TEST-ONLY injected `provider` (the LIN-581 seam), so a param-rename
+ *     mutation is caught by a second, independent assertion.
  *
- * The e2e suite can't cover the *pairing*: it only ever calls the documented URL,
- * so an alias that silently 404'd or hit the wrong handler would pass e2e.
+ * We drive each pair down a deterministic, network-free path (format
+ * validation 400s for the read/write GraphQL endpoints; test-mode "Issue not
+ * found" 404s for the LLM-backed endpoints; an injected fake provider for the
+ * echo probes) so every assertion is stable offline.
+ *
+ * The e2e suite already covers most of the *pairing*: tests/e2e/proxy.spec.js
+ * drives 7 of these 9 pairs through both URLs with the same probe design. Only
+ * the two `agent/status` <-> `foreman/status` pairs are unique to this file.
  */
 
 // LLM-backed endpoints short-circuit to deterministic test fixtures only when
@@ -117,7 +135,7 @@ const PAIRS = [
   }
 ];
 
-function buildApp() {
+function buildApp({ provider } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -138,7 +156,8 @@ function buildApp() {
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: {},
-    freeTierStore: { tryUse: async () => ({ allowed: true }) }
+    freeTierStore: { tryUse: async () => ({ allowed: true }) },
+    ...(provider ? { provider } : {}) // TEST-ONLY injection (LIN-581) — wins over registry resolution.
   }));
   return app;
 }
@@ -164,46 +183,7 @@ async function call(app, method, path, body) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Structural: each pair is ONE route serving BOTH paths.
-// ---------------------------------------------------------------------------
-describe('proxy route aliases — same handler (router stack)', () => {
-  const router = createProxyRoutes({
-    proxyTokenStore: { validateToken: async () => null },
-    proxyEventStore: { recordEvent: async () => {} },
-    resolveWorkspaceAccess: async () => ({ token: null, reason: 'ok' }),
-    getWorkspaceAccessToken: async () => null,
-    getWorkspaceOpenRouterKey: async () => null,
-    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
-    workspaceFromUrl: (req, res, next) => next(),
-    workspacePreferencesStore: {}, freeTierStore: {}
-  });
-
-  // Index routes by the exact path array Express stored for each Route.
-  const routePaths = router.stack
-    .filter(layer => layer.route)
-    .map(layer => ({ path: layer.route.path, methods: layer.route.methods }));
-
-  for (const pair of PAIRS) {
-    test(`${pair.name}: canonical + alias share one ${pair.method.toUpperCase()} route`, () => {
-      const match = routePaths.find(r =>
-        Array.isArray(r.path) &&
-        r.path.includes(pair.canonical) &&
-        r.path.includes(pair.alias) &&
-        r.methods[pair.method] === true
-      );
-      assert.ok(
-        match,
-        `expected a single ${pair.method.toUpperCase()} route whose path array contains both ` +
-        `${pair.canonical} and ${pair.alias}`
-      );
-      // Canonical is documented first by convention.
-      assert.equal(match.path[0], pair.canonical, 'canonical path should be listed first');
-    });
-  }
-});
-
-// ---------------------------------------------------------------------------
-// 2. Behavioral: canonical URL and alias URL return identical status + body.
+// 1. Behavioral: canonical URL and alias URL return identical status + body.
 // ---------------------------------------------------------------------------
 describe('proxy route aliases — identical payloads', () => {
   for (const pair of PAIRS) {
@@ -219,4 +199,92 @@ describe('proxy route aliases — identical payloads', () => {
       assert.deepEqual(alias.body, canonical.body, 'alias body must equal canonical body');
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// 2. Param-echo probes (mutation-teeth): the identical-payloads probes above
+// short-circuit on format validation that never actually reads the shared
+// :param, so all of them are blind to a mutation that renames only the
+// alias's param. For 3 of the 9 pairs — relations (read), comments (write),
+// cycle detail — the existing probe's validator (isValidIssueId / UUID_REGEX)
+// treats an unbound param exactly like a malformed one, so no status
+// divergence exists to catch that mutation (verified: a param rename makes
+// alias and canonical both 400 identically without this probe). These three
+// pairs get a second, param-echoing probe through a TEST-ONLY injected
+// `provider` (the LIN-581 seam, precedent: proxy-issues-pagination.test.js)
+// that records the id/param it was called with — under a param-rename
+// mutation the alias falls back to its pre-network 400 while the canonical
+// still reaches the provider and echoes 200/201, so the two diverge.
+//
+// The other 6 pairs (recommend/recap/brief/prompt/agent-status×2) already
+// probe with a validly-formatted-but-nonexistent identifier and see a real
+// 400-vs-404 divergence under the same mutation, so they already have teeth
+// without an echo probe — adding one there is optional strengthening, not
+// required, and is left out here to avoid the extra fixture wiring risk.
+// ---------------------------------------------------------------------------
+function makeEchoProvider() {
+  const calls = { relations: [], cycleDetail: [], createComment: [] };
+  return {
+    calls,
+    name: 'echo-fake',
+    supports: () => true,
+    async relations(token, issueId) {
+      calls.relations.push(issueId);
+      return { id: issueId, relations: [], inverseRelations: [] };
+    },
+    async cycleDetail(token, cycleId) {
+      calls.cycleDetail.push(cycleId);
+      return { id: cycleId, name: 'Echo Cycle' };
+    },
+    async issueWriteGuard(token, issueId) {
+      return { id: issueId, trashed: false };
+    },
+    async createComment(token, issueId, body) {
+      calls.createComment.push(issueId);
+      return { id: 'comment-1', issueId, body };
+    }
+  };
+}
+
+describe('proxy route aliases — param-echo probes (mutation-teeth)', () => {
+  test('relations (read): canonical and alias each reach the provider with their OWN issueId', async () => {
+    const provider = makeEchoProvider();
+    const app = buildApp({ provider });
+
+    const canonical = await call(app, 'get', '/api/proxy/issues/LIN-77/relations');
+    const alias = await call(app, 'get', '/api/proxy/relations/LIN-78');
+
+    assert.equal(canonical.status, 200, JSON.stringify(canonical.body));
+    assert.equal(alias.status, 200, JSON.stringify(alias.body));
+    assert.deepEqual(provider.calls.relations, ['LIN-77', 'LIN-78'],
+      'each URL must reach the provider with its own :issueId — a param-rename mutation would drop one to undefined');
+  });
+
+  test('comments (write): canonical and alias each reach the provider with their OWN issueId', async () => {
+    const provider = makeEchoProvider();
+    const app = buildApp({ provider });
+
+    const canonical = await call(app, 'post', '/api/proxy/issues/LIN-77/comments', { body: 'hello' });
+    const alias = await call(app, 'post', '/api/proxy/comments/LIN-78', { body: 'hello' });
+
+    assert.equal(canonical.status, 201, JSON.stringify(canonical.body));
+    assert.equal(alias.status, 201, JSON.stringify(alias.body));
+    assert.deepEqual(provider.calls.createComment, ['LIN-77', 'LIN-78'],
+      'each URL must reach the provider with its own :issueId — a param-rename mutation would drop one to undefined');
+  });
+
+  test('cycle detail: canonical and alias each reach the provider with their OWN cycleId', async () => {
+    const provider = makeEchoProvider();
+    const app = buildApp({ provider });
+    const CYCLE_A = '11111111-1111-1111-1111-111111111111';
+    const CYCLE_B = '22222222-2222-2222-2222-222222222222';
+
+    const canonical = await call(app, 'get', `/api/proxy/cycles/${CYCLE_A}`);
+    const alias = await call(app, 'get', `/api/proxy/cycle/${CYCLE_B}`);
+
+    assert.equal(canonical.status, 200, JSON.stringify(canonical.body));
+    assert.equal(alias.status, 200, JSON.stringify(alias.body));
+    assert.deepEqual(provider.calls.cycleDetail, [CYCLE_A, CYCLE_B],
+      'each URL must reach the provider with its own :cycleId — a param-rename mutation would drop one to undefined');
+  });
 });

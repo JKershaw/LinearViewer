@@ -19,27 +19,37 @@
  * reimplements or bypasses any link in that chain.
  *
  * Run with: node --test tests/unit/quota-isolation.test.js
+ *
+ * NODE_ENV must be set to 'test' BEFORE importing routes/proxy.js: the
+ * module-level proxyTokenCreationLimiter (max 10/15min/IP) is shared across
+ * every createProxyRoutes() instance in the process, and this file mints
+ * several tokens across its tests over real HTTP (LIN-2505).
  */
+process.env.NODE_ENV = 'test';
+
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { UserPreferencesStore } from '../../lib/user-preferences.js';
 import { getWorkspaceOpenRouterKey } from '../../lib/openrouter-key-resolver.js';
 
-function getHandler(router, method, path) {
-  const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
-  assert.ok(layer, `${method.toUpperCase()} ${path} route is registered`);
-  return layer.route.stack[layer.route.stack.length - 1].handle;
-}
-
-function makeRes() {
-  return {
-    statusCode: 200,
-    jsonBody: null,
-    status(code) { this.statusCode = code; return this; },
-    json(body) { this.jsonBody = body; return this; },
-  };
+async function call(app, method, path, body) {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  const { port } = server.address();
+  try {
+    const opts = { method: method.toUpperCase(), headers: { 'Content-Type': 'application/json' } };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    const res = await fetch(`http://127.0.0.1:${port}${path}`, opts);
+    const text = await res.text();
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { parsed = text; }
+    return { status: res.status, body: parsed };
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
 }
 
 function inMemoryCollection() {
@@ -80,35 +90,51 @@ function inMemoryCollection() {
   };
 }
 
-function buildProxyRouter({ proxyTokenStore }) {
-  return createProxyRoutes({
+// Fresh app per request, sharing the SAME proxyTokenStore across a test's
+// mints: the request-driven conversion (LIN-2505) needs to bake a specific
+// session into `workspaceFromUrl` per POST, so the app is built per call
+// rather than once per test — the store, where identity/state actually
+// lives, stays shared. Session-injection shape mirrors
+// tests/unit/dispatch-route-defaults.test.js:62-66.
+function buildProxyApp({ proxyTokenStore, session }) {
+  const app = express();
+  app.use(express.json());
+  app.use(createProxyRoutes({
     proxyTokenStore,
     proxyEventStore: { recordEvent: async () => {} },
     agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, taskSnapshotStore: {},
-    dispatchQueueStore: {}, workspaceFromUrl: (req, res, next) => next(),
+    dispatchQueueStore: {},
+    workspaceFromUrl: (req, res, next) => {
+      req.workspace = { urlKey: 'acme' };
+      req.session = session;
+      next();
+    },
     getWorkspaceAccessToken: () => null, resolveWorkspaceAccess: () => null,
     getWorkspaceOpenRouterKey: async () => null, workspacePreferencesStore: {}, freeTierStore: {},
-  });
+  }));
+  return app;
 }
 
-async function mintTokenForAccount(router, accountId) {
-  const handler = getHandler(router, 'post', '/workspace/:urlKey/api/proxy/tokens');
-  const res = makeRes();
-  await handler({
+async function mintToken({ proxyTokenStore, session, label }) {
+  const app = buildProxyApp({ proxyTokenStore, session });
+  const { status, body } = await call(app, 'post', '/workspace/acme/api/proxy/tokens', { label, scope: 'read' });
+  assert.strictEqual(status, 201, JSON.stringify(body));
+  return body.token;
+}
+
+async function mintTokenForAccount(proxyTokenStore, accountId) {
+  return mintToken({
+    proxyTokenStore,
     session: { accountId, features: { proxy: true } },
-    workspace: { urlKey: 'acme' },
-    body: { label: `token-for-${accountId}`, scope: 'read' },
-  }, res);
-  assert.strictEqual(res.statusCode, 201, JSON.stringify(res.jsonBody));
-  return res.jsonBody.token;
+    label: `token-for-${accountId}`
+  });
 }
 
 describe('Proxy-token quota isolation after the accountId re-key (LIN-1353 S1+S4)', () => {
   test('the HTTP token-creation write site stamps createdBy from req.session.accountId (not linearUserId)', async () => {
     const proxyTokenStore = new ProxyTokenStore({ collection: inMemoryCollection() });
-    const router = buildProxyRouter({ proxyTokenStore });
 
-    const token = await mintTokenForAccount(router, 'account-A');
+    const token = await mintTokenForAccount(proxyTokenStore, 'account-A');
     const validated = await proxyTokenStore.validateToken(token);
 
     assert.equal(validated.createdBy, 'account-A');
@@ -116,30 +142,25 @@ describe('Proxy-token quota isolation after the accountId re-key (LIN-1353 S1+S4
 
   test('a session with linearUserId but NO accountId mints a token with createdBy: null (proves the write site really switched keys)', async () => {
     const proxyTokenStore = new ProxyTokenStore({ collection: inMemoryCollection() });
-    const router = buildProxyRouter({ proxyTokenStore });
-    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/proxy/tokens');
-    const res = makeRes();
 
-    await handler({
+    const token = await mintToken({
+      proxyTokenStore,
       session: { linearUserId: 'legacy-linear-id', features: { proxy: true } },
-      workspace: { urlKey: 'acme' },
-      body: { label: 'legacy-session-token', scope: 'read' },
-    }, res);
+      label: 'legacy-session-token'
+    });
 
-    const validated = await proxyTokenStore.validateToken(res.jsonBody.token);
+    const validated = await proxyTokenStore.validateToken(token);
     assert.equal(validated.createdBy, null);
   });
 
   test('quota isolation end-to-end: account A\'s token resolves ONLY account A\'s OpenRouter key, never account B\'s', async () => {
     const proxyTokenStore = new ProxyTokenStore({ collection: inMemoryCollection() });
     const userPreferencesStore = new UserPreferencesStore({ collection: inMemoryCollection() });
-    const router = buildProxyRouter({ proxyTokenStore });
-
     await userPreferencesStore.setOpenRouterApiKey('account-A', 'sk-or-v1-account-A-key');
     await userPreferencesStore.setOpenRouterApiKey('account-B', 'sk-or-v1-account-B-key');
 
-    const tokenA = await mintTokenForAccount(router, 'account-A');
-    const tokenB = await mintTokenForAccount(router, 'account-B');
+    const tokenA = await mintTokenForAccount(proxyTokenStore, 'account-A');
+    const tokenB = await mintTokenForAccount(proxyTokenStore, 'account-B');
 
     // Drive the REAL chain: validate the token → its createdBy → the D1a resolver.
     const creatorA = (await proxyTokenStore.validateToken(tokenA)).createdBy;
@@ -162,12 +183,10 @@ describe('Proxy-token quota isolation after the accountId re-key (LIN-1353 S1+S4
     // tokens across different resolved identities.
     const proxyTokenStore = new ProxyTokenStore({ collection: inMemoryCollection() });
     const userPreferencesStore = new UserPreferencesStore({ collection: inMemoryCollection() });
-    const router = buildProxyRouter({ proxyTokenStore });
-
     await userPreferencesStore.setOpenRouterApiKey('account-A', 'sk-or-v1-account-A-key');
 
-    const firstToken = await mintTokenForAccount(router, 'account-A');
-    const secondToken = await mintTokenForAccount(router, 'account-A');
+    const firstToken = await mintTokenForAccount(proxyTokenStore, 'account-A');
+    const secondToken = await mintTokenForAccount(proxyTokenStore, 'account-A');
 
     const firstCreator = (await proxyTokenStore.validateToken(firstToken)).createdBy;
     const secondCreator = (await proxyTokenStore.validateToken(secondToken)).createdBy;
