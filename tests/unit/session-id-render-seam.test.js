@@ -25,6 +25,15 @@
  *
  * Set NODE_ENV before importing the routes so the proxy test-mode short-circuit
  * and the module-level rate-limiter skip apply.
+ *
+ * LIN-2505: the egress half used to pull its handler off the dashboard router's
+ * `router.stack` and call it directly; it now drives a real HTTP GET against
+ * `createDashboardRoutes`, matching the ingress half's existing house pattern
+ * (`app.listen(0, '127.0.0.1')` + `fetch`). This is a brittle-router-internals
+ * fix, not a proxy-router one: the walk it replaces inspects the DASHBOARD
+ * router (createDashboardRoutes), not routes/proxy.js — the proxy half above was
+ * already request-driven — so this file's conversion does not itself unblock the
+ * routes/proxy.js split (LIN-679).
  */
 process.env.NODE_ENV = 'test';
 
@@ -138,32 +147,19 @@ function sessionStores(items) {
   };
 }
 
-function getHandler(router, method, path) {
-  const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
-  assert.ok(layer, `${method.toUpperCase()} ${path} route is registered`);
-  return layer.route.stack[layer.route.stack.length - 1].handle;
-}
-
-function makeReqRes({ params = {} } = {}) {
-  const req = {
-    session: { features: {}, workspaces: [{ urlKey: 'acme', name: 'Acme' }] },
-    workspace: { urlKey: 'acme' },
-    params, query: {}, body: {}, protocol: 'http', get: () => 'localhost'
-  };
-  const res = {
-    statusCode: 200,
-    status(code) { this.statusCode = code; return this; },
-    json(b) { this.jsonBody = b; return this; },
-    send(b) { this.sentBody = b; return this; },
-    end(b) { this.endedWith = b; return this; }
-  };
-  return { req, res };
-}
-
+// GET /workspace/:urlKey/observation/session/:sessionId over real HTTP — the
+// house harness pattern (`app.listen(0, '127.0.0.1')` + `fetch`, CLAUDE.md:317),
+// exercising the actual route registration and the URL encode/decode hop that a
+// direct handler call skips, rather than pulling the handler off `router.stack`.
 async function renderSessionRoute(sessionId, items) {
   const stores = sessionStores(items);
-  const router = createDashboardRoutes({
-    workspaceFromUrl: (req, res, next) => next(),
+  const app = express();
+  app.use(createDashboardRoutes({
+    workspaceFromUrl: (req, res, next) => {
+      req.session = { features: {}, workspaces: [{ urlKey: 'acme', name: 'Acme' }] };
+      req.workspace = { urlKey: 'acme' };
+      next();
+    },
     dispatchQueueStore: stores.dispatchQueueStore,
     agentStatusStore: stores.agentStatusStore,
     observationSessionsStore: null,
@@ -177,11 +173,18 @@ async function renderSessionRoute(sessionId, items) {
     fetchWorkspaceIssues: async () => [],
     getOpenRouterSource: () => 'env',
     getDeployInfo: () => ({})
-  });
-  const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
-  const { req, res } = makeReqRes({ params: { sessionId } });
-  await handler(req, res);
-  return res;
+  }));
+
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  const { port } = server.address();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/workspace/acme/observation/session/${encodeURIComponent(sessionId)}`);
+    const sentBody = await res.text();
+    return { statusCode: res.status, sentBody };
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
 }
 
 // ─── Title extraction ──────────────────────────────────────────────────────────

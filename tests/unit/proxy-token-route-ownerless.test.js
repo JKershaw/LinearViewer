@@ -24,31 +24,38 @@
  * than a reimplementation of it.
  *
  * Run with: node --test tests/unit/proxy-token-route-ownerless.test.js
+ *
+ * NODE_ENV must be set to 'test' BEFORE importing routes/proxy.js: the
+ * module-level proxyTokenCreationLimiter (max 10/15min/IP) is shared across
+ * every createProxyRoutes() instance in the process, and this file makes 8
+ * route-level mints over real HTTP (LIN-2505).
  */
+process.env.NODE_ENV = 'test';
+
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 
 const ENV = 'DISPATCH_OWNERLESS_BROKER_COMPAT';
-const TOKENS_PATH = '/workspace/:urlKey/api/proxy/tokens';
+const TOKENS_PATH = '/workspace/acme/api/proxy/tokens';
 
-function getHandler(router, method, path) {
-  const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
-  assert.ok(layer, `${method.toUpperCase()} ${path} route is registered`);
-  // The LAST handler in the stack is the route's own; earlier entries are
-  // middleware (the creation rate limiter, workspaceFromUrl) that this unit
-  // harness deliberately bypasses.
-  return layer.route.stack[layer.route.stack.length - 1].handle;
-}
-
-function makeRes() {
-  return {
-    statusCode: 200,
-    jsonBody: null,
-    status(code) { this.statusCode = code; return this; },
-    json(body) { this.jsonBody = body; return this; },
-  };
+async function call(app, method, path, body) {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  const { port } = server.address();
+  try {
+    const opts = { method: method.toUpperCase(), headers: { 'Content-Type': 'application/json' } };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    const res = await fetch(`http://127.0.0.1:${port}${path}`, opts);
+    const text = await res.text();
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { parsed = text; }
+    return { statusCode: res.status, jsonBody: parsed };
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
 }
 
 function inMemoryCollection() {
@@ -74,36 +81,41 @@ function inMemoryCollection() {
   };
 }
 
-function buildProxyRouter({ proxyTokenStore }) {
-  return createProxyRoutes({
+// Fresh app per request (a session-injecting `workspaceFromUrl` is baked in at
+// build time), matching this file's own per-test isolation convention.
+function buildProxyApp({ proxyTokenStore, session }) {
+  const app = express();
+  app.use(express.json());
+  app.use(createProxyRoutes({
     proxyTokenStore,
     proxyEventStore: { recordEvent: async () => {} },
     agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, taskSnapshotStore: {},
-    dispatchQueueStore: {}, workspaceFromUrl: (req, res, next) => next(),
+    dispatchQueueStore: {},
+    workspaceFromUrl: (req, res, next) => {
+      req.workspace = { urlKey: 'acme' };
+      req.session = session;
+      next();
+    },
     getWorkspaceAccessToken: () => null, resolveWorkspaceAccess: () => null,
     getWorkspaceOpenRouterKey: async () => null, workspacePreferencesStore: {}, freeTierStore: {},
-  });
+  }));
+  return app;
 }
 
 /**
- * Drive the real handler. `accountId: null` models the ownerless session this
- * ticket is about — a session that authenticated but carries no account stamp.
+ * Drive the real route over HTTP. `accountId: null` models the ownerless
+ * session this ticket is about — a session that authenticated but carries no
+ * account stamp.
  */
-async function createToken(router, { accountId, body }) {
-  const handler = getHandler(router, 'post', TOKENS_PATH);
-  const res = makeRes();
-  await handler({
-    session: { accountId, features: { proxy: true } },
-    workspace: { urlKey: 'acme' },
-    body,
-  }, res);
-  return res;
+async function createToken(proxyTokenStore, { accountId, body }) {
+  const app = buildProxyApp({ proxyTokenStore, session: { accountId, features: { proxy: true } } });
+  return call(app, 'post', TOKENS_PATH, body);
 }
 
 function harness() {
   const collection = inMemoryCollection();
   const proxyTokenStore = new ProxyTokenStore({ collection });
-  return { collection, proxyTokenStore, router: buildProxyRouter({ proxyTokenStore }) };
+  return { collection, proxyTokenStore };
 }
 
 const restore = (t) => {
@@ -118,10 +130,10 @@ describe('LIN-1582 — POST .../api/proxy/tokens and the ownerless switch', () =
   test('compat OFF + bootstrap + ownerless session → 503, and no mint is attempted', async (t) => {
     restore(t);
     process.env[ENV] = 'off';
-    const { collection, router } = harness();
+    const { collection, proxyTokenStore } = harness();
     const warnMock = t.mock.method(console, 'warn', () => {});
 
-    const res = await createToken(router, {
+    const res = await createToken(proxyTokenStore, {
       accountId: null,
       body: { label: 'handoff', scope: 'readWrite', bootstrap: true },
     });
@@ -146,9 +158,9 @@ describe('LIN-1582 — POST .../api/proxy/tokens and the ownerless switch', () =
   test('compat OFF + bootstrap + OWNED session → 201, response shape unchanged', async (t) => {
     restore(t);
     process.env[ENV] = 'off';
-    const { collection, router, proxyTokenStore } = harness();
+    const { collection, proxyTokenStore } = harness();
 
-    const res = await createToken(router, {
+    const res = await createToken(proxyTokenStore, {
       accountId: 'account-A',
       body: { label: 'handoff', scope: 'readWrite', bootstrap: true },
     });
@@ -172,13 +184,13 @@ describe('LIN-1582 — POST .../api/proxy/tokens and the ownerless switch', () =
   test('compat OFF + NON-bootstrap + ownerless session → 201 (the untouched path)', async (t) => {
     restore(t);
     process.env[ENV] = 'off';
-    const { collection, router } = harness();
+    const { collection, proxyTokenStore } = harness();
 
     // The regression that would matter most: the bootstrap and non-bootstrap
     // branches share one createToken call via a ternary spread, so a check placed
     // outside `if (wantBootstrap)` would break every ordinary mint from a session
     // that happens to lack an accountId. The switch was never scoped to these.
-    const res = await createToken(router, {
+    const res = await createToken(proxyTokenStore, {
       accountId: null,
       body: { label: 'ordinary', scope: 'read' },
     });
@@ -193,9 +205,9 @@ describe('LIN-1582 — POST .../api/proxy/tokens and the ownerless switch', () =
   test('compat OFF + non-bootstrap singleUse + ownerless session → 201 (flag still honored)', async (t) => {
     restore(t);
     process.env[ENV] = 'off';
-    const { router } = harness();
+    const { proxyTokenStore } = harness();
 
-    const res = await createToken(router, {
+    const res = await createToken(proxyTokenStore, {
       accountId: null,
       body: { label: 'ordinary', scope: 'read', singleUse: true },
     });
@@ -208,9 +220,9 @@ describe('LIN-1582 — POST .../api/proxy/tokens and the ownerless switch', () =
   test('compat ON (default) + bootstrap + ownerless session → 201 (compat lane preserved)', async (t) => {
     restore(t);
     delete process.env[ENV];
-    const { collection, router } = harness();
+    const { collection, proxyTokenStore } = harness();
 
-    const res = await createToken(router, {
+    const res = await createToken(proxyTokenStore, {
       accountId: null,
       body: { label: 'handoff', scope: 'readWrite', bootstrap: true },
     });
@@ -223,13 +235,13 @@ describe('LIN-1582 — POST .../api/proxy/tokens and the ownerless switch', () =
   test('the string form "bootstrap": "true" is gated too', async (t) => {
     restore(t);
     process.env[ENV] = 'off';
-    const { collection, router } = harness();
+    const { collection, proxyTokenStore } = harness();
     t.mock.method(console, 'warn', () => {});
 
     // The route accepts both the boolean and the string (`bootstrap === 'true'`),
     // so the gate has to key on the same resolved `wantBootstrap` the mint does —
     // not on `req.body.bootstrap === true`, which a form-encoded caller would slip past.
-    const res = await createToken(router, {
+    const res = await createToken(proxyTokenStore, {
       accountId: null,
       body: { label: 'handoff', scope: 'readWrite', bootstrap: 'true' },
     });
@@ -242,18 +254,12 @@ describe('LIN-1582 — POST .../api/proxy/tokens and the ownerless switch', () =
     restore(t);
     process.env[ENV] = 'off';
     const { collection, proxyTokenStore } = harness();
-    const router = buildProxyRouter({ proxyTokenStore });
     t.mock.method(console, 'warn', () => {});
 
-    const handler = getHandler(router, 'post', TOKENS_PATH);
-    const res = makeRes();
     // No accountId anywhere on the session — the shape the optional chain in both
     // the gate and the mint has to tolerate identically.
-    await handler({
-      session: { features: { proxy: true } },
-      workspace: { urlKey: 'acme' },
-      body: { bootstrap: true, scope: 'readWrite' },
-    }, res);
+    const app = buildProxyApp({ proxyTokenStore, session: { features: { proxy: true } } });
+    const res = await call(app, 'post', TOKENS_PATH, { bootstrap: true, scope: 'readWrite' });
 
     assert.equal(res.statusCode, 503, JSON.stringify(res.jsonBody));
     assert.equal(collection._docs.length, 0);
@@ -263,15 +269,9 @@ describe('LIN-1582 — POST .../api/proxy/tokens and the ownerless switch', () =
     restore(t);
     process.env[ENV] = 'off';
     const { collection, proxyTokenStore } = harness();
-    const router = buildProxyRouter({ proxyTokenStore });
 
-    const handler = getHandler(router, 'post', TOKENS_PATH);
-    const res = makeRes();
-    await handler({
-      session: { accountId: null, features: { proxy: false } },
-      workspace: { urlKey: 'acme' },
-      body: { bootstrap: true },
-    }, res);
+    const app = buildProxyApp({ proxyTokenStore, session: { accountId: null, features: { proxy: false } } });
+    const res = await call(app, 'post', TOKENS_PATH, { bootstrap: true });
 
     // LIN-525 #2's defense-in-depth gate must keep precedence: a flag-off caller
     // learns the feature is off, not that their session lacks an owner.
