@@ -25,7 +25,13 @@ import { applyTrashedSignal, isTrashed, TRASHED_STATE } from '../../lib/trashed-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
 const providerSource = readFileSync(join(__dirname, '../../lib/providers/linear/index.js'), 'utf8');
-const instructionsAndDocs = proxySource + readFileSync(join(__dirname, '../../docs/proxy-integration.md'), 'utf8');
+// LIN-2245: the /api/proxy/instructions catalog (where these doc-side
+// Trashed/trashed/409 mentions actually live) moved out of routes/proxy.js
+// into its own pure builder module — read that too, or this assertion goes
+// partly vacuous (satisfied by unrelated code/doc text alone).
+const instructionsAndDocs = proxySource
+  + readFileSync(join(__dirname, '../../lib/proxy-instructions.js'), 'utf8')
+  + readFileSync(join(__dirname, '../../docs/proxy-integration.md'), 'utf8');
 
 // Pull a named gql`...` template literal out of a source file by its const name.
 function extractQuery(source, name) {

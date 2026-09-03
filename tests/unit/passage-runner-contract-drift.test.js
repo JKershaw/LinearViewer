@@ -41,11 +41,14 @@ import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Four sources, four variables — never concatenated (see file header).
+// Five sources, five variables — never concatenated (see file header).
 const docsSource = readFileSync(join(__dirname, '../../docs/passage-runner-prompt.md'), 'utf8');
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
 const factorySource = readFileSync(join(__dirname, '../../lib/dispatch-factory.js'), 'utf8');
 const integrationSource = readFileSync(join(__dirname, '../../docs/proxy-integration.md'), 'utf8');
+// LIN-2245: the /api/proxy/instructions catalog (the source of all 3
+// routes/proxy.js copies below) moved out to its own pure builder module.
+const instructionsSource = readFileSync(join(__dirname, '../../lib/proxy-instructions.js'), 'utf8');
 
 // Slices `source` from `startMarker` up to (not including) `endMarker`. Both
 // markers are literal anchor text, not line numbers, so the slice tracks the
@@ -162,24 +165,36 @@ describe('assertion 5: /dispatch status enum — prose<->prose only (known limit
   // Each source's occurrence count is pinned exactly (not an existence
   // check), so it fails loud if a single copy drops a value OR if the two
   // docs disagree with each other — dropping/diverging even one of the
-  // five real copies (3 in routes/proxy.js, 2 in docs/proxy-integration.md)
-  // goes red. It still does NOT catch a code-side derivation change to the
-  // enum (exactly what 7c6d811d was, adding `blocked`) unless that change
-  // also reaches a prose copy — that limit is real and stays undisclosed
-  // only in the sense that no code-side pin exists at all, which is honest.
+  // five real copies (3 in lib/proxy-instructions.js, 2 in
+  // docs/proxy-integration.md) goes red. It still does NOT catch a
+  // code-side derivation change to the enum (exactly what 7c6d811d was,
+  // adding `blocked`) unless that change also reaches a prose copy — that
+  // limit is real and stays undisclosed only in the sense that no
+  // code-side pin exists at all, which is honest.
   // The runner doc has no status enum of its own — its blocks/blocked-by
   // vocabulary is an unrelated sense and is not a source for this assertion.
+  // LIN-2245: the 3 copies used to live inline in routes/proxy.js's
+  // /api/proxy/instructions catalog; that catalog moved verbatim to
+  // lib/proxy-instructions.js, so routes/proxy.js now carries zero copies.
   const STATUS_ENUM = 'queued|taken|done|failed|blocked|aborted';
 
   function occurrenceCount(source, needle) {
     return source.split(needle).length - 1;
   }
 
-  test('routes/proxy.js prose states the enum in exactly 3 places', () => {
+  test('routes/proxy.js prose states the enum in exactly 0 places (moved to lib/proxy-instructions.js)', () => {
     assert.strictEqual(
       occurrenceCount(proxySource, STATUS_ENUM),
+      0,
+      'routes/proxy.js prose enum copy count drifted — a copy was added back, or the LIN-2245 move regressed'
+    );
+  });
+
+  test('lib/proxy-instructions.js prose states the enum in exactly 3 places', () => {
+    assert.strictEqual(
+      occurrenceCount(instructionsSource, STATUS_ENUM),
       3,
-      'routes/proxy.js prose enum copy count drifted — a copy was added, dropped, or diverged'
+      'lib/proxy-instructions.js prose enum copy count drifted — a copy was added, dropped, or diverged'
     );
   });
 
