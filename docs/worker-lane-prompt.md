@@ -158,13 +158,33 @@ depends on it).
 ## Step 5 — The `[ticket]` marker: gated on evidence, never on intent
 
 At every ticket transition, alongside your ordinary claim/close-out comments, emit one
-feedback-marker line in this form:
+feedback-marker line, in one of these three forms: `[ticket] LIN-XXXX done`,
+`[ticket] LIN-XXXX blocked — <specific reason>`, or
+`[ticket] LIN-XXXX refused — <what acceptance was unmet>`.
 
-```
+**How you must actually write it, in your own turn text — this is the part that gets relayed,
+and getting the shape wrong is silent.** The relay that reads your turn text for this line
+(`walkTicketMarkers` in `simple-dispatcher`) requires the marker to be **unfenced** — never
+inside a ` ``` ` code block, since fenced lines are blanked out before the relay ever looks for
+a marker — and **individually isolated**: its own paragraph, with a blank line (or the very
+start/end of your message) immediately above *and* immediately below it. Emit exactly one
+marker per turn to guarantee this. Two marker lines placed back to back with no blank line
+between them are **both** silently dropped, the same as a marker sitting inside a fence —
+there is no error either way, so the wrong shape reads on every downstream surface as
+"nothing happened here," not as a failure you'd notice.
+
+A turn closing one ticket, written correctly, looks like this in your own message text:
+
+Ticket verified closed, PR merged, CI green.
+
 [ticket] LIN-XXXX done
-[ticket] LIN-XXXX blocked — <specific reason>
-[ticket] LIN-XXXX refused — <what acceptance was unmet>
-```
+
+If you are closing more than one ticket in the same turn, give each marker its own isolated
+paragraph — never stack them on consecutive lines:
+
+[ticket] LIN-XXXX done
+
+[ticket] LIN-YYYY blocked — <specific reason>
 
 This is a lightweight, machine-parseable line for the surfaces that watch lanes (per-ticket
 observation, "ticket N of M", per-session walks) to key off, distinct from your close-out prose.
@@ -173,13 +193,12 @@ only a Linear comment.** Every reader that keys off this convention (`session-te
 `parseTicketMarkers`, the KPI cost-per-task denominator, Observation/Live Console lane chips)
 reads the dispatch feedback stream — a comment-only marker is invisible to all of them (LIN-2423
 measured this in production: markers were landing as comments while every reader read zero).
-You do not need to call anything extra to make this happen: write the marker as an isolated line
-— its own paragraph, nothing else on that line, never inside a fenced code block — in your
-ordinary turn text exactly as shown above, and `simple-dispatcher`'s runner relays it to the
-feedback channel for you automatically (`postTicketMarkerDelta` in `hook.js`, plus a live
-heartbeat-pass emitter in `reapers.js` for a long-running lane), tagged as a `status` feedback
-entry. Keep posting your close-out comment on the board as before — the marker is *additional*,
-never a replacement for it. **`[ticket] LIN-XXXX done` must be gated on exactly the same verified evidence as your close-out
+You do not need to call anything extra to make this happen: write the marker exactly as shown
+in the isolated examples above, in your ordinary turn text, and `simple-dispatcher`'s runner
+relays it to the feedback channel for you automatically (`postTicketMarkerDelta` in `hook.js`,
+plus a live heartbeat-pass emitter in `reapers.js` for a long-running lane), tagged as a
+`status` feedback entry. Keep posting your close-out comment on the board as before — the
+marker is *additional*, never a replacement for it. **`[ticket] LIN-XXXX done` must be gated on exactly the same verified evidence as your close-out
 comment — a landed, CI-green, verified commit — never on "I merged" or "I think I'm finished."**
 An intent-gated marker would be a new premature-done surface, the same bug class the dispatcher
 has already spent real effort eliminating elsewhere. Non-success outcomes are first-class, not
