@@ -22,12 +22,18 @@
  * call may then fail, and the fire-and-forget row survives that." Every
  * assertion below is on the recorded proxy-event rows, never on the
  * (deliberately unreachable) success response body — EXCEPT the HTTP status,
- * which is now asserted alongside every negative (`!events.some(...)`) check:
- * a missing/broken route over HTTP is a silent 404 with NO events at all, so
+ * which is asserted alongside every negative (`!events.some(...)`) check: a
+ * missing/broken route over HTTP is a silent 404 with NO events at all, so
  * without a status assertion every negative check here would pass vacuously
- * (LIN-2505). The expected status is 401 on every live-Linear case (the
- * downstream call fails authentication after the witness fires) and 200
- * under isTestMode.
+ * (LIN-2505). That status assertion is deliberately `!== 404`, not a pinned
+ * code: the live-Linear call downstream of the witness fails authentication
+ * (typically 401), but asserting that exact third-party status made these
+ * cases depend on api.linear.app's live response (LIN-2505 review finding) —
+ * offline, or on any Linear-side status change, the assertion failed for
+ * reasons unrelated to the behaviour under test. `!== 404` still closes the
+ * vacuous-negative hole (verified: a missing-route mutation reproduces
+ * exactly 404) without that third-party coupling. Status is asserted exactly
+ * (200) only under isTestMode, which is fully local/deterministic.
  *
  * Scaffolding mirrors tests/unit/proxy-openrouter-principal-hop.test.js: a
  * real ProxyTokenStore + real HTTP request through the full middleware chain
@@ -227,10 +233,11 @@ describe('LIN-1458 — OpenRouter fallback-credential-source audit note', () => 
       `/api/proxy/issues/${ISSUE_IDENTIFIER}/recommend`
     );
 
-    // The live-Linear call fails authentication downstream of the witness —
-    // asserting this (not just the events array) keeps the negative checks
-    // below from passing vacuously on a route that silently 404s instead.
-    assert.equal(status, 401, `expected the live-Linear call to 401 downstream of the witness, got ${status}`);
+    // A missing/broken route silently 404s with no events at all — asserting
+    // the request actually reached the route (not that value, just not a
+    // missing-route 404) keeps the negative check below from passing
+    // vacuously, without depending on api.linear.app's exact live status.
+    assert.notEqual(status, 404, `expected the request to reach the route, got a missing-route 404`);
     assert.ok(events.length >= 1, 'the terminal response is still logged');
     assert.ok(!events.some(e => e.note === PAID_NOTE || e.note === FREE_NOTE),
       `no fallback note when the creator's own key resolved: ${JSON.stringify(events)}`);
@@ -246,7 +253,7 @@ describe('LIN-1458 — OpenRouter fallback-credential-source audit note', () => 
       `/api/proxy/issues/${ISSUE_IDENTIFIER}/recommend`
     );
 
-    assert.equal(status, 401, `expected the live-Linear call to 401 downstream of the witness, got ${status}`);
+    assert.notEqual(status, 404, `expected the request to reach the route, got a missing-route 404`);
     const paidNotes = events.filter(e => e.note === PAID_NOTE);
     assert.equal(paidNotes.length, 1, `expected exactly one paid-env note: ${JSON.stringify(events)}`);
     assert.equal(paidNotes[0].status, 200, 'the witness row itself is a 200, independent of the eventual response');
@@ -263,7 +270,7 @@ describe('LIN-1458 — OpenRouter fallback-credential-source audit note', () => 
       `/api/proxy/issues/${ISSUE_IDENTIFIER}/recommend`
     );
 
-    assert.equal(status, 401, `expected the live-Linear call to 401 downstream of the witness, got ${status}`);
+    assert.notEqual(status, 404, `expected the request to reach the route, got a missing-route 404`);
     const freeNotes = events.filter(e => e.note === FREE_NOTE);
     const lin961Notes = events.filter(e => e.note === LIN_961_NOTE);
     assert.equal(freeNotes.length, 1, `expected exactly one free-tier fallback note: ${JSON.stringify(events)}`);
@@ -281,7 +288,7 @@ describe('LIN-1458 — OpenRouter fallback-credential-source audit note', () => 
       `/api/proxy/issues/${ISSUE_IDENTIFIER}/recommend?kind=implementation`
     );
 
-    assert.equal(status, 401, `expected the live-Linear call to 401 downstream, got ${status}`);
+    assert.notEqual(status, 404, `expected the request to reach the route, got a missing-route 404`);
     assert.ok(!events.some(e => e.note === PAID_NOTE || e.note === FREE_NOTE),
       `kind-override must bypass the 503 gate AND the witness together: ${JSON.stringify(events)}`);
   });
@@ -310,7 +317,7 @@ describe('LIN-1458 — OpenRouter fallback-credential-source audit note', () => 
       { method: 'POST', body: { issueIdentifier: ISSUE_IDENTIFIER } }
     );
 
-    assert.equal(status, 401, `expected the live-Linear call to 401 downstream of the witness, got ${status}`);
+    assert.notEqual(status, 404, `expected the request to reach the route, got a missing-route 404`);
     const paidNotes = events.filter(e => e.note === PAID_NOTE);
     assert.equal(paidNotes.length, 1, `expected exactly one witness row for the whole request: ${JSON.stringify(events)}`);
   });
@@ -326,7 +333,7 @@ describe('LIN-1458 — OpenRouter fallback-credential-source audit note', () => 
       { method: 'POST' }
     );
 
-    assert.equal(status, 401, `expected the live-Linear call to 401 downstream of the witness, got ${status}`);
+    assert.notEqual(status, 404, `expected the request to reach the route, got a missing-route 404`);
     const paidNotes = events.filter(e => e.note === PAID_NOTE);
     assert.equal(paidNotes.length, 1, `expected exactly one paid-env note: ${JSON.stringify(events)}`);
   });
@@ -342,7 +349,7 @@ describe('LIN-1458 — OpenRouter fallback-credential-source audit note', () => 
       { method: 'POST' }
     );
 
-    assert.equal(status, 401, `expected the live-Linear call to 401 downstream of the witness, got ${status}`);
+    assert.notEqual(status, 404, `expected the request to reach the route, got a missing-route 404`);
     const paidNotes = events.filter(e => e.note === PAID_NOTE);
     assert.equal(paidNotes.length, 1, `expected exactly one paid-env note: ${JSON.stringify(events)}`);
   });
