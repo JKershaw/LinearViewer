@@ -52,26 +52,37 @@ test.describe('Feedback widget', () => {
     await expect(trigger).toBeFocused()
   })
 
-  test('does not steal focus back when the panel is closed from the trigger itself', async ({ page, seedLocal }) => {
-    // The other half of the branch: `minimize()` only restores focus when focus
-    // was still inside the panel. Without this, a test could pass by focusing
-    // the trigger unconditionally, which would fight a user who had already
-    // moved on.
+  test('does not steal focus back when focus had already left the panel', async ({ page, seedLocal }) => {
+    // The other half of `minimize()`'s branch: it restores focus ONLY when
+    // focus was still inside the panel, so it cannot yank a user back from
+    // wherever they had moved on to.
+    //
+    // The close is dispatched PROGRAMMATICALLY, and that is the whole point of
+    // the test. A real `.click()` focuses the trigger in Chromium as a side
+    // effect, so the assertion would hold whether or not the guard exists —
+    // an earlier version of this test did exactly that and could not fail
+    // either way, which review round 3 caught. A synthetic `click` event runs
+    // the same handler without moving focus, so the guard is the only thing
+    // that decides where focus ends up: delete it and focus jumps to the
+    // trigger and this goes red.
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
     const trigger = page.getByTestId('nav-feedback-trigger')
+    const footerToggle = page.getByTestId('footer-feedback-toggle')
 
     await trigger.click()
     await expect(page.getByTestId('feedback-popup')).toBeVisible()
 
-    // Move focus out of the panel, then close via the trigger.
-    await page.getByTestId('footer-feedback-toggle').focus()
-    await expect(page.getByTestId('footer-feedback-toggle')).toBeFocused()
-    await trigger.click()
+    // Move focus out of the panel entirely, then close it without touching it.
+    await footerToggle.focus()
+    await expect(footerToggle).toBeFocused()
+    await page.evaluate(() => {
+      document.querySelector('[data-testid="nav-feedback-trigger"]')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
     await expect(page.getByTestId('feedback-popup')).toBeHidden()
-    // The click itself put focus on the trigger; what must NOT have happened is
-    // a restore firing on a panel that no longer held focus.
-    await expect(page.getByTestId('feedback-message')).not.toBeFocused()
+    await expect(footerToggle).toBeFocused()
   })
 
   test('opens a popup with message, priority, and screenshot fields', async ({ page, seedLocal }) => {

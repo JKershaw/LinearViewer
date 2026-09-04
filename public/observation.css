@@ -38,8 +38,13 @@
    Recorded here rather than quietly deleted because LIN-2298 moved the
    feedback trigger INTO that sticky header, so "does anything overlay this
    column" is now a live question on this page and the old answer was wrong.
-   What overlays it is the nav, deliberately and with a named mitigation;
-   nothing else does, which tests/e2e/observation.spec.js asserts by name. */
+
+   The answer, measured: nothing reaches the feed's last card or its `open ↗`
+   control — not the deleted FAB, and not the sticky nav either, which is
+   top-pinned while those targets rest near the bottom at max scroll.
+   tests/e2e/observation.spec.js asserts a flat zero at 320/360/390/430
+   against fixed AND sticky elements. See the fuller note on `.obs-page`
+   below. */
 
 .obs-page {
   max-width: 480px;

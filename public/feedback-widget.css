@@ -48,8 +48,10 @@
 
    The PANEL below stays `position: fixed`. That is deliberate and is not the
    defect: it is hidden until the user opens it, so it covers content only when
-   the user asked it to. The sweeps skip it while hidden (a `[hidden]` element
-   has a zero-area rect) and it is excluded by name while open. */
+   the user asked it to. Every sweep runs with the panel CLOSED, where a
+   `[hidden]` element's zero-area rect drops it from the candidate set on its
+   own — there is no name-based exclusion anywhere in the suite, and no sweep
+   opens the panel. */
 
 /* The nav trigger (LIN-2298). Rendered by `renderFeedbackTrigger`
    (lib/components/navbar.js) into `.nav-actions`, so it inherits `.nav-action`

@@ -34,14 +34,16 @@
 // this column any more" was asserted by a witness structurally incapable of
 // seeing the thing that does.
 //
-// So both are swept, and callers deal with the deliberate one EXPLICITLY rather
-// than having the filter hide it. tests/e2e/observation.spec.js — where the nav
-// really does pass over the feed — asserts that the sticky nav is the ONLY
-// thing covering the card, naming anything else in the failure. That is
-// strictly better than an exclusion list: an exclusion would empty the
-// candidate set on that page and hand back a green result proving nothing,
-// while this way a NEW overlay is caught and the one deliberate overlay is a
-// visible, argued decision instead of a silent filter rule.
+// So both are swept, and no caller filters or excludes anything: every sweep in
+// the suite asserts a flat zero. An intermediate version of this branch let
+// tests/e2e/observation.spec.js tolerate the sticky nav by name, on the
+// reasoning that a sticky header does pass over scrolled content. Measurement
+// killed that: the nav records ZERO overlaps against the Observation targets at
+// all four swept widths, because it is pinned to the top of the viewport while
+// those targets rest near the bottom at max scroll. The allow-rule was dead
+// code inside an acceptance witness, and it would have absorbed a real overlay
+// whose label merely contained the matched substring. Tolerating nothing is
+// both truer and stricter.
 //
 // There is deliberately NO `exclude` parameter. An earlier version had one, and
 // prose describing a panel-open sweep that no caller ever wrote — dead surface

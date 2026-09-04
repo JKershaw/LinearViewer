@@ -110,9 +110,12 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     // `.nav-bar` is `position: sticky; top: 0` and now hosts the feedback
     // trigger (LIN-2298). A sweep blind to sticky would let the prose claim
     // "nothing floats over this content" while the header does exactly that,
-    // which is what the review objected to. This pins that sticky is in the
-    // candidate vocabulary — the fact the nav is then EXCLUDED by name at the
-    // Observation call site is a separate, visible decision.
+    // which is what review round 1 objected to. This pins that sticky is in the
+    // candidate vocabulary at all.
+    //
+    // No caller excludes or tolerates the nav — every sweep asserts a flat
+    // zero. It simply never reaches those targets, which is measured rather
+    // than assumed (see the Observation acceptance).
     const { urlKey } = await seedLocal()
     await page.setViewportSize({ width: 360, height: 844 })
     await page.goto(`/workspace/${urlKey}/`)
