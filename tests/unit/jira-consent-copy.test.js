@@ -116,8 +116,14 @@ describe('LIN-2302 instance 1 — Jira API-token consent copy', () => {
     // So: no negation may appear anywhere in the same sentence as a write verb,
     // in either order. Checked per sentence rather than per paragraph so a
     // legitimate negation elsewhere ("we never store your token") stays legal.
+    // `writ\w*` is deliberately NOT in this list. It over-fires on legitimate
+    // copy about the CREDENTIAL rather than the issue surface — "we never
+    // write your token to disk" is a true, useful sentence and must stay
+    // legal. The remaining verbs are all about issues, comments and labels,
+    // which is the capability this paragraph has to be honest about. A
+    // "no write access" claim is still caught, by FALSE_CLAIMS above.
     const NEGATION = String.raw`\b(?:never|not|no|cannot|can't|won't|will not|unable to|without)\b`;
-    const WRITE_VERB = String.raw`\b(?:chang\w*|updat\w*|writ\w*|modif\w*|edit\w*|comment\w*|label\w*)\b`;
+    const WRITE_VERB = String.raw`\b(?:chang\w*|updat\w*|modif\w*|edit\w*|comment\w*|label\w*)\b`;
     for (const sentence of consentCopy().split(/(?<=[.!?])\s+/)) {
       assert.doesNotMatch(
         sentence,
@@ -157,12 +163,32 @@ describe('LIN-2302 instance 1 — Jira API-token consent copy', () => {
     for (const op of UNIMPLEMENTED) {
       assert.equal(jira.supports(op), false, `precondition: Jira still does not implement ${op}`);
     }
-    // `\b`, not a trailing space: `|` binds loosest, so `/upload|attachments? /`
-    // meant "upload" OR "attachments<space>" and missed the natural
-    // sentence-final "…and adding attachments." (review finding).
-    assert.doesNotMatch(copy, /\bcreat\w*\s+(?:new\s+)?(?:issues?|tickets?)\b/i, 'createIssue is not implemented on Jira');
-    assert.doesNotMatch(copy, /\b(?:upload\w*|attach(?:ment)?s?)\b/i, 'uploadFile is not implemented on Jira');
-    assert.doesNotMatch(copy, /\blink\w*\s+issues?\b/i, 'createRelation is not implemented on Jira');
+    // These bans are POLARITY-AWARE, which is the mirror of the fix applied to
+    // the disclosure check above. A first version banned the mention outright,
+    // so a TRUTHFUL sentence — "Harbour cannot create new issues." — failed the
+    // test. That fails closed (it costs an author an edit rather than letting a
+    // falsehood through) but it is still a guard rejecting a correct claim, so
+    // only an un-negated promise counts.
+    //
+    // `\b` and `\w*`, not a trailing space: `|` binds loosest, so
+    // `/upload|attachments? /` meant "upload" OR "attachments<space>" and
+    // missed both "…adding attachments." and "attaching" (review findings).
+    const NOT_NEGATED = (pattern) => {
+      for (const sentence of copy.split(/(?<=[.!?])\s+/)) {
+        if (!pattern.test(sentence)) continue;
+        if (/\b(?:never|not|no|cannot|can't|won't|will not|unable to)\b/i.test(sentence)) continue;
+        return sentence; // an affirmative promise of an unimplemented write
+      }
+      return null;
+    };
+    for (const [op, pattern] of [
+      ['createIssue', /\bcreat\w*\s+(?:new\s+)?(?:issues?|tickets?)\b/i],
+      ['uploadFile', /\b(?:upload\w*|attach\w*)\b/i],
+      ['createRelation', /\blink\w*\s+issues?\b/i],
+    ]) {
+      const offending = NOT_NEGATED(pattern);
+      assert.equal(offending, null, `${op} is not implemented on Jira, but the copy promises it: ${JSON.stringify(offending)}`);
+    }
   });
 
   test('distinguishes the token’s authority from what Harbour exercises', () => {
