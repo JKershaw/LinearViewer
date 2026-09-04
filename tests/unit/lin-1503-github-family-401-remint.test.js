@@ -24,7 +24,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 function getHandleUnauthorizedErrorBody() {
-  const startMarker = 'async function handleUnauthorizedError(workspace, session, teamId, openRouterSource, res) {';
+  const startMarker = 'async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res) {';
   const startIdx = SERVER_SRC.indexOf(startMarker);
   assert.notEqual(startIdx, -1, 'expected to find handleUnauthorizedError in server.js');
   const endIdx = SERVER_SRC.indexOf('\n/**\n * Home page', startIdx);
@@ -74,7 +74,7 @@ describe('LIN-1503: handleUnauthorizedError GitHub-family branch (source-text pi
   test('the render call is explicitly awaited so a rejection reaches catch (renderError), not catch (remintError)', () => {
     const body = getHandleUnauthorizedErrorBody();
     const guardIdx = body.indexOf("if (declaration.strategy === REFRESH_STRATEGY.REMINT) {");
-    const renderReturnIdx = body.indexOf('return await renderDashboardAfterRefresh(workspace, session, teamId, openRouterSource, res);', guardIdx);
+    const renderReturnIdx = body.indexOf('return await renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res);', guardIdx);
     assert.notEqual(renderReturnIdx, -1, 'expected `return await renderDashboardAfterRefresh(...)` — a bare `return renderDashboardAfterRefresh(...)` without await would not route a rejection through catch (renderError)');
   });
 

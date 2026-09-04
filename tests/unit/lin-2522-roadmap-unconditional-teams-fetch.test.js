@@ -82,6 +82,9 @@ async function runRoadmapRoute({ isTestMode, teamId, fetchedTeams = [], matchedT
     getOpenRouterSource: () => null,
     getFeatureFlags: () => ({ roadmap: true }),
     resolveTeamSelection: async () => ({ teamId }),
+    // LIN-2526: the route now also resolves an assignee filter uniformly
+    // (unused by roadmap's own render, but threaded to the shared 401 tail).
+    resolveAssigneeSelection: async () => ({ selectedAssignee: 'all', resolvedAssigneeName: null }),
     getProviderForWorkspace: () => provider,
     getWorkspaceCallScope: () => ({}),
     testMockTeams: [{ id: 'mock-team-1', name: 'Mock Team' }],

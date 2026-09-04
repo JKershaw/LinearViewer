@@ -50,7 +50,7 @@ const ensureValidTokenSrc = () => sliceBetween(
 );
 
 const handleUnauthorizedErrorSrc = () => sliceBetween(
-  'async function handleUnauthorizedError(workspace, session, teamId, openRouterSource, res) {',
+  'async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res) {',
   '\n/**\n * Home page'
 );
 
@@ -195,7 +195,7 @@ async function runReactive(opts) {
     'handleUnauthorizedError',
   ].join('\n');
   const fn = vm.runInContext(script, context);
-  await fn(opts.workspace, context.__session, 'team-1', null, res);
+  await fn(opts.workspace, context.__session, 'team-1', { selectedAssignee: 'all', resolvedAssigneeName: null }, null, res);
   return { calls, res, session: context.__session };
 }
 
@@ -387,7 +387,7 @@ describe('LIN-1887 Step 1(c) — reactive: a `none` provider survives its first 
       sliceBetween('function sendRelinkNotice(workspace, res) {', '\n/**\n * Middleware to ensure access token is valid'),
       'handleUnauthorizedError',
     ].join('\n'), ctx);
-    await fn(workspace, ctx.__session, 'team-1', null, res);
+    await fn(workspace, ctx.__session, 'team-1', { selectedAssignee: 'all', resolvedAssigneeName: null }, null, res);
 
     assert.equal(ctx.__session.workspaces.length, 1, 'a dead Jira token must not strand a co-resident workspace');
     assert.equal(calls.sessionDestroyed, false);
@@ -471,7 +471,7 @@ describe('LIN-1887 close-out F2 — a definitively-revoked non-destructive crede
       sliceBetween('function sendRelinkNotice(workspace, res) {', '\n/**\n * Middleware to ensure access token is valid'),
       'handleUnauthorizedError',
     ].join('\n'), ctx);
-    await fn(workspace, ctx.__session, 'team-1', null, res);
+    await fn(workspace, ctx.__session, 'team-1', { selectedAssignee: 'all', resolvedAssigneeName: null }, null, res);
 
     assert.deepEqual(calls.durableDeletes, [['acct-1', 'acme', 'jira']]);
     assert.deepEqual(calls.durableDeleteAlls, [], 'handleWorkspaceRemoval must still not be reached');
@@ -503,7 +503,7 @@ describe('LIN-1887 close-out F2 — a definitively-revoked non-destructive crede
       sliceBetween('function sendRelinkNotice(workspace, res) {', '\n/**\n * Middleware to ensure access token is valid'),
       'handleUnauthorizedError',
     ].join('\n'), ctx);
-    await fn({ id: 'w-x', urlKey: 'acme', provider: 'jira' }, ctx.__session, 'team-1', null, res);
+    await fn({ id: 'w-x', urlKey: 'acme', provider: 'jira' }, ctx.__session, 'team-1', { selectedAssignee: 'all', resolvedAssigneeName: null }, null, res);
     assert.deepEqual(calls.durableDeletes, []);
   });
 

@@ -112,7 +112,7 @@ describe('LIN-1524 accepted behaviour: legacy no-accountId session loses its wor
   });
 
   test('handleUnauthorizedError\'s 401 gate does not read workspace.refreshToken — accepted, per the option-A decision (do not reintroduce this as a "fix" without revisiting LIN-1524)', () => {
-    const startIdx = SERVER_SRC.indexOf('async function handleUnauthorizedError(workspace, session, teamId, openRouterSource, res) {');
+    const startIdx = SERVER_SRC.indexOf('async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res) {');
     assert.notEqual(startIdx, -1, 'expected to find handleUnauthorizedError in server.js');
     const endIdx = SERVER_SRC.indexOf('\n/**\n * Home page', startIdx);
     assert.notEqual(endIdx, -1, 'expected to find the end of handleUnauthorizedError (the next route\'s docstring)');
