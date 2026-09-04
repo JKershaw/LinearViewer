@@ -1294,8 +1294,13 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
     const matchedIds = new Set(
       issues.filter(issue => issue.assignee?.name === assigneeName).map(nodeKey)
     );
-    const relevantIds = expandToTreeContext(issues, matchedIds);
-    issues = issues.filter(issue => relevantIds.has(nodeKey(issue)));
+    // LIN-2526: a resolved name matching nothing in the loaded set (most
+    // notably `me` for a viewer with no assigned issues) degrades SILENTLY to
+    // unfiltered rather than rendering an empty dashboard — no visible error.
+    if (matchedIds.size > 0) {
+      const relevantIds = expandToTreeContext(issues, matchedIds);
+      issues = issues.filter(issue => relevantIds.has(nodeKey(issue)));
+    }
   }
 
   // Build issue tree structure (parent-child relationships)
@@ -1431,7 +1436,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
  * seam re-reads the durable record itself (a cheap redundant point-read past the
  * caller's gate), which is what lets it coalesce on the shared key.
  */
-async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res, { provider, exchange } = {}) {
+async function handleTokenRefreshAndRetry(workspace, session, teamId, assigneeState, openRouterSource, res, { provider, exchange } = {}) {
   const refreshed = await refreshOwnerCredential({
     ownerAccountId: session.accountId,
     urlKey: workspace.urlKey,
@@ -1451,7 +1456,7 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
   applyAccessTokenToWorkspace(workspace, refreshed.token, refreshed.expiresAt);
   await saveSession(session);
   console.log('Token refreshed after 401, retrying request');
-  return renderDashboardAfterRefresh(workspace, session, teamId, openRouterSource, res);
+  return renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res);
 }
 
 /**
@@ -1460,8 +1465,13 @@ async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouter
  * GitHub-family branch in handleUnauthorizedError can reuse the same render tail
  * without duplicating it, and without widening handleTokenRefreshAndRetry's own
  * Linear-specific refresh scope.
+ *
+ * LIN-2526 (F2): this path always re-renders as the dashboard regardless of
+ * which of the five routes triggered the 401, so it must carry the same
+ * assignee state a direct dashboard load would — otherwise `?assignee=`
+ * silently drops after a credential refresh.
  */
-async function renderDashboardAfterRefresh(workspace, session, teamId, openRouterSource, res) {
+async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res) {
   // Load custom prompts (non-blocking, fallback to empty)
   let customPrompts = [];
   try {
@@ -1469,12 +1479,16 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, openRoute
   } catch (e) { /* non-fatal */ }
 
   const deployInfo = getDeployInfo()
+  const provider = getProviderForWorkspace(workspace);
   // Pass urlKey so the periodicals group renders consistently after a token
   // refresh, matching the primary dashboard route (LIN-341).
-  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
+  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName });
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
+    availableAssignees,
+    selectedAssignee: assigneeState.selectedAssignee,
+    canFilterByMe: provider.supports('viewer'),
     workspaces: session.workspaces,
     openRouterSource,
     deployInfo,
@@ -1490,7 +1504,7 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, openRoute
 /**
  * Handles 401 Unauthorized errors from the Linear API.
  */
-async function handleUnauthorizedError(workspace, session, teamId, openRouterSource, res) {
+async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res) {
   // PAT tokens cannot be refreshed — show a clear error
   if (workspace.isPAT) {
     const html = renderErrorPage('Access Token Invalid',
@@ -1613,7 +1627,7 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
       // one above — the re-mint already succeeded, so a render failure (e.g.
       // the same rate limit hitting again) must preserve the workspace and
       // fail only this request, retryably.
-      return await renderDashboardAfterRefresh(workspace, session, teamId, openRouterSource, res);
+      return await renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res);
     } catch (renderError) {
       console.error('Post-remint dashboard render failed (workspace preserved):', renderError);
       return serviceUnavailable.html(res);
@@ -1650,7 +1664,7 @@ async function handleUnauthorizedError(workspace, session, teamId, openRouterSou
       // LIN-1887 Step 7: an OAuth Jira binding DOES have something to refresh,
       // which is what Phase 1's branch could not say. Basic Jira still reaches
       // the non-destructive response below (it has no durable record), unchanged.
-      return await handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res, { provider, exchange });
+      return await handleTokenRefreshAndRetry(workspace, session, teamId, assigneeState, openRouterSource, res, { provider, exchange });
     } catch (refreshError) {
       console.error('Token refresh failed after 401:', refreshError);
       // Step 7's invariant, enforced by the declaration rather than by a
@@ -2529,10 +2543,61 @@ async function resolveTeamSelection(req, workspace) {
 }
 
 /**
+ * Resolve the assignee filter for a workspace-scoped request (LIN-2526).
+ *
+ * URL-param only — unlike resolveTeamSelection, nothing here is persisted or
+ * restored; `?assignee=` absent means unfiltered ('all'), full stop. Called
+ * uniformly from all five team-filterable routes (dashboard-only wiring
+ * happens where the caller decides whether to thread `resolvedAssigneeName`
+ * into fetchAndPrepareProjects — see the `/` route below) so the shared
+ * post-401 refresh/retry chain, which always re-renders as the dashboard
+ * regardless of which route triggered it, has a uniform assignee state to
+ * carry rather than a special-cased one (F2).
+ *
+ * `me` degrades SILENTLY to unfiltered on two of its three failure paths:
+ * the provider not supporting `viewer`, or `viewer()` itself throwing. The
+ * third — the resolved display name matching no issue in the loaded set —
+ * can't be detected here (no issues are loaded yet); it degrades the same
+ * way downstream, in fetchAndPrepareProjects's filter seam.
+ *
+ * @param {import('express').Request} req
+ * @param {import('./lib/providers/interface.js').ProviderInterface} provider
+ * @param {*} scope - the provider call scope (getWorkspaceCallScope's output)
+ * @returns {Promise<{selectedAssignee: string, resolvedAssigneeName: string|null}>}
+ */
+async function resolveAssigneeSelection(req, provider, scope) {
+  const rawAssignee = req.query.assignee;
+
+  if (!rawAssignee || rawAssignee === 'all') {
+    return { selectedAssignee: 'all', resolvedAssigneeName: null };
+  }
+
+  if (rawAssignee === 'me') {
+    if (!provider.supports('viewer')) {
+      return { selectedAssignee: 'all', resolvedAssigneeName: null };
+    }
+    try {
+      const viewer = await provider.viewer(scope);
+      const name = viewer?.name || null;
+      if (!name) {
+        return { selectedAssignee: 'all', resolvedAssigneeName: null };
+      }
+      return { selectedAssignee: 'me', resolvedAssigneeName: name };
+    } catch (err) {
+      console.error('provider.viewer() failed resolving ?assignee=me:', err);
+      return { selectedAssignee: 'all', resolvedAssigneeName: null };
+    }
+  }
+
+  return { selectedAssignee: rawAssignee, resolvedAssigneeName: rawAssignee };
+}
+
+/**
  * Workspace project view - renders the interactive tree view.
  *
  * Query parameters:
  * - team: Optional team ID to filter issues by (or 'all' for all teams)
+ * - assignee: Optional assignee name to filter issues by ('me' or 'all') — dashboard-only (LIN-2526)
  */
 app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace
@@ -2540,6 +2605,11 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
 
   // LIN-2521: shared persist/restore rule (5 routes + the refresh-retry path).
   const { teamId } = await resolveTeamSelection(req, workspace);
+
+  // LIN-2526: dashboard-only assignee filter — URL-param only, no persistence.
+  const provider = getProviderForWorkspace(workspace);
+  const assigneeState = await resolveAssigneeSelection(req, provider, getWorkspaceCallScope(workspace));
+  const canFilterByMe = provider.supports('viewer');
 
   // Determine OpenRouter connection status for nav bar
   const openRouterSource = getOpenRouterSource(req);
@@ -2551,11 +2621,14 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true });
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName });
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
       selectedTeamId,
+      availableAssignees,
+      selectedAssignee: assigneeState.selectedAssignee,
+      canFilterByMe,
       workspaces: req.session.workspaces,
       openRouterSource,
       deployInfo,
@@ -2572,7 +2645,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
 
     // Handle 401 Unauthorized - attempt refresh or remove workspace
     if (isAuthError(error)) {
-      return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
+      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res);
     }
 
     // Generic error - show a classified, self-diagnosing error page so an
@@ -2603,6 +2676,10 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
 
   // LIN-2521: shared persist/restore rule (5 routes + the refresh-retry path).
   const { teamId } = await resolveTeamSelection(req, workspace);
+  // LIN-2526: resolved uniformly on all five routes (even though this page
+  // never applies it) so the shared post-401 refresh tail — which always
+  // re-renders as the dashboard — has a consistent assignee state to carry.
+  const assigneeState = await resolveAssigneeSelection(req, getProviderForWorkspace(workspace), getWorkspaceCallScope(workspace));
 
   try {
     // Load custom prompts (non-blocking, fallback to empty)
@@ -2642,7 +2719,7 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
     console.error('Swipe page error:', error);
 
     if (isAuthError(error)) {
-      return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
+      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res);
     }
 
     const html = renderUpstreamAwareErrorPage(error, {
@@ -2665,6 +2742,10 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
   const openRouterSource = getOpenRouterSource(req);
   // LIN-2521: shared persist/restore rule (5 routes + the refresh-retry path).
   const { teamId } = await resolveTeamSelection(req, workspace);
+  // LIN-2526: resolved uniformly on all five routes (even though this page
+  // never applies it) so the shared post-401 refresh tail — which always
+  // re-renders as the dashboard — has a consistent assignee state to carry.
+  const assigneeState = await resolveAssigneeSelection(req, getProviderForWorkspace(workspace), getWorkspaceCallScope(workspace));
 
   try {
     // Use swim sample data if session flag is set (for E2E tests/screenshots)
@@ -2687,7 +2768,7 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
     console.error('Swim page error:', error);
 
     if (isAuthError(error)) {
-      return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
+      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res);
     }
 
     const html = renderUpstreamAwareErrorPage(error, {
@@ -2717,6 +2798,10 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
 
   // LIN-2521: shared persist/restore rule (5 routes + the refresh-retry path).
   const { teamId } = await resolveTeamSelection(req, workspace);
+  // LIN-2526: resolved uniformly on all five routes (even though this page
+  // never applies it) so the shared post-401 refresh tail — which always
+  // re-renders as the dashboard — has a consistent assignee state to carry.
+  const assigneeState = await resolveAssigneeSelection(req, getProviderForWorkspace(workspace), getWorkspaceCallScope(workspace));
 
   try {
     // shipSample = dense fixture (8 projects, 6 WIP, ~36 cards) for density tests.
@@ -2758,7 +2843,7 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
     console.error('Ship page error:', error);
 
     if (isAuthError(error)) {
-      return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
+      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res);
     }
 
     const html = renderUpstreamAwareErrorPage(error, {
@@ -2786,6 +2871,10 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
 
   // LIN-2521: shared persist/restore rule (5 routes + the refresh-retry path).
   const { teamId } = await resolveTeamSelection(req, workspace);
+  // LIN-2526: resolved uniformly on all five routes (even though this page
+  // never applies it) so the shared post-401 refresh tail — which always
+  // re-renders as the dashboard — has a consistent assignee state to carry.
+  const assigneeState = await resolveAssigneeSelection(req, getProviderForWorkspace(workspace), getWorkspaceCallScope(workspace));
 
   try {
     // Fetch raw data — roadmap needs raw issues for velocity/queue calculations.
@@ -2839,7 +2928,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
     console.error('Roadmap page error:', error);
 
     if (isAuthError(error)) {
-      return handleUnauthorizedError(workspace, req.session, teamId, openRouterSource, res);
+      return handleUnauthorizedError(workspace, req.session, teamId, assigneeState, openRouterSource, res);
     }
 
     const html = renderUpstreamAwareErrorPage(error, {

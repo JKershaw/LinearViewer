@@ -43,7 +43,7 @@ const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 /** The full body of handleUnauthorizedError, sliced by its docstring bounds. */
 function sliceHandleUnauthorizedErrorBody(source = SERVER_SRC) {
-  const startMarker = 'async function handleUnauthorizedError(workspace, session, teamId, openRouterSource, res) {';
+  const startMarker = 'async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res) {';
   const startIdx = source.indexOf(startMarker);
   assert.notEqual(startIdx, -1, 'expected to find handleUnauthorizedError in server.js');
   const endIdx = source.indexOf('\n/**\n * Home page', startIdx);
@@ -208,7 +208,7 @@ async function runHandleUnauthorizedError({
   const script = [
     sliceHandleWorkspaceRemoval(source),
     '',
-    'async function __runFull(workspace, session, teamId, openRouterSource, res) {',
+    'async function __runFull(workspace, session, teamId, assigneeState, openRouterSource, res) {',
     handleUnauthorizedErrorInnerBody(source),
     '}',
     '__runFull'
@@ -227,7 +227,7 @@ async function runHandleUnauthorizedError({
     context
   )(realFn, calls);
 
-  const result = await wrapped(workspace, session, 'team-1', null, res);
+  const result = await wrapped(workspace, session, 'team-1', { selectedAssignee: 'all', resolvedAssigneeName: null }, null, res);
   return { result, calls, session, res, workspace };
 }
 

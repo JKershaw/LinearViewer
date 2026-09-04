@@ -95,7 +95,7 @@ describe('LIN-2521 — resolveTeamSelection is the sole req.query.team read site
   });
 
   test('each of the five routes forwards its OWN resolved teamId into handleUnauthorizedError (never a shared/global one)', () => {
-    const calls = [...SERVER_SRC.matchAll(/return handleUnauthorizedError\(workspace, req\.session, teamId, openRouterSource, res\);/g)];
+    const calls = [...SERVER_SRC.matchAll(/return handleUnauthorizedError\(workspace, req\.session, teamId, assigneeState, openRouterSource, res\);/g)];
     assert.equal(calls.length, 5, `expected 5 handleUnauthorizedError call sites carrying the route-local teamId, found ${calls.length}`);
   });
 });
@@ -103,29 +103,52 @@ describe('LIN-2521 — resolveTeamSelection is the sole req.query.team read site
 describe('LIN-2521 — the refresh-retry chain threads teamId through, never re-reads req.query.team', () => {
   test('handleTokenRefreshAndRetry accepts teamId and forwards it unchanged to renderDashboardAfterRefresh', () => {
     const body = sliceFunction('handleTokenRefreshAndRetry',
-      'async function handleTokenRefreshAndRetry(workspace, session, teamId, openRouterSource, res, { provider, exchange } = {}) {');
+      'async function handleTokenRefreshAndRetry(workspace, session, teamId, assigneeState, openRouterSource, res, { provider, exchange } = {}) {');
     assert.doesNotMatch(body, /req\.query/, 'must never read req.query directly — it has no req in scope');
-    assert.match(body, /return renderDashboardAfterRefresh\(workspace, session, teamId, openRouterSource, res\);/,
+    assert.match(body, /return renderDashboardAfterRefresh\(workspace, session, teamId, assigneeState, openRouterSource, res\);/,
       'must forward the SAME teamId parameter it received, not re-derive one');
   });
 
   test('renderDashboardAfterRefresh threads teamId into fetchAndPrepareProjects and the resulting selectedTeamId/teams into renderPage', () => {
     const body = sliceFunction('renderDashboardAfterRefresh',
-      'async function renderDashboardAfterRefresh(workspace, session, teamId, openRouterSource, res) {');
+      'async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res) {');
     assert.doesNotMatch(body, /req\.query/, 'must never read req.query directly — it has no req in scope');
-    assert.match(body, /fetchAndPrepareProjects\(workspace, teamId, null, workspace\.urlKey, \{ slim: true \}\)/,
+    assert.match(body, /fetchAndPrepareProjects\(workspace, teamId, null, workspace\.urlKey, \{ slim: true, assigneeName: assigneeState\.resolvedAssigneeName \}\)/,
       'must pass the received teamId into fetchAndPrepareProjects');
     // The destructure that captures selectedTeamId/teams off that same call.
-    assert.match(body, /const \{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated \} = await fetchAndPrepareProjects/);
+    assert.match(body, /const \{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees \} = await fetchAndPrepareProjects/);
     assert.match(body, /teams,\s*\n\s*selectedTeamId,/, 'renderPage must receive teams/selectedTeamId from the SAME resolved fetch, proving the 401-refresh re-render preserves them');
   });
 
   test('handleUnauthorizedError accepts teamId and forwards it unchanged to both renderDashboardAfterRefresh and handleTokenRefreshAndRetry, never re-reading req.query', () => {
     const body = sliceFunction('handleUnauthorizedError',
-      'async function handleUnauthorizedError(workspace, session, teamId, openRouterSource, res) {');
+      'async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res) {');
     assert.doesNotMatch(body, /req\.query/, 'must never read req.query directly — it has no req in scope');
-    assert.match(body, /return await renderDashboardAfterRefresh\(workspace, session, teamId, openRouterSource, res\);/);
-    assert.match(body, /return await handleTokenRefreshAndRetry\(workspace, session, teamId, openRouterSource, res, \{ provider, exchange \}\);/);
+    assert.match(body, /return await renderDashboardAfterRefresh\(workspace, session, teamId, assigneeState, openRouterSource, res\);/);
+    assert.match(body, /return await handleTokenRefreshAndRetry\(workspace, session, teamId, assigneeState, openRouterSource, res, \{ provider, exchange \}\);/);
+  });
+});
+
+describe('LIN-2526 — resolveAssigneeSelection is threaded the same way teamId is', () => {
+  test('resolveAssigneeSelection is called from all five team-filterable routes', () => {
+    // The dashboard route reuses its own `provider` local (needed separately
+    // for canFilterByMe) rather than re-deriving it inline, so it matches a
+    // slightly different call shape than the other four routes.
+    const genericCallSites = [...SERVER_SRC.matchAll(/const assigneeState = await resolveAssigneeSelection\(req, getProviderForWorkspace\(workspace\), getWorkspaceCallScope\(workspace\)\);/g)];
+    const dashboardCallSites = [...SERVER_SRC.matchAll(/const assigneeState = await resolveAssigneeSelection\(req, provider, getWorkspaceCallScope\(workspace\)\);/g)];
+    const total = genericCallSites.length + dashboardCallSites.length;
+    assert.equal(total, 5, `expected 5 resolveAssigneeSelection call sites (dashboard, swipe, swim, ship, roadmap), found ${total}`);
+    assert.equal(dashboardCallSites.length, 1, 'expected exactly the dashboard route to use the provider-reuse shape');
+  });
+
+  test('the dashboard route threads resolvedAssigneeName into fetchAndPrepareProjects and selectedAssignee/availableAssignees into renderPage', () => {
+    const startIdx = SERVER_SRC.indexOf("app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {");
+    assert.notEqual(startIdx, -1);
+    const endIdx = SERVER_SRC.indexOf('\n// ====', startIdx);
+    const body = SERVER_SRC.slice(startIdx, endIdx === -1 ? startIdx + 4000 : endIdx);
+    assert.match(body, /assigneeName: assigneeState\.resolvedAssigneeName/);
+    assert.match(body, /selectedAssignee: assigneeState\.selectedAssignee/);
+    assert.match(body, /availableAssignees/);
   });
 });
 

@@ -38,7 +38,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 function sliceRenderDashboardAfterRefresh() {
-  const startMarker = 'async function renderDashboardAfterRefresh(workspace, session, teamId, openRouterSource, res) {';
+  const startMarker = 'async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res) {';
   const startIdx = SERVER_SRC.indexOf(startMarker);
   assert.notEqual(startIdx, -1, 'expected to find renderDashboardAfterRefresh in server.js');
   const endMarker = '\n/**\n * Handles 401 Unauthorized errors from the Linear API.\n */';
@@ -66,12 +66,16 @@ async function runRenderDashboardAfterRefresh({ fetchResult }) {
       return '<html/>';
     },
     getFeatureFlags: () => ({}),
+    // LIN-2526: renderDashboardAfterRefresh now derives a provider off the
+    // workspace to compute canFilterByMe — a bare stub is enough here since
+    // this suite is only proving `truncated` survives the refresh render tail.
+    getProviderForWorkspace: () => ({ supports: () => false }),
     console: { log() {}, error() {} }
   });
 
   const script = [sliceRenderDashboardAfterRefresh(), '', 'renderDashboardAfterRefresh'].join('\n');
   const fn = vm.runInContext(script, context);
-  await fn(workspace, session, null, null, res);
+  await fn(workspace, session, null, { selectedAssignee: 'all', resolvedAssigneeName: null }, null, res);
   return calls;
 }
 
@@ -171,6 +175,12 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
     // take its "no explicit ?team=" restore branch and return `{ teamId: null }`
     // for a bare userPreferencesStore.getSelectedTeam() miss — matching that.
     resolveTeamSelection: async () => ({ teamId: null }),
+    // LIN-2526: the route now also resolves an assignee filter via
+    // resolveAssigneeSelection(req, provider, scope) — stubbed to the
+    // unfiltered default since this suite only proves `truncated` threading.
+    getProviderForWorkspace: () => ({ supports: () => false }),
+    getWorkspaceCallScope: () => ({}),
+    resolveAssigneeSelection: async () => ({ selectedAssignee: 'all', resolvedAssigneeName: null }),
     console: { log() {}, error() {} }
   });
 

@@ -57,7 +57,7 @@ const GITHUB_FAMILY_GUARD =
  * `owner-credential-durable-delete-census.test.js:201`).
  */
 function sliceHandleUnauthorizedErrorBody() {
-  const startMarker = 'async function handleUnauthorizedError(workspace, session, teamId, openRouterSource, res) {';
+  const startMarker = 'async function handleUnauthorizedError(workspace, session, teamId, assigneeState, openRouterSource, res) {';
   const startIdx = SERVER_SRC.indexOf(startMarker);
   assert.notEqual(startIdx, -1, 'expected to find handleUnauthorizedError in server.js');
   const endIdx = SERVER_SRC.indexOf('\n/**\n * Home page', startIdx);
@@ -195,7 +195,7 @@ async function runGitHubFamilyBranch({
     // The branch verbatim, wrapped in the same signature it lives under. The
     // trailing sentinel is what a non-GitHub-family workspace returns by
     // falling through — i.e. reaching the Linear arm this branch must not eat.
-    'async function __runBranch(workspace, session, teamId, openRouterSource, res) {',
+    'async function __runBranch(workspace, session, teamId, assigneeState, openRouterSource, res) {',
     // LIN-1887 Step 1: the branch's guard now reads the shared refresh
     // declaration, which handleUnauthorizedError computes once at the top of its
     // body. Recomputed here with the REAL `refreshDeclarationFor` — the slice
@@ -224,7 +224,7 @@ async function runGitHubFamilyBranch({
     context
   )(realRemoval, calls);
 
-  const result = await wrapped(workspace, session, 'team-1', null, res);
+  const result = await wrapped(workspace, session, 'team-1', { selectedAssignee: 'all', resolvedAssigneeName: null }, null, res);
   return { result, calls, session, res, workspace };
 }
 
