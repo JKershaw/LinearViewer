@@ -24,6 +24,11 @@ import { applyTrashedSignal, isTrashed, TRASHED_STATE } from '../../lib/trashed-
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
+// LIN-679 Stage 3a / LIN-2536: group D (the two by-ID read handlers this file
+// pins below) moved to routes/proxy-reads.js. `proxySource` still feeds the
+// group-E write-guard assertions (refuseIfTrashed's sites, all outside D) and
+// stays untouched for those — only the two D-scoped pins re-point here.
+const readsSource = readFileSync(join(__dirname, '../../routes/proxy-reads.js'), 'utf8');
 const providerSource = readFileSync(join(__dirname, '../../lib/providers/linear/index.js'), 'utf8');
 // LIN-2245: the /api/proxy/instructions catalog (where these doc-side
 // Trashed/trashed/409 mentions actually live) moved out of routes/proxy.js
@@ -123,10 +128,10 @@ describe('by-ID queries select the trashed field', () => {
 
 describe('SIGNAL: raw by-ID reads override state / flag the ghost', () => {
   test('/issues/:id handler applies the trashed signal', () => {
-    assert.match(proxySource, /applyTrashedSignal\(issue\)/);
+    assert.match(readsSource, /applyTrashedSignal\(issue\)/);
   });
   test('/relations/:id handler returns a top-level trashed flag', () => {
-    assert.match(proxySource, /trashed:\s*isTrashed\(issueRelations\)/);
+    assert.match(readsSource, /trashed:\s*isTrashed\(issueRelations\)/);
   });
 });
 

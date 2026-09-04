@@ -85,7 +85,9 @@ const GRAPHQL_CLIENT_FILES = ['lib/audit.js', 'lib/providers/linear/index.js', '
 const KNOWN_GRAPHQL_CLIENT_COUNT = 2;
 
 // The two raw-fetch asset relays, anchored by the host allowlist that gates each.
-const ASSET_RELAY_FILES = ['routes/workspace-api.js', 'routes/proxy.js'];
+// routes/proxy-reads.js (LIN-679 Stage 3a / LIN-2536): the attachment relay
+// moved out of routes/proxy.js — widen the file set, never relax the count.
+const ASSET_RELAY_FILES = ['routes/workspace-api.js', 'routes/proxy.js', 'routes/proxy-reads.js'];
 const KNOWN_ASSET_RELAY_COUNT = 2;
 
 describe('LIN-1899 census (a) — credential-bearing Linear egress mechanisms', () => {
@@ -117,7 +119,7 @@ describe('LIN-1899 census (a) — credential-bearing Linear egress mechanisms', 
       KNOWN_ASSET_RELAY_COUNT,
       `Found ${total} Linear asset-host allowlist(s) under routes/ (${JSON.stringify(counts)}), expected exactly ` +
       `${KNOWN_ASSET_RELAY_COUNT}: the image proxy (routes/workspace-api.js, guarded by LIN-1899) and the ` +
-      'attachment relay (routes/proxy.js, guarded by LIN-1891). A THIRD relay must withhold its Authorization ' +
+      'attachment relay (routes/proxy-reads.js, guarded by LIN-1891). A THIRD relay must withhold its Authorization ' +
       'header for a non-Linear active binding — asset relays degrade (serve the asset, drop the credential); ' +
       'capability endpoints refuse with 422 CAPABILITY_NOT_SUPPORTED.'
     );
