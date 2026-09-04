@@ -247,4 +247,64 @@ test.describe('OpenRouter consent interstitial (LIN-2412)', () => {
     await expect(page.getByTestId('openrouter-consent-grant-submit')).toBeVisible();
     await expect(page.getByTestId('openrouter-consent-decline-submit')).toBeVisible();
   });
+
+  // LIN-2497 — the LIN-2400 defect class, second instance. Both choices were
+  // plain `.login-button`, so "Connect and enable unattended use" and "Connect
+  // without unattended use" were pixel-identical apart from label length.
+  // Introduced in 2392a537 (LIN-2412), i.e. AFTER LIN-2400 was filed.
+  //
+  // Consequence is lower than LIN-2400's — neither branch here is irreversible,
+  // and declining still connects the key — so this is presentation hygiene, not
+  // a safety fix. Covered the same way regardless: real browser-computed style
+  // on the real page, in BOTH themes (the `theme` cookie drives the pre-paint
+  // `.theme-dark` class from lib/components/page.js, so setting it before
+  // navigation is enough — there is no toggle UI to drive here).
+  test.describe('Consent actions are visually differentiated (LIN-2497)', () => {
+    for (const theme of ['light', 'dark']) {
+      test(`${theme} theme: grant and decline no longer read as the same button`, async ({ page }) => {
+        if (theme === 'dark') {
+          await page.context().addCookies([{ name: 'theme', value: 'dark', url: 'http://localhost:3001' }]);
+        }
+        await page.goto('/auth/openrouter');
+        await expect(page.getByTestId('openrouter-consent-page')).toBeVisible();
+        if (theme === 'dark') {
+          await expect(page.locator('html')).toHaveClass(/theme-dark/);
+        }
+
+        const { grant, decline } = await page.evaluate(() => {
+          const read = el => {
+            const s = getComputedStyle(el);
+            return {
+              backgroundColor: s.backgroundColor,
+              color: s.color,
+              borderColor: s.borderColor,
+              fontSize: s.fontSize,
+              cursor: s.cursor,
+            };
+          };
+          return {
+            grant: read(document.querySelector('[data-testid="openrouter-consent-grant-submit"]')),
+            decline: read(document.querySelector('[data-testid="openrouter-consent-decline-submit"]')),
+          };
+        });
+
+        // They no longer share a look.
+        expect(decline.backgroundColor).not.toBe(grant.backgroundColor);
+        expect(decline.color).not.toBe(grant.color);
+        expect(decline.borderColor).not.toBe(grant.borderColor);
+
+        // DIRECTION, not mere difference (LIN-2400 review F1): the grant is the
+        // filled primary and the decline the chromeless outline, so a future
+        // change that merely swapped them would still fail here.
+        expect(decline.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+        expect(grant.backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+
+        // Both stay deliberately sized — not the UA default a bare <button> gets.
+        expect(grant.fontSize).toBe('16px');
+        expect(decline.fontSize).toBe('16px');
+        expect(grant.cursor).toBe('pointer');
+        expect(decline.cursor).toBe('pointer');
+      });
+    }
+  });
 });
