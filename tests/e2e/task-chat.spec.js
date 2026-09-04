@@ -164,6 +164,138 @@ test.describe('Task Chat Page (experimental)', () => {
       await expect(page.locator('.task-chat-msg-assistant .task-chat-msg-body'))
         .toContainText('error', { timeout: 5000 });
     });
+
+    // === LIN-2445 (LIN-2443's sibling class) ===
+    // Every assistant bubble opened with an in-progress pill and NOTHING in
+    // public/task-chat.js ever removed `status-pill--in-progress`, so a
+    // completed answer kept the amber pill forever — the same thing a human
+    // reported on the Flight Companion page from a phone.
+    //
+    // Every pill locator below is scoped by `.task-chat-msg-assistant` on
+    // purpose. `.task-chat-msg-who` alone would NOT be unambiguous: appendBubble
+    // passes the same whoClass for both roles, so the user's pill carries it
+    // too — only the `status-pill--*` state differs. That is where this diverges
+    // from flight-companion.spec.js's `.fc-msg-who`, which really is
+    // assistant-only (appendAssistantBubble passes it, appendUserBubble does
+    // not). Do not "simplify" these locators by dropping the role scope.
+
+    test('a completed answer settles its speaker pill to done (LIN-2445)', async ({ page }) => {
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('Where do you stand?');
+      await page.locator('#task-chat-send').click();
+
+      await expect(page.locator('.task-chat-msg-assistant .task-chat-msg-body'))
+        .toContainText('TEST-1', { timeout: 5000 });
+
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(pill).toHaveCount(1);
+      await expect(pill).toHaveClass(/status-pill--done/);
+      // False-positive guard: not still showing the state it was created with.
+      await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+      // The glyph moves with the class — a swapped class over a stale ◐ would
+      // read as done in CSS while still showing the in-progress character.
+      await expect(pill.locator('.status-pill__char')).toHaveText('✓');
+    });
+
+    test('a failed turn settles its speaker pill to failed, never in-progress (LIN-2445)', async ({ page }) => {
+      await page.locator('#task-chat-id').fill('TEST-9999');
+      await page.locator('#task-chat-question').fill('hi');
+      await page.locator('#task-chat-send').click();
+
+      await expect(page.locator('.task-chat-msg-assistant .task-chat-msg-body'))
+        .toContainText('error', { timeout: 5000 });
+
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(pill).toHaveClass(/status-pill--failed/);
+      await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+      await expect(pill.locator('.status-pill__char')).toHaveText('✕');
+    });
+
+    test('an empty answer keeps its row and reads as prose, not a bracket code (LIN-2445)', async ({ page }) => {
+      // The AI mock always answers, so the empty-`done` branch is unreachable
+      // through the real endpoint — intercept the SSE turn and serve a stream
+      // carrying nothing but `done`. Task Chat is user-initiated, so the row
+      // STAYS (LIN-2443's own AC2 reasoning: a human asked and deserves a
+      // visible answer); only the '[no response]' wording carries over, which
+      // AC2 rejected as reading like an error rather than an answer.
+      await page.route(`**${CHAT_API}/**`, (route) => route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+        body: 'event: done\ndata: {}\n\n',
+      }));
+
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('anything to add?');
+      await page.locator('#task-chat-send').click();
+
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(answer).toHaveCount(1, { timeout: 5000 });
+      await expect(answer).toContainText('no reply', { timeout: 5000 });
+      await expect(answer).not.toContainText('[no response]');
+
+      // An empty answer is still an answer — the turn ended cleanly.
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(pill).toHaveClass(/status-pill--done/);
+      await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+    });
+
+    // The remaining three terminal paths. The unknown-task test above covers the
+    // non-ok response's JSON arm through the real endpoint; these three are not
+    // reachable that way, so each is driven by intercepting the SSE turn. Added
+    // because "every terminal path is settled" was true of the code but not of
+    // the tests — three of the five had no witness at any level.
+
+    test('an SSE error event settles the pill to failed (LIN-2445)', async ({ page }) => {
+      await page.route(`**${CHAT_API}/**`, (route) => route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+        body: 'event: error\ndata: {"message":"upstream exploded"}\n\n',
+      }));
+
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('hi');
+      await page.locator('#task-chat-send').click();
+
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(answer).toContainText('upstream exploded', { timeout: 5000 });
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(pill).toHaveClass(/status-pill--failed/);
+      await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+    });
+
+    test('a non-ok response whose body is not JSON still settles the pill (LIN-2445)', async ({ page }) => {
+      // The parse-failure arm: response.json() rejects, so the .catch() branch
+      // renders the status-only message. It settles the pill too.
+      await page.route(`**${CHAT_API}/**`, (route) => route.fulfill({
+        status: 500,
+        headers: { 'Content-Type': 'text/html' },
+        body: '<html>not json at all</html>',
+      }));
+
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('hi');
+      await page.locator('#task-chat-send').click();
+
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(answer).toContainText('request failed (500)', { timeout: 5000 });
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(pill).toHaveClass(/status-pill--failed/);
+      await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+    });
+
+    test('a network failure settles the pill to failed (LIN-2445)', async ({ page }) => {
+      await page.route(`**${CHAT_API}/**`, (route) => route.abort('failed'));
+
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('hi');
+      await page.locator('#task-chat-send').click();
+
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(answer).toContainText('network failure', { timeout: 5000 });
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(pill).toHaveClass(/status-pill--failed/);
+      await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+    });
   });
 
   test.describe('Saved chats (LIN-1008)', () => {
@@ -217,6 +349,30 @@ test.describe('Task Chat Page (experimental)', () => {
       await item.locator('[data-testid="task-chat-saved-delete"]').click();
       await expect(page.locator('.task-chat-saved-item')).toHaveCount(0, { timeout: 5000 });
       await expect(page.locator('#task-chat-saved-empty')).toBeVisible();
+    });
+
+    // LIN-2445, second in-file instance — NOT enumerated by the ticket, found
+    // by walking every appendBubble caller. The resume replay renders one
+    // bubble per STORED turn, each of which finished long before it was
+    // persisted, so before this fix every replayed answer came back wearing a
+    // fresh amber in-progress pill that nothing would ever settle. Unlike the
+    // live case there is no completion moment to hook, so the replay opens the
+    // bubble settled instead of swapping it afterwards.
+    test('a resumed transcript replays its answers already settled, never in-progress (LIN-2445)', async ({ page }) => {
+      await haveOneTurn(page);
+      await page.locator('[data-testid="task-chat-save"]').click();
+      const item = page.locator('.task-chat-saved-item');
+      await expect(item).toHaveCount(1, { timeout: 5000 });
+
+      await page.locator('#task-chat-reset').click();
+      await expect(page.locator('.task-chat-msg')).toHaveCount(0);
+      await item.locator('[data-testid="task-chat-saved-open"]').click();
+
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(pill).toHaveCount(1, { timeout: 5000 });
+      await expect(pill).toHaveClass(/status-pill--done/);
+      await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+      await expect(pill.locator('.status-pill__char')).toHaveText('✓');
     });
 
     test('saved chats persist across a reload (durable, not localStorage)', async ({ page }) => {
