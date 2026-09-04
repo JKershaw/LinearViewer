@@ -18,6 +18,7 @@ import { createDedupeCache, createGenerationTracker, dedupeKey } from '../lib/pr
 import { createCredentialTrail } from '../lib/proxy-credential-trail.js';
 import { buildInstructions } from '../lib/proxy-instructions.js';
 import { createAgentStatusRoutes } from './proxy-agent-status.js';
+import { createTokensAdminRoutes } from './proxy-tokens-admin.js';
 import { BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../lib/rejected-credentials.js';
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
 import { deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
@@ -51,7 +52,7 @@ import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } f
 // surface for the dashboard fetchers only.
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { localProvider } from '../lib/providers/local/index.js';
-import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
+import { getProviderForWorkspace } from '../lib/providers/registry.js';
 // LIN-2239: the canonical ascending priority scale's boundary conversion —
 // `priority` (Linear-native, unchanged) stays the wire's authoritative field;
 // `priorityLevel` is the additive canonical-scale field this ticket adds.
@@ -77,7 +78,7 @@ import { foldPeriodicalRuns, DEFAULT_HORIZON_MS } from '../lib/periodical-runs.j
 import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION } from '../lib/dispatch-store.js';
 import { parseRepoFromDescription, resolveDispatchRepo, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext, shouldUseMcpTokenField, provisionBootstrapToken } from '../lib/proxy-preamble.js';
-import { BOOTSTRAP_TOKEN_TTL_SECONDS, WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
+import { WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
@@ -93,9 +94,7 @@ import {
 } from '../lib/proxy-ref-resolver.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { PartialWriteError } from '../lib/partial-write-error.js';
-import { badRequest, jsonError, notFound, serviceUnavailable, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
-import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
+import { badRequest, jsonError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
 
 /**
@@ -398,14 +397,6 @@ const MAX_SEARCH_LENGTH = 500;
 // never depends on a test fixture. Only consulted under NODE_ENV==='test'.
 const TEST_LOCAL_URL_KEY = 'local-workspace';
 
-// LIN-525 #5: the +proxy toggle auto-mints a 'prompt-proxy' readWrite token on
-// every page-load session that dispatches. To stop these standing credentials
-// from accumulating for the 90-day default TTL, give them a short TTL so they
-// self-prune. 48h comfortably outlives the 24h dispatch-queue item lifetime
-// plus the agent run that consumes the token, while bounding the exposure window.
-const PROMPT_PROXY_LABEL = 'prompt-proxy';
-const PROMPT_PROXY_TOKEN_TTL_SECONDS = 48 * 60 * 60;
-
 // LIN-1175: fail-closed 503 message for a claude-code dispatch whose out-of-band
 // bootstrap token could not be minted. attachProxyContext refuses (throws with
 // proxyAttachFailed) rather than launch a credential-less session; the route
@@ -415,8 +406,10 @@ const PROXY_ATTACH_FAILED_MESSAGE = 'Proxy context was requested but a proxy tok
 // LIN-376: every handoff (dispatch preamble, feedback, collective, page copy,
 // +proxy toggle) embeds a single-use BOOTSTRAP token, never a standing/working
 // one. The agent exchanges it at POST /api/proxy/token for a multi-use working
-// token. BOOTSTRAP_TOKEN_TTL_SECONDS / WORKING_TOKEN_TTL_SECONDS are imported
-// from lib/proxy-tokens.js so every mint site shares one source of truth.
+// token. WORKING_TOKEN_TTL_SECONDS is imported from lib/proxy-tokens.js so
+// every mint site shares one source of truth — BOOTSTRAP_TOKEN_TTL_SECONDS is
+// imported the same way, directly from lib/proxy-tokens.js, by group A's mint
+// site in routes/proxy-tokens-admin.js (LIN-679 Stage 2 / LIN-2534).
 // MAX_COMMENT_LENGTH now imported from lib/issue-write-validation.js (LIN-1552).
 
 // Dispatch input limits. The prompt/url caps for the POST /dispatch payload now
@@ -1588,211 +1581,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     return true;
   }
 
-  // =========================================================================
-  // User-Facing API (Session Auth) - Token Management
-  // =========================================================================
-
-  /**
-   * POST /workspace/:urlKey/api/proxy/tokens
-   * Create a new proxy token.
-   */
-  router.post('/workspace/:urlKey/api/proxy/tokens', proxyTokenCreationLimiter, workspaceFromUrl, async (req, res) => {
-    const { workspace } = req;
-
-    // LIN-525 #2: token minting is gated on the proxy feature flag (defense in
-    // depth — independent of the UI). The proxy page that mints tokens
-    // is itself flag-gated, so a mint request on a flag-off session means a
-    // stale global +proxy toggle is trying to inject where no button is shown.
-    if (getFeatureFlags(req.session).proxy !== true) {
-      return jsonError(res, 403, 'Proxy feature is not enabled for this workspace');
-    }
-
-    try {
-      const { label, scope, singleUse, bootstrap } = req.body || {};
-
-      if (label && label.length > MAX_NAME_LENGTH) {
-        return badRequest.json(res, `label exceeds maximum length of ${MAX_NAME_LENGTH}`);
-      }
-
-      if (scope && !['read', 'readWrite'].includes(scope)) {
-        return badRequest.json(res, 'scope must be "read" or "readWrite"');
-      }
-
-      // LIN-376: a bootstrap request mints a single-use, exchange-only token (the
-      // credential a handoff embeds); the client exchanges it at POST /api/proxy/token
-      // for a working token. Bootstrap is forced single-use in the store and carries
-      // the outlives-the-queue TTL.
-      const wantBootstrap = bootstrap === true || bootstrap === 'true';
-
-      // LIN-1582 — refuse an ownerless BOOTSTRAP mint before attempting it, when
-      // the compat lane is off. The store now refuses this structurally
-      // (lib/proxy-tokens.js), so without this pre-check the throw would land in
-      // the catch below and surface as a generic 500 "Failed to create token" —
-      // misreporting a deliberate policy decision as a server fault. Shaped like
-      // the broker lane's refusal (routes/dispatch.js): a 503 whose detail names
-      // the remedy, because the caller's own session is what lacks an owner and
-      // no retry can fix that. Scoped INSIDE the bootstrap case on purpose: the
-      // non-bootstrap branch shares the createToken call below via a ternary
-      // spread and must stay byte-identical, ownerless session or not.
-      if (wantBootstrap && !req.session?.accountId && !ownerlessCompatEnabled()) {
-        console.warn(
-          `Proxy token mint refused: bootstrap requested by a session with no account owner ` +
-          `(urlKey=${workspace.urlKey}) — DISPATCH_OWNERLESS_BROKER_COMPAT is off (LIN-1448/LIN-1582)`
-        );
-        return serviceUnavailable.json(
-          res,
-          'Session has no account owner (LIN-1448)',
-          'A bootstrap minted for a session with no account owner cannot resolve a workspace ' +
-          'credential, and the working token it is exchanged for inherits the miss. Sign in ' +
-          'again, or use an account that has this workspace connected, before requesting a ' +
-          'bootstrap token.'
-        );
-      }
-
-      // LIN-525 #5: short-TTL the auto-minted prompt-proxy tokens so they
-      // self-prune instead of standing for the 90-day default.
-      const isPromptProxy = (label || '') === PROMPT_PROXY_LABEL;
-
-      const result = await proxyTokenStore.createToken(workspace.urlKey, {
-        label: label || 'default',
-        scope: scope || 'read',
-        createdBy: req.session?.accountId || null,
-        ...(wantBootstrap
-          ? { kind: 'bootstrap', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS }
-          : {
-              singleUse: singleUse === true || singleUse === 'true',
-              ...(isPromptProxy ? { ttl: PROMPT_PROXY_TOKEN_TTL_SECONDS } : {})
-            })
-      });
-
-      // LIN-2370: the server→client provider channel the browser copy-prompt
-      // blocks need. `public/proxy.js` (buildAgentPrompt) and `public/common.js`
-      // (buildBlock, the +proxy append) both compose an agent-facing block that
-      // asserted "currently backed by Linear" to every workspace, because no
-      // provider identity is in scope in the browser. Both already mint through
-      // THIS route first, so the mint response is the channel — no new endpoint,
-      // no page-shell data attribute (lib/render.js et al. would each need one).
-      //
-      // IDENTITY, NOT ACCESS. `workspace.provider` is the declared field already
-      // on the session row `workspaceFromUrl` resolved, and `getProvider` looks
-      // it up WITHOUT the registry's legacy-Linear default — so this is the same
-      // pre-fallback discriminator `declaredProviderDisplayName` gates on, for
-      // zero IO. Reading it here rather than calling `resolveProviderAccess` is
-      // deliberate and load-bearing (found by review): that helper resolves
-      // ACCESS, and on a cache miss it can walk every session, spend the
-      // refresh-on-resolve cooldown, and perform a live OAuth exchange with
-      // retries — an unbounded stall on an interactive copy button that
-      // previously touched no provider at all, plus credential-trail and
-      // token-rotation side effects, all to obtain a name already sitting on
-      // `req`. A try/catch would have bounded the failure but never the latency.
-      //
-      // Never `getProviderForWorkspace`: that one applies LEGACY_DEFAULT_PROVIDER,
-      // so an undeclared workspace would read as "Linear" — the exact defect.
-      // Same derivation as routes/collective.js and the feedback-triage dispatch
-      // in routes/workspace-api.js. Null ⇒ the clients omit the clause entirely
-      // rather than hedging or guessing.
-      const providerDisplayName = getProvider(workspace.provider)?.ui?.displayName ?? null;
-
-      res.status(201).json({
-        success: true,
-        tokenId: result.tokenId,
-        token: result.token,
-        label: result.label,
-        scope: result.scope,
-        kind: result.kind,
-        singleUse: result.singleUse,
-        providerDisplayName,
-        message: 'Token created. Save this token now - it cannot be retrieved later.'
-      });
-    } catch (err) {
-      console.error('Create proxy token error:', err.message);
-      jsonError(res, 500, 'Failed to create token');
-    }
-  });
-
-  /**
-   * GET /workspace/:urlKey/api/proxy/tokens
-   * List all proxy tokens for this workspace.
-   */
-  router.get('/workspace/:urlKey/api/proxy/tokens', workspaceFromUrl, async (req, res) => {
-    const { workspace } = req;
-
-    try {
-      const tokens = await proxyTokenStore.listTokens(workspace.urlKey);
-      res.json({ tokens });
-    } catch (err) {
-      console.error('List proxy tokens error:', err.message);
-      jsonError(res, 500, 'Failed to list tokens');
-    }
-  });
-
-  /**
-   * DELETE /workspace/:urlKey/api/proxy/tokens/:tokenId
-   * Revoke a proxy token.
-   */
-  router.delete('/workspace/:urlKey/api/proxy/tokens/:tokenId', workspaceFromUrl, async (req, res) => {
-    const { workspace } = req;
-    const { tokenId } = req.params;
-
-    if (!UUID_REGEX.test(tokenId)) {
-      return badRequest.json(res, 'Invalid token ID format');
-    }
-
-    try {
-      const revoked = await proxyTokenStore.revokeToken(workspace.urlKey, tokenId);
-      if (!revoked) {
-        return notFound.json(res, 'Token not found');
-      }
-      res.json({ success: true });
-    } catch (err) {
-      console.error('Revoke proxy token error:', err.message);
-      jsonError(res, 500, 'Failed to revoke token');
-    }
-  });
-
-  /**
-   * GET /workspace/:urlKey/api/proxy/events
-   * List recent proxy events for this workspace.
-   */
-  router.get('/workspace/:urlKey/api/proxy/events', workspaceFromUrl, async (req, res) => {
-    const { workspace } = req;
-
-    try {
-      const limit = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit, 10), 1), 100) : 50;
-      const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
-      const result = await proxyEventStore.listEvents(workspace.urlKey, { limit, offset });
-      res.json(result);
-    } catch (err) {
-      console.error('List proxy events error:', err.message);
-      jsonError(res, 500, 'Failed to list events');
-    }
-  });
-
-  /**
-   * GET /workspace/:urlKey/api/proxy/credential-health
-   * Per-token credential health over the recent window (LIN-1586).
-   *
-   * Session-authenticated + workspace-scoped, exactly like the events endpoint
-   * above — same auth, same workspace resolution, same error envelope. It reads
-   * the audit rows the Event Log already shows, folded into the one verdict the
-   * rows cannot state on their own: a token that is still succeeding on
-   * workspace-free calls while every workspace-scoped call it makes reports
-   * `token_ownerless` is dead as a workspace credential.
-   *
-   * Returns verdicts and counts only — no account ids, no free text beyond the
-   * label the token list already shows.
-   */
-  router.get('/workspace/:urlKey/api/proxy/credential-health', workspaceFromUrl, async (req, res) => {
-    const { workspace } = req;
-
-    try {
-      const result = await proxyEventStore.listCredentialHealth(workspace.urlKey);
-      res.json(result);
-    } catch (err) {
-      console.error('Proxy credential health error:', err.message);
-      jsonError(res, 500, 'Failed to read credential health');
-    }
-  });
+  // Group A tokens-admin (LIN-679 Stage 2 / LIN-2534): extracted to
+  // routes/proxy-tokens-admin.js, mounted at its original position.
+  router.use(createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, proxyTokenCreationLimiter }));
 
   // =========================================================================
   // Consumer API - Agent Instructions (llms.txt)
