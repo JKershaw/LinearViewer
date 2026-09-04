@@ -65,11 +65,13 @@ const credential = (provider, { live = true } = {}) => async () => ({
 
 /**
  * `provider` is the injected provider instance, so `req.resolvedProvider` is
- * stamped from a real registry-shaped object. `declaredProvider` is what
- * `resolveWorkspaceAccess` reports — set it to null to model the workspace that
- * resolves NO provider at all.
+ * stamped from a real registry-shaped object and `displayName` is what the
+ * envelope should name. `throwOn` selects which seam fails: 'context' models a
+ * provider rejection on an issue-scoped kickoff (the stamped path), 'dispatch'
+ * models a failure on a GOAL-ONLY kickoff, which never calls
+ * `resolveProviderAccess` at all and so reaches the branch UNSTAMPED.
  */
-function buildApp({ providerName, displayName, declaredProvider = providerName, live = true }) {
+function buildApp({ providerName, displayName, live = true, throwOn = 'context' }) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -78,7 +80,7 @@ function buildApp({ providerName, displayName, declaredProvider = providerName, 
       validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' }),
     },
     proxyEventStore: { recordEvent: async () => {} },
-    resolveWorkspaceAccess: credential(declaredProvider, { live }),
+    resolveWorkspaceAccess: credential(providerName, { live }),
     getWorkspaceAccessToken: async () => 'live-token',
     getWorkspaceOpenRouterKey: async () => null,
     provider: {
@@ -87,12 +89,20 @@ function buildApp({ providerName, displayName, declaredProvider = providerName, 
       supports: () => true,
       createFields: () => [],
       // The seam the kickoff route reaches upstream through.
-      fetchIssueContext: async () => { throw upstreamError(401); },
+      fetchIssueContext: async () => {
+        if (throwOn === 'context') throw upstreamError(401);
+        return { issue: { id: 'i1', identifier: 'ENG-1', title: 't' }, comments: [], children: [] };
+      },
     },
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
-    dispatchQueueStore: { addItem: async () => ({ id: 'd1' }) },
+    dispatchQueueStore: {
+      addItem: async () => {
+        if (throwOn === 'dispatch') throw upstreamError(401);
+        return { id: 'd1' };
+      },
+    },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
@@ -100,14 +110,14 @@ function buildApp({ providerName, displayName, declaredProvider = providerName, 
   return app;
 }
 
-async function kickoff(app) {
+async function kickoff(app, body = { issueIdentifier: 'ENG-1' }) {
   const server = app.listen(0, '127.0.0.1');
   try {
     await new Promise(resolve => server.once('listening', resolve));
     const res = await fetch(`http://127.0.0.1:${server.address().port}${ENDPOINT}`, {
       method: 'POST',
       headers: { Authorization: 'Bearer agent-token', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ issueIdentifier: 'ENG-1' }),
+      body: JSON.stringify(body),
     });
     return { status: res.status, body: await res.json().catch(() => null) };
   } finally {
@@ -155,6 +165,28 @@ describe('LIN-2363 — the kickoff 401/503 envelope names the backend actually c
     assert.equal(status, 401, JSON.stringify(body));
     assert.equal(body.retryable, false);
     assert.match(body.detail, /GitHub Issues rejected the request/);
+  });
+});
+
+describe('LIN-2363 — the unstamped path degrades to neutral AT THE ROUTE', () => {
+  test('a goal-only kickoff, which never resolves a provider, is not told Linear', async () => {
+    // Found by review: `resolveProviderAccess` is called only inside
+    // `if (issueIdentifier)`, so a GOAL-ONLY kickoff reaches this catch with
+    // `req.resolvedProvider` unstamped. Without a route-level case here,
+    // dropping the `?? null` would let JS default-param semantics silently
+    // restore 'Linear' and NOTHING in the suite would fail — every other
+    // route-level test has a stamped provider.
+    const { status, body } = await kickoff(
+      buildApp({ providerName: 'github', displayName: 'GitHub Issues', throwOn: 'dispatch' }),
+      { goal: 'ship the thing' }
+    );
+
+    assert.ok(status === 401 || status === 503, `expected an auth-shaped status, got ${status}: ${JSON.stringify(body)}`);
+    assert.doesNotMatch(body.detail, /Linear/,
+      'an unattributable failure must never be blamed on Linear');
+    assert.match(body.detail, /^The upstream provider rejected the request as unauthenticated\.$/);
+    // The machine contract is unchanged on this arm too.
+    assert.equal(body.code, 'LINEAR_AUTH');
   });
 });
 
