@@ -32,9 +32,11 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
 // LIN-679 Stage 3a / LIN-2536: the GET /relations handler (group D) moved to
-// routes/proxy-reads.js. The DELETE relations handler (group E) stays on
-// proxySource, unchanged — only the GET test below re-points.
+// routes/proxy-reads.js — only the GET test below re-points.
 const readsSource = readFileSync(join(__dirname, '../../routes/proxy-reads.js'), 'utf8');
+// LIN-679 Stage 3b / LIN-2537: the DELETE relations handler (group E) moved to
+// routes/proxy-writes.js — only the DELETE handler test below re-points.
+const writesSource = readFileSync(join(__dirname, '../../routes/proxy-writes.js'), 'utf8');
 const providerSource = readFileSync(join(__dirname, '../../lib/providers/linear/index.js'), 'utf8');
 
 // Pull a named gql`...` template literal out of a source by its const name.
@@ -103,12 +105,12 @@ describe('proxy relationship queries', () => {
     // Route exists, keyed on relationId, gated by requireWriteScope, and
     // validates the relation id as a UUID.
     assert.match(
-      proxySource,
+      writesSource,
       /router\.delete\(\s*'\/api\/proxy\/issues\/:issueId\/relations\/:relationId'[^)]*requireWriteScope/s,
       'DELETE relations route must exist and require write scope'
     );
-    const handlerStart = proxySource.indexOf("'/api/proxy/issues/:issueId/relations/:relationId'");
-    const block = proxySource.slice(handlerStart, handlerStart + 1100);
+    const handlerStart = writesSource.indexOf("'/api/proxy/issues/:issueId/relations/:relationId'");
+    const block = writesSource.slice(handlerStart, handlerStart + 1100);
     assert.match(block, /UUID_REGEX\.test\(relationId\)/, 'must validate relationId as UUID');
     // Post-LIN-309 the handler calls the provider, capability-gated, instead of
     // owning the delete mutation.
