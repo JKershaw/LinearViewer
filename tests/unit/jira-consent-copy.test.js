@@ -37,6 +37,25 @@
  *      AFFIRMATIVE claim: the paragraph must state the capability and must not
  *      negate it.
  *
+ * ---- Known limits, stated rather than left for the next reader to find ----
+ *
+ * These are real and are NOT closed. All three fail CLOSED — they reject
+ * truthful copy rather than accept false copy — so the cost is an author
+ * rewording a sentence, not a falsehood shipping. Recorded because a guard
+ * whose precision is undocumented invites someone to weaken it on first
+ * contact:
+ *
+ *   - Clause splitting on `,`/`and` breaks negation scope across a LIST:
+ *     "Harbour cannot create new issues, upload files, or link issues." is
+ *     rejected, because the `cannot` stays in the first clause. Splitting into
+ *     separate sentences passes. The guard is therefore sensitive to
+ *     punctuation choice in accurate copy.
+ *   - The trailing-negation check spans an em dash (`[^.]*`), so "Harbour
+ *     updates issues, posts comments and manages labels — it cannot upload
+ *     attachments." is rejected.
+ *   - Sentence splitting on `?` means "Does Harbour change issues? No." slips
+ *     through. Not plausible consent-copy phrasing; noted for completeness.
+ *
  * Run with: node --test tests/unit/jira-consent-copy.test.js
  */
 import { test, describe } from 'node:test';
@@ -132,11 +151,31 @@ describe('LIN-2302 instance 1 — Jira API-token consent copy', () => {
     const NEGATION = String.raw`\b(?:never|not|no|cannot|can't|won't|will not|unable to|without)\b`;
     const TRAILING_NEGATION = String.raw`\b(?:never|not|no|cannot|can't|won't|will not|unable to)\b`;
     const WRITE_VERB = String.raw`\b(?:chang\w*|updat\w*|modif\w*|edit\w*|comment\w*|label\w*|writ\w*)\b`;
-    const ABOUT_THE_TOKEN = /\b(?:token|credential|password|secret)\b/i;
-    for (const sentence of consentCopy().split(/(?<=[.!?])\s+/)) {
-      // A sentence about storing/handling the credential is not a claim about
-      // the issue surface, so it is exempt rather than banned.
-      if (ABOUT_THE_TOKEN.test(sentence)) continue;
+    // The exemption is for clauses about HANDLING the credential, not for any
+    // clause that happens to name it. Mentioning the token is not enough:
+    // "Your API token is never used to change issues" names the token AND
+    // denies a real capability, and an exemption keyed on the word alone
+    // swallowed it whole (review's demonstrated open hole — clause-scoping
+    // alone did not fix it, because the denial and the token sit in the same
+    // clause). So a clause that also names the ISSUE SURFACE is never exempt:
+    // whatever else it is doing, it is making a claim about what Harbour can
+    // do to issues, which is exactly what this check exists to police.
+    const ISSUE_SURFACE = /\b(?:issues?|comments?|labels?|tickets?)\b/i;
+    const ABOUT_THE_TOKEN = (clause) =>
+      /\b(?:token|credential|password|secret)\b/i.test(clause) && !ISSUE_SURFACE.test(clause);
+    // CLAUSE-scoped, matching the over-disclosure bans. Sentence scope let a
+    // false capability claim ride along with any mention of the token: review
+    // demonstrated that "Your API token is never used to change issues, post
+    // comments, or edit labels." passed every check — the exemption skipped the
+    // whole sentence, and the exempted words then satisfied the affirmative
+    // disclosure check. It was the one hole in this file that failed OPEN.
+    const clauses = consentCopy()
+      .split(/(?<=[.!?])\s+/)
+      .flatMap(part => part.split(/\s*(?:,|;|\band\b|\bbut\b|\bwhile\b|—)\s*/i));
+    for (const sentence of clauses) {
+      // A clause about storing/handling the credential is not a claim about the
+      // issue surface, so it is exempt rather than banned.
+      if (ABOUT_THE_TOKEN(sentence)) continue;
       assert.doesNotMatch(
         sentence,
         new RegExp(`${NEGATION}[^.]*${WRITE_VERB}`, 'i'),

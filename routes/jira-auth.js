@@ -592,7 +592,8 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
    * LIN-1890 E2 — the `mode: 'new'` bootstrap: a Jira-only human, holding zero
    * Linear and zero GitHub bindings, lands in a working workspace.
    *
-   * Mirrors `routes/github-auth.js:413-500` step for step, because the sequence
+   * Mirrors the GitHub bootstrap step for step (the shared orchestration now
+   * lives in `lib/github-install-flow.js` since LIN-2397), because the sequence
    * is not arbitrary — each step depends on the one before it:
    *
    *   find-or-create `jira:${accountId}` → regenerate → restore workspaces →
