@@ -5542,7 +5542,35 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // for this exact upstream shape, not a new taxonomy.
       const authStatus = graphqlErrorStatus(err, req);
       if (authStatus === 401 || authStatus === 503) {
-        const classification = classifyUpstreamError(err);
+        // LIN-2363: attribute the failure to the backend actually called. This
+        // branch built its envelope inline rather than through
+        // `graphqlErrorDetail`, so it forwarded `classifyUpstreamError`'s
+        // Linear-hardcoded `detail` verbatim — the one `detail` field in this
+        // file LIN-2351 did not reach.
+        //
+        // `req.resolvedProvider.displayName` (NOT `.declared`) is the right read
+        // here, and the distinction is deliberate: this is ERROR ATTRIBUTION, not
+        // identity assertion. The question is "which backend did we just call and
+        // get rejected by", so the post-fallback name is correct — the same read
+        // `graphqlErrorDetail` uses, reused rather than re-derived so the two can
+        // never disagree about one rejection. (LIN-2354's `.declared` gate is for
+        // prose that CLAIMS what a workspace is backed by; that is a different
+        // question.) Nothing stamped ⇒ null ⇒ provider-neutral wording, never a
+        // guessed "Linear".
+        //
+        // WHY NOW, given this is latent: `graphqlErrorStatus` above reads only
+        // `err.response.status`, while all three non-Linear clients set
+        // `err.status` — so a real GitHub/Jira 401 currently maps to 500 and never
+        // reaches here (re-verified at HEAD). The moment anyone normalises that
+        // shape — the obvious fix, tracked separately — this branch would start
+        // telling GitHub and Jira operators that *Linear* rejected their
+        // credentials, in the exact field LIN-2351 just cleaned. Fixing the trap
+        // before it arms is the whole point.
+        //
+        // `code`/`category`/`retryable` are untouched: the `LINEAR_*` codes are a
+        // published, machine-matchable contract and renaming them is a breaking
+        // change needing a deprecation path — LIN-2351's boundary, held here.
+        const classification = classifyUpstreamError(err, req.resolvedProvider?.displayName ?? null);
         logEvent(req, '/api/proxy/autopilot/kickoff', authStatus);
         console.error('Proxy autopilot kickoff error:', err.message);
         return jsonError(res, authStatus, 'Failed to dispatch autopilot kickoff', {
