@@ -134,11 +134,14 @@ describe('Half A: diffMountAgainstFactory (fixture-based)', () => {
 // ---------------------------------------------------------------------------
 
 describe('Half A: mount-completeness census against the real repo', () => {
-  test('censusMountCompleteness finds exactly 5 proxy sub-routers, all missingFromMount empty, all extraInMount empty', () => {
+  // Deliberately its own test, separate from the corpus-size sanity check
+  // below: this is the one that demonstrates Half A's documented blind spot
+  // (mechanism (ii) — see the PR description's mutation-validation section).
+  // A dep dropped from BOTH a factory's signature and its mount shrinks
+  // `required` and `mounted` together, so missingFromMount/extraInMount stay
+  // empty — correctly blind, not a false negative in this test.
+  test('every discovered factory has an empty missingFromMount and an empty extraInMount', () => {
     const rows = censusMountCompleteness({ routesDir: 'routes', proxySourcePath: 'routes/proxy.js' });
-
-    assert.equal(rows.length, 5, `expected 5 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
-
     for (const row of rows) {
       assert.deepEqual(
         row.missingFromMount, [],
@@ -155,7 +158,18 @@ describe('Half A: mount-completeness census against the real repo', () => {
         `${row.file} (${row.factoryName}): extraInMount should be empty at HEAD, got ${JSON.stringify(row.extraInMount)}`
       );
     }
+  });
 
+  // A separate, coarser sanity pin: the corpus is exactly 5 files / 39
+  // declared deps today. Unlike the test above, THIS one is not blind to a
+  // signature+mount drop (removing a dep from a factory's signature shrinks
+  // `required`, which this total catches) — that's a different, unrelated
+  // invariant catching it, not evidence Half A's own missing/extra detectors
+  // saw the gap; keeping the two in separate tests keeps that distinction
+  // legible in the mutation-validation record.
+  test('the corpus is exactly 5 proxy sub-router files totalling 39 declared deps', () => {
+    const rows = censusMountCompleteness({ routesDir: 'routes', proxySourcePath: 'routes/proxy.js' });
+    assert.equal(rows.length, 5, `expected 5 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
     const totalDeps = rows.reduce((sum, row) => sum + row.required.length, 0);
     assert.equal(totalDeps, 39, `expected 39 total required deps across the 5 factories, found ${totalDeps}`);
   });
