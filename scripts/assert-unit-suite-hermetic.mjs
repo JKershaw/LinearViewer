@@ -57,7 +57,6 @@ const guardPath = join(ROOT, 'tests', 'fixtures', 'network-guard.js');
 
 writeFileSync(watcherPath, `
 import net from 'node:net';
-import tls from 'node:tls';
 import fs from 'node:fs';
 
 const OUT = ${JSON.stringify(logPath)};
@@ -71,26 +70,32 @@ const hits = [];
 import { defaultIsLoopback as loopback } from ${JSON.stringify(guardPath)};
 
 function destinationOf(args) {
-  const a = args[0];
+  // Node's net.createConnection runs normalizeArgs and calls
+  // Socket.prototype.connect with the resulting ARRAY [options, cb]. Without
+  // unwrapping it every host reads undefined, and a missing host counts as
+  // loopback - so the watcher would report zero escapes for everything.
+  const a = Array.isArray(args[0]) ? args[0][0] : args[0];
   if (a && typeof a === 'object') return { host: a.host || a.hostname || null, port: a.port ?? null };
   if (typeof a === 'number') return { host: typeof args[1] === 'string' ? args[1] : null, port: a };
   if (typeof a === 'string') return { host: a, port: null };
   return { host: null, port: null };
 }
 
-function wrap(mod, name, kind) {
-  const original = mod[name];
-  mod[name] = function (...args) {
-    const { host, port } = destinationOf(args);
-    if (!loopback(host)) {
-      hits.push({ kind, host, port, argv: process.argv.slice(1).join(' ') });
-    }
-    return original.apply(mod, args);
-  };
-}
-wrap(net, 'connect', 'net.connect');
-wrap(net, 'createConnection', 'net.createConnection');
-wrap(tls, 'connect', 'tls.connect');
+// net.Socket.prototype.connect is the single choke point every transport
+// funnels through: http.request on any Node version, undici's fetch, tls, and
+// a bare new net.Socket(). Wrapping the MODULE functions instead is
+// Node-version dependent (Node 20's http Agent captures net.createConnection
+// at module load), which is how a green local run and a red CI run disagreed
+// about the same code. No backticks in this comment on purpose - it lives
+// inside a template literal.
+const originalConnect = net.Socket.prototype.connect;
+net.Socket.prototype.connect = function (...args) {
+  const { host, port } = destinationOf(args);
+  if (!loopback(host)) {
+    hits.push({ kind: 'net.Socket.connect', host, port, argv: process.argv.slice(1).join(' ') });
+  }
+  return originalConnect.apply(this, args);
+};
 
 process.on('exit', () => {
   if (!hits.length) return;

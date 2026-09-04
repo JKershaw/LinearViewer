@@ -136,7 +136,7 @@ describe('LIN-1880: guardSockets sees the transport layer', () => {
         'a native fetch must be visible at the socket layer — the whole point of this guard'
       );
       assert.equal(guard.connections[0].host, '127.0.0.1');
-      assert.match(guard.connections[0].kind, /net\.(connect|createConnection)/);
+      assert.equal(guard.connections[0].kind, 'net.Socket.connect');
     });
   });
 
@@ -180,33 +180,51 @@ describe('LIN-1880: guardSockets sees the transport layer', () => {
     });
   });
 
-  test('a unix-socket path is loopback, not an escape', () => {
-    // Both call shapes must agree, and they did not: `{ path }` landed in the
-    // no-host branch (loopback) while the bare-string form was recorded as an
-    // escape. Review found the doc and the code claiming opposite things.
-    const guard = guardSockets();
+  test('a unix-socket path is loopback in BOTH call shapes', () => {
+    // Review found the doc and the code claiming opposite things here, so both
+    // shapes are pinned — and they reach different branches, which is why one
+    // test was not enough.
+    //
+    // `net.connect('/path')` goes through normalizeArgs and arrives as
+    // `[{ path }]`, which has no host and is loopback via the `!host` branch.
+    // A DIRECT `new net.Socket().connect('/path')` arrives as a raw string and
+    // is only loopback because of the leading-`/` check in defaultIsLoopback.
+    // Verified: the first shape alone leaves that check dead code, so removing
+    // it broke nothing and the test passed vacuously.
+    const viaModule = guardSockets();
     try {
       const sock = net.connect('/tmp/lin-1880-nonexistent.sock');
       sock.on('error', () => {});
       sock.destroy();
     } finally {
-      guard.restore();
+      viaModule.restore();
     }
-    assert.deepEqual(guard.connections, [], 'a unix socket never leaves the machine');
+    assert.deepEqual(viaModule.connections, [], 'net.connect(path) — the {path} shape');
+
+    const viaPrototype = guardSockets();
+    try {
+      const sock = new net.Socket();
+      sock.on('error', () => {});
+      sock.connect('/tmp/lin-1880-nonexistent.sock');
+      sock.destroy();
+    } finally {
+      viaPrototype.restore();
+    }
+    assert.deepEqual(viaPrototype.connections, [], 'socket.connect(path) — the raw-string shape');
   });
 
-  test('restore() puts the real transports back, and is idempotent', async () => {
-    const net = await import('node:net');
-    const tls = await import('node:tls');
-    const beforeConnect = net.default.connect;
-    const beforeTls = tls.default.connect;
+  test('restore() puts the real transport back, and is idempotent', () => {
+    // The guard patches ONE thing — `net.Socket.prototype.connect` — because
+    // that is the choke point every transport funnels through. Patching the
+    // module exports instead was Node-version dependent and is what made this
+    // file green locally and red in CI; see the comment on guardSockets.
+    const before = net.Socket.prototype.connect;
 
     const guard = guardSockets();
-    assert.notEqual(net.default.connect, beforeConnect, 'the guard actually patched net.connect');
+    assert.notEqual(net.Socket.prototype.connect, before, 'the guard actually patched the prototype');
     guard.restore();
     guard.restore(); // second call must be a no-op, not a re-restore of a patched fn
-    assert.equal(net.default.connect, beforeConnect, 'net.connect restored');
-    assert.equal(tls.default.connect, beforeTls, 'tls.connect restored');
+    assert.equal(net.Socket.prototype.connect, before, 'prototype restored');
   });
 });
 

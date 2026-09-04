@@ -24,7 +24,6 @@
 import http from 'http';
 import https from 'https';
 import net from 'net';
-import tls from 'tls';
 
 /**
  * Start guarding. Returns `{ attempts, restore() }`. `attempts` is a live
@@ -86,36 +85,33 @@ export function guardNetwork() {
  * given a dispatcher, so proxy-based counting cannot see it either. Two
  * instruments, one blind spot each, the same escape invisible to both.
  *
- * This one wraps `net.connect` / `net.createConnection` / `tls.connect`. That
- * covers both classes the two earlier instruments missed between them —
- * undici's `fetch` and direct `http(s).request` both route through
- * `net.createConnection` — which is what LIN-1880 asked for.
+ * WHY `net.Socket.prototype.connect`, and not the module functions. An earlier
+ * version wrapped `net.connect` / `net.createConnection` / `tls.connect` — the
+ * module exports — and that is NODE-VERSION DEPENDENT. Node 20's
+ * `_http_agent.js` does `Agent.prototype.createConnection = net.createConnection`
+ * at module load, capturing the function reference, so patching the export
+ * afterwards is invisible to every `http.request`. Node 25 resolves it at call
+ * time and IS observed. The result was a guard that covered a class on the
+ * author's machine and not in CI — which CI caught, on the very run that first
+ * enforced this gate.
  *
- * It is NOT true that every transport must go through these, and an earlier
- * version of this comment said so. `new net.Socket().connect(host, port)` calls
- * the prototype method directly and is invisible here; review demonstrated it
- * with a probe. Nothing in this suite uses that shape, but on a ticket about
- * instruments overclaiming their coverage, the claim belongs in the limits
- * below rather than in the sentence selling the guard.
+ * The prototype method is the choke point all of them funnel through, verified
+ * by probe: `http.request` (on both Node behaviours), undici's `fetch`, a real
+ * `tls.connect`, and a bare `new net.Socket().connect()` — which the module-level
+ * version could not see either, and which was documented as a known limit until
+ * this closed it.
  *
- * LOOPBACK IS NOT RECORDED, and that is the whole reason this is usable. The
- * unit suite's own house pattern is `app.listen(0, '127.0.0.1')` plus a real
- * `fetch` against it (CLAUDE.md), so a guard that counted every socket would
- * report hundreds of legitimate connections and be useless as a signal. What
- * `connections` holds is escapes.
+ * LOOPBACK IS NOT RECORDED, and that is what makes this usable. The unit
+ * suite's house pattern is `app.listen(0, '127.0.0.1')` plus a real `fetch`
+ * against it (CLAUDE.md), so a guard counting every socket would report
+ * hundreds of legitimate connections and carry no signal. What `connections`
+ * holds is escapes.
  *
- * KNOWN LIMITS, stated rather than left to be discovered. None appears in this
- * suite today; they are recorded so a future reader is not misled about what a
- * clean run proves:
- *   - `new net.Socket().connect(...)` bypasses the wrapped module functions
- *     entirely (above).
- *   - A hostname is classified by STRING, so a non-loopback name that RESOLVES
- *     to 127.0.0.1 counts as an escape.
- *   - A unix socket is treated as loopback, which it is. Both call shapes are
- *     handled: `{ path }` (no host at all) and the bare-string form, which
- *     `defaultIsLoopback` recognises by its leading `/`. An earlier version
- *     documented the string form as loopback while the code recorded it as an
- *     escape — review caught the mismatch by probe.
+ * KNOWN LIMIT, stated rather than left to be discovered: a hostname is
+ * classified by STRING, so a non-loopback name that RESOLVES to 127.0.0.1
+ * counts as an escape. Unix sockets are loopback in both call shapes
+ * (`{ path }` has no host; the bare-string form is recognised by its leading
+ * `/` in `defaultIsLoopback`).
  *
  * @param {Object} [opts]
  * @param {(host: string|null) => boolean} [opts.isLoopback] - override the
@@ -124,14 +120,18 @@ export function guardNetwork() {
  */
 export function guardSockets({ isLoopback = defaultIsLoopback } = {}) {
   const connections = [];
-  const originals = {
-    netConnect: net.connect,
-    netCreateConnection: net.createConnection,
-    tlsConnect: tls.connect,
-  };
+  const originalConnect = net.Socket.prototype.connect;
 
   function destinationOf(args) {
-    const first = args[0];
+    // `Socket.prototype.connect` is called BOTH ways. Node's own
+    // `net.createConnection` runs `normalizeArgs` and passes the resulting
+    // ARRAY — `[options, callback]` — as a single argument, while a caller
+    // doing `socket.connect(port, host)` passes the raw overload. Unwrapping
+    // the array is not a nicety: without it every host reads `undefined`, and
+    // since a missing host counts as loopback the guard would report ZERO
+    // escapes for everything. A gate that always passes is worse than no gate,
+    // and this is how close that came to shipping.
+    const first = Array.isArray(args[0]) ? args[0][0] : args[0];
     if (first && typeof first === 'object') {
       return { host: first.host || first.hostname || null, port: first.port ?? null };
     }
@@ -139,28 +139,16 @@ export function guardSockets({ isLoopback = defaultIsLoopback } = {}) {
       return { host: typeof args[1] === 'string' ? args[1] : null, port: first };
     }
     if (typeof first === 'string') {
-      // A path (unix socket) or a host string; either way there is no port here.
+      // A unix-socket path; there is no port in this shape.
       return { host: first, port: null };
     }
     return { host: null, port: null };
   }
 
-  function record(kind, args) {
+  net.Socket.prototype.connect = function guardedSocketConnect(...args) {
     const { host, port } = destinationOf(args);
-    if (!isLoopback(host)) connections.push({ host, port, kind });
-  }
-
-  net.connect = function guardedNetConnect(...args) {
-    record('net.connect', args);
-    return originals.netConnect.apply(net, args);
-  };
-  net.createConnection = function guardedNetCreateConnection(...args) {
-    record('net.createConnection', args);
-    return originals.netCreateConnection.apply(net, args);
-  };
-  tls.connect = function guardedTlsConnect(...args) {
-    record('tls.connect', args);
-    return originals.tlsConnect.apply(tls, args);
+    if (!isLoopback(host)) connections.push({ host, port, kind: 'net.Socket.connect' });
+    return originalConnect.apply(this, args);
   };
 
   let restored = false;
@@ -169,9 +157,7 @@ export function guardSockets({ isLoopback = defaultIsLoopback } = {}) {
     restore() {
       if (restored) return;
       restored = true;
-      net.connect = originals.netConnect;
-      net.createConnection = originals.netCreateConnection;
-      tls.connect = originals.tlsConnect;
+      net.Socket.prototype.connect = originalConnect;
     },
   };
 }
