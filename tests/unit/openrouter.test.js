@@ -1498,8 +1498,12 @@ describe('buildMetaPromptTemplate cited-sweep rule (LIN-1873)', () => {
       result.includes('some classes have no sweep and that saying so is a first-class answer'),
       'without this the rule pushes plans toward inventing a query'
     );
+    // The first form is what the meta rule actually says; an earlier version
+    // carried `|| result.includes('destinations')` as a fallback, which accepts
+    // the bare word anywhere in a ~10KB prompt and defeats the assertion it
+    // was guarding.
     assert.ok(
-      result.includes('destinations* of new or moved code') || result.includes('destinations'),
+      result.includes('destinations* of new or moved code'),
       'must name the moved-code-destinations shape'
     );
     assert.ok(
@@ -1534,8 +1538,12 @@ describe('buildMetaPromptTemplate cited-sweep rule (LIN-1873)', () => {
       result.includes('argues about the SWEEP'),
       'a disputed enumeration must be argued as a query'
     );
+    // NOT a bare `includes('converge')`. `origin/main`'s Plan-prompts rule
+    // already says "migration / convergence / pre-launch parent epics", so that
+    // assertion passes with the entire LIN-1873 meta text deleted — a witness
+    // that witnesses nothing, in the test file for a rule about exactly that.
     assert.ok(
-      result.includes('converge'),
+      result.includes('converge once one of them runs it'),
       'must say why — a query converges where member-by-member discovery does not'
     );
   });

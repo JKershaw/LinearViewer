@@ -44,6 +44,8 @@ Newest last.
 
 | Date (UTC) | Commit | Ticket | Paths | Change | Expected direction |
 | --- | --- | --- | --- | --- | --- |
+| 2026-07-26 | `56bf3cd0` | LIN-1579 | handwritten + meta | Widened the proportional lane on what review can name (monitor / rollback routes out of the hard-gate class). | unknown (backfilled) |
+| 2026-07-26 | `a88c2cf7` | LIN-1602 | handwritten + meta | Added the `plan-review` prompt template and registered it. | *(baseline — see note below)* |
 | 2026-07-26 | `7f1efdb8` | LIN-1603 | handwritten + meta | The plan-review gate itself: its routing branch, the one-revision-cycle loop bound, and the eval. | *(baseline — see note below)* |
 | 2026-08-01 | `7814cec5` | LIN-1770 | handwritten + meta | close-out archives and prunes stage artifacts; a plan revision replaces the prior plan block rather than appending beside it. | unknown (backfilled) |
 | 2026-08-01 | `da3790e7` | LIN-1772 | handwritten + meta | Added the missing archive-verification failure branch to close-out's Archive & Prune. | unknown (backfilled) |
@@ -100,15 +102,37 @@ Two honesty notes about what a backfilled row is worth:
    would be exactly the rationalisation the column exists to prevent, and it
    would look identical to a real prediction in the table.
 
-2. **The inclusion filter is deliberately wide.** LIN-1662 asks for changes that
-   "could plausibly move the ratio", which is a judgement. Rather than make that
-   call retrospectively on fourteen commits, this backfill lists **every**
-   commit touching either prompt path since the baseline window opened
-   (2026-07-26). Over-recording is recoverable by a later reader; the failure
-   mode LIN-1662 names is under-recording.
+2. **The inclusion filter is deliberately wide, and here is the sweep.**
+   LIN-1662 asks for changes that "could plausibly move the ratio", which is a
+   judgement. Rather than make that call retrospectively, this backfill lists
+   **every** commit touching either prompt path since the baseline window
+   opened. Over-recording is recoverable by a later reader; the failure mode
+   LIN-1662 names is under-recording.
 
-`7f1efdb8` (LIN-1603) is listed with no direction because it is the
-**intervention being measured**, not an interruption to the measurement — the
-plan-review gate whose effect LIN-1661's read exists to detect. It landed on
-the window's opening day and is recorded here for completeness so a reader does
-not have to wonder whether it was missed.
+   ```
+   git log --since="2026-07-26T00:00:00+00:00" --format="%h|%ad|%s" --date=short --reverse \
+     -- lib/prompt-template-defs.js lib/prompts/meta-prompt-template.js
+   ```
+
+   Run at `a518422e`: **17 commits**, which are the rows above including
+   LIN-1873's own.
+
+   **Note the explicit timestamp, because the obvious form of this query is
+   wrong.** `--since=2026-07-26` uses git's *approxidate*, which resolves a bare
+   date to that date **at the current time of day** — so run in the evening it
+   silently drops every commit from earlier in the window's first day. The first
+   version of this log was built that way and lost exactly two rows: `56bf3cd0`
+   and `a88c2cf7`, the second of which *creates the plan-review step being
+   measured*. Review caught it.
+
+   That is this ticket's own rule paying out on this ticket's own artifact: a
+   cited sweep is re-runnable and therefore checkable, and a hand-list is not.
+   The query is recorded here so the next person appending a row extends a
+   verifiable enumeration rather than trusting this one.
+
+`7f1efdb8` (LIN-1603) and `a88c2cf7` (LIN-1602) are listed with no direction
+because they are the **intervention being measured**, not interruptions to the
+measurement — LIN-1602 adds the plan-review template and LIN-1603 adds the gate
+that routes to it, which is precisely the effect LIN-1661's read exists to
+detect. Both landed on the window's opening day and are recorded here so a
+reader does not have to wonder whether they were missed.

@@ -1079,7 +1079,10 @@ describe('cited-sweep rule — plan-review template (LIN-1873)', () => {
 
   test('re-runs the plan\'s own sweep before searching independently', () => {
     const result = generatePrompt('plan-review', reviewIssue, ctx);
-    assert.ok(/re-run the plan\\'s own sweep first|re-run the plan.s own sweep first/i.test(result.prompt),
+    // One alternative only. An earlier version wrote `/…plan\\'s own…|…plan.s own…/`,
+    // where `\\` is a literal backslash in a regex literal — so the first
+    // alternative could never match and only the second was carrying the test.
+    assert.ok(/re-run the plan.s own sweep first/i.test(result.prompt),
       'the cheap mechanical check must come first');
     assert.ok(/run THAT query, at the sha it names/i.test(result.prompt),
       'must pin re-running the cited query at its own sha, not an equivalent search');
