@@ -6,6 +6,14 @@ proxy. Revised the same day after a fresh-context adversarial second read (17 fi
 blocking; all addressed below, see "Revision record"). A draft in the same sense the Charter is
 a draft: proposed, not adopted.*
 
+*Filed 2026-09-04 as **LIN-2569** (hub) with eighteen children, LIN-2570 through LIN-2587, over
+the proxy. Phases 0–2 are Todo, Phases 3–4 Backlog; build order is carried by blocking relations.
+Item → ticket: P0.1 LIN-2570 · P0.2 LIN-2571 · P0.4 LIN-2572 · P1.1 LIN-2573 · P1.3 LIN-2574 ·
+P1.4 LIN-2575 · P1.5 LIN-2576 · P1.6 LIN-2577 · P2.1 LIN-2578 · P2.2 LIN-2579 · P2.3 LIN-2580 ·
+P3.1 LIN-2581 · P3.2 LIN-2582 · P3.3 LIN-2583 · P3.4 LIN-2584 · P4.1 LIN-2585 · P4.2 LIN-2586 ·
+P4.3 LIN-2587. Not re-filed, linked from the hub instead: P1.2 is LIN-1785 + LIN-2422; P3.5 is
+LIN-1832 (refusal counts already have a ticket); P4.4 is LIN-2544; P4.5 is LIN-2515.*
+
 *Citation note. Ticket ids that appear nowhere in this tree (LIN-1604, 1626, 1668, 2415, 2422,
 2513, 2515, 2532, 2544) are live-workspace facts read over the proxy on 2026-09-04, not file
 facts. The "nine unscorable phrases" are from the proxy's `/north-star` reading of 2026-09-02,
@@ -260,7 +268,7 @@ finding becomes a check or a ticket only by a human ruling. Cost: one dispatched
 not a Harbour OpenRouter call, so the free-tier clamp does not apply. Witness: registry entry
 and edition one in the same PR through the LIN-694 gate.
 
-**P3.5 · Refusal and hand-back counts as a KPI** — implementation (Improvement) — same project
+**P3.5 · Refusal and hand-back counts as a KPI** — is **LIN-1832**; link, do not duplicate — same project
 — P3 — no dependency
 The refusal license cutting upward (`docs/reviews/lane-run-review-2026-08-23.md`, where a lane
 declined to close LIN-2010 on the operator's own incorrect say-so; see also LIN-2254) is the
