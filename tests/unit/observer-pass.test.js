@@ -364,6 +364,57 @@ describe('observer-pass: runObserverPass', () => {
     assert.strictEqual(afterThird.rev, afterSecond.rev, 'the recovered report is carried forward as a true no-op');
   });
 
+  test('LIN-2408: the recovery tick does NOT feed the degraded fallback back to the model as a prior observation', async () => {
+    // `buildPassMessages` injects the prior summary as "Your own prior
+    // observation: …" for continuity. After a degraded tick that string is the
+    // fallback narrating its own failure — "could not reach a model" — which
+    // is not an observation. This fix makes the recovery tick the COMMON way
+    // out of a degraded state, so it would have become the common case too.
+    //
+    // Asserted on the actual prompt sent to the seam, because review pointed
+    // out the other integration tests ignore `messages` entirely and would
+    // never catch this.
+    const observerStateStore = freshStore();
+    const urlKey = `ws-no-degraded-priming-${randomUUID()}`;
+    await observerStateStore.ensureSeeded(`sweep:v1:${urlKey}`, nonEmptyCensus);
+
+    const sent = [];
+    const fake = async (messages, options, onEvent) => {
+      sent.push(messages);
+      onEvent('token', { token: JSON.stringify({ narrative: 'Recovered view of the fleet.', flags: [] }) });
+      onEvent('done', { finishReason: 'stop' });
+    };
+    const base = { observerStateStore, workspacePreferencesStore: fakeWorkspacePreferencesStore() };
+
+    // Tick 1 degrades (no key), writing the fallback narrative as the summary.
+    await runObserverPass(urlKey, { ...base, streamChatWithTools: fake, getPaidEnvKey: () => null, now: Date.now() });
+    const afterFirst = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKey}`);
+    assert.match(afterFirst.state.summary, /could not reach a model/, 'precondition: the degraded summary is what would be replayed');
+    assert.strictEqual(sent.length, 0);
+
+    // Tick 2 retries. The prompt must carry NO prior observation at all.
+    await runObserverPass(urlKey, { ...base, streamChatWithTools: fake, getPaidEnvKey: () => 'fake-key', now: Date.now() + 1000 });
+    assert.strictEqual(sent.length, 1, 'the retry must actually reach the model');
+    const prompt = JSON.stringify(sent[0]);
+    assert.doesNotMatch(prompt, /could not reach a model/, 'the degraded fallback must not be replayed to the model');
+    assert.doesNotMatch(prompt, /Your own prior observation/, 'a degraded prior contributes no observation at all');
+
+    // And the healthy case still DOES carry continuity forward, so the
+    // suppression is scoped to degradation rather than deleting the feature.
+    // The census must genuinely change — `ensureSeeded` is seed-if-absent and
+    // would silently no-op here, leaving a quiet tick and a vacuous assertion.
+    const sweepDoc = await observerStateStore.readCurrent(`sweep:v1:${urlKey}`);
+    await observerStateStore.advance(
+      `sweep:v1:${urlKey}`, sweepDoc.rev,
+      { ...nonEmptyCensus, lanes: { ...nonEmptyCensus.lanes, working: 9 } },
+      { reason: 'sweep' }
+    );
+    await runObserverPass(urlKey, { ...base, streamChatWithTools: fake, getPaidEnvKey: () => 'fake-key', now: Date.now() + 2000 });
+    assert.strictEqual(sent.length, 2, 'a changed census calls the model again');
+    assert.match(JSON.stringify(sent[1]), /Your own prior observation: Recovered view of the fleet\./,
+      'a HEALTHY prior summary is still threaded through for continuity');
+  });
+
   test('LIN-2408: a retry that degrades AGAIN keeps retrying rather than freezing', async () => {
     // The pathological case, asserted rather than assumed. A model that keeps
     // failing must not have its stale narrative frozen into the panel; the
