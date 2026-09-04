@@ -66,20 +66,31 @@
      needs clearing under this column any more, and `1.5rem` is now ordinary
      end-of-feed breathing room rather than a reserve.
 
-     NOT "nothing floats over this column any more" — an earlier draft of this
-     comment said that and it was false. The sticky `.nav-bar` above still
-     passes over the feed as it scrolls (see the correction at the top of this
-     file). What is gone is the BOTTOM-RIGHT overlay this padding was fighting,
-     and the sticky header is a deliberate, separately-mitigated decision, not
-     an instance of the class.
+     Two earlier drafts of this paragraph were wrong in opposite directions and
+     both are worth recording, because each was a claim written without a
+     measurement behind it.
+
+     The first said "nothing floats over this column any more". False as a
+     general statement: `.nav-bar` is sticky (see the correction at the top of
+     this file), so something out-of-flow does pass over this page.
+
+     The second over-corrected to "the sticky nav still passes over the feed as
+     it scrolls", and asserted it in the test as a tolerated overlay. Also
+     false, for the targets that matter: swept at 320/360/390/430 with six
+     seeded sessions, the nav records ZERO overlaps against the last
+     `.obs-session` and its `open ↗` control. It cannot reach them — the nav is
+     pinned to the top of the viewport and the feed's end rests near the bottom
+     at max scroll, so the two never share a band.
+
+     What is actually true: the BOTTOM-RIGHT overlay this padding was fighting
+     is gone, and nothing else reaches these targets either.
 
      The guard is a test, not this comment: tests/e2e/observation.spec.js sweeps
-     every 2px offset at 320/360/390/430 and asserts that the ONLY thing passing
-     over the last `.obs-session` and its `.obs-session-open` is that sticky nav
-     — anything else fails and is named in the failure. It also asserts the
-     sweep had candidates, so it cannot pass by finding nothing. That is
-     LIN-2298's acceptance witness, and it goes red if a floating element
-     returns here, which a padding value cannot do. */
+     every 2px offset at those four widths and asserts a flat ZERO overlaps —
+     against fixed AND sticky elements, so a future change that did bring the
+     nav or any other overlay into this band goes red and is named in the
+     failure. That is LIN-2298's acceptance witness, and it catches what a
+     padding value never could. */
   padding: 0 0.6rem 1.5rem;
 }
 

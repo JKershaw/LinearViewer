@@ -75,9 +75,14 @@
    /feedback-widget.js, a throw inside buildWidget, or JS off leaves it
    permanently disabled. Dimmed with a default cursor, that reads as
    unavailable instead of broken. */
-.nav-feedback-trigger:disabled {
+.nav-feedback-trigger:disabled,
+.nav-feedback-trigger:disabled:hover {
   opacity: 0.5;
   cursor: default;
+  /* `.nav-action:hover { color: var(--fg) }` (public/style.css) still matches a
+     disabled button, so without the second selector the dead control brightens
+     under the cursor — reading as interactive at exactly the moment it is not. */
+  color: var(--fg-dim, inherit);
 }
 
 /* A pending draft (text not yet sent) gets a subtle marker dot — carried over

@@ -1670,13 +1670,21 @@ test.describe('Live Console (experimental)', () => {
       await expect(page.getByTestId('feedback-widget-root')).toHaveAttribute('data-enabled', 'true');
 
       const result = await sweepFixedOverlaps(page, '[data-testid="live-console-more"]');
-      // The real precondition. The two above (button visible, flag on) are
-      // necessary and NOT sufficient — neither establishes that a single
-      // overlay candidate exists, which is what the LIN-2298 review caught:
-      // the old `await expect(fab).toBeVisible()` was doing this job, and
-      // deleting the FAB deleted it. Asserting "no overlaps" against an empty
-      // candidate set is the LIN-2252 no-op wearing this ticket's clothes.
+      // The walk found something. The two preconditions above (button visible,
+      // flag on) do not establish even that much, which is what the LIN-2298
+      // review caught — the old `await expect(fab).toBeVisible()` was doing
+      // this job and deleting the FAB deleted it.
+      //
+      // Deliberately not overstated: the only candidate on this page is the
+      // top-pinned sticky nav, which cannot reach this control, so this does
+      // not prove a failure was reachable. It catches an empty walk. Detection
+      // capability is pinned by tests/e2e/overlay-sweep-control.spec.js.
       expectSweepNotVacuous(expect, result, 'live console "view earlier" @390px');
+      // And the page must actually scroll, or the sweep runs one iteration at
+      // rest and proves nothing. The Observation sweep asserts this; this one
+      // did not, and with a single seeded event the page may well not scroll.
+      const maxScroll = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+      expect(maxScroll, 'live console must scroll at 390px for the sweep to mean anything').toBeGreaterThan(0);
       expect(result.hits, describeHits(result)).toEqual([]);
     });
 

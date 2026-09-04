@@ -15,7 +15,7 @@ test.describe('Feedback widget', () => {
     await page.goto(`/workspace/${urlKey}/`)
     await page.waitForLoadState('networkidle')
 
-    // Hidden by default — the floating button is not present until enabled.
+    // Hidden by default — the nav trigger is not rendered until the flag is on.
     await expect(page.getByTestId('nav-feedback-trigger')).toHaveCount(0)
 
     const toggle = page.getByTestId('footer-feedback-toggle')
@@ -28,6 +28,50 @@ test.describe('Feedback widget', () => {
 
     await expect(page.getByTestId('footer-feedback-toggle')).toHaveAttribute('data-enabled', 'true')
     await expect(page.getByTestId('nav-feedback-trigger')).toBeVisible()
+  })
+
+  // LIN-2298 a11y. The trigger moved from beside the panel (the FAB) to the top
+  // nav, ~a viewport away, so `open()`/`minimize()` now move focus across the
+  // page. The re-review noted the focus-return fix shipped with ZERO coverage
+  // on a branch arguing that unfalsifiable assertions are the defect — this is
+  // that coverage.
+  test('moves focus into the panel on open and returns it to the trigger on close', async ({ page, seedLocal }) => {
+    const { urlKey } = await seedLocal()
+    await enableWidget(page, urlKey)
+    const trigger = page.getByTestId('nav-feedback-trigger')
+
+    await trigger.click()
+    await expect(page.getByTestId('feedback-popup')).toBeVisible()
+    // open() focuses the message box, so a keyboard user lands where they type.
+    await expect(page.getByTestId('feedback-message')).toBeFocused()
+
+    // Closing from a control INSIDE the panel is the case that matters: focus
+    // is about to be destroyed with the thing that holds it.
+    await page.getByTestId('feedback-close').click()
+    await expect(page.getByTestId('feedback-popup')).toBeHidden()
+    await expect(trigger).toBeFocused()
+  })
+
+  test('does not steal focus back when the panel is closed from the trigger itself', async ({ page, seedLocal }) => {
+    // The other half of the branch: `minimize()` only restores focus when focus
+    // was still inside the panel. Without this, a test could pass by focusing
+    // the trigger unconditionally, which would fight a user who had already
+    // moved on.
+    const { urlKey } = await seedLocal()
+    await enableWidget(page, urlKey)
+    const trigger = page.getByTestId('nav-feedback-trigger')
+
+    await trigger.click()
+    await expect(page.getByTestId('feedback-popup')).toBeVisible()
+
+    // Move focus out of the panel, then close via the trigger.
+    await page.getByTestId('footer-feedback-toggle').focus()
+    await expect(page.getByTestId('footer-feedback-toggle')).toBeFocused()
+    await trigger.click()
+    await expect(page.getByTestId('feedback-popup')).toBeHidden()
+    // The click itself put focus on the trigger; what must NOT have happened is
+    // a restore firing on a panel that no longer held focus.
+    await expect(page.getByTestId('feedback-message')).not.toBeFocused()
   })
 
   test('opens a popup with message, priority, and screenshot fields', async ({ page, seedLocal }) => {
@@ -312,9 +356,14 @@ test.describe('Feedback widget', () => {
         await enableWidget(page, urlKey)
 
         const result = await sweepFixedOverlaps(page, '[data-testid="footer-feedback-toggle"]')
-        // The precondition that matters, and the one the FAB's deletion took
-        // away: the sweep had something to sweep against. Asserting "no
-        // overlaps" against an empty candidate set is the LIN-2252 no-op shape.
+        // The sweep's walk found something. This is a NARROW guarantee — the
+        // only candidate here is the top-pinned sticky nav, which can never
+        // reach this bottom-anchored footer control, so it does not establish
+        // that a failure was reachable. What it does catch is an empty walk,
+        // which is not hypothetical: it is what surfaced the half-parsed-page
+        // race `enableWidget` below now guards against. Detection capability
+        // is underwritten by tests/e2e/overlay-sweep-control.spec.js; this
+        // sweep is the regression net.
         expectSweepNotVacuous(expect, result, `footer toggle @${width}px`)
         expect(result.hits, describeHits(result)).toEqual([])
       })
@@ -432,12 +481,15 @@ async function dropFileOnZone(page, { name, type, bytes, size }) {
 // rest of the page is still parsing (`document.readyState === 'loading'`).
 //
 // Measured, not theorised: with a visibility wait, the sweeps below ran against
-// a half-parsed document at 320/360/390 nondeterministically, and at 390 the
-// document was early enough that `body *` matched NOTHING — zero overlay
-// candidates, so "no overlaps" was true and meaningless. The vacuity
-// precondition added for the LIN-2298 review is what surfaced it; it was
-// invisible before, and the same race would have let the ORIGINAL `.feedback-fab`
-// sweeps pass by finding no FAB rather than by finding no overlap.
+// a half-parsed document at 320/360/390 nondeterministically. An earlier version
+// of this comment said `body *` matched NOTHING at 390; that was imprecise and
+// is corrected here. Elements existed — what was empty was the OVERLAY set: at
+// that point the stylesheet had not applied, so `.nav-bar` computed as `static`
+// rather than `sticky` and nothing qualified. Either way the sweep had nothing
+// to find and "no overlaps" was true and meaningless. The vacuity precondition
+// added for the LIN-2298 review is what surfaced it; it was invisible before,
+// and the same race would have let the ORIGINAL `.feedback-fab` sweeps pass by
+// finding no FAB rather than by finding no overlap.
 //
 // `toBeEnabled()` is the real readiness signal because LIN-2298 made it one:
 // the trigger ships `disabled` and public/feedback-widget.js clears that only
@@ -449,4 +501,10 @@ async function enableWidget(page, urlKey) {
   await page.getByTestId('footer-feedback-toggle').click()
   await page.waitForLoadState('networkidle')
   await expect(page.getByTestId('nav-feedback-trigger')).toBeEnabled()
+  // `toBeEnabled()` can resolve at readyState 'interactive': /feedback-widget.js
+  // is `defer`, its init runs on DOMContentLoaded, and it clears `disabled`
+  // synchronously there. The sweep helper THROWS on a non-complete document, so
+  // without this the DCL->load window would surface as a confusing hard error
+  // rather than a wait. Narrow, but the failure is ugly and the fix is a line.
+  await page.waitForLoadState('load')
 }

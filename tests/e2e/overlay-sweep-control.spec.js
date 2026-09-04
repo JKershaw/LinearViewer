@@ -33,9 +33,13 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     })
   }
 
-  test('reports a fixed overlay placed over the swept target, and stays silent once it is gone', async ({ page, seedLocal }) => {
+  // Run at every width the real sweeps use. Detection capability is not
+  // width-independent — the target's own geometry moves — so proving it at 360
+  // and asserting it at 320/390/430 was a gap the re-review named.
+  for (const width of [320, 360, 390, 430]) {
+  test(`reports a fixed overlay placed over the swept target, and stays silent once it is gone (${width}px)`, async ({ page, seedLocal }) => {
     const { urlKey } = await seedLocal()
-    await page.setViewportSize({ width: 360, height: 844 })
+    await page.setViewportSize({ width, height: 844 })
     await page.goto(`/workspace/${urlKey}/`)
     await page.waitForLoadState('networkidle')
 
@@ -66,6 +70,40 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
       without.hits.filter(h => h.overlay === 'sweep-control-overlay'),
       'removing the overlay must remove its hits'
     ).toEqual([])
+  })
+  }
+
+  test('reports EVERY overlay covering the target at an offset, not just the first', async ({ page, seedLocal }) => {
+    // The re-review's blocking finding: the sweep used to `break` after the
+    // first overlapping overlay in document order. Combined with a call site
+    // that filtered a known-benign overlay out of the hits, that made any
+    // SECOND overlay at the same offsets invisible — the exact "assertion that
+    // cannot fail" this branch keeps arguing against.
+    //
+    // The Observation acceptance no longer filters anything, so it would fail
+    // on the first hit regardless; this is what keeps the helper itself honest
+    // if a caller ever does tolerate one overlay again.
+    const { urlKey } = await seedLocal()
+    await page.setViewportSize({ width: 360, height: 844 })
+    await page.goto(`/workspace/${urlKey}/`)
+    await page.waitForLoadState('networkidle')
+
+    await page.evaluate(() => {
+      for (const id of ['overlay-one', 'overlay-two']) {
+        const el = document.createElement('div')
+        el.setAttribute('data-testid', id)
+        // Same band, so both cover the target at the same scroll offsets.
+        el.style.cssText = 'position:fixed;right:16px;bottom:16px;width:120px;height:40px;background:#2563eb;z-index:1000'
+        document.body.appendChild(el)
+      }
+    })
+
+    const result = await sweepFixedOverlaps(page, '[data-testid="footer-feedback-toggle"]')
+    const named = new Set(result.hits.map(h => h.overlay))
+    expect(
+      [...named].sort(),
+      `both overlays must be reported, not just the first in document order — ${describeHits(result)}`
+    ).toEqual(['overlay-one', 'overlay-two'])
   })
 
   test('sweeps sticky overlays too, not just fixed ones', async ({ page, seedLocal }) => {

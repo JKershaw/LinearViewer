@@ -283,14 +283,21 @@
     // just used went. `open()` moves focus INTO the panel, so returning it is
     // the other half of that transaction, not a nicety.
     function minimize() {
+      // Read focus BEFORE hiding. Setting `hidden` triggers HTML's focus-fixup
+      // on the focused descendant, and when `activeElement` updates relative to
+      // that is engine-dependent — Blink defers it to the next lifecycle update,
+      // so reading afterwards happens to work in Chromium and would silently
+      // stop working elsewhere. The failure mode is invisible (focus simply
+      // isn't restored), which is the shape this branch keeps arguing against.
+      const focusWasInPanel = popup.contains(document.activeElement);
       popup.hidden = true;
       triggers.forEach(t => t.setAttribute('aria-expanded', 'false'));
       reflectDraftIndicator();
-      // Only when focus is still inside the panel we are hiding: a click on
-      // the trigger itself already has focus in the right place, and stealing
-      // it back from wherever the user has since moved would be worse than
-      // doing nothing.
-      if (triggers.length && popup.contains(document.activeElement)) triggers[0].focus();
+      // Only when focus was still inside the panel we just hid: a click on the
+      // trigger itself already has focus in the right place, and stealing it
+      // back from wherever the user has since moved would be worse than doing
+      // nothing.
+      if (triggers.length && focusWasInPanel) triggers[0].focus();
     }
 
     function persist() {

@@ -740,47 +740,36 @@ test.describe('LIN-2298: no fixed overlay covers the Observation feed', () => {
       // meaning "the last card". On a ticket whose own fix step cited a class
       // that does not exist (`.obs-card`), a selector that is right by luck is
       // not good enough.
+      // Nothing is excluded from this sweep, and the assertion is a flat zero.
+      //
+      // An intermediate version of this test tolerated the sticky `.nav-bar`,
+      // on the reasoning that a sticky header genuinely does pass over scrolled
+      // content and that overlay is deliberate. That reasoning was sound and
+      // the tolerance was still wrong, because it was never MEASURED. It is
+      // now: swept at all four widths with six seeded sessions, the nav reports
+      // ZERO overlaps against both the last card and its `open ↗` control.
+      //
+      // It cannot reach them. The nav is pinned to the top of the viewport and
+      // both targets sit at the end of the feed, so at max scroll they rest
+      // near the BOTTOM — the two never occupy the same band. (Same geometry
+      // that keeps the footer sweeps in feedback-widget.spec.js clear of it.)
+      //
+      // So an allow-rule for the nav would have been dead code that had never
+      // fired, sitting in the acceptance witness of a ticket about assertions
+      // that cannot fail — and worse, it would have silently absorbed a REAL
+      // overlay whose label happened to match. A flat zero is both the truth
+      // and the stronger claim. The helper still sweeps sticky as well as
+      // fixed, so if a future change did bring the nav (or any other sticky
+      // element) into this band, this goes red and names it.
       const LAST_CARD = '#obs-active > .obs-session:last-child';
-
-      // NOTHING is excluded from this sweep, and the assertion is shaped
-      // around that on purpose.
-      //
-      // The obvious way to write this ticket's acceptance is "the card is
-      // covered by no overlay at all". That assertion is available and it is a
-      // LIE, which the LIN-2298 review is what surfaced: `.nav-bar` is
-      // `position: sticky; top: 0` with a z-index and a translucent wash
-      // (public/style.css), so it genuinely does pass over this column as the
-      // feed scrolls — and LIN-2298 moved the feedback trigger INTO it. A
-      // sweep filtered to `position: fixed` would have let that assertion
-      // stand while being structurally unable to see the counterexample.
-      //
-      // So the sweep looks at fixed AND sticky and the assertion names what it
-      // tolerates: the ONLY thing allowed to pass over the card is the sticky
-      // nav, which predates this ticket, is a deliberate design decision, and
-      // carries its own named mitigation (per-interaction `scroll-margin-top`
-      // — see the `.nav-bar` comment in public/style.css). Anything else — a
-      // reintroduced FAB, a new floating control — fails, and the failure
-      // message names it.
-      //
-      // This is both stronger and more honest than an exclusion list: an
-      // exclusion would leave the candidate set EMPTY on this page and hand
-      // back a green result that proves nothing, which is the LIN-2252 shape
-      // this whole ticket family exists to have caught.
-      const DELIBERATE = /nav-bar/;
 
       const card = await sweepFixedOverlaps(page, LAST_CARD);
       expectSweepNotVacuous(expect, card, `last .obs-session @${width}px`);
-      expect(
-        card.hits.filter(h => !DELIBERATE.test(h.overlay)),
-        `last .obs-session covered by something other than the sticky nav: ${describeHits(card)}`
-      ).toEqual([]);
+      expect(card.hits, `last .obs-session: ${describeHits(card)}`).toEqual([]);
 
       const open = await sweepFixedOverlaps(page, `${LAST_CARD} .obs-session-open`);
       expectSweepNotVacuous(expect, open, `.obs-session-open @${width}px`);
-      expect(
-        open.hits.filter(h => !DELIBERATE.test(h.overlay)),
-        `.obs-session-open covered by something other than the sticky nav: ${describeHits(open)}`
-      ).toEqual([]);
+      expect(open.hits, `its .obs-session-open: ${describeHits(open)}`).toEqual([]);
     });
   }
 
