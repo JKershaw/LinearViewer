@@ -44,6 +44,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Five sources, five variables — never concatenated (see file header).
 const docsSource = readFileSync(join(__dirname, '../../docs/passage-runner-prompt.md'), 'utf8');
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
+// LIN-679 Stage 4 (LIN-2538): group F compute (including /north-star and
+// /cost) moved to its own sub-router, mounted from routes/proxy.js.
+const proxyComputeSource = readFileSync(join(__dirname, '../../routes/proxy-compute.js'), 'utf8');
 const factorySource = readFileSync(join(__dirname, '../../lib/dispatch-factory.js'), 'utf8');
 const integrationSource = readFileSync(join(__dirname, '../../docs/proxy-integration.md'), 'utf8');
 // LIN-2245: the /api/proxy/instructions catalog (the source of all 3
@@ -149,9 +152,10 @@ describe('assertion 4: north-star reading.state/roadmap.state match the handler 
   // literal — NOT the /api/proxy/instructions prose block describing the
   // same shape, which would match whether or not the handler still agrees
   // (that's the trap this ticket's plan review found).
+  // LIN-679 Stage 4 (LIN-2538): the handler moved to routes/proxy-compute.js.
   test('the north-star handler emits reading.state and roadmap.state', () => {
     const handler = sliceBetween(
-      proxySource,
+      proxyComputeSource,
       "router.get('/api/proxy/north-star',",
       'GET /api/proxy/periodicals'
     );
@@ -215,8 +219,9 @@ describe('claim 2 (honestly weak pin): /cost stays a single per-identifier route
   // SAME route instead — a `?rollup=1` query param or an internal branch —
   // since that would leave the route's registration, and this count, wholly
   // unchanged. Nothing can honestly pin more than that from source alone.
-  test('routes/proxy.js registers exactly one cost route, with no sibling roll-up path', () => {
-    const routeRegistrations = proxySource.match(/router\.(?:get|post|put|patch|delete)\((?:\[[^\]]*\]|'[^']*')/g) || [];
+  // LIN-679 Stage 4 (LIN-2538): /cost moved wholesale to routes/proxy-compute.js.
+  test('routes/proxy-compute.js registers exactly one cost route, with no sibling roll-up path', () => {
+    const routeRegistrations = proxyComputeSource.match(/router\.(?:get|post|put|patch|delete)\((?:\[[^\]]*\]|'[^']*')/g) || [];
     const costRegistrations = routeRegistrations.filter(r => r.includes('cost'));
     assert.strictEqual(costRegistrations.length, 1, 'expected exactly one cost-related route registration — a new sibling path was added');
     assert.match(costRegistrations[0], /'\/api\/proxy\/issues\/:identifier\/cost'/);

@@ -34,6 +34,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // pinned here now live at their new home, so we read the provider source.
 const linearSource = readFileSync(join(__dirname, '../../lib/providers/linear/index.js'), 'utf8');
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
+// LIN-679 Stage 4 (LIN-2538): group F's recommend/recap/brief handlers moved
+// to their own sub-router. fetchWithTimeout/CONTEXT_FETCH_TIMEOUT_MS stay
+// defined in routes/proxy.js (H1: computeRecommendation, relocated but kept
+// in routes/proxy.js, still calls them at :1744/:1762) and are injected into F.
+const proxyComputeSource = readFileSync(join(__dirname, '../../routes/proxy-compute.js'), 'utf8');
 
 // Pull a named gql`...` template literal out of a source file by its const name.
 function extractQuery(source, name) {
@@ -260,9 +265,18 @@ describe('recommendation context fetch stops fighting the keepalive', () => {
     assert.ok(ms > 25_000, `backstop (${ms}ms) must exceed the 25s keepalive flush`);
   });
 
+  // LIN-679 Stage 4 (LIN-2538, H2): four of the five call sites moved to
+  // routes/proxy-compute.js; the fifth (inside computeRecommendation, called
+  // from /recommend and the relocated-but-shared /recommend-and-dispatch)
+  // stayed in routes/proxy.js. The anti-pattern regex has 0 matches at either
+  // home today, so re-pointing the absence assertion to F's source and adding
+  // a complementary check against routes/proxy.js (the 937555cd template)
+  // strengthens the pin rather than merely moving it.
   test('recommendation endpoints no longer cap the context fetch at the 25s keepalive boundary', () => {
+    assert.doesNotMatch(proxyComputeSource, /withTimeout\(\s*fetchRecommendationContext/,
+      'the tight GRAPHQL_TIMEOUT_MS cap on fetchRecommendationContext must be gone (routes/proxy-compute.js)');
     assert.doesNotMatch(proxySource, /withTimeout\(\s*fetchRecommendationContext/,
-      'the tight GRAPHQL_TIMEOUT_MS cap on fetchRecommendationContext must be gone');
+      'the tight GRAPHQL_TIMEOUT_MS cap on fetchRecommendationContext must be gone (routes/proxy.js)');
   });
 
   test('context fetch is abortable (signal threaded) under the backstop budget, via the resolved provider (LIN-2044)', () => {
@@ -275,12 +289,19 @@ describe('recommendation context fetch stops fighting the keepalive', () => {
     // pre-existing, now-reachable gap named in that step, not something this shape
     // test asserts on), while the caller-visible 504-on-timeout behavior is unchanged
     // for every provider regardless.
-    const calls = proxySource.match(
-      /fetchWithTimeout\(\s*\(signal\)\s*=>\s*provider\.fetchRecommendationContext\(accessToken,\s*identifier,\s*\{\s*signal(?:,\s*noDescend)?\s*\}\),\s*CONTEXT_FETCH_TIMEOUT_MS\)/g
-    ) || [];
-    // recommend + recap (x2) + brief (x2) = 5 sites
-    assert.strictEqual(calls.length, 5,
-      `all 5 recommendation-context fetches must call provider.fetchRecommendationContext via the abortable backstop helper (found ${calls.length})`);
+    //
+    // LIN-679 Stage 4 (LIN-2538, H1/H2): the site inside computeRecommendation
+    // (called from /recommend, and shared with the still-in-routes/proxy.js
+    // /recommend-and-dispatch) stayed put when computeRecommendation itself
+    // stayed; the other four (recap x2, brief x2) moved to
+    // routes/proxy-compute.js. Split 4/1, not a single re-pointed 5.
+    const pattern = /fetchWithTimeout\(\s*\(signal\)\s*=>\s*provider\.fetchRecommendationContext\(accessToken,\s*identifier,\s*\{\s*signal(?:,\s*noDescend)?\s*\}\),\s*CONTEXT_FETCH_TIMEOUT_MS\)/g;
+    const computeCalls = proxyComputeSource.match(pattern) || [];
+    const proxyCalls = proxySource.match(pattern) || [];
+    assert.strictEqual(computeCalls.length, 4,
+      `4 of the 5 recommendation-context fetches (recap x2, brief x2) must call provider.fetchRecommendationContext via the abortable backstop helper in routes/proxy-compute.js (found ${computeCalls.length})`);
+    assert.strictEqual(proxyCalls.length, 1,
+      `the recommend site's recommendation-context fetch (inside computeRecommendation) must remain in routes/proxy.js (found ${proxyCalls.length})`);
   });
 
   test('fetchWithTimeout aborts the request and clears its timer', () => {

@@ -368,7 +368,7 @@ const ROWS = [
   // --- Group F: task-automation compute ---
   {
     group: 'F', method: 'GET', url: '/api/proxy/stack', expect: 200,
-    note: 'isTestMode → getTestMockData() fixture (:3522)',
+    note: 'isTestMode → getTestMockData() fixture (routes/proxy-compute.js:249)',
     run: () => call(buildApp(), 'GET', '/api/proxy/stack'),
   },
   {
@@ -397,7 +397,7 @@ const ROWS = [
   },
   {
     group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-1/snapshots', expect: 200,
-    note: 'taskSnapshotStore.list() (:4032)',
+    note: 'taskSnapshotStore.list() (routes/proxy-compute.js:571)',
     run: () => call(buildApp(), 'GET', '/api/proxy/issues/LIN-1/snapshots'),
   },
   {
@@ -553,14 +553,16 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
   // routes/proxy-reads.js — 47 - 13 = 34.
   // LIN-2537 (Stage 3b / PR-3b): group E's 12 router.* registrations moved to
   // routes/proxy-writes.js — 34 - 12 = 22.
-  test('routes/proxy.js has exactly 22 router.* registrations (65 URL forms across the whole proxy surface)', () => {
+  // LIN-2538 (Stage 4 / PR-4): group F's 12 router.* registrations moved to
+  // routes/proxy-compute.js — 22 - 12 = 10.
+  test('routes/proxy.js has exactly 10 router.* registrations (65 URL forms across the whole proxy surface)', () => {
     const src = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
     const matches = src.match(/^\s{2}router\.(get|post|put|patch|delete)\(/gm) || [];
-    assert.equal(matches.length, 22,
-      `expected 22 route registrations in routes/proxy.js, found ${matches.length} — ` +
+    assert.equal(matches.length, 10,
+      `expected 10 route registrations in routes/proxy.js, found ${matches.length} — ` +
       `this file's 65-row ROWS table must be re-derived from source before trusting it`);
     assert.equal(ROWS.length, 65,
-      `this file's ROWS table must cover exactly 65 URL forms (22 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 13 in routes/proxy-reads.js + 12 in routes/proxy-writes.js + 10 array-path aliases), found ${ROWS.length}`);
+      `this file's ROWS table must cover exactly 65 URL forms (10 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 13 in routes/proxy-reads.js + 12 in routes/proxy-writes.js + 12 in routes/proxy-compute.js + 10 array-path aliases), found ${ROWS.length}`);
   });
 });
 

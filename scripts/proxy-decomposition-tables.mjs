@@ -140,7 +140,9 @@ routes.forEach((r, i) => { r.idx = i; r.region = regionOf(i); });
 // routes/proxy-reads.js — 47 - 13 = 34.
 // LIN-2537 (Stage 3b / PR-3b): group E (12 routes) moved to
 // routes/proxy-writes.js — 34 - 12 = 22.
-const EXPECTED_ROUTES_IN_FILE = 22;
+// LIN-2538 (Stage 4 / PR-4): group F (12 routes) moved to
+// routes/proxy-compute.js — 22 - 12 = 10.
+const EXPECTED_ROUTES_IN_FILE = 10;
 if (routes.length !== EXPECTED_ROUTES_IN_FILE) {
   console.error(`ENDPOINT DRIFT: found ${routes.length} route registrations, expected ${EXPECTED_ROUTES_IN_FILE}.`);
   console.error('The region ranges above are index-based; re-derive them before trusting either table.');
