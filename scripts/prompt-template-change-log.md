@@ -60,7 +60,7 @@ Newest last.
 | 2026-08-25 | `842db225` | LIN-2311 | handwritten + meta | Dropped the native priority field from the Follow-up Triage instruction. | unknown (backfilled) |
 | 2026-08-25 | `3c573ac6` | LIN-2316 | handwritten | Annotated triage's displayed priority; named `priorityLevel` as the sole write field. | unknown (backfilled) |
 | 2026-08-25 | `b5235e9e` | LIN-2317 | handwritten + meta | Named `priorityLevel` in the meta-prompt triage path; annotated canonical 0. | unknown (backfilled) |
-| 2026-09-04 | `76911b8b` | LIN-1873 | handwritten + meta | Generalised the cited-sweep rule into plan and plan-review: a claim of covering a class must cite the reproducible query whose output IS the enumeration (with output and sha), the reviewer re-runs that query rather than searching independently, and a class with no possible sweep is declared as such with its reason. | **down** |
+| 2026-09-04 | `d8152ee8` | LIN-1873 | handwritten + meta | Generalised the cited-sweep rule into plan and plan-review: a claim of covering a class must cite the reproducible query whose output IS the enumeration (with output and sha), the reviewer re-runs that query rather than searching independently, and a class with no possible sweep is declared as such with its reason. | **down** |
 
 ### On the LIN-1873 row's direction, recorded before the read
 
@@ -115,11 +115,17 @@ Two honesty notes about what a backfilled row is worth:
    ```
 
    Run at `a518422e`: **17 commits**, which are the rows above including
-   LIN-1873's own. LIN-1873 then landed two review-fix commits over the same
-   two paths (`15663318`, `76911b8b`); they are the same change as the row above,
-   not new interruptions, and the row cites the last of them so the claim is
-   checkable at HEAD rather than pointing at a commit that predates the text
-   it describes.
+   LIN-1873's own. LIN-1873 then landed two rounds of review fixes over the
+   same two paths; they are the same change as the row above, not new
+   interruptions.
+
+   **A row must cite a sha that is on `main`.** This repo squash-merges, so
+   every branch commit is discarded at merge and a row citing one is
+   unresolvable the moment it lands — which defeats the column whose stated
+   purpose is "makes the claim checkable at HEAD". The LIN-1873 row first cited
+   its branch head `76911b8b`; that sha does not exist on `main` and the row is
+   now corrected to the squash commit `d8152ee8`. Cite the MERGE commit, not
+   the work.
 
    **Note the explicit timestamp, because the obvious form of this query is
    wrong.** `--since=2026-07-26` uses git's *approxidate*, which resolves a bare
