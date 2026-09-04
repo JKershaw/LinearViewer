@@ -769,15 +769,22 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
   test('LIN-2367: two tasks in the SAME workspace sharing a decision_id each keep their own raisedAt', async () => {
     // The sibling LIN-2291's review recorded and deliberately left unfixed.
     // LIN-2291 closed the CROSS-workspace half by moving to a
-    // `(urlKey, decision_id)` composite key. That key is still not unique:
+    // `(urlKey, decision_id)` composite key, which is still not unique:
     // `collectUnansweredDecisions` dedupes task decisions per
-    // `(urlKey, issueId)`, so ONE workspace can hold many unanswered rows,
-    // each carrying its own agent-invented free-text decision_id
-    // (simple-dispatcher/hook.js instructs: "a short unique string you invent
-    // for this decision"). Two tasks in one workspace both inventing
-    // 'proceed-or-abort' collide exactly as the cross-workspace pair did, and
-    // this is at least as likely — one workspace routinely dispatches many
-    // tasks under that identical instruction.
+    // `(urlKey, issueId)`, so ONE workspace can hold many unanswered rows.
+    //
+    // WHICH ROWS can actually carry a colliding decision_id — the ticket
+    // argues this from the agent inventing the string, and that is wrong for
+    // this branch (see the comment on the join in routes/dashboard.js).
+    // `lib/scan.js` overwrites it with `buildId(issueId, inputHash)`, so rows
+    // from the CURRENT producer cannot collide. The reachable case is legacy:
+    // the store landed in `7960bb48` and the overwrite only in `e968cf3a`, and
+    // the store is deliberately no-TTL, so every row written in between still
+    // carries a raw agent-supplied decision_id.
+    //
+    // These fixtures are therefore shaped like a LEGACY row, not like anything
+    // the producer emits today. Said plainly so the next reader does not try
+    // to reproduce them through `runTaskScan` and conclude the test is fake.
     const staleMs = Date.now() - 30 * 60 * 60 * 1000; // 30h — stale under the 24h default
     const freshMs = Date.now() - 60 * 60 * 1000;      // 1h — not stale
     const taskDecisionsStore = {
@@ -822,8 +829,16 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
     // It cannot fire for a store-sourced row (`toRecord` always sets
     // `id: doc._id`, and `_id` is the deterministic
     // `scan_<issueId8>_<inputHash12>`), so this guards a future producer rather
-    // than a live case. The point is the FAILURE MODE: an unmatchable row must
-    // contribute no age at all, never silently adopt a neighbour's.
+    // than a live case.
+    //
+    // What it pins is a POLICY, not a theft: an unmatchable row contributes no
+    // age at all. Without the `anchorId` ternary the row would match ITSELF
+    // (it is the only row with a null id) and contribute its own correct age —
+    // so the fix does not prevent it borrowing a neighbour's raisedAt, it
+    // chooses not to age it at all. That choice costs something, recorded on
+    // the join in routes/dashboard.js: `lib/escalation-kpis.js` skips
+    // null-raised rows, so the row vanishes from the KPI rather than being
+    // mis-aged.
     const staleMs = Date.now() - 30 * 60 * 60 * 1000;
     const taskDecisionsStore = {
       async listResolvedForWorkspaces() { return []; },
@@ -850,8 +865,11 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
 
     assert.equal(res.statusCode, 200);
     // The id-less row has no raisedAt, so it contributes no age: one stale row,
-    // not two. A null-matching find would have paired it with scan_real.
-    assert.equal(res.jsonBody.unansweredAge.staleCount, 1, 'an unmatchable row must not borrow a raisedAt from a neighbour');
+    // not two. Under BOTH old predicates it resolved to scan_real and both
+    // counted stale; under a null-matching find it would resolve to itself and
+    // still count. Either way the assertion is a real witness — it just pins
+    // the policy rather than preventing a theft.
+    assert.equal(res.jsonBody.unansweredAge.staleCount, 1, 'an unmatchable row contributes no age rather than being aged from an unreliable key');
   });
 
   test('windowDays is clamped to [1, 365] and defaults to 30 when absent/invalid', async () => {
