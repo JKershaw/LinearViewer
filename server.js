@@ -1332,7 +1332,8 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
     .map(project => {
       const { roots } = forest.get(project.id) || { roots: [] };
       const { incomplete, completed, completedCount } = partitionCompleted(roots);
-      return { project, incomplete, completed, completedCount };
+      const collapsed = incomplete.length === 0 && completedCount === 0;
+      return { project: { ...project, collapsed }, incomplete, completed, completedCount };
     });
 
   return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated };

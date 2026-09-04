@@ -381,6 +381,7 @@ function resetDOM() {
     show(project.querySelector('.project-description'))
     show(project.querySelector('.project-meta'))
     show(project.querySelector('.completed-toggle'))
+    show(project.querySelector('.add-task-link'))
   })
 
   // Hide all completed sections, reset toggle text
@@ -513,7 +514,7 @@ function applyState(state) {
     setArrow(header, false)
 
     // Hide all project content (including .node containers)
-    const children = project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for]')
+    const children = project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for], .add-task-link')
     children.forEach(hide)
   })
 
@@ -531,25 +532,54 @@ function getDefaultCollapsedProjects() {
   return ids
 }
 
+// Union stored collapsed-project ids with the page's default-collapsed ones
+// (LIN-2514). An empty project's default must override stale/absent stored
+// state whenever state is (re)applied, since the storage key is global and
+// not workspace-scoped — a first-load-only union would never reach a
+// returning user carrying unrelated stored state. `storedIds` may be
+// undefined/missing (legacy or partial `linear-projects-state` shapes).
+function unionDefaultCollapsedProjects(storedIds) {
+  return [...new Set([...(storedIds || []), ...getDefaultCollapsedProjects()])]
+}
+
+// Shared in-memory UI state, owned by init() but also reapplied by
+// initSearch()'s clearSearchState() on a search round trip (LIN-2514 review
+// F-A). Both must mutate/reassign this SAME object rather than a detached
+// loadState() result, or the DOM (driven by whichever object applyState was
+// last called with) and the state object toggleItem/handleProjectHeaderClick
+// close over can disagree about a project's collapsed id, silently
+// swallowing the next header click.
+let state
+
 function init() {
   const isLanding = document.body.classList.contains('is-landing')
 
   // On landing page, always use defaults (no persistence)
   // On authenticated page, load from localStorage
-  let state
   if (isLanding) {
     state = getDefaultState()
     state.collapsedProjects = getDefaultCollapsedProjects()
   } else {
     state = loadState()
-    // On first load (no saved state), apply default collapsed projects from HTML
-    if (!hasStoredState()) {
-      state.collapsedProjects = getDefaultCollapsedProjects()
-    }
+    // Empty-project defaults always win over restored state (union, not
+    // replace), since a global localStorage key would otherwise permanently
+    // block the default for any returning user (LIN-2514).
+    state.collapsedProjects = unionDefaultCollapsedProjects(state.collapsedProjects)
   }
 
-  // Wrap saveState to be a no-op on landing
-  const persistState = isLanding ? () => {} : saveState
+  // Wrap saveState to be a no-op on landing. Also strip default-derived
+  // collapsed ids before writing (LIN-2514 review F2): state.collapsedProjects
+  // is the union of stored + default ids, but a default is nothing the user
+  // chose — persisting it would immortalize the default the moment any
+  // unrelated toggle calls persistState, leaving a project collapsed with no
+  // user intent once it later gains its first issue (the default itself
+  // disappears then, since it's derived fresh from the page each load).
+  const persistState = isLanding
+    ? () => {}
+    : (s) => {
+        const defaults = getDefaultCollapsedProjects()
+        saveState({ ...s, collapsedProjects: s.collapsedProjects.filter(id => !defaults.includes(id)) })
+      }
 
   applyState(state)
 
@@ -611,13 +641,14 @@ function init() {
 
     if (isCollapsed) {
       // Hide all project content (including .node containers)
-      project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for]')
+      project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for], .add-task-link')
         .forEach(hide)
     } else {
       // Show project description, meta, and completed toggle
       show(project.querySelector('.project-description'))
       show(project.querySelector('.project-meta'))
       show(project.querySelector('.completed-toggle'))
+      show(project.querySelector('.add-task-link'))
 
       // Show top-level nodes (but keep them collapsed unless explicitly expanded)
       // Nodes are inside a .tree wrapper (not the completed one)
@@ -1999,7 +2030,17 @@ function initSearch() {
     // Also ensure all .node elements are visible before resetDOM re-applies depth-based visibility,
     // in case search left nodes hidden that resetDOM wouldn't otherwise reach (e.g. in completed sections)
     document.querySelectorAll('.node.hidden').forEach(n => n.classList.remove('hidden'))
-    applyState(loadState())
+    // LIN-2514: fold in default-collapsed empty projects the same way init()
+    // does — raw loadState() alone would leave an empty project rendered
+    // expanded (▼) with its children still hidden by the collapse logic below.
+    // Review F-A: reassign the SAME `state` object init() owns (module-scope,
+    // shared with toggleItem/handleProjectHeaderClick) rather than a detached
+    // loadState() result — otherwise the DOM this applyState call paints and
+    // the in-memory state a subsequent header click reads from disagree about
+    // whether the project is collapsed, swallowing that first click.
+    state = loadState()
+    state.collapsedProjects = unionDefaultCollapsedProjects(state.collapsedProjects)
+    applyState(state)
   }
 
   function closeSearch() {

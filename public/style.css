@@ -1061,7 +1061,7 @@ a.wordmark:hover {
    Yellow accent color matches Linear's "started" state.
 */
 .in-progress-section {
-  margin-bottom: 2.5rem;
+  margin-bottom: var(--space-5);
 }
 
 .in-progress-header {
@@ -1108,7 +1108,7 @@ a.wordmark:hover {
    single collapsible list. Green accent color matches Linear's "completed" state.
 */
 .recent-activity-section {
-  margin-bottom: 2.5rem;
+  margin-bottom: var(--space-5);
 }
 
 .recent-activity-header {
@@ -1125,7 +1125,7 @@ a.wordmark:hover {
    Each project is a collapsible section with header, description, and issue tree.
 */
 .project {
-  margin-bottom: 2.5rem;
+  margin-bottom: var(--space-5);
   overflow: hidden;
 }
 
@@ -1879,18 +1879,6 @@ a.wordmark:hover {
     flex-basis: 100%;
     order: 1;
     margin-left: 2.4ch;
-  }
-
-  .project {
-    margin-bottom: var(--space-5);
-  }
-
-  .in-progress-section {
-    margin-bottom: var(--space-5);
-  }
-
-  .recent-activity-section {
-    margin-bottom: var(--space-5);
   }
 
   .project-header {
