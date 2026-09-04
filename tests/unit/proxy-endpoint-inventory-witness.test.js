@@ -26,6 +26,15 @@
  * status per URL form, which is the specific coverage `router.stack` used to
  * provide structurally and no longer does.
  *
+ * A status-only assertion is vacuous on the 10 rows below that expect 404:
+ * Express's own default catch-all ("Cannot GET <path>", text/html) is ALSO a
+ * 404, so a dropped/shadowed route would pass one of those rows exactly as
+ * green as the real handler's own "not found" response. Each of those rows
+ * carries `expectBody` — the handler's actual JSON error shape — and the
+ * witness below additionally pins the response content-type to
+ * application/json for them, so a route that stops resolving fails loudly
+ * instead of silently matching Express's default.
+ *
  * Group letters (A-I) in the row comments below are LIN-679's own group
  * labels (see the ticket), matching route registration order 1:1 — this
  * file's own witness (see the "registration count" test below) is what
@@ -146,7 +155,7 @@ async function call(app, method, path, { body, headers } = {}) {
     const text = await res.text();
     let parsed;
     try { parsed = JSON.parse(text); } catch { parsed = text; }
-    return { status: res.status, body: parsed };
+    return { status: res.status, body: parsed, contentType: res.headers.get('content-type') };
   } finally {
     await new Promise(resolve => server.close(resolve));
   }
@@ -362,23 +371,27 @@ const ROWS = [
     run: () => call(buildApp(), 'GET', '/api/proxy/stack'),
   },
   {
-    group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-999999/prompt/implement', expect: 404,
-    note: 'canonical form, isTestMode "Issue not found" (:3553)',
-    run: () => call(buildApp(), 'GET', '/api/proxy/issues/LIN-999999/prompt/implement'),
+    group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-999999/prompt/implementation', expect: 404,
+    note: 'canonical form, isTestMode "Issue not found" (:3553) — templateKey must be a real hasPrompt() key ("implement" 404s earlier, at the template-key check, with a different body)',
+    expectBody: { error: 'Issue not found' },
+    run: () => call(buildApp(), 'GET', '/api/proxy/issues/LIN-999999/prompt/implementation'),
   },
   {
-    group: 'F', method: 'GET', url: '/api/proxy/prompt/LIN-999999/implement', expect: 404,
+    group: 'F', method: 'GET', url: '/api/proxy/prompt/LIN-999999/implementation', expect: 404,
     note: 'flat alias form (:3553 array path)',
-    run: () => call(buildApp(), 'GET', '/api/proxy/prompt/LIN-999999/implement'),
+    expectBody: { error: 'Issue not found' },
+    run: () => call(buildApp(), 'GET', '/api/proxy/prompt/LIN-999999/implementation'),
   },
   {
     group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-999999/recommend', expect: 404,
     note: 'canonical form, isTestMode "Issue not found" (:3825)',
+    expectBody: { error: 'Issue not found' },
     run: () => call(buildApp(), 'GET', '/api/proxy/issues/LIN-999999/recommend'),
   },
   {
     group: 'F', method: 'GET', url: '/api/proxy/recommend/LIN-999999', expect: 404,
     note: 'flat alias form (:3825 array path)',
+    expectBody: { error: 'Issue not found' },
     run: () => call(buildApp(), 'GET', '/api/proxy/recommend/LIN-999999'),
   },
   {
@@ -414,11 +427,13 @@ const ROWS = [
   {
     group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-999999/recap', expect: 404,
     note: 'canonical form, isTestMode "Issue not found" (:4492)',
+    expectBody: { error: 'Issue not found' },
     run: () => call(buildApp(), 'GET', '/api/proxy/issues/LIN-999999/recap'),
   },
   {
     group: 'F', method: 'GET', url: '/api/proxy/recap/LIN-999999', expect: 404,
     note: 'flat alias form (:4492 array path)',
+    expectBody: { error: 'Issue not found' },
     run: () => call(buildApp(), 'GET', '/api/proxy/recap/LIN-999999'),
   },
   {
@@ -429,11 +444,13 @@ const ROWS = [
   {
     group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-999999/brief', expect: 404,
     note: 'canonical form, isTestMode "Issue not found" (:4783)',
+    expectBody: { error: 'Issue not found' },
     run: () => call(buildApp(), 'GET', '/api/proxy/issues/LIN-999999/brief'),
   },
   {
     group: 'F', method: 'GET', url: '/api/proxy/brief/LIN-999999', expect: 404,
     note: 'flat alias form (:4783 array path)',
+    expectBody: { error: 'Issue not found' },
     run: () => call(buildApp(), 'GET', '/api/proxy/brief/LIN-999999'),
   },
   {
@@ -505,11 +522,13 @@ const ROWS = [
   {
     group: 'I', method: 'GET', url: '/api/proxy/dispatch/d1', expect: 404,
     note: 'getItemStatus() → null (:6625)',
+    expectBody: { error: 'Dispatch item not found' },
     run: () => call(buildApp({ dispatchQueueStore: makeDispatchStore() }), 'GET', '/api/proxy/dispatch/d1'),
   },
   {
     group: 'I', method: 'GET', url: '/api/proxy/dispatch/d1/prompt', expect: 404,
     note: 'getItemStatus() → null (:6727)',
+    expectBody: { error: 'Dispatch item not found' },
     run: () => call(buildApp({ dispatchQueueStore: makeDispatchStore() }), 'GET', '/api/proxy/dispatch/d1/prompt'),
   },
 ];
@@ -540,9 +559,23 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
 describe('LIN-679 PR-0: endpoint inventory witness (all 65 URL forms resolve)', () => {
   for (const row of ROWS) {
     test(`[${row.group}] ${row.method} ${row.url} -> ${row.expect} (${row.note})`, async () => {
-      const { status, body } = await row.run();
+      const { status, body, contentType } = await row.run();
       assert.equal(status, row.expect,
         `expected ${row.expect}, got ${status}: ${JSON.stringify(body).slice(0, 300)}`);
+      // A dropped/shadowed route also resolves to a bare 404 — Express's own
+      // default "Cannot GET <path>" catch-all — so a status-only assertion on
+      // an `expect: 404` row is vacuous: it passes identically whether the
+      // real handler ran and legitimately reported "not found", or the route
+      // simply stopped being registered. `expectBody` pins the row to the
+      // handler's own JSON error shape (and, via `contentType`, to `res.json`
+      // rather than finalhandler's text/html default) so a dropped route
+      // fails this row instead of passing it by accident.
+      if (row.expectBody) {
+        assert.match(contentType || '', /^application\/json/,
+          `expected a JSON response (route resolved and ran its own handler), got content-type ${contentType}: ${JSON.stringify(body).slice(0, 300)}`);
+        assert.deepEqual(body, row.expectBody,
+          `expected body ${JSON.stringify(row.expectBody)}, got ${JSON.stringify(body).slice(0, 300)}`);
+      }
     });
   }
 });
