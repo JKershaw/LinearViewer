@@ -82,11 +82,16 @@
   // cursor MUST stay on the SSE text node (`.task-chat-msg-body`, the element
   // send() writes textContent into), so it's the text span, not the wrapper,
   // that toggles `.chat-cursor`.
-  function appendBubble(role, text) {
+  //
+  // LIN-2445: `state` overrides the assistant default for a turn that is
+  // ALREADY complete when it is appended — the saved-chat replay, where every
+  // stored turn finished before it was ever persisted. A live turn still opens
+  // 'in-progress' and is settled by setBubbleState below.
+  function appendBubble(role, text, state) {
     var whoLabel = role === 'user' ? 'you' : (maskFlightCompanionSentinel(activeTask) || 'task');
     var li = window.ChatUI.appendMessage(transcript, {
       who: whoLabel,
-      whoState: role === 'user' ? undefined : 'in-progress',
+      whoState: role === 'user' ? undefined : (state || 'in-progress'),
       whoClass: 'task-chat-msg-who',
       self: role === 'user',
       text: text,
@@ -96,6 +101,28 @@
     });
     setEmptyVisible(false);
     return li.querySelector('.task-chat-msg-body');
+  }
+
+  // LIN-2445 (LIN-2443's sibling class): settle a live assistant bubble's
+  // speaker pill when its turn ends. ChatUI.appendMessage bakes the pill into
+  // innerHTML and returns only the <li>, so there is no mutation API — this is
+  // the same page-local swap public/flight-companion.js:229 landed for
+  // LIN-2443, against the SAME shared vocabulary (status-pill--done/--failed,
+  // public/style.css). Deliberately duplicated rather than hoisted into
+  // window.ChatUI: LIN-2443's boundary keeps the shared primitives untouched,
+  // and hoisting would tax collective.js/observation.js/session.js for a need
+  // only the two streaming pages have. Glyphs mirror STATUS_PILL_GLYPHS
+  // (public/common.js) — NOT a chat.css/chat.js fork.
+  var PILL_GLYPHS = { done: '\u2713', failed: '\u2715' };
+
+  function setBubbleState(li, state) {
+    if (!li) return;
+    var pill = li.querySelector('.chat-msg__who');
+    if (!pill) return;
+    pill.classList.remove('status-pill--in-progress');
+    pill.classList.add('status-pill--' + state);
+    var char = pill.querySelector('.status-pill__char');
+    if (char) char.textContent = PILL_GLYPHS[state] || '';
   }
 
   // Human-readable label for a `tool` SSE breadcrumb (LIN-990). Derived from the
@@ -257,7 +284,10 @@
         activeTask = chat.taskIdentifier || '';
         idInput.value = activeTask;
         transcript.innerHTML = '';
-        chatHistory.forEach(function (turn) { appendBubble(turn.role, turn.content); });
+        // LIN-2445: every replayed turn is finished by definition — it was
+        // persisted. Open it settled rather than appending an in-progress pill
+        // that nothing will ever come along to clear.
+        chatHistory.forEach(function (turn) { appendBubble(turn.role, turn.content, 'done'); });
         if (activeLabel) activeLabel.textContent = activeTask ? 'talking to ' + maskFlightCompanionSentinel(activeTask) : '';
         if (resetBtn) resetBtn.classList.remove('hidden');
         setEmptyVisible(chatHistory.length === 0);
@@ -335,11 +365,13 @@
         return response.json().then(function (body) {
           answerEl.classList.remove('chat-cursor');
           answerEl.textContent = '[error: ' + ((body && body.error) || ('request failed (' + response.status + ')')) + ']';
+          setBubbleState(answerLi, 'failed');
           chatHistory.pop(); // drop the unanswered question so retry is clean
           setBusy(false);
         }).catch(function () {
           answerEl.classList.remove('chat-cursor');
           answerEl.textContent = '[error: request failed (' + response.status + ')]';
+          setBubbleState(answerLi, 'failed');
           chatHistory.pop();
           setBusy(false);
         });
@@ -360,13 +392,22 @@
             chatHistory.push({ role: 'assistant', content: answerText });
             if (chatHistory.length > 40) chatHistory.splice(0, chatHistory.length - 40);
           } else {
-            answerEl.textContent = '[no response]';
+            // LIN-2445: the row STAYS — Task Chat is user-initiated, so a human
+            // asked and deserves an answer even when it is empty (LIN-2443's
+            // own AC2 reasoning for keeping human-asked turns). Only the wording
+            // carries over: '[no response]' read like an error code rather than
+            // an answer, which is what AC2 rejected.
+            answerEl.textContent = 'no reply \u2014 nothing to add';
           }
+          // The turn ended cleanly either way — an empty answer is still an
+          // answer here, not a failure.
+          setBubbleState(answerLi, 'done');
           setBusy(false);
           questionInput.focus();
         } else if (type === 'error') {
           answerEl.classList.remove('chat-cursor');
           answerEl.textContent = answerText + '\n[error: ' + ((eventData && eventData.message) || 'failed') + ']';
+          setBubbleState(answerLi, 'failed');
           chatHistory.pop();
           setBusy(false);
         }
@@ -374,6 +415,7 @@
     }).catch(function () {
       answerEl.classList.remove('chat-cursor');
       answerEl.textContent = '[error: network failure]';
+      setBubbleState(answerLi, 'failed');
       chatHistory.pop();
       setBusy(false);
     });
