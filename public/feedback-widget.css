@@ -33,10 +33,18 @@
    The rect-sweep tests those reserves were pinned by are NOT deleted. They are
    kept and re-aimed in tests/e2e/feedback-widget.spec.js and
    tests/e2e/live-console.spec.js: instead of "this content never intersects
-   `.feedback-fab`", they now assert "this content never intersects ANY fixed
-   overlay, at any 2px scroll offset". That is a strictly stronger witness for
-   the class, and it is the one that goes red if a future change reintroduces a
-   floating element over the same content.
+   `.feedback-fab`", they now assert "this content never intersects any visible
+   FIXED-OR-STICKY overlay, at any 2px scroll offset", and each call site
+   asserts the sweep had candidates to find so a green result cannot be
+   vacuous. tests/e2e/overlay-sweep-control.spec.js is the positive control
+   that keeps the machinery itself honest.
+
+   Sticky is in that vocabulary deliberately, and it is not a detail: `.nav-bar`
+   is `position: sticky` and now HOSTS this trigger. A sweep filtered to `fixed`
+   alone would let a comment claim nothing floats over a column while being
+   structurally unable to see the header that does. That is the mistake the
+   LIN-2298 review caught in the first version of this block, which is why this
+   paragraph now describes the witness rather than praising it.
 
    The PANEL below stays `position: fixed`. That is deliberate and is not the
    defect: it is hidden until the user opens it, so it covers content only when
@@ -53,6 +61,23 @@
    is the entire point of the relocation. */
 .nav-feedback-trigger {
   position: relative;
+}
+
+/* The pre-hydration (and JS-failed) state, made VISIBLE.
+   `renderFeedbackTrigger` ships the button `disabled` so a click cannot land
+   before public/feedback-widget.js binds it. Without this rule that was a lie
+   the user could not see: `button.nav-action` (public/style.css) sets `color`
+   and `cursor: pointer` unconditionally and strips the border, so a disabled
+   trigger looked identical to a live one and silently ate clicks — the exact
+   UX the `disabled` was added to make honest.
+   It also matters beyond the hydration window. The FAB simply never appeared
+   if the widget script failed; this button is server-rendered, so a 404 on
+   /feedback-widget.js, a throw inside buildWidget, or JS off leaves it
+   permanently disabled. Dimmed with a default cursor, that reads as
+   unavailable instead of broken. */
+.nav-feedback-trigger:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* A pending draft (text not yet sent) gets a subtle marker dot — carried over

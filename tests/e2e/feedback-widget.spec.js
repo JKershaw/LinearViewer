@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js'
-import { sweepFixedOverlaps, describeHits } from '../fixed-overlay-sweep.js'
+import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixed-overlay-sweep.js'
 
 // Feedback widget client UX (LIN-635). Seeding rides the provider harness
 // (`seedLocal`); navigation drives off the returned urlKey (parallel-aware
@@ -311,8 +311,12 @@ test.describe('Feedback widget', () => {
         await page.setViewportSize({ width, height: 844 })
         await enableWidget(page, urlKey)
 
-        const hits = await sweepFixedOverlaps(page, '[data-testid="footer-feedback-toggle"]')
-        expect(hits, describeHits(hits)).toEqual([])
+        const result = await sweepFixedOverlaps(page, '[data-testid="footer-feedback-toggle"]')
+        // The precondition that matters, and the one the FAB's deletion took
+        // away: the sweep had something to sweep against. Asserting "no
+        // overlaps" against an empty candidate set is the LIN-2252 no-op shape.
+        expectSweepNotVacuous(expect, result, `footer toggle @${width}px`)
+        expect(result.hits, describeHits(result)).toEqual([])
       })
     }
 
@@ -332,8 +336,9 @@ test.describe('Feedback widget', () => {
       // full column and INCLUDES its padding, so it would report the same result
       // with or without a reserve and prove nothing — the trap that made an
       // earlier version of the `.footer-deploy` assertion vacuous.
-      const hits = await sweepFixedOverlaps(page, '.footer-action.reset-view')
-      expect(hits, describeHits(hits)).toEqual([])
+      const result = await sweepFixedOverlaps(page, '.footer-action.reset-view')
+      expectSweepNotVacuous(expect, result, 'reset link @430px')
+      expect(result.hits, describeHits(result)).toEqual([])
     })
 
     // What this adds over the sweeps: they iterate every offset INCLUDING max
@@ -417,11 +422,31 @@ async function dropFileOnZone(page, { name, type, bytes, size }) {
 }
 
 // Enable the flag via the footer toggle and land on a reloaded page with the
-// widget mounted.
+// widget mounted AND hydrated.
+//
+// The wait is `toBeEnabled()`, not `toBeVisible()`, and that is load-bearing.
+// The toggle handler POSTs and then calls `window.location.reload()`, so the
+// `networkidle` below can resolve against the PRE-reload page — the reload has
+// not started yet. `toBeVisible()` does not catch that: the nav is server-
+// rendered near the top of the document, so the trigger is visible while the
+// rest of the page is still parsing (`document.readyState === 'loading'`).
+//
+// Measured, not theorised: with a visibility wait, the sweeps below ran against
+// a half-parsed document at 320/360/390 nondeterministically, and at 390 the
+// document was early enough that `body *` matched NOTHING — zero overlay
+// candidates, so "no overlaps" was true and meaningless. The vacuity
+// precondition added for the LIN-2298 review is what surfaced it; it was
+// invisible before, and the same race would have let the ORIGINAL `.feedback-fab`
+// sweeps pass by finding no FAB rather than by finding no overlap.
+//
+// `toBeEnabled()` is the real readiness signal because LIN-2298 made it one:
+// the trigger ships `disabled` and public/feedback-widget.js clears that only
+// after the panel is built and the click handler bound. Waiting on it means
+// waiting on hydration, not on paint.
 async function enableWidget(page, urlKey) {
   await page.goto(`/workspace/${urlKey}/`)
   await page.waitForLoadState('networkidle')
   await page.getByTestId('footer-feedback-toggle').click()
   await page.waitForLoadState('networkidle')
-  await expect(page.getByTestId('nav-feedback-trigger')).toBeVisible()
+  await expect(page.getByTestId('nav-feedback-trigger')).toBeEnabled()
 }

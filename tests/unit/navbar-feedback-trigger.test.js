@@ -15,10 +15,21 @@
  *   - mount without trigger → the panel is rendered but unreachable;
  *   - trigger without mount → a control that does nothing when clicked.
  *
- * Neither throws, neither is visible in CI, and both are one forgotten
- * `featureFlags` argument away on any of the ~30 pages that render both
- * components. So the contract is pinned as a contract: for the same
- * `(urlKey, isLanding, featureFlags)` the two renderers must agree.
+ * Neither throws and neither is visible in CI. So the contract is pinned as a
+ * contract: for the same `(urlKey, isLanding, featureFlags)` the two renderers
+ * must agree.
+ *
+ * WHAT THIS DOES NOT COVER, stated because an earlier version of this comment
+ * claimed it did. It said the contract was pinned so that "one forgotten
+ * `featureFlags` argument on any of the ~30 pages" could not drift. It cannot
+ * detect that: the cases below call both renderers with the SAME options
+ * object, so a page that threads `featureFlags` to the navbar and not the
+ * footer is invisible here by construction. What this pins is that the two
+ * GATES agree given equal inputs — real and worth having, and not the same
+ * claim. Call-site threading was checked by hand across all 25 `renderNavBar`
+ * sites for LIN-2298 (every one pairs with a `renderPageFooter` receiving the
+ * same `urlKey`/`isLanding`/`featureFlags`); a test that pins THAT would have
+ * to walk the render modules, which is a different tool than this one.
  *
  * Run with: node --test tests/unit/navbar-feedback-trigger.test.js
  */

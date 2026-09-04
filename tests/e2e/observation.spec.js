@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { featuresParam } from '../helpers.js';
-import { sweepFixedOverlaps, describeHits } from '../fixed-overlay-sweep.js';
+import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixed-overlay-sweep.js';
 
 // LIN-595: the first-class autopilot Observation page
 // (/workspace/:urlKey/observation), which superseded the experimental autopilot
@@ -732,11 +732,55 @@ test.describe('LIN-2298: no fixed overlay covers the Observation feed', () => {
       const maxScroll = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
       expect(maxScroll, `page must scroll at ${width}px for the sweep to mean anything`).toBeGreaterThan(0);
 
-      const cardHits = await sweepFixedOverlaps(page, '#obs-active .obs-session:last-of-type');
-      expect(cardHits, `last .obs-session: ${describeHits(cardHits)}`).toEqual([]);
+      // `> .obs-session:last-child`, NOT `:last-of-type`. `:last-of-type`
+      // matches the last element of its TAG among siblings, which is only
+      // correct here by accident of structure (`#obs-active` is a <ul> whose
+      // children happen to be exclusively `li.obs-session`). Append one
+      // non-card <li> — a "load more" row, a sentinel — and it silently stops
+      // meaning "the last card". On a ticket whose own fix step cited a class
+      // that does not exist (`.obs-card`), a selector that is right by luck is
+      // not good enough.
+      const LAST_CARD = '#obs-active > .obs-session:last-child';
 
-      const openHits = await sweepFixedOverlaps(page, '#obs-active .obs-session:last-of-type .obs-session-open');
-      expect(openHits, `its .obs-session-open: ${describeHits(openHits)}`).toEqual([]);
+      // NOTHING is excluded from this sweep, and the assertion is shaped
+      // around that on purpose.
+      //
+      // The obvious way to write this ticket's acceptance is "the card is
+      // covered by no overlay at all". That assertion is available and it is a
+      // LIE, which the LIN-2298 review is what surfaced: `.nav-bar` is
+      // `position: sticky; top: 0` with a z-index and a translucent wash
+      // (public/style.css), so it genuinely does pass over this column as the
+      // feed scrolls — and LIN-2298 moved the feedback trigger INTO it. A
+      // sweep filtered to `position: fixed` would have let that assertion
+      // stand while being structurally unable to see the counterexample.
+      //
+      // So the sweep looks at fixed AND sticky and the assertion names what it
+      // tolerates: the ONLY thing allowed to pass over the card is the sticky
+      // nav, which predates this ticket, is a deliberate design decision, and
+      // carries its own named mitigation (per-interaction `scroll-margin-top`
+      // — see the `.nav-bar` comment in public/style.css). Anything else — a
+      // reintroduced FAB, a new floating control — fails, and the failure
+      // message names it.
+      //
+      // This is both stronger and more honest than an exclusion list: an
+      // exclusion would leave the candidate set EMPTY on this page and hand
+      // back a green result that proves nothing, which is the LIN-2252 shape
+      // this whole ticket family exists to have caught.
+      const DELIBERATE = /nav-bar/;
+
+      const card = await sweepFixedOverlaps(page, LAST_CARD);
+      expectSweepNotVacuous(expect, card, `last .obs-session @${width}px`);
+      expect(
+        card.hits.filter(h => !DELIBERATE.test(h.overlay)),
+        `last .obs-session covered by something other than the sticky nav: ${describeHits(card)}`
+      ).toEqual([]);
+
+      const open = await sweepFixedOverlaps(page, `${LAST_CARD} .obs-session-open`);
+      expectSweepNotVacuous(expect, open, `.obs-session-open @${width}px`);
+      expect(
+        open.hits.filter(h => !DELIBERATE.test(h.overlay)),
+        `.obs-session-open covered by something other than the sticky nav: ${describeHits(open)}`
+      ).toEqual([]);
     });
   }
 

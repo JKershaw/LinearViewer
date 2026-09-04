@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { sweepFixedOverlaps, describeHits } from '../fixed-overlay-sweep.js';
+import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixed-overlay-sweep.js';
 
 // Experimental Live Console — an ambient, generation-free feed of the whole
 // swarm working (LIN-1436). Seeds via /test/set-session (the test-token
@@ -1669,8 +1669,15 @@ test.describe('Live Console (experimental)', () => {
       await expect(page.locator('[data-testid="live-console-more"]')).toBeVisible();
       await expect(page.getByTestId('feedback-widget-root')).toHaveAttribute('data-enabled', 'true');
 
-      const hits = await sweepFixedOverlaps(page, '[data-testid="live-console-more"]');
-      expect(hits, describeHits(hits)).toEqual([]);
+      const result = await sweepFixedOverlaps(page, '[data-testid="live-console-more"]');
+      // The real precondition. The two above (button visible, flag on) are
+      // necessary and NOT sufficient — neither establishes that a single
+      // overlay candidate exists, which is what the LIN-2298 review caught:
+      // the old `await expect(fab).toBeVisible()` was doing this job, and
+      // deleting the FAB deleted it. Asserting "no overlaps" against an empty
+      // candidate set is the LIN-2252 no-op wearing this ticket's clothes.
+      expectSweepNotVacuous(expect, result, 'live console "view earlier" @390px');
+      expect(result.hits, describeHits(result)).toEqual([]);
     });
 
     // LIN-2296's ledger item L2, still asserted after LIN-2298 removed the
@@ -1694,8 +1701,13 @@ test.describe('Live Console (experimental)', () => {
     // the sweep's, above, and asked more generally.
     //
     // 320px is deliberately NOT asserted single-line — there the button needs
-    // more width than that viewport gives it. Geometry, not tuning; the sweep
-    // still covers what matters there.
+    // more width than that viewport gives it. Geometry, not tuning.
+    //
+    // The previous version of this comment added "the sweep still covers what
+    // matters there". It does not: the sweep above runs at 390px only. That
+    // sentence was carried over from origin/main and restated rather than
+    // checked — a small instance of exactly the claim-without-grounding this
+    // ticket family is about, so it is corrected rather than deleted quietly.
     test('the "view earlier activity" label stays on ONE line at 360px (LIN-2296, L2)', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true, feedbackWidget: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);

@@ -562,10 +562,13 @@
      before LIN-2272, and it is what it gets back.
 
      The witness stays. tests/e2e/live-console.spec.js still sweeps every 2px
-     scroll offset at this width, re-aimed from "never intersects `.feedback-fab`"
-     to "never intersects ANY fixed overlay" — a strictly stronger assertion, and
-     the one that catches a reintroduction rather than only a regression in a
-     rule that no longer exists. */
+     scroll offset at 390px, re-aimed from "never intersects `.feedback-fab`"
+     to "never intersects a visible fixed-or-sticky overlay", with a
+     candidate-count precondition so a green result cannot be vacuous — the
+     LIN-2298 review found the first version of this witness could not have
+     failed, because deleting the FAB emptied its candidate set. It catches a
+     reintroduction rather than only a regression in a rule that no longer
+     exists. */
 }
 
 @media (prefers-reduced-motion: reduce) {

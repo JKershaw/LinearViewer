@@ -1,12 +1,20 @@
 /**
  * Feedback Widget (LIN-635)
  *
- * A floating feedback control, hidden by default and enabled per-user via the
- * `feedbackWidget` flag (toggled from the footer or Settings). When enabled it
- * paints a floating button; clicking it opens a popup with a free-text area, a
- * priority select, and an optional screenshot. The popup can be minimized
- * without losing input (draft text/priority persist in localStorage; the
- * selected screenshot persists in memory while the page is not reloaded).
+ * A feedback control, hidden by default and enabled per-user via the
+ * `feedbackWidget` flag (toggled from the footer or Settings). Clicking it
+ * opens a popup with a free-text area, a priority select, and an optional
+ * screenshot. The popup can be minimized without losing input (draft
+ * text/priority persist in localStorage; the selected screenshot persists in
+ * memory while the page is not reloaded).
+ *
+ * LIN-2298 changed where the trigger lives, and this header said "floating"
+ * for a while after it stopped being true. It is NOT floating: the trigger is
+ * a normal-flow button in the nav bar, server-rendered by
+ * `renderFeedbackTrigger` (lib/components/navbar.js) and bound below. This
+ * file paints only the PANEL. The fixed `.feedback-fab` it replaces was an
+ * overlay over full-width content, which LIN-2272 proved no CSS reserve can
+ * clear at every scroll offset.
  *
  * The foot offers three explicit actions (LIN-918, LIN-952, LIN-1037) — Save,
  * Save + triage, and Save + autopilot. On submit it captures the current page URL
@@ -267,10 +275,22 @@
     }
 
     // Minimize: hide popup, keep all input (draft persisted; file kept in memory).
+    //
+    // Focus returns to the trigger. This was tolerable while the trigger was
+    // the FAB sitting directly beside the panel; LIN-2298 put ~a full viewport
+    // between them, so closing without restoring focus drops a keyboard user
+    // to <body> at the TOP of the document with no idea where the control they
+    // just used went. `open()` moves focus INTO the panel, so returning it is
+    // the other half of that transaction, not a nicety.
     function minimize() {
       popup.hidden = true;
       triggers.forEach(t => t.setAttribute('aria-expanded', 'false'));
       reflectDraftIndicator();
+      // Only when focus is still inside the panel we are hiding: a click on
+      // the trigger itself already has focus in the right place, and stealing
+      // it back from wherever the user has since moved would be worse than
+      // doing nothing.
+      if (triggers.length && popup.contains(document.activeElement)) triggers[0].focus();
     }
 
     function persist() {
