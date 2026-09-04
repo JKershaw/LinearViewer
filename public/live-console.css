@@ -543,7 +543,37 @@
      bottom-right corner (16px inset + 83px wide, ~99px), so keep the
      centred button's right edge left of that band. This holds at every
      scroll position, since it never depends on scrollY. */
-  .lc-more { padding-right: 7rem; }
+  /* LIN-2296: LIN-2272's 7rem (112px) reserve cleared the FAB at every scroll
+     offset — re-measured, still 0 overlaps at 320/360/390/430 — but squeezed
+     the flex item below the pill's natural width at <=360px, wrapping the label
+     to two lines and orphaning the arrow. That is ledger item L2.
+
+     Discharged by TUNING rather than by a human accepting the wrap, which is
+     the first option LIN-2296 itself lists.
+
+     The reserve has a VALID WINDOW at 360px, not a single right answer: too
+     large and the flex item is squeezed under the button's natural width and
+     wraps; too small and the centred button's right edge crosses into the FAB's
+     band. 4.5rem sits mid-window rather than against either edge, so a later
+     label or font change does not immediately re-break the single-line test.
+     7rem sat hard against the wrap edge and 6rem only just clear of it.
+
+     Do NOT reason about this as "the right edge moves by half the reserve you
+     give back" — that identity only holds while the button keeps a fixed width,
+     which is exactly not the regime here: giving reserve back also lets the
+     squeezed button grow, so both terms move at once. Measure, don't derive.
+
+     GATED on a rendered FAB, same as the footer reserve in
+     public/feedback-widget.css. Unconditionally reserving this space cost the
+     button ~96px on every Live Console load with the widget OFF — the default —
+     for a button that is not on screen. LIN-2272 shipped it ungated; that is
+     corrected here rather than carried forward.
+
+     320px is out of reach either way, and it is the CONTAINER that decides:
+     `.lc-more`'s content box starts at x=28, so a button wide enough to stay
+     single-line cannot also end left of the FAB. The two constraints are
+     disjoint at that width — not a tuning failure. */
+  body:has(#feedback-widget-root[data-enabled="true"]) .lc-more { padding-right: 4.5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

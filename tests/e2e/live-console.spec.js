@@ -1673,5 +1673,59 @@ test.describe('Live Console (experimental)', () => {
 
       expect(offendingOffsets, `overlapping at scrollY: ${offendingOffsets.join(', ')}`).toEqual([]);
     });
+
+    // LIN-2296 — the COST of LIN-2272's reserve, and its discharge.
+    //
+    // The 7rem reserve cleared the FAB at every offset (the sweep above), but
+    // squeezed `.lc-more-btn` below its 203px natural width at <=360px, wrapping
+    // the label to two lines and orphaning the arrow. That was ledger item L2:
+    // "visual acceptance of the wrapped label", which no test and no CI check
+    // could discharge — CI carries no visual assertion on this element, so green
+    // CI said nothing about it.
+    //
+    // LIN-2296 offered two discharges: a human accepting the wrap, or TUNING the
+    // reserve so it stays single-line. Tuning is what landed (7rem -> 6rem,
+    // spending 8px of the 41px of slack the ticket measured at 360px), which
+    // turns L2 from a human-judgement item into an assertable one. This is that
+    // assertion: the button is a SINGLE LINE at 360px, measured off its own box
+    // against its own line-height rather than eyeballed.
+    //
+    // 320px is deliberately NOT asserted single-line. There the button would
+    // need a right edge <=221 while being >=203 wide, which does not fit that
+    // viewport at all — geometry, not tuning. The sweep above still covers 320
+    // for the thing that matters (no overlap).
+    test('the "view earlier activity" label stays on ONE line at 360px (LIN-2296, L2)', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true, feedbackWidget: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+      await page.request.post('/test/seed-agent-status', {
+        data: { urlKey: URL_KEY, taskIdentifier: 'LIN-1', action: 'implementation', status: 'in_progress', summary: 'seed event so "view earlier" renders' },
+      });
+
+      await page.setViewportSize({ width: 360, height: 844 });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-event"]');
+      await expect(page.locator('[data-testid="live-console-more"]')).toBeVisible();
+
+      const { lines, height, lineHeight, btnRight, fabLeft } = await page.evaluate(() => {
+        const btn = document.querySelector('[data-testid="live-console-more"]');
+        const fab = document.querySelector('[data-testid="feedback-fab"]');
+        const cs = getComputedStyle(btn);
+        const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
+        const inner = btn.getBoundingClientRect().height
+          - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+          - parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth);
+        return {
+          lines: Math.round(inner / lh),
+          height: btn.getBoundingClientRect().height,
+          lineHeight: lh,
+          btnRight: btn.getBoundingClientRect().right,
+          fabLeft: fab.getBoundingClientRect().left,
+        };
+      });
+
+      expect(lines, `button is ${height}px tall at a ${lineHeight}px line-height — expected one line`).toBe(1);
+      // And the tuning must not have eaten the clearance it was tuned against.
+      expect(btnRight).toBeLessThanOrEqual(fabLeft);
+    });
   });
 });
