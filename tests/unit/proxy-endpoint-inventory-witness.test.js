@@ -180,29 +180,30 @@ function sessionWorkspaceApp(session, overrides = {}) {
 
 const ROWS = [
   // --- Group A: user-facing (session-auth) token admin, workspace-prefixed ---
+  // (LIN-679 Stage 2 / LIN-2534: moved to routes/proxy-tokens-admin.js)
   {
     group: 'A', method: 'POST', url: '/workspace/acme/api/proxy/tokens', expect: 403,
-    note: 'feature flag off (:1605)',
+    note: 'feature flag off (routes/proxy-tokens-admin.js:51)',
     run: () => call(sessionWorkspaceApp({}), 'POST', '/workspace/acme/api/proxy/tokens', { body: {} }),
   },
   {
     group: 'A', method: 'GET', url: '/workspace/acme/api/proxy/tokens', expect: 200,
-    note: 'listTokens() (:1691)',
+    note: 'listTokens() (routes/proxy-tokens-admin.js:166)',
     run: () => call(sessionWorkspaceApp({}, { proxyTokenStore: { listTokens: async () => ([]) } }), 'GET', '/workspace/acme/api/proxy/tokens'),
   },
   {
     group: 'A', method: 'DELETE', url: '/workspace/acme/api/proxy/tokens/not-a-uuid', expect: 400,
-    note: 'UUID_REGEX.test(tokenId) (:1707)',
+    note: 'UUID_REGEX.test(tokenId) (routes/proxy-tokens-admin.js:182)',
     run: () => call(sessionWorkspaceApp({}), 'DELETE', '/workspace/acme/api/proxy/tokens/not-a-uuid'),
   },
   {
     group: 'A', method: 'GET', url: '/workspace/acme/api/proxy/events', expect: 200,
-    note: 'listEvents() (:1733)',
+    note: 'listEvents() (routes/proxy-tokens-admin.js:208)',
     run: () => call(sessionWorkspaceApp({}), 'GET', '/workspace/acme/api/proxy/events'),
   },
   {
     group: 'A', method: 'GET', url: '/workspace/acme/api/proxy/credential-health', expect: 200,
-    note: 'listCredentialHealth() (:1759)',
+    note: 'listCredentialHealth() (routes/proxy-tokens-admin.js:234)',
     run: () => call(sessionWorkspaceApp({}), 'GET', '/workspace/acme/api/proxy/credential-health'),
   },
 
@@ -544,14 +545,16 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
   // LIN-2533 (Stage 1): group G's 2 router.* registrations moved to
   // routes/proxy-agent-status.js, mounted via router.use() (invisible to this
   // regex, which only matches get/post/put/patch/delete) — 55 - 2 = 53.
-  test('routes/proxy.js has exactly 53 router.* registrations (65 URL forms across the whole proxy surface)', () => {
+  // LIN-2534 (Stage 2 / PR-2a): group A's 5 router.* registrations moved to
+  // routes/proxy-tokens-admin.js, mounted the same way — 53 - 5 = 48.
+  test('routes/proxy.js has exactly 48 router.* registrations (65 URL forms across the whole proxy surface)', () => {
     const src = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
     const matches = src.match(/^\s{2}router\.(get|post|put|patch|delete)\(/gm) || [];
-    assert.equal(matches.length, 53,
-      `expected 53 route registrations in routes/proxy.js, found ${matches.length} — ` +
+    assert.equal(matches.length, 48,
+      `expected 48 route registrations in routes/proxy.js, found ${matches.length} — ` +
       `this file's 65-row ROWS table must be re-derived from source before trusting it`);
     assert.equal(ROWS.length, 65,
-      `this file's ROWS table must cover exactly 65 URL forms (53 registrations in routes/proxy.js + 2 in routes/proxy-agent-status.js + 10 array-path aliases), found ${ROWS.length}`);
+      `this file's ROWS table must cover exactly 65 URL forms (48 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 10 array-path aliases), found ${ROWS.length}`);
   });
 });
 
