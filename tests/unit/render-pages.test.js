@@ -8,7 +8,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderLoginPage, renderGitHubRepoSelectPage, renderGitHubProjectSelectPage, renderMergeConfirmPage } from '../../lib/render-pages.js';
+import { renderLoginPage, renderGitHubRepoSelectPage, renderGitHubProjectSelectPage, renderMergeConfirmPage, renderMergeReauthRequiredPage, renderOpenRouterConsentPage } from '../../lib/render-pages.js';
 
 describe('renderLoginPage — GitHub CTA gating (LIN-541)', () => {
   test('shows the GitHub button when GitHub OAuth is enabled', () => {
@@ -133,6 +133,40 @@ describe('renderMergeConfirmPage — differentiated consent actions (LIN-2400)',
     // identically to its safe decline (both were plain .login-button before).
     assert.match(html, /class="login-button" data-testid="merge-confirm-submit"/);
     assert.match(html, /class="login-button login-button-secondary" data-testid="merge-decline-submit"/);
+  });
+
+  test('LIN-2497: the OpenRouter consent page uses the SAME hook, in the same direction', () => {
+    // Introduced plain in 2392a537 (LIN-2412), after LIN-2400 was filed, so
+    // both choices were pixel-identical apart from label length. Asserting
+    // DIRECTION, not mere difference (LIN-2400 review F1): the grant is the
+    // filled primary, the decline the chromeless outline.
+    const html = renderOpenRouterConsentPage({ urlKey: 'acme' });
+    assert.match(html, /class="login-button" data-testid="openrouter-consent-grant-submit"/);
+    assert.match(html, /class="login-button login-button-secondary" data-testid="openrouter-consent-decline-submit"/);
+  });
+
+  // LIN-2496 — the exit asymmetry between merge-confirm and its reauth sibling,
+  // settled as a decision rather than closed as a bug. Pinned so nobody
+  // "restores consistency" by adding a link that strands session state.
+  test('LIN-2496: merge-confirm offers exactly two exits, both of which clear pendingMerge', () => {
+    const html = renderMergeConfirmPage({ identityLabel: 'Linear' });
+    // No bare navigation link. Its decline button IS the safe way out —
+    // POST /auth/merge/decline deletes pendingMerge and redirects to '/'
+    // (routes/account-merge.js) — whereas an <a href="/"> would leave the
+    // offer stranded in the session while the other two exits clear it.
+    assert.doesNotMatch(html, /error-home-link/);
+    assert.match(html, /action="\/auth\/merge\/confirm"/);
+    assert.match(html, /action="\/auth\/merge\/decline"/);
+  });
+
+  test('LIN-2496: the reauth sibling DOES keep its home link — it has no decline to fall back on', () => {
+    // The contrast that makes the asymmetry deliberate: this page sets no
+    // pendingMerge (lib/account-conflict.js returns before the assignment), and
+    // its only action is "Sign in again", so the home link is the only exit for
+    // a user who does not want to re-authenticate.
+    const html = renderMergeReauthRequiredPage({ identityLabel: 'Linear', reauthUrl: '/auth/linear' });
+    assert.match(html, /class="error-home-link"/);
+    assert.doesNotMatch(html, /action="\/auth\/merge\/decline"/);
   });
 
   test('behaviour is unchanged: same routes, form structure, testids, and copy', () => {
