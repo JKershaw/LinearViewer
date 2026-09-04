@@ -381,6 +381,7 @@ function resetDOM() {
     show(project.querySelector('.project-description'))
     show(project.querySelector('.project-meta'))
     show(project.querySelector('.completed-toggle'))
+    show(project.querySelector('.add-task-link'))
   })
 
   // Hide all completed sections, reset toggle text
@@ -531,6 +532,16 @@ function getDefaultCollapsedProjects() {
   return ids
 }
 
+// Union stored collapsed-project ids with the page's default-collapsed ones
+// (LIN-2514). An empty project's default must override stale/absent stored
+// state whenever state is (re)applied, since the storage key is global and
+// not workspace-scoped — a first-load-only union would never reach a
+// returning user carrying unrelated stored state. `storedIds` may be
+// undefined/missing (legacy or partial `linear-projects-state` shapes).
+function unionDefaultCollapsedProjects(storedIds) {
+  return [...new Set([...(storedIds || []), ...getDefaultCollapsedProjects()])]
+}
+
 function init() {
   const isLanding = document.body.classList.contains('is-landing')
 
@@ -545,11 +556,22 @@ function init() {
     // Empty-project defaults always win over restored state (union, not
     // replace), since a global localStorage key would otherwise permanently
     // block the default for any returning user (LIN-2514).
-    state.collapsedProjects = [...new Set([...state.collapsedProjects, ...getDefaultCollapsedProjects()])]
+    state.collapsedProjects = unionDefaultCollapsedProjects(state.collapsedProjects)
   }
 
-  // Wrap saveState to be a no-op on landing
-  const persistState = isLanding ? () => {} : saveState
+  // Wrap saveState to be a no-op on landing. Also strip default-derived
+  // collapsed ids before writing (LIN-2514 review F2): state.collapsedProjects
+  // is the union of stored + default ids, but a default is nothing the user
+  // chose — persisting it would immortalize the default the moment any
+  // unrelated toggle calls persistState, leaving a project collapsed with no
+  // user intent once it later gains its first issue (the default itself
+  // disappears then, since it's derived fresh from the page each load).
+  const persistState = isLanding
+    ? () => {}
+    : (s) => {
+        const defaults = getDefaultCollapsedProjects()
+        saveState({ ...s, collapsedProjects: s.collapsedProjects.filter(id => !defaults.includes(id)) })
+      }
 
   applyState(state)
 
@@ -2000,7 +2022,12 @@ function initSearch() {
     // Also ensure all .node elements are visible before resetDOM re-applies depth-based visibility,
     // in case search left nodes hidden that resetDOM wouldn't otherwise reach (e.g. in completed sections)
     document.querySelectorAll('.node.hidden').forEach(n => n.classList.remove('hidden'))
-    applyState(loadState())
+    // LIN-2514: fold in default-collapsed empty projects the same way init()
+    // does — raw loadState() alone would leave an empty project rendered
+    // expanded (▼) with its children still hidden by the collapse logic below.
+    const restoredState = loadState()
+    restoredState.collapsedProjects = unionDefaultCollapsedProjects(restoredState.collapsedProjects)
+    applyState(restoredState)
   }
 
   function closeSearch() {
