@@ -2461,31 +2461,32 @@ app.use(createShipJourneyRoutes({ workspaceFromUrl, reportHistoryStore, fetchWor
 app.use(createShipBiscuitRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, observationSessionsStore, agentStatusStore, llmCallLogStore, taskSnapshotStore, reportHistoryStore, shipBiscuitHistoryStore }))
 
 /**
- * Workspace project view - renders the interactive tree view.
+ * Resolve the team filter for a workspace-scoped request (LIN-2521).
  *
- * Query parameters:
- * - team: Optional team ID to filter issues by (or 'all' for all teams)
+ * Lifted from the dashboard route (the one place this used to live) so all
+ * five team-filterable routes — and the post-401 refresh/retry chain, which
+ * threads the value each route resolves here rather than re-reading
+ * `req.query.team` blindly — share one persist/restore rule instead of five
+ * page-local copies.
+ *
+ * An explicit `?team=` param (including `all`) is the source of truth and is
+ * persisted; when the param is absent we restore the prior selection so
+ * leaving a workspace and returning preserves the filter. Best-effort:
+ * persistence never blocks the page. `isPersistableTeamRef`'s cap (LIN-2025
+ * F4) is carried unchanged here, not relaxed, as it goes from one call site
+ * to five plus the retry path — it only bounds the store's shape; a
+ * stale/unmatched value still self-corrects on every later read via the
+ * membership check fetchAndPrepareProjects (or the roadmap route's own
+ * matchTeamId) already runs.
+ *
+ * @param {import('express').Request} req
+ * @param {Workspace} workspace
+ * @returns {Promise<{teamId: string|null}>}
  */
-app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
-  const workspace = req.workspace
-  const deployInfo = getDeployInfo()
-
-  // Parse team filter from query string. LIN-2025: no longer format-validated
-  // here — the raw ref is resolved against the workspace's actual team list
-  // (graceful drop-to-unscoped on no match) inside fetchAndPrepareProjects,
-  // which already fetches that list for the primary binding at no extra cost.
+async function resolveTeamSelection(req, workspace) {
   const rawTeam = req.query.team;
   let teamId = rawTeam && rawTeam !== 'all' ? rawTeam : null;
 
-  // Remember team selection per {user, workspace} (LIN-727). An explicit ?team=
-  // param (including 'all') is the source of truth and is persisted; when the
-  // param is absent we restore the prior selection so leaving a workspace and
-  // returning preserves the filter. Best-effort: persistence never blocks the page.
-  // LIN-2025 (F4): the raw value is persisted with no write-time validation
-  // fetch — a stale/unmatched value self-corrects on every later read via the
-  // same membership check fetchAndPrepareProjects already runs. The cheap
-  // type/length cap is not that validation: it just keeps the store's shape
-  // bounded now that the UUID gate no longer bounds it for free.
   const accountId = req.session.accountId;
   if (accountId) {
     if (rawTeam !== undefined) {
@@ -2501,6 +2502,22 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       }
     }
   }
+
+  return { teamId };
+}
+
+/**
+ * Workspace project view - renders the interactive tree view.
+ *
+ * Query parameters:
+ * - team: Optional team ID to filter issues by (or 'all' for all teams)
+ */
+app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace
+  const deployInfo = getDeployInfo()
+
+  // LIN-2521: shared persist/restore rule (5 routes + the refresh-retry path).
+  const { teamId } = await resolveTeamSelection(req, workspace);
 
   // Determine OpenRouter connection status for nav bar
   const openRouterSource = getOpenRouterSource(req);
@@ -2562,10 +2579,8 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
   const deployInfo = getDeployInfo();
   const openRouterSource = getOpenRouterSource(req);
 
-  // Parse team filter (same as main dashboard; LIN-2025 — resolved by
-  // fetchAndPrepareProjects, not format-validated here)
-  const rawTeam = req.query.team;
-  const teamId = rawTeam && rawTeam !== 'all' ? rawTeam : null;
+  // LIN-2521: shared persist/restore rule (5 routes + the refresh-retry path).
+  const { teamId } = await resolveTeamSelection(req, workspace);
 
   try {
     // Load custom prompts (non-blocking, fallback to empty)
@@ -2624,8 +2639,8 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   const deployInfo = getDeployInfo();
   const openRouterSource = getOpenRouterSource(req);
-  const rawTeam = req.query.team;
-  const teamId = rawTeam && rawTeam !== 'all' ? rawTeam : null;
+  // LIN-2521: shared persist/restore rule (5 routes + the refresh-retry path).
+  const { teamId } = await resolveTeamSelection(req, workspace);
 
   try {
     // Use swim sample data if session flag is set (for E2E tests/screenshots)
@@ -2674,8 +2689,8 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
   }
 
-  const rawTeam = req.query.team;
-  const teamId = rawTeam && rawTeam !== 'all' ? rawTeam : null;
+  // LIN-2521: shared persist/restore rule (5 routes + the refresh-retry path).
+  const { teamId } = await resolveTeamSelection(req, workspace);
 
   try {
     // shipSample = dense fixture (8 projects, 6 WIP, ~36 cards) for density tests.
@@ -2741,8 +2756,8 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`);
   }
 
-  const rawTeam = req.query.team;
-  const teamId = rawTeam && rawTeam !== 'all' ? rawTeam : null;
+  // LIN-2521: shared persist/restore rule (5 routes + the refresh-retry path).
+  const { teamId } = await resolveTeamSelection(req, workspace);
 
   try {
     // Fetch raw data — roadmap needs raw issues for velocity/queue calculations.

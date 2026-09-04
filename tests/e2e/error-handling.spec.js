@@ -144,6 +144,104 @@ test.describe('Team Filtering', () => {
   });
 });
 
+// LIN-2521: resolveTeamSelection lifted the dashboard's persist/restore logic
+// out to all five team-filterable routes + the refresh-retry path. Before this
+// ticket, ONLY the dashboard remembered a team selection across visits — swim,
+// ship, swipe and roadmap each parsed `?team=` for the current request only
+// and forgot it the instant the param was dropped. This proves the NEW
+// cross-route behavior: set a team on one route (with no `?team=`, so a stale
+// remembered value can't fake a pass), read it back on another.
+//
+// Raw HTTP via `page.request` (not full page navigation/DOM) — deliberate:
+// swim/ship/swipe/roadmap don't render the team selector yet (that's LIN-2523,
+// later in this lane), so there is no `#team-toggle` to assert against. The
+// underlying provider-read scoping already works server-side (LIN-2516 Scope
+// §1) and is visible in the raw HTML as which `TEST-N` issue identifiers
+// appear — Engineering-team issues (TEST-1/2/6/11/13/14/15/30/31) vs
+// Design-team issues (TEST-4/5), from the shared Linear test-token fixture
+// (tests/fixtures/mock-data.js) every one of these five routes reads from in
+// test mode. ship/roadmap need their feature flags on to avoid the settings
+// redirect; roadmap's own isTestMode arm always returns the full
+// `testMockData` regardless of resolvedTeamId (server.js, unchanged by this
+// ticket — a pre-existing quirk of that route's test-mode branch, not
+// something this ticket's persistence lift touches), so roadmap is exercised
+// here as a WRITE-path participant only (its resolveTeamSelection call still
+// persists to the same store) rather than asserted on its own rendered output.
+test.describe('Team persistence across all five routes (LIN-2521)', () => {
+  const ENGINEERING = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+  const DESIGN = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+
+  test.beforeEach(async ({ page, workerUrlKey }) => {
+    const features = encodeURIComponent(JSON.stringify({ roadmap: true, ship: true }));
+    await page.goto(`/test/set-session?urlKey=${workerUrlKey}&features=${features}`);
+  });
+
+  async function identifiersOn(page, path) {
+    const res = await page.request.get(path);
+    expect(res.ok()).toBe(true);
+    const body = await res.text();
+    return new Set([...body.matchAll(/TEST-\d+/g)].map(m => m[0]));
+  }
+
+  test('a team set on swim (no persistence before this ticket) is honoured on the dashboard, with no ?team= param', async ({ page, workerUrlKey }) => {
+    const base = `/workspace/${workerUrlKey}`;
+    await identifiersOn(page, `${base}/swim?team=${DESIGN}`);
+
+    const restored = await identifiersOn(page, `${base}/`);
+    assertDesignOnly(restored);
+  });
+
+  test('a team set on the dashboard is honoured on swim, ship, and swipe, with no ?team= param', async ({ page, workerUrlKey }) => {
+    const base = `/workspace/${workerUrlKey}`;
+    await identifiersOn(page, `${base}/?team=${DESIGN}`);
+
+    assertDesignOnly(await identifiersOn(page, `${base}/swim`));
+    assertDesignOnly(await identifiersOn(page, `${base}/ship`));
+    assertDesignOnly(await identifiersOn(page, `${base}/swipe`));
+  });
+
+  test('a team set on ship is honoured on swipe; a team set on swipe is honoured back on the dashboard', async ({ page, workerUrlKey }) => {
+    const base = `/workspace/${workerUrlKey}`;
+    await identifiersOn(page, `${base}/ship?team=${ENGINEERING}`);
+    assertEngineeringOnly(await identifiersOn(page, `${base}/swipe`));
+
+    await identifiersOn(page, `${base}/swipe?team=${DESIGN}`);
+    assertDesignOnly(await identifiersOn(page, `${base}/`));
+  });
+
+  test('roadmap participates in the same persisted selection as a WRITE (its own isTestMode render is unaffected, a pre-existing/orthogonal quirk) — swim still restores what roadmap set', async ({ page, workerUrlKey }) => {
+    const base = `/workspace/${workerUrlKey}`;
+    await identifiersOn(page, `${base}/roadmap?team=${ENGINEERING}`);
+
+    assertEngineeringOnly(await identifiersOn(page, `${base}/swim`));
+  });
+
+  test('an explicit ?team=all on any route clears the remembered team for every route (LIN-727)', async ({ page, workerUrlKey }) => {
+    const base = `/workspace/${workerUrlKey}`;
+    await identifiersOn(page, `${base}/swim?team=${DESIGN}`);
+    assertDesignOnly(await identifiersOn(page, `${base}/ship`));
+
+    await identifiersOn(page, `${base}/swim?team=all`);
+
+    const unscoped = await identifiersOn(page, `${base}/ship`);
+    // Unscoped means BOTH teams' issues are present — the clear genuinely
+    // dropped the filter rather than merely failing to restore Design.
+    expect(unscoped.has('TEST-1')).toBe(true);  // Engineering
+    expect(unscoped.has('TEST-4')).toBe(true);  // Design
+  });
+
+  function assertDesignOnly(identifiers) {
+    expect(identifiers.has('TEST-4')).toBe(true);
+    expect(identifiers.has('TEST-5')).toBe(true);
+    expect(identifiers.has('TEST-1')).toBe(false); // an Engineering-only issue must be absent
+  }
+
+  function assertEngineeringOnly(identifiers) {
+    expect(identifiers.has('TEST-1')).toBe(true);
+    expect(identifiers.has('TEST-4')).toBe(false); // a Design-only issue must be absent
+  }
+});
+
 test.describe('OAuth Error Handling', () => {
   // PINNED: OAuth callbacks are the auth bootstrap the local harness does not model.
   test('OAuth callback with error shows friendly message', async ({ page }) => {
