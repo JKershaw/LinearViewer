@@ -18,7 +18,7 @@
  * ALSO PINNED HERE (a deliberate non-change): `PRIORITY_WORDS` in
  * roadmap-narrative-template.js is documented as "Linear numeric priority → word".
  * That is an internal note about the STORED SCALE — the descending 1..4 Linear
- * native scale, as documented at `POST /api/proxy/issues` — not a claim about
+ * native scale, as documented at docs/proxy-integration.md — not a claim about
  * which provider backs the workspace. LIN-2354's trap T2 forbids renaming a
  * Linear-specific storage quirk onto another provider, and LIN-2371's own
  * acceptance repeats it, so that comment must stay put. The test below fails if
@@ -85,30 +85,40 @@ describe('LIN-2371 — task-chat persona names the declared provider', () => {
 
 describe('LIN-2371 — roadmap narrative names the declared identifier scheme', () => {
   test('a declared provider is named', () => {
-    assert.match(narrative('GitHub Issues'),
-      /- Tasks carry their GitHub Issues identifier \(e\.g\. LIN-204\)/);
+    assert.match(narrative('GitHub Issues'), /- Tasks carry their GitHub Issues identifier where one exists\./);
   });
 
-  test('Linear still reads exactly as before on a Linear-backed workspace', () => {
-    assert.match(narrative('Linear'),
-      /- Tasks carry their Linear identifier \(e\.g\. LIN-204\)/);
+  test('Linear still reads the same on a Linear-backed workspace', () => {
+    assert.match(narrative('Linear'), /- Tasks carry their Linear identifier where one exists\./);
   });
 
   test('an unresolved provider degrades to the neutral scheme, never Linear', () => {
     for (const absent of ABSENT) {
       const out = narrative(absent);
-      assert.match(out, /- Tasks carry their tracker identifier \(e\.g\. LIN-204\)/,
+      assert.match(out, /- Tasks carry their tracker identifier where one exists\./,
         `${absent}: neutral identifier phrasing`);
       assert.doesNotMatch(out, /their Linear identifier/,
         `${absent}: must never fall back to Linear`);
     }
   });
 
+  test('the LIN-204 example is gone — it contradicted the provider it qualified', () => {
+    // Found by review: naming the scheme from the real provider turned this
+    // sentence into "their Jira identifier (e.g. LIN-204)" — self-contradictory
+    // on exactly the non-Linear workspaces the fix exists for. An earlier draft
+    // of this very test PINNED that contradiction.
+    for (const name of ['Jira', 'GitHub Issues', 'Linear', null]) {
+      assert.doesNotMatch(narrative(name), /identifier \(e\.g\./,
+        `${name}: no provider-specific example may qualify the identifier phrase`);
+    }
+  });
+
   test('the surrounding instruction is untouched', () => {
     assert.match(narrative(null),
       /Cite the identifier alongside the title at least on first mention of a task/);
-    // The one other identifier reference in this prompt is a literal example of a
-    // string the model must not rewrite — not a provider claim. It stays.
+    // The one other identifier reference is a literal example of a string the
+    // model must not REWRITE — a don't-alter rule, not a claim about the
+    // scheme. It stays.
     assert.match(narrative(null), /never alter identifiers like LIN-123/);
   });
 });
@@ -136,5 +146,64 @@ describe('LIN-2371 — the stored-scale note is deliberately NOT neutralised (tr
       join(__dirname, '../../lib/prompts/task-chat-template.js'), 'utf8');
     assert.doesNotMatch(chatSrc, /You ARE a single Linear task/,
       'the hardcoded persona this ticket exists to remove');
+  });
+});
+
+
+/**
+ * B1 (found by review) — pin the ROUTE wiring, not just the templates.
+ *
+ * Mutation-proved before this block existed: deleting BOTH new arguments at the
+ * two call sites — i.e. reverting the entire user-visible effect of this change —
+ * left the full 9173-test suite green, as did swapping the roadmap route's
+ * fallback-free derivation for the legacy-defaulting `getProviderForWorkspace`,
+ * which reintroduces LIN-2354's exact defect.
+ *
+ * This is the same discharge `tests/unit/lin-2354-session-lane-no-provider.test.js`
+ * exists to provide for LIN-2354's four session-lane sites; LIN-2371 adds two more
+ * of the same kind. Source assertions are the established in-repo convention for
+ * it (tests/unit/task-chat-route.test.js) and are used here because both routes'
+ * test-mode paths short-circuit BEFORE the prompt builders — `runLayer` returns
+ * `emitMockLayer`, and the task-chat `mockAi` branch returns before
+ * `buildTaskChatMessages` — so a driven-route assertion cannot reach them.
+ */
+describe('LIN-2371 — the route derivations are pinned', () => {
+  const src = (rel) => readFileSync(join(__dirname, '../../', rel), 'utf8');
+
+  test('routes/task-chat.js derives the name fallback-free and passes it to the builder', () => {
+    const ROUTE = src('routes/task-chat.js');
+    assert.match(ROUTE, /const providerDisplayName = getProvider\(declaredSource\)\?\.ui\?\.displayName \?\? null;/,
+      'must use the bare registry lookup, never the legacy-defaulting one');
+    assert.match(ROUTE, /buildTaskChatMessages\(.*, providerDisplayName\);/,
+      'the derived name must actually reach the persona builder');
+  });
+
+  test('routes/task-chat.js honours ?source= only when it matches a REAL binding', () => {
+    const ROUTE = src('routes/task-chat.js');
+    // Reading `workspace.bindings` directly is load-bearing:
+    // `getBindingsForWorkspace` SYNTHESIZES a `provider || 'linear'` binding for a
+    // legacy workspace, which would smuggle the Linear default straight back in.
+    assert.match(ROUTE, /\(workspace\.bindings \|\| \[\]\)\.some\(b => b\.provider === requestedSource\)/,
+      'an unmatched client-supplied source must not reach the prose');
+    // Match a CALL, not a prose mention — the comment at the derivation
+    // explains precisely why that helper is avoided, and a bare name match
+    // would fail on its own explanation. (This file already has one such
+    // wire: tests/unit/task-chat-route.test.js's LIN-2047 guard matches
+    // `getProviderForWorkspace` anywhere, comments included.)
+    assert.doesNotMatch(ROUTE, /getBindingsForWorkspace\(/,
+      'that helper synthesizes a linear-defaulted binding — never call it for identity');
+  });
+
+  test('routes/workspace-api-roadmap.js derives the name fallback-free and passes it to the builder', () => {
+    const ROUTE = src('routes/workspace-api-roadmap.js');
+    assert.match(ROUTE, /const declaredProviderDisplayName = getProvider\(req\.workspace\?\.provider\)\?\.ui\?\.displayName \?\? null;/,
+      'must use the bare registry lookup, never the legacy-defaulting one');
+    assert.match(ROUTE, /buildRoadmapNarrativeMessages\(roadmapModel, declaredProviderDisplayName\)/,
+      'the derived name must actually reach the narrative builder');
+    // This file legitimately imports getProviderForWorkspace for capability
+    // shaping, so a bare doesNotMatch on the file would be wrong. Pin instead
+    // that the NARRATIVE derivation is not the defaulting one.
+    assert.doesNotMatch(ROUTE, /const declaredProviderDisplayName = getProviderForWorkspace/,
+      'the identity derivation must not be the legacy-defaulting helper');
   });
 });

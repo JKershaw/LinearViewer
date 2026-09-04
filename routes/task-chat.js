@@ -441,16 +441,35 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
 
       const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
       // LIN-2371: the DECLARED provider identity for the persona sentence.
-      // `workspace.provider` is the raw, uncoerced field, and `getProvider`
-      // resolves it WITHOUT the registry's legacy-Linear default — so an
-      // undeclared workspace yields null here and the persona degrades to
-      // "a single task" rather than asserting Linear. Deliberately NOT taken
-      // from `issueProvider` above: that resolution ends in the defaulting
-      // lookup, so its display name always names some provider (Linear
-      // included), which is precisely the defect this fixes. Same derivation as
-      // routes/collective.js and the feedback-triage dispatch in
-      // routes/workspace-api.js.
-      const providerDisplayName = getProvider(workspace.provider)?.ui?.displayName ?? null;
+      //
+      // Row-correct AND fallback-free, which needs both halves (the second was
+      // found by review). `?source=` is a real client-sent param
+      // (public/task-chat.js), so on a multi-binding workspace the row being
+      // chatted with may come from a different backend than the workspace's own
+      // active one — and LIN-2047 already settled, in this file, that this route
+      // binds to the ROW's resolution rather than the workspace-active one.
+      // Naming the workspace's provider there would assert a false one, the very
+      // class this ticket fixes. So a requested source is honoured, but ONLY when
+      // it matches a REAL binding — `workspace.bindings` is read directly rather
+      // than through `getBindingsForWorkspace`, which SYNTHESIZES a
+      // `provider || 'linear'` binding for a legacy workspace and would smuggle
+      // the Linear default back in. A client-supplied param that matches nothing
+      // is ignored, so it can never inject a provider name into the prose.
+      //
+      // The name is then resolved with `getProvider`, which is a bare registry
+      // lookup carrying no legacy-Linear default — so an undeclared workspace
+      // yields null and the persona degrades to "a single task" rather than
+      // asserting Linear. Same derivation as routes/collective.js and the
+      // feedback-triage dispatch in routes/workspace-api.js.
+      //
+      // Deliberately not read off `issueProvider` above: `resolveIssueBinding`'s
+      // UNMATCHED branch ends in the defaulting lookup, so its display name can
+      // name a provider that was never declared.
+      const declaredSource = (typeof requestedSource === 'string' && requestedSource
+        && (workspace.bindings || []).some(b => b.provider === requestedSource))
+        ? requestedSource
+        : workspace.provider;
+      const providerDisplayName = getProvider(declaredSource)?.ui?.displayName ?? null;
       const messages = buildTaskChatMessages(context.issue, context, question.trim(), safeHistory, providerDisplayName);
       const callMeta = { urlKey: workspace?.urlKey || null, feature: 'task-chat', issueIdentifier: context.issue?.identifier || null };
 
