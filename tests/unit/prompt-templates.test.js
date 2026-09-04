@@ -1041,10 +1041,40 @@ describe('cited-sweep rule — plan template (LIN-1873)', () => {
     const result = generatePrompt('plan', planIssue, ctx);
     assert.ok(/no sweep, and saying so is a first-class answer/i.test(result.prompt),
       'declaring a class un-sweepable must not read as an omission');
-    assert.ok(/destinations\* of new or moved code|destinations of new or moved code/i.test(result.prompt),
+    // NOT `|| /destinations of new or moved code/`. The emphasis marker is part
+    // of the clause; the loose alternative passes with it stripped, and the meta
+    // counterpart was already tightened to the exact form. Review found the same
+    // item fixed on one path and not the other -- the drift the both-paths rule
+    // exists to prevent, inside this ticket's own tests.
+    assert.ok(/destinations\* of new or moved code/i.test(result.prompt),
       'must name the moved-code-destinations shape (LIN-1717)');
     assert.ok(/production data rather than source/i.test(result.prompt),
       'must name the population-is-data shape (LIN-1731)');
+  });
+
+  test('bounds the un-sweepable escape hatch with a checkable criterion', () => {
+    // The escape hatch is the rule's ONLY opt-out, so it is the one clause a
+    // future edit can quietly widen back into "this class is awkward, therefore
+    // I am exempt" -- which would hollow out the whole directive while leaving
+    // every other assertion green. It shipped unpinned: review deleted the
+    // criterion from BOTH paths and the suites stayed at 324/0 and 177/0.
+    const result = generatePrompt('plan', planIssue, ctx);
+    assert.ok(/not in the current source tree/i.test(result.prompt),
+      'the test for a third un-sweepable shape must be stated, not left to judgement');
+    assert.ok(/merely awkward to grep/i.test(result.prompt),
+      'a hard-to-grep class must be excluded from the hatch by name');
+    assert.ok(/harder query, not an absent one/i.test(result.prompt),
+      'must say WHY it is excluded, or the exclusion reads as arbitrary');
+  });
+
+  test('names where the sweep, its output and its sha are recorded', () => {
+    // A cited sweep the reviewer cannot find is a hand-list with extra steps,
+    // and check (1) of plan-review is written to go looking for it.
+    const result = generatePrompt('plan', planIssue, ctx);
+    assert.ok(/Record all three in the issue description/i.test(result.prompt),
+      'the query, its output and its sha need a stated destination');
+    assert.ok(/where plan-review will look for them/i.test(result.prompt),
+      'the destination must be tied to the reader who consumes it');
   });
 
   test('warns against manufacturing a query to fill the slot', () => {
@@ -1086,7 +1116,12 @@ describe('cited-sweep rule — plan-review template (LIN-1873)', () => {
       'the cheap mechanical check must come first');
     assert.ok(/run THAT query, at the sha it names/i.test(result.prompt),
       'must pin re-running the cited query at its own sha, not an equivalent search');
-    assert.ok(/Only where the plan cites no sweep do you fall back/i.test(result.prompt),
+    // Review found check (1) announcing "the cheap, mechanical half" without
+    // ever naming the other half, so the reword below states both. This
+    // assertion caught that reword, which is the pin doing its job.
+    assert.ok(/expensive half is the fallback/i.test(result.prompt),
+      'both halves must be named, not one plus an unlabelled else-branch');
+    assert.ok(/reached only where the plan cites no sweep/i.test(result.prompt),
       'the independent search is the fallback, not the primary');
   });
 
@@ -1096,7 +1131,11 @@ describe('cited-sweep rule — plan-review template (LIN-1873)', () => {
       'must redirect a disputed enumeration to the query');
     assert.ok(/Propose the query you would run instead and show its output/i.test(result.prompt),
       'proposing a counter-query is the concrete action');
-    assert.ok(/discovering members one at a time do not|one at a time do not/i.test(result.prompt),
+    // One alternative only. The old second branch `one at a time do not` was a
+    // SUBSTRING of the first, so the first could never be the deciding branch
+    // and the effective assertion was silently the weaker one -- the same dead
+    // -alternation defect review found two lines up, left behind by its fix.
+    assert.ok(/discovering members one at a time do not/i.test(result.prompt),
       'must say why: member-by-member discovery does not converge');
   });
 

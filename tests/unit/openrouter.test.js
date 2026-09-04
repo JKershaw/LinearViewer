@@ -1512,6 +1512,34 @@ describe('buildMetaPromptTemplate cited-sweep rule (LIN-1873)', () => {
     );
   });
 
+  test('Plan-prompts rule bounds the un-sweepable escape hatch with a criterion', () => {
+    // Mirrors the handwritten pin. Both paths carried this clause and NEITHER
+    // asserted it: review removed it from both files and both suites stayed
+    // fully green. An unbounded "some classes have no sweep" is an opt-out of
+    // the entire rule, so this is the load-bearing half of the escape hatch.
+    const result = build();
+    assert.ok(
+      result.includes('not in the current source tree at all'),
+      'the test for a third un-sweepable shape must be stated in the meta path too'
+    );
+    assert.ok(
+      result.includes('merely awkward to grep is a harder query rather than an absent one'),
+      'a hard-to-grep class must be excluded from the hatch by name'
+    );
+  });
+
+  test('Plan-prompts rule says where the sweep and its sha are recorded', () => {
+    const result = build();
+    assert.ok(
+      result.includes('recorded in the issue description alongside the plan'),
+      'the query, its output and its sha need a stated destination'
+    );
+    assert.ok(
+      result.includes('where plan-review looks for them'),
+      'the destination must be tied to the reader who consumes it'
+    );
+  });
+
   test('Plan-prompts rule warns against a query that only looks authoritative', () => {
     const result = build();
     assert.ok(
