@@ -75,7 +75,7 @@ import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } from './lib/providers/index.js' // barrel: owns the five self-registering provider imports (LIN-2010)
 import { NotImplementedError } from './lib/providers/interface.js'
 import { LocalStore } from './lib/local-store.js'
-import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID } from './lib/tree.js'
+import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, expandToTreeContext, nodeKey } from './lib/tree.js'
 import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { parseRepoFromDescription } from './lib/prompt-formatters.js'
@@ -1187,7 +1187,7 @@ app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
  * @param {string|null} teamId - Optional team ID to filter issues by
  * @returns {Promise<{trees, inProgressTrees, organizationName, teams, selectedTeamId}>} Prepared data for rendering
  */
-async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null, { slim = false } = {}) {
+async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null, { slim = false, assigneeName = null } = {}) {
   // Fan out across ALL of the workspace's provider bindings and merge the
   // results, rather than resolving a single provider (LIN-544). A legacy/Linear
   // workspace has exactly one synthesized binding here, so the merge is a no-op
@@ -1275,7 +1275,28 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
   // single pre-forest seam hides them from the project tree, the in-progress
   // ancestor context, and the recent-activity feed at once — without touching the
   // shared terminal/glyph helpers, so completed (✓) and duplicate stay visible.
-  const issues = mergedIssues.filter(issue => !isHiddenState(issue));
+  let issues = mergedIssues.filter(issue => !isHiddenState(issue));
+
+  // LIN-2525: the assignee filter's available options are the full,
+  // team-scoped set — computed BEFORE the assignee filter below narrows
+  // `issues`, so the dropdown never shrinks to just the current selection.
+  const availableAssignees = [...new Set(
+    issues.map(issue => issue.assignee?.name).filter(Boolean)
+  )].sort();
+
+  // LIN-2525: apply the assignee filter once, before any of the three forest
+  // builders consume `issues` — filtering after would tear matched issues out
+  // of their tree context (an ancestor's project grouping, an in-progress
+  // parent's subtask list). expandToTreeContext (LIN-2524) keeps the matched
+  // issues' ancestor chain AND descendants, source-qualified (LIN-544) via
+  // nodeKey — never a raw issue.id walk.
+  if (assigneeName) {
+    const matchedIds = new Set(
+      issues.filter(issue => issue.assignee?.name === assigneeName).map(nodeKey)
+    );
+    const relevantIds = expandToTreeContext(issues, matchedIds);
+    issues = issues.filter(issue => relevantIds.has(nodeKey(issue)));
+  }
 
   // Build issue tree structure (parent-child relationships)
   const forest = buildForest(issues);
@@ -1336,7 +1357,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       return { project: { ...project, collapsed }, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated };
+  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees };
 }
 
 /**
