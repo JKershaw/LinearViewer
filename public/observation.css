@@ -31,44 +31,34 @@
 .obs-page {
   max-width: 480px;
   margin: 0 auto;
-  /* LIN-2298 corrects what this padding was claimed to do. The original comment
-     said it stopped "the fixed feedback FAB ever overlapping the last card"
-     (LIN-783). It does not, and LIN-2272 later proved why: bottom padding on a
-     normal-flow ancestor cannot clear a `position: fixed` sibling — it grows
-     the document and the max-scroll offset while the FAB keeps its SCREEN
-     position, so content still sweeps through the band on the way past.
+  /* LIN-2298 landed the fix this comment used to describe as pending, so the
+     6rem bottom reserve is gone with it.
 
-     MEASURED at main 54116d21, six seeded sessions, rect sweep every 2px:
-     the last `.obs-session` intersects `.feedback-fab` at 111 scroll offsets
-     (520-740 at 360px), and the card's own `open ↗` control at 26 (578-628).
-     Same at 320/390, 112/27 at 430. So this is a real defect, not merely an
-     over-reserved padding — the ticket's own "if zero, this reduces to a
-     comment correction" branch does not apply.
+     The history, because it is the whole reason this comment is long. LIN-783
+     added `6rem` here claiming it stopped "the fixed feedback FAB ever
+     overlapping the last card". It did not, and LIN-2272 proved why: bottom
+     padding on a normal-flow ancestor cannot clear a `position: fixed` sibling
+     — it grows the document and the max-scroll offset while the fixed element
+     keeps its SCREEN position, so content sweeps through the band on the way
+     past. Measured at main 54116d21 (six seeded sessions, rect sweep every
+     2px): the last `.obs-session` intersected `.feedback-fab` at 111 scroll
+     offsets, and the card's own `open ↗` control at 26. A real defect, not an
+     over-reserved padding.
 
-     What the padding DOES buy, and why it stays: at rest (max scroll) the last
-     card ends above the FAB, which is the common resting state. It is a real
-     if partial mitigation, just not the one the old comment claimed.
+     What the padding genuinely bought was the resting state — at max scroll the
+     last card ended above the FAB — and that is now bought by there being no
+     FAB. John's ruling on LIN-2298 relocated the trigger into nav chrome
+     (`renderFeedbackTrigger`, lib/components/navbar.js) and deleted the fixed
+     button, which retires the class rather than reserving around it. Nothing
+     floats over this column any more, so nothing needs clearing under it, and
+     `1.5rem` is now just ordinary end-of-feed breathing room.
 
-     What it cannot buy, and a correction. The CARD RECT spans the full column
-     by design, so no horizontal reserve keeps it out of a fixed overlay's path
-     — that part stands, and it is cosmetic anyway (card text is left-aligned;
-     the FAB passes over whitespace).
-
-     But an earlier version of this comment generalised that into "no CSS
-     reserve can keep full-width content out of a fixed overlay's path" and used
-     it to dismiss the whole ticket. That was wrong about the half that matters.
-     The `open ↗` control is `.obs-session-open` inside `.obs-session-side`, a
-     right-aligned shrink-to-fit column (see the flex rules below) — structurally
-     the same shape as the footer rows LIN-2299 reserved, and reservable the same
-     scrollY-independent way. Honest measurement, overreaching conclusion.
-
-     It is still not fixed here, for a different and better reason: John ruled on
-     LIN-2298 (relocate the feedback trigger into nav chrome and drop the fixed
-     FAB entirely), which removes this whole defect class rather than reserving
-     around it, and routed that work to a later lane. A horizontal reserve on
-     `.obs-session-side` would be thrown away by it. If that ruling is ever
-     reversed, the reserve is the fix — not a claim that none exists. */
-  padding: 0 0.6rem 6rem;
+     The guard is a test, not this comment: tests/e2e/observation.spec.js sweeps
+     every 2px offset at 320/360/390/430 and asserts the last `.obs-session` and
+     its `.obs-session-open` intersect NO fixed overlay. That is LIN-2298's
+     acceptance witness, and it goes red if a floating element returns here —
+     which a padding value cannot do. */
+  padding: 0 0.6rem 1.5rem;
 }
 
 /* Desktop composition (LIN-1225): the mobile-first feed is a single narrow

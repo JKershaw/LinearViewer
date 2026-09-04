@@ -2,118 +2,84 @@
  * Feedback Widget styles (LIN-635)
  *
  * CLI/terminal aesthetic, light theme, mobile-responsive — reuses the shared
- * design tokens from style.css (:root). Floating button + popup, fixed to the
- * bottom-right and kept above page chrome via --z-overlay.
+ * design tokens from style.css (:root).
+ *
+ * LIN-2298 changed the shape this file describes. It was "floating button +
+ * popup, fixed to the bottom-right"; it is now a NAV-CHROME trigger (rendered
+ * by lib/components/navbar.js, styled below) plus a popup that is fixed to the
+ * bottom-right only while the user has it open. See the block below for what
+ * was removed and why.
  */
 
-/* LIN-2299/2296: the FAB's own footprint, named once.
- *
- * LIN-2272 established the general result these tokens exist to serve: bottom
- * padding on a normal-flow ancestor CANNOT clear a `position: fixed` sibling —
- * it only grows the document and the max-scroll offset, so content still sweeps
- * past the FAB's fixed SCREEN position at intermediate offsets. The only reserve
- * that holds at every scroll position is a HORIZONTAL one, and it can only work
- * where content can be kept out of the right-hand band at all.
- *
- * Measured at main 54116d21 (rect sweep, every 2px offset, 320/360/390/430):
- * the button is 83x32 at <=390 and 87.1x34 at 430, inset 16px. So the widest
- * band it owns is 16 + 87.1 = 103.1px. --fab-band-x adds a small gutter on top
- * so reserved content never abuts the button.
- *
- * The footer reserve below consumes this token. `public/live-console.css`'s
- * `.lc-more` deliberately does NOT — its reserve is tuned to a different
- * constraint (keeping a centred button single-line inside its own container,
- * see the comment there), so binding it to the FAB's band would couple two
- * numbers that must move independently. An earlier version of this comment
- * claimed both consumers reserved against the token; only one does.
- */
-:root {
-  --fab-band-x: 112px;
+/* LIN-2298: the fixed FAB, and every reserve that existed only to dodge it,
+   are GONE from this file.
+
+   What was here, and why none of it is: a `--fab-band-x: 112px` token naming
+   the FAB's measured footprint; a `body:has(#feedback-widget-root[data-enabled])`
+   horizontal reserve pushing `.footer-deploy` and `.footer-actions` out of that
+   band; and the `.feedback-fab` / `.feedback-fab-draft` rules themselves. They
+   were LIN-2299's correct answer to the wrong-shaped problem — LIN-2272 proved
+   bottom padding cannot clear a `position: fixed` sibling, so LIN-2299 reserved
+   HORIZONTALLY instead, which does hold at every scroll offset for content that
+   can be kept out of the band.
+
+   The reserve is deleted rather than kept because its precondition is gone: it
+   was gated on a FAB being on screen, and there is no FAB. Keeping a rule whose
+   `body:has()` gate can never match would be dead CSS that reads as a live
+   constraint. John's ruling (LIN-2298) moved the trigger into nav chrome for
+   exactly this reason — a normal-flow trigger has no band to reserve against,
+   so the whole defect CLASS retires instead of its third instance.
+
+   The rect-sweep tests those reserves were pinned by are NOT deleted. They are
+   kept and re-aimed in tests/e2e/feedback-widget.spec.js and
+   tests/e2e/live-console.spec.js: instead of "this content never intersects
+   `.feedback-fab`", they now assert "this content never intersects ANY fixed
+   overlay, at any 2px scroll offset". That is a strictly stronger witness for
+   the class, and it is the one that goes red if a future change reintroduces a
+   floating element over the same content.
+
+   The PANEL below stays `position: fixed`. That is deliberate and is not the
+   defect: it is hidden until the user opens it, so it covers content only when
+   the user asked it to. The sweeps skip it while hidden (a `[hidden]` element
+   has a zero-area rect) and it is excluded by name while open. */
+
+/* The nav trigger (LIN-2298). Rendered by `renderFeedbackTrigger`
+   (lib/components/navbar.js) into `.nav-actions`, so it inherits `.nav-action`
+   for typography and spacing from style.css and needs only the affordance the
+   FAB used to carry: the pending-draft dot.
+
+   `position: relative` is here solely to anchor that dot. It creates no
+   stacking context problem for the page — the element is in normal flow, which
+   is the entire point of the relocation. */
+.nav-feedback-trigger {
+  position: relative;
 }
 
-/* LIN-2299: the fixed FAB covered the shared footer's `feedback` toggle — the
-   very control that dismisses it — at max scroll, on every footer-bearing page
-   whenever the widget is on. Horizontal reserve, never bottom padding, per the
-   LIN-2272 result above.
-
-   No overlap COUNTS are quoted here on purpose. They depend on the page's own
-   content (how tall the document is, where the footer lands), so a figure
-   measured on one route is not the figure on another — an earlier version of
-   this comment quoted per-width counts from a different page than the guard
-   test uses, and they did not reproduce. The live witness is the sweep in
-   tests/e2e/feedback-widget.spec.js, which asserts ZERO intersections at every
-   2px offset across four widths and goes red if this rule is removed.
-
-   GATED, and the gate is the whole point. `#feedback-widget-root` is rendered
-   only by renderFeedbackMount (lib/components/footer.js), itself gated on
-   `!isLanding && urlKey`, and carries `data-enabled` from the per-user
-   `feedbackWidget` flag. So this rule fires ONLY when a FAB is actually on
-   screen. An earlier ungated version of it (in style.css, with a
-   `var(--fab-band-x, 112px)` fallback) was measurably wrong twice, which is why
-   the gate is spelled out rather than assumed:
-     - on landing/legal pages feedback-widget.css is never loaded, so the
-       FALLBACK applied and shoved the centred footer 56px off-centre at 320px
-       for a FAB that cannot exist there;
-     - with the flag OFF — the default — it took `.footer-deploy` from 2 lines
-       to 4 on ~30 authenticated pages, again for a button that is not rendered.
-   `body:has(...)` is the established idiom here (public/ship.css:5,
-   public/swim.css:6). Living in THIS stylesheet is belt-and-braces: the rule
-   cannot even be parsed on a page that has no FAB stylesheet.
-
-   WHICH ROWS, and why not all of them. Measured with the sweep below, widget
-   on, `.footer-deploy` reserved: `.footer-actions` still reached the FAB's band
-   at 23 scroll offsets at 430px, and it holds the `reset` link — an interactive
-   control, i.e. the same defect as the covered `feedback` toggle — so it gets
-   the same reserve. `.footer-brand` also reaches the band (7 offsets at 390, 9
-   at 430) and is deliberately NOT reserved: it is a non-interactive wordmark,
-   so a fixed button passing over it is cosmetic, the same call made for the
-   Observation card body in public/observation.css. Recorded rather than
-   claimed away — an earlier version of this comment asserted that the rows
-   around `.footer-deploy` "never reach the FAB's band", which measurement
-   disproved, and which was itself a vertical-position argument of exactly the
-   kind LIN-2272 warns against. */
-body:has(#feedback-widget-root[data-enabled="true"]) .footer-deploy,
-body:has(#feedback-widget-root[data-enabled="true"]) .footer-actions {
-  padding-right: var(--fab-band-x);
-}
-
-.feedback-fab {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: var(--z-overlay, 1000);
-  font-family: var(--font-structural, monospace);
-  font-size: var(--font-size-sm, 0.85em);
-  color: var(--bg, #fff);
-  background: var(--blue, #2563eb);
-  border: 1px solid var(--blue, #2563eb);
-  border-radius: var(--radius-md, 6px);
-  box-shadow: var(--shadow-md, 0 2px 8px rgba(0, 0, 0, 0.1));
-  padding: 8px 14px;
-  cursor: pointer;
-}
-
-.feedback-fab:hover {
-  filter: brightness(0.95);
-}
-
-/* A pending draft (text not yet sent) gets a subtle marker dot. */
-.feedback-fab-draft::after {
+/* A pending draft (text not yet sent) gets a subtle marker dot — carried over
+   from `.feedback-fab-draft`, which used the same treatment. Offsets are
+   smaller than the FAB's (-3px) because this trigger sits inline in a nav row
+   rather than free-floating in a corner, so a dot hanging 3px proud would
+   collide with its neighbours' baseline. */
+.nav-feedback-trigger-draft::after {
   content: '';
   position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 8px;
-  height: 8px;
+  top: -2px;
+  right: -2px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--yellow, #d4a600);
   border: 1px solid var(--bg, #fff);
 }
 
+/* The panel's `bottom` was 60px: clearance for the 32px FAB at its 16px inset,
+   so the two never overlapped. With the FAB gone that 60px is a gap held open
+   for an element that no longer exists, so it drops to the same 16px inset the
+   right edge uses and the panel sits square in the corner. */
 .feedback-popup {
   position: fixed;
   right: 16px;
-  bottom: 60px;
+  bottom: 16px;
   z-index: var(--z-overlay, 1000);
   width: 340px;
   max-width: calc(100vw - 32px);

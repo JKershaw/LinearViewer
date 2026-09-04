@@ -122,9 +122,16 @@
     const draft = loadDraft();
     let selectedFile = null; // in-memory; survives minimize (no reload)
 
+    // LIN-2298: no trigger is rendered here any more. The fixed `.feedback-fab`
+    // that used to lead this markup was a `position: fixed` element floating
+    // over full-width content, and LIN-2272 established that no CSS reserve
+    // clears such an element at every scroll offset once the content spans the
+    // column. It is replaced by a normal-flow trigger in the nav bar
+    // (`renderFeedbackTrigger`, lib/components/navbar.js), bound below. The
+    // PANEL stays an overlay on purpose: it appears only once the user asks for
+    // it, so it covers content by the user's own choice, which is the half of
+    // the old behaviour John's ruling explicitly kept.
     root.innerHTML = `
-      <button type="button" class="feedback-fab" data-testid="feedback-fab"
-              aria-label="Give feedback" title="Give feedback">feedback</button>
       <div class="feedback-popup" data-testid="feedback-popup" hidden role="dialog" aria-label="Feedback">
         <div class="feedback-popup-head">
           <span class="feedback-popup-title">Feedback</span>
@@ -188,7 +195,20 @@
       });
     }
 
-    const fab = root.querySelector('.feedback-fab');
+    // LIN-2298: the trigger now lives in the nav bar, OUTSIDE this root, so it
+    // is queried from the document rather than from `root`. A NodeList, not a
+    // single element, so a page that ever grows a second trigger (a mobile
+    // duplicate, say) keeps every copy's `aria-expanded` and draft dot in step
+    // rather than silently maintaining only the first.
+    //
+    // Empty is tolerated, not an error: the widget's own actions (draft
+    // persistence, submit) do not depend on a trigger existing, so a surface
+    // that mounts the widget without a nav must degrade to an unopenable panel
+    // rather than a thrown TypeError that takes the rest of this script with
+    // it. No such surface exists today — every page rendering the mount also
+    // renders the nav, which tests/unit/navbar-feedback-trigger.test.js pins —
+    // so this is a guard against a future page, not a live case.
+    const triggers = Array.from(document.querySelectorAll('[data-testid="nav-feedback-trigger"]'));
     const popup = root.querySelector('.feedback-popup');
     const messageEl = root.querySelector('.feedback-message');
     const priorityEl = root.querySelector('.feedback-priority');
@@ -216,7 +236,7 @@
 
     function reflectDraftIndicator() {
       const hasDraft = !!messageEl.value.trim();
-      fab.classList.toggle('feedback-fab-draft', hasDraft);
+      triggers.forEach(t => t.classList.toggle('nav-feedback-trigger-draft', hasDraft));
     }
 
     // The remove control and filename chip only exist while a screenshot is
@@ -242,14 +262,14 @@
 
     function open() {
       popup.hidden = false;
-      fab.setAttribute('aria-expanded', 'true');
+      triggers.forEach(t => t.setAttribute('aria-expanded', 'true'));
       messageEl.focus();
     }
 
     // Minimize: hide popup, keep all input (draft persisted; file kept in memory).
     function minimize() {
       popup.hidden = true;
-      fab.setAttribute('aria-expanded', 'false');
+      triggers.forEach(t => t.setAttribute('aria-expanded', 'false'));
       reflectDraftIndicator();
     }
 
@@ -257,8 +277,17 @@
       saveDraft({ message: messageEl.value, priority: parseInt(priorityEl.value, 10) || 0 });
     }
 
-    fab.addEventListener('click', () => {
-      if (popup.hidden) open(); else minimize();
+    // Bind, THEN enable. `renderFeedbackTrigger` (lib/components/navbar.js)
+    // ships the button `disabled` because it is server-rendered and on screen
+    // from first paint, while this file is a deferred script — a click in that
+    // window would find no listener and vanish. Enabling only after the
+    // listener is attached is what makes the button's enabled state mean "this
+    // works", so the order of these two statements is the contract, not style.
+    triggers.forEach(t => {
+      t.addEventListener('click', () => {
+        if (popup.hidden) open(); else minimize();
+      });
+      t.disabled = false;
     });
     minBtn.addEventListener('click', minimize);
     closeBtn.addEventListener('click', minimize);

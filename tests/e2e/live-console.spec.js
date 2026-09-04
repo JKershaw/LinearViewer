@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { sweepFixedOverlaps, describeHits } from '../fixed-overlay-sweep.js';
 
 // Experimental Live Console — an ambient, generation-free feed of the whole
 // swarm working (LIN-1436). Seeds via /test/set-session (the test-token
@@ -1628,17 +1629,30 @@ test.describe('Live Console (experimental)', () => {
     });
   });
 
-  test.describe('Mobile FAB overlap (LIN-2272)', () => {
-    // LIN-2252's `.lc-more { padding-bottom: 3.5rem }` looked like a fix but
-    // measured as a no-op: `.lc-more-btn` is normal-flow and `.feedback-fab`
-    // is `position: fixed`, so bottom padding on an ancestor can never move
-    // the button relative to the VIEWPORT — it only grows the document and
-    // the max scroll offset, leaving the SAME overlap band at the SAME
-    // scroll positions with or without the rule. This spec pins the real
-    // contract: no rect intersection between the two elements at ANY scroll
-    // offset, not just one snapshot position or a computed-style assertion
-    // (a style assertion would have let the LIN-2252 no-op pass).
-    test('the "view earlier activity" control never overlaps the fixed feedback FAB, at any scroll position', async ({ page }) => {
+  test.describe('Fixed-overlay clearance (LIN-2272 → LIN-2298)', () => {
+    // The three-ticket history this pins, because the assertion below only
+    // makes sense against it:
+    //
+    //   LIN-2252 wrote `.lc-more { padding-bottom: 3.5rem }` and it measured as
+    //     a NO-OP — `.lc-more-btn` is normal-flow and the feedback FAB was
+    //     `position: fixed`, so bottom padding on an ancestor only grew the
+    //     document and the max-scroll offset, leaving the SAME overlap band at
+    //     the SAME scroll positions. A computed-style assertion would have
+    //     passed it; this sweep is why the file uses rects instead.
+    //   LIN-2272 generalised that into the class result and replaced it with a
+    //     HORIZONTAL reserve, which holds at every offset because it never
+    //     depends on scrollY.
+    //   LIN-2296 tuned the reserve (7rem → 4.5rem) because 7rem squeezed the
+    //     centred pill under its natural width at ≤360px and wrapped the label.
+    //   LIN-2298 deleted the FAB on John's ruling, and the reserve with it.
+    //
+    // So this sweep is RE-AIMED, not deleted. Pointed at `.feedback-fab` it
+    // would now pass vacuously — you cannot intersect an element that is not
+    // rendered — which is exactly the failure mode LIN-2252 demonstrated. It
+    // asserts the CLASS instead: the control intersects NO visible fixed
+    // overlay at any 2px scroll offset. That is what goes red if a future
+    // change floats something over this button again.
+    test('the "view earlier activity" control never sits under any fixed overlay, at any scroll position', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true, feedbackWidget: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
       await page.request.post('/test/seed-agent-status', {
@@ -1649,51 +1663,39 @@ test.describe('Live Console (experimental)', () => {
       await page.goto(PAGE_URL);
       await page.waitForSelector('[data-testid="live-console-event"]');
 
-      const moreBtn = page.locator('[data-testid="live-console-more"]');
-      const fab = page.locator('[data-testid="feedback-fab"]');
-      await expect(moreBtn).toBeVisible();
-      await expect(fab).toBeVisible();
+      // Preconditions, so the sweep cannot pass by sweeping nothing. The
+      // feedbackWidget flag is deliberately ON: this is the configuration that
+      // used to produce the overlap, so it is the one worth asserting against.
+      await expect(page.locator('[data-testid="live-console-more"]')).toBeVisible();
+      await expect(page.getByTestId('feedback-widget-root')).toHaveAttribute('data-enabled', 'true');
 
-      // Sweep every 2px scroll offset (matching the ticket's own measurement
-      // step) and record any offset where the two rects actually intersect.
-      const offendingOffsets = await page.evaluate(() => {
-        const btn = document.querySelector('[data-testid="live-console-more"]');
-        const fabEl = document.querySelector('[data-testid="feedback-fab"]');
-        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-        const offending = [];
-        for (let y = 0; y <= maxScroll; y += 2) {
-          window.scrollTo(0, y);
-          const a = btn.getBoundingClientRect();
-          const b = fabEl.getBoundingClientRect();
-          const intersects = a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-          if (intersects) offending.push(y);
-        }
-        return offending;
-      });
-
-      expect(offendingOffsets, `overlapping at scrollY: ${offendingOffsets.join(', ')}`).toEqual([]);
+      const hits = await sweepFixedOverlaps(page, '[data-testid="live-console-more"]');
+      expect(hits, describeHits(hits)).toEqual([]);
     });
 
-    // LIN-2296 — the COST of LIN-2272's reserve, and its discharge.
+    // LIN-2296's ledger item L2, still asserted after LIN-2298 removed the
+    // reserve it was tuning.
     //
-    // The 7rem reserve cleared the FAB at every offset (the sweep above), but
-    // squeezed `.lc-more-btn` below its 203px natural width at <=360px, wrapping
-    // the label to two lines and orphaning the arrow. That was ledger item L2:
-    // "visual acceptance of the wrapped label", which no test and no CI check
-    // could discharge — CI carries no visual assertion on this element, so green
-    // CI said nothing about it.
+    // L2 was "visual acceptance of the wrapped label" — a human-judgement item
+    // no CI check could discharge. LIN-2296 discharged it by TUNING (7rem →
+    // 4.5rem) instead, which turned it into this assertable one: the button is
+    // a SINGLE LINE at 360px, measured off its own box against its own
+    // line-height rather than eyeballed.
     //
-    // LIN-2296 offered two discharges: a human accepting the wrap, or TUNING the
-    // reserve so it stays single-line. Tuning is what landed (7rem -> 6rem,
-    // spending 8px of the 41px of slack the ticket measured at 360px), which
-    // turns L2 from a human-judgement item into an assertable one. This is that
-    // assertion: the button is a SINGLE LINE at 360px, measured off its own box
-    // against its own line-height rather than eyeballed.
+    // LIN-2298 gives the reserve back entirely, which can only RELAX this
+    // constraint — the pill has strictly more room than the 4.5rem regime it
+    // was tuned for. Keeping the test is not redundant even so: it is the
+    // witness that removing the reserve did not disturb the layout it was
+    // taken out of, and it stays the guard on a future label or font change.
     //
-    // 320px is deliberately NOT asserted single-line. There the button would
-    // need a right edge <=221 while being >=203 wide, which does not fit that
-    // viewport at all — geometry, not tuning. The sweep above still covers 320
-    // for the thing that matters (no overlap).
+    // The old `btnRight <= fabLeft` clause is GONE rather than relaxed: there
+    // is no FAB to clear, and an assertion against a missing element's rect
+    // would throw rather than measure. The clearance question it asked is now
+    // the sweep's, above, and asked more generally.
+    //
+    // 320px is deliberately NOT asserted single-line — there the button needs
+    // more width than that viewport gives it. Geometry, not tuning; the sweep
+    // still covers what matters there.
     test('the "view earlier activity" label stays on ONE line at 360px (LIN-2296, L2)', async ({ page }) => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true, feedbackWidget: true })}&urlKey=${URL_KEY}`);
       await clearFeed(page, URL_KEY);
@@ -1706,9 +1708,8 @@ test.describe('Live Console (experimental)', () => {
       await page.waitForSelector('[data-testid="live-console-event"]');
       await expect(page.locator('[data-testid="live-console-more"]')).toBeVisible();
 
-      const { lines, height, lineHeight, btnRight, fabLeft } = await page.evaluate(() => {
+      const { lines, height, lineHeight } = await page.evaluate(() => {
         const btn = document.querySelector('[data-testid="live-console-more"]');
-        const fab = document.querySelector('[data-testid="feedback-fab"]');
         const cs = getComputedStyle(btn);
         const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
         const inner = btn.getBoundingClientRect().height
@@ -1718,14 +1719,35 @@ test.describe('Live Console (experimental)', () => {
           lines: Math.round(inner / lh),
           height: btn.getBoundingClientRect().height,
           lineHeight: lh,
-          btnRight: btn.getBoundingClientRect().right,
-          fabLeft: fab.getBoundingClientRect().left,
         };
       });
 
       expect(lines, `button is ${height}px tall at a ${lineHeight}px line-height — expected one line`).toBe(1);
-      // And the tuning must not have eaten the clearance it was tuned against.
-      expect(btnRight).toBeLessThanOrEqual(fabLeft);
+    });
+
+    // The reserve is ABSENT, not merely inactive (LIN-2298). Asserted because
+    // an earlier version of this rule shipped UNGATED and cost the button ~96px
+    // on every Live Console load with the widget off — the default — for a
+    // button that was not on screen. A rule left behind after its `body:has()`
+    // gate can never match is dead CSS that still reads as a live width
+    // constraint on this container.
+    test('`.lc-more` reserves nothing, with the widget on', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true, feedbackWidget: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+      await page.request.post('/test/seed-agent-status', {
+        data: { urlKey: URL_KEY, taskIdentifier: 'LIN-1', action: 'implementation', status: 'in_progress', summary: 'seed event so "view earlier" renders' },
+      });
+
+      await page.setViewportSize({ width: 360, height: 844 });
+      await page.goto(PAGE_URL);
+      await page.waitForSelector('[data-testid="live-console-event"]');
+
+      // Precondition: the widget is on, i.e. the exact state the removed rule
+      // was gated on. Without this the assertion would hold trivially.
+      await expect(page.getByTestId('feedback-widget-root')).toHaveAttribute('data-enabled', 'true');
+
+      const pad = await page.evaluate(() => getComputedStyle(document.querySelector('.lc-more')).paddingRight);
+      expect(pad).toBe('0px');
     });
   });
 });

@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js'
+import { sweepFixedOverlaps, describeHits } from '../fixed-overlay-sweep.js'
 
 // Feedback widget client UX (LIN-635). Seeding rides the provider harness
 // (`seedLocal`); navigation drives off the returned urlKey (parallel-aware
@@ -15,7 +16,7 @@ test.describe('Feedback widget', () => {
     await page.waitForLoadState('networkidle')
 
     // Hidden by default — the floating button is not present until enabled.
-    await expect(page.getByTestId('feedback-fab')).toHaveCount(0)
+    await expect(page.getByTestId('nav-feedback-trigger')).toHaveCount(0)
 
     const toggle = page.getByTestId('footer-feedback-toggle')
     await expect(toggle).toBeVisible()
@@ -26,14 +27,14 @@ test.describe('Feedback widget', () => {
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('footer-feedback-toggle')).toHaveAttribute('data-enabled', 'true')
-    await expect(page.getByTestId('feedback-fab')).toBeVisible()
+    await expect(page.getByTestId('nav-feedback-trigger')).toBeVisible()
   })
 
   test('opens a popup with message, priority, and screenshot fields', async ({ page, seedLocal }) => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
 
-    await page.getByTestId('feedback-fab').click()
+    await page.getByTestId('nav-feedback-trigger').click()
     await expect(page.getByTestId('feedback-popup')).toBeVisible()
     await expect(page.getByTestId('feedback-message')).toBeVisible()
     await expect(page.getByTestId('feedback-priority')).toBeVisible()
@@ -48,7 +49,7 @@ test.describe('Feedback widget', () => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
 
-    await page.getByTestId('feedback-fab').click()
+    await page.getByTestId('nav-feedback-trigger').click()
     await expect(page.getByTestId('feedback-submit')).toBeVisible()
     await expect(page.getByTestId('feedback-submit-triage')).toBeVisible()
     await expect(page.getByTestId('feedback-submit-autopilot')).toBeVisible()
@@ -80,7 +81,7 @@ test.describe('Feedback widget', () => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
 
-    await page.getByTestId('feedback-fab').click()
+    await page.getByTestId('nav-feedback-trigger').click()
     // The shared exec-controls render inside the popup.
     const exec = page.getByTestId('feedback-exec-controls')
     await expect(exec).toBeVisible()
@@ -114,7 +115,7 @@ test.describe('Feedback widget', () => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
 
-    await page.getByTestId('feedback-fab').click()
+    await page.getByTestId('nav-feedback-trigger').click()
     const exec = page.getByTestId('feedback-exec-controls')
 
     let posted = null
@@ -141,7 +142,7 @@ test.describe('Feedback widget', () => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
 
-    await page.getByTestId('feedback-fab').click()
+    await page.getByTestId('nav-feedback-trigger').click()
     await page.getByTestId('feedback-message').fill('Half-written feedback')
     await page.getByTestId('feedback-priority').selectOption('2')
 
@@ -150,13 +151,13 @@ test.describe('Feedback widget', () => {
     await expect(page.getByTestId('feedback-popup')).toBeHidden()
 
     // Reopen — text is still there.
-    await page.getByTestId('feedback-fab').click()
+    await page.getByTestId('nav-feedback-trigger').click()
     await expect(page.getByTestId('feedback-message')).toHaveValue('Half-written feedback')
 
     // Survives a full reload (localStorage draft).
     await page.reload()
     await page.waitForLoadState('networkidle')
-    await page.getByTestId('feedback-fab').click()
+    await page.getByTestId('nav-feedback-trigger').click()
     await expect(page.getByTestId('feedback-message')).toHaveValue('Half-written feedback')
     await expect(page.getByTestId('feedback-priority')).toHaveValue('2')
   })
@@ -168,7 +169,7 @@ test.describe('Feedback widget', () => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
 
-    await page.getByTestId('feedback-fab').click()
+    await page.getByTestId('nav-feedback-trigger').click()
     const remove = page.getByTestId('feedback-file-remove')
     await expect(remove).toBeHidden()
 
@@ -189,7 +190,7 @@ test.describe('Feedback widget', () => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
 
-    await page.getByTestId('feedback-fab').click()
+    await page.getByTestId('nav-feedback-trigger').click()
 
     // Force the client-side FileReader read to fail, mimicking the device-side
     // NotReadableError an Android-Chrome content-provider read can throw — the
@@ -226,7 +227,7 @@ test.describe('Feedback widget', () => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
 
-    await page.getByTestId('feedback-fab').click()
+    await page.getByTestId('nav-feedback-trigger').click()
     await expect(page.getByTestId('feedback-file-chip')).toBeHidden()
 
     await dropFileOnZone(page, { name: 'dropped.png', type: 'image/png', bytes: [1, 2, 3] })
@@ -242,7 +243,7 @@ test.describe('Feedback widget', () => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
 
-    await page.getByTestId('feedback-fab').click()
+    await page.getByTestId('nav-feedback-trigger').click()
 
     // 7MB + 1 byte — one over MAX_IMAGE_BYTES.
     await dropFileOnZone(page, { name: 'huge.png', type: 'image/png', size: 7 * 1024 * 1024 + 1 })
@@ -258,7 +259,7 @@ test.describe('Feedback widget', () => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
 
-    await page.getByTestId('feedback-fab').click()
+    await page.getByTestId('nav-feedback-trigger').click()
     await expect(page.getByTestId('feedback-file-chip')).toBeHidden()
 
     await page.getByTestId('feedback-popup').evaluate((popup) => {
@@ -271,59 +272,116 @@ test.describe('Feedback widget', () => {
     await expect(page.getByTestId('feedback-file-name')).toHaveText('pasted.png')
   })
 
-  // LIN-2299 — the shared footer's `feedback` toggle vs the fixed FAB.
+  // LIN-2298 — the class witness, inherited from LIN-2299/2296 and re-aimed.
   //
-  // The irony this pins: the FAB covered the very control that dismisses it,
-  // at the one scroll position a user is most likely to be at. Because both
-  // are rendered from lib/components/footer.js, ONE sweep here covers the whole
-  // ~30-page footer-bearing surface — which is what closes the remainder of the
-  // LIN-2272 review's instance 3 ("no page other than live-console has any
-  // geometry-sweep coverage for the FAB").
+  // These sweeps were written for a defect that no longer exists: a fixed
+  // `.feedback-fab` floating over the footer's own `feedback` toggle — the very
+  // control that dismisses it — at the one scroll position a user is most
+  // likely to be at. LIN-2299 fixed that with a horizontal reserve and pinned it
+  // here; LIN-2298 then deleted the FAB outright on John's ruling, and with it
+  // the reserve.
   //
-  // A REAL RECT SWEEP at every scroll offset, never a computed-style assertion:
-  // a style-value assertion is precisely what let LIN-2252's no-op pass CI
-  // green, and the ticket calls that out by name. Measured before the fix at
-  // main 54116d21: 19 overlapping offsets at 320px, 18 at 360, 18 at 390, 22 at
-  // 430 — at 360 the toggle's right edge was 344.1 against the FAB's 344.0.
-  test.describe('LIN-2299: the footer feedback toggle never sits under the FAB', () => {
+  // The ruling was explicit that these tests SURVIVE the deletion: "keep their
+  // rect-sweep tests as the class witness (they must still report zero overlaps
+  // with the FAB gone)". So they are kept and pointed at the CLASS rather than
+  // at one element: not "never intersects `.feedback-fab`" (which would now pass
+  // vacuously — you cannot intersect an element that is not rendered) but
+  // "never intersects ANY visible fixed overlay, at any 2px scroll offset".
+  //
+  // That is strictly stronger than what they asserted before, and it is the
+  // version that earns its keep going forward: it goes red if ANYONE
+  // reintroduces a floating element over this content, which is the actual
+  // LIN-2272 class, rather than only if a specific deleted rule regresses.
+  //
+  // Still a REAL RECT SWEEP, never a computed-style assertion — a style-value
+  // assertion is precisely what let LIN-2252's no-op pass CI green. Measured
+  // before LIN-2299 at main 54116d21: 19 overlapping offsets at 320px, 18 at
+  // 360, 18 at 390, 22 at 430; at 360 the toggle's right edge was 344.1 against
+  // the FAB's 344.0.
+  //
+  // Because both the toggle and the widget mount are rendered from
+  // lib/components/footer.js, ONE sweep here covers the whole ~30-page
+  // footer-bearing surface — which is what closed the remainder of the LIN-2272
+  // review's instance 3 ("no page other than live-console has any geometry-sweep
+  // coverage for the FAB").
+  test.describe('LIN-2298: no fixed overlay covers the footer controls, at any scroll offset', () => {
     for (const width of [320, 360, 390, 430]) {
-      test(`no overlap at any scroll offset (${width}px)`, async ({ page, seedLocal }) => {
+      test(`the footer feedback toggle is clear of every fixed overlay (${width}px)`, async ({ page, seedLocal }) => {
         const { urlKey } = await seedLocal()
         await page.setViewportSize({ width, height: 844 })
         await enableWidget(page, urlKey)
 
-        const offending = await page.evaluate(() => {
-          const toggle = document.querySelector('[data-testid="footer-feedback-toggle"]')
-          const fab = document.querySelector('[data-testid="feedback-fab"]')
-          const maxScroll = document.documentElement.scrollHeight - window.innerHeight
-          const hits = []
-          for (let y = 0; y <= Math.max(maxScroll, 0); y += 2) {
-            window.scrollTo(0, y)
-            const a = toggle.getBoundingClientRect()
-            const b = fab.getBoundingClientRect()
-            if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) hits.push(y)
-          }
-          return hits
-        })
-
-        expect(offending, `overlapping at scrollY: ${offending.join(', ')}`).toEqual([])
+        const hits = await sweepFixedOverlaps(page, '[data-testid="footer-feedback-toggle"]')
+        expect(hits, describeHits(hits)).toEqual([])
       })
     }
 
-    // What this adds over the sweeps: they iterate every offset INCLUDING
-    // max scroll, so the non-overlap half here is a strict subset of them. The
-    // part that is NOT redundant is the precondition — that the footer is
+    // `.footer-actions` holds the `reset` link — an interactive control, so an
+    // overlay covering it is the same defect as the covered toggle, not a
+    // cosmetic one. It reached the FAB's band at 23 offsets at 430px before
+    // LIN-2299's reserve.
+    test('the reset-link row is clear of every fixed overlay too', async ({ page, seedLocal }) => {
+      const { urlKey } = await seedLocal()
+      await page.setViewportSize({ width: 430, height: 844 })
+      await enableWidget(page, urlKey)
+      // Only the main dashboard renders `reset`; assert its presence rather
+      // than sweeping vacuously against a control that is not there.
+      await expect(page.locator('.footer-action.reset-view')).toHaveCount(1)
+
+      // The LINK, not the row. `.footer-actions` is a block: its rect spans the
+      // full column and INCLUDES its padding, so it would report the same result
+      // with or without a reserve and prove nothing — the trap that made an
+      // earlier version of the `.footer-deploy` assertion vacuous.
+      const hits = await sweepFixedOverlaps(page, '.footer-action.reset-view')
+      expect(hits, describeHits(hits)).toEqual([])
+    })
+
+    // What this adds over the sweeps: they iterate every offset INCLUDING max
+    // scroll, so a non-overlap assertion here would be a strict subset of them.
+    // The part that is NOT redundant is the PRECONDITION — that the footer is
     // actually on screen at max scroll, so the sweeps cannot have been passing
     // vacuously against a footer that never entered the viewport at all.
-    //
-    // Measured on the TOGGLE, not on `.footer-deploy`. A block's
-    // getBoundingClientRect() returns the BORDER box, which includes the
-    // padding, so the row's right edge does not move when the reserve is
-    // applied — asserting on it would pass either way and prove nothing.
-    // The regressions a fresh-context review caught in the FIRST version of this
-    // fix, which was ungated: it reserved 112px for a FAB that could not exist.
-    // These are the witnesses that would have caught it.
-    test('reserves NOTHING on a page that cannot show a FAB (landing, legal)', async ({ page }) => {
+    test('the footer is genuinely on screen at max scroll, so the sweeps are not vacuous', async ({ page, seedLocal }) => {
+      const { urlKey } = await seedLocal()
+      await page.setViewportSize({ width: 360, height: 844 })
+      await enableWidget(page, urlKey)
+
+      const m = await page.evaluate(() => {
+        window.scrollTo(0, document.documentElement.scrollHeight)
+        const toggle = document.querySelector('[data-testid="footer-feedback-toggle"]').getBoundingClientRect()
+        return { top: toggle.top, bottom: toggle.bottom, viewportH: window.innerHeight }
+      })
+
+      expect(m.top).toBeLessThan(m.viewportH)
+      expect(m.bottom).toBeGreaterThan(0)
+    })
+
+    // The reserve LIN-2299 landed is GONE, and its absence is asserted rather
+    // than assumed. A gated rule left behind after its gate can never match is
+    // dead CSS that still reads as a live constraint; worse, an UNGATED version
+    // of this same rule shipped twice and was measurably wrong both times (it
+    // shoved the centred footer 56px off-centre on landing pages, and took
+    // `.footer-deploy` from 2 lines to 4 on ~30 pages with the flag off). This
+    // is the witness that the reserve is not merely inactive but absent.
+    test('reserves NOTHING now the FAB is gone — with the widget ON', async ({ page, seedLocal }) => {
+      const { urlKey } = await seedLocal()
+      await page.setViewportSize({ width: 360, height: 844 })
+      await enableWidget(page, urlKey)
+
+      // Precondition: the widget really is on, so this is not vacuous.
+      await expect(page.getByTestId('footer-feedback-toggle')).toHaveAttribute('data-enabled', 'true')
+
+      const pads = await page.evaluate(() => ({
+        deploy: getComputedStyle(document.querySelector('.footer-deploy')).paddingRight,
+        actions: document.querySelector('.footer-actions')
+          ? getComputedStyle(document.querySelector('.footer-actions')).paddingRight
+          : '0px'
+      }))
+      expect(pads.deploy).toBe('0px')
+      expect(pads.actions).toBe('0px')
+    })
+
+    test('reserves NOTHING on a page that cannot show the widget at all (landing, legal)', async ({ page }) => {
       await page.goto('/test/clear-session')
       for (const width of [320, 360]) {
         await page.setViewportSize({ width, height: 844 })
@@ -334,91 +392,9 @@ test.describe('Feedback widget', () => {
             const el = document.querySelector('.footer-deploy')
             return el ? getComputedStyle(el).paddingRight : null
           })
-          // feedback-widget.css is not even loaded here (renderFeedbackMount is
-          // gated on !isLanding && urlKey), so an ungated rule with a non-zero
-          // var() FALLBACK would silently reserve — and did.
           if (pad !== null) expect(pad, `${path} @${width}px`).toBe('0px')
         }
       }
-    })
-
-    test('reserves NOTHING while the widget flag is off — the default', async ({ page, seedLocal }) => {
-      const { urlKey } = await seedLocal()
-      await page.setViewportSize({ width: 360, height: 844 })
-      await page.goto(`/workspace/${urlKey}/`)
-      await page.waitForLoadState('networkidle')
-
-      // The flag is a durable per-user preference, so an earlier test in this
-      // file may have left it ON for this worker. Force it off rather than
-      // assume the default.
-      if (await page.getByTestId('footer-feedback-toggle').getAttribute('data-enabled') === 'true') {
-        await page.getByTestId('footer-feedback-toggle').click()
-        await page.waitForLoadState('networkidle')
-      }
-
-      // Precondition: the flag really is off, so this is not vacuous.
-      await expect(page.getByTestId('footer-feedback-toggle')).toHaveAttribute('data-enabled', 'false')
-      await expect(page.getByTestId('feedback-fab')).toHaveCount(0)
-
-      const pad = await page.evaluate(() => getComputedStyle(document.querySelector('.footer-deploy')).paddingRight)
-      expect(pad).toBe('0px')
-    })
-
-    test('reserves ONLY once the widget is actually on', async ({ page, seedLocal }) => {
-      const { urlKey } = await seedLocal()
-      await page.setViewportSize({ width: 360, height: 844 })
-      await enableWidget(page, urlKey)
-      const pad = await page.evaluate(() => getComputedStyle(document.querySelector('.footer-deploy')).paddingRight)
-      expect(pad).not.toBe('0px')
-    })
-
-    // `.footer-actions` holds the `reset` link — an interactive control, so the
-    // FAB covering it is the same defect as the covered toggle, not a cosmetic
-    // one. It reached the band at 23 offsets at 430px before this reserve.
-    test('the reset-link row never sits under the FAB either', async ({ page, seedLocal }) => {
-      const { urlKey } = await seedLocal()
-      await page.setViewportSize({ width: 430, height: 844 })
-      await enableWidget(page, urlKey)
-      // Only the main dashboard renders `reset`; skip rather than assert
-      // vacuously if this route has no such control.
-      await expect(page.locator('.footer-action.reset-view')).toHaveCount(1)
-
-      const offending = await page.evaluate(() => {
-        // The LINK, not the row. `.footer-actions` is a block: its rect spans
-        // the full column and INCLUDES the padding, so it would report an
-        // overlap with or without the reserve and prove nothing — the same trap
-        // that made an earlier version of the `.footer-deploy` assertion vacuous.
-        const row = document.querySelector('.footer-action.reset-view')
-        const fab = document.querySelector('[data-testid="feedback-fab"]')
-        const maxScroll = document.documentElement.scrollHeight - window.innerHeight
-        const hits = []
-        for (let y = 0; y <= Math.max(maxScroll, 0); y += 2) {
-          window.scrollTo(0, y)
-          const a = row.getBoundingClientRect()
-          const b = fab.getBoundingClientRect()
-          if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) hits.push(y)
-        }
-        return hits
-      })
-      expect(offending, `overlapping at scrollY: ${offending.join(', ')}`).toEqual([])
-    })
-
-    test('the footer is genuinely on screen at max scroll, so the sweeps are not vacuous', async ({ page, seedLocal }) => {
-      const { urlKey } = await seedLocal()
-      await page.setViewportSize({ width: 360, height: 844 })
-      await enableWidget(page, urlKey)
-
-      const m = await page.evaluate(() => {
-        window.scrollTo(0, document.documentElement.scrollHeight)
-        const toggle = document.querySelector('[data-testid="footer-feedback-toggle"]').getBoundingClientRect()
-        const fab = document.querySelector('[data-testid="feedback-fab"]').getBoundingClientRect()
-        return { toggleRight: toggle.right, toggleTop: toggle.top, fabLeft: fab.left, viewportH: window.innerHeight }
-      })
-
-      // Guard the guard: if the footer were off screen the comparison below
-      // would be vacuous.
-      expect(m.toggleTop).toBeLessThan(m.viewportH)
-      expect(m.toggleRight).toBeLessThanOrEqual(m.fabLeft)
     })
   })
 })
@@ -447,5 +423,5 @@ async function enableWidget(page, urlKey) {
   await page.waitForLoadState('networkidle')
   await page.getByTestId('footer-feedback-toggle').click()
   await page.waitForLoadState('networkidle')
-  await expect(page.getByTestId('feedback-fab')).toBeVisible()
+  await expect(page.getByTestId('nav-feedback-trigger')).toBeVisible()
 }

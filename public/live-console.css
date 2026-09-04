@@ -532,48 +532,40 @@
   .lc-event { grid-template-columns: auto 1fr; }
   .lc-event-meta { grid-column: 2; }
 
-  /* LIN-2272: LIN-2252's `padding-bottom` here was a no-op — `.lc-more-btn`
-     is in normal flow and `.feedback-fab` (feedback-widget.css) is
-     `position: fixed`, so bottom padding on this ancestor only grows the
-     document/max-scroll and never moves the button relative to the
-     viewport. As the page scrolls, the button's fixed document position
-     sweeps past the FAB's fixed screen position regardless of padding, so
-     no amount of vertical spacing here can clear it for every scroll
-     offset. Reserve HORIZONTAL space instead: the FAB occupies the
-     bottom-right corner (16px inset + 83px wide, ~99px), so keep the
-     centred button's right edge left of that band. This holds at every
-     scroll position, since it never depends on scrollY. */
-  /* LIN-2296: LIN-2272's 7rem (112px) reserve cleared the FAB at every scroll
-     offset — re-measured, still 0 overlaps at 320/360/390/430 — but squeezed
-     the flex item below the pill's natural width at <=360px, wrapping the label
-     to two lines and orphaning the arrow. That is ledger item L2.
+  /* LIN-2298 removed the FAB this reserve existed for, so the reserve is gone.
 
-     Discharged by TUNING rather than by a human accepting the wrap, which is
-     the first option LIN-2296 itself lists.
+     What stood here: `body:has(#feedback-widget-root[data-enabled="true"])
+     .lc-more { padding-right: 4.5rem }`. Its lineage is worth keeping even
+     though the rule is not, because it is the record of a defect class being
+     chased down three times.
 
-     The reserve has a VALID WINDOW at 360px, not a single right answer: too
-     large and the flex item is squeezed under the button's natural width and
-     wraps; too small and the centred button's right edge crosses into the FAB's
-     band. 4.5rem sits mid-window rather than against either edge, so a later
-     label or font change does not immediately re-break the single-line test.
-     7rem sat hard against the wrap edge and 6rem only just clear of it.
+     LIN-2252 wrote `padding-bottom` here and it measured as a NO-OP:
+     `.lc-more-btn` is normal flow and the FAB was `position: fixed`, so bottom
+     padding on an ancestor only grew the document and the max-scroll offset and
+     never moved the button relative to the viewport. LIN-2272 generalised that
+     into the class result and replaced it with a HORIZONTAL reserve, which does
+     hold at every scroll offset because it never depends on scrollY. LIN-2296
+     then tuned 7rem down to 4.5rem: 7rem cleared the FAB but squeezed the
+     centred pill under its natural width at <=360px, wrapping the label to two
+     lines and orphaning the arrow.
 
-     Do NOT reason about this as "the right edge moves by half the reserve you
-     give back" — that identity only holds while the button keeps a fixed width,
-     which is exactly not the regime here: giving reserve back also lets the
-     squeezed button grow, so both terms move at once. Measure, don't derive.
+     All three were correct answers to a problem John's ruling on LIN-2298
+     deleted instead: the trigger moved into nav chrome
+     (`renderFeedbackTrigger`, lib/components/navbar.js) and the fixed button
+     was removed, so there is no band for the centred button to stay clear of.
+     Deleting the rule rather than leaving it gated is deliberate — its
+     `body:has()` gate can never match again, and a rule that cannot fire still
+     reads to the next person as a live constraint on this button's width.
 
-     GATED on a rendered FAB, same as the footer reserve in
-     public/feedback-widget.css. Unconditionally reserving this space cost the
-     button ~96px on every Live Console load with the widget OFF — the default —
-     for a button that is not on screen. LIN-2272 shipped it ungated; that is
-     corrected here rather than carried forward.
+     The 4.5rem is NOT given back as some other spacing value. It was reserve,
+     not design: the pill's natural centred layout is what this container wanted
+     before LIN-2272, and it is what it gets back.
 
-     320px is out of reach either way, and it is the CONTAINER that decides:
-     `.lc-more`'s content box starts at x=28, so a button wide enough to stay
-     single-line cannot also end left of the FAB. The two constraints are
-     disjoint at that width — not a tuning failure. */
-  body:has(#feedback-widget-root[data-enabled="true"]) .lc-more { padding-right: 4.5rem; }
+     The witness stays. tests/e2e/live-console.spec.js still sweeps every 2px
+     scroll offset at this width, re-aimed from "never intersects `.feedback-fab`"
+     to "never intersects ANY fixed overlay" — a strictly stronger assertion, and
+     the one that catches a reintroduction rather than only a regression in a
+     rule that no longer exists. */
 }
 
 @media (prefers-reduced-motion: reduce) {

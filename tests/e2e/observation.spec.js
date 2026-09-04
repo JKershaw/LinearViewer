@@ -1,4 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { featuresParam } from '../helpers.js';
+import { sweepFixedOverlaps, describeHits } from '../fixed-overlay-sweep.js';
 
 // LIN-595: the first-class autopilot Observation page
 // (/workspace/:urlKey/observation), which superseded the experimental autopilot
@@ -649,5 +651,121 @@ test.describe('Sessions tab — in-flight standalone sessions (LIN-1194)', () =>
     // plumbing (it resolves by the session's own dispatch id).
     expect(page.url()).toMatch(sessionPathRe);
     await expect(page.locator('.page-header')).toContainText(/Session|session/);
+  });
+});
+
+// ── LIN-2298: the acceptance witness ────────────────────────────────────────
+//
+// This is the sweep the ticket was refused on. LIN-2298 demanded "measure
+// first", and lane C's measurement is what turned it from a suspected
+// over-reserved padding into a ruled-on defect: with six seeded sessions and a
+// rect sweep every 2px, the last `.obs-session` intersected the fixed
+// `.feedback-fab` at 111 scroll offsets (520–740 at 360px) and the card's own
+// `open ↗` control at 26 (578–628). 111/26 at 320 and 390, 112/27 at 430.
+//
+// Why the Observation feed and not another page: `.obs-session` cards span the
+// reading column BY DESIGN, and LIN-2272's result is that no CSS reserve keeps
+// full-width content out of a fixed overlay's path at every scroll offset. The
+// horizontal reserve that worked for the footer rows (LIN-2299) and the centred
+// Live Console button (LIN-2296) had nowhere to push these cards to. That is
+// what made John rule for relocating the trigger rather than reserving again.
+//
+// The selector correction matters and is recorded here because the ticket's own
+// text got it wrong: it asked for a sweep of "the last `.obs-card`", and
+// `.obs-card` appears NOWHERE in the repo. The real card is `.obs-session` and
+// its control is `.obs-session-open`, inside `.obs-session-side`. A guard
+// written from the ticket's wording would have swept a phantom and passed.
+//
+// Asserted against ANY visible fixed overlay rather than against `.feedback-fab`
+// by name — see tests/fixed-overlay-sweep.js. Naming the deleted element would
+// make this pass vacuously, which is the exact shape of the LIN-2252 no-op the
+// whole ticket family exists to have caught.
+test.describe('LIN-2298: no fixed overlay covers the Observation feed', () => {
+  // Six sessions, matching the count lane C measured with. The count is
+  // load-bearing: the sweep needs a document tall enough to actually scroll,
+  // and the overlap band it is guarding against was measured on a feed this
+  // long. One card would leave `maxScroll` at 0 and the loop would run a single
+  // iteration at rest — passing while testing nothing.
+  async function seedFeed(page, n = 6) {
+    const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+    const { token } = await tokenResp.json();
+    for (let i = 0; i < n; i++) {
+      const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+        data: {
+          prompt: 'do the thing', promptName: 'implementation', kind: 'implementation',
+          issueIdentifier: `LIN-229${i}`, issueTitle: `Sweep session ${i}`, target: 'cli'
+        }
+      });
+      expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
+      const item = (await res.json()).item;
+      // TAKEN but unfinished → the card reconstructs as in-flight and renders
+      // its `open ↗` control, which is the interactive half of the acceptance.
+      const take = await page.request.post(`/api/dispatch/take/${item.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      expect(take.status(), `take failed: ${await take.text()}`).toBe(200);
+    }
+  }
+
+  for (const width of [320, 360, 390, 430]) {
+    test(`the last session card and its open control are clear of every fixed overlay (${width}px)`, async ({ page }) => {
+      // feedbackWidget ON deliberately: this is the configuration that produced
+      // the 111/26 overlaps, so it is the one worth asserting against. With the
+      // flag off the old FAB was not rendered either and the sweep would have
+      // been green for the wrong reason.
+      await page.goto(`/test/set-session?urlKey=${URL_KEY}${featuresParam({ feedbackWidget: true })}`);
+      await clearRuns(page);
+      await seedFeed(page);
+
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto(OBSERVATION_URL);
+      await page.waitForLoadState('networkidle');
+      await page.locator('.obs-tab[data-view="sessions"]').click();
+
+      // Preconditions, so a green sweep cannot mean "nothing was there".
+      await expect(page.getByTestId('feedback-widget-root')).toHaveAttribute('data-enabled', 'true');
+      const cards = page.locator('#obs-active .obs-session');
+      await expect(cards.first()).toBeVisible();
+      const count = await cards.count();
+      expect(count, 'seeded feed rendered').toBeGreaterThan(1);
+
+      // And the document must actually scroll, or every sweep below runs one
+      // iteration at rest and proves nothing.
+      const maxScroll = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+      expect(maxScroll, `page must scroll at ${width}px for the sweep to mean anything`).toBeGreaterThan(0);
+
+      const cardHits = await sweepFixedOverlaps(page, '#obs-active .obs-session:last-of-type');
+      expect(cardHits, `last .obs-session: ${describeHits(cardHits)}`).toEqual([]);
+
+      const openHits = await sweepFixedOverlaps(page, '#obs-active .obs-session:last-of-type .obs-session-open');
+      expect(openHits, `its .obs-session-open: ${describeHits(openHits)}`).toEqual([]);
+    });
+  }
+
+  // The relocation half of the acceptance: "a witness that the trigger is
+  // present and opens the panel from the nav on a mobile viewport." Run at
+  // 360px — the width the overlap was measured at, and the one where the nav
+  // is most likely to have collapsed the trigger out of reach.
+  test('the nav trigger is present and opens the panel on a mobile viewport', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}${featuresParam({ feedbackWidget: true })}`);
+    await page.setViewportSize({ width: 360, height: 844 });
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+
+    const trigger = page.getByTestId('nav-feedback-trigger');
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    // The FAB is gone, not merely restyled — assert its absence so a partial
+    // revert that left both controls on screen would fail here.
+    await expect(page.getByTestId('feedback-fab')).toHaveCount(0);
+
+    await expect(page.getByTestId('feedback-popup')).toBeHidden();
+    await trigger.click();
+    await expect(page.getByTestId('feedback-popup')).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    // And it closes again from the same control — a disclosure, not a one-way door.
+    await trigger.click();
+    await expect(page.getByTestId('feedback-popup')).toBeHidden();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 });
