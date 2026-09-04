@@ -878,6 +878,55 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
     assert.equal(res.jsonBody.unansweredAge.staleCount, 1, 'an unmatchable row contributes no age rather than being aged from an unreliable key');
   });
 
+  test('LIN-2367: two workspaces holding rows with the SAME record id do not cross-match', async () => {
+    // `_id` alone is not unique in this system, so the join keeps `urlKey`.
+    //
+    // `_id` is `scan_<issueId8>_<inputHash12>` and the store partitions by
+    // workspace: every store operation is `{_id, urlKey}`-scoped, and
+    // tests/unit/task-decisions-store.test.js deliberately records the same
+    // (issueId, inputHash) under `ws-a` and `ws-b` — two rows sharing an `_id`
+    // — and asserts both persist. The MangoDB dev backend does not enforce
+    // `_id` uniqueness either (its default `_id` index carries no `unique`).
+    //
+    // An identity-only join would therefore have traded LIN-2367's collision
+    // axis for LIN-2291's, quietly undoing that fix. This pins that it did not:
+    // the fixture is the exact shape the store's own test constructs.
+    const staleMs = Date.now() - 30 * 60 * 60 * 1000; // 30h — stale
+    const freshMs = Date.now() - 60 * 60 * 1000;      // 1h — not stale
+    const sharedId = 'scan_11111111_222222222222';
+    const taskDecisionsStore = {
+      async listResolvedForWorkspaces() { return []; },
+      async listUnansweredForWorkspaces(urlKeys) {
+        assert.deepEqual(urlKeys, ['ws-a', 'ws-b']);
+        return [
+          {
+            id: sharedId, urlKey: 'ws-a', issueId: '11111111-1111-1111-1111-111111111111',
+            issueIdentifier: 'LIN-40', decision: { decision_id: sharedId, question: 'q?' },
+            scannedAt: new Date(staleMs).toISOString(), outcome: null, outcomeAt: null
+          },
+          {
+            id: sharedId, urlKey: 'ws-b', issueId: '11111111-1111-1111-1111-111111111111',
+            issueIdentifier: 'LIN-40', decision: { decision_id: sharedId, question: 'q?' },
+            scannedAt: new Date(freshMs).toISOString(), outcome: null, outcomeAt: null
+          }
+        ];
+      }
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] }, 'ws-b': { live: [], history: [], agentStatus: [] } };
+    const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Bravo' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.unansweredAge.count, 2, 'both rows must reach the KPI');
+    // An id-only join resolves BOTH to ws-a's 30h row (first match) and reports 2.
+    assert.equal(
+      res.jsonBody.unansweredAge.staleCount, 1,
+      'ws-b must keep its own fresh scannedAt — dropping urlKey from the join would re-open LIN-2291'
+    );
+  });
+
   test('windowDays is clamped to [1, 365] and defaults to 30 when absent/invalid', async () => {
     const router = makeKpiRouter({ 'ws-a': { live: [], history: [], agentStatus: [] } });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
