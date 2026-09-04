@@ -270,6 +270,74 @@ test.describe('Feedback widget', () => {
     await expect(page.getByTestId('feedback-file-chip')).toBeVisible()
     await expect(page.getByTestId('feedback-file-name')).toHaveText('pasted.png')
   })
+
+  // LIN-2299 — the shared footer's `feedback` toggle vs the fixed FAB.
+  //
+  // The irony this pins: the FAB covered the very control that dismisses it,
+  // at the one scroll position a user is most likely to be at. Because both
+  // are rendered from lib/components/footer.js, ONE sweep here covers the whole
+  // ~30-page footer-bearing surface — which is what closes the remainder of the
+  // LIN-2272 review's instance 3 ("no page other than live-console has any
+  // geometry-sweep coverage for the FAB").
+  //
+  // A REAL RECT SWEEP at every scroll offset, never a computed-style assertion:
+  // a style-value assertion is precisely what let LIN-2252's no-op pass CI
+  // green, and the ticket calls that out by name. Measured before the fix at
+  // main 54116d21: 19 overlapping offsets at 320px, 18 at 360, 18 at 390, 22 at
+  // 430 — at 360 the toggle's right edge was 344.1 against the FAB's 344.0.
+  test.describe('LIN-2299: the footer feedback toggle never sits under the FAB', () => {
+    for (const width of [320, 360, 390, 430]) {
+      test(`no overlap at any scroll offset (${width}px)`, async ({ page, seedLocal }) => {
+        const { urlKey } = await seedLocal()
+        await page.setViewportSize({ width, height: 844 })
+        await enableWidget(page, urlKey)
+
+        const offending = await page.evaluate(() => {
+          const toggle = document.querySelector('[data-testid="footer-feedback-toggle"]')
+          const fab = document.querySelector('[data-testid="feedback-fab"]')
+          const maxScroll = document.documentElement.scrollHeight - window.innerHeight
+          const hits = []
+          for (let y = 0; y <= Math.max(maxScroll, 0); y += 2) {
+            window.scrollTo(0, y)
+            const a = toggle.getBoundingClientRect()
+            const b = fab.getBoundingClientRect()
+            if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) hits.push(y)
+          }
+          return hits
+        })
+
+        expect(offending, `overlapping at scrollY: ${offending.join(', ')}`).toEqual([])
+      })
+    }
+
+    // The sweeps above would also pass on a page whose footer simply never
+    // reaches the FAB's band — a false negative that would survive the reserve
+    // being deleted. This pins the reserve's own geometric consequence at the
+    // position that actually matters: scrolled fully to the bottom, with the
+    // footer on screen, the toggle ends left of the FAB.
+    //
+    // Measured on the TOGGLE, not on `.footer-deploy`. A block's
+    // getBoundingClientRect() returns the BORDER box, which includes the
+    // padding, so the row's right edge does not move when the reserve is
+    // applied — asserting on it would pass either way and prove nothing.
+    test('at max scroll the toggle itself ends left of the FAB, with the footer on screen', async ({ page, seedLocal }) => {
+      const { urlKey } = await seedLocal()
+      await page.setViewportSize({ width: 360, height: 844 })
+      await enableWidget(page, urlKey)
+
+      const m = await page.evaluate(() => {
+        window.scrollTo(0, document.documentElement.scrollHeight)
+        const toggle = document.querySelector('[data-testid="footer-feedback-toggle"]').getBoundingClientRect()
+        const fab = document.querySelector('[data-testid="feedback-fab"]').getBoundingClientRect()
+        return { toggleRight: toggle.right, toggleTop: toggle.top, fabLeft: fab.left, viewportH: window.innerHeight }
+      })
+
+      // Guard the guard: if the footer were off screen the comparison below
+      // would be vacuous.
+      expect(m.toggleTop).toBeLessThan(m.viewportH)
+      expect(m.toggleRight).toBeLessThanOrEqual(m.fabLeft)
+    })
+  })
 })
 
 // Synthesize a drag-and-drop of a single file onto the drop zone. Builds a real
