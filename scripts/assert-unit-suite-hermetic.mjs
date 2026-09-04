@@ -34,7 +34,7 @@
  * as a hermeticity pass).
  */
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, existsSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -107,7 +107,7 @@ process.on('exit', () => {
 const withProxy = process.argv.includes('--proxy');
 const env = {
   ...process.env,
-  NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import ${watcherPath}`].filter(Boolean).join(' '),
+  NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import ${JSON.stringify(watcherPath)}`].filter(Boolean).join(' '),
 };
 if (withProxy) {
   // Deliberately a dead loopback port. The point is only that the env vars are
@@ -145,21 +145,28 @@ child.on('close', (code) => {
   }
 
   // POSITIVE CONTROL. A zero-length socket log only means "no escapes" if the
-  // watcher was actually present. `node --test` runs a process per file, so a
-  // healthy run installs it many times over; zero installs means the
-  // measurement never happened and the zero is meaningless.
-  if (installs === 0) {
+  // watcher was actually present in the processes that ran the tests.
+  //
+  // The threshold is the FILE COUNT, not zero, and the difference is the whole
+  // point. `node --test` runs a process per file, and the npm parent gets the
+  // watcher too — so a run where `--import` reached the parent but NOT the
+  // children lands on exactly one install. That is the precise regression this
+  // check names, and an `installs === 0` threshold would have printed PASS for
+  // it. (Review caught that: the guard's message described coverage the guard
+  // did not have — the same overclaiming this ticket is about.)
+  const expected = readdirSync(join(ROOT, 'tests', 'unit')).filter((f) => f.endsWith('.test.js')).length;
+  if (installs < expected) {
     console.error(
-      '\n[hermetic] FAIL — the socket watcher never loaded in any child process, so this run measured NOTHING.\n' +
-      'A zero here would be indistinguishable from a clean run. Check that NODE_OPTIONS `--import` still\n' +
-      'propagates to `node --test` children in this Node version.'
+      `\n[hermetic] FAIL — the socket watcher loaded in ${installs} process(es) but there are ${expected} unit test files,\n` +
+      'so some of them ran unmeasured and a zero here would be misleading. Check that NODE_OPTIONS `--import`\n' +
+      'still propagates to `node --test` children in this Node version.'
     );
     cleanup();
     process.exit(1);
   }
 
   if (rows.length === 0) {
-    console.log(`\n[hermetic] PASS — the unit suite opened zero non-loopback sockets (watcher installed in ${installs} processes).`);
+    console.log(`\n[hermetic] PASS — the unit suite opened zero non-loopback sockets (watcher installed in ${installs} processes, ${expected} test files).`);
     cleanup();
     process.exit(0);
   }
