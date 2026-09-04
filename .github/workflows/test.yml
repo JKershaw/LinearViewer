@@ -38,8 +38,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run unit tests
-        run: npm run test:unit
+      # LIN-1880: runs the SAME unit suite, once, under a socket-level watcher,
+      # and additionally fails if any test opens a non-loopback socket. Costs no
+      # extra CI time than `npm run test:unit` did — it wraps that command
+      # rather than adding a second run. The property is worthless unenforced:
+      # the unit suite reached api.linear.app on every run for months while two
+      # other instruments reported clean.
+      - name: Run unit tests (hermetic — no live network)
+        run: npm run test:hermetic
+        env:
+          CI: true
+          MONGODB_TEST_URI: mongodb://localhost:27017
+
+      # The acceptance criteria name BOTH arms: the escape count must be zero
+      # with proxy env set as well as unset, because native fetch ignores
+      # HTTPS_PROXY entirely and a proxy-based counter cannot see it. Cheap
+      # (~35s) and it is the arm that would otherwise never be run.
+      - name: Run unit tests (hermetic, proxy env set)
+        run: npm run test:hermetic:proxy
         env:
           CI: true
           MONGODB_TEST_URI: mongodb://localhost:27017
