@@ -163,6 +163,14 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
     isAuthError: () => false,
     handleUnauthorizedError: async () => {},
     renderUpstreamAwareErrorPage: () => '<error/>',
+    // LIN-2521: the route now resolves its team filter via the shared
+    // resolveTeamSelection(req, workspace) helper (a separate top-level
+    // function, not part of this handler's own sliced source) rather than
+    // the inline persist/restore logic this test previously didn't need to
+    // stub. `req.query` is `{}` in every case here, so the real helper would
+    // take its "no explicit ?team=" restore branch and return `{ teamId: null }`
+    // for a bare userPreferencesStore.getSelectedTeam() miss — matching that.
+    resolveTeamSelection: async () => ({ teamId: null }),
     console: { log() {}, error() {} }
   });
 
