@@ -103,7 +103,17 @@ const REGION_STAGE = Object.fromEntries(REGIONS.map(r => [r[0], r[4]]));
 const ORDER = REGIONS.map(r => r[0]);
 const regionOf = i => (REGIONS.find(r => i >= r[1] && i <= r[2]) || [])[0];
 
-const METHODS = new Set(['get', 'post', 'patch', 'put', 'delete', 'all', 'use', 'options', 'head']);
+// LIN-2533 (Stage 1): 'use' deliberately excluded. Once a group moves to a
+// router.use() sub-router, the mount call sits where its handlers used to —
+// but a mount is not itself an endpoint. Counting it 1:1 would make the total
+// partially self-cancelling as each stage lands (net -1 per group instead of
+// the true -N), silently weakening the exact drift this script exists to
+// catch: a real endpoint dropped inside a badly-wired sub-router would still
+// show a "plausible" total. Excluding 'use' keeps this count strictly
+// "endpoints directly registered in routes/proxy.js" — the same convention
+// tests/unit/proxy-endpoint-inventory-witness.test.js's registration-count
+// guard already uses, so the two detectors cannot drift apart from each other.
+const METHODS = new Set(['get', 'post', 'patch', 'put', 'delete', 'all', 'options', 'head']);
 const routes = [];
 traverse(ast, {
   CallExpression(p) {
@@ -118,11 +128,30 @@ traverse(ast, {
 routes.sort((a, b) => a.start - b.start);
 routes.forEach((r, i) => { r.idx = i; r.region = regionOf(i); });
 
-if (routes.length !== 55) {
-  console.error(`ENDPOINT DRIFT: found ${routes.length} route registrations, expected 55.`);
+// LIN-2533 (Stage 1): re-derived at HEAD after group G (2 routes) moved to
+// routes/proxy-agent-status.js — 55 - 2 = 53. Hand-lower this in the same PR
+// as each future stage's group leaves, same discipline as the witness's own
+// registration-count guard (tests/unit/proxy-endpoint-inventory-witness.test.js).
+const EXPECTED_ROUTES_IN_FILE = 53;
+if (routes.length !== EXPECTED_ROUTES_IN_FILE) {
+  console.error(`ENDPOINT DRIFT: found ${routes.length} route registrations, expected ${EXPECTED_ROUTES_IN_FILE}.`);
   console.error('The region ranges above are index-based; re-derive them before trusting either table.');
   process.exit(1);
 }
+
+// KNOWN LIMITATION (single-file scope, flagged at LIN-2533 rather than fixed —
+// fixing it means making REGIONS aware of routes that already left this file,
+// which is a rewrite, not a one-line change): REGIONS below is still shaped
+// for the PRE-stage-1 55-route file. Group G's departure shifts every route
+// index from its old position (44) onward down by 2, so the H and I ranges
+// below now point at the WRONG routes (H's [46,49] actually indexes into what
+// is now I's own first two routes, etc.) — Table A/B's region/destination/
+// stage columns for anything at or after G's old position are misattributed
+// this stage, on top of being advisory/rejected-shape already. This does NOT
+// affect Table B's load-bearing pin INVENTORY (file/line/pattern/match-count),
+// which is computed independently of REGIONS — only its advisory `breaks`/
+// `destinations` columns are affected. Re-derive REGIONS by hand each stage,
+// or file a follow-up to make this cross-file-aware.
 
 // ------------------------------------------------------- symbols + refs ------
 let programPath = null, cprPath = null;

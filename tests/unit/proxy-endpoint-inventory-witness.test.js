@@ -541,14 +541,17 @@ const ROWS = [
 // ---------------------------------------------------------------------------
 
 describe('LIN-679 PR-0: proxy.js registration count', () => {
-  test('routes/proxy.js has exactly 55 router.* registrations (65 URL forms)', () => {
+  // LIN-2533 (Stage 1): group G's 2 router.* registrations moved to
+  // routes/proxy-agent-status.js, mounted via router.use() (invisible to this
+  // regex, which only matches get/post/put/patch/delete) — 55 - 2 = 53.
+  test('routes/proxy.js has exactly 53 router.* registrations (65 URL forms across the whole proxy surface)', () => {
     const src = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
     const matches = src.match(/^\s{2}router\.(get|post|put|patch|delete)\(/gm) || [];
-    assert.equal(matches.length, 55,
-      `expected 55 route registrations in routes/proxy.js, found ${matches.length} — ` +
+    assert.equal(matches.length, 53,
+      `expected 53 route registrations in routes/proxy.js, found ${matches.length} — ` +
       `this file's 65-row ROWS table must be re-derived from source before trusting it`);
     assert.equal(ROWS.length, 65,
-      `this file's ROWS table must cover exactly 65 URL forms (55 registrations + 10 array-path aliases), found ${ROWS.length}`);
+      `this file's ROWS table must cover exactly 65 URL forms (53 registrations in routes/proxy.js + 2 in routes/proxy-agent-status.js + 10 array-path aliases), found ${ROWS.length}`);
   });
 });
 
