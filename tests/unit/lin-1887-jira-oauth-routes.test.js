@@ -320,7 +320,11 @@ describe('LIN-1887 Step 4 — POST /auth/jira/oauth/link (the pick)', () => {
 // Jira clears at FLOW COMPLETION, not at the callback. With one reachable site
 // the callback IS the completion (it links and redirects), so the nonce is gone
 // when it returns and LIN-2499's acceptance holds. With SEVERAL sites the
-// callback renders a site picker and the nonce stays live until the POST pick.
+// callback renders a site picker and the nonce stays live until the POST pick —
+// and if the human ABANDONS the pick it is never consumed at all, so the window
+// is the life of the session, not the gap between two requests. Same unbounded-
+// residue shape routes/jira-auth.js:172-176 already documents for the carried
+// refresh token on this exact path.
 //
 // That second case is a REAL GAP, recorded here rather than pinned as correct.
 // It is not the beginInstall situation in lib/github-install-flow.js: that hop

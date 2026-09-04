@@ -538,8 +538,9 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' } });
-    // A non-wiping regenerate: still async, still invokes its callback, but
-    // preserves every field. Nothing but the route's own delete can clear them.
+    // A non-wiping regenerate: still invokes its callback (as the base helper
+    // does — both are synchronous), but preserves every field. Nothing but the
+    // route's own delete can then clear them.
     session.regenerate = (cb) => { cb(); };
 
     await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
