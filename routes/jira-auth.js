@@ -15,9 +15,24 @@
  *                             /rest/api/3/myself), then linkProvider it onto
  *                             that same workspace.
  *
- * The Phase 1 BASIC routes above remain ADD-SOURCE ONLY, and deliberately so:
- * an API token authenticates a workspace binding, not a human, so it cannot
- * establish a login. Because they have no OAuth redirect round-trip, the target
+ * The BASIC routes above are ADD-SOURCE ONLY, and the reason is a FLOW
+ * decision, not a property of API tokens.
+ *
+ * This comment used to say "an API token authenticates a workspace binding,
+ * not a human, so it cannot establish a login". That is false, and refuted by
+ * this very file, in `POST /auth/jira/link` below, which validates via
+ * `GET /rest/api/3/myself` and then calls `establishAccount(..., 'jira',
+ * myself.accountId, ...)` — the SAME durable-identity function the OAuth path
+ * uses — under a comment reading "keyed on the human's Jira accountId". The
+ * Basic lane authenticates a human and Harbour treats Jira-by-token as an
+ * identity provider.
+ *
+ * The actual reason: this lane has no `mode: 'new'` bootstrap. `GET
+ * /auth/jira` 400s unless `?workspace=` names a workspace already in the
+ * session, so the form is unreachable except from an existing workspace. The
+ * OAuth lane grew that bootstrap in LIN-1890; this one did not.
+ *
+ * Because these routes have no OAuth redirect round-trip, the target
  * workspace's urlKey rides as a plain form field (GET → hidden POST field)
  * rather than session-carried `mode`/`workspaceUrlKey` intent.
  *
@@ -180,8 +195,16 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
   /**
    * Step 1: render the link form for the workspace the user is adding Jira
    * onto. `?workspace=<urlKey>` mirrors every other add-source entry point's
-   * `workspace` query param (routes/github-auth.js), even though Jira never
-   * carries a `mode` — it has no "new" (fresh top-level) path this phase.
+   * `workspace` query param (routes/github-auth.js).
+   *
+   * THESE BASIC ROUTES carry no `mode`, and that is the whole reason the
+   * workspace has to ride in the query string. Scoped deliberately: an earlier
+   * version of this line said "Jira never carries a `mode` — it has no 'new'
+   * (fresh top-level) path this phase", and both halves are false at HEAD. The
+   * OAuth lane below carries `mode` throughout and HAS a `mode: 'new'`
+   * bootstrap (see "LIN-1890 E2 — the `mode: 'new'` bootstrap" further down
+   * this file). "this phase" is the same stale framing LIN-2302 stripped from
+   * the sibling surfaces.
    */
   router.get('/auth/jira', (req, res) => {
     const workspaceUrlKey = req.query.workspace
@@ -569,7 +592,8 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
    * LIN-1890 E2 — the `mode: 'new'` bootstrap: a Jira-only human, holding zero
    * Linear and zero GitHub bindings, lands in a working workspace.
    *
-   * Mirrors `routes/github-auth.js:413-500` step for step, because the sequence
+   * Mirrors the GitHub bootstrap step for step (the shared orchestration now
+   * lives in `lib/github-install-flow.js` since LIN-2397), because the sequence
    * is not arbitrary — each step depends on the one before it:
    *
    *   find-or-create `jira:${accountId}` → regenerate → restore workspaces →
