@@ -191,12 +191,27 @@ describe('public/llms.txt prompt catalog stays in sync with PROMPT_TEMPLATES', (
 // seventh instance of this class.
 //
 // SCOPE BOUNDARY: this is a narrow count guard, NOT the structural remedy for
-// claim-drift generally — that is LIN-2261's retrospective-audit template. Only
-// undated CURRENT-STATE docs are covered. The other "N templates" hits in-tree
-// (docs/prompt-audit-report.md, docs/meta-prompt-audit-report.md,
-// docs/lin-260-*) are dated point-in-time audit reports and are deliberately
-// left alone — freezing a historical record is not drift.
-// =============================================================================
+// claim-drift generally — that is LIN-2261's retrospective-audit template.
+//
+// What is deliberately NOT covered, and why (an earlier draft of this comment
+// claimed the exclusions were all "dated audit reports"; review showed that was
+// itself a false enumeration — on the very surface meant to stop false
+// enumerations — so it is spelled out properly here):
+//
+//   - docs/prompt-audit-report.md, docs/meta-prompt-audit-report.md — genuinely
+//     dated point-in-time records (Date: 2026-01-21 / 2026-01-28). Freezing a
+//     historical report is not drift.
+//   - docs/lin-260-prompt-scaling-research.md — a Status-marked RESEARCH doc,
+//     not a dated audit report. Same reasoning (a point-in-time artifact), but
+//     it is not the same kind of document, and saying so was wrong.
+//   - content/landing.md:18 ("14 deterministic templates") — undated, current
+//     state, and PUBLIC (parsed at boot by server.js and served
+//     unauthenticated), so it is squarely this class and NOT excluded on
+//     principle. It is excluded because it is already owned by LIN-2392, and
+//     absorbing another ticket's instance is the scope creep LIN-313 forbids.
+//     That file carries adjacent provider drift too (line 13 lists the backends
+//     and omits Jira and github-projects), which is the same ticket's business.
+// ==============================================================================
 
 describe('current-state docs keep the prompt-template count in sync with PROMPT_TEMPLATES', () => {
   const templateCount = Object.keys(PROMPT_TEMPLATES).length;
