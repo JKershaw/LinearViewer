@@ -995,6 +995,169 @@ describe('mutation-check directive — pin the review institutionalization (LIN-
   });
 });
 
+
+// =============================================================================
+// LIN-1873 — the cited-sweep rule, pinned on BOTH prompt paths
+// =============================================================================
+//
+// Evidence base is LIN-1871, which applied this by hand to the four tickets
+// parked at plan-review with 4+ agent sessions each and ZERO commits between
+// them. In every case the convergent query was cheap (one `rg`, or a ~40-line
+// script) and reproduced the reviewer's blocking finding mechanically — and on
+// LIN-1717 the reviewer had already written the query down; the plan simply
+// never cited it.
+//
+// The rule has two halves and BOTH are pinned, because the second is what
+// stops the first becoming a box to tick: a plan may declare a class
+// un-sweepable, and a reviewer must check the REASON rather than the absence.
+// Without that, the rule would push plans toward inventing an authoritative-
+// looking query for a class that has none — which ends the conversation with
+// the wrong answer instead of not ending it.
+
+describe('cited-sweep rule — plan template (LIN-1873)', () => {
+  const planIssue = {
+    id: 'issue-sweep-plan', identifier: 'TEST-SW1', title: 'Cover every call site',
+    description: 'Handle the whole class', url: 'https://linear.app/test/issue/TEST-SW1',
+    state: { name: 'Todo', type: 'unstarted' }, createdAt: '2026-01-01T00:00:00.000Z',
+    labels: []
+  };
+  const ctx = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+
+  test('requires a reproducible query whose output IS the enumeration', () => {
+    const result = generatePrompt('plan', planIssue, ctx);
+    assert.ok(/Cite the sweep, not the conclusion/.test(result.prompt),
+      'plan prompt must carry the cited-sweep directive');
+    assert.ok(/reproducible query whose output IS that enumeration/i.test(result.prompt),
+      'must pin the substantive clause — the query IS the enumeration, not a supporting note');
+  });
+
+  test('requires the output and the sha it was run at, not just the query', () => {
+    const result = generatePrompt('plan', planIssue, ctx);
+    assert.ok(/Paste the output and record the commit sha it was run at/i.test(result.prompt),
+      'a query with no output and no sha is not reproducible by the reviewer');
+  });
+
+  test('names the two un-sweepable shapes and makes declaring one a first-class answer', () => {
+    const result = generatePrompt('plan', planIssue, ctx);
+    assert.ok(/no sweep, and saying so is a first-class answer/i.test(result.prompt),
+      'declaring a class un-sweepable must not read as an omission');
+    // NOT `|| /destinations of new or moved code/`. The emphasis marker is part
+    // of the clause; the loose alternative passes with it stripped, and the meta
+    // counterpart was already tightened to the exact form. Review found the same
+    // item fixed on one path and not the other -- the drift the both-paths rule
+    // exists to prevent, inside this ticket's own tests.
+    assert.ok(/destinations\* of new or moved code/i.test(result.prompt),
+      'must name the moved-code-destinations shape (LIN-1717)');
+    assert.ok(/production data rather than source/i.test(result.prompt),
+      'must name the population-is-data shape (LIN-1731)');
+  });
+
+  test('bounds the un-sweepable escape hatch with a checkable criterion', () => {
+    // The escape hatch is the rule's ONLY opt-out, so it is the one clause a
+    // future edit can quietly widen back into "this class is awkward, therefore
+    // I am exempt" -- which would hollow out the whole directive while leaving
+    // every other assertion green. It shipped unpinned: review deleted the
+    // criterion from BOTH paths and the suites stayed at 324/0 and 177/0.
+    const result = generatePrompt('plan', planIssue, ctx);
+    assert.ok(/not in the current source tree/i.test(result.prompt),
+      'the test for a third un-sweepable shape must be stated, not left to judgement');
+    assert.ok(/merely awkward to grep/i.test(result.prompt),
+      'a hard-to-grep class must be excluded from the hatch by name');
+    assert.ok(/harder query, not an absent one/i.test(result.prompt),
+      'must say WHY it is excluded, or the exclusion reads as arbitrary');
+  });
+
+  test('names where the sweep, its output and its sha are recorded', () => {
+    // A cited sweep the reviewer cannot find is a hand-list with extra steps,
+    // and check (1) of plan-review is written to go looking for it.
+    const result = generatePrompt('plan', planIssue, ctx);
+    assert.ok(/Record all three in the issue description/i.test(result.prompt),
+      'the query, its output and its sha need a stated destination');
+    assert.ok(/where plan-review will look for them/i.test(result.prompt),
+      'the destination must be tied to the reader who consumes it');
+  });
+
+  test('warns against manufacturing a query to fill the slot', () => {
+    const result = generatePrompt('plan', planIssue, ctx);
+    assert.ok(/Do not manufacture a query to fill the slot/i.test(result.prompt),
+      'the anti-incentive is the half that keeps the rule honest');
+    assert.ok(/looks authoritative and is quietly incomplete/i.test(result.prompt),
+      'must name WHY a fabricated sweep is worse than none');
+    assert.ok(/rather than trimming the query until it agrees/i.test(result.prompt),
+      'a disagreeing sweep is a result to report, not a query to tune');
+  });
+
+  test('sits inside the completeness check, before the per-surface notes', () => {
+    const result = generatePrompt('plan', planIssue, ctx);
+    const completeness = result.prompt.indexOf('**Completeness check.**');
+    const sweep = result.prompt.indexOf('Cite the sweep, not the conclusion');
+    const perSurface = result.prompt.indexOf('For each surface, note:');
+    assert.ok(completeness > -1 && sweep > -1 && perSurface > -1, 'all three anchors present');
+    assert.ok(completeness < sweep, 'the sweep directive extends the completeness check');
+    assert.ok(sweep < perSurface, 'and stays ahead of the per-surface notes');
+  });
+});
+
+describe('cited-sweep rule — plan-review template (LIN-1873)', () => {
+  const reviewIssue = {
+    id: 'issue-sweep-rev', identifier: 'TEST-SW2', title: 'Verify the plan',
+    description: 'Plan is documented', url: 'https://linear.app/test/issue/TEST-SW2',
+    state: { name: 'Todo', type: 'unstarted' }, createdAt: '2026-01-01T00:00:00.000Z',
+    labels: []
+  };
+  const ctx = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+
+  test('re-runs the plan\'s own sweep before searching independently', () => {
+    const result = generatePrompt('plan-review', reviewIssue, ctx);
+    // One alternative only. An earlier version wrote `/…plan\\'s own…|…plan.s own…/`,
+    // where `\\` is a literal backslash in a regex literal — so the first
+    // alternative could never match and only the second was carrying the test.
+    assert.ok(/re-run the plan.s own sweep first/i.test(result.prompt),
+      'the cheap mechanical check must come first');
+    assert.ok(/run THAT query, at the sha it names/i.test(result.prompt),
+      'must pin re-running the cited query at its own sha, not an equivalent search');
+    // Review found check (1) announcing "the cheap, mechanical half" without
+    // ever naming the other half, so the reword below states both. This
+    // assertion caught that reword, which is the pin doing its job.
+    assert.ok(/expensive half is the fallback/i.test(result.prompt),
+      'both halves must be named, not one plus an unlabelled else-branch');
+    assert.ok(/reached only where the plan cites no sweep/i.test(result.prompt),
+      'the independent search is the fallback, not the primary');
+  });
+
+  test('directs disagreement at the sweep, because that is what converges', () => {
+    const result = generatePrompt('plan-review', reviewIssue, ctx);
+    assert.ok(/argue about the SWEEP/i.test(result.prompt),
+      'must redirect a disputed enumeration to the query');
+    assert.ok(/Propose the query you would run instead and show its output/i.test(result.prompt),
+      'proposing a counter-query is the concrete action');
+    // One alternative only. The old second branch `one at a time do not` was a
+    // SUBSTRING of the first, so the first could never be the deciding branch
+    // and the effective assertion was silently the weaker one -- the same dead
+    // -alternation defect review found two lines up, left behind by its fix.
+    assert.ok(/discovering members one at a time do not/i.test(result.prompt),
+      'must say why: member-by-member discovery does not converge');
+  });
+
+  test('an un-sweepable class is checked on its REASON, not treated as incomplete', () => {
+    const result = generatePrompt('plan-review', reviewIssue, ctx);
+    assert.ok(/declares a class un-sweepable is not thereby incomplete/i.test(result.prompt),
+      'the reviewer must not demand a sweep that cannot exist');
+    assert.ok(/Check the REASON, not the absence/i.test(result.prompt),
+      'pins what the reviewer actually checks');
+    assert.ok(/demand a sweep only where you can name the query/i.test(result.prompt),
+      'a demand for a sweep must come with the query that would produce it');
+  });
+
+  test('stays check (1) — the completeness slot, ahead of Strategy Framing', () => {
+    const result = generatePrompt('plan-review', reviewIssue, ctx);
+    const one = result.prompt.indexOf('1. **Completeness check');
+    const two = result.prompt.indexOf('2. **Strategy Framing');
+    assert.ok(one > -1 && two > -1, 'both numbered checks present');
+    assert.ok(one < two, 'the sweep re-run belongs to check (1), not a new check');
+  });
+});
+
 // =============================================================================
 // look-into Template Tests
 // =============================================================================

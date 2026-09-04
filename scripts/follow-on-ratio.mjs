@@ -2,6 +2,14 @@
 /**
  * scripts/follow-on-ratio.mjs  (LIN-1654 — LIN-1601 Phase 0 / LIN-1600 S6)
  *
+ * CHANGE LOG: prompt-template changes that could move this ratio are recorded
+ * in `scripts/prompt-template-change-log.md`, one append-only row each (John's
+ * 2026-08-04 ruling; definitional home LIN-1662). Read it before interpreting a
+ * number from this script — the series is interrupted, and the log is what lets
+ * you segment it instead of assuming it is clean. Append a row when you change
+ * a prompt template; a log that silently stops being maintained presents a
+ * contaminated window as clean, with the authority of a record.
+ *
  * The network read behind the follow-on task ratio: the "before" baseline
  * LIN-1600's falsifiable close is judged against one cycle after the
  * `plan-review` gate lands. All analysis lives in `lib/follow-on-ratio.js`
