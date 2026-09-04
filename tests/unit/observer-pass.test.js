@@ -62,6 +62,51 @@ describe('observer-pass: assessQuietPath', () => {
     assert.deepStrictEqual(assessQuietPath({ censusDoc, lastCensusStateHash: null }), { quiet: true, reason: 'empty-fleet' });
   });
 
+  test('LIN-2408: unchanged census but the prior report DEGRADED -> not quiet, so the pass retries', () => {
+    // The `unchanged` gate exists to avoid re-spending a call to restate a
+    // conclusion already reached. When the last tick degraded, no conclusion
+    // was reached — there is nothing to restate, and carrying it forward
+    // (LIN-2405) republishes "could not reach a model" every tick until the
+    // census happens to change, which on an idle fleet means indefinitely.
+    const censusDoc = { stateHash: 'h1', state: { lanes: { working: 1 } } };
+    assert.deepStrictEqual(
+      assessQuietPath({ censusDoc, lastCensusStateHash: 'h1', priorDegraded: true }),
+      { quiet: false, reason: null }
+    );
+  });
+
+  test('LIN-2408: the retry is scoped to degradation — an unchanged census with a HEALTHY prior stays quiet', () => {
+    // The other half. Without this, the fix would simply delete the quiet path
+    // and the pass would spend an LLM call every 15 minutes on a fleet that
+    // has not moved, which is the cost the gate exists to avoid.
+    const censusDoc = { stateHash: 'h1', state: { lanes: { working: 1 } } };
+    assert.deepStrictEqual(
+      assessQuietPath({ censusDoc, lastCensusStateHash: 'h1', priorDegraded: false }),
+      { quiet: true, reason: 'unchanged' }
+    );
+    // Omitted entirely (the pre-LIN-2408 call shape) must behave as healthy.
+    assert.deepStrictEqual(
+      assessQuietPath({ censusDoc, lastCensusStateHash: 'h1' }),
+      { quiet: true, reason: 'unchanged' }
+    );
+  });
+
+  test('LIN-2408: a degraded prior does not override the earlier quiet reasons', () => {
+    // `no-census` and `empty-fleet` are honest quiet states that cost nothing
+    // and have nothing to retry — a degraded prior must not turn them into
+    // LLM calls. Ordering inside assessQuietPath is what guarantees this, so
+    // it is pinned rather than assumed.
+    assert.deepStrictEqual(
+      assessQuietPath({ censusDoc: null, lastCensusStateHash: 'h1', priorDegraded: true }),
+      { quiet: true, reason: 'no-census' }
+    );
+    const emptyDoc = { stateHash: 'h1', state: { lanes: { working: 0, silent: 0 } } };
+    assert.deepStrictEqual(
+      assessQuietPath({ censusDoc: emptyDoc, lastCensusStateHash: 'h1', priorDegraded: true }),
+      { quiet: true, reason: 'empty-fleet' }
+    );
+  });
+
   test('census unchanged since the last pass (same stateHash) -> quiet, reason unchanged', () => {
     const censusDoc = { state: { lanes: nonEmptyLanes }, stateHash: 'h1' };
     assert.deepStrictEqual(assessQuietPath({ censusDoc, lastCensusStateHash: 'h1' }), { quiet: true, reason: 'unchanged' });
@@ -251,6 +296,156 @@ describe('observer-pass: runObserverPass', () => {
     assert.deepStrictEqual(doc.state.report.flags, ['blocked-cluster']);
     assert.strictEqual(doc.state.report.censusRev, 1);
     assert.ok(doc.state.report.censusGroundedAt, 'the census own updatedAt is carried through as the grounding stamp');
+  });
+
+  test('LIN-2408: a degraded tick is retried on the next tick even with an UNCHANGED census, and the retry does not become permanent', async () => {
+    // This is the ticket's own measured scenario, end to end.
+    //
+    // Before the fix: tick 1 with no API key writes
+    // `degraded: {reason: 'llm-unavailable'}`; tick 2 WITH a working key and an
+    // unchanged census calls the LLM ZERO times and republishes "could not
+    // reach a model" verbatim, forever, until the census happens to change.
+    // On a mostly-idle fleet — the state the report exists to describe — the
+    // census is stable and that is the steady state a reader meets.
+    const observerStateStore = freshStore();
+    const urlKey = `ws-degraded-retry-${randomUUID()}`;
+    await observerStateStore.ensureSeeded(`sweep:v1:${urlKey}`, nonEmptyCensus);
+
+    let callCount = 0;
+    const fakeStreamChatWithTools = async (messages, options, onEvent) => {
+      callCount += 1;
+      onEvent('token', { token: JSON.stringify({ narrative: 'Two loops working, one blocked.', flags: [] }) });
+      onEvent('done', { finishReason: 'stop' });
+    };
+    const base = { observerStateStore, workspacePreferencesStore: fakeWorkspacePreferencesStore() };
+
+    // Tick 1 — no key resolvable. Degrades honestly, spends nothing.
+    const first = await runObserverPass(urlKey, {
+      ...base,
+      streamChatWithTools: fakeStreamChatWithTools,
+      getPaidEnvKey: () => null,
+      now: Date.now()
+    });
+    assert.strictEqual(first.quiet, false, 'a fresh census is not a quiet tick');
+    assert.strictEqual(callCount, 0, 'no key resolved — the model must not be reached');
+    const afterFirst = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKey}`);
+    assert.deepStrictEqual(afterFirst.state.report.degraded, { reason: 'llm-unavailable' });
+    assert.match(afterFirst.state.report.narrative, /could not reach a model/);
+
+    // Tick 2 — key now resolves, census UNCHANGED. This is the whole ticket.
+    const second = await runObserverPass(urlKey, {
+      ...base,
+      streamChatWithTools: fakeStreamChatWithTools,
+      getPaidEnvKey: () => 'fake-key',
+      now: Date.now() + 1000
+    });
+    assert.strictEqual(second.quiet, false, 'a degraded prior report must not be treated as a settled state');
+    assert.strictEqual(callCount, 1, 'the pass must actually retry the model, not carry the degraded narrative forward');
+    const afterSecond = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKey}`);
+    assert.strictEqual(afterSecond.state.report.degraded, null, 'the retry succeeded, so the report is no longer degraded');
+    assert.strictEqual(afterSecond.state.report.narrative, 'Two loops working, one blocked.');
+    assert.doesNotMatch(afterSecond.state.report.narrative, /could not reach a model/, 'the stale degraded narrative must be gone');
+    // The census's own numbers still win over anything the model says.
+    assert.deepStrictEqual(afterSecond.state.report.lanes, nonEmptyCensus.lanes);
+
+    // Tick 3 — still unchanged, but the prior report is now HEALTHY, so the
+    // quiet gate must re-engage. Without this the fix would have converted a
+    // one-off recovery into a permanent 15-minute LLM spend on an idle fleet,
+    // trading the ticket's defect for the cost the gate exists to prevent.
+    const third = await runObserverPass(urlKey, {
+      ...base,
+      streamChatWithTools: fakeStreamChatWithTools,
+      getPaidEnvKey: () => 'fake-key',
+      now: Date.now() + 2000
+    });
+    assert.strictEqual(third.quiet, true, 'a healthy prior + unchanged census is quiet again');
+    assert.strictEqual(callCount, 1, 'the retry is scoped to degradation — it must not spend on every subsequent tick');
+    const afterThird = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKey}`);
+    assert.strictEqual(afterThird.rev, afterSecond.rev, 'the recovered report is carried forward as a true no-op');
+  });
+
+  test('LIN-2408: the recovery tick does NOT feed the degraded fallback back to the model as a prior observation', async () => {
+    // `buildPassMessages` injects the prior summary as "Your own prior
+    // observation: …" for continuity. After a degraded tick that string is the
+    // fallback narrating its own failure — "could not reach a model" — which
+    // is not an observation. This fix makes the recovery tick the COMMON way
+    // out of a degraded state, so it would have become the common case too.
+    //
+    // Asserted on the actual prompt sent to the seam, because review pointed
+    // out the other integration tests ignore `messages` entirely and would
+    // never catch this.
+    const observerStateStore = freshStore();
+    const urlKey = `ws-no-degraded-priming-${randomUUID()}`;
+    await observerStateStore.ensureSeeded(`sweep:v1:${urlKey}`, nonEmptyCensus);
+
+    const sent = [];
+    const fake = async (messages, options, onEvent) => {
+      sent.push(messages);
+      onEvent('token', { token: JSON.stringify({ narrative: 'Recovered view of the fleet.', flags: [] }) });
+      onEvent('done', { finishReason: 'stop' });
+    };
+    const base = { observerStateStore, workspacePreferencesStore: fakeWorkspacePreferencesStore() };
+
+    // Tick 1 degrades (no key), writing the fallback narrative as the summary.
+    await runObserverPass(urlKey, { ...base, streamChatWithTools: fake, getPaidEnvKey: () => null, now: Date.now() });
+    const afterFirst = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKey}`);
+    assert.match(afterFirst.state.summary, /could not reach a model/, 'precondition: the degraded summary is what would be replayed');
+    assert.strictEqual(sent.length, 0);
+
+    // Tick 2 retries. The prompt must carry NO prior observation at all.
+    await runObserverPass(urlKey, { ...base, streamChatWithTools: fake, getPaidEnvKey: () => 'fake-key', now: Date.now() + 1000 });
+    assert.strictEqual(sent.length, 1, 'the retry must actually reach the model');
+    const prompt = JSON.stringify(sent[0]);
+    assert.doesNotMatch(prompt, /could not reach a model/, 'the degraded fallback must not be replayed to the model');
+    assert.doesNotMatch(prompt, /Your own prior observation/, 'a degraded prior contributes no observation at all');
+
+    // And the healthy case still DOES carry continuity forward, so the
+    // suppression is scoped to degradation rather than deleting the feature.
+    // The census must genuinely change — `ensureSeeded` is seed-if-absent and
+    // would silently no-op here, leaving a quiet tick and a vacuous assertion.
+    const sweepDoc = await observerStateStore.readCurrent(`sweep:v1:${urlKey}`);
+    await observerStateStore.advance(
+      `sweep:v1:${urlKey}`, sweepDoc.rev,
+      { ...nonEmptyCensus, lanes: { ...nonEmptyCensus.lanes, working: 9 } },
+      { reason: 'sweep' }
+    );
+    await runObserverPass(urlKey, { ...base, streamChatWithTools: fake, getPaidEnvKey: () => 'fake-key', now: Date.now() + 2000 });
+    assert.strictEqual(sent.length, 2, 'a changed census calls the model again');
+    assert.match(JSON.stringify(sent[1]), /Your own prior observation: Recovered view of the fleet\./,
+      'a HEALTHY prior summary is still threaded through for continuity');
+  });
+
+  test('LIN-2408: a retry that degrades AGAIN keeps retrying rather than freezing', async () => {
+    // The pathological case, asserted rather than assumed. A model that keeps
+    // failing must not have its stale narrative frozen into the panel; the
+    // pass keeps attempting recovery on each tick. The cost is bounded by the
+    // 15-minute cadence and stops the moment a tick succeeds — see the cost
+    // note in assessQuietPath.
+    const observerStateStore = freshStore();
+    const urlKey = `ws-degraded-twice-${randomUUID()}`;
+    await observerStateStore.ensureSeeded(`sweep:v1:${urlKey}`, nonEmptyCensus);
+
+    let callCount = 0;
+    const alwaysUnparseable = async (messages, options, onEvent) => {
+      callCount += 1;
+      onEvent('token', { token: 'not json at all' });
+      onEvent('done', { finishReason: 'stop' });
+    };
+    const deps = {
+      observerStateStore,
+      workspacePreferencesStore: fakeWorkspacePreferencesStore(),
+      streamChatWithTools: alwaysUnparseable,
+      getPaidEnvKey: () => 'fake-key'
+    };
+
+    await runObserverPass(urlKey, { ...deps, now: Date.now() });
+    assert.strictEqual(callCount, 1);
+    const afterFirst = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKey}`);
+    assert.deepStrictEqual(afterFirst.state.report.degraded, { reason: 'unparseable' });
+
+    const second = await runObserverPass(urlKey, { ...deps, now: Date.now() + 1000 });
+    assert.strictEqual(second.quiet, false, 'still degraded, so still not settled');
+    assert.strictEqual(callCount, 2, 'a persistently failing model is retried, not frozen');
   });
 
   test('two consecutive passes: an UNCHANGED census on tick 2 takes the quiet path (no second LLM call), preserves the prior substantive report/summary verbatim, and is a clean no-op; a THIRD unchanged tick does not manufacture yet another transition', async () => {
