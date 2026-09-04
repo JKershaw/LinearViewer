@@ -27,6 +27,50 @@ import http from 'node:http';
 import net from 'node:net';
 import { guardNetwork, guardSockets } from '../fixtures/network-guard.js';
 
+/**
+ * Run `fn(origin)` against a server that exists only for this call.
+ *
+ * CONNECTION POOLING is why this exists, and it cost two debugging rounds.
+ * Both transports reuse sockets — Node's default HTTP agent keep-alives them,
+ * and undici does its own pooling — so once any test in this file has talked to
+ * the shared server, a later test's request REUSES that socket and performs no
+ * `net.createConnection` at all. A guard watching that second request correctly
+ * records nothing, and a test asserting "it records something" fails for a
+ * reason that has nothing to do with the guard.
+ *
+ * That is exactly how this surfaced. The first version did not await the
+ * request, so it sometimes caught the very first connect and sometimes did not:
+ * green locally, red in CI. Awaiting made it consistently red, which is what
+ * exposed the pooling underneath the race. A fresh server per assertion means a
+ * fresh port, so a new connection is unavoidable.
+ *
+ * The mirror-image hazard matters more: a "records NOTHING" assertion under a
+ * reused socket passes VACUOUSLY every time. That is a vacuous pass hiding
+ * inside the file whose whole subject is vacuous passes, so those tests get a
+ * fresh server too rather than only the ones that would fail loudly.
+ */
+async function withFreshServer(fn) {
+  const srv = http.createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{}');
+  });
+  await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
+  try {
+    return await fn(`http://127.0.0.1:${srv.address().port}`);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+}
+
+/** Drive a real `http.request` to completion, on its own connection. */
+function httpRequestOnce(url) {
+  return new Promise((resolve) => {
+    const req = http.request(url, { agent: false }, (res) => { res.resume(); res.on('end', resolve); });
+    req.on('error', resolve);
+    req.end();
+  });
+}
+
 let server;
 let origin;
 
@@ -42,33 +86,35 @@ after(async () => {
 
 describe('LIN-1880: guardNetwork is blind to native fetch — demonstrated, not assumed', () => {
   test('a fetch() that really happens is reported as zero attempts by the request-level guard', async () => {
-    const guard = guardNetwork();
-    try {
-      const res = await fetch(origin);
-      // Precondition: the request genuinely happened. Without this the zero
-      // below would be the trivially correct answer to "no request was made".
-      assert.equal(res.status, 200, 'the fetch must actually reach the local server');
-    } finally {
-      guard.restore();
-    }
-    assert.deepEqual(
-      guard.attempts, [],
-      'guardNetwork sees nothing here — this is the blind spot LIN-1880 exists for, not a bug in this test'
-    );
+    await withFreshServer(async (url) => {
+      const guard = guardNetwork();
+      try {
+        const res = await fetch(url);
+        // Precondition: the request genuinely happened. Without this the zero
+        // below would be the trivially correct answer to "no request was made".
+        assert.equal(res.status, 200, 'the fetch must actually reach the local server');
+      } finally {
+        guard.restore();
+      }
+      assert.deepEqual(
+        guard.attempts, [],
+        'guardNetwork sees nothing here — this is the blind spot LIN-1880 exists for, not a bug in this test'
+      );
+    });
   });
 
-  test('guardNetwork DOES still see a direct http.request — so it is not simply broken', () => {
+  test('guardNetwork DOES still see a direct http.request — so it is not simply broken', async () => {
     // The other half. If the assertion above passed because the guard were
     // inert, this would fail too, and the demonstration would prove nothing.
-    const guard = guardNetwork();
-    try {
-      const req = http.request(origin, () => {});
-      req.on('error', () => {});
-      req.end();
-    } finally {
-      guard.restore();
-    }
-    assert.equal(guard.attempts.length, 1, 'the request-level guard still observes its own class');
+    await withFreshServer(async (url) => {
+      const guard = guardNetwork();
+      try {
+        await httpRequestOnce(url);
+      } finally {
+        guard.restore();
+      }
+      assert.equal(guard.attempts.length, 1, 'the request-level guard still observes its own class');
+    });
   });
 });
 
@@ -78,53 +124,60 @@ describe('LIN-1880: guardSockets sees the transport layer', () => {
     // remote host: this suite must stay hermetic even while proving it can
     // detect a leak. `isLoopback: () => false` makes the local connection
     // classify exactly as a remote one would.
-    const guard = guardSockets({ isLoopback: () => false });
-    try {
-      await fetch(origin);
-    } finally {
-      guard.restore();
-    }
-    assert.ok(
-      guard.connections.length > 0,
-      'a native fetch must be visible at the socket layer — the whole point of this guard'
-    );
-    assert.equal(guard.connections[0].host, '127.0.0.1');
-    assert.match(guard.connections[0].kind, /net\.(connect|createConnection)/);
+    await withFreshServer(async (url) => {
+      const guard = guardSockets({ isLoopback: () => false });
+      try {
+        await fetch(url);
+      } finally {
+        guard.restore();
+      }
+      assert.ok(
+        guard.connections.length > 0,
+        'a native fetch must be visible at the socket layer — the whole point of this guard'
+      );
+      assert.equal(guard.connections[0].host, '127.0.0.1');
+      assert.match(guard.connections[0].kind, /net\.(connect|createConnection)/);
+    });
   });
 
-  test('does NOT record loopback by default, or the guard would be unusable here', () => {
+  test('does NOT record loopback by default, or the guard would be unusable here', async () => {
     // The suite's house pattern is `app.listen(0, '127.0.0.1')` + a real fetch
     // against it. A guard that counted those would report hundreds of
     // legitimate connections and carry no signal at all.
-    const guard = guardSockets();
-    try {
-      const req = http.request(origin, () => {});
-      req.on('error', () => {});
-      req.end();
-    } finally {
-      guard.restore();
-    }
-    assert.deepEqual(guard.connections, [], '127.0.0.1 is not an escape');
+    //
+    // AWAITED deliberately. A non-awaited request restores the guard before the
+    // socket is attempted, so this "records nothing" assertion would pass
+    // whether the guard worked or not — a vacuous pass hiding inside a test
+    // whose whole subject is vacuous passes.
+    await withFreshServer(async (url) => {
+      const guard = guardSockets();
+      try {
+        await httpRequestOnce(url);
+      } finally {
+        guard.restore();
+      }
+      assert.deepEqual(guard.connections, [], '127.0.0.1 is not an escape');
+    });
   });
 
-  test('records a direct http.request too — the OTHER class it claims to cover', () => {
+  test('records a direct http.request too — the OTHER class it claims to cover', async () => {
     // The module's selling point is covering BOTH classes the earlier
     // instruments missed between them. The fetch test above proves the undici
     // half; without this the `http(s).request` half rests on the loopback test,
     // which would pass even if guardSockets were blind to it entirely. Review
     // named that gap.
-    const guard = guardSockets({ isLoopback: () => false });
-    try {
-      const req = http.request(origin, () => {});
-      req.on('error', () => {});
-      req.end();
-    } finally {
-      guard.restore();
-    }
-    assert.ok(
-      guard.connections.length > 0,
-      'a direct http.request must also be visible at the socket layer'
-    );
+    await withFreshServer(async (url) => {
+      const guard = guardSockets({ isLoopback: () => false });
+      try {
+        await httpRequestOnce(url);
+      } finally {
+        guard.restore();
+      }
+      assert.ok(
+        guard.connections.length > 0,
+        'a direct http.request must also be visible at the socket layer'
+      );
+    });
   });
 
   test('a unix-socket path is loopback, not an escape', () => {
