@@ -178,6 +178,46 @@ describe('public/llms.txt prompt catalog stays in sync with PROMPT_TEMPLATES', (
 });
 
 // =============================================================================
+// The SAME drift, in the two internal current-state docs (LIN-2302 Instance 6).
+// `public/llms.txt` was guarded by the block above (LIN-2261), but that guard is
+// scoped to llms.txt only — CLAUDE.md and docs/executive-summary.md carry the
+// same hand-maintained count and were left unguarded. The figure has now drifted
+// three times inside one ticket's lifetime (14 -> 16 -> 17), and a stale value
+// has already been load-bearing once: an operator relied on the wrong figure
+// while filing LIN-2261 and propagated it into that ticket.
+//
+// Derived from the registry, never pinned to a literal, for the same reason the
+// block above is: the NEXT template addition should fail here rather than ship a
+// seventh instance of this class.
+//
+// SCOPE BOUNDARY: this is a narrow count guard, NOT the structural remedy for
+// claim-drift generally — that is LIN-2261's retrospective-audit template. Only
+// undated CURRENT-STATE docs are covered. The other "N templates" hits in-tree
+// (docs/prompt-audit-report.md, docs/meta-prompt-audit-report.md,
+// docs/lin-260-*) are dated point-in-time audit reports and are deliberately
+// left alone — freezing a historical record is not drift.
+// =============================================================================
+
+describe('current-state docs keep the prompt-template count in sync with PROMPT_TEMPLATES', () => {
+  const templateCount = Object.keys(PROMPT_TEMPLATES).length;
+
+  const CURRENT_STATE_DOCS = [
+    { file: 'CLAUDE.md', pattern: /Prompt template definitions \((\d+) templates\)/ },
+    { file: 'docs/executive-summary.md', pattern: /\| (\d+) prompt templates with `aiHint`/ },
+  ];
+
+  for (const { file, pattern } of CURRENT_STATE_DOCS) {
+    test(`${file} advertises the registry's real template count`, () => {
+      const text = fs.readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+      const match = text.match(pattern);
+      assert.ok(match, `${file} must still carry a template-count claim matching ${pattern}`);
+      assert.strictEqual(Number(match[1]), templateCount,
+        `${file} claims ${match[1]} prompt templates; the registry exports ${templateCount}`);
+    });
+  }
+});
+
+// =============================================================================
 // generatePrompt Tests
 // =============================================================================
 
