@@ -317,12 +317,22 @@ describe('LIN-1887 Step 4 — POST /auth/jira/oauth/link (the pick)', () => {
 // pin the behaviour that is already correct, and they record WHERE Jira's clear
 // point actually is, which is not identical to the GitHub surfaces'.
 //
-// Jira clears at FLOW COMPLETION, not unconditionally at the callback. With one
-// reachable site the callback IS the completion (it links and redirects), so the
-// nonce is gone when it returns. With several sites the callback renders a site
-// picker and the nonce is consumed by the POST pick that follows — mid-flow it
-// survives on purpose, the same reason lib/github-install-flow.js keeps it for
-// the beginInstall hop.
+// Jira clears at FLOW COMPLETION, not at the callback. With one reachable site
+// the callback IS the completion (it links and redirects), so the nonce is gone
+// when it returns and LIN-2499's acceptance holds. With SEVERAL sites the
+// callback renders a site picker and the nonce stays live until the POST pick.
+//
+// That second case is a REAL GAP, recorded here rather than pinned as correct.
+// It is not the beginInstall situation in lib/github-install-flow.js: that hop
+// keeps the nonce because it re-enters the same callback and must pass the
+// guard again. Nothing needs it here — `POST /auth/jira/oauth/link` reads only
+// `req.session.jiraPending` (`completeJiraOAuthLink` takes `mode` and
+// `workspaceUrlKey` off `pending`, never off `oauthIntent`), so the picker
+// render at routes/jira-auth.js:464 could clear it exactly as the two GitHub
+// pickers now do. It is left alone only because routes/jira-auth.js is outside
+// LIN-2499's file carve; the fix is filed as LIN-2530. These tests therefore
+// assert what the code DOES — the multi-site one is a witness for that
+// follow-up, not an endorsement of it.
 describe('LIN-2499 — Jira OAuth consumes the CSRF nonce at flow completion', () => {
   test('single site: the callback completes the flow and the nonce is gone', async () => {
     const session = makeSession({ oauthState: 'nonce', oauthIntent: { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' } });
@@ -345,7 +355,10 @@ describe('LIN-2499 — Jira OAuth consumes the CSRF nonce at flow completion', (
     assert.equal(replay.status, 400);
   });
 
-  test('several sites: the nonce survives the picker render and is consumed by the pick', async () => {
+  // Witness for the gap described above (LIN-2530): the nonce is still
+  // replayable between the picker render and the pick. Invert this assertion
+  // when LIN-2530 lands — it records current behaviour, it does not defend it.
+  test('several sites: the nonce SURVIVES the picker render (gap) and is consumed by the pick', async () => {
     const session = makeSession({ oauthState: 'nonce', oauthIntent: { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' } });
     const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), fetches: stubs(TWO_SITES) });
 

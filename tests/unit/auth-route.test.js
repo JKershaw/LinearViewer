@@ -485,13 +485,17 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   // === LIN-2499: the CSRF nonce's post-success lifetime ===
   // docs/reviews/security-review-2026-06-25.md:64 recorded that oauthState is
   // validated and never cleared. The mismatch arm (LIN-1351) and the add-source
-  // arms were already covered above; the mode:'new' SUCCESS path was not, on
-  // either side of the change. Worth pinning even though regenerate() below the
-  // clear happens to wipe both fields anyway — that is an incidental property of
-  // an unrelated session-fixation defence, and this is the assertion that would
-  // catch its removal, or a reordering that moves work above the regenerate.
+  // arms were already covered above; the mode:'new' SUCCESS path was not.
+  //
+  // Say plainly what these are, because two of the three are NOT regression
+  // guards: routes/auth.js's mode:'new' path was never actually replayable —
+  // `req.session.regenerate()` below the new clear already wiped both fields,
+  // so the explicit `delete` is redundant-by-design, not a fix. The two
+  // outcome tests below therefore pass with that source line removed, and they
+  // are here to pin the OUTCOME the ticket names, whatever produces it. Only
+  // the third test isolates the new line itself.
 
-  test('mode:"new" success consumes oauthState/oauthIntent (LIN-2499)', async () => {
+  test('mode:"new" success consumes oauthState/oauthIntent — outcome, however produced (LIN-2499)', async () => {
     const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
@@ -519,6 +523,30 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.strictEqual(replay.statusCode, 400);
     assert.match(replay.body, /Session Expired/);
     assert.strictEqual(replay.redirectedTo, null, 'the flow did not re-run');
+  });
+
+  // The one test that actually exercises routes/auth.js's own clear. The shim's
+  // regenerate deliberately does NOT wipe, so the explicit `delete` above it is
+  // the only thing that can clear these fields — delete that line and this test
+  // goes red, which is exactly what the two tests above cannot do. It is not
+  // idle: it pins the invariant as ORDER-INDEPENDENT, so a later refactor that
+  // moves work between the clear and the regenerate, or drops the regenerate
+  // (as the add-source arm already has), cannot silently resurrect the
+  // replayable nonce this ticket exists to remove.
+  test('mode:"new" success clears the nonce WITHOUT relying on regenerate() to wipe it (LIN-2499)', async () => {
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' } });
+    // A non-wiping regenerate: still async, still invokes its callback, but
+    // preserves every field. Nothing but the route's own delete can clear them.
+    session.regenerate = (cb) => { cb(); };
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.redirectedTo, '/workspace/acme/', 'the sign-in still lands');
+    assert.strictEqual(session.oauthState, undefined, 'cleared by routes/auth.js, not by the session wipe');
+    assert.strictEqual(session.oauthIntent, undefined);
   });
 
   test('add-source success consumes oauthState/oauthIntent (LIN-2499 characterization of the LIN-1351 clear)', async () => {
