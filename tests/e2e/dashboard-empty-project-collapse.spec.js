@@ -225,6 +225,60 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
     await expect(emptyProject.locator('.add-task-link')).toBeHidden();
   });
 
+  // Review F-A: clearSearchState() applied a DETACHED state object
+  // (loadState() plus the F5 union) rather than the same `state` object
+  // init() owns. The F2 fix strips default-derived ids before persistState
+  // writes, so after a search close the DOM was collapsed again while
+  // init()'s in-memory state.collapsedProjects still said "expanded" (from
+  // the manual expand below) — the next header click then toggled the id
+  // *back in* and re-hid an already-hidden project: one dead click. This is
+  // the exact reviewed step 2->4 sequence: manually expand a
+  // default-collapsed empty project, open+close search, then the very next
+  // header click must respond (not be swallowed).
+  test('a header click responds immediately after a search round trip following manual expand (F-A)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(emptyProjectSeed(localWorkerUrlKey));
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    const emptyId = localSeedId(localWorkerUrlKey, 'proj-empty');
+    const emptyProject = page.locator(`.project[data-id="${emptyId}"]`);
+    const header = emptyProject.locator('.project-header');
+    const addTaskLink = emptyProject.locator('.add-task-link');
+
+    // 1. On load: default-collapsed.
+    await expect(header).toHaveText(/^▶/);
+    await expect(addTaskLink).toBeHidden();
+
+    // 2. Manually expand the empty project.
+    await header.click();
+    await expect(header).toHaveText(/^▼/);
+    await expect(addTaskLink).toBeVisible();
+
+    // 3. Open search, then close it (Escape) — F5 fixed this half: it must
+    // revert to collapsed (the default), not stay expanded.
+    const searchToggle = page.locator('.search-toggle');
+    const searchInput = page.locator('#search-input');
+    await searchToggle.click();
+    await searchInput.fill('active');
+    await searchInput.press('Escape');
+    await expect(header).toHaveText(/^▶/);
+    await expect(addTaskLink).toBeHidden();
+
+    // 4. The very next header click is the load-bearing assertion: under the
+    // F-A bug this click was silently swallowed (state.collapsedProjects
+    // still held the manually-expanded id from step 2, so toggling it here
+    // re-added it and re-hid an already-hidden project — no visible change).
+    await header.click();
+    await expect(header).toHaveText(/^▼/);
+    await expect(addTaskLink).toBeVisible();
+
+    // 5. One more click for good measure — collapses again, confirming the
+    // handler is now toggling normally rather than merely "unstuck" once.
+    await header.click();
+    await expect(header).toHaveText(/^▶/);
+    await expect(addTaskLink).toBeHidden();
+  });
+
   // Review F4: the manual-toggle half of the .add-task-link wiring
   // (handleProjectHeaderClick's hide/show branches) shipped with zero
   // coverage — mutation-checked in review (removing it left 43 specs green).

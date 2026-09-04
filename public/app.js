@@ -542,12 +542,20 @@ function unionDefaultCollapsedProjects(storedIds) {
   return [...new Set([...(storedIds || []), ...getDefaultCollapsedProjects()])]
 }
 
+// Shared in-memory UI state, owned by init() but also reapplied by
+// initSearch()'s clearSearchState() on a search round trip (LIN-2514 review
+// F-A). Both must mutate/reassign this SAME object rather than a detached
+// loadState() result, or the DOM (driven by whichever object applyState was
+// last called with) and the state object toggleItem/handleProjectHeaderClick
+// close over can disagree about a project's collapsed id, silently
+// swallowing the next header click.
+let state
+
 function init() {
   const isLanding = document.body.classList.contains('is-landing')
 
   // On landing page, always use defaults (no persistence)
   // On authenticated page, load from localStorage
-  let state
   if (isLanding) {
     state = getDefaultState()
     state.collapsedProjects = getDefaultCollapsedProjects()
@@ -2025,9 +2033,14 @@ function initSearch() {
     // LIN-2514: fold in default-collapsed empty projects the same way init()
     // does — raw loadState() alone would leave an empty project rendered
     // expanded (▼) with its children still hidden by the collapse logic below.
-    const restoredState = loadState()
-    restoredState.collapsedProjects = unionDefaultCollapsedProjects(restoredState.collapsedProjects)
-    applyState(restoredState)
+    // Review F-A: reassign the SAME `state` object init() owns (module-scope,
+    // shared with toggleItem/handleProjectHeaderClick) rather than a detached
+    // loadState() result — otherwise the DOM this applyState call paints and
+    // the in-memory state a subsequent header click reads from disagree about
+    // whether the project is collapsed, swallowing that first click.
+    state = loadState()
+    state.collapsedProjects = unionDefaultCollapsedProjects(state.collapsedProjects)
+    applyState(state)
   }
 
   function closeSearch() {
