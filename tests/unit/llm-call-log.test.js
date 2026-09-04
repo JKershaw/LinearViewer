@@ -175,10 +175,69 @@ describe('LlmCallLogStore.summarize', () => {
   });
 
   test('empty for unknown workspace, missing urlKey, or no collection', async () => {
-    const empty = { totalCalls: 0, totalCost: 0, totalTokens: 0, byFeature: [], lastCallAt: null };
+    const empty = { totalCalls: 0, totalCost: 0, totalTokens: 0, byFeature: [], lastCallAt: null, latencyByFeatureModel: [] };
     assert.deepStrictEqual(await store.summarize('nope'), empty);
     assert.deepStrictEqual(await store.summarize(), empty);
     assert.deepStrictEqual(await new LlmCallLogStore({}).summarize('acme'), empty);
+  });
+
+  test('aggregates durationMs by feature × model with count/p50Ms/p90Ms/maxMs (nearest-rank)', async () => {
+    // Deterministic 10-value array: 100,200,...,1000ms, sorted ascending already.
+    const durations = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
+    for (const durationMs of durations) {
+      await store.record({ urlKey: 'acme', feature: 'recommend', model: 'openai/gpt-5.4-mini', durationMs });
+    }
+    const s = await store.summarize('acme');
+    assert.strictEqual(s.latencyByFeatureModel.length, 1);
+    const row = s.latencyByFeatureModel[0];
+    assert.strictEqual(row.feature, 'recommend');
+    assert.strictEqual(row.model, 'openai/gpt-5.4-mini');
+    assert.strictEqual(row.count, 10);
+    // Nearest-rank, 1-indexed ceiling: p50 -> index ceil(0.5*10)-1=4 -> 500; p90 -> ceil(0.9*10)-1=8 -> 900.
+    assert.strictEqual(row.p50Ms, 500);
+    assert.strictEqual(row.p90Ms, 900);
+    assert.strictEqual(row.maxMs, 1000);
+  });
+
+  test('missing durationMs is skipped from the latency group, not counted as zero or as a call', async () => {
+    await store.record({ urlKey: 'acme', feature: 'recommend', model: 'openai/gpt-5.4-mini', durationMs: 1000 });
+    await store.record({ urlKey: 'acme', feature: 'recommend', model: 'openai/gpt-5.4-mini' }); // no durationMs
+    const s = await store.summarize('acme');
+    assert.strictEqual(s.totalCalls, 2); // summarize()'s own count still includes both
+    assert.strictEqual(s.latencyByFeatureModel.length, 1);
+    const row = s.latencyByFeatureModel[0];
+    assert.strictEqual(row.count, 1);
+    assert.strictEqual(row.p50Ms, 1000);
+    assert.strictEqual(row.maxMs, 1000);
+  });
+
+  test('a feature/model group where every call lacks durationMs produces no row', async () => {
+    await store.record({ urlKey: 'acme', feature: 'brief', model: 'anthropic/claude-opus-5' }); // no durationMs
+    const s = await store.summarize('acme');
+    assert.strictEqual(s.totalCalls, 1);
+    assert.deepStrictEqual(s.latencyByFeatureModel, []);
+  });
+
+  test('groups by (feature, model) pair, not feature alone', async () => {
+    await store.record({ urlKey: 'acme', feature: 'recommend', model: 'openai/gpt-5.4-mini', durationMs: 100 });
+    await store.record({ urlKey: 'acme', feature: 'recommend', model: 'anthropic/claude-opus-5', durationMs: 5000 });
+    const s = await store.summarize('acme');
+    assert.strictEqual(s.latencyByFeatureModel.length, 2);
+    const pairs = s.latencyByFeatureModel.map(r => `${r.feature}|${r.model}`).sort();
+    assert.deepStrictEqual(pairs, ['recommend|anthropic/claude-opus-5', 'recommend|openai/gpt-5.4-mini']);
+  });
+
+  test('rows sort descending by p90Ms, ties broken by feature then model', async () => {
+    await store.record({ urlKey: 'acme', feature: 'recap', model: 'model-a', durationMs: 100 });
+    await store.record({ urlKey: 'acme', feature: 'brief', model: 'model-b', durationMs: 5000 });
+    await store.record({ urlKey: 'acme', feature: 'brief', model: 'model-a', durationMs: 5000 }); // tie on p90Ms with above
+    const s = await store.summarize('acme');
+    assert.strictEqual(s.latencyByFeatureModel.length, 3);
+    // Two 5000ms rows outrank the 100ms row; among the tie, feature 'brief' is equal so model breaks it: 'model-a' < 'model-b'.
+    assert.deepStrictEqual(
+      s.latencyByFeatureModel.map(r => `${r.feature}|${r.model}`),
+      ['brief|model-a', 'brief|model-b', 'recap|model-a']
+    );
   });
 });
 
