@@ -1570,56 +1570,60 @@ export function createDashboardRoutes({
       if (row.disposition === 'task-bound') {
         // Keyed on RECORD IDENTITY, not on any composite of content (LIN-2367).
         //
-        // WHICH ROWS THIS ACTUALLY PROTECTS, because the obvious answer is
-        // wrong and LIN-2367's own description gets it wrong too. It argues
-        // from `decision_id` being agent-invented free text
-        // (`simple-dispatcher/hook.js`: "a short unique string you invent for
-        // this decision"). That instruction governs LOOP decisions, which take
-        // the `else` branch below and join on `loopId`. For the scan-produced
-        // rows THIS branch joins, `lib/scan.js` overwrites the model's
-        // `decision_id` with `TaskDecisionsStore.buildId(issueId, inputHash)`
-        // — the same string that becomes `_id` — so `decision_id === id`, and
-        // two tasks in one workspace have different issue UUIDs and therefore
-        // cannot collide. Through the current producer, neither LIN-2367's
-        // same-workspace collision nor LIN-2291's cross-workspace one is
-        // reachable.
+        // WHY, stated as what is verified rather than as a collision story.
+        // This justification has now been written three times and been wrong
+        // twice, so it is worth being exact about what is actually known.
         //
-        // The reachable case is LEGACY ROWS. The store landed in `7960bb48`
-        // (LIN-2197 Phase 2); the `decision_id` overwrite only in `e968cf3a`
-        // (Phase 4). Every row written in between carries a raw agent-supplied
-        // decision_id — and this store is deliberately durable with NO TTL
-        // (see its header: a TTL "would silently delete an unanswered ruling"),
-        // so those rows are still here and always will be. They are exactly the
-        // collision the ticket describes.
+        // What is verified: NO producer, past or present, can emit a colliding
+        // `decision_id` on these rows. `lib/scan.js` sets it to
+        // `TaskDecisionsStore.buildId(issueId, inputHash)` — the same value
+        // that becomes `_id` — so `decision_id === _id`, and `_id` is the
+        // primary key, so two rows cannot share one. (That is the whole
+        // guarantee. An earlier version of this comment argued instead that
+        // two tasks have different issue UUIDs; `buildId` truncates to
+        // `scan_<issueId8>_<inputHash12>`, so that was a prefix-probability
+        // argument, not a proof.)
         //
-        // So the key changes KIND rather than growing another field. The rows
-        // already carry a real identity: `taskDecisionAnchor` stamps
-        // `taskDecisionId: entry.id` (lib/unanswered-decisions.js), the store's
-        // `toRecord` sets `id: doc._id`, and the RESOLVED half of this same
-        // function already keys on it (`decisionId: r.id` above) — as does the
-        // reply/dismiss write path (`markOutcome({id: taskDecisionId})`). Using
-        // it for a read-side join is strictly weaker than what already ships.
-        // Both sides derive from the SAME read in this request, so the match is
-        // exact rather than probable.
+        // Two justifications that were offered and are FALSE, recorded so they
+        // are not offered a fourth time:
+        //   - LIN-2367's own description, and LIN-2291's before it, argue from
+        //     `decision_id` being agent-invented free text
+        //     (`simple-dispatcher/hook.js`: "a short unique string you invent").
+        //     That instruction lives in `DECISION_EMIT_INSTRUCTION` and governs
+        //     dispatch-loop decisions, which take the `else` branch below and
+        //     join on `loopId`. It never described these rows.
+        //   - A "legacy rows" window between `7960bb48` (store landed) and
+        //     `e968cf3a` (overwrite added). There is no such window: those two
+        //     commits are parent and child, and `e968cf3a` is the commit that
+        //     added the store's FIRST WRITER as well as the overwrite. At its
+        //     parent, `lib/scan.js` did not exist and `recordScan` had no
+        //     caller. The no-TTL durability is real, but it preserves an empty
+        //     set.
         //
-        // The `anchorId` ternary is what stops an id-less row matching another
-        // id-less row. TRADE-OFF, recorded rather than presented as free: an
+        // So this closes a defect class BY CONSTRUCTION rather than fixing a
+        // live bug, and that is a sufficient reason on its own: a read-side
+        // join should key on the primary key, not on content that merely
+        // happens to be unique today. It is also strictly weaker than what
+        // already ships — the RESOLVED half of this same function keys on
+        // `r.id` (above), and the reply/dismiss write path already trusts
+        // `taskDecisionId` for a WRITE (`markOutcome({id: taskDecisionId})`).
+        // Both sides of this join derive from the SAME read in this request.
+        //
+        // The `anchorId` ternary stops an id-less row matching another id-less
+        // row. TRADE-OFF, recorded rather than presented as free: an
         // unmatchable row gets `raisedAt: null`, and `lib/escalation-kpis.js`
-        // skips null-raised rows entirely — so such a row vanishes from
-        // `unansweredAge` rather than being mis-aged. That is the honest
-        // reading ("we do not know when this was raised") but it does HIDE a
-        // genuinely stale ruling, which docs/escalation-philosophy.md §4 warns
-        // against. Unreachable today (`_id` is always set on a stored row), so
-        // it is a documented cost of the guard, not a live one.
+        // skips null-raised rows before counting — so it vanishes from
+        // `unansweredAge` entirely rather than being mis-aged. That is honest
+        // ("we do not know when this was raised") but it HIDES a stale ruling,
+        // which docs/escalation-philosophy.md §4 warns against. Unreachable
+        // today, since `_id` is always set on a stored row.
         //
-        // THE PERMANENT FIX, named and deliberately not taken here (LIN-313:
-        // name the class, keep the fix minimal): `collectUnansweredDecisions`
-        // builds these rows FROM the entries that hold `scannedAt`, so
-        // stamping it onto the anchor at derivation time would delete this
-        // re-join outright and close the class rather than fixing it a third
-        // time. It widens into a shape the rulings feed also consumes, so it
-        // belongs in its own ticket — but if there is ever a fourth incident on
-        // this line, that is the fix.
+        // THE PERMANENT FIX, named and deliberately not taken (LIN-313: name
+        // the class, keep the fix minimal): `collectUnansweredDecisions` builds
+        // these rows FROM the entries that hold `scannedAt`, so stamping it
+        // onto the anchor at derivation time deletes this re-join outright. It
+        // widens into a shape the rulings feed also consumes, so it belongs in
+        // its own ticket.
         const anchorId = row.anchor?.taskDecisionId || null;
         const match = anchorId ? taskUnansweredRows.find(t => t.id === anchorId) : null;
         return { decisionId: row.decision?.decision_id, raisedAt: match?.scannedAt || null };

@@ -773,18 +773,24 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
     // `collectUnansweredDecisions` dedupes task decisions per
     // `(urlKey, issueId)`, so ONE workspace can hold many unanswered rows.
     //
-    // WHICH ROWS can actually carry a colliding decision_id — the ticket
-    // argues this from the agent inventing the string, and that is wrong for
-    // this branch (see the comment on the join in routes/dashboard.js).
-    // `lib/scan.js` overwrites it with `buildId(issueId, inputHash)`, so rows
-    // from the CURRENT producer cannot collide. The reachable case is legacy:
-    // the store landed in `7960bb48` and the overwrite only in `e968cf3a`, and
-    // the store is deliberately no-TTL, so every row written in between still
-    // carries a raw agent-supplied decision_id.
+    // THESE FIXTURES ARE SYNTHETIC, and that is the honest description of
+    // them. No producer can emit a colliding `decision_id` on these rows:
+    // `lib/scan.js` sets it to `buildId(issueId, inputHash)`, the same value
+    // that becomes `_id`, so `decision_id === _id` and the primary key makes a
+    // collision impossible. Two earlier drafts of this comment claimed
+    // otherwise — first that the agent invents the string (true of dispatch
+    // -loop decisions, which take the other branch), then that legacy rows
+    // exist from before the overwrite landed (they do not; the commit that
+    // added the overwrite also added the store's first writer). See the join
+    // in routes/dashboard.js for both corrections.
     //
-    // These fixtures are therefore shaped like a LEGACY row, not like anything
-    // the producer emits today. Said plainly so the next reader does not try
-    // to reproduce them through `runTaskScan` and conclude the test is fake.
+    // So this test does NOT reproduce a live bug. It pins the JOIN'S CONTRACT:
+    // given two rows that share a decision_id, each must keep its own
+    // raisedAt. That contract is worth pinning independently of whether
+    // today's producer can violate it — it is what makes the key correct by
+    // construction rather than by luck, and it is what a future producer
+    // would break. Said plainly so the next reader does not try to reproduce
+    // these rows through `runTaskScan` and conclude the test is fake.
     const staleMs = Date.now() - 30 * 60 * 60 * 1000; // 30h — stale under the 24h default
     const freshMs = Date.now() - 60 * 60 * 1000;      // 1h — not stale
     const taskDecisionsStore = {
