@@ -1635,6 +1635,20 @@ function clearTeamSelection(urlKey) {
   }
 }
 
+// LIN-2520: path-preserving filter URL builder, shared by every filter click
+// handler (team here; the assignee handler, LIN-2528, reuses this once it
+// lands). Built off the CURRENT page's own pathname + query string, so
+// choosing a filter keeps the user on whatever page they were viewing
+// (/swim, /ship, /roadmap, /swipe) instead of the old hard-coded jump back to
+// the dashboard — and every unrelated param (e.g. a future second filter)
+// survives the rebuild untouched.
+window.buildFilterUrl = function buildFilterUrl(paramName, value) {
+  const params = new URLSearchParams(window.location.search)
+  params.set(paramName, value)
+  const qs = params.toString()
+  return `${window.location.pathname}${qs ? `?${qs}` : ''}`
+}
+
 // Navigation bar interactions (workspace/team selectors)
 function initNavBar() {
   const navBar = document.querySelector('.nav-bar')
@@ -1715,12 +1729,13 @@ function initNavBar() {
       // Get workspace URL key from data attribute (workspace-prefixed URLs)
       const urlKey = teamOptions.dataset.urlKey
       setTeamSelection(teamId, urlKey)
-      const workspacePrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
       // Always carry the param — including ?team=all — so the server records the
       // explicit choice (and clears any remembered team) rather than treating a
-      // bare URL as "restore the prior selection" (LIN-727).
-      const url = `${workspacePrefix}/?team=${teamId}`
-      window.location.href = url
+      // bare URL as "restore the prior selection" (LIN-727). Path-preserving
+      // (LIN-2520): stays on whatever page the user picked the team from
+      // (/swim, /ship, /roadmap, /swipe), rather than jumping back to the
+      // dashboard. Always a real navigation — choosing a team must re-fetch.
+      window.location.href = buildFilterUrl('team', teamId)
     })
   }
 
@@ -1806,10 +1821,35 @@ function initNavBar() {
     const savedTeamExists = savedTeam === 'all' ||
       [...teamOptionsAll].some(opt => opt.dataset.team === savedTeam)
 
-    // If URL has no team but localStorage does (and team still exists), redirect
+    // If URL has no team but localStorage does (and team still exists), restore it.
+    //
+    // LIN-2520 (R4): two stores back this — localStorage (read here) and the
+    // server-side restore that already rendered THIS page via userPreferencesStore
+    // (keyed per {accountId, urlKey}). They can diverge (no accountId this
+    // session, a fire-and-forget persist failure, two accounts sharing a
+    // browser). So don't blindly trust localStorage — read what the server
+    // actually applied off the DOM (renderTeamOptions marks the chosen option
+    // `.selected`, including the `all` option) and compare:
+    //   - equal   -> the render already reflects savedTeam; just fix the URL
+    //                in place (no re-fetch needed).
+    //   - diverge -> the render does NOT reflect savedTeam; a real navigation
+    //                is genuinely needed to fetch the correct scope.
+    //
+    // Soft coupling: this reads `#team-options .nav-option.selected`, the same
+    // marker `renderTeamOptions` (navbar.js) paints. If that marker or selector
+    // is ever removed, `serverAppliedTeam` silently reads as absent/`'all'`,
+    // this comparison always reads "diverge", and the branch below just always
+    // takes the real-navigation path — degrading to today's pre-fix behavior
+    // rather than breaking.
     if (!urlTeam && savedTeam && savedTeam !== 'all' && savedTeamExists) {
-      const workspacePrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      window.location.href = `${workspacePrefix}/?team=${savedTeam}`
+      const selected = document.querySelector('#team-options .nav-option.selected')
+      const serverAppliedTeam = selected?.dataset.team || 'all'
+      const url = buildFilterUrl('team', savedTeam)
+      if (serverAppliedTeam === savedTeam) {
+        window.history.replaceState(null, '', url)
+      } else {
+        window.location.href = url
+      }
       return
     }
 
