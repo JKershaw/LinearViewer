@@ -513,7 +513,7 @@ function applyState(state) {
     setArrow(header, false)
 
     // Hide all project content (including .node containers)
-    const children = project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for]')
+    const children = project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for], .add-task-link')
     children.forEach(hide)
   })
 
@@ -542,10 +542,10 @@ function init() {
     state.collapsedProjects = getDefaultCollapsedProjects()
   } else {
     state = loadState()
-    // On first load (no saved state), apply default collapsed projects from HTML
-    if (!hasStoredState()) {
-      state.collapsedProjects = getDefaultCollapsedProjects()
-    }
+    // Empty-project defaults always win over restored state (union, not
+    // replace), since a global localStorage key would otherwise permanently
+    // block the default for any returning user (LIN-2514).
+    state.collapsedProjects = [...new Set([...state.collapsedProjects, ...getDefaultCollapsedProjects()])]
   }
 
   // Wrap saveState to be a no-op on landing
@@ -611,13 +611,14 @@ function init() {
 
     if (isCollapsed) {
       // Hide all project content (including .node containers)
-      project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for]')
+      project.querySelectorAll('.node, .project-description, .project-meta, .completed-toggle, [data-completed-for], .add-task-link')
         .forEach(hide)
     } else {
       // Show project description, meta, and completed toggle
       show(project.querySelector('.project-description'))
       show(project.querySelector('.project-meta'))
       show(project.querySelector('.completed-toggle'))
+      show(project.querySelector('.add-task-link'))
 
       // Show top-level nodes (but keep them collapsed unless explicitly expanded)
       // Nodes are inside a .tree wrapper (not the completed one)
