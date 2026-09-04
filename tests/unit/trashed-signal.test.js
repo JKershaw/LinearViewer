@@ -25,10 +25,15 @@ import { applyTrashedSignal, isTrashed, TRASHED_STATE } from '../../lib/trashed-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
 // LIN-679 Stage 3a / LIN-2536: group D (the two by-ID read handlers this file
-// pins below) moved to routes/proxy-reads.js. `proxySource` still feeds the
-// group-E write-guard assertions (refuseIfTrashed's sites, all outside D) and
-// stays untouched for those — only the two D-scoped pins re-point here.
+// pins below) moved to routes/proxy-reads.js. `proxySource` still fed the
+// group-E write-guard assertions until Stage 3b moved those too (see
+// `writesSource` below) — it now carries neither describe block's subject.
 const readsSource = readFileSync(join(__dirname, '../../routes/proxy-reads.js'), 'utf8');
+// LIN-679 Stage 3b / LIN-2537: group E (refuseIfTrashed + its call sites, the
+// write-endpoint 409 guard this file's REFUSE block pins) moved to
+// routes/proxy-writes.js — re-point those assertions here, mirroring the
+// Stage 3a readsSource split above.
+const writesSource = readFileSync(join(__dirname, '../../routes/proxy-writes.js'), 'utf8');
 const providerSource = readFileSync(join(__dirname, '../../lib/providers/linear/index.js'), 'utf8');
 // LIN-2245: the /api/proxy/instructions catalog (where these doc-side
 // Trashed/trashed/409 mentions actually live) moved out of routes/proxy.js
@@ -148,13 +153,13 @@ describe('REFUSE: context fetcher rejects a trashed target (surfaces 4-6)', () =
 
 describe('REFUSE: write endpoints reject a trashed target with 409 (surfaces 3, 8)', () => {
   test('a shared refuseIfTrashed guard exists and returns 409', () => {
-    assert.match(proxySource, /async function refuseIfTrashed/);
-    const start = proxySource.indexOf('async function refuseIfTrashed');
+    assert.match(writesSource, /async function refuseIfTrashed/);
+    const start = writesSource.indexOf('async function refuseIfTrashed');
     // 600, not 400: LIN-1559 prepended the missing-read backstop line ahead of
     // the guard read, pushing the 409 refusal past a 400-char window. The
     // assertions below are what this test protects; the window is just how far it
     // reads to find them.
-    const body = proxySource.slice(start, start + 600);
+    const body = writesSource.slice(start, start + 600);
     assert.match(body, /status\(409\)|jsonError\(res, 409/, 'refusal must be a 409');
     assert.match(body, /isTrashed\(issue\)/);
   });
@@ -162,15 +167,25 @@ describe('REFUSE: write endpoints reject a trashed target with 409 (surfaces 3, 
   test('PATCH, comments, and relation-create call refuseIfTrashed before mutating', () => {
     // Count the guard call sites in the write handlers (PATCH + comments +
     // relations = 3 invocations beyond the definition itself).
-    const calls = (proxySource.match(/await refuseIfTrashed\(/g) || []).length;
+    const calls = (writesSource.match(/await refuseIfTrashed\(/g) || []).length;
     assert.ok(calls >= 3, `expected >=3 refuseIfTrashed call sites, found ${calls}`);
   });
 
   test('label and description-edit handlers refuse trashed inline with 409', () => {
     // These already read the issue, so they branch on the in-hand flag rather
     // than paying a second round-trip.
-    const inline409 = (proxySource.match(/isTrashed\(issue\)\) \{\s*\n\s*logEvent\([^\n]*409\)/g) || []).length;
+    const inline409 = (writesSource.match(/isTrashed\(issue\)\) \{\s*\n\s*logEvent\([^\n]*409\)/g) || []).length;
     assert.ok(inline409 >= 3, `expected >=3 inline 409 refusals (2 label + 1 description), found ${inline409}`);
+  });
+
+  // LIN-679 Stage 3b / LIN-2537: complementary absence pin (the `937555cd` /
+  // Stage-3a-R2 template) — a still-green presence pin whose subject has left
+  // routes/proxy.js would be a defect, not a pass. Guards against the guard
+  // silently reappearing (or a partial move leaving a stray copy) in the
+  // donor file.
+  test('refuseIfTrashed no longer lives in routes/proxy.js', () => {
+    assert.doesNotMatch(proxySource, /async function refuseIfTrashed/);
+    assert.doesNotMatch(proxySource, /await refuseIfTrashed\(/);
   });
 });
 
