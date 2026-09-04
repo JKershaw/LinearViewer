@@ -23,52 +23,80 @@
 
 /* The bespoke observation app bar (LIN-927 `.obs-appbar*`) was retired in
    LIN-978: observation now uses the shared header nav (`renderNavBar`), which
-   carries the tier-gated view switcher. The app bar's sticky/translucent feel
-   was not carried over — a global sticky header intercepts clicks on scrolled
-   content (it broke the ship-orientation toggle), so the shared nav stays in
-   normal flow (see the note on `.nav-bar` in `style.css`). */
+   carries the tier-gated view switcher.
+
+   CORRECTION (LIN-2298). This comment used to end "the app bar's
+   sticky/translucent feel was not carried over … so the shared nav stays in
+   normal flow". That is false at HEAD and has been for some time: `.nav-bar`
+   is `position: sticky; top: 0` with a `z-index` and a translucent
+   backdrop-blurred wash (see `.nav-bar` in `public/style.css`). The
+   click-interception hazard this comment describes was real and did back the
+   sticky out once — but it was later solved with per-interaction
+   `scroll-margin-top` and the sticky reinstated, and that comment was not
+   updated to match.
+
+   Recorded here rather than quietly deleted because LIN-2298 moved the
+   feedback trigger INTO that sticky header, so "does anything overlay this
+   column" is now a live question on this page and the old answer was wrong.
+
+   The answer, measured: nothing reaches the feed's last card or its `open ↗`
+   control — not the deleted FAB, and not the sticky nav either, which is
+   top-pinned while those targets rest near the bottom at max scroll.
+   tests/e2e/observation.spec.js asserts a flat zero at 320/360/390/430
+   against fixed AND sticky elements. See the fuller note on `.obs-page`
+   below. */
 
 .obs-page {
   max-width: 480px;
   margin: 0 auto;
-  /* LIN-2298 corrects what this padding was claimed to do. The original comment
-     said it stopped "the fixed feedback FAB ever overlapping the last card"
-     (LIN-783). It does not, and LIN-2272 later proved why: bottom padding on a
-     normal-flow ancestor cannot clear a `position: fixed` sibling — it grows
-     the document and the max-scroll offset while the FAB keeps its SCREEN
-     position, so content still sweeps through the band on the way past.
+  /* LIN-2298 landed the fix this comment used to describe as pending, so the
+     6rem bottom reserve is gone with it.
 
-     MEASURED at main 54116d21, six seeded sessions, rect sweep every 2px:
-     the last `.obs-session` intersects `.feedback-fab` at 111 scroll offsets
-     (520-740 at 360px), and the card's own `open ↗` control at 26 (578-628).
-     Same at 320/390, 112/27 at 430. So this is a real defect, not merely an
-     over-reserved padding — the ticket's own "if zero, this reduces to a
-     comment correction" branch does not apply.
+     The history, because it is the whole reason this comment is long. LIN-783
+     added `6rem` here claiming it stopped "the fixed feedback FAB ever
+     overlapping the last card". It did not, and LIN-2272 proved why: bottom
+     padding on a normal-flow ancestor cannot clear a `position: fixed` sibling
+     — it grows the document and the max-scroll offset while the fixed element
+     keeps its SCREEN position, so content sweeps through the band on the way
+     past. Measured at main 54116d21 (six seeded sessions, rect sweep every
+     2px): the last `.obs-session` intersected `.feedback-fab` at 111 scroll
+     offsets, and the card's own `open ↗` control at 26. A real defect, not an
+     over-reserved padding.
 
-     What the padding DOES buy, and why it stays: at rest (max scroll) the last
-     card ends above the FAB, which is the common resting state. It is a real
-     if partial mitigation, just not the one the old comment claimed.
+     What the padding genuinely bought was the resting state — at max scroll the
+     last card ended above the FAB — and that is now bought by there being no
+     FAB. John's ruling on LIN-2298 relocated the trigger into nav chrome
+     (`renderFeedbackTrigger`, lib/components/navbar.js) and deleted the fixed
+     button, which retires the class rather than reserving around it. Nothing
+     needs clearing under this column any more, and `1.5rem` is now ordinary
+     end-of-feed breathing room rather than a reserve.
 
-     What it cannot buy, and a correction. The CARD RECT spans the full column
-     by design, so no horizontal reserve keeps it out of a fixed overlay's path
-     — that part stands, and it is cosmetic anyway (card text is left-aligned;
-     the FAB passes over whitespace).
+     Two earlier drafts of this paragraph were wrong in opposite directions and
+     both are worth recording, because each was a claim written without a
+     measurement behind it.
 
-     But an earlier version of this comment generalised that into "no CSS
-     reserve can keep full-width content out of a fixed overlay's path" and used
-     it to dismiss the whole ticket. That was wrong about the half that matters.
-     The `open ↗` control is `.obs-session-open` inside `.obs-session-side`, a
-     right-aligned shrink-to-fit column (see the flex rules below) — structurally
-     the same shape as the footer rows LIN-2299 reserved, and reservable the same
-     scrollY-independent way. Honest measurement, overreaching conclusion.
+     The first said "nothing floats over this column any more". False as a
+     general statement: `.nav-bar` is sticky (see the correction at the top of
+     this file), so something out-of-flow does pass over this page.
 
-     It is still not fixed here, for a different and better reason: John ruled on
-     LIN-2298 (relocate the feedback trigger into nav chrome and drop the fixed
-     FAB entirely), which removes this whole defect class rather than reserving
-     around it, and routed that work to a later lane. A horizontal reserve on
-     `.obs-session-side` would be thrown away by it. If that ruling is ever
-     reversed, the reserve is the fix — not a claim that none exists. */
-  padding: 0 0.6rem 6rem;
+     The second over-corrected to "the sticky nav still passes over the feed as
+     it scrolls", and asserted it in the test as a tolerated overlay. Also
+     false, for the targets that matter: swept at 320/360/390/430 with six
+     seeded sessions, the nav records ZERO overlaps against the last
+     `.obs-session` and its `open ↗` control. It cannot reach them — the nav is
+     pinned to the top of the viewport and the feed's end rests near the bottom
+     at max scroll, so the two never share a band.
+
+     What is actually true: the BOTTOM-RIGHT overlay this padding was fighting
+     is gone, and nothing else reaches these targets either.
+
+     The guard is a test, not this comment: tests/e2e/observation.spec.js sweeps
+     every 2px offset at those four widths and asserts a flat ZERO overlaps —
+     against fixed AND sticky elements, so a future change that did bring the
+     nav or any other overlay into this band goes red and is named in the
+     failure. That is LIN-2298's acceptance witness, and it catches what a
+     padding value never could. */
+  padding: 0 0.6rem 1.5rem;
 }
 
 /* Desktop composition (LIN-1225): the mobile-first feed is a single narrow
