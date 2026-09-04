@@ -1636,8 +1636,8 @@ function clearTeamSelection(urlKey) {
 }
 
 // LIN-2520: path-preserving filter URL builder, shared by every filter click
-// handler (team here; the assignee handler, LIN-2528, reuses this once it
-// lands). Built off the CURRENT page's own pathname + query string, so
+// handler (team above; the assignee handler, LIN-2528, below). Built off the
+// CURRENT page's own pathname + query string, so
 // choosing a filter keeps the user on whatever page they were viewing
 // (/swim, /ship, /roadmap, /swipe) instead of the old hard-coded jump back to
 // the dashboard — and every unrelated param (e.g. a future second filter)
@@ -1656,8 +1656,10 @@ function initNavBar() {
 
   const workspaceToggle = document.getElementById('workspace-toggle')
   const teamToggle = document.getElementById('team-toggle')
+  const assigneeToggle = document.getElementById('assignee-toggle')
   const workspaceOptions = document.getElementById('workspace-options')
   const teamOptions = document.getElementById('team-options')
+  const assigneeOptions = document.getElementById('assignee-options')
 
   // Create overlay element for mobile dropdown backdrop
   let dropdownOverlay = document.querySelector('.nav-dropdown-overlay')
@@ -1671,10 +1673,10 @@ function initNavBar() {
   let openSelector = null
 
   function closeAllSelectors() {
-    ;[workspaceToggle, teamToggle].forEach(btn => {
+    ;[workspaceToggle, teamToggle, assigneeToggle].forEach(btn => {
       if (btn) btn.setAttribute('aria-expanded', 'false')
     })
-    ;[workspaceOptions, teamOptions].forEach(panel => {
+    ;[workspaceOptions, teamOptions, assigneeOptions].forEach(panel => {
       if (panel) panel.classList.add('hidden')
     })
     if (dropdownOverlay) dropdownOverlay.classList.add('hidden')
@@ -1711,6 +1713,14 @@ function initNavBar() {
     })
   }
 
+  // Assignee toggle (LIN-2528, dashboard-only)
+  if (assigneeToggle && assigneeOptions) {
+    assigneeToggle.addEventListener('click', (e) => {
+      e.stopPropagation()
+      toggleSelector(assigneeToggle, assigneeOptions, 'assignee')
+    })
+  }
+
   // "⋯ more" view-overflow — the shared, in-flow disclosure (LIN-1058 / LIN-1286),
   // wired below. An IN-FLOW disclosure: the `.nav-views-overflow` block sits below
   // the tab strip in NORMAL FLOW — no floating panel, no backdrop, no click-catcher
@@ -1739,6 +1749,24 @@ function initNavBar() {
     })
   }
 
+  // Assignee option selection (LIN-2528). Reuses buildFilterUrl (LIN-2520) so
+  // every other query param — ?team= included — survives the rebuild. Always
+  // a real navigation: the filter is applied server-side. No localStorage
+  // write and no auto-restore counterpart — assignee lives in the URL only
+  // (unlike team, LIN-2526's boundary).
+  if (assigneeOptions) {
+    assigneeOptions.addEventListener('click', (e) => {
+      const option = e.target.closest('.nav-option[data-assignee]')
+      if (!option) return
+
+      e.stopPropagation()
+      const assignee = option.dataset.assignee
+      // Always carry the param — including ?assignee=all — matching the team
+      // handler's convention of an explicit choice over a bare/absent URL.
+      window.location.href = buildFilterUrl('assignee', assignee)
+    })
+  }
+
   // Close on outside click
   document.addEventListener('click', () => {
     if (openSelector) closeAllSelectors()
@@ -1746,7 +1774,7 @@ function initNavBar() {
 
   // Prevent clicks inside options panels from triggering "close on outside click"
   // Links still navigate, forms still submit - we just don't hide the panel first
-  ;[workspaceOptions, teamOptions].forEach(panel => {
+  ;[workspaceOptions, teamOptions, assigneeOptions].forEach(panel => {
     if (panel) {
       panel.addEventListener('click', (e) => e.stopPropagation())
     }
@@ -1805,6 +1833,8 @@ function initNavBar() {
       handleKeyboard(e, workspaceToggle, workspaceOptions)
     } else if (openSelector === 'team') {
       handleKeyboard(e, teamToggle, teamOptions)
+    } else if (openSelector === 'assignee') {
+      handleKeyboard(e, assigneeToggle, assigneeOptions)
     }
   })
 
