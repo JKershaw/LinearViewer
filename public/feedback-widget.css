@@ -6,6 +6,29 @@
  * bottom-right and kept above page chrome via --z-overlay.
  */
 
+/* LIN-2299/2296: the FAB's own footprint, named once.
+ *
+ * LIN-2272 established the general result these tokens exist to serve: bottom
+ * padding on a normal-flow ancestor CANNOT clear a `position: fixed` sibling —
+ * it only grows the document and the max-scroll offset, so content still sweeps
+ * past the FAB's fixed SCREEN position at intermediate offsets. The only reserve
+ * that holds at every scroll position is a HORIZONTAL one, and it can only work
+ * where content can be kept out of the right-hand band at all.
+ *
+ * Measured at main 54116d21 (rect sweep, every 2px offset, 320/360/390/430):
+ * the button is 83x32 at <=390 and 87.1x34 at 430, inset 16px. So the widest
+ * band it owns is 16 + 87.1 = 103.1px. --fab-band-x adds a small gutter on top
+ * so reserved content never abuts the button.
+ *
+ * Consumers reserve against THIS, never a re-typed magic number:
+ *   public/style.css      .footer-deploy   (LIN-2299, ~30 footer-bearing pages)
+ *   public/live-console.css .lc-more       (LIN-2296, retuned from a flat 7rem)
+ */
+:root {
+  --fab-inset: 16px;
+  --fab-band-x: 112px;
+}
+
 .feedback-fab {
   position: fixed;
   right: 16px;

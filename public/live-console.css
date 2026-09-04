@@ -543,7 +543,24 @@
      bottom-right corner (16px inset + 83px wide, ~99px), so keep the
      centred button's right edge left of that band. This holds at every
      scroll position, since it never depends on scrollY. */
-  .lc-more { padding-right: 7rem; }
+  /* LIN-2296: 7rem (112px) cleared the FAB at every offset — re-measured, still
+     0 overlapping offsets at 320/360/390/430 — but at <=360px it squeezed the
+     flex item below the pill's natural 203px width, wrapping the label to two
+     lines and orphaning the arrow. That is L2 on the LIN-2272 ledger.
+
+     Discharged by TUNING rather than by a human accepting the wrap, which is
+     the first option LIN-2296 itself lists. Measured at 360px with the 7rem
+     reserve: button right edge 220, FAB left edge 261 — 41px of slack to give
+     back. The centred button's right edge moves by half of whatever the reserve
+     gives up, so dropping 7rem -> 6rem (16px) spends 8px of that 41 and returns
+     16px of width to the button, taking it back over its 203px natural width.
+
+     6rem is the reserve the FAB's own footprint needs (--fab-band-x is 112px of
+     total band, but the button is CENTRED, so only half the shortfall matters).
+     320px still wraps and cannot not: there the button would need a right edge
+     of <=221 while being >=203 wide, which does not fit the viewport at all.
+     That is geometry, not tuning — recorded rather than papered over. */
+  .lc-more { padding-right: 6rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

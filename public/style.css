@@ -2969,6 +2969,28 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   font-size: 0.9em;
 }
 
+/* LIN-2299: the fixed feedback FAB covers this row's `feedback` toggle — the
+   very control that dismisses the FAB — at max scroll, on EVERY footer-bearing
+   page (~30) whenever the flag is on. Measured at main 54116d21, rect sweep at
+   every 2px offset: 19 overlapping offsets at 320px, 18 at 360, 18 at 390, 22
+   at 430. At 360 the toggle's right edge is 344.1 and the FAB's is 344.0 —
+   they are stacked in the same corner to within a pixel.
+
+   HORIZONTAL reserve, not bottom padding. LIN-2272 proved bottom padding on a
+   normal-flow ancestor cannot clear a `position: fixed` sibling: it only grows
+   the document and the max-scroll offset, leaving the same overlap at the same
+   screen positions. This holds at every scroll offset because it never depends
+   on scrollY — the row simply cannot extend into the band the FAB owns.
+
+   Unconditional, and harmless when the flag-gated FAB is absent: it costs this
+   one wrapping row the FAB's own width on the right. `text-align: center` is
+   inherited from .page-footer, so the row re-centres inside the narrowed box
+   rather than shifting hard left. Scoped to .footer-deploy alone — the nav,
+   brand and action rows above it never reach the FAB's band. */
+.page-footer .footer-deploy {
+  padding-right: var(--fab-band-x, 112px);
+}
+
 .footer-link {
   color: var(--fg-dim);
   text-decoration: none;
