@@ -8,7 +8,8 @@
     "test:ui": "playwright test --ui",
     "test:unit": "node --test tests/unit/*.test.js",
     "env:check": "bash scripts/env-check.sh",
-    "setup": "bash scripts/setup.sh"
+    "setup": "bash scripts/setup.sh",
+    "test:hermetic": "node scripts/assert-unit-suite-hermetic.mjs"
   },
   "dependencies": {
     "@jkershaw/mangodb": "^0.1.2",

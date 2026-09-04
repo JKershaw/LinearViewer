@@ -26,6 +26,11 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+// LIN-1880: this file opened a live TLS connection to api.linear.app on every
+// run. The Linear call is incidental — no assertion here reads Linear data —
+// so it is refused rather than stubbed with a plausible response.
+import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
+installHermeticLinearTransport();
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
