@@ -134,7 +134,9 @@ routes.forEach((r, i) => { r.idx = i; r.region = regionOf(i); });
 // registration-count guard (tests/unit/proxy-endpoint-inventory-witness.test.js).
 // LIN-2534 (Stage 2 / PR-2a): group A (5 routes) moved to
 // routes/proxy-tokens-admin.js — 53 - 5 = 48.
-const EXPECTED_ROUTES_IN_FILE = 48;
+// LIN-2535 (Stage 2 / PR-2c): group C (1 route) moved to
+// routes/proxy-token-exchange.js — 48 - 1 = 47.
+const EXPECTED_ROUTES_IN_FILE = 47;
 if (routes.length !== EXPECTED_ROUTES_IN_FILE) {
   console.error(`ENDPOINT DRIFT: found ${routes.length} route registrations, expected ${EXPECTED_ROUTES_IN_FILE}.`);
   console.error('The region ranges above are index-based; re-derive them before trusting either table.');
