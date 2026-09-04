@@ -31,7 +31,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -64,12 +64,26 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     assert.equal(stampCount, 2, 'expected exactly 2 stamps: the TEST_LOCAL_URL_KEY short-circuit and the real resolveWorkspaceAccess path');
   });
 
-  test('all 24 resolveProviderAccess call sites pass `req` as the third argument, so the chokepoint can actually stamp onto THIS request', () => {
-    const callSites = PROXY_SRC.match(/resolveProviderAccess\([^)]*\)/g) || [];
-    // Exclude the function's own definition line, which matches a different shape.
-    const invocations = callSites.filter(c => !c.startsWith('resolveProviderAccess(urlKey'));
-    assert.ok(invocations.length >= 10, `expected at least 10 resolveProviderAccess call sites, found ${invocations.length}`);
-    const missingReq = invocations.filter(c => !/,\s*req\)$/.test(c));
+  // LIN-679 Stage 3a / LIN-2536 (F4): derived from the filesystem rather than
+  // a hard-coded file list, so this floor covers every present AND future
+  // routes/proxy-*.js extraction (E/F/H/I) with no further manual append —
+  // the exact non-extensibility defect LIN-2557 documents for the sibling
+  // rateLimit( census. House precedent: tests/unit/test-server-listen-bind.test.js's
+  // directory-derived file discovery.
+  const routesDir = join(__dirname, '../../routes');
+  const proxyRouteFiles = readdirSync(routesDir).filter(f => f.startsWith('proxy') && f.endsWith('.js'));
+
+  test('every routes/proxy*.js file\'s resolveProviderAccess call sites pass `req` as the third argument, so the chokepoint can actually stamp onto THIS request', () => {
+    const invocations = [];
+    for (const file of proxyRouteFiles) {
+      const src = readFileSync(join(routesDir, file), 'utf8');
+      const callSites = src.match(/resolveProviderAccess\([^)]*\)/g) || [];
+      // Exclude the function's own definition line (routes/proxy.js only), which matches a different shape.
+      const filtered = callSites.filter(c => !c.startsWith('resolveProviderAccess(urlKey'));
+      invocations.push(...filtered.map(call => ({ file, call })));
+    }
+    assert.ok(invocations.length >= 10, `expected at least 10 resolveProviderAccess call sites across ${proxyRouteFiles.join(', ')}, found ${invocations.length}`);
+    const missingReq = invocations.filter(({ call }) => !/,\s*req\)$/.test(call));
     assert.deepEqual(missingReq, [], `every resolveProviderAccess(...) call must end in ", req)" so the chokepoint can stamp — offenders: ${JSON.stringify(missingReq)}`);
   });
 

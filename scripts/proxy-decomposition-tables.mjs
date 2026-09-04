@@ -136,7 +136,9 @@ routes.forEach((r, i) => { r.idx = i; r.region = regionOf(i); });
 // routes/proxy-tokens-admin.js — 53 - 5 = 48.
 // LIN-2535 (Stage 2 / PR-2c): group C (1 route) moved to
 // routes/proxy-token-exchange.js — 48 - 1 = 47.
-const EXPECTED_ROUTES_IN_FILE = 47;
+// LIN-2536 (Stage 3a / PR-3a): group D (13 routes) moved to
+// routes/proxy-reads.js — 47 - 13 = 34.
+const EXPECTED_ROUTES_IN_FILE = 34;
 if (routes.length !== EXPECTED_ROUTES_IN_FILE) {
   console.error(`ENDPOINT DRIFT: found ${routes.length} route registrations, expected ${EXPECTED_ROUTES_IN_FILE}.`);
   console.error('The region ranges above are index-based; re-derive them before trusting either table.');

@@ -31,6 +31,10 @@ import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
+// LIN-679 Stage 3a / LIN-2536: the GET /relations handler (group D) moved to
+// routes/proxy-reads.js. The DELETE relations handler (group E) stays on
+// proxySource, unchanged — only the GET test below re-points.
+const readsSource = readFileSync(join(__dirname, '../../routes/proxy-reads.js'), 'utf8');
 const providerSource = readFileSync(join(__dirname, '../../lib/providers/linear/index.js'), 'utf8');
 
 // Pull a named gql`...` template literal out of a source by its const name.
@@ -119,11 +123,22 @@ describe('proxy relationship queries', () => {
     // arrays, matching /issues/{id} and the rest of the read surface after the
     // LIN-310 flatten. Re-wrapping in { nodes: [...] } would reintroduce the
     // source-revealing GraphQL shape the contract neutralization removed.
-    const handlerStart = proxySource.indexOf("logEvent(req, '/api/proxy/relations', 200)");
+    const handlerStart = readsSource.indexOf("logEvent(req, '/api/proxy/relations', 200)");
     assert.ok(handlerStart !== -1, '/relations 200 handler not found');
-    const block = proxySource.slice(handlerStart, handlerStart + 600);
+    const block = readsSource.slice(handlerStart, handlerStart + 600);
     assert.match(block, /\.\.\.flattenRelations\(issueRelations\)/, 'must spread the flattened relations payload');
     assert.doesNotMatch(block, /relations:\s*\{\s*nodes:/, 'relations must NOT be wrapped as { nodes: [...] }');
     assert.doesNotMatch(block, /inverseRelations:\s*\{\s*nodes:/, 'inverseRelations must NOT be wrapped as { nodes: [...] }');
+  });
+
+  // LIN-679 Stage 3a / LIN-2536 Verification step 5 / ticket item 7: the
+  // handler-local absence pin above moved to readsSource with the handler.
+  // This complementary pin stays on the FULL, unscoped proxySource text so a
+  // future re-introduction of the {nodes:} wrapper ANYWHERE in routes/proxy.js
+  // — not just inside the (now-departed) /relations handler — cannot pass
+  // silently once the scoped D-local pin no longer reads that file at all.
+  test('routes/proxy.js no longer contains the {nodes} relations wrapper anywhere (LIN-310)', () => {
+    assert.doesNotMatch(proxySource, /relations:\s*\{\s*nodes:/, 'relations must NOT be wrapped as { nodes: [...] } anywhere in routes/proxy.js');
+    assert.doesNotMatch(proxySource, /inverseRelations:\s*\{\s*nodes:/, 'inverseRelations must NOT be wrapped as { nodes: [...] } anywhere in routes/proxy.js');
   });
 });

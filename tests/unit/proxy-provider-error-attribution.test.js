@@ -416,10 +416,25 @@ describe('the withTimeout/fetchWithTimeout raiser wording is provider-neutral', 
 // characterization test complements with a direct source check.
 // ---------------------------------------------------------------------------
 describe('ssrfGuardUrl attachment-host message is provider-neutral', () => {
-  const PROXY_SRC = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
+  // LIN-679 Stage 3a / LIN-2536: ssrfGuardUrl (and the whole attachments
+  // handler it guards) moved to routes/proxy-reads.js. Single-region, travels
+  // with group D — this block's own PROXY_SRC is independent of the :389
+  // block above (separately block-scoped, no shared-const hazard).
+  const PROXY_SRC = readFileSync(join(__dirname, '../../routes/proxy-reads.js'), 'utf8');
+  const ROUTES_PROXY_SRC = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
 
   test('the host-not-allowed message no longer names Linear', () => {
     assert.match(PROXY_SRC, /reason: 'host-not-allowed', message: 'Invalid attachment URL: host not allowed'/);
     assert.doesNotMatch(PROXY_SRC, /must be from Linear/);
+  });
+
+  // Complementary absence pin (ticket Verification step 5 / R2, mirrors the
+  // 937555cd/LIN-2245 template item 7 already applies to the relations
+  // {nodes:} pair): a still-green assertion whose subject left the file is a
+  // defect, not a pass — this stops the old wording from silently
+  // reappearing anywhere in routes/proxy.js now that the scoped pin above no
+  // longer reads that file at all.
+  test('routes/proxy.js no longer contains the old Linear-named host message anywhere', () => {
+    assert.doesNotMatch(ROUTES_PROXY_SRC, /must be from Linear/);
   });
 });

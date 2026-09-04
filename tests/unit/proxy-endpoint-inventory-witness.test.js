@@ -549,14 +549,16 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
   // routes/proxy-tokens-admin.js, mounted the same way — 53 - 5 = 48.
   // LIN-2535 (Stage 2 / PR-2c): group C's 1 router.* registration moved to
   // routes/proxy-token-exchange.js — 48 - 1 = 47.
-  test('routes/proxy.js has exactly 47 router.* registrations (65 URL forms across the whole proxy surface)', () => {
+  // LIN-2536 (Stage 3a / PR-3a): group D's 13 router.* registrations moved to
+  // routes/proxy-reads.js — 47 - 13 = 34.
+  test('routes/proxy.js has exactly 34 router.* registrations (65 URL forms across the whole proxy surface)', () => {
     const src = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
     const matches = src.match(/^\s{2}router\.(get|post|put|patch|delete)\(/gm) || [];
-    assert.equal(matches.length, 47,
-      `expected 47 route registrations in routes/proxy.js, found ${matches.length} — ` +
+    assert.equal(matches.length, 34,
+      `expected 34 route registrations in routes/proxy.js, found ${matches.length} — ` +
       `this file's 65-row ROWS table must be re-derived from source before trusting it`);
     assert.equal(ROWS.length, 65,
-      `this file's ROWS table must cover exactly 65 URL forms (47 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 10 array-path aliases), found ${ROWS.length}`);
+      `this file's ROWS table must cover exactly 65 URL forms (34 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 13 in routes/proxy-reads.js + 10 array-path aliases), found ${ROWS.length}`);
   });
 });
 
@@ -586,4 +588,65 @@ describe('LIN-679 PR-0: endpoint inventory witness (all 65 URL forms resolve)', 
       }
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// LIN-679 Stage 3a / LIN-2536, R1 (carried into implementation by the
+// coordinator's ruling, comment d5187b60): two D seams whose wiring — as
+// opposed to the underlying helper, which IS behaviourally covered elsewhere
+// — had only a source/unit-level pin before this stage, and that pin is
+// exactly the one that changes files in this move (routes/proxy.js ->
+// routes/proxy-reads.js). The status-only rows above prove resolution; they
+// do not prove response SHAPE, so they do not discharge this gap on their
+// own. These three tests drive the real composed app over HTTP and assert on
+// response bodies, closing it.
+// ---------------------------------------------------------------------------
+
+describe('LIN-2536 R1: HTTP-level witnesses for the two D seams pinned only by source text before this stage', () => {
+  test('GET /api/proxy/issues/:issueId/relations returns flat arrays, not the {nodes} shape (LIN-310)', async () => {
+    const provider = {
+      ...makeFakeProvider(),
+      relations: async () => ({
+        id: 'i1',
+        relations: { nodes: [{ id: 'r1', type: 'blocks' }] },
+        inverseRelations: { nodes: [{ id: 'r2', type: 'blocked_by' }] },
+      }),
+    };
+    const { status, body } = await call(buildApp({ provider }), 'GET', '/api/proxy/issues/LIN-77/relations');
+    assert.equal(status, 200);
+    assert.deepEqual(body.relations, [{ id: 'r1', type: 'blocks' }],
+      `relations must be a flat array, got ${JSON.stringify(body.relations)}`);
+    assert.deepEqual(body.inverseRelations, [{ id: 'r2', type: 'blocked_by' }],
+      `inverseRelations must be a flat array, got ${JSON.stringify(body.inverseRelations)}`);
+  });
+
+  test('GET /api/proxy/issues/:issueId overrides a trashed issue\'s state to Trashed/canceled (LIN-401)', async () => {
+    const provider = {
+      ...makeFakeProvider(),
+      issueDetail: async () => ({
+        id: 'i1', identifier: 'LIN-1', title: 't', trashed: true,
+        state: { name: 'In Progress', type: 'started' },
+        comments: { nodes: [] },
+      }),
+    };
+    const { status, body } = await call(buildApp({ provider }), 'GET', '/api/proxy/issues/LIN-1');
+    assert.equal(status, 200);
+    assert.deepEqual(body.state, { name: 'Trashed', type: 'canceled' },
+      `trashed issue's state must be overridden, got ${JSON.stringify(body.state)}`);
+    assert.equal(body.trashed, true);
+  });
+
+  test('GET /api/proxy/issues/:issueId/relations flags a trashed target with a top-level trashed:true', async () => {
+    const provider = {
+      ...makeFakeProvider(),
+      relations: async () => ({
+        id: 'i1', trashed: true,
+        relations: { nodes: [] },
+        inverseRelations: { nodes: [] },
+      }),
+    };
+    const { status, body } = await call(buildApp({ provider }), 'GET', '/api/proxy/issues/LIN-77/relations');
+    assert.equal(status, 200);
+    assert.equal(body.trashed, true);
+  });
 });
