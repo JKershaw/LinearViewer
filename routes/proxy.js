@@ -376,6 +376,13 @@ const proxyLimiter = rateLimit({
   skip: () => process.env.NODE_ENV === 'test'
 });
 
+// Module scope (not inside createProxyRoutes) so its budget is
+// process-global across every createProxyRoutes() instance, unlike
+// proxyLimiter above: two composer calls share one limiter, they don't each
+// get their own. Declaring this inside the factory would make it
+// per-instance instead, which is a behaviour change (LIN-679 Stage 2 /
+// LIN-2534 plan-review R4). Group A's sub-router (routes/proxy-tokens-admin.js)
+// receives this instance injected, never redeclares it.
 const proxyTokenCreationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,

@@ -32,7 +32,7 @@ const PROMPT_PROXY_TOKEN_TTL_SECONDS = 48 * 60 * 60;
  * @param {Object} deps.proxyTokenStore - Proxy token storage instance
  * @param {Object} deps.proxyEventStore - Proxy event/audit storage instance
  * @param {Function} deps.workspaceFromUrl - Session-cookie workspace resolution middleware
- * @param {Function} deps.proxyTokenCreationLimiter - Per-IP rate limiter middleware, POST /tokens only (process-global across every createProxyRoutes() instance — see routes/proxy.js's own declaration/comment; injected here rather than redeclared so that lifetime is preserved)
+ * @param {Function} deps.proxyTokenCreationLimiter - Per-IP rate limiter middleware, POST /tokens only (process-global across every createProxyRoutes() instance; injected here rather than redeclared so that lifetime is preserved)
  */
 export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, proxyTokenCreationLimiter }) {
   const router = Router();
