@@ -52,8 +52,14 @@ function extractRenderSavedRowsSrc() {
 // taken separately and run into the same context after the mask slice — the
 // real file relies on hoisting for the same call, which a single contiguous
 // slice could not reproduce.
+//
+// LIN-2445 widened the signature to `(role, text, state)` and added
+// `setBubbleState` + `PILL_GLYPHS` between this function and
+// `toolBreadcrumbLabel`, so the slice now carries all three. That is
+// deliberate: they are the pill's write path either side of the turn, and
+// keeping them in one slice is what lets the tests below drive both.
 function extractAppendBubbleSrc() {
-  const start = TASK_CHAT_JS_SRC.indexOf('  function appendBubble(role, text) {');
+  const start = TASK_CHAT_JS_SRC.indexOf('  function appendBubble(role, text, state) {');
   assert.notEqual(start, -1, 'appendBubble found in public/task-chat.js');
   const end = TASK_CHAT_JS_SRC.indexOf('\n  function toolBreadcrumbLabel', start);
   assert.notEqual(end, -1, 'the next top-level function marks the end of the slice');
@@ -109,6 +115,26 @@ function makeBubbleSandbox(activeTask) {
   vm.runInContext(extractMaskFnSrc(), sandbox, { filename: 'task-chat.js-mask-slice' });
   vm.runInContext(extractAppendBubbleSrc(), sandbox, { filename: 'task-chat.js-append-bubble-slice' });
   return { sandbox, captured };
+}
+
+// A bubble <li> shaped the way ChatUI.appendMessage renders one, just deep
+// enough for setBubbleState (LIN-2445): the `.chat-msg__who` pill it looks up,
+// carrying the `.status-pill__char` glyph node it rewrites. Kept separate from
+// FakeElement above, whose FakeClassList models only toggle/contains — this
+// path needs real add/remove.
+function makePillLi() {
+  const classes = new Set(['status-pill', 'chat-msg__who', 'status-pill--in-progress']);
+  const char = { textContent: '◐' };
+  const pill = {
+    classList: {
+      add: (...n) => n.forEach(c => classes.add(c)),
+      remove: (...n) => n.forEach(c => classes.delete(c)),
+      contains: (c) => classes.has(c),
+    },
+    querySelector: (sel) => (sel === '.status-pill__char' ? char : null),
+  };
+  const li = { querySelector: (sel) => (sel === '.chat-msg__who' ? pill : null) };
+  return { li, pill, char };
 }
 
 function makeSandbox(src) {
@@ -209,5 +235,61 @@ describe('appendBubble (LIN-2437 A.11 review finding 1) — assistant bubble spe
     const empty = makeBubbleSandbox('');
     empty.sandbox.appendBubble('assistant', 'hi');
     assert.equal(empty.captured[0].who, 'task', 'the || fallback must survive the mask being applied first');
+  });
+});
+
+// LIN-2445 — the pill's two write paths, at the unit level. The end-to-end
+// witnesses are in tests/e2e/task-chat.spec.js; these pin the mechanism
+// directly so a regression names the function rather than a rendered class.
+describe('appendBubble / setBubbleState (LIN-2445) — the assistant pill settles', () => {
+  test('a live assistant turn still OPENS in-progress', () => {
+    const { sandbox, captured } = makeBubbleSandbox('TEST-1');
+    sandbox.appendBubble('assistant', '');
+    assert.equal(captured[0].whoState, 'in-progress');
+  });
+
+  test('an already-complete turn opens SETTLED — the saved-chat replay path', () => {
+    // openSavedChat replays stored turns, every one of which finished before it
+    // was persisted. There is no completion moment to hook, so the state is
+    // passed at append time instead of swapped afterwards.
+    const { sandbox, captured } = makeBubbleSandbox('TEST-1');
+    sandbox.appendBubble('assistant', 'a stored answer', 'done');
+    assert.equal(captured[0].whoState, 'done');
+  });
+
+  test("the user's turn takes no status state, with or without an explicit one", () => {
+    const { sandbox, captured } = makeBubbleSandbox('TEST-1');
+    sandbox.appendBubble('user', 'a question', 'done');
+    assert.equal(captured[0].whoState, undefined, 'the user pill stays a neutral tag chip');
+  });
+
+  test('setBubbleState swaps in-progress for the terminal state AND its glyph', () => {
+    const { sandbox } = makeBubbleSandbox('TEST-1');
+    const { li, pill, char } = makePillLi();
+
+    sandbox.setBubbleState(li, 'done');
+
+    assert.ok(!pill.classList.contains('status-pill--in-progress'), 'the amber state must not persist');
+    assert.ok(pill.classList.contains('status-pill--done'));
+    // The glyph moves with the class — a swapped class over a stale ◐ would
+    // read as done in CSS while still showing the in-progress character.
+    assert.equal(char.textContent, '✓');
+  });
+
+  test('setBubbleState reaches the failed state too', () => {
+    const { sandbox } = makeBubbleSandbox('TEST-1');
+    const { li, pill, char } = makePillLi();
+
+    sandbox.setBubbleState(li, 'failed');
+
+    assert.ok(!pill.classList.contains('status-pill--in-progress'));
+    assert.ok(pill.classList.contains('status-pill--failed'));
+    assert.equal(char.textContent, '✕');
+  });
+
+  test('setBubbleState is a defensive no-op on a missing li or a bubble with no pill', () => {
+    const { sandbox } = makeBubbleSandbox('TEST-1');
+    assert.doesNotThrow(() => sandbox.setBubbleState(null, 'done'));
+    assert.doesNotThrow(() => sandbox.setBubbleState({ querySelector: () => null }, 'done'));
   });
 });
