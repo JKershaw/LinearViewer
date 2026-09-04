@@ -543,24 +543,37 @@
      bottom-right corner (16px inset + 83px wide, ~99px), so keep the
      centred button's right edge left of that band. This holds at every
      scroll position, since it never depends on scrollY. */
-  /* LIN-2296: 7rem (112px) cleared the FAB at every offset — re-measured, still
-     0 overlapping offsets at 320/360/390/430 — but at <=360px it squeezed the
-     flex item below the pill's natural 203px width, wrapping the label to two
-     lines and orphaning the arrow. That is L2 on the LIN-2272 ledger.
+  /* LIN-2296: LIN-2272's 7rem (112px) reserve cleared the FAB at every scroll
+     offset — re-measured, still 0 overlaps at 320/360/390/430 — but squeezed
+     the flex item below the pill's natural width at <=360px, wrapping the label
+     to two lines and orphaning the arrow. That is ledger item L2.
 
      Discharged by TUNING rather than by a human accepting the wrap, which is
-     the first option LIN-2296 itself lists. Measured at 360px with the 7rem
-     reserve: button right edge 220, FAB left edge 261 — 41px of slack to give
-     back. The centred button's right edge moves by half of whatever the reserve
-     gives up, so dropping 7rem -> 6rem (16px) spends 8px of that 41 and returns
-     16px of width to the button, taking it back over its 203px natural width.
+     the first option LIN-2296 itself lists.
 
-     6rem is the reserve the FAB's own footprint needs (--fab-band-x is 112px of
-     total band, but the button is CENTRED, so only half the shortfall matters).
-     320px still wraps and cannot not: there the button would need a right edge
-     of <=221 while being >=203 wide, which does not fit the viewport at all.
-     That is geometry, not tuning — recorded rather than papered over. */
-  .lc-more { padding-right: 6rem; }
+     The reserve has a VALID WINDOW at 360px, not a single right answer: too
+     large and the flex item is squeezed under the button's natural width and
+     wraps; too small and the centred button's right edge crosses into the FAB's
+     band. 4.5rem sits mid-window rather than against either edge, so a later
+     label or font change does not immediately re-break the single-line test.
+     7rem sat hard against the wrap edge and 6rem only just clear of it.
+
+     Do NOT reason about this as "the right edge moves by half the reserve you
+     give back" — that identity only holds while the button keeps a fixed width,
+     which is exactly not the regime here: giving reserve back also lets the
+     squeezed button grow, so both terms move at once. Measure, don't derive.
+
+     GATED on a rendered FAB, same as the footer reserve in
+     public/feedback-widget.css. Unconditionally reserving this space cost the
+     button ~96px on every Live Console load with the widget OFF — the default —
+     for a button that is not on screen. LIN-2272 shipped it ungated; that is
+     corrected here rather than carried forward.
+
+     320px is out of reach either way, and it is the CONTAINER that decides:
+     `.lc-more`'s content box starts at x=28, so a button wide enough to stay
+     single-line cannot also end left of the FAB. The two constraints are
+     disjoint at that width — not a tuning failure. */
+  body:has(#feedback-widget-root[data-enabled="true"]) .lc-more { padding-right: 4.5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

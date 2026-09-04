@@ -49,13 +49,25 @@
      card ends above the FAB, which is the common resting state. It is a real
      if partial mitigation, just not the one the old comment claimed.
 
-     What it CANNOT buy: the intermediate-offset sweep. Unlike the footer row
-     (LIN-2299) and the centred Live Console button (LIN-2296), these cards span
-     the full column by design, so there is no horizontal band to reserve — no
-     CSS reserve can keep full-width content out of a fixed overlay's path.
-     Closing that needs the FAB to stop overlaying (auto-hide while scrolling,
-     or participating in layout), which is a product decision rather than a
-     styling one and is parked on LIN-2298 rather than guessed at here. */
+     What it cannot buy, and a correction. The CARD RECT spans the full column
+     by design, so no horizontal reserve keeps it out of a fixed overlay's path
+     — that part stands, and it is cosmetic anyway (card text is left-aligned;
+     the FAB passes over whitespace).
+
+     But an earlier version of this comment generalised that into "no CSS
+     reserve can keep full-width content out of a fixed overlay's path" and used
+     it to dismiss the whole ticket. That was wrong about the half that matters.
+     The `open ↗` control is `.obs-session-open` inside `.obs-session-side`, a
+     right-aligned shrink-to-fit column (see the flex rules below) — structurally
+     the same shape as the footer rows LIN-2299 reserved, and reservable the same
+     scrollY-independent way. Honest measurement, overreaching conclusion.
+
+     It is still not fixed here, for a different and better reason: John ruled on
+     LIN-2298 (relocate the feedback trigger into nav chrome and drop the fixed
+     FAB entirely), which removes this whole defect class rather than reserving
+     around it, and routed that work to a later lane. A horizontal reserve on
+     `.obs-session-side` would be thrown away by it. If that ruling is ever
+     reversed, the reserve is the fix — not a claim that none exists. */
   padding: 0 0.6rem 6rem;
 }
 

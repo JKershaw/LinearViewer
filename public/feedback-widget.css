@@ -20,13 +20,61 @@
  * band it owns is 16 + 87.1 = 103.1px. --fab-band-x adds a small gutter on top
  * so reserved content never abuts the button.
  *
- * Consumers reserve against THIS, never a re-typed magic number:
- *   public/style.css      .footer-deploy   (LIN-2299, ~30 footer-bearing pages)
- *   public/live-console.css .lc-more       (LIN-2296, retuned from a flat 7rem)
+ * The footer reserve below consumes this token. `public/live-console.css`'s
+ * `.lc-more` deliberately does NOT — its reserve is tuned to a different
+ * constraint (keeping a centred button single-line inside its own container,
+ * see the comment there), so binding it to the FAB's band would couple two
+ * numbers that must move independently. An earlier version of this comment
+ * claimed both consumers reserved against the token; only one does.
  */
 :root {
-  --fab-inset: 16px;
   --fab-band-x: 112px;
+}
+
+/* LIN-2299: the fixed FAB covered the shared footer's `feedback` toggle — the
+   very control that dismisses it — at max scroll, on every footer-bearing page
+   whenever the widget is on. Horizontal reserve, never bottom padding, per the
+   LIN-2272 result above.
+
+   No overlap COUNTS are quoted here on purpose. They depend on the page's own
+   content (how tall the document is, where the footer lands), so a figure
+   measured on one route is not the figure on another — an earlier version of
+   this comment quoted per-width counts from a different page than the guard
+   test uses, and they did not reproduce. The live witness is the sweep in
+   tests/e2e/feedback-widget.spec.js, which asserts ZERO intersections at every
+   2px offset across four widths and goes red if this rule is removed.
+
+   GATED, and the gate is the whole point. `#feedback-widget-root` is rendered
+   only by renderFeedbackMount (lib/components/footer.js), itself gated on
+   `!isLanding && urlKey`, and carries `data-enabled` from the per-user
+   `feedbackWidget` flag. So this rule fires ONLY when a FAB is actually on
+   screen. An earlier ungated version of it (in style.css, with a
+   `var(--fab-band-x, 112px)` fallback) was measurably wrong twice, which is why
+   the gate is spelled out rather than assumed:
+     - on landing/legal pages feedback-widget.css is never loaded, so the
+       FALLBACK applied and shoved the centred footer 56px off-centre at 320px
+       for a FAB that cannot exist there;
+     - with the flag OFF — the default — it took `.footer-deploy` from 2 lines
+       to 4 on ~30 authenticated pages, again for a button that is not rendered.
+   `body:has(...)` is the established idiom here (public/ship.css:5,
+   public/swim.css:6). Living in THIS stylesheet is belt-and-braces: the rule
+   cannot even be parsed on a page that has no FAB stylesheet.
+
+   WHICH ROWS, and why not all of them. Measured with the sweep below, widget
+   on, `.footer-deploy` reserved: `.footer-actions` still reached the FAB's band
+   at 23 scroll offsets at 430px, and it holds the `reset` link — an interactive
+   control, i.e. the same defect as the covered `feedback` toggle — so it gets
+   the same reserve. `.footer-brand` also reaches the band (7 offsets at 390, 9
+   at 430) and is deliberately NOT reserved: it is a non-interactive wordmark,
+   so a fixed button passing over it is cosmetic, the same call made for the
+   Observation card body in public/observation.css. Recorded rather than
+   claimed away — an earlier version of this comment asserted that the rows
+   around `.footer-deploy` "never reach the FAB's band", which measurement
+   disproved, and which was itself a vertical-position argument of exactly the
+   kind LIN-2272 warns against. */
+body:has(#feedback-widget-root[data-enabled="true"]) .footer-deploy,
+body:has(#feedback-widget-root[data-enabled="true"]) .footer-actions {
+  padding-right: var(--fab-band-x);
 }
 
 .feedback-fab {
