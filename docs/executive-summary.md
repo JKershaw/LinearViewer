@@ -154,7 +154,7 @@ The planned feature — **follow-on prompts triggered by Claude Code** — would
 
 | Component | File | Role |
 |-----------|------|------|
-| Template definitions | `lib/prompt-template-defs.js` | 14 prompt templates with `aiHint` and `completionSignals` |
+| Template definitions | `lib/prompt-template-defs.js` | 17 prompt templates with `aiHint` and `completionSignals` |
 | Template engine | `lib/prompt-templates.js` | `generatePrompt()` entry point, availability rules |
 | Formatting helpers | `lib/prompt-formatters.js` | Shared section formatters |
 | Meta-prompt | `lib/prompts/meta-prompt-template.js` | AI decision tree for recommendation |

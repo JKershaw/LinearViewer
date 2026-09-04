@@ -178,6 +178,61 @@ describe('public/llms.txt prompt catalog stays in sync with PROMPT_TEMPLATES', (
 });
 
 // =============================================================================
+// The SAME drift, in the two internal current-state docs (LIN-2302 Instance 6).
+// `public/llms.txt` was guarded by the block above (LIN-2261), but that guard is
+// scoped to llms.txt only — CLAUDE.md and docs/executive-summary.md carry the
+// same hand-maintained count and were left unguarded. The figure has now drifted
+// three times inside one ticket's lifetime (14 -> 16 -> 17), and a stale value
+// has already been load-bearing once: an operator relied on the wrong figure
+// while filing LIN-2261 and propagated it into that ticket.
+//
+// Derived from the registry, never pinned to a literal, for the same reason the
+// block above is: the NEXT template addition should fail here rather than ship a
+// seventh instance of this class.
+//
+// SCOPE BOUNDARY: this is a narrow count guard, NOT the structural remedy for
+// claim-drift generally — that is LIN-2261's retrospective-audit template.
+//
+// What is deliberately NOT covered, and why (an earlier draft of this comment
+// claimed the exclusions were all "dated audit reports"; review showed that was
+// itself a false enumeration — on the very surface meant to stop false
+// enumerations — so it is spelled out properly here):
+//
+//   - docs/prompt-audit-report.md, docs/meta-prompt-audit-report.md — genuinely
+//     dated point-in-time records (Date: 2026-01-21 / 2026-01-28). Freezing a
+//     historical report is not drift.
+//   - docs/lin-260-prompt-scaling-research.md — a Status-marked RESEARCH doc,
+//     not a dated audit report. Same reasoning (a point-in-time artifact), but
+//     it is not the same kind of document, and saying so was wrong.
+//   - content/landing.md:18 ("14 deterministic templates") — undated, current
+//     state, and PUBLIC (parsed at boot by server.js and served
+//     unauthenticated), so it is squarely this class and NOT excluded on
+//     principle. It is excluded because it is already owned by LIN-2392, and
+//     absorbing another ticket's instance is the scope creep LIN-313 forbids.
+//     That file carries adjacent provider drift too (line 13 lists the backends
+//     and omits Jira and github-projects), which is the same ticket's business.
+// ==============================================================================
+
+describe('current-state docs keep the prompt-template count in sync with PROMPT_TEMPLATES', () => {
+  const templateCount = Object.keys(PROMPT_TEMPLATES).length;
+
+  const CURRENT_STATE_DOCS = [
+    { file: 'CLAUDE.md', pattern: /Prompt template definitions \((\d+) templates\)/ },
+    { file: 'docs/executive-summary.md', pattern: /\| (\d+) prompt templates with `aiHint`/ },
+  ];
+
+  for (const { file, pattern } of CURRENT_STATE_DOCS) {
+    test(`${file} advertises the registry's real template count`, () => {
+      const text = fs.readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+      const match = text.match(pattern);
+      assert.ok(match, `${file} must still carry a template-count claim matching ${pattern}`);
+      assert.strictEqual(Number(match[1]), templateCount,
+        `${file} claims ${match[1]} prompt templates; the registry exports ${templateCount}`);
+    });
+  }
+});
+
+// =============================================================================
 // generatePrompt Tests
 // =============================================================================
 
