@@ -766,6 +766,94 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
     assert.equal(res.jsonBody.unansweredAge.staleCount, 1, 'only the ws-a row is stale — ws-b must not inherit ws-a\'s raisedAt via a decision_id-only match');
   });
 
+  test('LIN-2367: two tasks in the SAME workspace sharing a decision_id each keep their own raisedAt', async () => {
+    // The sibling LIN-2291's review recorded and deliberately left unfixed.
+    // LIN-2291 closed the CROSS-workspace half by moving to a
+    // `(urlKey, decision_id)` composite key. That key is still not unique:
+    // `collectUnansweredDecisions` dedupes task decisions per
+    // `(urlKey, issueId)`, so ONE workspace can hold many unanswered rows,
+    // each carrying its own agent-invented free-text decision_id
+    // (simple-dispatcher/hook.js instructs: "a short unique string you invent
+    // for this decision"). Two tasks in one workspace both inventing
+    // 'proceed-or-abort' collide exactly as the cross-workspace pair did, and
+    // this is at least as likely — one workspace routinely dispatches many
+    // tasks under that identical instruction.
+    const staleMs = Date.now() - 30 * 60 * 60 * 1000; // 30h — stale under the 24h default
+    const freshMs = Date.now() - 60 * 60 * 1000;      // 1h — not stale
+    const taskDecisionsStore = {
+      async listResolvedForWorkspaces() { return []; },
+      async listUnansweredForWorkspaces(urlKeys) {
+        assert.deepEqual(urlKeys, ['ws-a']);
+        return [
+          {
+            id: 'scan_stale', urlKey: 'ws-a', issueId: '11111111-1111-1111-1111-111111111111',
+            issueIdentifier: 'LIN-20', decision: { decision_id: 'proceed-or-abort', question: 'q?' },
+            scannedAt: new Date(staleMs).toISOString(), outcome: null, outcomeAt: null
+          },
+          {
+            id: 'scan_fresh', urlKey: 'ws-a', issueId: '22222222-2222-2222-2222-222222222222',
+            issueIdentifier: 'LIN-21', decision: { decision_id: 'proceed-or-abort', question: 'q?' },
+            scannedAt: new Date(freshMs).toISOString(), outcome: null, outcomeAt: null
+          }
+        ];
+      }
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] } };
+    const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    // Precondition: both rows survive into the KPI at all. Without this a
+    // dedupe regression could drop one and make staleCount 1 vacuously.
+    assert.equal(res.jsonBody.unansweredAge.count, 2, 'both same-workspace rows must reach the KPI');
+    // Under the LIN-2291 composite key both rows resolve to the FIRST match —
+    // the 30h-stale one — so both count as stale. Matching on the store's own
+    // record identity gives each row its own scannedAt.
+    assert.equal(
+      res.jsonBody.unansweredAge.staleCount, 1,
+      'only the 30h row is stale; the 1h row must not inherit its raisedAt via a (urlKey, decision_id) match'
+    );
+  });
+
+  test('LIN-2367: a task-bound row with no resolvable record identity reports no raisedAt rather than borrowing one', async () => {
+    // The `|| null` degradation path on `taskDecisionAnchor`'s `taskDecisionId`.
+    // It cannot fire for a store-sourced row (`toRecord` always sets
+    // `id: doc._id`, and `_id` is the deterministic
+    // `scan_<issueId8>_<inputHash12>`), so this guards a future producer rather
+    // than a live case. The point is the FAILURE MODE: an unmatchable row must
+    // contribute no age at all, never silently adopt a neighbour's.
+    const staleMs = Date.now() - 30 * 60 * 60 * 1000;
+    const taskDecisionsStore = {
+      async listResolvedForWorkspaces() { return []; },
+      async listUnansweredForWorkspaces() {
+        return [
+          {
+            id: 'scan_real', urlKey: 'ws-a', issueId: '11111111-1111-1111-1111-111111111111',
+            issueIdentifier: 'LIN-30', decision: { decision_id: 'shared', question: 'q?' },
+            scannedAt: new Date(staleMs).toISOString(), outcome: null, outcomeAt: null
+          },
+          {
+            id: null, urlKey: 'ws-a', issueId: '22222222-2222-2222-2222-222222222222',
+            issueIdentifier: 'LIN-31', decision: { decision_id: 'shared', question: 'q?' },
+            scannedAt: new Date(staleMs).toISOString(), outcome: null, outcomeAt: null
+          }
+        ];
+      }
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] } };
+    const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    // The id-less row has no raisedAt, so it contributes no age: one stale row,
+    // not two. A null-matching find would have paired it with scan_real.
+    assert.equal(res.jsonBody.unansweredAge.staleCount, 1, 'an unmatchable row must not borrow a raisedAt from a neighbour');
+  });
+
   test('windowDays is clamped to [1, 365] and defaults to 30 when absent/invalid', async () => {
     const router = makeKpiRouter({ 'ws-a': { live: [], history: [], agentStatus: [] } });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');

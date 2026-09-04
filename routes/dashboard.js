@@ -1568,14 +1568,34 @@ export function createDashboardRoutes({
 
     const unansweredRows = unansweredRulings.map(row => {
       if (row.disposition === 'task-bound') {
-        // Keyed on (urlKey, decisionId), matching lib/unanswered-decisions.js's
-        // own shelfGate composite key (LIN-2262) — decisionId alone is
-        // agent-invented free text and not globally unique, so two workspaces
-        // sharing one would otherwise resolve to the wrong workspace's row
-        // and attach that row's raisedAt (LIN-2291).
-        const match = taskUnansweredRows.find(t =>
-          t.urlKey === row.anchor?.workspaceUrlKey && t.decision?.decision_id === row.decision?.decision_id
-        );
+        // Keyed on RECORD IDENTITY, not on any composite of content.
+        //
+        // This started as `decision_id` alone; LIN-2291 found two workspaces
+        // sharing one and moved to `(urlKey, decision_id)`. That is still not
+        // unique (LIN-2367): `collectUnansweredDecisions` dedupes task
+        // decisions per `(urlKey, issueId)`, so ONE workspace holds many
+        // unanswered rows, each carrying an agent-invented free-text
+        // decision_id — `simple-dispatcher/hook.js` literally instructs "a
+        // short unique string you invent for this decision". Two tasks in one
+        // workspace both inventing `proceed-or-abort` collide exactly as the
+        // cross-workspace pair did, and `.find` attaches the first row's
+        // `scannedAt` to both.
+        //
+        // No composite of CONTENT fixes this, which is why the key changes
+        // kind rather than growing another field: the rows already carry a
+        // real identity. `taskDecisionAnchor` stamps `taskDecisionId: entry.id`
+        // (lib/unanswered-decisions.js) and the store's `toRecord` sets
+        // `id: doc._id`, the deterministic `scan_<issueId8>_<inputHash12>`. Both
+        // sides of this join derive from the SAME read in this request, so the
+        // match is exact rather than merely probable.
+        //
+        // Both ids must be truthy. `taskDecisionId` degrades to `null` on an
+        // anchor whose entry had no id — unreachable for a store-sourced row,
+        // but without the guard a null-vs-null match would let an unmatchable
+        // row silently adopt a neighbour's raisedAt, which is the very defect
+        // class this line has now been through twice.
+        const anchorId = row.anchor?.taskDecisionId || null;
+        const match = anchorId ? taskUnansweredRows.find(t => t.id && t.id === anchorId) : null;
         return { decisionId: row.decision?.decision_id, raisedAt: match?.scannedAt || null };
       }
       const loop = loops.find(l => l.loopId === row.anchor?.loopId);
