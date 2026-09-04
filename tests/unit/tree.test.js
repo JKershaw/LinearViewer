@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES, selectFocusSubtask, computeFrontierFacts, isBlocked } from '../../lib/tree.js';
+import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, isTerminalState, isCompleted, TERMINAL_STATE_TYPES, selectFocusSubtask, computeFrontierFacts, isBlocked, expandToTreeContext, nodeKey } from '../../lib/tree.js';
 import { isHiddenState, getStateDisplay } from '../../lib/providers/state-map.js';
 import { childrenToGraphNodes, computeGraphFeatures, hasOpenFrontier } from '../../lib/graph-features.js';
 
@@ -297,6 +297,65 @@ describe('buildForest', () => {
       const titles = roots.map(r => r.issue.title).sort();
       assert.deepStrictEqual(titles, ['GitHub 7', 'Linear 7']);
     });
+  });
+});
+
+// =============================================================================
+// expandToTreeContext (LIN-2524)
+// =============================================================================
+// Seed-set expansion for the assignee filter's "personal working view": a
+// matched issue keeps its ancestor chain (for grouping context) and its full
+// descendant subtree (so a matched parent's subtasks stay visible).
+describe('expandToTreeContext', () => {
+  test('preserves a matched sub-issue\'s unmatched parent (ancestor expansion)', () => {
+    const parent = createIssue({ id: 'p1', title: 'Parent' });
+    const child = createIssue({ id: 'c1', title: 'Child', parent: { id: 'p1' } });
+    const unrelated = createIssue({ id: 'u1', title: 'Unrelated' });
+
+    const result = expandToTreeContext([parent, child, unrelated], new Set([nodeKey(child)]));
+
+    assert.ok(result.has(nodeKey(parent)), 'unmatched parent preserved');
+    assert.ok(result.has(nodeKey(child)), 'seed itself preserved');
+    assert.ok(!result.has(nodeKey(unrelated)), 'unrelated issue dropped');
+  });
+
+  test('preserves a matched parent\'s unmatched children (descendant expansion)', () => {
+    const parent = createIssue({ id: 'p2', title: 'Parent' });
+    const child = createIssue({ id: 'c2', title: 'Child', parent: { id: 'p2' } });
+    const grandchild = createIssue({ id: 'g2', title: 'Grandchild', parent: { id: 'c2' } });
+    const unrelated = createIssue({ id: 'u2', title: 'Unrelated' });
+
+    const result = expandToTreeContext([parent, child, grandchild, unrelated], new Set([nodeKey(parent)]));
+
+    assert.ok(result.has(nodeKey(parent)));
+    assert.ok(result.has(nodeKey(child)), 'direct child preserved');
+    assert.ok(result.has(nodeKey(grandchild)), 'breadth-first walk reaches grandchildren');
+    assert.ok(!result.has(nodeKey(unrelated)));
+  });
+
+  test('an issue with no relation to any match is dropped', () => {
+    const a = createIssue({ id: 'a3', title: 'A' });
+    const b = createIssue({ id: 'b3', title: 'B' });
+
+    const result = expandToTreeContext([a, b], new Set([nodeKey(a)]));
+
+    assert.strictEqual(result.size, 1);
+    assert.ok(result.has(nodeKey(a)));
+    assert.ok(!result.has(nodeKey(b)));
+  });
+
+  test('a fixture with two providers sharing a raw id does not collide (LIN-544)', () => {
+    const linearParent = createIssue({ id: 'shared', title: 'Linear parent', source: 'linear' });
+    const linearChild = createIssue({ id: 'lc', title: 'Linear child', source: 'linear', parent: { id: 'shared' } });
+    const githubTwin = createIssue({ id: 'shared', title: 'GitHub twin', source: 'github' });
+
+    const result = expandToTreeContext(
+      [linearParent, linearChild, githubTwin],
+      new Set([nodeKey(linearChild)])
+    );
+
+    assert.ok(result.has(nodeKey(linearParent)), 'linear parent (same source as seed) preserved');
+    assert.ok(!result.has(nodeKey(githubTwin)), 'github twin sharing the raw id is not pulled in');
   });
 });
 
