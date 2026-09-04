@@ -1223,4 +1223,68 @@ describe('GitHub Projects auth routes', () => {
       'never the GitHub Issues sibling\'s base path');
   });
 
+  // === LIN-2499: the CSRF nonce's post-success lifetime ===
+  // Mirrors the Issues-surface block in github-auth.test.js. The clear itself is
+  // shared (lib/github-install-flow.js since LIN-2397 stage B); these pin that
+  // BOTH surfaces get it, so a future de-sharing of the flow goes red here.
+
+  test('GET callback (install path) consumes oauthState/oauthIntent once the picker renders (LIN-2499)', async () => {
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github-projects/callback');
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github-projects' } });
+    const res = makeRes();
+
+    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+
+    assert.match(res.body, /github-projects-board-form/, 'the picker still renders');
+    assert.equal(session.oauthState, undefined);
+    assert.equal(session.oauthIntent, undefined);
+    assert.equal(session.githubProjectsPending.mode, 'new');
+  });
+
+  test('GET callback (re-bind path) consumes oauthState/oauthIntent once the picker renders (LIN-2499)', async () => {
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github-projects/callback');
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github-projects', workspaceUrlKey: 'acme' } });
+    const res = makeRes();
+
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+
+    assert.match(res.body, /github-projects-board-form/, 'the picker still renders');
+    assert.equal(session.oauthState, undefined);
+    assert.equal(session.oauthIntent, undefined);
+    assert.equal(session.githubProjectsPending.workspaceUrlKey, 'acme', 'the add-source target still rides in pending');
+  });
+
+  test('a replayed callback with the already-consumed nonce gets the 400 Session Expired page, not a second picker (LIN-2499)', async () => {
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github-projects/callback');
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github-projects' } });
+
+    const first = makeRes();
+    await handler({ query: { installation_id: '99', state: 'real' }, session }, first);
+    assert.match(first.body, /github-projects-board-form/);
+
+    const replay = makeRes();
+    await handler({ query: { installation_id: '99', state: 'real' }, session }, replay);
+
+    assert.equal(replay.statusCode, 400);
+    assert.match(replay.body, /Session Expired/);
+    assert.doesNotMatch(replay.body, /github-projects-board-form/, 'the flow did not re-run');
+  });
+
+  test('GET callback KEEPS the nonce on the no-installations beginInstall hop (LIN-2499 boundary)', async () => {
+    const provider = { ...fakeProvider(), listReboundableBoards: async () => [] };
+    const router = createGitHubProjectsAuthRoutes({ provider, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github-projects/callback');
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github-projects' } });
+    const res = makeRes();
+
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+
+    assert.match(res.redirectedTo, /installations\/new\?state=real/, 'the install hop carries the same nonce');
+    assert.equal(session.oauthState, 'real', 'the nonce survives for the return trip');
+    assert.deepEqual(session.oauthIntent, { mode: 'new', provider: 'github-projects' });
+  });
+
 });

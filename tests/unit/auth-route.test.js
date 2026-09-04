@@ -481,4 +481,60 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     // live-token workspace never leaked in, and org-1 (the pre-existing workspace) survives.
     assert.deepStrictEqual(session.workspaces, [{ id: 'org-1', name: 'Acme', urlKey: 'acme' }]);
   });
+
+  // === LIN-2499: the CSRF nonce's post-success lifetime ===
+  // docs/reviews/security-review-2026-06-25.md:64 recorded that oauthState is
+  // validated and never cleared. The mismatch arm (LIN-1351) and the add-source
+  // arms were already covered above; the mode:'new' SUCCESS path was not, on
+  // either side of the change. Worth pinning even though regenerate() below the
+  // clear happens to wipe both fields anyway — that is an incidental property of
+  // an unrelated session-fixation defence, and this is the assertion that would
+  // catch its removal, or a reordering that moves work above the regenerate.
+
+  test('mode:"new" success consumes oauthState/oauthIntent (LIN-2499)', async () => {
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' } });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.redirectedTo, '/workspace/acme/', 'the sign-in still lands');
+    assert.strictEqual(session.oauthState, undefined);
+    assert.strictEqual(session.oauthIntent, undefined);
+  });
+
+  test('a replayed callback with the consumed nonce hits the 400 Session Expired guard, not a second sign-in (LIN-2499)', async () => {
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' } });
+
+    const first = makeRes();
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, first);
+    assert.strictEqual(first.redirectedTo, '/workspace/acme/');
+
+    const replay = makeRes();
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, replay);
+
+    assert.strictEqual(replay.statusCode, 400);
+    assert.match(replay.body, /Session Expired/);
+    assert.strictEqual(replay.redirectedTo, null, 'the flow did not re-run');
+  });
+
+  test('add-source success consumes oauthState/oauthIntent (LIN-2499 characterization of the LIN-1351 clear)', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const myAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
+
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = addSourceSession(myAccount._id);
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.redirectedTo, '/workspace/acme/settings?provider_ok=linear');
+    assert.strictEqual(session.oauthState, undefined);
+    assert.strictEqual(session.oauthIntent, undefined);
+  });
 });

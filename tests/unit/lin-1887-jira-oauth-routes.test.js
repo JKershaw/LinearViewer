@@ -310,6 +310,56 @@ describe('LIN-1887 Step 4 — POST /auth/jira/oauth/link (the pick)', () => {
   });
 });
 
+// === LIN-2499: the CSRF nonce's post-success lifetime ===
+// routes/jira-auth.js:562/621 already deleted oauthState/oauthIntent — LIN-2499
+// names this surface as the in-repo precedent the other three routers were
+// brought up to. Nothing asserted it, so these are characterization tests: they
+// pin the behaviour that is already correct, and they record WHERE Jira's clear
+// point actually is, which is not identical to the GitHub surfaces'.
+//
+// Jira clears at FLOW COMPLETION, not unconditionally at the callback. With one
+// reachable site the callback IS the completion (it links and redirects), so the
+// nonce is gone when it returns. With several sites the callback renders a site
+// picker and the nonce is consumed by the POST pick that follows — mid-flow it
+// survives on purpose, the same reason lib/github-install-flow.js keeps it for
+// the beginInstall hop.
+describe('LIN-2499 — Jira OAuth consumes the CSRF nonce at flow completion', () => {
+  test('single site: the callback completes the flow and the nonce is gone', async () => {
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' } });
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), fetches: stubs() });
+
+    const res = await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
+
+    assert.equal(res.status, 302);
+    assert.equal(session.oauthState, undefined);
+    assert.equal(session.oauthIntent, undefined);
+  });
+
+  test('single site: replaying the consumed nonce gets the 400 Session Expired guard, not a second link', async () => {
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' } });
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), fetches: stubs() });
+
+    await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
+    const replay = await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
+
+    assert.equal(replay.status, 400);
+  });
+
+  test('several sites: the nonce survives the picker render and is consumed by the pick', async () => {
+    const session = makeSession({ oauthState: 'nonce', oauthIntent: { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' } });
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), fetches: stubs(TWO_SITES) });
+
+    const picker = await request(app, { path: '/auth/jira/oauth/callback?code=c&state=nonce' });
+    assert.equal(picker.status, 200);
+    assert.equal(session.oauthState, 'nonce', 'still mid-flow — the pick has not happened yet');
+
+    const pick = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-2' } });
+    assert.equal(pick.status, 302);
+    assert.equal(session.oauthState, undefined);
+    assert.equal(session.oauthIntent, undefined);
+  });
+});
+
 describe('LIN-1887 — the Phase 1 Basic routes are untouched', () => {
   test('GET /auth/jira still renders the API-token form', async () => {
     const app = makeApp({ session: makeSession(), store: makeStore(), provider: fakeProvider() });

@@ -1502,6 +1502,79 @@ describe('GitHub auth routes', () => {
     assert.doesNotMatch(res.body, /href="\/auth\/github-projects"/,
       'never the GitHub Projects sibling\'s base path');
   });
+
+  // === LIN-2499: the CSRF nonce's post-success lifetime ===
+  // docs/reviews/security-review-2026-06-25.md:64 recorded that oauthState is
+  // validated but never cleared, leaving the nonce replayable for the life of
+  // the session. Nothing asserted its lifetime in any of the four routers, so
+  // these are characterization tests first and a regression guard second. The
+  // clear lives in lib/github-install-flow.js (shared with the GitHub Projects
+  // router since LIN-2397 stage B), at the callback's TERMINAL exits only.
+
+  test('GET callback (install path) consumes oauthState/oauthIntent once the picker renders (LIN-2499)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
+    const res = makeRes();
+
+    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+
+    assert.match(res.body, /github-repo-form/, 'the picker still renders');
+    assert.equal(session.oauthState, undefined);
+    assert.equal(session.oauthIntent, undefined);
+    // The intent's payload survives where the link step actually reads it.
+    assert.equal(session.githubPending.mode, 'new');
+  });
+
+  test('GET callback (re-bind path) consumes oauthState/oauthIntent once the picker renders (LIN-2499)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' } });
+    const res = makeRes();
+
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+
+    assert.match(res.body, /github-repo-form/, 'the picker still renders');
+    assert.equal(session.oauthState, undefined);
+    assert.equal(session.oauthIntent, undefined);
+    assert.equal(session.githubPending.workspaceUrlKey, 'acme', 'the add-source target still rides in pending');
+  });
+
+  test('a replayed callback with the already-consumed nonce gets the 400 Session Expired page, not a second picker (LIN-2499)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
+
+    const first = makeRes();
+    await handler({ query: { installation_id: '99', state: 'real' }, session }, first);
+    assert.match(first.body, /github-repo-form/);
+
+    // Same session, same nonce, replayed — the guard now has nothing to match.
+    const replay = makeRes();
+    await handler({ query: { installation_id: '99', state: 'real' }, session }, replay);
+
+    assert.equal(replay.statusCode, 400);
+    assert.match(replay.body, /Session Expired/);
+    assert.doesNotMatch(replay.body, /github-repo-form/, 'the flow did not re-run');
+  });
+
+  // The boundary that makes the clear safe: a first-time connect has no
+  // installations yet, so the callback redirects to beginInstall REUSING this
+  // same nonce (LIN-735) and comes back through this handler a second time.
+  // Clearing on that arm would 400 every first-time connect.
+  test('GET callback KEEPS the nonce on the no-installations beginInstall hop (LIN-2499 boundary)', async () => {
+    const provider = { ...fakeProvider(), listReboundableRepos: async () => [] };
+    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
+    const res = makeRes();
+
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+
+    assert.match(res.redirectedTo, /installations\/new\?state=real/, 'the install hop carries the same nonce');
+    assert.equal(session.oauthState, 'real', 'the nonce survives for the return trip');
+    assert.deepEqual(session.oauthIntent, { mode: 'new', provider: 'github' });
+  });
 });
 
 describe('githubErrorDiagnostic (LIN-746)', () => {

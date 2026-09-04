@@ -301,6 +301,17 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
       }
 
       // === Normal Linear login (mode:'new') ===
+      // LIN-2499: consume the CSRF nonce now the callback has succeeded, so it
+      // cannot be replayed for the life of the session (security-review
+      // 2026-06-25). `intent` was already read into a local above, so nothing
+      // downstream needs the session copy. regenerate() below happens to wipe
+      // both fields too, but the invariant must not depend on that — the
+      // add-source arm above has no regenerate and clears them explicitly for
+      // the same reason (LIN-1351), and routes/jira-auth.js:562 is the
+      // in-repo precedent.
+      delete req.session.oauthState
+      delete req.session.oauthIntent
+
       // Preserve existing workspaces before regenerating session
       const existingWorkspaces = req.session.workspaces || []
       // LIN-2233 (L2.1): carry session.accountId and its freshness stamp across
