@@ -60,10 +60,9 @@ import { getProviderForWorkspace } from '../lib/providers/registry.js';
 // `priority` (Linear-native, unchanged) stays the wire's authoritative field;
 // `priorityLevel` is the additive canonical-scale field this ticket adds.
 import { canonicalPriorityToLinear } from '../lib/providers/models.js';
-import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
+import { isTrashed } from '../lib/trashed-signal.js';
 import { extractPeriodicalGateId, checkPeriodicalReportGate } from '../lib/periodical-report-gate.js';
 import { flattenIssue, collectIssueAttachments, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
-import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
@@ -85,7 +84,7 @@ import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPIL
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
-import { UUID_REGEX, isValidIssueId, requireTeamMembership, TeamNotFoundError } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import {
   parseSourceNamespace,
   resolveStateRef,
