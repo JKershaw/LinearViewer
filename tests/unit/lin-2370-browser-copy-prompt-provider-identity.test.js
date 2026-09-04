@@ -93,11 +93,14 @@ async function call(app, method, path, body) {
 }
 
 /**
- * Mint through the real route. `resolveWorkspaceAccess` is what decides the
- * DECLARED provider: its `provider` field is the pre-fallback name, which is
- * exactly the discriminator `declaredProviderDisplayName` gates on.
+ * Mint through the real route. The DECLARED provider is `workspace.provider` —
+ * the raw field on the session row `workspaceFromUrl` resolves — so the harness
+ * drives it there. `resolveWorkspaceAccess` is deliberately wired to throw: this
+ * route must not touch the provider-ACCESS lane at all to name the workspace
+ * (see the route comment), so any call would surface here as a failure rather
+ * than silently costing an interactive mint a live credential round trip.
  */
-async function mint({ resolveWorkspaceAccess, injectedProvider }) {
+async function mint({ provider }) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -106,13 +109,14 @@ async function mint({ resolveWorkspaceAccess, injectedProvider }) {
     agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, taskSnapshotStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => {
-      req.workspace = { urlKey: 'acme' };
+      req.workspace = { urlKey: 'acme', ...(provider === undefined ? {} : { provider }) };
       req.session = { accountId: 'account-A', features: { proxy: true } };
       next();
     },
     getWorkspaceAccessToken: () => null,
-    resolveWorkspaceAccess,
-    ...(injectedProvider ? { provider: injectedProvider } : {}),
+    resolveWorkspaceAccess: () => {
+      throw new Error('the mint route must not resolve provider ACCESS to name the provider');
+    },
     getWorkspaceOpenRouterKey: async () => null,
     workspacePreferencesStore: {}, freeTierStore: {},
   }));
@@ -121,44 +125,41 @@ async function mint({ resolveWorkspaceAccess, injectedProvider }) {
 
 describe('LIN-2370 Part 1 — the mint response carries the DECLARED provider name', () => {
   test('a declared non-Linear provider is named', async () => {
-    const res = await mint({
-      resolveWorkspaceAccess: async () => ({ token: 'tok', provider: 'github', reason: 'ok' }),
-      injectedProvider: { name: 'github', ui: { displayName: 'GitHub Issues' } },
-    });
+    const res = await mint({ provider: 'jira' });
 
     assert.equal(res.statusCode, 201, JSON.stringify(res.jsonBody));
-    assert.equal(res.jsonBody.providerDisplayName, 'GitHub Issues');
+    assert.equal(res.jsonBody.providerDisplayName, 'Jira');
     // The mint itself is untouched — the channel is additive.
     assert.ok(res.jsonBody.token, 'a token is still minted');
     assert.equal(res.jsonBody.kind, 'bootstrap');
   });
 
-  test('an UNDECLARED provider yields null — never the Linear fallback (the defect)', async () => {
-    // A workspace with no `provider` field. `getProviderForWorkspace` applies
-    // LEGACY_DEFAULT_PROVIDER, so `.displayName` reads 'Linear' here — reading
-    // it instead of `.declared` is precisely the bug. `.declared` is null, so
-    // the clause must be dropped.
-    const res = await mint({
-      resolveWorkspaceAccess: async () => ({ token: 'tok', provider: null, reason: 'ok' }),
-    });
+  test('a declared Linear workspace still reads exactly as before', async () => {
+    const res = await mint({ provider: 'linear' });
 
     assert.equal(res.statusCode, 201, JSON.stringify(res.jsonBody));
-    assert.equal(res.jsonBody.providerDisplayName, null,
-      'an undeclared provider must not resolve to Linear via the legacy fallback');
-    assert.ok(res.jsonBody.token, 'a token is still minted');
+    assert.equal(res.jsonBody.providerDisplayName, 'Linear');
   });
 
-  test('a failing provider resolve degrades to null and NEVER fails the mint', async () => {
-    // Resolution is this route's first provider IO. A token the caller can no
-    // longer obtain would be far worse than an unnamed provider, so any throw
-    // must degrade to the omitted clause.
-    const res = await mint({
-      resolveWorkspaceAccess: async () => { throw new Error('upstream down'); },
-    });
+  test('an UNDECLARED provider yields null — never the Linear fallback (the defect)', async () => {
+    // A legacy workspace row with no `provider` field. `getProviderForWorkspace`
+    // would apply LEGACY_DEFAULT_PROVIDER and read 'Linear' here — using it
+    // instead of the fallback-free `getProvider` IS the bug. The clause must be
+    // dropped instead.
+    for (const absent of [undefined, null, '']) {
+      const res = await mint({ provider: absent });
+      assert.equal(res.statusCode, 201, JSON.stringify(res.jsonBody));
+      assert.equal(res.jsonBody.providerDisplayName, null,
+        `${JSON.stringify(absent)}: an undeclared provider must not resolve to Linear`);
+      assert.ok(res.jsonBody.token, 'a token is still minted');
+    }
+  });
+
+  test('an unknown provider name yields null rather than throwing', async () => {
+    const res = await mint({ provider: 'not-a-registered-provider' });
 
     assert.equal(res.statusCode, 201, JSON.stringify(res.jsonBody));
     assert.equal(res.jsonBody.providerDisplayName, null);
-    assert.ok(res.jsonBody.token, 'the mint survives a provider-resolution failure');
   });
 });
 
@@ -216,28 +217,92 @@ describe('LIN-2370 Part 2a — public/common.js buildBlock (the +proxy append)',
   });
 });
 
-describe('LIN-2370 Part 2b — public/proxy.js buildAgentPrompt (the Proxy page copy button)', () => {
-  // public/proxy.js is a DOM-bound IIFE that returns early without its page
-  // elements, so its builder is not reachable through a window export. Pin the
-  // shipped source directly: the clause must be conditional on the parameter,
-  // and the Linear literal must be gone.
-  const SRC = readFileSync(join(__dirname, '../../public/proxy.js'), 'utf8');
-
-  test('buildAgentPrompt takes the declared provider name as a parameter', () => {
-    assert.match(SRC, /function buildAgentPrompt\(token, scope, providerDisplayName\)/);
+/**
+ * Drive the REAL public/proxy.js copy button in a vm sandbox and return the
+ * prompt it composed.
+ *
+ * public/proxy.js is a DOM-bound IIFE with no window export, so an earlier draft
+ * of this file asserted regexes against its source instead. Review was right that
+ * this is coverage-by-appearance — it pins formatting and would pass on a
+ * behaviour change the regexes do not happen to spell out. The builder IS
+ * reachable: the generate-button handler writes the composed prompt to
+ * `promptOutput.textContent`, so a stub document plus a stub `window.api` gets
+ * the shipped function's real output. This matters because no e2e touches the
+ * Proxy page copy button at all (`grep proxy-generate-btn tests/e2e/` is empty),
+ * making this the only coverage standing behind that call site.
+ */
+async function runCopyButton(providerDisplayName) {
+  const el = (extra = {}) => ({
+    textContent: '', dataset: {}, disabled: false,
+    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+    addEventListener(type, fn) { this._handlers = this._handlers || {}; this._handlers[type] = fn; },
+    querySelector: () => null, closest: () => null,
+    ...extra,
   });
 
-  test('the clause is conditional, and omitted rather than hedged when absent', () => {
-    assert.match(SRC, /const backing = providerDisplayName \? `; currently backed by \$\{providerDisplayName\}` : '';/);
-    assert.match(SRC, /workspace API proxy \(source-neutral\$\{backing\}\)/);
+  const generateBtn = el();
+  const promptOutput = el();
+  const tokenList = el({ dataset: { urlKey: 'acme' } });
+
+  const byId = { 'proxy-generate-btn': generateBtn, 'proxy-prompt-output': promptOutput };
+  const bySelector = { '.proxy-token-list': tokenList };
+
+  const sandbox = {
+    window: {
+      location: { origin: 'https://harbour.test' },
+      // The mint response is the channel under test.
+      api: async () => ({ token: 'BOOTSTRAP', providerDisplayName }),
+      relativeTime: () => '',
+    },
+    document: {
+      getElementById: (id) => byId[id] || null,
+      querySelector: (sel) => bySelector[sel] || null,
+      addEventListener() {},
+    },
+    navigator: { clipboard: { writeText: async () => {} } },
+    setTimeout, clearTimeout, console,
+    escapeHtml: (v) => String(v),
+  };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  // The IIFE's trailing init (refreshTokenCount / loadCredentialHealth) fires
+  // fetches through the same stubbed window.api; nothing there affects the
+  // prompt, and any rejection is an unhandled promise, not a load failure.
+  vm.runInContext(readFileSync(join(__dirname, '../../public/proxy.js'), 'utf8'),
+    sandbox, { filename: 'proxy.js' });
+
+  await generateBtn._handlers.click();
+  return promptOutput.textContent;
+}
+
+describe('LIN-2370 Part 2b — public/proxy.js buildAgentPrompt (the Proxy page copy button)', () => {
+  test('names a declared provider — the shipped builder, actually executed', async () => {
+    const out = await runCopyButton('Jira');
+    assert.match(out, /^You have access to a workspace API proxy \(source-neutral; currently backed by Jira\)\./);
+    // The mint's own token still reaches the copied prompt.
+    assert.match(out, /Bearer BOOTSTRAP/);
+  });
+
+  test('Linear still reads exactly as before on a Linear-backed workspace', async () => {
+    assert.match(await runCopyButton('Linear'),
+      /workspace API proxy \(source-neutral; currently backed by Linear\)/);
+  });
+
+  test('omits the clause entirely when the provider is unresolved', async () => {
+    for (const absent of [null, undefined, '']) {
+      const out = await runCopyButton(absent);
+      assert.doesNotMatch(out, /currently backed by/,
+        `${JSON.stringify(absent)}: no backing-provider claim at all when unresolved`);
+      assert.doesNotMatch(out, /Linear/,
+        `${JSON.stringify(absent)}: must never fall back to Linear`);
+      // Neutral, not hedged — still a complete sentence.
+      assert.match(out, /^You have access to a workspace API proxy \(source-neutral\)\. Use it to read/);
+    }
   });
 
   test('no unconditional Linear claim survives anywhere in the file', () => {
-    assert.doesNotMatch(SRC, /currently backed by Linear/,
+    assert.doesNotMatch(readFileSync(join(__dirname, '../../public/proxy.js'), 'utf8'),
+      /currently backed by Linear/,
       'the hardcoded claim this ticket exists to remove');
-  });
-
-  test('the call site threads the name from the mint response', () => {
-    assert.match(SRC, /buildAgentPrompt\(token, scope, data\.providerDisplayName \|\| null\)/);
   });
 });

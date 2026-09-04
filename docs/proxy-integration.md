@@ -67,9 +67,12 @@ Response:
   "label": "My Agent",
   "scope": "readWrite",
   "singleUse": false,
+  "providerDisplayName": "Linear",
   "message": "Token created. Save this token now - it cannot be retrieved later."
 }
 ```
+
+`providerDisplayName` (LIN-2370) is the **declared** provider backing this workspace — the name the browser's copy-prompt blocks use for their `currently backed by X` clause. It is `null` whenever no provider was actually declared for the workspace, and callers must reproduce that: **omit the claim entirely** rather than hedging it or defaulting to Linear (LIN-2354's contract). It is derived from the workspace's own `provider` field, so it costs no upstream call and can never fail a mint.
 
 ### Token Scopes
 

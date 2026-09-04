@@ -50,7 +50,7 @@ import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } f
 // surface for the dashboard fetchers only.
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { localProvider } from '../lib/providers/local/index.js';
-import { getProviderForWorkspace } from '../lib/providers/registry.js';
+import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
 // LIN-2239: the canonical ascending priority scale's boundary conversion —
 // `priority` (Linear-native, unchanged) stays the wire's authoritative field;
 // `priorityLevel` is the additive canonical-scale field this ticket adds.
@@ -1672,23 +1672,25 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // THIS route first, so the mint response is the channel — no new endpoint,
       // no page-shell data attribute (lib/render.js et al. would each need one).
       //
-      // Same contract as LIN-2354 everywhere else: `declaredProviderDisplayName`
-      // is gated on `.declared`, so this is the PRE-fallback name and is null
-      // exactly when nothing was declared. The clients omit the clause on null
-      // rather than hedging or defaulting to Linear.
+      // IDENTITY, NOT ACCESS. `workspace.provider` is the declared field already
+      // on the session row `workspaceFromUrl` resolved, and `getProvider` looks
+      // it up WITHOUT the registry's legacy-Linear default — so this is the same
+      // pre-fallback discriminator `declaredProviderDisplayName` gates on, for
+      // zero IO. Reading it here rather than calling `resolveProviderAccess` is
+      // deliberate and load-bearing (found by review): that helper resolves
+      // ACCESS, and on a cache miss it can walk every session, spend the
+      // refresh-on-resolve cooldown, and perform a live OAuth exchange with
+      // retries — an unbounded stall on an interactive copy button that
+      // previously touched no provider at all, plus credential-trail and
+      // token-rotation side effects, all to obtain a name already sitting on
+      // `req`. A try/catch would have bounded the failure but never the latency.
       //
-      // Wrapped so this can never fail a mint: resolution adds this route's first
-      // provider IO, and a token the caller can no longer obtain would be a far
-      // worse outcome than an unnamed provider. Any failure degrades to null,
-      // i.e. the clause is dropped — the same never-5xx neutral-degrade contract
-      // GET /api/proxy/instructions uses for the identical resolve.
-      let providerDisplayName = null;
-      try {
-        await resolveProviderAccess(workspace.urlKey, req.session?.accountId || null, req);
-        providerDisplayName = declaredProviderDisplayName(req);
-      } catch {
-        // Stays unresolved — the clause is omitted, never guessed.
-      }
+      // Never `getProviderForWorkspace`: that one applies LEGACY_DEFAULT_PROVIDER,
+      // so an undeclared workspace would read as "Linear" — the exact defect.
+      // Same derivation as routes/collective.js and the feedback-triage dispatch
+      // in routes/workspace-api.js. Null ⇒ the clients omit the clause entirely
+      // rather than hedging or guessing.
+      const providerDisplayName = getProvider(workspace.provider)?.ui?.displayName ?? null;
 
       res.status(201).json({
         success: true,
