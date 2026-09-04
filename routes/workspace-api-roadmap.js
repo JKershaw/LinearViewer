@@ -9,7 +9,7 @@ import { Router } from 'express';
 import { createHash } from 'crypto';
 import { badRequest, jsonError, notFound, unauthorized } from '../lib/errors.js';
 import { getNorthStarDocVersion } from '../lib/north-star-resolver.js';
-import { getProviderForWorkspace } from '../lib/providers/registry.js';
+import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { buildRoadmapNarrativeMessages } from '../lib/prompts/roadmap-narrative-template.js';
 import { buildRoadmapProductMessages } from '../lib/prompts/roadmap-product-template.js';
@@ -696,12 +696,21 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
       return streamLayer(res, { messages, apiKey: llm.apiKey, model: llm.model, maxTokens, layer, layerName, urlKey: req.workspace?.urlKey });
     }
 
+    // LIN-2371: the DECLARED provider identity for the narrative's identifier
+    // instruction. `req.workspace.provider` is the raw, uncoerced field and
+    // `getProvider` (unlike `getProviderForWorkspace`, imported above for
+    // capability shaping) carries no legacy-Linear default — so an undeclared
+    // workspace yields null and the instruction degrades to the neutral "their
+    // tracker identifier" rather than asserting Linear. Same derivation as
+    // routes/collective.js and routes/task-chat.js.
+    const declaredProviderDisplayName = getProvider(req.workspace?.provider)?.ui?.displayName ?? null;
+
     try {
       // Layer 1 — Technical (hard prerequisite; first unit already reserved).
       const tech = await runLayer({
         layer: 'technical', layerName: 'technical narrative', maxTokens: ROADMAP_LAYER_MAX_TOKENS, precharged: true,
         mockText: 'Mock technical narrative covering recent delivery.',
-        buildMessages: () => buildRoadmapNarrativeMessages(roadmapModel)
+        buildMessages: () => buildRoadmapNarrativeMessages(roadmapModel, declaredProviderDisplayName)
       });
       if (tech.ok) {
         // Layer 2 — Product (hard prerequisite; chains from technical).

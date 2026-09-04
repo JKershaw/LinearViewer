@@ -25,6 +25,7 @@ import { createChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-too
 import { sessionIsTerminal } from './dashboard.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
+import { getProvider } from '../lib/providers/registry.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 
@@ -439,7 +440,18 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       }
 
       const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
-      const messages = buildTaskChatMessages(context.issue, context, question.trim(), safeHistory);
+      // LIN-2371: the DECLARED provider identity for the persona sentence.
+      // `workspace.provider` is the raw, uncoerced field, and `getProvider`
+      // resolves it WITHOUT the registry's legacy-Linear default — so an
+      // undeclared workspace yields null here and the persona degrades to
+      // "a single task" rather than asserting Linear. Deliberately NOT taken
+      // from `issueProvider` above: that resolution ends in the defaulting
+      // lookup, so its display name always names some provider (Linear
+      // included), which is precisely the defect this fixes. Same derivation as
+      // routes/collective.js and the feedback-triage dispatch in
+      // routes/workspace-api.js.
+      const providerDisplayName = getProvider(workspace.provider)?.ui?.displayName ?? null;
+      const messages = buildTaskChatMessages(context.issue, context, question.trim(), safeHistory, providerDisplayName);
       const callMeta = { urlKey: workspace?.urlKey || null, feature: 'task-chat', issueIdentifier: context.issue?.identifier || null };
 
       // Forward every SSE event through untouched (including `tool` breadcrumbs,
