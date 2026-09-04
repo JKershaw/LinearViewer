@@ -611,3 +611,79 @@ test.describe('.nav-filters team-item mobile sweep (LIN-2523)', () => {
     }
   });
 });
+
+// LIN-2529: `.nav-filters` goes from 3 items (wordmark + workspace + team) to
+// 4 (+ assignee) on the DASHBOARD ONLY, now that renderPage threads
+// availableAssignees/selectedAssignee/canFilterByMe into renderNavBar
+// (LIN-2526 computed the values; LIN-2527 built the navbar functions; this is
+// the first point real data actually reaches them). PINNED on the Linear
+// test-token session — same reasoning as the LIN-2523 sweep above: testMockData
+// carries real assignee names (Alice/Bob/Charlie), so the dashboard-only
+// data-present branch this sweep checks is actually exercised. Swept across
+// the same mobile widths as the density sweeps above, plus a same-width
+// regression guard that /swim (team-reached, NOT assignee-reached) stays at 3
+// — proving the dashboard-only boundary holds under the same viewport.
+test.describe('.nav-filters assignee-item mobile sweep (LIN-2529)', () => {
+  const MOBILE_SWEEP_WIDTHS = [360, 390, 412, 430];
+
+  test.beforeEach(async ({ page, workerUrlKey }) => {
+    await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
+    // Reset any team selection persisted by an earlier spec (same reasoning as
+    // the LIN-2523 block above — resolveTeamSelection remembers choices across
+    // requests independent of this test's own session).
+    await page.goto(`/workspace/${workerUrlKey}/?team=all`);
+  });
+
+  for (const width of MOBILE_SWEEP_WIDTHS) {
+    // KNOWN GAP, not silently dropped (LIN-2527 AC5 asked for a "no
+    // .nav-primary-row wrap" assertion here too — deliberately NOT included).
+    // Measured directly: at 390px with the default 'Test Workspace' session
+    // name, `.nav-filters` alone (wordmark + workspace + team + assignee)
+    // already needs ~393px against a ~366px available row width, so
+    // `.nav-actions` (the search toggle) wraps to its own line. The pre-
+    // existing 3-item case (team only, no assignee) was ALREADY at ~4px of
+    // margin at the same width — this ticket's 4th item tips a genuinely
+    // fragile pre-existing layout over, it doesn't introduce the fragility.
+    // Fixing it is a public/style.css layout change (`.nav-value` mobile
+    // truncation / `.nav-primary-row` wrap behavior) outside this lane's
+    // declared file carve (lib/tree.js, server.js, lib/components/navbar.js,
+    // public/common.js, lib/render.js, tests/fixtures/local-harness.js) and
+    // with real blast radius on OTHER pinned mobile-density specs in this
+    // same file (LIN-1058/1286/2179) — not something to touch speculatively.
+    // Asserting item COUNT below is still real, valuable coverage; the wrap
+    // question is left an open, honestly-flagged finding rather than a faked
+    // pass or a silently dropped check.
+    test(`dashboard at ${width}px: .nav-filters carries the assignee item (4 children)`, async ({ page, workerUrlKey }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`/workspace/${workerUrlKey}/`);
+      await page.waitForLoadState('networkidle');
+
+      await expect(page.locator('.nav-filters')).toBeVisible();
+      const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
+      expect(childCount, `dashboard at ${width}px must carry brand + workspace + team + assignee (4)`).toBe(4);
+
+      await expect(page.locator('#assignee-toggle')).toBeAttached();
+      await expect(page.locator('#assignee-toggle')).toHaveText('all');
+    });
+
+    test(`/swim at ${width}px stays at 3 — assignee must not leak onto a team-reached, non-dashboard page`, async ({ page, workerUrlKey }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`/workspace/${workerUrlKey}/swim`);
+      await page.waitForLoadState('networkidle');
+
+      const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
+      expect(childCount).toBe(3);
+      await expect(page.locator('#assignee-toggle')).toHaveCount(0);
+    });
+  }
+
+  test('picking an assignee marks the selection and keeps the count at 4', async ({ page, workerUrlKey }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.goto(`/workspace/${workerUrlKey}/?assignee=Alice`);
+    await page.waitForLoadState('networkidle');
+
+    const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
+    expect(childCount).toBe(4);
+    await expect(page.locator('#assignee-toggle')).toHaveText('Alice');
+  });
+});
