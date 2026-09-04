@@ -2773,14 +2773,19 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
     // LIN-2025: resolve teamId against the workspace's actual team list
     // (graceful drop-to-unscoped on no match), replacing the UUID format
     // gate. This route doesn't go through fetchAndPrepareProjects, so it
-    // needs its own team fetch — guarded on teamId being present (no team
-    // filter, no extra round trip) AND kept inside the same isTestMode arm as
-    // the projects fetch below, so a test-token session never issues a real
-    // provider call ahead of it (that would break the roadmap.spec.js
-    // LIN-1034 regression guard's test-token coverage).
-    const resolvedTeamId = teamId
-      ? matchTeamId(isTestMode ? testMockTeams : await provider.fetchTeams(scope), teamId)
-      : null;
+    // needs its own team fetch — kept inside the same isTestMode arm as the
+    // projects fetch below, so a test-token session never issues a real
+    // provider call (that would break the roadmap.spec.js LIN-1034
+    // regression guard's test-token coverage).
+    //
+    // LIN-2522: unconditional on teamId presence (previously gated, so an
+    // unfiltered roadmap load had no team list to render a selector from —
+    // matchTeamId's own `if (!rawTeamId) return null` already makes a null
+    // teamId a no-op, so the old presence guard bought nothing but the
+    // missing list). Known accepted cost: a real added provider round trip
+    // on a genuine unfiltered roadmap load — deliberate and bounded.
+    const teams = isTestMode ? testMockTeams : await provider.fetchTeams(scope);
+    const resolvedTeamId = matchTeamId(teams, teamId);
     const { organizationName, projects, issues } = isTestMode
       ? testMockData
       : await provider.fetchProjects(scope, resolvedTeamId);
