@@ -1444,6 +1444,115 @@ describe('buildMetaPromptTemplate class check (LIN-313)', () => {
 // tests before approving the close. Mirrors the handwritten path per
 // CLAUDE.md's both-paths rule (review template's Test Quality Check bullet +
 // checklist item). Nothing pinned this on the meta path either (LIN-2303).
+
+// LIN-1873 — the cited-sweep rule on the META path.
+//
+// The both-paths rule (CLAUDE.md, docs/prompt-change-validation.md) is why this
+// file mirrors tests/unit/prompt-templates.test.js: a rule that lands only in
+// the handwritten templates silently does not apply to any AI-generated prompt,
+// and the two drift without anything noticing. LIN-2303 is the precedent —
+// LIN-2274's directive was unpinned on both paths until it added these.
+describe('buildMetaPromptTemplate cited-sweep rule (LIN-1873)', () => {
+  function build() {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context',
+      identifier: 'LIN-1',
+      hasSubtasks: false,
+      subtaskCount: 0,
+      completedCount: 0,
+      inProgressCount: 0,
+      remainingCount: 0,
+      hasComments: false,
+      commentCount: 0,
+      aiHints: 'hints'
+    });
+  }
+
+  test('Plan-prompts rule requires the query whose output IS the enumeration', () => {
+    const result = build();
+    assert.ok(
+      result.includes('cites the reproducible query whose output IS the enumeration'),
+      'the plan rule must require a cited sweep for any class-coverage claim'
+    );
+    assert.ok(
+      result.includes('the commit sha it was run at'),
+      'a query with no sha is not reproducible by the reviewer'
+    );
+  });
+
+  test('Plan-prompts rule carries the LIN-1871 evidence base, not a bare assertion', () => {
+    const result = build();
+    assert.ok(
+      result.includes('LIN-1871'),
+      'the rule should cite the four-ticket evidence base it came from'
+    );
+    assert.ok(
+      result.includes('4+ sessions and zero commits'),
+      'the cost of NOT having the rule is what motivates it'
+    );
+  });
+
+  test('Plan-prompts rule makes "no sweep" a first-class answer and names both shapes', () => {
+    const result = build();
+    assert.ok(
+      result.includes('some classes have no sweep and that saying so is a first-class answer'),
+      'without this the rule pushes plans toward inventing a query'
+    );
+    assert.ok(
+      result.includes('destinations* of new or moved code') || result.includes('destinations'),
+      'must name the moved-code-destinations shape'
+    );
+    assert.ok(
+      result.includes('production data rather than source'),
+      'must name the population-is-data shape'
+    );
+  });
+
+  test('Plan-prompts rule warns against a query that only looks authoritative', () => {
+    const result = build();
+    assert.ok(
+      result.includes('looks authoritative and is quietly incomplete'),
+      'the anti-incentive is what keeps the rule from becoming a box to tick'
+    );
+  });
+
+  test('Plan-review-prompts rule re-runs the plan\'s cited sweep as check (1)', () => {
+    const result = build();
+    assert.ok(
+      result.includes('re-run THAT query at the sha it names'),
+      'the verifier must re-run the cited query, not an equivalent of their own'
+    );
+    assert.ok(
+      result.includes('only where the plan cites no sweep does the verifier fall back'),
+      'the independent search is the fallback, not the primary path'
+    );
+  });
+
+  test('Plan-review-prompts rule directs disagreement at the sweep', () => {
+    const result = build();
+    assert.ok(
+      result.includes('argues about the SWEEP'),
+      'a disputed enumeration must be argued as a query'
+    );
+    assert.ok(
+      result.includes('converge'),
+      'must say why — a query converges where member-by-member discovery does not'
+    );
+  });
+
+  test('Plan-review-prompts rule checks the REASON when a class is declared un-sweepable', () => {
+    const result = build();
+    assert.ok(
+      result.includes('un-sweepable is not thereby incomplete'),
+      'the verifier must not treat an absent sweep as an automatic finding'
+    );
+    assert.ok(
+      result.includes('demand a sweep only where the verifier can name the query'),
+      'a demand must come with the query that would satisfy it'
+    );
+  });
+});
+
 describe('buildMetaPromptTemplate mutation-check directive (LIN-2274)', () => {
   function build() {
     return buildMetaPromptTemplate({
