@@ -144,6 +144,46 @@ export function defaultLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
 }
 
 /**
+ * Assignee-filter dashboard fixture (LIN-2529). `local.viewer()` returns the
+ * synthetic constant `{ id: 'local-user', name: 'Local User', ... }`
+ * regardless of what's seeded (lib/providers/local/index.js) — the local
+ * provider's `assignee` field is an unvalidated passthrough
+ * (`assignee: doc.assignee ?? null`, this file's `localSeedFromLinearFixture`),
+ * so the `me` spec exercises nothing unless at least one issue is actually
+ * seeded `assignee: { name: 'Local User' }` (F7).
+ *
+ * Shape, each case isolated to its own root so assertions can't cross-talk:
+ *   - `filter-parent` (Backlog, unassigned) → `filter-child` (Todo, assigned
+ *     'Local User'): filtering by Local User must pull the UNASSIGNED PARENT
+ *     in as ancestor context (matched sub-issue's unmatched parent).
+ *   - `filter-ip-parent` (In Progress, assigned 'Local User') →
+ *     `filter-ip-child` (Todo, unassigned): filtering by Local User must keep
+ *     the child visible both in the project tree (descendant context) AND in
+ *     the In Progress section (buildInProgressForest's OWN walk over the
+ *     already-filtered `issues`, LIN-2525's seam ordering).
+ *   - `filter-other` (Todo, assigned 'Other User'): proves an unrelated
+ *     assignee's issue is excluded when filtering by Local User.
+ *   - `filter-unrelated` (Backlog, unassigned, no relation to any match):
+ *     proves an issue with no relation to any match is dropped.
+ */
+export function assigneeFilterLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY) {
+  const id = (rawId) => localSeedId(urlKey, rawId);
+  return {
+    projects: [
+      { id: id('filter-proj'), name: 'Filter Project', content: null, sortOrder: 1 },
+    ],
+    issues: [
+      { id: id('filter-parent'), identifier: 'FILT-1', title: 'Unassigned parent', description: '', projectId: id('filter-proj'), sortOrder: 1, state: { name: 'Backlog', type: 'backlog' }, assignee: null, url: `/workspace/${urlKey}/issue/${id('filter-parent')}` },
+      { id: id('filter-child'), identifier: 'FILT-2', title: 'Assigned child', description: '', projectId: id('filter-proj'), parentId: id('filter-parent'), sortOrder: 2, state: { name: 'Todo', type: 'unstarted' }, assignee: { name: 'Local User' }, url: `/workspace/${urlKey}/issue/${id('filter-child')}` },
+      { id: id('filter-ip-parent'), identifier: 'FILT-3', title: 'Assigned in-progress parent', description: '', projectId: id('filter-proj'), sortOrder: 3, state: { name: 'In Progress', type: 'started' }, assignee: { name: 'Local User' }, url: `/workspace/${urlKey}/issue/${id('filter-ip-parent')}` },
+      { id: id('filter-ip-child'), identifier: 'FILT-4', title: 'Unassigned in-progress subtask', description: '', projectId: id('filter-proj'), parentId: id('filter-ip-parent'), sortOrder: 4, state: { name: 'Todo', type: 'unstarted' }, assignee: null, url: `/workspace/${urlKey}/issue/${id('filter-ip-child')}` },
+      { id: id('filter-other'), identifier: 'FILT-5', title: 'Other assignee task', description: '', projectId: id('filter-proj'), sortOrder: 5, state: { name: 'Todo', type: 'unstarted' }, assignee: { name: 'Other User' }, url: `/workspace/${urlKey}/issue/${id('filter-other')}` },
+      { id: id('filter-unrelated'), identifier: 'FILT-6', title: 'Unrelated unassigned task', description: '', projectId: id('filter-proj'), sortOrder: 6, state: { name: 'Backlog', type: 'backlog' }, assignee: null, url: `/workspace/${urlKey}/issue/${id('filter-unrelated')}` },
+    ],
+  };
+}
+
+/**
  * Ship radial view backlog-visibility fixture (LIN-1208). `swimLocalSeed`
  * doesn't cover the blocker/parent exemption — per LIN-1208's research, none
  * of its four backlog cards blocks or parents anything — so this is a
