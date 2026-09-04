@@ -481,4 +481,89 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     // live-token workspace never leaked in, and org-1 (the pre-existing workspace) survives.
     assert.deepStrictEqual(session.workspaces, [{ id: 'org-1', name: 'Acme', urlKey: 'acme' }]);
   });
+
+  // === LIN-2499: the CSRF nonce's post-success lifetime ===
+  // docs/reviews/security-review-2026-06-25.md:64 recorded that oauthState is
+  // validated and never cleared. The mismatch arm (LIN-1351) and the add-source
+  // arms were already covered above; the mode:'new' SUCCESS path was not.
+  //
+  // Say plainly what these are, because two of the three are NOT regression
+  // guards: routes/auth.js's mode:'new' path was never actually replayable —
+  // `req.session.regenerate()` below the new clear already wiped both fields,
+  // so the explicit `delete` is redundant-by-design, not a fix. The two
+  // outcome tests below therefore pass with that source line removed, and they
+  // are here to pin the OUTCOME the ticket names, whatever produces it. Only
+  // the third test isolates the new line itself.
+
+  test('mode:"new" success consumes oauthState/oauthIntent — outcome, however produced (LIN-2499)', async () => {
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' } });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.redirectedTo, '/workspace/acme/', 'the sign-in still lands');
+    assert.strictEqual(session.oauthState, undefined);
+    assert.strictEqual(session.oauthIntent, undefined);
+  });
+
+  test('a replayed callback with the consumed nonce hits the 400 Session Expired guard, not a second sign-in (LIN-2499)', async () => {
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' } });
+
+    const first = makeRes();
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, first);
+    assert.strictEqual(first.redirectedTo, '/workspace/acme/');
+
+    const replay = makeRes();
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, replay);
+
+    assert.strictEqual(replay.statusCode, 400);
+    assert.match(replay.body, /Session Expired/);
+    assert.strictEqual(replay.redirectedTo, null, 'the flow did not re-run');
+  });
+
+  // The one test that actually exercises routes/auth.js's own clear. The shim's
+  // regenerate deliberately does NOT wipe, so the explicit `delete` above it is
+  // the only thing that can clear these fields — delete that line and this test
+  // goes red, which is exactly what the two tests above cannot do. It is not
+  // idle: it pins the invariant as ORDER-INDEPENDENT, so a later refactor that
+  // moves work between the clear and the regenerate, or drops the regenerate
+  // (as the add-source arm already has), cannot silently resurrect the
+  // replayable nonce this ticket exists to remove.
+  test('mode:"new" success clears the nonce WITHOUT relying on regenerate() to wipe it (LIN-2499)', async () => {
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' } });
+    // A non-wiping regenerate: still invokes its callback (as the base helper
+    // does — both are synchronous), but preserves every field. Nothing but the
+    // route's own delete can then clear them.
+    session.regenerate = (cb) => { cb(); };
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.redirectedTo, '/workspace/acme/', 'the sign-in still lands');
+    assert.strictEqual(session.oauthState, undefined, 'cleared by routes/auth.js, not by the session wipe');
+    assert.strictEqual(session.oauthIntent, undefined);
+  });
+
+  test('add-source success consumes oauthState/oauthIntent (LIN-2499 characterization of the LIN-1351 clear)', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const myAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
+
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = addSourceSession(myAccount._id);
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.redirectedTo, '/workspace/acme/settings?provider_ok=linear');
+    assert.strictEqual(session.oauthState, undefined);
+    assert.strictEqual(session.oauthIntent, undefined);
+  });
 });
