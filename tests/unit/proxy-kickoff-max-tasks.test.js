@@ -16,8 +16,8 @@ process.env.NODE_ENV = 'test';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 // LIN-1880: this file opened a live TLS connection to api.linear.app on every
-// run. The Linear call is incidental — no assertion here reads Linear data —
-// so it is refused rather than stubbed with a plausible response.
+// run. Never restored — the refusal stands for the whole file, which also
+// means the dispatch referent guard stays fail-open here. See the fixture.
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
 installHermeticLinearTransport();
 import express from 'express';

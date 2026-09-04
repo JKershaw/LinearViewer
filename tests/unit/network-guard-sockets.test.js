@@ -24,6 +24,7 @@ process.env.NODE_ENV = 'test';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import net from 'node:net';
 import { guardNetwork, guardSockets } from '../fixtures/network-guard.js';
 
 let server;
@@ -104,6 +105,41 @@ describe('LIN-1880: guardSockets sees the transport layer', () => {
       guard.restore();
     }
     assert.deepEqual(guard.connections, [], '127.0.0.1 is not an escape');
+  });
+
+  test('records a direct http.request too — the OTHER class it claims to cover', () => {
+    // The module's selling point is covering BOTH classes the earlier
+    // instruments missed between them. The fetch test above proves the undici
+    // half; without this the `http(s).request` half rests on the loopback test,
+    // which would pass even if guardSockets were blind to it entirely. Review
+    // named that gap.
+    const guard = guardSockets({ isLoopback: () => false });
+    try {
+      const req = http.request(origin, () => {});
+      req.on('error', () => {});
+      req.end();
+    } finally {
+      guard.restore();
+    }
+    assert.ok(
+      guard.connections.length > 0,
+      'a direct http.request must also be visible at the socket layer'
+    );
+  });
+
+  test('a unix-socket path is loopback, not an escape', () => {
+    // Both call shapes must agree, and they did not: `{ path }` landed in the
+    // no-host branch (loopback) while the bare-string form was recorded as an
+    // escape. Review found the doc and the code claiming opposite things.
+    const guard = guardSockets();
+    try {
+      const sock = net.connect('/tmp/lin-1880-nonexistent.sock');
+      sock.on('error', () => {});
+      sock.destroy();
+    } finally {
+      guard.restore();
+    }
+    assert.deepEqual(guard.connections, [], 'a unix socket never leaves the machine');
   });
 
   test('restore() puts the real transports back, and is idempotent', async () => {

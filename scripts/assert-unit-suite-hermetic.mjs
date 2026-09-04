@@ -34,7 +34,7 @@
  * as a hermeticity pass).
  */
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,19 +42,33 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const workDir = mkdtempSync(join(tmpdir(), 'hermetic-'));
 const logPath = join(workDir, 'sockets.log');
+// Separate file, appended on watcher LOAD. Without it an empty socket log is
+// indistinguishable from "the watcher never ran" — a `--import` dropped by a
+// future Node/npm change, or an unwritable path, would silently print PASS.
+// That is the exact shape of vacuous guard this ticket exists to end, and it
+// would have been in the instrument that certifies the fix.
+const installedPath = join(workDir, 'installed.log');
 const watcherPath = join(workDir, 'socket-watcher.mjs');
 
 // The watcher is written out rather than kept as a repo file because it must be
 // loadable by `--import` in every child process, and because it is inert
 // instrumentation with no place in the shipped tree.
+const guardPath = join(ROOT, 'tests', 'fixtures', 'network-guard.js');
+
 writeFileSync(watcherPath, `
 import net from 'node:net';
 import tls from 'node:tls';
 import fs from 'node:fs';
 
 const OUT = ${JSON.stringify(logPath)};
+const INSTALLED = ${JSON.stringify(installedPath)};
+try { fs.appendFileSync(INSTALLED, process.argv.slice(1).join(' ') + '\\n'); } catch {}
 const hits = [];
-const loopback = (h) => !h || h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '0.0.0.0';
+// Imported, never re-implemented. A local copy drifted from
+// tests/fixtures/network-guard.js the moment that one learned unix sockets are
+// not escapes, and this script then failed a legitimate test. Two instruments
+// disagreeing about what they measure is exactly this ticket's defect class.
+import { defaultIsLoopback as loopback } from ${JSON.stringify(guardPath)};
 
 function destinationOf(args) {
   const a = args[0];
@@ -80,7 +94,13 @@ wrap(tls, 'connect', 'tls.connect');
 
 process.on('exit', () => {
   if (!hits.length) return;
-  try { fs.appendFileSync(OUT, hits.map((h) => JSON.stringify(h)).join('\\n') + '\\n'); } catch {}
+  try {
+    fs.appendFileSync(OUT, hits.map((h) => JSON.stringify(h)).join('\\n') + '\\n');
+  } catch (err) {
+    // Never swallow: a lost write turns a real escape into a silent PASS.
+    process.stderr.write('[hermetic] FATAL: could not record socket escapes: ' + err.message + '\\n');
+    process.exitCode = 1;
+  }
 });
 `);
 
@@ -99,26 +119,52 @@ if (withProxy) {
 
 console.log(`[hermetic] running the unit suite${withProxy ? ' with proxy env set' : ''}…`);
 
-const child = spawn('npm', ['run', 'test:unit'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'inherit'] });
-let out = '';
-child.stdout.on('data', (chunk) => { out += chunk; process.stdout.write(chunk); });
+const child = spawn('npm', ['run', 'test:unit'], { cwd: ROOT, env, stdio: 'inherit' });
+
+// Without this an ENOENT on `npm` emits an unhandled 'error' and throws a raw
+// stack instead of this script's own message.
+child.on('error', (err) => {
+  console.error(`\n[hermetic] could not start the unit suite: ${err.message}`);
+  process.exit(1);
+});
 
 child.on('close', (code) => {
   const rows = existsSync(logPath)
     ? readFileSync(logPath, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
     : [];
+  const installs = existsSync(installedPath)
+    ? readFileSync(installedPath, 'utf8').split('\n').filter(Boolean).length
+    : 0;
+
+  const cleanup = () => { try { rmSync(workDir, { recursive: true, force: true }); } catch {} };
 
   if (code !== 0) {
     console.error(`\n[hermetic] the unit suite FAILED (exit ${code}). A red suite makes the socket count meaningless — fix the suite first.`);
+    cleanup();
+    process.exit(1);
+  }
+
+  // POSITIVE CONTROL. A zero-length socket log only means "no escapes" if the
+  // watcher was actually present. `node --test` runs a process per file, so a
+  // healthy run installs it many times over; zero installs means the
+  // measurement never happened and the zero is meaningless.
+  if (installs === 0) {
+    console.error(
+      '\n[hermetic] FAIL — the socket watcher never loaded in any child process, so this run measured NOTHING.\n' +
+      'A zero here would be indistinguishable from a clean run. Check that NODE_OPTIONS `--import` still\n' +
+      'propagates to `node --test` children in this Node version.'
+    );
+    cleanup();
     process.exit(1);
   }
 
   if (rows.length === 0) {
-    console.log('\n[hermetic] PASS — the unit suite opened zero non-loopback sockets.');
+    console.log(`\n[hermetic] PASS — the unit suite opened zero non-loopback sockets (watcher installed in ${installs} processes).`);
+    cleanup();
     process.exit(0);
   }
 
-  console.error(`\n[hermetic] FAIL — the unit suite opened ${rows.length} non-loopback socket(s):`);
+  console.error(`\n[hermetic] FAIL — the unit suite opened ${rows.length} non-loopback socket(s) (watcher installed in ${installs} processes):`);
   const byDestination = new Map();
   for (const r of rows) {
     const file = (r.argv.match(/tests\/unit\/[\w.-]+/g) || []).pop() || r.argv.slice(0, 80);
@@ -135,5 +181,6 @@ child.on('close', (code) => {
     'tests/fixtures/hermetic-linear.js for the pattern — rather than mocking globalThis.fetch,\n' +
     'which module-scope transports capture before any test body runs.'
   );
+  cleanup();
   process.exit(1);
 });

@@ -86,9 +86,17 @@ export function guardNetwork() {
  * given a dispatcher, so proxy-based counting cannot see it either. Two
  * instruments, one blind spot each, the same escape invisible to both.
  *
- * This one wraps `net.connect` / `net.createConnection` / `tls.connect`, which
- * every transport in the process must go through — including undici. It
- * therefore covers BOTH classes at once, which is what LIN-1880 asked for.
+ * This one wraps `net.connect` / `net.createConnection` / `tls.connect`. That
+ * covers both classes the two earlier instruments missed between them —
+ * undici's `fetch` and direct `http(s).request` both route through
+ * `net.createConnection` — which is what LIN-1880 asked for.
+ *
+ * It is NOT true that every transport must go through these, and an earlier
+ * version of this comment said so. `new net.Socket().connect(host, port)` calls
+ * the prototype method directly and is invisible here; review demonstrated it
+ * with a probe. Nothing in this suite uses that shape, but on a ticket about
+ * instruments overclaiming their coverage, the claim belongs in the limits
+ * below rather than in the sentence selling the guard.
  *
  * LOOPBACK IS NOT RECORDED, and that is the whole reason this is usable. The
  * unit suite's own house pattern is `app.listen(0, '127.0.0.1')` plus a real
@@ -96,10 +104,18 @@ export function guardNetwork() {
  * report hundreds of legitimate connections and be useless as a signal. What
  * `connections` holds is escapes.
  *
- * KNOWN LIMIT, stated rather than left to be discovered: a hostname is
- * classified by string, so a non-loopback name that RESOLVES to 127.0.0.1
- * counts as an escape, and a unix-socket connection (no host) counts as
- * loopback. Neither shape appears in this suite.
+ * KNOWN LIMITS, stated rather than left to be discovered. None appears in this
+ * suite today; they are recorded so a future reader is not misled about what a
+ * clean run proves:
+ *   - `new net.Socket().connect(...)` bypasses the wrapped module functions
+ *     entirely (above).
+ *   - A hostname is classified by STRING, so a non-loopback name that RESOLVES
+ *     to 127.0.0.1 counts as an escape.
+ *   - A unix socket is treated as loopback, which it is. Both call shapes are
+ *     handled: `{ path }` (no host at all) and the bare-string form, which
+ *     `defaultIsLoopback` recognises by its leading `/`. An earlier version
+ *     documented the string form as loopback while the code recorded it as an
+ *     escape — review caught the mismatch by probe.
  *
  * @param {Object} [opts]
  * @param {(host: string|null) => boolean} [opts.isLoopback] - override the
@@ -160,8 +176,21 @@ export function guardSockets({ isLoopback = defaultIsLoopback } = {}) {
   };
 }
 
-/** Hosts that are not an escape: the suite's own in-process servers. */
-function defaultIsLoopback(host) {
+/**
+ * Hosts that are not an escape: the suite's own in-process servers.
+ *
+ * EXPORTED because `scripts/assert-unit-suite-hermetic.mjs` generates a
+ * standalone watcher that must classify identically. It had its own copy, the
+ * two drifted the moment this one learned about unix sockets, and the script
+ * then flagged a legitimate test as an escape. Two instruments disagreeing
+ * about what they measure is the defect class this whole ticket is about, so
+ * they now share one function rather than a convention.
+ */
+export function defaultIsLoopback(host) {
   if (!host) return true;
+  // A unix-socket path, passed as a bare string to net.connect('/tmp/x.sock').
+  // It never leaves the machine, so it is not an escape — and the `{ path }`
+  // form already lands in the `!host` branch above, so both shapes agree.
+  if (host.startsWith('/')) return true;
   return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0';
 }

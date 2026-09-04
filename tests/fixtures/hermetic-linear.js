@@ -30,9 +30,9 @@
  * body runs, swapping the global is not observed. `setLinearFetchImpl`
  * (lib/linear-fetch.js) is resolved per attempt inside the retry loop instead.
  *
- * USAGE — call at module scope, BEFORE the route imports run their side
- * effects is not required (the hook is read per call, not per construction),
- * but calling it at the top keeps the intent visible:
+ * USAGE — call at module scope. Ordering against the route imports does not
+ * matter (the hook is read per call, not per construction), but calling it at
+ * the top keeps the intent visible:
  *
  *     import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
  *     installHermeticLinearTransport();
@@ -47,6 +47,12 @@ import { setLinearFetchImpl } from '../../lib/linear-fetch.js';
  * Linear data, converting a real dependency into an invisible one — the same
  * shape of quiet failure this ticket is about. A refusal makes such a test go
  * red and name itself.
+ *
+ * NOTE the envelope is HTTP 200 with a GraphQL `errors` array, which is what
+ * every current consumer expects — they all go through graphql-request, which
+ * throws `ClientError` on `errors` regardless of status. A future consumer that
+ * called `createLinearFetch` directly and checked `res.ok` would read this as a
+ * success carrying `data: null`. If one appears, give this a non-2xx status.
  *
  * It refuses by returning a GraphQL-shaped error envelope rather than throwing,
  * because that is what the provider's own error path is built to handle: a
