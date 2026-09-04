@@ -217,7 +217,7 @@ const ROWS = [
   // --- Group C: token exchange ---
   {
     group: 'C', method: 'POST', url: '/api/proxy/token', expect: 401,
-    note: 'missing Bearer (:1830)',
+    note: 'missing Bearer (routes/proxy-token-exchange.js:39)',
     run: () => call(buildApp(), 'POST', '/api/proxy/token', { headers: { Authorization: '' } }),
   },
 
@@ -547,14 +547,16 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
   // regex, which only matches get/post/put/patch/delete) — 55 - 2 = 53.
   // LIN-2534 (Stage 2 / PR-2a): group A's 5 router.* registrations moved to
   // routes/proxy-tokens-admin.js, mounted the same way — 53 - 5 = 48.
-  test('routes/proxy.js has exactly 48 router.* registrations (65 URL forms across the whole proxy surface)', () => {
+  // LIN-2535 (Stage 2 / PR-2c): group C's 1 router.* registration moved to
+  // routes/proxy-token-exchange.js — 48 - 1 = 47.
+  test('routes/proxy.js has exactly 47 router.* registrations (65 URL forms across the whole proxy surface)', () => {
     const src = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
     const matches = src.match(/^\s{2}router\.(get|post|put|patch|delete)\(/gm) || [];
-    assert.equal(matches.length, 48,
-      `expected 48 route registrations in routes/proxy.js, found ${matches.length} — ` +
+    assert.equal(matches.length, 47,
+      `expected 47 route registrations in routes/proxy.js, found ${matches.length} — ` +
       `this file's 65-row ROWS table must be re-derived from source before trusting it`);
     assert.equal(ROWS.length, 65,
-      `this file's ROWS table must cover exactly 65 URL forms (48 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 10 array-path aliases), found ${ROWS.length}`);
+      `this file's ROWS table must cover exactly 65 URL forms (47 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 10 array-path aliases), found ${ROWS.length}`);
   });
 });
 

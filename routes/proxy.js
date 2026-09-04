@@ -19,6 +19,7 @@ import { createCredentialTrail } from '../lib/proxy-credential-trail.js';
 import { buildInstructions } from '../lib/proxy-instructions.js';
 import { createAgentStatusRoutes } from './proxy-agent-status.js';
 import { createTokensAdminRoutes } from './proxy-tokens-admin.js';
+import { createTokenExchangeRoutes } from './proxy-token-exchange.js';
 import { BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../lib/rejected-credentials.js';
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
 import { deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
@@ -78,7 +79,6 @@ import { foldPeriodicalRuns, DEFAULT_HORIZON_MS } from '../lib/periodical-runs.j
 import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION } from '../lib/dispatch-store.js';
 import { parseRepoFromDescription, resolveDispatchRepo, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext, shouldUseMcpTokenField, provisionBootstrapToken } from '../lib/proxy-preamble.js';
-import { WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
@@ -413,10 +413,11 @@ const PROXY_ATTACH_FAILED_MESSAGE = 'Proxy context was requested but a proxy tok
 // LIN-376: every handoff (dispatch preamble, feedback, collective, page copy,
 // +proxy toggle) embeds a single-use BOOTSTRAP token, never a standing/working
 // one. The agent exchanges it at POST /api/proxy/token for a multi-use working
-// token. WORKING_TOKEN_TTL_SECONDS is imported from lib/proxy-tokens.js so
-// every mint site shares one source of truth — BOOTSTRAP_TOKEN_TTL_SECONDS is
-// imported the same way, directly from lib/proxy-tokens.js, by group A's mint
-// site in routes/proxy-tokens-admin.js (LIN-679 Stage 2 / LIN-2534).
+// token. WORKING_TOKEN_TTL_SECONDS is imported directly from
+// lib/proxy-tokens.js by group C's exchange site in
+// routes/proxy-token-exchange.js (LIN-679 Stage 2 / LIN-2535), same pattern as
+// BOOTSTRAP_TOKEN_TTL_SECONDS, imported the same way by group A's mint site in
+// routes/proxy-tokens-admin.js (LIN-679 Stage 2 / LIN-2534).
 // MAX_COMMENT_LENGTH now imported from lib/issue-write-validation.js (LIN-1552).
 
 // Dispatch input limits. The prompt/url caps for the POST /dispatch payload now
@@ -1640,60 +1641,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     res.type('text/plain').send(text);
   });
 
-  /**
-   * POST /api/proxy/token  (LIN-376)
-   * Exchange a single-use bootstrap token for a multi-use working token.
-   *
-   * This is the ONE operation a bootstrap token authenticates — `authenticateProxyToken`
-   * (via validateToken) rejects a bootstrap on every data endpoint, so a handoff can
-   * embed a bootstrap safely and the agent's first real call is this exchange. The
-   * working token is returned only in this response body; it never enters the durable
-   * prompt/queue/log. Auth is inline (not authenticateProxyToken, which would reject a
-   * bootstrap): read the Bearer token and hand it straight to the store's atomic
-   * exchange. Rate-limited like every consumer route; the successful exchange is
-   * audit-logged against the resolved workspace.
-   */
-  router.post('/api/proxy/token', proxyLimiter, async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return jsonError(res, 401, 'Missing or invalid Authorization header', PROXY_TOKEN_REJECTED_EXTRA);
-    }
-    const bootstrap = authHeader.slice(7);
-    if (!bootstrap) {
-      return jsonError(res, 401, 'Empty token', PROXY_TOKEN_REJECTED_EXTRA);
-    }
-
-    try {
-      const working = await proxyTokenStore.exchangeBootstrapToken(bootstrap, {
-        ttl: WORKING_TOKEN_TTL_SECONDS
-      });
-      if (!working) {
-        // No workspace to attribute a failed exchange to, so it is not audit-logged.
-        // LIN-1985: same non-workspace-fault class as authenticateProxyToken's
-        // rejections above — the presented (bootstrap) token itself is bad.
-        return jsonError(res, 401, 'Invalid, expired, or already-exchanged bootstrap token', PROXY_TOKEN_REJECTED_EXTRA);
-      }
-
-      proxyEventStore.recordEvent({
-        urlKey: working.urlKey,
-        tokenId: working.tokenId,
-        tokenLabel: working.label,
-        method: 'POST',
-        endpoint: '/api/proxy/token',
-        status: 200
-      }).catch(err => console.error('Failed to log proxy event:', err));
-
-      res.json({
-        token: working.token,
-        scope: working.scope,
-        expiresAt: working.expiresAt,
-        notes: 'The bootstrap token you sent has been consumed by this exchange. Use the token above (the "token" field of this response) for all subsequent requests — the bootstrap is now spent and will never authenticate again.'
-      });
-    } catch (err) {
-      console.error('Proxy token exchange error:', err.message);
-      jsonError(res, 500, 'Failed to exchange token');
-    }
-  });
+  // Group C token-exchange (LIN-679 Stage 2 / LIN-2535): extracted to
+  // routes/proxy-token-exchange.js, mounted at its original position.
+  router.use(createTokenExchangeRoutes({ proxyTokenStore, proxyEventStore, proxyLimiter, PROXY_TOKEN_REJECTED_EXTRA }));
 
   // =========================================================================
   // Consumer API - Read Endpoints
