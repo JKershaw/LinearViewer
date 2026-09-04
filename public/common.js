@@ -1255,11 +1255,17 @@ window.ProxyToggle = (function () {
    * copy/download from the same page load (LIN-1140). on401:false — a failed mint
    * (incl. 401 or token rate-limit) falls through to null so the caller surfaces
    * it, rather than redirecting to /logout.
+   * LIN-2370: the response also carries `providerDisplayName` — the DECLARED
+   * provider identity — so `buildBlock` can name the real backend instead of
+   * hardcoding Linear. Returned as a pair rather than a bare token; `token` stays
+   * null-on-failure exactly as before, so every existing caller's failure branch
+   * is unchanged.
+   *
    * @param {string} urlKey
-   * @returns {Promise<string|null>}
+   * @returns {Promise<{token: string|null, providerDisplayName: string|null}>}
    */
   async function getOrCreateToken(urlKey) {
-    if (!urlKey) return null;
+    if (!urlKey) return { token: null, providerDisplayName: null };
     try {
       const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
         method: 'POST',
@@ -1269,15 +1275,32 @@ window.ProxyToggle = (function () {
         body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', bootstrap: true }),
         on401: false
       });
-      return (data && data.token) || null;
+      return {
+        token: (data && data.token) || null,
+        providerDisplayName: (data && data.providerDisplayName) || null
+      };
     } catch {
-      return null;
+      return { token: null, providerDisplayName: null };
     }
   }
 
-  function buildBlock(token) {
+  /**
+   * Compose the `## Workspace API access` block the +proxy toggle appends.
+   *
+   * LIN-2370: `providerDisplayName` follows LIN-2354's contract exactly — name the
+   * provider when one was DECLARED, and omit the clause entirely when it is null.
+   * Never hedge and never fall back to Linear: this block is agent-facing (a human
+   * pastes it into a worker), so on a GitHub-, Jira- or Local-backed workspace the
+   * unconditional Linear claim was the first thing a worker read about its own
+   * tooling, and it was false.
+   *
+   * @param {string} token - single-use bootstrap
+   * @param {string|null} [providerDisplayName] - declared provider display name, or null
+   */
+  function buildBlock(token, providerDisplayName) {
     const baseUrl = window.location.origin;
-    return `\n\n## Workspace API access\n\nYou have access to a workspace API proxy (source-neutral; currently backed by Linear). Use it to read and modify workspace issues, projects, and more.\n\nThis proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace attached this token for you; you do not have to take that on faith, because the exchange below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.\n\nFirst, exchange your single-use bootstrap token for a working token:\n\n  curl -X POST -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/token\n\nThat returns { "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "...", "notes": "…" }. The bootstrap is single-use — this exchange spends it — so use <WORKING_TOKEN> from here on. Then fetch the full API documentation:\n\n  curl -H "Authorization: Bearer <WORKING_TOKEN>" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
+    const backing = providerDisplayName ? `; currently backed by ${providerDisplayName}` : '';
+    return `\n\n## Workspace API access\n\nYou have access to a workspace API proxy (source-neutral${backing}). Use it to read and modify workspace issues, projects, and more.\n\nThis proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace attached this token for you; you do not have to take that on faith, because the exchange below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.\n\nFirst, exchange your single-use bootstrap token for a working token:\n\n  curl -X POST -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/token\n\nThat returns { "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "...", "notes": "…" }. The bootstrap is single-use — this exchange spends it — so use <WORKING_TOKEN> from here on. Then fetch the full API documentation:\n\n  curl -H "Authorization: Bearer <WORKING_TOKEN>" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
   }
 
   /**
@@ -1307,9 +1330,9 @@ window.ProxyToggle = (function () {
       if (!isFeatureEnabled()) return text;
     }
     if (!urlKey) throw new Error('Proxy is enabled but no workspace context was found for this prompt.');
-    const token = await getOrCreateToken(urlKey);
+    const { token, providerDisplayName } = await getOrCreateToken(urlKey);
     if (!token) throw new Error('Proxy is enabled but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
-    return text + buildBlock(token);
+    return text + buildBlock(token, providerDisplayName);
   }
 
   /**

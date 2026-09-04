@@ -69,7 +69,7 @@
         });
         const token = data.token;
 
-        const prompt = buildAgentPrompt(token, scope);
+        const prompt = buildAgentPrompt(token, scope, data.providerDisplayName || null);
         promptOutput.textContent = prompt;
         promptOutput.classList.add('has-prompt');
 
@@ -105,10 +105,26 @@
     });
   }
 
-  function buildAgentPrompt(token, scope) {
+  /**
+   * Compose the copy-to-clipboard agent prompt.
+   *
+   * LIN-2370: `providerDisplayName` is the DECLARED provider identity, carried on
+   * the token-mint response (`POST .../api/proxy/tokens`). Reuses LIN-2354's
+   * contract exactly — name the provider when one was declared, and OMIT the
+   * clause entirely when it is null/absent. Never hedge ("unknown") and never
+   * fall back to Linear: an unresolved workspace reading as "backed by Linear"
+   * is precisely the defect this fixes, and this block is agent-facing, so a
+   * human pastes it straight into a worker's context.
+   *
+   * @param {string} token - single-use bootstrap
+   * @param {string} scope - 'read' | 'readWrite'
+   * @param {string|null} [providerDisplayName] - declared provider display name, or null
+   */
+  function buildAgentPrompt(token, scope, providerDisplayName) {
     const instructionsUrl = `${baseUrl}/api/proxy/instructions`;
     const tokenUrl = `${baseUrl}/api/proxy/token`;
-    return `You have access to a workspace API proxy (source-neutral; currently backed by Linear). Use it to read${scope === 'readWrite' ? ' and modify' : ''} workspace issues, projects, and more.
+    const backing = providerDisplayName ? `; currently backed by ${providerDisplayName}` : '';
+    return `You have access to a workspace API proxy (source-neutral${backing}). Use it to read${scope === 'readWrite' ? ' and modify' : ''} workspace issues, projects, and more.
 
 This proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace generated this token for you; you do not have to take that on faith, because the exchange below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.
 

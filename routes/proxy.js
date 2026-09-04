@@ -50,7 +50,7 @@ import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } f
 // surface for the dashboard fetchers only.
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { localProvider } from '../lib/providers/local/index.js';
-import { getProviderForWorkspace } from '../lib/providers/registry.js';
+import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
 // LIN-2239: the canonical ascending priority scale's boundary conversion —
 // `priority` (Linear-native, unchanged) stays the wire's authoritative field;
 // `priorityLevel` is the additive canonical-scale field this ticket adds.
@@ -1664,6 +1664,34 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
             })
       });
 
+      // LIN-2370: the server→client provider channel the browser copy-prompt
+      // blocks need. `public/proxy.js` (buildAgentPrompt) and `public/common.js`
+      // (buildBlock, the +proxy append) both compose an agent-facing block that
+      // asserted "currently backed by Linear" to every workspace, because no
+      // provider identity is in scope in the browser. Both already mint through
+      // THIS route first, so the mint response is the channel — no new endpoint,
+      // no page-shell data attribute (lib/render.js et al. would each need one).
+      //
+      // IDENTITY, NOT ACCESS. `workspace.provider` is the declared field already
+      // on the session row `workspaceFromUrl` resolved, and `getProvider` looks
+      // it up WITHOUT the registry's legacy-Linear default — so this is the same
+      // pre-fallback discriminator `declaredProviderDisplayName` gates on, for
+      // zero IO. Reading it here rather than calling `resolveProviderAccess` is
+      // deliberate and load-bearing (found by review): that helper resolves
+      // ACCESS, and on a cache miss it can walk every session, spend the
+      // refresh-on-resolve cooldown, and perform a live OAuth exchange with
+      // retries — an unbounded stall on an interactive copy button that
+      // previously touched no provider at all, plus credential-trail and
+      // token-rotation side effects, all to obtain a name already sitting on
+      // `req`. A try/catch would have bounded the failure but never the latency.
+      //
+      // Never `getProviderForWorkspace`: that one applies LEGACY_DEFAULT_PROVIDER,
+      // so an undeclared workspace would read as "Linear" — the exact defect.
+      // Same derivation as routes/collective.js and the feedback-triage dispatch
+      // in routes/workspace-api.js. Null ⇒ the clients omit the clause entirely
+      // rather than hedging or guessing.
+      const providerDisplayName = getProvider(workspace.provider)?.ui?.displayName ?? null;
+
       res.status(201).json({
         success: true,
         tokenId: result.tokenId,
@@ -1672,6 +1700,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
         scope: result.scope,
         kind: result.kind,
         singleUse: result.singleUse,
+        providerDisplayName,
         message: 'Token created. Save this token now - it cannot be retrieved later.'
       });
     } catch (err) {
