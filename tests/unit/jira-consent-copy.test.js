@@ -116,15 +116,27 @@ describe('LIN-2302 instance 1 — Jira API-token consent copy', () => {
     // So: no negation may appear anywhere in the same sentence as a write verb,
     // in either order. Checked per sentence rather than per paragraph so a
     // legitimate negation elsewhere ("we never store your token") stays legal.
-    // `writ\w*` is deliberately NOT in this list. It over-fires on legitimate
-    // copy about the CREDENTIAL rather than the issue surface — "we never
-    // write your token to disk" is a true, useful sentence and must stay
-    // legal. The remaining verbs are all about issues, comments and labels,
-    // which is the capability this paragraph has to be honest about. A
-    // "no write access" claim is still caught, by FALSE_CLAIMS above.
+    // `writ\w*` is back, but scoped. Dropping it wholesale — to keep "we never
+    // write your token to disk" legal — opened a hole review demonstrated:
+    // "Harbour will not write to your Jira." passed everything, since
+    // FALSE_CLAIMS only bans the literal "no write access" phrasings. It is
+    // now included, with clauses about the TOKEN itself exempted, so both the
+    // true credential sentence and the false capability claim are handled.
+    // Two lists, because "without" negates FORWARD only. It appears before what
+    // it negates, so using it in the reverse (verb-then-negation) direction
+    // produced a false positive on truthful copy: "Harbour adds labels without
+    // creating new issues." tripped on `label ... without`, where the "without"
+    // governs "creating new issues" — an UNimplemented write it is correct to
+    // disclaim. A guard that rejects an accurate sentence is the same defect as
+    // one that accepts a false one, just pointing the other way.
     const NEGATION = String.raw`\b(?:never|not|no|cannot|can't|won't|will not|unable to|without)\b`;
-    const WRITE_VERB = String.raw`\b(?:chang\w*|updat\w*|modif\w*|edit\w*|comment\w*|label\w*)\b`;
+    const TRAILING_NEGATION = String.raw`\b(?:never|not|no|cannot|can't|won't|will not|unable to)\b`;
+    const WRITE_VERB = String.raw`\b(?:chang\w*|updat\w*|modif\w*|edit\w*|comment\w*|label\w*|writ\w*)\b`;
+    const ABOUT_THE_TOKEN = /\b(?:token|credential|password|secret)\b/i;
     for (const sentence of consentCopy().split(/(?<=[.!?])\s+/)) {
+      // A sentence about storing/handling the credential is not a claim about
+      // the issue surface, so it is exempt rather than banned.
+      if (ABOUT_THE_TOKEN.test(sentence)) continue;
       assert.doesNotMatch(
         sentence,
         new RegExp(`${NEGATION}[^.]*${WRITE_VERB}`, 'i'),
@@ -132,7 +144,7 @@ describe('LIN-2302 instance 1 — Jira API-token consent copy', () => {
       );
       assert.doesNotMatch(
         sentence,
-        new RegExp(`${WRITE_VERB}[^.]*${NEGATION}`, 'i'),
+        new RegExp(`${WRITE_VERB}[^.]*${TRAILING_NEGATION}`, 'i'),
         `consent copy negates a write capability: ${JSON.stringify(sentence)}`
       );
     }
@@ -173,11 +185,19 @@ describe('LIN-2302 instance 1 — Jira API-token consent copy', () => {
     // `\b` and `\w*`, not a trailing space: `|` binds loosest, so
     // `/upload|attachments? /` meant "upload" OR "attachments<space>" and
     // missed both "…adding attachments." and "attaching" (review findings).
+    // Split to CLAUSES, not sentences. Sentence scope was a real hole: any
+    // unrelated negation anywhere in the sentence suppressed the ban, so
+    // "Harbour has no access to your private projects, and will create new
+    // issues for you." passed every check. The negation has to belong to the
+    // same clause as the promise to excuse it.
     const NOT_NEGATED = (pattern) => {
-      for (const sentence of copy.split(/(?<=[.!?])\s+/)) {
-        if (!pattern.test(sentence)) continue;
-        if (/\b(?:never|not|no|cannot|can't|won't|will not|unable to)\b/i.test(sentence)) continue;
-        return sentence; // an affirmative promise of an unimplemented write
+      const clauses = copy
+        .split(/(?<=[.!?])\s+/)
+        .flatMap(sentence => sentence.split(/\s*(?:,|;|\band\b|\bbut\b|\bwhile\b|—)\s*/i));
+      for (const clause of clauses) {
+        if (!pattern.test(clause)) continue;
+        if (/\b(?:never|not|no|cannot|can't|won't|will not|unable to|without)\b/i.test(clause)) continue;
+        return clause; // an affirmative promise of an unimplemented write
       }
       return null;
     };

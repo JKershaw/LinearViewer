@@ -20,7 +20,7 @@
  *
  * This comment used to say "an API token authenticates a workspace binding,
  * not a human, so it cannot establish a login". That is false, and refuted by
- * this very file 165 lines below: `POST /auth/jira/link` validates via
+ * this very file, in `POST /auth/jira/link` below, which validates via
  * `GET /rest/api/3/myself` and then calls `establishAccount(..., 'jira',
  * myself.accountId, ...)` — the SAME durable-identity function the OAuth path
  * uses — under a comment reading "keyed on the human's Jira accountId". The
@@ -195,8 +195,16 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
   /**
    * Step 1: render the link form for the workspace the user is adding Jira
    * onto. `?workspace=<urlKey>` mirrors every other add-source entry point's
-   * `workspace` query param (routes/github-auth.js), even though Jira never
-   * carries a `mode` — it has no "new" (fresh top-level) path this phase.
+   * `workspace` query param (routes/github-auth.js).
+   *
+   * THESE BASIC ROUTES carry no `mode`, and that is the whole reason the
+   * workspace has to ride in the query string. Scoped deliberately: an earlier
+   * version of this line said "Jira never carries a `mode` — it has no 'new'
+   * (fresh top-level) path this phase", and both halves are false at HEAD. The
+   * OAuth lane below carries `mode` throughout and HAS a `mode: 'new'`
+   * bootstrap (see "LIN-1890 E2 — the `mode: 'new'` bootstrap" further down
+   * this file). "this phase" is the same stale framing LIN-2302 stripped from
+   * the sibling surfaces.
    */
   router.get('/auth/jira', (req, res) => {
     const workspaceUrlKey = req.query.workspace
