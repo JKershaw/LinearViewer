@@ -2593,7 +2593,7 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
     // each card's "Dispatched Sessions [N]" header (no per-card fetch). Counts
     // are non-critical — a store hiccup must never break the page, so fall back
     // to an empty map.
-    const [{ trees, inProgressTrees, recentActivityTrees, organizationName }, allLoops] = await Promise.all([
+    const [{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId }, allLoops] = await Promise.all([
       fetchAndPrepareProjects(workspace, teamId),
       getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore }).catch(() => [])
     ]);
@@ -2610,7 +2610,9 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
         customPrompts,
         initialIdentifier: req.params.identifier || null,
         isLocalhost,
-        sessionCounts
+        sessionCounts,
+        teams,
+        selectedTeamId
       }
     );
     res.send(html);
@@ -2645,7 +2647,7 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
   try {
     // Use swim sample data if session flag is set (for E2E tests/screenshots)
     const mockOverride = req.session.swimSample ? swimSampleData : null;
-    const { trees, inProgressTrees, recentActivityTrees, organizationName } = await fetchAndPrepareProjects(workspace, teamId, mockOverride);
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } = await fetchAndPrepareProjects(workspace, teamId, mockOverride);
     const html = renderSwimPage(
       { projectTrees: trees, inProgressTrees, recentActivityTrees, organizationName },
       {
@@ -2653,7 +2655,9 @@ app.get('/workspace/:urlKey/swim', workspaceFromUrl, async (req, res) => {
         urlKey: workspace.urlKey,
         openRouterSource,
         workspaces: req.session.workspaces,
-        featureFlags: getFeatureFlags(req.session)
+        featureFlags: getFeatureFlags(req.session),
+        teams,
+        selectedTeamId
       }
     );
     res.send(html);
@@ -2698,7 +2702,7 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
     const mockOverride = req.session.shipSample ? shipDenseSampleData
       : req.session.swimSample ? swimSampleData
       : null;
-    const { trees, inProgressTrees, recentActivityTrees, organizationName } =
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId } =
       await fetchAndPrepareProjects(workspace, teamId, mockOverride);
 
     // Orientation mode (LIN-301): a pure read of the newest saved roadmap report
@@ -2722,7 +2726,9 @@ app.get('/workspace/:urlKey/ship', workspaceFromUrl, async (req, res) => {
         orientation: latestReport?.orientation || [],
         orientationMeta: latestReport
           ? { generatedAt: latestReport.generatedAt, northStar: latestReport.northStar, model: latestReport.model }
-          : null
+          : null,
+        teams,
+        selectedTeamId
       }
     );
     res.send(html);
@@ -2801,7 +2807,9 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
         openRouterSource,
         workspaces: req.session.workspaces,
         featureFlags,
-        availableModels: AVAILABLE_MODELS
+        availableModels: AVAILABLE_MODELS,
+        teams,
+        selectedTeamId: resolvedTeamId
       }
     );
     res.send(html);

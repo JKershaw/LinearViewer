@@ -546,3 +546,68 @@ test.describe('Landing preview nav auth tap target (LIN-2210)', () => {
     for (const h of heights) expect(h).toBeGreaterThanOrEqual(44);
   });
 });
+
+// LIN-2523: `.nav-filters` goes from 2 items (wordmark + workspace) to 3
+// (+ team) on the four newly-selectored pages (swipe/swim/ship/roadmap) now
+// that they thread real teams/selectedTeamId into renderNavBar. PINNED on the
+// Linear test-token session (mirrors tests/e2e/error-handling.spec.js's own
+// "Team Filtering" block) — the local provider declares zero teams
+// (`fetchTeams` returns `[]`), so `swimLocalSeed`'s session would never
+// exercise the data-present branch this sweep is checking. Swept across the
+// same mobile widths tests/e2e/header-nav.spec.js's other density sweep uses
+// (360/390/412/430) so this rides the same "does the strip actually still
+// fit" concern, not just a desktop-only assertion.
+test.describe('.nav-filters team-item mobile sweep (LIN-2523)', () => {
+  const MOBILE_SWEEP_WIDTHS = [360, 390, 412, 430];
+  const NEWLY_SELECTORED_PAGES = ['swipe', 'swim', 'ship', 'roadmap'];
+  const FEATURES = encodeURIComponent(JSON.stringify({ roadmap: true, ship: true }));
+
+  test.beforeEach(async ({ page, workerUrlKey }) => {
+    await page.goto(`/test/set-session?urlKey=${workerUrlKey}&features=${FEATURES}`);
+    // Reset any team selection persisted for this {account, urlKey} by an
+    // earlier spec (LIN-2521's resolveTeamSelection remembers the choice
+    // across requests, independent of this test's own session) — an explicit
+    // ?team=all clears it (LIN-727), so every test below starts from the
+    // genuine "all" default rather than inheriting a stale filter.
+    await page.goto(`/workspace/${workerUrlKey}/?team=all`);
+  });
+
+  for (const width of MOBILE_SWEEP_WIDTHS) {
+    for (const pagePath of NEWLY_SELECTORED_PAGES) {
+      test(`${pagePath} at ${width}px: .nav-filters carries the team item (3 children, team selector attached)`, async ({ page, workerUrlKey }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto(`/workspace/${workerUrlKey}/${pagePath}`);
+        await page.waitForLoadState('networkidle');
+
+        await expect(page.locator('.nav-filters')).toBeVisible();
+        const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
+        expect(childCount, `${pagePath} at ${width}px must carry brand + workspace + team (3), not just brand + workspace (2)`).toBe(3);
+
+        await expect(page.locator('#team-toggle')).toBeAttached();
+        await expect(page.locator('#team-toggle')).toHaveText('all');
+      });
+    }
+
+    test(`a non-filterable page (dispatch) at ${width}px stays at 2 — the baseline this sweep's "3" is measured against`, async ({ page, workerUrlKey }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`/workspace/${workerUrlKey}/dispatch`);
+      await page.waitForLoadState('networkidle');
+
+      const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
+      expect(childCount).toBe(2);
+      await expect(page.locator('#team-toggle')).toHaveCount(0);
+    });
+  }
+
+  test('picking a team marks the selection and keeps the count at 3, on each newly-selectored page', async ({ page, workerUrlKey }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    for (const pagePath of NEWLY_SELECTORED_PAGES) {
+      await page.goto(`/workspace/${workerUrlKey}/${pagePath}?team=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee`);
+      await page.waitForLoadState('networkidle');
+
+      const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
+      expect(childCount, pagePath).toBe(3);
+      await expect(page.locator('#team-toggle'), pagePath).toHaveText('Engineering');
+    }
+  });
+});
