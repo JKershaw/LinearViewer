@@ -1664,6 +1664,32 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
             })
       });
 
+      // LIN-2370: the server→client provider channel the browser copy-prompt
+      // blocks need. `public/proxy.js` (buildAgentPrompt) and `public/common.js`
+      // (buildBlock, the +proxy append) both compose an agent-facing block that
+      // asserted "currently backed by Linear" to every workspace, because no
+      // provider identity is in scope in the browser. Both already mint through
+      // THIS route first, so the mint response is the channel — no new endpoint,
+      // no page-shell data attribute (lib/render.js et al. would each need one).
+      //
+      // Same contract as LIN-2354 everywhere else: `declaredProviderDisplayName`
+      // is gated on `.declared`, so this is the PRE-fallback name and is null
+      // exactly when nothing was declared. The clients omit the clause on null
+      // rather than hedging or defaulting to Linear.
+      //
+      // Wrapped so this can never fail a mint: resolution adds this route's first
+      // provider IO, and a token the caller can no longer obtain would be a far
+      // worse outcome than an unnamed provider. Any failure degrades to null,
+      // i.e. the clause is dropped — the same never-5xx neutral-degrade contract
+      // GET /api/proxy/instructions uses for the identical resolve.
+      let providerDisplayName = null;
+      try {
+        await resolveProviderAccess(workspace.urlKey, req.session?.accountId || null, req);
+        providerDisplayName = declaredProviderDisplayName(req);
+      } catch {
+        // Stays unresolved — the clause is omitted, never guessed.
+      }
+
       res.status(201).json({
         success: true,
         tokenId: result.tokenId,
@@ -1672,6 +1698,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
         scope: result.scope,
         kind: result.kind,
         singleUse: result.singleUse,
+        providerDisplayName,
         message: 'Token created. Save this token now - it cannot be retrieved later.'
       });
     } catch (err) {
