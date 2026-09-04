@@ -169,11 +169,15 @@ test.describe('Task Chat Page (experimental)', () => {
     // Every assistant bubble opened with an in-progress pill and NOTHING in
     // public/task-chat.js ever removed `status-pill--in-progress`, so a
     // completed answer kept the amber pill forever — the same thing a human
-    // reported on the Flight Companion page from a phone. `.task-chat-msg-who`
-    // is unique to the assistant bubble (appendBubble passes it as whoClass;
-    // the user's turn is a plain tag chip carrying no status class), so it is
-    // an unambiguous selector — the same reasoning flight-companion.spec.js
-    // records for `.fc-msg-who`.
+    // reported on the Flight Companion page from a phone.
+    //
+    // Every pill locator below is scoped by `.task-chat-msg-assistant` on
+    // purpose. `.task-chat-msg-who` alone would NOT be unambiguous: appendBubble
+    // passes the same whoClass for both roles, so the user's pill carries it
+    // too — only the `status-pill--*` state differs. That is where this diverges
+    // from flight-companion.spec.js's `.fc-msg-who`, which really is
+    // assistant-only (appendAssistantBubble passes it, appendUserBubble does
+    // not). Do not "simplify" these locators by dropping the role scope.
 
     test('a completed answer settles its speaker pill to done (LIN-2445)', async ({ page }) => {
       await page.locator('#task-chat-id').fill('TEST-1');
@@ -232,6 +236,64 @@ test.describe('Task Chat Page (experimental)', () => {
       // An empty answer is still an answer — the turn ended cleanly.
       const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
       await expect(pill).toHaveClass(/status-pill--done/);
+      await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+    });
+
+    // The remaining three terminal paths. The unknown-task test above covers the
+    // non-ok response's JSON arm through the real endpoint; these three are not
+    // reachable that way, so each is driven by intercepting the SSE turn. Added
+    // because "every terminal path is settled" was true of the code but not of
+    // the tests — three of the five had no witness at any level.
+
+    test('an SSE error event settles the pill to failed (LIN-2445)', async ({ page }) => {
+      await page.route(`**${CHAT_API}/**`, (route) => route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+        body: 'event: error\ndata: {"message":"upstream exploded"}\n\n',
+      }));
+
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('hi');
+      await page.locator('#task-chat-send').click();
+
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(answer).toContainText('upstream exploded', { timeout: 5000 });
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(pill).toHaveClass(/status-pill--failed/);
+      await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+    });
+
+    test('a non-ok response whose body is not JSON still settles the pill (LIN-2445)', async ({ page }) => {
+      // The parse-failure arm: response.json() rejects, so the .catch() branch
+      // renders the status-only message. It settles the pill too.
+      await page.route(`**${CHAT_API}/**`, (route) => route.fulfill({
+        status: 500,
+        headers: { 'Content-Type': 'text/html' },
+        body: '<html>not json at all</html>',
+      }));
+
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('hi');
+      await page.locator('#task-chat-send').click();
+
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(answer).toContainText('request failed (500)', { timeout: 5000 });
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(pill).toHaveClass(/status-pill--failed/);
+      await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+    });
+
+    test('a network failure settles the pill to failed (LIN-2445)', async ({ page }) => {
+      await page.route(`**${CHAT_API}/**`, (route) => route.abort('failed'));
+
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('hi');
+      await page.locator('#task-chat-send').click();
+
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(answer).toContainText('network failure', { timeout: 5000 });
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(pill).toHaveClass(/status-pill--failed/);
       await expect(pill).not.toHaveClass(/status-pill--in-progress/);
     });
   });

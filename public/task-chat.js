@@ -119,7 +119,12 @@
     if (!li) return;
     var pill = li.querySelector('.chat-msg__who');
     if (!pill) return;
-    pill.classList.remove('status-pill--in-progress');
+    // Clear EVERY state this function can set, not just in-progress: a bubble
+    // that is settled twice (an abort landing in the outer catch after a `done`
+    // already arrived) would otherwise carry both --done and --failed, and read
+    // as whichever CSS rule happens to come last. Removing all three first
+    // makes the swap idempotent and order-independent.
+    pill.classList.remove('status-pill--in-progress', 'status-pill--done', 'status-pill--failed');
     pill.classList.add('status-pill--' + state);
     var char = pill.querySelector('.status-pill__char');
     if (char) char.textContent = PILL_GLYPHS[state] || '';
