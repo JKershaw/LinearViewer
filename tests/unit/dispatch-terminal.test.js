@@ -471,7 +471,7 @@ describe('deriveLifecycleStatus (LIN-2079)', () => {
       assert.equal(deriveLifecycleStatus(merged), 'failed');
     });
 
-    test('resume-launch-failed [failed] (dispatcher.js:798), rootItemId threaded on a parked target, derives failed on the anchor', () => {
+    test('resume-launch-failed [failed] (dispatcher.js:855), rootItemId threaded on a parked target, derives failed on the anchor', () => {
       const followUpRow = {
         feedback: [
           {
@@ -486,10 +486,10 @@ describe('deriveLifecycleStatus (LIN-2079)', () => {
       assert.equal(deriveLifecycleStatus(merged), 'failed');
     });
 
-    test('negative control: the SAME resume-launch-failed marker, unanchored (as dispatcher.js posts when the pre-attempt phase was NOT parked), never joins the anchor lineage', () => {
+    test('negative control: the SAME resume-launch-failed marker, unanchored (as dispatcher.js posts when the target was already terminal — non-parked, non-forced; an unconditional post here would falsely flip an honest terminal, LIN-2366), never joins the anchor lineage', () => {
       const followUpRow = {
         feedback: [
-          { message: '[failed] Failed to resume iTerm session: boom', timestamp: '2026-08-20T02:00:00.000Z', kind: 'status' /* no rootItemId — active or already-terminal target */ }
+          { message: '[failed] Failed to resume iTerm session: boom', timestamp: '2026-08-20T02:00:00.000Z', kind: 'status' /* no rootItemId — already-terminal target. LIN-2366: a FORCED (active) target now threads rootItemId too, since the kill-first has already killed its reporter — this negative control now covers only the terminal population. */ }
         ]
       };
       const merged = mergeLineageFeedback(anchorParkedFeedback(), [followUpRow], ANCHOR, SINCE);
