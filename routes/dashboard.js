@@ -148,7 +148,7 @@ const EFFORT_READOUT_HISTORY_LIMIT = 200;
  * @param {(item: T) => Promise<any>} mapper
  * @returns {Promise<Array<{status:'fulfilled',value:any}|{status:'rejected',reason:any}>>}
  */
-async function settleWithConcurrency(items, limit, mapper) {
+export async function settleWithConcurrency(items, limit, mapper) {
   const results = new Array(items.length);
   let cursor = 0;
   const runNext = async () => {

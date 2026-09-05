@@ -35,6 +35,14 @@ const RECOMMEND_DESCENT_BUDGET_MS = 180_000;
 // with the client-disconnect signal and the shared descent budget so a stalled Linear
 // call can't hold the SSE socket open until Heroku's H15 fires (LIN-346, gap #1).
 const CONTEXT_FETCH_TIMEOUT_MS = 45_000;
+
+// GET /api/scan-due paging + fan-out bounds (LIN-2649 WS2/S3). Page size
+// mirrors BASIS_CHECK_MAX_PER_PAGE (public/observation.js) and its reasoning
+// — each check fetches live task context, so N candidates is N provider
+// reads. Concurrency mirrors pumpBasisChecks's shape, server-side over the
+// DB-sourced candidate list.
+const DUE_CHECK_PAGE_SIZE = 40;
+const DUE_CHECK_CONCURRENCY = 5;
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
@@ -45,7 +53,8 @@ import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
-import { scanBasisHashFromContext, dueBasisHashFromContext, basisChanged as computeBasisChanged, BASIS_VERSION } from '../lib/scan-fingerprint.js';
+import { scanBasisHashFromContext, dueBasisHashFromContext, dueChanged, basisChanged as computeBasisChanged, BASIS_VERSION } from '../lib/scan-fingerprint.js';
+import { settleWithConcurrency } from './dashboard.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
@@ -2729,6 +2738,122 @@ ${goal}`
       free_text: false
     });
   }
+
+  /**
+   * GET paginated scan-due candidates for a workspace (LIN-2649 WS2/S3): which
+   * already-scanned tasks have had their DUE-basis content move since they
+   * were last scanned, checked on demand against live provider reads. Pages
+   * ACROSS every distinct scanned issueId in the workspace via
+   * `taskDecisionsStore.listCandidatesForWorkspace` (keyset-ordered
+   * `(scannedAt asc, issueId asc)`), unlike the single-task scan routes above
+   * — but reuses this file's same resolve-then-gate capability convention and
+   * keepalive precedent.
+   *
+   * Do not reopen: page size, concurrency, ordering, response shape and the
+   * ledger-exclusion rule are the parent LIN-2241/LIN-2649 plan's settled
+   * design (LIN-2666).
+   *
+   * @route GET /workspace/:urlKey/api/scan-due
+   * @query {string} [cursor] - opaque base64url-JSON `{scannedAt,issueId}` keyset position;
+   *   absent starts at the beginning of the ordering. A decodable-but-stale cursor
+   *   (naming a pair no longer present) is NOT an error — the keyset `>` comparison
+   *   resumes from the nearest later point.
+   * @query {string} [source] - provider binding override, same convention as the routes above
+   * @returns {Object} { items, nextCursor, pageCandidateCount, totalCandidateCount } —
+   *   `items[]`: { issueId, issueIdentifier, dueStatus: true|false|null, error?: true }.
+   *   `dueStatus` is exactly `true`/`false`/`null`; `error` is an orthogonal flag set only
+   *   on a per-candidate provider-read failure, never folded into `dueStatus`.
+   */
+  router.get('/workspace/:urlKey/api/scan-due', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
+
+    if (!taskDecisionsStore) {
+      return jsonError(res, 503, 'Scan store not configured');
+    }
+    // [F-4] Capability gate — once per request, BEFORE any store read or
+    // provider call: a provider without fetchRecommendationContext fails the
+    // WHOLE page with one clean 422, instead of DUE_CHECK_PAGE_SIZE candidates
+    // each 422ing individually. Same resolve-then-gate convention as the scan
+    // routes above (and the recommend/recap/brief routes elsewhere in this file).
+    if (!issueProvider.supports('fetchRecommendationContext')) {
+      return jsonError(res, 422, "This workspace's provider does not support scan-due checks", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+      });
+    }
+
+    // Parse the opaque keyset cursor BEFORE any store call. Anything present
+    // that fails to decode/parse, or decodes to the wrong shape, is a 400 —
+    // a stale-but-decodable cursor is handled entirely inside
+    // listCandidatesForWorkspace's keyset comparison, not here.
+    let cursor = null;
+    if (req.query.cursor !== undefined) {
+      try {
+        if (typeof req.query.cursor !== 'string') throw new Error('cursor must be a string');
+        const decoded = JSON.parse(Buffer.from(req.query.cursor, 'base64url').toString('utf8'));
+        if (!decoded || typeof decoded !== 'object' || typeof decoded.scannedAt !== 'string' || typeof decoded.issueId !== 'string') {
+          throw new Error('cursor has the wrong shape');
+        }
+        cursor = { scannedAt: decoded.scannedAt, issueId: decoded.issueId };
+      } catch {
+        return jsonError(res, 400, 'Invalid cursor', { code: 'INVALID_CURSOR' });
+      }
+    }
+
+    // Force-regenerate-per-candidate always spends up to DUE_CHECK_PAGE_SIZE
+    // provider reads; arm a Heroku H12 guard around the store read + fan-out.
+    const keepalive = armKeepalive(res);
+    try {
+      const page = await taskDecisionsStore.listCandidatesForWorkspace(workspace.urlKey, { cursor, limit: DUE_CHECK_PAGE_SIZE });
+
+      const results = await settleWithConcurrency(page.items, DUE_CHECK_CONCURRENCY, async (row) => {
+        const context = await issueProvider.fetchRecommendationContext(issueCallScope, row.issueId);
+        // LIN-2649 WS2 null-ledger guard — same fail-open asymmetry as the
+        // scan-time write path above (this route's second call site, not a
+        // re-derivation): an absent harbourCommentsStore means "we cannot
+        // tell which comments are Harbour's", not "no comments changed" — an
+        // empty set filters nothing, so the worst case is a false DUE, never
+        // a false not-due and never a fabricated unknown.
+        const recordedCommentIds = harbourCommentsStore
+          ? await harbourCommentsStore.wereRecordedByHarbour(workspace.urlKey, context.comments)
+          : new Set();
+        const currentDueBasisHash = dueBasisHashFromContext(context, { recordedCommentIds });
+        return {
+          issueId: row.issueId,
+          issueIdentifier: row.issueIdentifier,
+          dueStatus: dueChanged({
+            raisedDueBasisHash: row.dueBasisHash,
+            raisedDueBasisVersion: row.dueBasisVersion,
+            currentDueBasisHash
+          })
+        };
+      });
+
+      // Per-item failure isolation: one candidate's provider read rejecting
+      // (after the page-level capability check already passed) contributes
+      // {dueStatus: null, error: true} for THAT row only — settleWithConcurrency's
+      // allSettled shape means every other row and the page's 200 are unaffected.
+      const items = results.map((result, i) => result.status === 'fulfilled'
+        ? result.value
+        : { issueId: page.items[i].issueId, issueIdentifier: page.items[i].issueIdentifier, dueStatus: null, error: true });
+
+      keepalive.send(200, {
+        items,
+        nextCursor: page.nextCursor,
+        pageCandidateCount: page.items.length,
+        totalCandidateCount: page.totalCandidateCount
+      });
+    } catch (error) {
+      console.error('Scan-due GET error:', error);
+      keepalive.send(500, { error: 'Failed to fetch scan-due candidates', message: error.message });
+    } finally {
+      // Always stop, on the success path, on a settleWithConcurrency rejection
+      // (defensive — its allSettled shape shouldn't reject), and on any
+      // synchronous throw before the response is sent.
+      keepalive.stop();
+    }
+  });
 
   // ===========================================================================
   // Image Proxy API
