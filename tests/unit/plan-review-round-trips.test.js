@@ -698,6 +698,95 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
     assert.equal('rulerContamination' in agg.diagnostics, false);
   });
 
+  // ─── LIN-2358: an unparseable rulerChangeAt must not report a confident 0 ───
+  //
+  // `toMs` returns NaN on unparseable input, and `NaN != null` is true — so the
+  // contamination branch RAN and `rulerContamination` was EMITTED, while every
+  // `x < NaN` comparison was false and it therefore always read 0. A
+  // well-formed answer meaning "nothing measured" rather than "nothing found",
+  // with the garbage echoed back in `window.rulerChangeAt` and no signal
+  // anywhere. Same silent-wrong-answer shape LIN-2037 item 3 removed one
+  // option over, on the sibling `asOf`.
+
+  test('an unparseable rulerChangeAt THROWS, rather than reporting rulerContamination: 0', () => {
+    const straddles = issue('ruler-straddle', {
+      rows: [
+        row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z'),
+        row('r2', 'plan', 'done', '2026-08-03T00:00:00.000Z', '2026-08-03T00:05:00.000Z'),
+      ],
+    });
+    // The SAME fixture that reports 1 against a valid instant, so the assertion
+    // is about the input being rejected and not about the fixture being inert.
+    assert.equal(
+      computePlanReviewRoundTrips([straddles], { asOf: ASOF, rulerChangeAt: '2026-08-02T00:00:00.000Z' })
+        .diagnostics.rulerContamination,
+      1,
+      'control: this fixture is genuinely contaminated'
+    );
+
+    assert.throws(
+      () => computePlanReviewRoundTrips([straddles], { asOf: ASOF, rulerChangeAt: 'not-a-date' }),
+      /rulerChangeAt must be a parseable ISO instant \(got "not-a-date"\)/
+    );
+  });
+
+  test('the throw covers every unparseable shape, not just a bad string', () => {
+    for (const bad of ['not-a-date', '2026-13-45', 42, {}, [], true, new Date('nope')]) {
+      assert.throws(
+        () => computePlanReviewRoundTrips([], { asOf: ASOF, rulerChangeAt: bad }),
+        /rulerChangeAt must be a parseable ISO instant/,
+        `expected ${JSON.stringify(bad)} to be rejected`
+      );
+    }
+  });
+
+  test('a VALID Date instance is accepted — the validator rejects unparseable input, not a parseable shape', () => {
+    // Caught in review: an earlier revision checked `typeof value !== 'string'`,
+    // which threw on a valid Date with the self-contradicting message
+    // 'must be a parseable ISO instant (got "2026-08-02T00:00:00.000Z")'. `toMs`
+    // has always accepted Dates, so that NARROWED behaviour rather than
+    // validating it. The list above is careful about the distinction: it
+    // includes `new Date('nope')` (an Invalid Date, genuinely unparseable) and
+    // this test covers its valid counterpart.
+    const straddles = issue('ruler-straddle-date', {
+      rows: [
+        row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z'),
+        row('r2', 'plan', 'done', '2026-08-03T00:00:00.000Z', '2026-08-03T00:05:00.000Z'),
+      ],
+    });
+    const agg = computePlanReviewRoundTrips([straddles], {
+      asOf: ASOF, rulerChangeAt: new Date('2026-08-02T00:00:00.000Z'),
+    });
+    assert.equal(agg.diagnostics.rulerContamination, 1, 'a Date must measure exactly as its ISO string does');
+  });
+
+  test('a VALID rulerChangeAt is unaffected, and falsy values still mean absent', () => {
+    // The validation is scoped to values that actually reach the parse — the
+    // truthy guard that was already there. Widening it to `!= null` would make
+    // `--ruler-change-at ""` throw, but the CLI already collapses that to
+    // undefined, so it would only change behaviour for a caller that does not
+    // exist.
+    const agg = computePlanReviewRoundTrips([], { asOf: ASOF, rulerChangeAt: '2026-08-02T00:00:00.000Z' });
+    assert.equal(agg.window.rulerChangeAt, '2026-08-02T00:00:00.000Z');
+    assert.equal(agg.diagnostics.rulerContamination, 0);
+
+    for (const absent of [undefined, null, '', 0, false]) {
+      const out = computePlanReviewRoundTrips([], { asOf: ASOF, rulerChangeAt: absent });
+      assert.equal('rulerContamination' in out.diagnostics, false, `${JSON.stringify(absent)} must read as absent`);
+      assert.equal(out.window.rulerChangeAt, null);
+    }
+  });
+
+  test('LIN-2358: asOf\'s own message is unchanged — the shared helper did not reword it', () => {
+    // requireAsOf now delegates to requireInstant. Byte-identical wording is
+    // the point of sharing it; a reworded message would be an unannounced
+    // contract change for anyone matching on it.
+    assert.throws(
+      () => computePlanReviewRoundTrips([], { asOf: 'nope' }),
+      /plan-review-round-trips: computePlanReviewRoundTrips: asOf must be a parseable ISO instant \(got "nope"\)/
+    );
+  });
+
   test('LIN-1984: completeness is a top-level, advisory sibling of diagnostics', () => {
     const clean = computePlanReviewRoundTrips([issue('a1')], { asOf: ASOF });
     assert.deepEqual(clean.completeness, { attempted: 1, read: 1, skipped: 0, complete: true });
