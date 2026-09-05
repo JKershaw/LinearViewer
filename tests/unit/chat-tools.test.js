@@ -92,8 +92,8 @@ describe('CHAT_TOOL_SCHEMAS', () => {
   test('exposes the pass-1 + pass-2 + pass-3 read tools', () => {
     const names = CHAT_TOOL_SCHEMAS.map(t => t.function.name).sort();
     assert.deepStrictEqual(names, [
-      'get_brief', 'get_children_status', 'get_comments', 'get_history', 'get_recap',
-      'get_relations', 'get_session', 'get_stack', 'list_active_sessions',
+      'get_brief', 'get_children_status', 'get_comments', 'get_history', 'get_pr_status',
+      'get_recap', 'get_relations', 'get_session', 'get_stack', 'list_active_sessions',
       'list_pending_decisions', 'list_task_sessions', 'lookup_task',
       'search_tasks',
     ]);
@@ -129,13 +129,13 @@ describe('CHAT_TOOL_SCHEMAS', () => {
   });
 });
 
-describe('CHAT_TOOL_RESULT_BUDGETS (LIN-1065, LIN-1073, LIN-2617)', () => {
-  test('grants only the row-list and transcript tools a larger-than-default budget', () => {
-    // Additive map: get_comments, get_session (full transcript, LIN-1073) and the
-    // two LIN-2617 fleet-wide row lists are the ONLY overrides, each strictly
-    // larger than the global default.
+describe('CHAT_TOOL_RESULT_BUDGETS (LIN-1065, LIN-1073, LIN-2617, LIN-2624)', () => {
+  test('grants only the row-list, transcript and PR-status tools a larger-than-default budget', () => {
+    // Additive map: get_comments, get_session (full transcript, LIN-1073), the
+    // two LIN-2617 fleet-wide row lists, and LIN-2624's get_pr_status are the
+    // ONLY overrides, each strictly larger than the global default.
     assert.deepStrictEqual(Object.keys(CHAT_TOOL_RESULT_BUDGETS).sort(), [
-      'get_comments', 'get_session', 'list_active_sessions', 'list_pending_decisions',
+      'get_comments', 'get_pr_status', 'get_session', 'list_active_sessions', 'list_pending_decisions',
     ]);
     assert.ok(CHAT_TOOL_RESULT_BUDGETS.get_comments > TOOL_RESULT_MAX_CHARS);
     assert.ok(CHAT_TOOL_RESULT_BUDGETS.get_comments >= 10000, 'within the recommended ~10-12k range');
@@ -146,6 +146,9 @@ describe('CHAT_TOOL_RESULT_BUDGETS (LIN-1065, LIN-1073, LIN-2617)', () => {
     // below; here we only hold the line that both exceed the global default.
     assert.ok(CHAT_TOOL_RESULT_BUDGETS.list_active_sessions > TOOL_RESULT_MAX_CHARS);
     assert.ok(CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions > TOOL_RESULT_MAX_CHARS);
+    // LIN-2624: a matrix build's check-run rollup can carry dozens of named
+    // rows — a truncated CI readout is a silently wrong answer, not a shorter one.
+    assert.ok(CHAT_TOOL_RESULT_BUDGETS.get_pr_status > TOOL_RESULT_MAX_CHARS);
   });
 
   test('does NOT override any other tool, so they keep the 4000 default', () => {
@@ -1544,6 +1547,267 @@ describe('read-only invariant', () => {
   test('send_follow_up (LIN-1073) is the sole, deliberate exception — kept out of CHAT_TOOL_SCHEMAS', () => {
     assert.strictEqual(FOLLOW_UP_TOOL_SCHEMA.function.name, 'send_follow_up');
     assert.ok(!CHAT_TOOL_SCHEMAS.includes(FOLLOW_UP_TOOL_SCHEMA));
+  });
+});
+
+// ─── Invariant 2 (workspace-scoped): the LIN-2624 exception ─────────────────
+//
+// Invariant #2 (lib/chat-tools.js:16-20) is that no executor accepts a
+// workspace/token/scope argument from the model — every OTHER tool takes only
+// an issue id or a query. `get_pr_status` is the one deliberate, named
+// exception: it takes a model-supplied `repo`, checked against a
+// server-derived allowlist rather than trusted outright. This is distinct
+// from the pre-existing "read-only invariant" tests above (invariant #3).
+
+describe('invariant 2 exception (LIN-2624)', () => {
+  test('get_pr_status is the sole schema accepting a cross-workspace "repo" — every other tool stays closure-scoped', () => {
+    const crossScopeParamNames = ['repo', 'workspace', 'workspaceId', 'urlKey', 'token', 'scope'];
+    for (const t of CHAT_TOOL_SCHEMAS) {
+      const props = Object.keys(t.function.parameters.properties || {});
+      const found = props.find(p => crossScopeParamNames.includes(p));
+      if (t.function.name === 'get_pr_status') {
+        assert.strictEqual(found, 'repo', 'get_pr_status must declare a "repo" parameter');
+      } else {
+        assert.strictEqual(found, undefined, `${t.function.name} unexpectedly accepts a cross-scope "${found}" parameter`);
+      }
+    }
+  });
+});
+
+// ─── get_pr_status (LIN-2624) ────────────────────────────────────────────────
+
+describe('get_pr_status', () => {
+  // A fake provider whose fetchProjects reports one project bound to the
+  // public LinearViewer repo via the `repo=` convention (lib/workspace-repos.js).
+  function makeRepoProvider({ repo = 'JKershaw/LinearViewer' } = {}) {
+    return makeFakeProvider({
+      async fetchProjects(scope) {
+        return {
+          projects: [{ id: 'proj-1', name: 'Proj', content: `repo=${repo}` }],
+          issues: [],
+        };
+      },
+    });
+  }
+
+  // A fetch fake that records every call and answers a small, fixed script of
+  // GitHub REST responses keyed by path. Unset paths 404.
+  function makeFakeGithubFetch(responses = {}) {
+    const calls = [];
+    const fetchImpl = async (url) => {
+      calls.push(url);
+      const path = url.replace('https://api.github.com', '');
+      const entry = responses[path];
+      if (!entry) return { ok: false, status: 404, json: async () => ({ message: 'Not Found' }) };
+      return { ok: entry.status >= 200 && entry.status < 300, status: entry.status, json: async () => entry.body };
+    };
+    fetchImpl.calls = calls;
+    return fetchImpl;
+  }
+
+  function catalogWithGithubFetch({ repo, githubFetch }) {
+    const provider = makeRepoProvider({ repo });
+    return createChatToolCatalog({ provider, scope: SCOPE, urlKey: URL_KEY, githubFetch });
+  }
+
+  test('rejects a repo this workspace has not named, before ever calling fetch (mutation-check: removing the allowlist check would make this pass)', async () => {
+    const githubFetch = makeFakeGithubFetch();
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
+    await assert.rejects(
+      () => executeTool({ name: 'get_pr_status', arguments: { repo: 'someone-else/not-named', number: 42 } }),
+      /not in this workspace's allowed repo list/,
+    );
+    assert.strictEqual(githubFetch.calls.length, 0, 'an unlisted repo must never reach a GitHub fetch');
+  });
+
+  test('rejects a malformed PR number before any fetch, including the allowlist read', async () => {
+    const githubFetch = makeFakeGithubFetch();
+    const provider = makeRepoProvider({});
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE, urlKey: URL_KEY, githubFetch });
+    await assert.rejects(
+      () => executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', number: 'not-a-number' } }),
+      /Invalid PR number/,
+    );
+    assert.strictEqual(provider.calls.length, 0, 'malformed input must be rejected before the allowlist is even resolved');
+    assert.strictEqual(githubFetch.calls.length, 0);
+  });
+
+  test('rejects a malformed sha before any fetch', async () => {
+    const githubFetch = makeFakeGithubFetch();
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
+    await assert.rejects(
+      () => executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', sha: 'zz-not-hex' } }),
+      /Invalid commit sha/,
+    );
+    assert.strictEqual(githubFetch.calls.length, 0);
+  });
+
+  test('requires at least one of number/sha', async () => {
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch: makeFakeGithubFetch() });
+    await assert.rejects(
+      () => executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer' } }),
+      /requires "number" and\/or "sha"/,
+    );
+  });
+
+  test('a private allow-listed repo answers not-readable rather than a bare 404 (repo-visibility probe fails)', async () => {
+    // No `/repos/JKershaw/LinearViewer` entry in the script → the fake 404s it.
+    const githubFetch = makeFakeGithubFetch({});
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
+    const result = await executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', number: 42 } });
+    assert.deepStrictEqual(result, { repo: 'JKershaw/LinearViewer', readable: false, reason: 'not readable: private repository' });
+    assert.strictEqual(githubFetch.calls.length, 1, 'a failed visibility probe must short-circuit before the PR/check calls');
+  });
+
+  test('rollup shape: PR state, head/base, mergeable, and the check-run + status rollup', async () => {
+    const githubFetch = makeFakeGithubFetch({
+      '/repos/JKershaw/LinearViewer': { status: 200, body: { private: false } },
+      '/repos/JKershaw/LinearViewer/pulls/42': {
+        status: 200,
+        body: {
+          state: 'open', merged: false, mergeable: true,
+          head: { ref: 'feature-x', sha: 'abc1234abc1234abc1234abc1234abc1234abcd' },
+          base: { ref: 'main' },
+        },
+      },
+      '/repos/JKershaw/LinearViewer/commits/abc1234abc1234abc1234abc1234abc1234abcd/check-runs': {
+        status: 200, body: { check_runs: [{ name: 'unit', conclusion: 'success' }, { name: 'e2e', conclusion: 'failure' }] },
+      },
+      '/repos/JKershaw/LinearViewer/commits/abc1234abc1234abc1234abc1234abc1234abcd/status': {
+        status: 200, body: { statuses: [{ context: 'ci-success', state: 'success' }] },
+      },
+    });
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
+    const result = await executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', number: 42 } });
+    assert.deepStrictEqual(result, {
+      repo: 'JKershaw/LinearViewer',
+      readable: true,
+      number: 42,
+      state: 'open',
+      merged: false,
+      head: { ref: 'feature-x', sha: 'abc1234abc1234abc1234abc1234abc1234abcd' },
+      base: { ref: 'main' },
+      mergeable: true,
+      ref: 'abc1234abc1234abc1234abc1234abc1234abcd',
+      checks: [
+        { name: 'unit', conclusion: 'success' },
+        { name: 'e2e', conclusion: 'failure' },
+        { name: 'ci-success', conclusion: 'success' },
+      ],
+    });
+  });
+
+  test('a sha-only call (no number) skips the PR fetch and reports checks for that ref directly', async () => {
+    const sha = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+    const githubFetch = makeFakeGithubFetch({
+      '/repos/JKershaw/LinearViewer': { status: 200, body: { private: false } },
+      [`/repos/JKershaw/LinearViewer/commits/${sha}/check-runs`]: { status: 200, body: { check_runs: [] } },
+      [`/repos/JKershaw/LinearViewer/commits/${sha}/status`]: { status: 200, body: { statuses: [] } },
+    });
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
+    const result = await executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', sha } });
+    assert.deepStrictEqual(result, { repo: 'JKershaw/LinearViewer', readable: true, ref: sha, checks: [] });
+    assert.ok(!githubFetch.calls.some(u => u.includes('/pulls/')), 'a sha-only call must never fetch a PR');
+  });
+
+  test('an unknown PR number throws rather than being read as a private repo', async () => {
+    const githubFetch = makeFakeGithubFetch({
+      '/repos/JKershaw/LinearViewer': { status: 200, body: { private: false } },
+    });
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
+    await assert.rejects(
+      () => executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', number: 9999 } }),
+      /PR #9999 not found/,
+    );
+  });
+
+  // LIN-2624 review finding: an unauthenticated GitHub 403 (the 60/hour rate
+  // limit, or any other forbidden reason) must NEVER be conflated with a 404
+  // — neither read as "private repository" nor silently degraded to an empty
+  // checks list. Both are real, distinguishable failures the model should see
+  // as errors, not as false "private"/"no CI" answers.
+  test('a 403 on the repo-visibility probe throws — it must NOT be read as private repository (rate-limit != private)', async () => {
+    const githubFetch = makeFakeGithubFetch({
+      '/repos/JKershaw/LinearViewer': { status: 403, body: { message: 'API rate limit exceeded' } },
+    });
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
+    await assert.rejects(
+      () => executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', number: 42 } }),
+      /HTTP 403/,
+    );
+  });
+
+  test('a 403 on the PR fetch throws — it must NOT be read as "PR not found"', async () => {
+    const githubFetch = makeFakeGithubFetch({
+      '/repos/JKershaw/LinearViewer': { status: 200, body: { private: false } },
+      '/repos/JKershaw/LinearViewer/pulls/42': { status: 403, body: { message: 'API rate limit exceeded' } },
+    });
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
+    await assert.rejects(
+      () => executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', number: 42 } }),
+      (err) => err.message.includes('HTTP 403') && !/not found/.test(err.message),
+    );
+  });
+
+  test('a 403 on the check-runs/status calls throws — it must NOT silently degrade to an empty (false "no CI checks") rollup', async () => {
+    const sha = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+    const githubFetch = makeFakeGithubFetch({
+      '/repos/JKershaw/LinearViewer': { status: 200, body: { private: false } },
+      [`/repos/JKershaw/LinearViewer/commits/${sha}/check-runs`]: { status: 403, body: { message: 'API rate limit exceeded' } },
+      [`/repos/JKershaw/LinearViewer/commits/${sha}/status`]: { status: 200, body: { statuses: [] } },
+    });
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
+    await assert.rejects(
+      () => executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', sha } }),
+      /HTTP 403/,
+    );
+  });
+
+  test('a genuine 404 on check-runs for a real ref degrades to an empty list (distinct from the 403 case above)', async () => {
+    const sha = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+    const githubFetch = makeFakeGithubFetch({
+      '/repos/JKershaw/LinearViewer': { status: 200, body: { private: false } },
+      [`/repos/JKershaw/LinearViewer/commits/${sha}/status`]: { status: 200, body: { statuses: [] } },
+      // no check-runs entry → the fake 404s it
+    });
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
+    const result = await executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', sha } });
+    assert.deepStrictEqual(result, { repo: 'JKershaw/LinearViewer', readable: true, ref: sha, checks: [] });
+  });
+
+  test('a cache hit avoids a second round of fetches for the same (repo, number, sha)', async () => {
+    const githubFetch = makeFakeGithubFetch({
+      '/repos/JKershaw/LinearViewer': { status: 200, body: { private: false } },
+      '/repos/JKershaw/LinearViewer/pulls/42': {
+        status: 200,
+        body: { state: 'open', merged: false, mergeable: null, head: { ref: 'x', sha: 'abc1234' }, base: { ref: 'main' } },
+      },
+      '/repos/JKershaw/LinearViewer/commits/abc1234/check-runs': { status: 200, body: { check_runs: [] } },
+      '/repos/JKershaw/LinearViewer/commits/abc1234/status': { status: 200, body: { statuses: [] } },
+    });
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
+    const first = await executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', number: 42 } });
+    const callsAfterFirst = githubFetch.calls.length;
+    assert.ok(callsAfterFirst > 0);
+    const second = await executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', number: 42 } });
+    assert.strictEqual(githubFetch.calls.length, callsAfterFirst, 'a cache hit must not fetch again');
+    assert.deepStrictEqual(second, first);
+  });
+
+  test('the GitHub binding\'s own repo (scope.repo) is allow-listed even with no matching project repo=', async () => {
+    const provider = makeFakeProvider({
+      async fetchProjects() { return { projects: [], issues: [] }; },
+    });
+    const githubFetch = makeFakeGithubFetch({
+      '/repos/JKershaw/bound-repo': { status: 200, body: { private: false } },
+      '/repos/JKershaw/bound-repo/commits/abc1234/check-runs': { status: 200, body: { check_runs: [] } },
+      '/repos/JKershaw/bound-repo/commits/abc1234/status': { status: 200, body: { statuses: [] } },
+    });
+    const { executeTool } = createChatToolCatalog({
+      provider, scope: { token: 'gh-token', repo: 'JKershaw/bound-repo' }, urlKey: URL_KEY, githubFetch,
+    });
+    const result = await executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/bound-repo', sha: 'abc1234' } });
+    assert.strictEqual(result.readable, true);
   });
 });
 
