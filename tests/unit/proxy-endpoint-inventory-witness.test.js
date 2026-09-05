@@ -47,52 +47,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
-import express from 'express';
-import { createProxyRoutes } from '../../routes/proxy.js';
+// LIN-2543: BASE_DEPS/buildApp/call moved to tests/unit/lib/proxy-fake-deps.js
+// (byte-identical relocation) so tests/unit/proxy-di-witness.test.js can
+// reuse them too, without importing this `.test.js` file as a module — doing
+// that would re-register every describe/test below a second time under
+// Node's per-file test-process isolation, silently doubling this file's test
+// count in the suite. Both files now import from that one shared module.
+import { ACME, BASE_DEPS, buildApp, call, makeFakeProvider } from './lib/proxy-fake-deps.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ACME = 'acme';
-
-// ---------------------------------------------------------------------------
-// Shared fakes
-// ---------------------------------------------------------------------------
-
-// A comprehensive, always-succeeding fake provider (LIN-581 test-only seam,
-// precedent: proxy-route-aliases.test.js). Every method the D/E/F groups'
-// deterministic probes below can reach is covered; none of it is exercised
-// for probes that 400/401/404/503 before reaching the provider.
-function makeFakeProvider() {
-  return {
-    name: 'fake',
-    ui: null,
-    supports: () => true,
-    createFields: () => ['teamId'],
-    apiWriteFields: () => ['projectId', 'stateId', 'assigneeId', 'parentId', 'cycleId', 'priority'],
-    viewer: async () => ({ id: 'u1', name: 'Test User' }),
-    fetchTeams: async () => ([{ id: 't1', key: 'LIN', name: 'Team' }]),
-    projects: async () => ([]),
-    issues: async () => ({ nodes: [], pageInfo: { hasNextPage: false, endCursor: null } }),
-    issueDetail: async () => ({ id: 'i1', identifier: 'LIN-1', title: 't', state: { name: 'Todo', type: 'unstarted' }, comments: { nodes: [] } }),
-    search: async () => ([]),
-    states: async () => ([]),
-    labels: async () => ([]),
-    cycles: async () => ([]),
-    cycleDetail: async (token, id) => ({ id, name: 'Cycle' }),
-    relations: async (token, issueId) => ({ id: issueId, relations: { nodes: [] }, inverseRelations: { nodes: [] } }),
-    createIssue: async () => ({ issue: { id: 'new1', identifier: 'LIN-2' }, success: true }),
-    issueWriteGuard: async () => ({ id: 'i1', state: { type: 'unstarted' }, team: { id: 't1' } }),
-    updateIssue: async () => ({ issue: { id: 'i1' }, success: true }),
-    createComment: async () => ({ id: 'c1', issueId: 'i1', body: 'x' }),
-    deleteComment: async () => ({ success: true }),
-    updateComment: async () => ({ id: 'c1' }),
-    uploadFile: async () => 'https://example.test/asset.png',
-    createRelation: async () => ({ id: 'r1' }),
-    deleteRelation: async () => ({ success: true }),
-    issueLabels: async () => ({ id: 'i1', labels: { nodes: [] } }),
-    updateIssueLabels: async () => ({ issue: { id: 'i1' }, success: true }),
-    fetchAttachment: async () => null,
-  };
-}
 
 // A minimal but functioning dispatch-queue store: empty results everywhere,
 // which is enough to reach 200s on the read paths and a 404 on the by-id
@@ -104,61 +67,6 @@ function makeDispatchStore() {
     getItemStatus: async () => null,
     historyTtl: 30 * 24 * 60 * 60, // seconds
   };
-}
-
-const BASE_DEPS = () => ({
-  proxyTokenStore: {
-    validateToken: async () => ({ tokenId: 't1', urlKey: ACME, label: 'test', scope: 'readWrite', createdBy: 'u1' }),
-    listTokens: async () => ([]),
-  },
-  proxyEventStore: {
-    recordEvent: async () => {},
-    listEvents: async () => ({ events: [], total: 0 }),
-    listCredentialHealth: async () => ({ tokens: [] }),
-    listSelfCredentialHealth: async () => ({ occupancy: {}, workspaceAccess: {} }),
-  },
-  resolveWorkspaceAccess: async () => ({ token: 'test-token', reason: 'ok' }),
-  getWorkspaceAccessToken: async () => 'test-token',
-  getWorkspaceOpenRouterKey: async () => null,
-  agentStatusStore: {},
-  recapCacheStore: { get: async () => null, set: async () => {} },
-  briefCacheStore: { get: async () => null, set: async () => {} },
-  taskSnapshotStore: { list: async () => ({ items: [], total: 0 }), diffLatest: async () => ({ changed: false }) },
-  workspaceFromUrl: (req, res, next) => next(),
-  workspacePreferencesStore: {},
-  freeTierStore: { tryUse: async () => ({ allowed: true }) },
-  provider: makeFakeProvider(),
-});
-
-/**
- * Fresh app per probe (mirrors every other proxy test file's per-test
- * buildApp() convention) so one row's deps can never leak into another's.
- */
-function buildApp(overrides = {}) {
-  const app = express();
-  app.use(express.json());
-  app.use(createProxyRoutes({ ...BASE_DEPS(), ...overrides }));
-  return app;
-}
-
-async function call(app, method, path, { body, headers } = {}) {
-  const server = app.listen(0, '127.0.0.1');
-  await new Promise(resolve => server.once('listening', resolve));
-  const { port } = server.address();
-  try {
-    const opts = { method: method.toUpperCase(), headers: { Authorization: 'Bearer anything', ...headers } };
-    if (body !== undefined) {
-      opts.headers['Content-Type'] = 'application/json';
-      opts.body = JSON.stringify(body);
-    }
-    const res = await fetch(`http://127.0.0.1:${port}${path}`, opts);
-    const text = await res.text();
-    let parsed;
-    try { parsed = JSON.parse(text); } catch { parsed = text; }
-    return { status: res.status, body: parsed, contentType: res.headers.get('content-type') };
-  } finally {
-    await new Promise(resolve => server.close(resolve));
-  }
 }
 
 function sessionWorkspaceApp(session, overrides = {}) {
