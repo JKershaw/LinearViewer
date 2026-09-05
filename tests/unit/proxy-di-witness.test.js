@@ -160,19 +160,20 @@ describe('Half A: mount-completeness census against the real repo', () => {
     }
   });
 
-  // A separate, coarser sanity pin: the corpus is exactly 7 files / 87
-  // declared deps today (LIN-2539: group H's routes/proxy-kickoff.js adds 17).
-  // Unlike the test above, THIS one is not blind to a signature+mount drop
-  // (removing a dep from a factory's signature shrinks `required`, which this
-  // total catches) — that's a different, unrelated invariant catching it, not
-  // evidence Half A's own missing/extra detectors saw the gap; keeping the two
-  // in separate tests keeps that distinction legible in the mutation-validation
-  // record.
-  test('the corpus is exactly 7 proxy sub-router files totalling 87 declared deps', () => {
+  // A separate, coarser sanity pin: the corpus is exactly 8 files / 111
+  // declared deps today (LIN-2540: group I's routes/proxy-dispatch.js adds
+  // 24, all un-defaulted so classifyParams counts every one as required —
+  // 87 + 24 = 111). Unlike the test above, THIS one is not blind to a
+  // signature+mount drop (removing a dep from a factory's signature shrinks
+  // `required`, which this total catches) — that's a different, unrelated
+  // invariant catching it, not evidence Half A's own missing/extra detectors
+  // saw the gap; keeping the two in separate tests keeps that distinction
+  // legible in the mutation-validation record.
+  test('the corpus is exactly 8 proxy sub-router files totalling 111 declared deps', () => {
     const rows = censusMountCompleteness({ routesDir: 'routes', proxySourcePath: 'routes/proxy.js' });
-    assert.equal(rows.length, 7, `expected 7 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
+    assert.equal(rows.length, 8, `expected 8 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
     const totalDeps = rows.reduce((sum, row) => sum + row.required.length, 0);
-    assert.equal(totalDeps, 87, `expected 87 total required deps across the 7 factories, found ${totalDeps}`);
+    assert.equal(totalDeps, 111, `expected 111 total required deps across the 8 factories, found ${totalDeps}`);
   });
 });
 
