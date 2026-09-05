@@ -419,4 +419,26 @@ describe('GET /workspace/:urlKey/api/scan/:issueId — basisChanged (LIN-2241)',
     assert.ok(doc.basisHash, 'a basis digest is recorded at raise time');
     assert.equal(doc.basisVersion, BASIS_VERSION, 'stored beside the hash that produced it');
   });
+
+  // LIN-2649 WS2 (LIN-2665 beat 3): the scan route's sole write path computes
+  // dueBasisHash from the SAME context, in the SAME request, as basisHash —
+  // this is the live end-to-end witness that it actually lands on the row,
+  // driven through the REAL router with NO harbourCommentsStore mounted (see
+  // this file's own module docstring) — the [C-3] null-guard's fail-open path.
+  test('POST records a dueBasisHash alongside basisHash, live, with NO harbourCommentsStore mounted — the [C-3] null-guard fail-open path', async () => {
+    const { BASIS_VERSION } = await import('../../lib/scan-fingerprint.js');
+    const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    const doc = collection._docs.find(d => d._id === posted.body.id);
+
+    assert.ok(doc.dueBasisHash, 'a due-basis digest is recorded at raise time');
+    assert.equal(doc.basisVersion, BASIS_VERSION, 'basisVersion is shared between basisHash and dueBasisHash');
+
+    // With no ledger store mounted, recordedCommentIds resolves to an empty
+    // Set — nothing filtered — so dueBasisHash's projection is identical to
+    // basisHash's and the two digests must be byte-equal. This is the
+    // fail-open property made legible: an absent ledger store filters
+    // NOTHING, so a later comparison against a dueBasisHash computed WITH the
+    // ledger present can only ever read as MORE due, never less.
+    assert.equal(doc.dueBasisHash, doc.basisHash);
+  });
 });

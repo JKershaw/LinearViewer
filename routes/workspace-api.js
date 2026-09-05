@@ -45,7 +45,7 @@ import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
-import { scanBasisHashFromContext, basisChanged as computeBasisChanged, BASIS_VERSION } from '../lib/scan-fingerprint.js';
+import { scanBasisHashFromContext, dueBasisHashFromContext, basisChanged as computeBasisChanged, BASIS_VERSION } from '../lib/scan-fingerprint.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
@@ -2535,6 +2535,21 @@ ${goal}`
         });
       }
 
+      // LIN-2649 WS2: [C-3] scan-time ledger-store null guard. Same fail-open
+      // asymmetry as the route-side call site (routes/workspace-api.js's
+      // comment-create seams above) — this is the SECOND place it lives, not
+      // a re-derivation: a dueBasisHash stored while harbourCommentsStore is
+      // absent (nothing filtered) and later compared against one computed
+      // while it IS present differs -> a false DUE, never a false not-due,
+      // and never a fabricated unknown. `harbourCommentsStore` defaults to
+      // null in createWorkspaceApiRoutes, and tests/unit/scan-routes.test.js
+      // mounts the real router with no ledger store while driving this exact
+      // route end to end — an unguarded call here would be a TypeError on a
+      // shipped route.
+      const recordedCommentIds = harbourCommentsStore
+        ? await harbourCommentsStore.wereRecordedByHarbour(workspace.urlKey, context.comments)
+        : new Set();
+
       // 'decision' or 'zero-finding' — both are normal, persisted outcomes.
       const record = await taskDecisionsStore.recordScan({
         urlKey: workspace.urlKey,
@@ -2548,6 +2563,14 @@ ${goal}`
         // has since moved without spending a model call.
         basisHash: scanBasisHashFromContext(context),
         basisVersion: BASIS_VERSION,
+        // LIN-2649 WS2: a THIRD, additive digest — the same projection as
+        // basisHash with Harbour-ledger-recorded comments filtered out, for
+        // "is this scanned task worth spending another scan on?" rather than
+        // "has a pending ruling's basis moved?". Computed in the SAME request
+        // from the SAME context as basisHash above, so a scan always stores
+        // both hashes together and there is exactly one write path to keep
+        // in sync.
+        dueBasisHash: dueBasisHashFromContext(context, { recordedCommentIds }),
         decision: scanResult.outcome === 'decision' ? scanResult.decision : null
       });
       if (!record) {
