@@ -79,6 +79,15 @@ function parseArgs(argv) {
     else if (v === '--limit') a.limit = parseInt(argv[++i], 10) || 250;
     else if (v === '--ruler-change-at') a.rulerChangeAt = argv[++i];
   }
+  // LIN-2358: validate at the argv boundary too. The library throws on an
+  // unparseable value and that is the real guard — but a typo'd flag deserves a
+  // usage error, not a stack trace from three frames down, and the check is
+  // free here. Deliberately the same predicate the library uses, so the two
+  // cannot disagree about what parses.
+  if (a.rulerChangeAt && !Number.isFinite(new Date(a.rulerChangeAt).getTime())) {
+    console.error(`--ruler-change-at must be a parseable ISO instant (got ${JSON.stringify(a.rulerChangeAt)})`);
+    process.exit(2);
+  }
   return a;
 }
 
