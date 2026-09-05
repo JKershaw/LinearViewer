@@ -24,6 +24,14 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+// LIN-2447: the lease derivation is pinned against openrouter.js's own live
+// constant, not a copy of it.
+import { DEFAULT_MAX_TOOL_ITERATIONS } from '../../lib/openrouter.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 import { buildCompanionSnapshot, shouldSpendTurn, COMPANION_SEED_STATE, COMPANION_INSTANCE_PREFIX, DEFAULT_COMPANION_FLOOR_MS, RESERVATION_LEASE_MS, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../../lib/flight-companion-gate.js';
 
@@ -164,6 +172,7 @@ describe('shouldSpendTurn: census-delta true/false', () => {
       lastCensusSnapshot: buildCompanionSnapshot(doc),
       lastTurnAt: new Date(5000).toISOString(),
       turnReservedUntil: null,
+      reservationId: null,
       notes: 'prior notes'
     });
     // LIN-2442: the reserve record re-emits the PRIOR baseline unchanged
@@ -174,8 +183,10 @@ describe('shouldSpendTurn: census-delta true/false', () => {
       lastCensusSnapshot: priorSnapshot,
       lastTurnAt: new Date(5000).toISOString(),
       turnReservedUntil: new Date(5000 + RESERVATION_LEASE_MS).toISOString(),
+      reservationId: result.reserveRecord.reservationId, // LIN-2447, asserted for shape below
       notes: 'prior notes'
     });
+    assert.match(result.reserveRecord.reservationId, /^[0-9a-f-]{36}$/, 'a per-turn nonce, defaulted from randomUUID');
   });
 
   test('removed attention tuple -> true, surface true, reason spend', () => {
@@ -219,6 +230,7 @@ describe('shouldSpendTurn: census-delta true/false', () => {
       lastCensusSnapshot: buildCompanionSnapshot(doc),
       lastTurnAt: new Date(1000).toISOString(),
       turnReservedUntil: null,
+      reservationId: null,
       notes: ''
     });
     // Seed turn: no prior baseline, so the reserve record's baseline stays null too.
@@ -228,6 +240,7 @@ describe('shouldSpendTurn: census-delta true/false', () => {
       lastCensusSnapshot: null,
       lastTurnAt: new Date(1000).toISOString(),
       turnReservedUntil: new Date(1000 + RESERVATION_LEASE_MS).toISOString(),
+      reservationId: result.reserveRecord.reservationId,
       notes: ''
     });
   });
@@ -337,9 +350,82 @@ describe('shouldSpendTurn: turn-in-flight precedence (LIN-2442)', () => {
     assert.strictEqual(COMPANION_SEED_STATE.turnReservedUntil, null);
   });
 
-  test('RESERVATION_LEASE_MS is derived: DEFAULT_MAX_TOOL_ITERATIONS (4) x REQUEST_TIMEOUT_MS (120_000) + headroom', () => {
-    assert.strictEqual(RESERVATION_LEASE_MS, 600_000);
-    assert.ok(RESERVATION_LEASE_MS > 4 * 120_000, 'lease must outlast the worst-case 480s turn with headroom');
+  // LIN-2447 item 1. The assertion this replaces read
+  //   assert.ok(RESERVATION_LEASE_MS > 4 * 120_000)
+  // and passed — while the lease was 600_000 and the true worst case was ALSO
+  // 600_000, i.e. zero headroom. It passed because it encoded the same missing
+  // hop the comment did: `streamChatWithTools` runs up to
+  // DEFAULT_MAX_TOOL_ITERATIONS `runToolHop` calls and then ALWAYS falls
+  // through to a final `streamChat`, so the bound is (MAX + 1) timeouts.
+  //
+  // Pinned against openrouter.js's LIVE constants rather than copies, so
+  // raising either one fails here instead of silently eating the headroom
+  // again. REQUEST_TIMEOUT_MS is module-private, so it is read from source —
+  // the alternative is a hard-coded 120_000, which is the exact mistake this
+  // test exists to prevent recurring.
+  test('LIN-2447: RESERVATION_LEASE_MS outlasts (DEFAULT_MAX_TOOL_ITERATIONS + 1) x REQUEST_TIMEOUT_MS, with real headroom', () => {
+    const openrouterSrc = readFileSync(join(__dirname, '../../lib/openrouter.js'), 'utf8');
+    const timeoutMatch = /const REQUEST_TIMEOUT_MS = (\d+);/.exec(openrouterSrc);
+    assert.ok(timeoutMatch, 'expected REQUEST_TIMEOUT_MS in lib/openrouter.js — if this fails the constant moved and this pin needs re-anchoring');
+    const requestTimeoutMs = Number(timeoutMatch[1]);
+
+    // The mandatory final hop, asserted from source rather than assumed.
+    assert.match(
+      openrouterSrc,
+      /Final answer ALWAYS streams[\s\S]*?return streamChat\(convo, streamOptions, onEvent\);/,
+      'the +1 in the derivation is this unconditional final streamChat — if it becomes conditional, the arithmetic below changes'
+    );
+
+    const worstCaseMs = (DEFAULT_MAX_TOOL_ITERATIONS + 1) * requestTimeoutMs;
+    assert.strictEqual(worstCaseMs, 600_000, 'sanity: the worst case the old lease exactly equalled');
+    assert.ok(
+      RESERVATION_LEASE_MS > worstCaseMs,
+      `lease (${RESERVATION_LEASE_MS}) must EXCEED the ${worstCaseMs}ms model-call worst case, not equal it`
+    );
+    assert.ok(
+      RESERVATION_LEASE_MS >= worstCaseMs * 1.25,
+      'and by a real margin, not a rounding error'
+    );
+  });
+
+  test('LIN-2447 item 3: two same-millisecond reservations are distinguishable, so they cannot both win the CAS', () => {
+    // Byte-identical inputs, byte-identical clock — the exact collision that
+    // let advance()'s duplicate-identical-state branch return true to BOTH
+    // callers, so both proceeded to a billable model call.
+    const build = () => {
+      const priorSnapshot = { lanes: lanes({ terminal: 0 }), attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 };
+      return {
+        currentCensusDoc: census({ stateHash: 'hNew', rev: 2, lanesState: lanes({ terminal: 0 }), attention: [attentionRow('loop-1', 'blocked', 'review')] }),
+        companionDoc: companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null }),
+        now: 5000,
+      };
+    };
+    const a = shouldSpendTurn(build());
+    const b = shouldSpendTurn(build());
+
+    assert.strictEqual(a.spend, true);
+    assert.strictEqual(b.spend, true);
+    assert.notStrictEqual(
+      a.reserveRecord.reservationId,
+      b.reserveRecord.reservationId,
+      'same-millisecond reservations must differ, or the store cannot tell them apart'
+    );
+    assert.notDeepStrictEqual(
+      a.reserveRecord,
+      b.reserveRecord,
+      'and the RECORDS must differ — the store hashes the whole state, so equal records hash equal and both callers win'
+    );
+  });
+
+  test('LIN-2447: the commit record carries no reservation — committing releases the lease', () => {
+    const priorSnapshot = { lanes: lanes({ terminal: 0 }), attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 };
+    const result = shouldSpendTurn({
+      currentCensusDoc: census({ stateHash: 'hNew', rev: 2, lanesState: lanes({ terminal: 0 }), attention: [attentionRow('loop-1', 'blocked', 'review')] }),
+      companionDoc: companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null }),
+      now: 5000,
+    });
+    assert.strictEqual(result.nextRecord.turnReservedUntil, null);
+    assert.strictEqual(result.nextRecord.reservationId, null, 'the commit clears the nonce alongside the deadline');
   });
 });
 
@@ -583,9 +669,15 @@ describe('shouldSpendTurn: sweep liveness (LIN-2438)', () => {
     for (const buildArgs of spendCases) {
       const freshArgs = buildArgs();
       freshArgs.currentCensusDoc = { ...freshArgs.currentCensusDoc, lastSeenAt: new Date(freshArgs.now) };
+      // LIN-2447: the reserve record now carries a per-turn nonce, so two
+      // invocations differ by construction. Inject a fixed one on both sides —
+      // this test is about liveness never changing the decision, not about the
+      // records being byte-identical across independent turns (they must not be).
+      freshArgs.reservationId = 'fixed-for-comparison';
       const freshResult = shouldSpendTurn(freshArgs);
 
       const ancientArgs = buildArgs();
+      ancientArgs.reservationId = 'fixed-for-comparison';
       // Genuinely past DEFAULT_SWEEP_LIVENESS_HORIZON_MS relative to THIS
       // fixture's own `now` (not epoch 0) — several of these fixtures use a
       // `now` in the single-digit thousands, far smaller than the 1.8M ms

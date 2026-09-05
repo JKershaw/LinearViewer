@@ -581,7 +581,27 @@ export function createFlightCompanionRoutes({
       if (sawDone && !clientGone && companionAdvance) {
         try {
           const currentEnvelope = await observerStateStore.readCurrent(companionAdvance.instanceKey);
-          if (currentEnvelope) {
+          // LIN-2447 item 2: commit only onto OUR OWN reservation. The read
+          // above is deliberately fresh (the store's duplicate-identical-state
+          // branch does not bump `rev`, so `expectedRev + 1` would CAS against
+          // a stale witness) — but fresh also means it can return a SUCCESSOR's
+          // record, if this turn outlived its lease and the next one reserved.
+          // Committing onto that would do two wrong things at once: clear the
+          // successor's live lease (our commit record carries
+          // `turnReservedUntil: null`) and overwrite its baseline with our own
+          // stale one. Matching the reservation id is what makes the CAS
+          // scoped to the turn that opened it rather than to whatever is there
+          // now. Skipping is safe and is the same benign outcome as a lost CAS
+          // below: the successor is already reporting this change.
+          const stillOurs = currentEnvelope
+            && currentEnvelope.state
+            && currentEnvelope.state.reservationId === companionAdvance.reserveRecord.reservationId;
+          if (currentEnvelope && !stillOurs) {
+            console.error('Flight Companion turn: commit skipped, reservation no longer ours', {
+              instanceKey: companionAdvance.instanceKey,
+              urlKey: workspace.urlKey,
+            });
+          } else if (currentEnvelope) {
             const commitResult = await observerStateStore.advance(
               companionAdvance.instanceKey, currentEnvelope.rev, companionAdvance.commitRecord,
               { reason: 'flight-companion-commit' }
