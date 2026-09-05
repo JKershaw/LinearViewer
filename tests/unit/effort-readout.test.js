@@ -54,6 +54,43 @@ function fourRowLineageComments() {
   ];
 }
 
+// A realistic PRICED/timed row (R1, R2): raw `status: 'taken'` plus a genuine
+// `[usage]` telemetry entry — the wire shape `parseUsagePayload`
+// (lib/session-telemetry.js) actually parses — AND a `[done]` terminal
+// marker. This is what a settled worker session that reported cost/effort
+// looks like; `doneRow` above deliberately carries no usage telemetry at all
+// (it exists to exercise the survival walk, not the cost path), and the
+// implementation review's ledger (item 4) named relying on a telemetry-free
+// fixture for a cost-path assertion as a defect in its own right.
+function pricedRow({ id, issueId, issueIdentifier, kind, dispatchedAt, completedAt, costUsd, effort = null }) {
+  const usagePayload = { model: 'test/model' };
+  if (costUsd != null) usagePayload.costUsd = costUsd;
+  if (effort) usagePayload.effort = effort;
+  return {
+    id, issueId, issueIdentifier, kind, status: 'taken', dispatchedAt,
+    feedback: [
+      { kind: 'usage', message: `[usage] ${JSON.stringify(usagePayload)}` },
+      { message: '[done] complete', timestamp: completedAt },
+    ],
+  };
+}
+
+// A priced row whose terminal marker carries no `timestamp` — `deriveCompletedAt`
+// then returns null even though the row is a settled 'done' (lifecycleStatus
+// only needs the MARKER, not its timestamp), so `buildTaskCost` derives a
+// `durationMs` of null while `costUsd` still populates from the separate
+// `[usage]` entry. Used to exercise a lineage priced but not timed — the
+// other half of R2's per-column coverage disclosure.
+function pricedRowNoDuration({ id, issueId, issueIdentifier, kind, dispatchedAt, costUsd }) {
+  return {
+    id, issueId, issueIdentifier, kind, status: 'taken', dispatchedAt,
+    feedback: [
+      { kind: 'usage', message: `[usage] ${JSON.stringify({ model: 'test/model', costUsd })}` },
+      { message: '[done] complete' },
+    ],
+  };
+}
+
 describe('G2 — issue-object contract (plan-review 583701c2)', () => {
   test('RED: passing a bare row set (the plan-review defect) yields an empty walk — rate null, roundTrips.n 0', () => {
     const rows = fourRowLineageRows();
@@ -255,6 +292,85 @@ describe('D10 — ship_empty effort column', () => {
     // No telemetry in this fixture at all -> sessionCount 0, effort null either way;
     // the shape under test is that `effort` is null when no session reports one.
     assert.equal(planCard.effort, null);
+  });
+});
+
+describe('R1 — effort-caption honesty (implementation review 62e30986)', () => {
+  test('no session in the corpus reports a realised effort: the caption still names LIN-2567 as pending', () => {
+    // fourRowLineageRows/doneRow carry no [usage] telemetry at all.
+    const rows = fourRowLineageRows();
+    const issueContext = new Map([['LIN-1', { id: 'issue-1', comments: fourRowLineageComments() }]]);
+    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
+    assert.match(readout.notes.effortShipEmpty, /does not yet report a realised effort value/);
+    assert.match(readout.notes.effortShipEmpty, /LIN-2567/);
+  });
+
+  test('a session in the corpus reports a realised effort: the caption states what is true instead of a stale universal absence', () => {
+    const rows = [
+      pricedRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 5, effort: 'high' }),
+      // A second, un-stamped (backfill) lineage of the same kind, alongside the stamped one.
+      doneRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z' }),
+    ];
+    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    assert.doesNotMatch(readout.notes.effortShipEmpty, /does not yet report a realised effort value/, 'the false unconditional claim must not survive once a session reports one');
+    assert.match(readout.notes.effortShipEmpty, /LIN-2567/);
+    assert.match(readout.notes.effortShipEmpty, /backfill/i, 'must disclose that un-stamped (backfill) rows stay null permanently');
+    const implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    // The per-row read path is unchanged: the stamped row's effort still renders, the backfill row's does not.
+    assert.deepEqual(implCard.effort, { high: 1 });
+  });
+
+  test('a requested (row-level) effort value never substitutes for a realised one, regardless of corpus state', () => {
+    const row = { ...pricedRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 5 }), effort: 'low' };
+    const readout = computeEffortReadout({ liveRows: [], historyRows: [row], issueContext: new Map(), asOf: ASOF });
+    const implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    assert.equal(implCard.effort, null, 'the dispatch row\'s own REQUESTED effort field must never populate the realised-effort cell');
+  });
+});
+
+describe('R2 — cost is a SUM, duration is a MEAN, with per-column coverage (implementation review 62e30986)', () => {
+  test('two priced lineages and one unpriced (but timed) lineage: cost sums only the priced two, duration means all three, coverage is disclosed', () => {
+    const rows = [
+      pricedRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', costUsd: 3 }),
+      pricedRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T03:00:00.000Z', costUsd: 9 }),
+      // No [usage] telemetry at all -> unpriced, but still carries a terminal marker -> still timed.
+      doneRow({ id: 'r3', issueId: 'i3', issueIdentifier: 'LIN-3', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T02:00:00.000Z' }),
+    ];
+    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    assert.equal(implCard.sessionCount, 3);
+    assert.equal(implCard.costUsd, 12, 'cost is the SUM of the two priced lineages, not an average over all three');
+    assert.equal(implCard.costAggregation, 'sum');
+    assert.equal(implCard.costPricedCount, 2);
+    assert.equal(implCard.costUnpricedCount, 1);
+    assert.equal(implCard.durationMs, 2 * 60 * 60 * 1000, 'duration is the MEAN of the three (1h, 3h, 2h)');
+    assert.equal(implCard.durationAggregation, 'mean');
+    assert.equal(implCard.durationCoveredCount, 3);
+    assert.equal(implCard.durationMissingCount, 0);
+  });
+
+  test('a lineage priced but not timed is excluded from the duration mean while still counting toward cost', () => {
+    const rows = [
+      pricedRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', costUsd: 4 }),
+      // Terminal marker present (so the row is a settled 'done', eligible) but with no
+      // timestamp, so `deriveCompletedAt` returns null and `buildTaskCost` derives no duration.
+      pricedRowNoDuration({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', costUsd: 8 }),
+    ];
+    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    assert.equal(implCard.costUsd, 12, 'both lineages are priced');
+    assert.equal(implCard.costPricedCount, 2);
+    assert.equal(implCard.costUnpricedCount, 0);
+    assert.equal(implCard.durationMs, 60 * 60 * 1000, 'duration means only the one lineage with a resolved terminal duration');
+    assert.equal(implCard.durationCoveredCount, 1);
+    assert.equal(implCard.durationMissingCount, 1);
+  });
+
+  test('notes.costUnit states the three distinct aggregations and does not claim cost is per-lineage the way duration/effort are', () => {
+    const readout = computeEffortReadout({ liveRows: [], historyRows: [], issueContext: new Map(), asOf: ASOF });
+    assert.match(readout.notes.costUnit, /SUM/);
+    assert.match(readout.notes.costUnit, /MEAN/);
+    assert.match(readout.notes.costUnit, /COUNT/);
   });
 });
 

@@ -20,6 +20,22 @@ function doneRow({ id, issueId, issueIdentifier, kind, dispatchedAt, completedAt
   };
 }
 
+// A realistic priced row carrying genuine `[usage]` telemetry (R1/R2) — see
+// tests/unit/effort-readout.test.js's own `pricedRow` for why `doneRow`
+// (telemetry-free) cannot exercise the cost/effort-populated paths.
+function pricedRow({ id, issueId, issueIdentifier, kind, dispatchedAt, completedAt, costUsd, effort = null }) {
+  const usagePayload = { model: 'test/model' };
+  if (costUsd != null) usagePayload.costUsd = costUsd;
+  if (effort) usagePayload.effort = effort;
+  return {
+    id, issueId, issueIdentifier, kind, status: 'taken', dispatchedAt,
+    feedback: [
+      { kind: 'usage', message: `[usage] ${JSON.stringify(usagePayload)}` },
+      { message: '[done] complete', timestamp: completedAt },
+    ],
+  };
+}
+
 function render(readout) {
   return renderEffortReadoutPage('Workspace', {
     urlKey: 'ws', workspaces: [], featureFlags: {}, readout, generatedAt: ASOF,
@@ -82,8 +98,8 @@ describe('per-kind cards and markup conventions (D3, S1 sweep)', () => {
   });
 });
 
-describe('D10 — the ship-empty effort caption names LIN-2567', () => {
-  test('the caption is on the surface, naming the dependency and that it self-populates', () => {
+describe('R1 (formerly D10) — the effort caption states the truth for the current corpus', () => {
+  test('no session in the corpus reports a realised effort: the caption names LIN-2567 as pending', () => {
     const html = render(readoutOver([]));
     assert.match(html, /data-testid="effort-caption-ship-empty"/);
     assert.match(html, /LIN-2567/);
@@ -103,6 +119,53 @@ describe('D10 — the ship-empty effort caption names LIN-2567', () => {
     const html = render(readout);
     assert.match(html, /data-testid="effort-card-effort-implementation">not reported</);
     assert.ok(!/effort-card-effort-implementation">high/.test(html));
+  });
+
+  test('a session in the corpus reports a realised effort: the caption states what is true instead of the stale unconditional claim', () => {
+    const rows = [
+      pricedRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 5, effort: 'high' }),
+    ];
+    const readout = readoutOver(rows);
+    const html = render(readout);
+    assert.match(html, /data-testid="effort-caption-ship-empty"/);
+    assert.match(html, /LIN-2567/);
+    assert.ok(!/does not yet report a realised effort value/.test(html), 'the false unconditional claim must not render once a session reports one');
+    assert.match(html, /backfill/i);
+    assert.match(html, /data-testid="effort-card-effort-implementation">high: 1</);
+  });
+});
+
+describe('R2 — cost/duration are labelled by aggregation, and partial coverage is disclosed', () => {
+  test('the card labels cost as a total and duration as a mean', () => {
+    const rows = [pricedRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', costUsd: 5 })];
+    const html = render(readoutOver(rows));
+    assert.match(html, /cost \(total\)/);
+    assert.match(html, /duration \(mean\)/);
+    assert.match(html, /effort \(count\)/);
+  });
+
+  test('a partly-priced kind discloses how many of its lineages contributed to the cost figure', () => {
+    const rows = [
+      pricedRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', costUsd: 3 }),
+      pricedRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T03:00:00.000Z', costUsd: 9 }),
+      doneRow({ id: 'r3', issueId: 'i3', issueIdentifier: 'LIN-3', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T02:00:00.000Z' }),
+    ];
+    const html = render(readoutOver(rows));
+    assert.match(html, /data-testid="effort-card-coverage-implementation"/);
+    assert.match(html, /2 of 3 lineages priced \(cost\)/);
+  });
+
+  test('a fully-covered kind renders no coverage footnote at all', () => {
+    const rows = [pricedRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', costUsd: 3 })];
+    const html = render(readoutOver(rows));
+    assert.ok(!html.includes('effort-card-coverage-implementation'));
+  });
+
+  test('the "does not measure" note states the three aggregations, not a single "per-lineage" figure covering all three', () => {
+    const html = render(readoutOver([]));
+    assert.match(html, /SUM/);
+    assert.match(html, /MEAN/);
+    assert.match(html, /COUNT/);
   });
 });
 

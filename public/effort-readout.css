@@ -22,10 +22,24 @@
   margin: 0.3rem 0;
   flex-wrap: wrap;
 }
+.effort-card-metric-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.effort-card-metric-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--fg-dim);
+}
 .effort-card-metric {
   font-family: var(--font-structural);
   font-size: 1rem;
   font-weight: 600;
+}
+.effort-card-coverage {
+  border-top-style: dotted;
 }
 
 .effort-card-value {
