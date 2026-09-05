@@ -9,8 +9,9 @@ import { HarbourCommentsStore } from '../../lib/harbour-comments-store.js';
 
 // Modelled on tests/unit/shelved-rulings-store.test.js's hand-rolled mock
 // collection, extended to support $setOnInsert (record()'s idempotent
-// first-write semantics) and an $in filter on an arbitrary field (the
-// wereRecordedByHarbour batch read filters on `commentId`, not just `urlKey`).
+// first-write semantics) and an $in filter on an arbitrary field (LIN-2664 F1:
+// wereRecordedByHarbour's batch read filters on `_id` — the `${urlKey}::${commentId}`
+// composition, not a separate `urlKey`/`commentId` field pair).
 function createMockCollection() {
   const docs = [];
   function matchesField(docValue, queryValue) {
