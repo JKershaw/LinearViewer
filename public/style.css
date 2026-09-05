@@ -1723,9 +1723,45 @@ a.wordmark:hover {
     gap: var(--space-2) 1ch;
   }
 
+  /* LIN-2551 — the mobile density budget for the filter strip.
+     LIN-2527's 4th item (assignee) took `.nav-filters` from one row to three
+     at every swept width (360/390/412/430). The 3-item strip fitted on one
+     row with only a few px to spare, so the 4th item tipped an already-thin
+     budget rather than introducing the fragility — which is why the fix is a
+     budget, not a rewrite. The four knobs below buy the room back WITHOUT
+     removing information: every label and value still renders, and nothing
+     above 640px changes. Pinned by the LIN-2551 block in
+     tests/e2e/header-nav.spec.js, which measures the strip's rendered height
+     with a real assignee SELECTED — the default `all`/`all` state is ~40px
+     cheaper and a budget tuned against it passes while the real one wraps.
+
+     `flex-wrap` is deliberately KEPT as the safety valve below this range.
+     Making the row structurally unwrappable (`nowrap`) was tried and
+     rejected twice over: on its own it pushes the last selector past the
+     viewport edge, where the root's `overflow-x: clip` leaves it unreachable
+     with no scrollbar to reveal it; and constraining the row enough to stop
+     that shrinks the values away to nothing, so the row "fits" only by hiding
+     what it is showing. Both failure modes are worse than the wrap, and both
+     are now pinned by their own tests. Getting to one row at ANY width would
+     mean dropping the labels or the brand on mobile — a design call, not a
+     budget one. */
   .nav-filters {
     flex-direction: row;
-    gap: 1.5ch;
+    gap: 1ch;
+  }
+
+  /* Labels are the strip's largest fixed cost (~147px of its ~395px at 360px)
+     and the part that cannot truncate, so a step down here buys the most room
+     for the least loss. */
+  .nav-label {
+    font-size: 0.8em;
+  }
+
+  /* The flex `gap` above already separates the brand from the first selector;
+     the base rule's extra margin is a second separator paid for twice. */
+  .wordmark-nav {
+    margin-right: 0;
+    font-size: 0.85em;
   }
 
   .nav-actions {
@@ -1736,6 +1772,8 @@ a.wordmark:hover {
     min-height: 44px;
     display: flex;
     align-items: center;
+    /* Label-to-value spacing, tightened from the base 0.5ch (LIN-2551). */
+    gap: 0.25ch;
   }
 
   /* Landing/preview auth links (Sign in / GitHub / Jira, .nav-action.login):
@@ -1749,7 +1787,12 @@ a.wordmark:hover {
   }
 
   .nav-value {
-    max-width: 12ch;
+    /* Tightened from 12ch (LIN-2551). This is the 481-640px band only; the
+       phone block below relaxes it to 10ch once the brand is out of the way.
+       Which values reach the cap depends entirely on the workspace — a long
+       organisation or team name will, `all` never does — so this is a bound
+       on the damage, not a claim that nothing hits it. */
+    max-width: 8ch;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1939,13 +1982,44 @@ a.wordmark:hover {
     margin-bottom: var(--space-4);
   }
 
-  /* Tighter nav spacing on very small phones */
-  .nav-filters {
-    gap: 1ch;
+}
+
+/* LIN-2551 — on a phone the header carries controls, not the brand.
+   ===========================================================================
+   Four labelled selectors do not fit beside the wordmark at phone widths: at
+   320px they need ~332px of ~296px available, and even at 412px — a real,
+   swept device width — every other lever combined left only ~10px of margin
+   on CI's font metrics, which is a layout that holds by luck. The wordmark is
+   the one passenger in this strip that is not a control, so it is what gives
+   way. The app is still named in the tab title, in the footer, and in this
+   same header from 481px up.
+
+   This is the deliberate, visible trade in this fix, and it is one line to
+   reverse if the brand is wanted back on mobile — but reversing it re-opens
+   LIN-2551 unless the labels go instead.
+
+   The bound is 480px rather than the 400px used elsewhere in this file
+   because the root font steps up above 400px: the strip's content jumps ~40px
+   exactly where a 400px cutoff would stop helping, which is precisely how
+   412px ended up the tightest width. Its own block rather than widening the
+   400px one above, whose other rules are about page sections and have no
+   business moving. */
+@media (max-width: 480px) {
+  .nav-filters > .wordmark-nav {
+    display: none;
   }
 
+  .nav-filters {
+    gap: 0.75ch;
+  }
+
+  /* The brand's ~80px is spent on fitting FOUR selectors, not on lengthening
+     three — 8ch is what leaves 360px (the tightest width carrying both a team
+     and an assignee) a margin that survives another machine's font metrics.
+     A 10ch cap fitted locally and still wrapped on CI at exactly that width
+     and that filter state. */
   .nav-value {
-    max-width: 10ch;
+    max-width: 8ch;
   }
 }
 
