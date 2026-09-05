@@ -139,6 +139,12 @@ function makeChatUI() {
   const calls = { appendMessage: [], appendNote: [] };
   return {
     calls,
+    // LIN-2632 beat 2: flight-companion.js now calls
+    // window.ChatUI.toolBreadcrumbLabel for its tool breadcrumbs — sourced
+    // from the REAL chat.js (loadChatUI(), defined further down this file)
+    // rather than a second hand-rolled fake, so a real regression in the
+    // shared label helper fails these tests too, not just its own.
+    toolBreadcrumbLabel: loadChatUI().toolBreadcrumbLabel,
     appendMessage(thread, opts) {
       calls.appendMessage.push(opts);
       const li = new FakeElement('li');
@@ -829,7 +835,13 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
       'the display-only no-reply sentence must never be pushed to history');
   });
 
-  test('AC3: an auto-wake tick emitting only tool call/result frames appends ZERO rows', async () => {
+  // LIN-2632 beat 2 narrows this: AC3's real invariant is "no empty assistant
+  // BUBBLE for a tool-only tick" — it predates tool breadcrumbs existing at
+  // all, back when 'call'/'result' rendered nothing whatsoever. Now that they
+  // render a breadcrumb note (the fix for "it doesn't appear to use tools?"),
+  // the thread is no longer empty on a tool-only tick, but it still must
+  // never contain an assistant bubble (chat-msg / ChatUI.appendMessage).
+  test('AC3: an auto-wake tick emitting only tool call/result frames appends breadcrumbs but never an assistant bubble', async () => {
     const { exports: m, thread, chatUICalls } = loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: '1', name: 'get_stack' }),
@@ -839,8 +851,9 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
     });
     m.autoWakeTick();
     await flush();
-    assert.strictEqual(thread.children.length, 0, 'a tool-only tick must not paint an empty bubble');
     assert.strictEqual(chatUICalls.appendMessage.length, 0, 'no bubble may be created for a tool-only turn');
+    assert.strictEqual(chatUICalls.appendNote.length, 1, 'the call breadcrumb renders (settled by the result, not a second note)');
+    assert.ok(thread.children.every(li => !li.className.includes('chat-msg')), 'every row is a note, never a bubble');
   });
 
   test('AC3 preservation: a `proposed` event on a text-free turn still renders a wired Approve/Dismiss card (null-beforeLi fallback)', async () => {
@@ -963,18 +976,86 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
     assert.strictEqual(capNotes.length, 1);
   });
 
-  test('call/result(non-proposed)/error phases render no UI', async () => {
-    const { exports: m, chatUICalls } = loadClient({
+  // LIN-2632 beat 2: 'call'/'result'/'error' used to render nothing at all
+  // (the bug — "it doesn't appear to use tools?"). Now 'call' renders a
+  // pending breadcrumb via the shared window.ChatUI.toolBreadcrumbLabel,
+  // 'result' settles it, and 'error' marks it — correlated by the tool
+  // event's own `id`.
+  test('"call" renders a pending breadcrumb using the shared label helper', async () => {
+    const { exports: m, chatUICalls, thread } = loadClient({
       fetchImpl: () => sseResponse([
-        sseFrame('tool', { phase: 'call', id: '1', name: 'get_stack' }),
-        sseFrame('tool', { phase: 'result', id: '1', name: 'get_stack', result: '{}' }),
+        sseFrame('tool', { phase: 'call', id: '1', name: 'get_stack', arguments: {} }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(chatUICalls.appendNote.length, 1);
+    assert.equal(chatUICalls.appendNote[0].text, '↳ checked the task stack …');
+    const li = thread.children.find(l => l.textContent.includes('checked the task stack'));
+    assert.ok(li, 'expected the pending breadcrumb in the thread');
+  });
+
+  test('"result" settles the matching "call" breadcrumb in place (no new note), dropping the pending ellipsis', async () => {
+    const { exports: m, chatUICalls, thread } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: '1', name: 'list_task_sessions', arguments: { issueId: 'LIN-9' } }),
+        sseFrame('tool', { phase: 'result', id: '1', name: 'list_task_sessions', result: '[]' }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    // Settling mutates the existing note in place — it must not append a
+    // second one.
+    assert.strictEqual(chatUICalls.appendNote.length, 1);
+    const li = thread.children.find(l => l.className.includes('fc-inline-note'));
+    assert.equal(li.textContent, '↳ checked sessions for LIN-9', 'settled text keeps the call-time specifics and drops the ellipsis');
+  });
+
+  test('"error" marks the matching "call" breadcrumb failed, recomputed from the error event', async () => {
+    const { exports: m, chatUICalls, thread } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: '2', name: 'get_session', arguments: { sessionId: 'abc' } }),
         sseFrame('tool', { phase: 'error', id: '2', name: 'get_session', error: 'boom' }),
         sseFrame('done', { surface: true }),
       ]),
     });
     m.autoWakeTick();
     await flush();
+    assert.strictEqual(chatUICalls.appendNote.length, 1);
+    const li = thread.children.find(l => l.className.includes('fc-inline-note'));
+    assert.equal(li.textContent, '↳ get_session failed: boom');
+  });
+
+  test('a result/error with no matching call id is a defensive no-op (never throws, no orphan note)', async () => {
+    const { exports: m, chatUICalls } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'result', id: 'orphan', name: 'get_stack', result: '{}' }),
+        sseFrame('tool', { phase: 'error', id: 'orphan-2', name: 'get_stack', error: 'x' }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    await assert.doesNotReject(async () => { m.autoWakeTick(); await flush(); });
     assert.strictEqual(chatUICalls.appendNote.length, 0);
+  });
+
+  test('two concurrent tool calls in one turn settle independently, correlated by id', async () => {
+    const { chatUICalls, thread, exports: m } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: 'a', name: 'get_stack', arguments: {} }),
+        sseFrame('tool', { phase: 'call', id: 'b', name: 'get_session', arguments: { sessionId: 'xyz' } }),
+        sseFrame('tool', { phase: 'result', id: 'a', name: 'get_stack', result: '{}' }),
+        sseFrame('tool', { phase: 'error', id: 'b', name: 'get_session', error: 'timeout' }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(chatUICalls.appendNote.length, 2, 'each call gets exactly one note, settling mutates in place');
+    const notes = thread.children.filter(l => l.className.includes('fc-inline-note')).map(l => l.textContent);
+    assert.ok(notes.includes('↳ checked the task stack'), 'the "a" breadcrumb settled');
+    assert.ok(notes.includes('↳ get_session failed: timeout'), 'the "b" breadcrumb failed independently');
   });
 
   test('a valid proposal renders Approve/Dismiss; Dismiss is zero-fetch and terminal', async () => {

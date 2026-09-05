@@ -308,8 +308,9 @@
   }
 
   function showInlineNote(message, beforeLi) {
-    window.ChatUI.appendNote(thread, message, { liClass: 'fc-inline-note', before: beforeLi });
+    var li = window.ChatUI.appendNote(thread, message, { liClass: 'fc-inline-note', before: beforeLi });
     setEmptyVisible(false);
+    return li;
   }
 
   function freeTierMessage(classification) {
@@ -420,14 +421,52 @@
 
   // ─── Tool-wire phase handling (F5: all five phases explicit) ───────────
 
-  function handleToolEvent(data, beforeLi) {
-    if (data.phase === 'proposed') {
+  // Settle a 'call' breadcrumb on its matching 'result' — correlated via the
+  // tool event's own `id` (stable across call/result/error for one hop,
+  // lib/openrouter.js:1588-1607). Reuses the label already rendered at call
+  // time rather than recomputing from the result event, which carries no
+  // `arguments` at all — recomputing here would silently drop call-time
+  // specifics (e.g. which issueId list_task_sessions was asked for). A
+  // result with no matching call (defensive only — the wire always pairs
+  // them within one turn) is a no-op.
+  function settleToolCall(data, toolLis) {
+    var entry = toolLis && data.id ? toolLis[data.id] : null;
+    if (!entry) return;
+    entry.li.textContent = '↳ ' + entry.label;
+  }
+
+  // Mark a 'call' breadcrumb failed on its matching 'error'. Unlike settle,
+  // this recomputes the label — from the error event's own name + error
+  // message via the shared helper — since that is genuinely new information
+  // the call-time label never had.
+  function failToolCall(data, toolLis) {
+    var entry = toolLis && data.id ? toolLis[data.id] : null;
+    if (!entry) return;
+    entry.li.textContent = '↳ ' + window.ChatUI.toolBreadcrumbLabel({ phase: 'error', name: data.name, error: data.error });
+  }
+
+  function handleToolEvent(data, beforeLi, toolLis) {
+    if (data.phase === 'call') {
+      // Tool use is invisible on this page even when it happens (the bug
+      // this beat fixes) — task-chat.js renders a breadcrumb per tool event
+      // via appendToolBreadcrumb (public/task-chat.js) through
+      // ChatUI.appendNote (public/chat.js), using labels from the shared
+      // window.ChatUI.toolBreadcrumbLabel (lifted off task-chat.js, LIN-2632
+      // beat 1). This mirrors that — call renders pending, settled on the
+      // matching 'result' below, marked on 'error'.
+      var label = window.ChatUI.toolBreadcrumbLabel(data);
+      if (!label) return;
+      var li = showInlineNote('↳ ' + label + ' …', beforeLi);
+      if (toolLis && data.id) toolLis[data.id] = { li: li, label: label };
+    } else if (data.phase === 'result') {
+      settleToolCall(data, toolLis);
+    } else if (data.phase === 'error') {
+      failToolCall(data, toolLis);
+    } else if (data.phase === 'proposed') {
       renderProposal(data.result, beforeLi);
     } else if (data.phase === 'cap') {
       showInlineNote('Reached the tool-call limit for this turn — answering with what it has.', beforeLi);
     }
-    // 'call' / 'result' (non-proposed) / 'error' → no UI, mirrors
-    // task-chat.js's own silent handling of these phases.
   }
 
   // ─── Cadence scheduling ──────────────────────────────────────────────────
@@ -600,6 +639,12 @@
     var answerEl = null;
     var answerLi = null;
     var answerText = '';
+    // Correlates a 'call' breadcrumb to the 'result'/'error' that settles it,
+    // keyed by the tool event's own `id` (stable across all three phases for
+    // one hop — lib/openrouter.js:1588-1607). Scoped to this turn, matching
+    // answerLi/answerText above — a fresh turn gets a fresh map, and real
+    // tool-call ids never repeat within one turn.
+    var toolBreadcrumbLis = {};
 
     // AC3 (LIN-2443): the bubble is created on demand rather than at stream
     // open, so a silent or tool-only auto-wake tick never paints an empty
@@ -637,7 +682,7 @@
             // (:269-270) and ChatUI.appendNote (chat.js:106) both already
             // append at thread level in that case, so the Approve/Dismiss
             // card renders identically — just appended rather than inserted.
-            handleToolEvent(eventData, answerLi);
+            handleToolEvent(eventData, answerLi, toolBreadcrumbLis);
           } else if (type === 'token' || type === 'message') {
             var chunk = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
             // First NON-EMPTY chunk creates the bubble — text is the only
