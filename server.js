@@ -70,6 +70,7 @@ import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
 import { TaskDecisionsStore } from './lib/task-decisions-store.js'
 import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
 import { DismissalSuggestionsStore } from './lib/dismissal-suggestions-store.js'
+import { HarbourCommentsStore } from './lib/harbour-comments-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
@@ -491,6 +492,14 @@ const shelvedRulingsStore = new ShelvedRulingsStore({
 // operator still owns; a suggestion offers them a one-click way to close it).
 const dismissalSuggestionsStore = new DismissalSuggestionsStore({
   collection: dismissalSuggestionsCollection
+})
+
+// Harbour-comments ledger (LIN-2648, WS1 of LIN-2241): durable record of which
+// comment ids Harbour itself wrote, keyed (urlKey, commentId). No TTL — see
+// lib/harbour-comments-store.js for the full coverage-semantics docstring.
+const harbourCommentsCollection = db.collection('harbour-comments')
+const harbourCommentsStore = new HarbourCommentsStore({
+  collection: harbourCommentsCollection
 })
 
 // Saved chats (LIN-1008): durable, resumable task-chat transcripts, private per
@@ -2464,10 +2473,10 @@ async function getNorthStarDocVersionForWorkspace(urlKey, accountId) {
   return resolveNorthStarDocVersion(userPreferencesStore, urlKey, accountId);
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, rejectedCredentialRegistry }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, rejectedCredentialRegistry }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.

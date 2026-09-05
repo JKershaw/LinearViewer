@@ -444,6 +444,9 @@ async function fetchWithTimeout(workFn, ms) {
  *   to `null` rather than 503ing (unlike getWorkspaceNorthStar/reportHistoryStore above).
  * @param {Object} [options.reportHistoryStore] - Durable per-workspace roadmap report history store
  *   (LIN-1810). Absent → GET /api/proxy/north-star 503s.
+ * @param {Object} [options.harbourCommentsStore] - Durable (urlKey, commentId) ledger (LIN-2648) of
+ *   comments Harbour itself wrote. Threaded into createProxyWriteRoutes; best-effort record at each
+ *   createComment seam, never gates the response. Absent → the seams simply skip recording.
  * @param {Object} [options.dispatchPresetsStore] - Dispatch presets store (LIN-1390), used by the
  *   autopilot kickoff route to validate an incoming `presetId` and resolve its config's routing
  *   precedence over workspace dispatchDefaults. Absent → `presetId` is accepted but has no effect.
@@ -455,7 +458,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null }) {
   const router = Router();
 
   /**
@@ -1308,7 +1311,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group E writes (LIN-679 Stage 3b / LIN-2537): extracted to
   // routes/proxy-writes.js, mounted at its original position.
-  router.use(createProxyWriteRoutes({ proxyLimiter, commentDedupe, commentDedupeGenerations, authenticateProxyToken, requireWriteScope, resolveProviderAccess, denyIfUnsupported, denyIfMissingRead, workspaceUnavailable, graphqlErrorStatus, writeRejected, resolveTeamInput, resolveStateInput, resolveProjectInput, resolveLabelInput, refResolutionFailed, partialWriteFailed, logEvent }));
+  router.use(createProxyWriteRoutes({ proxyLimiter, commentDedupe, commentDedupeGenerations, authenticateProxyToken, requireWriteScope, resolveProviderAccess, denyIfUnsupported, denyIfMissingRead, workspaceUnavailable, graphqlErrorStatus, writeRejected, resolveTeamInput, resolveStateInput, resolveProjectInput, resolveLabelInput, refResolutionFailed, partialWriteFailed, logEvent, harbourCommentsStore }));
 
   // Charge one free-tier unit for a proxy LLM request about to generate. Returns
   // null when the request may proceed, or a { status, body } rejection carrying
