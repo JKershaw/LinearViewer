@@ -1131,6 +1131,87 @@ describe('refreshOwnerCredential (LIN-2097, Block H — freeze + non-live bounda
     assert.equal(durable.tokenExpiresAt, NOW + FAR_FUTURE_MS);
   });
 
+  // ─── LIN-2329: the event must say WHICH of the two things happened ───────────
+  //
+  // `isSameCredential` is computed for the freeze above and was then never
+  // consulted again, so the CAS-won write recorded `via: 'rotated'`
+  // UNCONDITIONALLY — asserting a rotation, and by implication a recovery, for
+  // an exchange that handed back the bytes we already had. LIN-2327's research
+  // measured the consequence: 19 byte-identical no-op refreshes on one
+  // fingerprint produced 19 × refresh_success{via:'rotated'}, while the
+  // credential was in an unrecoverable reject → refresh → same-bytes → reject
+  // loop. Counting refresh_success is the natural first query for "is this
+  // recovering?", and it returned the wrong answer with full confidence.
+
+  const capturingLifecycleStore = () => {
+    const events = [];
+    return { events, async recordEvent(e) { events.push(e); } };
+  };
+
+  test('LIN-2329 [byte-identical exchange]: records via: byte-identical, NOT rotated', async () => {
+    const lifecycleEventStore = capturingLifecycleStore();
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: NOW + FAR_FUTURE_MS } });
+    // The provider hands back the SAME access-token bytes — the exact shape
+    // LIN-2097's freeze exists for, and the shape that was mislabelled.
+    const refreshAccessToken = async () => ({ access_token: 'access-SAME', refresh_token: 'R1-rotated', expires_in: 3600 });
+
+    await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store, lifecycleEventStore });
+
+    const successes = lifecycleEventStore.events.filter(e => e.kind === 'refresh_success');
+    assert.equal(successes.length, 1);
+    assert.equal(successes[0].detail.via, 'byte-identical',
+      'a no-op exchange must not assert a rotation that did not happen');
+    assert.notEqual(successes[0].detail.via, 'rotated');
+  });
+
+  test('LIN-2329 [genuinely new bytes]: still records via: rotated — the label is narrowed, not replaced', async () => {
+    // The control. Without it, the test above would pass on an implementation
+    // that labelled EVERY success 'byte-identical', which is the same class of
+    // wrong answer in the other direction.
+    const lifecycleEventStore = capturingLifecycleStore();
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-OLD', refreshToken: 'R0', tokenExpiresAt: NOW + FAR_FUTURE_MS } });
+    const refreshAccessToken = async () => ({ access_token: 'access-NEW', refresh_token: 'R1-rotated', expires_in: 3600 });
+
+    await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store, lifecycleEventStore });
+
+    const successes = lifecycleEventStore.events.filter(e => e.kind === 'refresh_success');
+    assert.equal(successes.length, 1);
+    assert.equal(successes[0].detail.via, 'rotated');
+  });
+
+  test('LIN-2329: the label follows the SAME predicate the expiry freeze uses, so the two can never disagree', async () => {
+    // `isSameCredential` also requires a finite stored expiry (M3's guard):
+    // same bytes but an unusable stored expiry falls back to a fresh
+    // calculateExpiresAt — i.e. it does NOT freeze — so it must not report
+    // byte-identical either, or the event would contradict the write.
+    const lifecycleEventStore = capturingLifecycleStore();
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: undefined } });
+    const refreshAccessToken = async () => ({ access_token: 'access-SAME', refresh_token: 'R1-rotated', expires_in: 3600 });
+
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store, lifecycleEventStore });
+
+    assert.notEqual(result.expiresAt, undefined, 'sanity: this case does NOT freeze — it calculates a fresh expiry');
+    const successes = lifecycleEventStore.events.filter(e => e.kind === 'refresh_success');
+    assert.equal(successes[0].detail.via, 'rotated',
+      'the event must describe what the write actually did, not what the bytes alone suggest');
+  });
+
+  test('LIN-2329: only the LABEL changed — the freeze and the unconditional refreshToken write are untouched', async () => {
+    // Guard on the ticket's explicit "Not in scope": the freeze is LIN-2097's
+    // deliberate behaviour, re-confirmed by LIN-2327's research. This ticket
+    // changes what the event SAYS, never what the refresh DOES.
+    const lifecycleEventStore = capturingLifecycleStore();
+    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: NOW + FAR_FUTURE_MS } });
+    const refreshAccessToken = async () => ({ access_token: 'access-SAME', refresh_token: 'R1-rotated', expires_in: 3600 });
+
+    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store, lifecycleEventStore });
+
+    assert.equal(result.expiresAt, NOW + FAR_FUTURE_MS, 'still frozen at the stored expiry');
+    const durable = await store.get('account-A', 'acme');
+    assert.equal(durable.refreshToken, 'R1-rotated', 'the rotated refreshToken is still persisted unconditionally');
+    assert.equal(durable.tokenExpiresAt, NOW + FAR_FUTURE_MS);
+  });
+
   test('H2 [B1: freeze + already-past stored expiry -> refreshOwnerCredential returns the RAW frozen result, not null]: the liveness null-check no longer lives on this shared seam — it moved to doRefresh\'s headless call site (see Block J) so a non-live result never reaches the two human refresh entrants (server.js\'s ensureValidToken / handleTokenRefreshAndRetry), which call refreshOwnerCredential directly and would otherwise tear the workspace down on a plain null', async () => {
     const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: NOW + PAST_MS } });
     const refreshAccessToken = async () => ({ access_token: 'access-SAME', refresh_token: 'R1-rotated', expires_in: 3600 });
