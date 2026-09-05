@@ -1031,7 +1031,7 @@ describe('Flight Companion turn endpoint (LIN-2442) — acceptance witnesses, mu
     assert.strictEqual(afterTurn1.state.lastCensusStateHash, null, 'the OLD (seed/null) baseline must be untouched by a failed turn');
     assert.ok(afterTurn1.state.turnReservedUntil, 'a reservation lease must be recorded');
 
-    // Fast-forward past BOTH the 180s floor and the 600s lease the same way
+    // Fast-forward past BOTH the 180s floor and the reservation lease the same way
     // real elapsed time would read: by writing already-past deadlines
     // through the store's OWN CAS (route has no injectable clock —
     // Date.now() is read directly — this is the same wall-clock-simulation
@@ -1138,7 +1138,7 @@ describe('Flight Companion turn endpoint (LIN-2442) — acceptance witnesses, mu
   });
 
   // ── (c) the lease outlasts a slow turn — first-ever run of this witness ──
-  test('(c) a turn still in flight past the 180s floor but inside the 600s lease is denied with reason: turn-in-flight', async () => {
+  test('(c) a turn still in flight past the 180s floor but inside the reservation lease is denied with reason: turn-in-flight', async () => {
     const store = freshRealStore();
     const census = censusWithAttention('hash-c', 4);
     withCensus(store, census);
@@ -1506,5 +1506,130 @@ describe('Flight Companion turn endpoint (LIN-2449) — client disconnect mid-tu
       commitAdvances.length, 2,
       'reservation + commit — without this control, the test above would pass just as happily on a route that never commits at all'
     );
+  });
+});
+
+
+// ─── LIN-2447 item 2: the commit CAS is scoped to its OWN reservation ─────────
+//
+// The commit block re-reads the companion record fresh (it must — the store's
+// duplicate-identical-state branch does not bump `rev`, so `expectedRev + 1`
+// would CAS against a stale witness). Fresh also means it can return a
+// SUCCESSOR's record, if this turn outlived its lease and the next one
+// reserved in the meantime. Committing onto that did two wrong things at once:
+// cleared the successor's live lease (the commit record carries
+// `turnReservedUntil: null`) and overwrote the successor's baseline with this
+// turn's stale one. The review that filed this drove it against a real store
+// and recorded the trace: A's lease expires, B reserves, both sit at a
+// billable model call, then A's late commit lands and clears B.
+describe('Flight Companion turn endpoint (LIN-2447 item 2) — late commit cannot clobber a successor', () => {
+  // A store whose companion record is swapped out from under the turn between
+  // the reservation and the commit — i.e. a successor reserved while this turn
+  // was still streaming. Records every advance so the test can prove which
+  // record survived.
+  function racingObserverStateStore({ censusDoc, successorState, calls }) {
+    let doc = { rev: 1, state: COMPANION_SEED_STATE };
+    let reserved = false;
+    return {
+      calls,
+      async ensureSeeded(instanceKey) {
+        calls.push({ method: 'ensureSeeded', instanceKey });
+        return { _id: instanceKey, rev: doc.rev, state: doc.state };
+      },
+      async readCurrent(instanceKey) {
+        calls.push({ method: 'readCurrent', instanceKey });
+        if (instanceKey.startsWith('sweep:v1:')) return censusDoc;
+        if (reserved) {
+          // The commit block's own fresh read: hand it the successor's record.
+          return { _id: instanceKey, rev: 9, state: successorState };
+        }
+        return { _id: instanceKey, rev: doc.rev, state: doc.state };
+      },
+      async advance(instanceKey, expectedRev, nextState) {
+        calls.push({ method: 'advance', instanceKey, expectedRev, nextState });
+        reserved = true;
+        doc = { rev: doc.rev + 1, state: nextState };
+        return true;
+      },
+    };
+  }
+
+  test('a commit whose reservation is no longer the stored one is SKIPPED, not applied', async () => {
+    const calls = [];
+    const successorState = {
+      v: 1,
+      lastCensusStateHash: 'successor-baseline',
+      lastCensusSnapshot: null,
+      lastTurnAt: new Date().toISOString(),
+      turnReservedUntil: new Date(Date.now() + 900_000).toISOString(),
+      reservationId: 'successor-reservation-id',
+      notes: '',
+    };
+    const store = racingObserverStateStore({ censusDoc: realCensusDoc(), successorState, calls });
+    const app = buildApp({
+      observerStateStore: store,
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called'); } },
+      chatClient: {
+        async streamChat(messages, opts, onEvent) { onEvent('done', {}); },
+        async streamChatWithTools(messages, opts, onEvent) { onEvent('done', {}); },
+      },
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {});
+    assert.strictEqual(status, 200);
+
+    const companionAdvances = calls.filter(c =>
+      c.method === 'advance' && c.instanceKey.startsWith('companion:v1:'));
+    assert.strictEqual(
+      companionAdvances.length, 1,
+      'only the reservation — the commit must not land on a record that is no longer ours'
+    );
+    // The successor's live lease is intact precisely because nothing was written.
+    assert.strictEqual(successorState.turnReservedUntil !== null, true);
+    assert.strictEqual(successorState.reservationId, 'successor-reservation-id');
+  });
+
+  test('control: when the stored reservation IS ours, the commit still lands', async () => {
+    // Without this, the test above would pass on a route that never commits.
+    const calls = [];
+    let capturedReserve = null;
+    const store = {
+      calls,
+      async ensureSeeded(instanceKey) {
+        calls.push({ method: 'ensureSeeded', instanceKey });
+        return { _id: instanceKey, rev: 1, state: COMPANION_SEED_STATE };
+      },
+      async readCurrent(instanceKey) {
+        calls.push({ method: 'readCurrent', instanceKey });
+        if (instanceKey.startsWith('sweep:v1:')) return realCensusDoc();
+        // Echo back exactly what was reserved — the ordinary, unraced case.
+        return { _id: instanceKey, rev: 2, state: capturedReserve || COMPANION_SEED_STATE };
+      },
+      async advance(instanceKey, expectedRev, nextState) {
+        calls.push({ method: 'advance', instanceKey, expectedRev, nextState });
+        if (nextState.turnReservedUntil) capturedReserve = nextState;
+        return true;
+      },
+    };
+    const app = buildApp({
+      observerStateStore: store,
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called'); } },
+      chatClient: {
+        async streamChat(messages, opts, onEvent) { onEvent('done', {}); },
+        async streamChatWithTools(messages, opts, onEvent) { onEvent('done', {}); },
+      },
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {});
+    assert.strictEqual(status, 200);
+
+    const companionAdvances = calls.filter(c =>
+      c.method === 'advance' && c.instanceKey.startsWith('companion:v1:'));
+    assert.strictEqual(companionAdvances.length, 2, 'reservation + commit');
+    const commit = companionAdvances[1].nextState;
+    assert.strictEqual(commit.turnReservedUntil, null, 'the commit releases the lease');
+    assert.strictEqual(commit.reservationId, null, 'and clears the nonce with it');
   });
 });
