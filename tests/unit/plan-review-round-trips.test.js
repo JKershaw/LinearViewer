@@ -880,6 +880,33 @@ describe('computeIssueRoundTrips — {gateKind, rePassKind} option (LIN-2592)', 
     const result = computeIssueRoundTrips(iss, { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
     assert.equal(result.roundTrips, 0);
   });
+
+  test('gateDue reaches true under the review pair via a non-default rePassKind dispatch (kills a hardcoded-`plan` regression in hasRePassDispatch)', () => {
+    const iss = issue('gate-review-pair', {
+      description: 'plan-review due: yes — (a) needs multiple sessions.',
+      rows: [
+        row('i1', 'implementation', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z'),
+      ],
+    });
+    const result = computeIssueRoundTrips(iss, { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
+    assert.equal(result.gateDue, true,
+      'hasRePassDispatch must check options.rePassKind ("implementation"), not a hardcoded "plan" literal — this issue has an implementation row and no plan row at all');
+  });
+
+  test('computePlanReviewRoundTrips forwards a non-default gate pair to every issue (kills a dropped pair-forwarding regression in the aggregate wrapper)', () => {
+    const iss = issue('agg-review-pair', {
+      rows: [
+        row('i1', 'implementation', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z'),
+        row('r1', 'review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z',
+          feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:05:00.000Z')),
+      ],
+    });
+    const agg = computePlanReviewRoundTrips([iss], { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
+    assert.equal(agg.scale.reachedPlanReviewAny, 1,
+      'the aggregate must forward {gateKind, rePassKind} to computeIssueRoundTrips per issue — a dropped pair would default to plan-review/plan and find no gate row in this review/implementation fixture');
+    assert.equal(agg.primary.denominator, 1);
+    assert.equal(agg.primary.numerator, 1);
+  });
 });
 
 // ─── __internal sanity (mirrors follow-on-ratio.test.js's pattern) ──────────
