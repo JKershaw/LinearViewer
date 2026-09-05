@@ -1132,7 +1132,7 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
     m.autoWakeTick();
     await flush();
     assert.strictEqual(checkIn.hidden, false);
-    assert.strictEqual(checkIn.textContent, m.formatNoCensus());
+    assert.match(checkIn.textContent, /^checked in .+ \u00b7 no fleet scan yet$/);
     assert.doesNotMatch(checkIn.textContent, /nothing new/, 'the whole defect: this line must not claim a scan happened');
     assert.strictEqual(thread.children.length, 0, 'no row is ever appended to the thread');
     assert.strictEqual(chatUICalls.appendNote.length, 0);
@@ -1142,9 +1142,10 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
 
   test('LIN-2487: no-census carries no warning class, and clears a stale one', async () => {
     // Deliberately not styled as a warning: the common case is a brand-new
-    // workspace inside the sweep's own 60s interval, which is not a fault. The
-    // distinct TEXT is the signal. Clearing a leftover class matters because
-    // the previous tick may have been a sweep-not-seen one.
+    // workspace still waiting for its first sweep, which is not a fault — and
+    // that wait runs to roster-length × 60s, since observer-sweep is
+    // round-robin one workspace per tick, not 60s flat. Clearing a leftover
+    // class matters because the previous tick may have been sweep-not-seen.
     const { exports: m, checkIn } = loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
@@ -1154,10 +1155,14 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
     assert.strictEqual(checkIn.classList.contains('fc-checkin--warning'), false);
   });
 
-  test('LIN-2487: formatNoCensus names no time — there has never been a scan to timestamp', () => {
+  test('LIN-2487: formatNoCensus reports THIS tick\'s time, not the sweep\'s — there is no sweep instant to name', () => {
     const { exports: m } = loadClient({ fetchImpl: () => jsonResponse(200, {}) });
-    assert.strictEqual(m.formatNoCensus(), 'no fleet scan yet');
-    assert.doesNotMatch(m.formatNoCensus(), /\d/, 'unlike sweep-not-seen, there is no last-seen instant to report');
+    const line = m.formatNoCensus(new Date('2026-09-05T09:00:00.000Z'));
+    assert.match(line, /no fleet scan yet$/, 'the state being reported');
+    assert.match(line, /^checked in /, 'and the ordinary line\'s leading clause, so a stopped/hidden/offline page is still distinguishable from a ticking one');
+    // The clock is an argument, never read inside — same purity contract as
+    // its two siblings, which is what puts it on the test seam at all.
+    assert.notStrictEqual(line, m.formatNoCensus(new Date('2026-09-05T11:00:00.000Z')));
   });
 
   test('LIN-2487: the three gate-silent lines are mutually distinct', () => {
@@ -1168,7 +1173,7 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
     const lines = [
       m.formatCheckIn(new Date('2026-09-05T09:00:00.000Z')),
       m.formatSweepNotSeen(new Date('2026-09-05T08:00:00.000Z')),
-      m.formatNoCensus(),
+      m.formatNoCensus(new Date('2026-09-05T09:00:00.000Z')),
     ];
     assert.strictEqual(new Set(lines).size, 3, `expected three distinct check-in lines, got ${JSON.stringify(lines)}`);
   });
