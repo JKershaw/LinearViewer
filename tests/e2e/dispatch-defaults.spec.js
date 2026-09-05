@@ -147,13 +147,21 @@ test.describe('Dispatch defaults settings', () => {
     await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
   });
 
-  // Acceptance #3 (LIN-2616, the LIN-1747 hazard): a save with no operator
-  // input for a given per-kind row must write NO byKind.effort entry for that
-  // row — never silently promote 18 inherited rows into explicit overrides.
-  // Proven the same way the rest of this spec proves persistence: through the
-  // real POST handler + a real reload, scoping the check to the row a save
-  // actually touched vs. every row it didn't.
-  test('saving one per-kind effort override does not write byKind.effort entries for untouched kinds (LIN-2616, LIN-1747)', async ({ page, localWorkerUrlKey }) => {
+  // Acceptance #3 (LIN-2616), save-path half: a save that touches ONE per-kind
+  // row must not fan that value out into byKind.effort entries for the rows the
+  // operator never typed in. Proven the same way the rest of this spec proves
+  // persistence: through the real POST handler + a real reload, scoping the
+  // check to the row a save actually touched vs. every row it didn't.
+  //
+  // NOTE what this does NOT cover: the LIN-1747 *visual-inheritance* hazard —
+  // per-kind rows rendering the workspace-wide effort as if it were their own
+  // override — is not exercised here, because this scenario never sets a
+  // workspace-wide effort. That guard is the unit witness
+  // `a kind with no effort override renders blank even when the workspace-wide
+  // effort is set (LIN-2616, LIN-1747)` in tests/unit/render-settings.test.js;
+  // mutating renderDispatchDefaultsSection to inherit reddens that test and
+  // leaves this one green. Keep both — they cover different halves.
+  test('saving one per-kind effort override does not write byKind.effort entries for untouched kinds (LIN-2616)', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 

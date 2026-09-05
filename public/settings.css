@@ -278,7 +278,8 @@
 }
 
 .harness-select,
-.dispatch-model-input {
+.dispatch-model-input,
+.dispatch-effort-input {
   font-family: var(--font-content);
   font-size: 0.9em;
   padding: var(--space-1) var(--space-2);
@@ -293,18 +294,28 @@
 }
 
 .harness-select:focus,
-.dispatch-model-input:focus {
+.dispatch-model-input:focus,
+.dispatch-effort-input:focus {
   outline: none;
   border-color: var(--blue);
 }
 
-.dispatch-model-input::placeholder {
+.dispatch-model-input::placeholder,
+.dispatch-effort-input::placeholder {
   color: var(--fg-dim);
 }
 
 .dispatch-model-input {
   min-width: 20ch;
   flex: 1 1 20ch;
+}
+
+/* The effort input shares the model input's growth behaviour so the shared row
+   (renderDispatchDefaultRow, LIN-2616 L5) stays balanced at every one of its
+   five call sites; its content is short, so it gets the narrower basis. */
+.dispatch-effort-input {
+  min-width: 14ch;
+  flex: 1 1 14ch;
 }
 
 .dispatch-defaults-form {
@@ -516,6 +527,7 @@
 
   .harness-select,
   .dispatch-model-input,
+  .dispatch-effort-input,
   .ai-override-select,
   .ai-override-input {
     min-width: 100%;
