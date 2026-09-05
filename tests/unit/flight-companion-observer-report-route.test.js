@@ -72,7 +72,15 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
     const { status, text } = await get(app, '/workspace/acme/flight-companion');
     assert.strictEqual(status, 200);
     assert.match(text, /No observer pass has run for this workspace yet\./);
-    assert.deepStrictEqual(observerStateStore.calls, [{ method: 'readCurrent', instanceKey: 'pass:v1:acme' }]);
+    assert.deepStrictEqual(observerStateStore.calls, [
+      // LIN-2621: the GET handler ALSO reads the companion + census docs
+      // once each per page load, for the status strip's last-check-in and
+      // sweep-liveness/no-census lines — still read-only (readCurrent ONLY),
+      // the same discipline this file's own header/guard enforces.
+      { method: 'readCurrent', instanceKey: 'pass:v1:acme' },
+      { method: 'readCurrent', instanceKey: 'companion:v1:acme' },
+      { method: 'readCurrent', instanceKey: 'sweep:v1:acme' },
+    ]);
   });
 
   test('honest empty state when the instance exists but is still at the seed marker (never completed one tick)', async () => {
@@ -120,7 +128,15 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
     // ... and the census's freshness stamp (report.censusGroundedAt) must
     // BOTH appear, distinctly — never conflated into one timestamp.
     assert.match(text, /2026-08-30T07:00:00\.000Z/);
-    assert.deepStrictEqual(observerStateStore.calls, [{ method: 'readCurrent', instanceKey: 'pass:v1:acme' }]);
+    assert.deepStrictEqual(observerStateStore.calls, [
+      // LIN-2621: the GET handler ALSO reads the companion + census docs
+      // once each per page load, for the status strip's last-check-in and
+      // sweep-liveness/no-census lines — still read-only (readCurrent ONLY),
+      // the same discipline this file's own header/guard enforces.
+      { method: 'readCurrent', instanceKey: 'pass:v1:acme' },
+      { method: 'readCurrent', instanceKey: 'companion:v1:acme' },
+      { method: 'readCurrent', instanceKey: 'sweep:v1:acme' },
+    ]);
   });
 
   test('renders attention row truncation via attentionCount when the array is capped', async () => {
@@ -200,7 +216,15 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
     const { text } = await get(app, '/workspace/acme/flight-companion');
     assert.match(text, /<code>on-unimplemented<\/code>/);
     assert.match(text, /No flags this tick\./);
-    assert.deepStrictEqual(observerStateStore.calls, [{ method: 'readCurrent', instanceKey: 'pass:v1:acme' }]);
+    assert.deepStrictEqual(observerStateStore.calls, [
+      // LIN-2621: the GET handler ALSO reads the companion + census docs
+      // once each per page load, for the status strip's last-check-in and
+      // sweep-liveness/no-census lines — still read-only (readCurrent ONLY),
+      // the same discipline this file's own header/guard enforces.
+      { method: 'readCurrent', instanceKey: 'pass:v1:acme' },
+      { method: 'readCurrent', instanceKey: 'companion:v1:acme' },
+      { method: 'readCurrent', instanceKey: 'sweep:v1:acme' },
+    ]);
   });
 
   test('omitting observerStateStore entirely still renders the page with the honest empty state (no crash)', async () => {
@@ -231,6 +255,14 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
     // The page's primary deliverable — the kickoff prompt — must survive a
     // rejecting observer-state read, not just the empty-state panel.
     assert.match(text, /id="flight-companion-prompt"/);
-    assert.deepStrictEqual(observerStateStore.calls, [{ method: 'readCurrent', instanceKey: 'pass:v1:acme' }]);
+    assert.deepStrictEqual(observerStateStore.calls, [
+      // LIN-2621: the GET handler ALSO reads the companion + census docs
+      // once each per page load, for the status strip's last-check-in and
+      // sweep-liveness/no-census lines — still read-only (readCurrent ONLY),
+      // the same discipline this file's own header/guard enforces.
+      { method: 'readCurrent', instanceKey: 'pass:v1:acme' },
+      { method: 'readCurrent', instanceKey: 'companion:v1:acme' },
+      { method: 'readCurrent', instanceKey: 'sweep:v1:acme' },
+    ]);
   });
 });

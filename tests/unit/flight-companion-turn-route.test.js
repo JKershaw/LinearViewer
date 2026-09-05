@@ -73,7 +73,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { MangoClient } from '@jkershaw/mangodb';
-import { createFlightCompanionRoutes, buildCensusSeedText } from '../../routes/flight-companion.js';
+import { createFlightCompanionRoutes, buildCensusSeedText, buildFlightCompanionStripData } from '../../routes/flight-companion.js';
 import {
   buildFlightCompanionMessages, renderStaleAttentionLine, formatFossilThreshold,
 } from '../../lib/prompts/flight-companion-brief.js';
@@ -227,6 +227,40 @@ async function post(app, path, body) {
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+}
+
+// LIN-2621: the GET page route's own harness — mirrors `post` above exactly,
+// method aside. Nothing in this file exercised the GET page handler over
+// real HTTP before this beat (only renderFlightCompanionPage's own markup,
+// directly, in tests/unit/render-flight-companion.test.js) — the page's
+// server-side model resolution + observer-state reads are new this beat and
+// need a real Express round trip to prove "resolves once per page load",
+// not just a call to the pure renderer.
+async function get(app, path) {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  const { port } = server.address();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}${path}`, { redirect: 'manual' });
+    const text = await res.text();
+    return { status: res.status, text, headers: res.headers };
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+// LIN-2621: a minimal fake workspacePreferencesStore — `resolveWorkspaceModel`
+// (lib/workspace-preferences.js) reads only `getWorkspacePreferences(urlKey)`
+// → `{modelId}`. `calls` is a shared array so a test can assert the GET
+// handler calls it exactly once per page load.
+function fakeWorkspacePreferencesStore(modelId, calls = []) {
+  return {
+    calls,
+    async getWorkspacePreferences(urlKey) {
+      calls.push({ method: 'getWorkspacePreferences', urlKey });
+      return { modelId };
+    },
+  };
 }
 
 // A census doc whose stateHash differs from COMPANION_SEED_STATE's null
@@ -1836,5 +1870,119 @@ describe('Flight Companion turn endpoint (LIN-2447 item 2) — late commit canno
     const commit = companionAdvances[1].nextState;
     assert.strictEqual(commit.turnReservedUntil, null, 'the commit releases the lease');
     assert.strictEqual(commit.reservationId, null, 'and clears the nonce with it');
+  });
+});
+
+// ─── LIN-2621 beat 2: buildFlightCompanionStripData (pure) ─────────────────
+
+describe('buildFlightCompanionStripData (LIN-2621) — pure derivation, no I/O', () => {
+  test('a curated model reports tools on; an uncurated one reports tools off', () => {
+    const curated = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
+    assert.strictEqual(curated.toolsOn, true);
+
+    const uncurated = buildFlightCompanionStripData({ model: 'some-vendor/not-in-the-allowlist', companionDoc: null, censusDoc: null });
+    assert.strictEqual(uncurated.toolsOn, false);
+  });
+
+  test('the mode line reads rung 1 while no toggle exists', () => {
+    const strip = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
+    assert.strictEqual(strip.mode, 'read-only · proposes, never acts · rung 1 of 3');
+  });
+
+  test('last check-in reads the companion doc\'s lastTurnAt; absent means never', () => {
+    const withTurn = buildFlightCompanionStripData({
+      model: 'openai/gpt-5.4-mini',
+      companionDoc: { rev: 3, state: { ...COMPANION_SEED_STATE, lastTurnAt: '2026-09-05T12:00:00.000Z' } },
+      censusDoc: null,
+    });
+    assert.strictEqual(withTurn.lastCheckInAt, '2026-09-05T12:00:00.000Z');
+
+    const noTurn = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
+    assert.strictEqual(noTurn.lastCheckInAt, null);
+  });
+
+  test('no census doc means "no-census"; a fresh census means "alive"; a stale one means "stale"', () => {
+    const now = new Date('2026-09-05T12:00:00.000Z').getTime();
+
+    const noCensus = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null, now });
+    assert.strictEqual(noCensus.sweepStatus, 'no-census');
+
+    const fresh = buildFlightCompanionStripData({
+      model: 'openai/gpt-5.4-mini', companionDoc: null,
+      censusDoc: { lastSeenAt: new Date(now - 60_000).toISOString() },
+      now,
+    });
+    assert.strictEqual(fresh.sweepStatus, 'alive');
+
+    const stale = buildFlightCompanionStripData({
+      model: 'openai/gpt-5.4-mini', companionDoc: null,
+      censusDoc: { lastSeenAt: new Date(now - (DEFAULT_SWEEP_LIVENESS_HORIZON_MS + 60_000)).toISOString() },
+      now,
+    });
+    assert.strictEqual(stale.sweepStatus, 'stale');
+  });
+
+  test('next check-in due is deliberately null — no server-side schedule exists to render (see the function\'s own doc comment)', () => {
+    const strip = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
+    assert.strictEqual(strip.nextCheckInAt, null);
+  });
+});
+
+// ─── LIN-2621 beat 2: the GET page handler's server-side strip resolution ──
+
+describe('Flight Companion GET page (LIN-2621) — model resolution + status strip', () => {
+  test('resolves the model exactly once per page load, via resolveWorkspaceModel (never resolveAiOperationModel)', async () => {
+    const prefCalls = [];
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini', prefCalls),
+      flightCompanionEnabled: true,
+    });
+    const { status } = await get(app, '/workspace/acme/flight-companion');
+    assert.strictEqual(status, 200);
+    assert.strictEqual(prefCalls.length, 1, 'exactly one resolveWorkspaceModel-backing read per page load');
+  });
+
+  test('the rendered strip reports an uncurated model as tools off', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('some-vendor/not-in-the-allowlist'),
+      flightCompanionEnabled: true,
+    });
+    const { status, text } = await get(app, '/workspace/acme/flight-companion');
+    assert.strictEqual(status, 200);
+    assert.match(text, /fc-strip-tools">tools: off</);
+    assert.doesNotMatch(text, /fc-strip-tools">tools: on</);
+  });
+
+  test('the rendered strip carries the mode line verbatim', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
+      flightCompanionEnabled: true,
+    });
+    const { text } = await get(app, '/workspace/acme/flight-companion');
+    assert.match(text, /mode: read-only · proposes, never acts · rung 1 of 3/);
+  });
+
+  test('no census doc yet renders "no fleet scan yet" — LIN-2487\'s own wording, not re-derived', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
+      flightCompanionEnabled: true,
+    });
+    const { text } = await get(app, '/workspace/acme/flight-companion');
+    assert.match(text, /no fleet scan yet/);
+  });
+
+  test('the feature-flag-off redirect is unaffected by the new strip wiring', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
+      flightCompanionEnabled: false,
+    });
+    const { status, headers } = await get(app, '/workspace/acme/flight-companion');
+    assert.strictEqual(status, 302);
+    assert.match(headers.get('location'), /\/settings$/);
   });
 });

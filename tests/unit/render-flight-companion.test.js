@@ -147,18 +147,39 @@ describe('renderFlightCompanionPage — LIN-2622: start button + re-orient affor
     assert.match(html, /<button type="button" id="flight-companion-reorient" class="[^"]*\bhidden\b[^"]*"[^>]*>reorient<\/button>/);
   });
 
-  test('is NOT a status strip: no strip container element exists — the affordance sits beside the existing check-in line', () => {
-    // LIN-2621 (Backlog) owns the actual status strip. This pins the
-    // beat-4 decision honestly: no `.fc-status-strip`/`status-strip`
-    // class or id is introduced anywhere on the page.
-    assert.doesNotMatch(html, /status-strip/i);
+  // LIN-2621 beat 2 replaces the LIN-2622 negative test that used to live
+  // here ("no `.fc-status-strip`/`status-strip` selector exists anywhere") —
+  // that pinned the honest state of the world BEFORE this ticket built the
+  // real strip, and this ticket is the one that lands it, so keeping the
+  // negative assertion would now be pinning a regression. Deliberately
+  // replaced, not silently deleted (LIN-2621 beat 2 instruction 4).
+  test('the status strip now exists, as a real element (not deleted, replaced)', () => {
+    assert.match(html, /<div class="fc-status-strip" id="flight-companion-strip">/);
+  });
+
+  // LIN-2622 close-out finding F1 / LIN-2621 beat 2: `#flight-companion-
+  // reorient` used to carry `action-btn` with NO colour variant class —
+  // transparent, borderless, indistinguishable from body text at rest.
+  // `toBeVisible()` (an e2e computed-style check) passes for that anyway, so
+  // the fix must be catchable WITHOUT a browser: assert the button now
+  // carries a real, existing colour-variant class (`.action-btn.connect`,
+  // reused verbatim from public/common-actions.css — not forked/invented).
+  test('F1 fixed: the re-orient button now carries a real colour-variant class, not bare action-btn', () => {
+    const reorientIdx = html.indexOf('id="flight-companion-reorient"');
+    const tagStart = html.lastIndexOf('<button', reorientIdx);
+    const tagEnd = html.indexOf('>', reorientIdx);
+    const tag = html.slice(tagStart, tagEnd);
+    assert.match(tag, /\bclass="[^"]*\baction-btn\b[^"]*\bconnect\b[^"]*"/, 'expected the reorient button to carry .action-btn.connect');
   });
 
   test('the start button and the re-orient button are direct siblings of the thread/empty-state/check-in/composer — never wrapped', () => {
     // Load-bearing for flight-companion.css's phone-shape media query,
     // which sizes these elements as direct flex children of
     // .flight-companion-chat-section by selector (see that file's header
-    // comment) — a wrapper div here would silently break it.
+    // comment) — a wrapper div here would silently break it. The status
+    // strip (LIN-2621) is a NEW sibling prepended before the thread — it
+    // does not disturb this relative order, so this assertion is unchanged.
+    const stripIdx = html.indexOf('id="flight-companion-strip"');
     const threadIdx = html.indexOf('id="flight-companion-thread"');
     const emptyIdx = html.indexOf('id="flight-companion-chat-empty"');
     const startIdx = html.indexOf('id="flight-companion-start"');
@@ -166,8 +187,54 @@ describe('renderFlightCompanionPage — LIN-2622: start button + re-orient affor
     const reorientIdx = html.indexOf('id="flight-companion-reorient"');
     const composerIdx = html.indexOf('flight-companion-question');
     assert.ok(
-      threadIdx < emptyIdx && emptyIdx < startIdx && startIdx < checkinIdx && checkinIdx < reorientIdx && reorientIdx < composerIdx,
-      'expected thread -> empty-state -> start -> check-in -> reorient -> composer, in that order'
+      stripIdx > -1 && stripIdx < threadIdx
+        && threadIdx < emptyIdx && emptyIdx < startIdx && startIdx < checkinIdx && checkinIdx < reorientIdx && reorientIdx < composerIdx,
+      'expected strip -> thread -> empty-state -> start -> check-in -> reorient -> composer, in that order'
     );
+  });
+});
+
+describe('renderFlightCompanionPage — LIN-2621: the status strip', () => {
+  test('renders every strip field from the supplied data, verbatim', () => {
+    const strip = {
+      model: 'openai/gpt-5.4-mini',
+      toolsOn: true,
+      lastCheckInAt: '2026-09-05T12:00:00.000Z',
+      nextCheckInAt: null,
+      sweepStatus: 'alive',
+      sweepLastSeenAt: '2026-09-05T11:59:00.000Z',
+      mode: 'read-only · proposes, never acts · rung 1 of 3',
+    };
+    const html = renderFlightCompanionPage({ prompt: 'kickoff', strip }, { urlKey: 'ws' });
+    assert.match(html, /fc-strip-model">model: <code>openai\/gpt-5\.4-mini<\/code>/);
+    assert.match(html, /fc-strip-tools">tools: on</);
+    assert.match(html, /fc-strip-checkin">last check-in: <time datetime="2026-09-05T12:00:00\.000Z">/);
+    assert.match(html, /fc-strip-mode">mode: read-only · proposes, never acts · rung 1 of 3</);
+    assert.match(html, /sweep alive · last seen/);
+  });
+
+  test('an uncurated model renders tools off', () => {
+    const html = renderFlightCompanionPage(
+      { prompt: 'kickoff', strip: { model: 'not-curated', toolsOn: false, mode: 'read-only · proposes, never acts · rung 1 of 3' } },
+      { urlKey: 'ws' }
+    );
+    assert.match(html, /fc-strip-tools">tools: off</);
+  });
+
+  test('no census (or no strip data at all) renders LIN-2487\'s own "no fleet scan yet" wording, never a fabricated status', () => {
+    const withNoCensus = renderFlightCompanionPage(
+      { prompt: 'kickoff', strip: { model: 'openai/gpt-5.4-mini', toolsOn: true, sweepStatus: 'no-census', mode: 'x' } },
+      { urlKey: 'ws' }
+    );
+    assert.match(withNoCensus, /no fleet scan yet/);
+
+    const withNoStripAtAll = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
+    assert.match(withNoStripAtAll, /no fleet scan yet/);
+    assert.doesNotMatch(withNoStripAtAll, /sweep stale/);
+  });
+
+  test('the next check-in mount is present, server-rendered empty, filled in client-side (same house pattern as #flight-companion-checkin)', () => {
+    const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
+    assert.match(html, /<span class="fc-strip-next-checkin" id="flight-companion-strip-next">next check-in: —<\/span>/);
   });
 });

@@ -110,6 +110,36 @@
   margin: 0;
 }
 
+/* Status strip (LIN-2621): model id, tools on/off, last check-in, next
+   check-in due, sweep liveness/no-census, and the mode line — a server-
+   rendered wrap-row of `.fc-strip-*` spans above the thread. Semantic-
+   token-only (dark-safe), mobile-first: wraps onto as many lines as a phone
+   viewport needs rather than truncating or scrolling horizontally. No
+   animation/motion of any kind, so it needs no reduced-motion override. */
+.fc-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  font-family: var(--font-content);
+  color: var(--muted);
+  font-size: 0.85em;
+  margin: 0 0 var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.fc-status-strip code {
+  font-family: var(--font-structural);
+  color: var(--text);
+}
+
+.fc-strip-mode {
+  /* The one line that is a fact about POSTURE, not activity — set slightly
+     apart from the others by giving it the page's own text color rather
+     than the strip's muted default. */
+  color: var(--text);
+}
+
 /* Chat thread + composer (LIN-2435). `.chat-thread`/`.chat-composer`
    themselves need no new rules — chat.css already styles them; this is the
    page-local proposal sub-component + a couple of thin composer hooks,
@@ -300,6 +330,11 @@
     min-height: 0;
     --chat-thread-max-height: none;
   }
+  /* LIN-2621: the status strip is a new direct child, prepended above the
+     thread — it takes its natural (wrapped) height like the section-header
+     above it, never growing to fill remaining space, so it joins THIS fixed-
+     height group rather than the thread's flex:1 group. */
+  #flight-companion-strip,
   #flight-companion-checkin,
   #flight-companion-start,
   #flight-companion-reorient,

@@ -108,6 +108,12 @@
   // SAME boot turn.
   var startBtn = document.getElementById('flight-companion-start');
   var reorientBtn = document.getElementById('flight-companion-reorient');
+  // LIN-2621: the status strip's "next check-in due" mount — server-rendered
+  // as an em-dash placeholder (lib/render-flight-companion.js's
+  // renderStatusStrip), since the wake cadence below is this client's own
+  // in-memory countdown with no server-side schedule to render at page-load
+  // time. Optional-guarded like every other mount here.
+  var nextCheckInEl = document.getElementById('flight-companion-strip-next');
 
   if (!thread || !questionInput || !sendBtn) return;
 
@@ -173,6 +179,16 @@
     if (effect === 'reset') return { delayMs: CADENCE_BASE_MS, stopped: false };
     if (effect === 'double') return { delayMs: nextCadenceDelay(state.delayMs), stopped: false };
     return state;
+  }
+
+  // LIN-2621: the strip's "next check-in due" text for a countdown of
+  // `delayMs` starting now. Injected `nowMs` for deterministic tests — the
+  // wall-clock time is a genuine prediction (the client's own cadence timer),
+  // never a duration, since that is what the strip's other fields ("last
+  // check-in") are already stamped as.
+  function formatNextCheckIn(delayMs, nowMs) {
+    var due = new Date((typeof nowMs === 'number' ? nowMs : Date.now()) + delayMs);
+    return 'next check-in: ' + due.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
   // A `phase: 'proposed'` tool result is a stringified, possibly-truncated
@@ -537,6 +553,12 @@
   function scheduleAutoWake(delayMs) {
     if (timerId) clearTimeout(timerId);
     timerId = setTimeout(autoWakeTick, delayMs);
+    // LIN-2621: every place that arms the shared timer is a new "next
+    // check-in" prediction — updating it here, in the one place the timer is
+    // actually armed, covers every caller (initial load, a cadence effect,
+    // the in-flight retry branch, and visibility resume) without repeating
+    // the call at each site.
+    if (nextCheckInEl) nextCheckInEl.textContent = formatNextCheckIn(delayMs);
   }
 
   // Apply a cadence effect AND (unless stopped/hidden) reschedule the
@@ -547,12 +569,14 @@
     cadence = advanceCadence(cadence, effect);
     if (cadence.stopped) {
       if (timerId) { clearTimeout(timerId); timerId = null; }
+      if (nextCheckInEl) nextCheckInEl.textContent = 'next check-in: —';
       return;
     }
     if (document.hidden) {
       // Paused — no eager scheduling while hidden; resumed by
       // visibilitychange below, at the (possibly just-updated) delay.
       if (timerId) { clearTimeout(timerId); timerId = null; }
+      if (nextCheckInEl) nextCheckInEl.textContent = 'next check-in: —';
       return;
     }
     scheduleAutoWake(cadence.delayMs);
@@ -1000,10 +1024,11 @@
     module.exports = {
       capHistory, nextCadenceDelay, doneCadenceEffect, autoWakeErrorCadenceEffect,
       advanceCadence, classifyTurnResponse, parseProposalResult, formatCheckIn, formatSweepNotSeen,
-      formatNoCensus,
+      formatNoCensus, formatNextCheckIn,
       applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion, startBoot,
       getCadenceState: function () { return cadence; },
       getChatHistory: function () { return chatHistory; },
+      getNextCheckInText: function () { return nextCheckInEl ? nextCheckInEl.textContent : null; },
       CADENCE_BASE_MS: CADENCE_BASE_MS, CADENCE_CAP_MS: CADENCE_CAP_MS, HISTORY_CAP: HISTORY_CAP,
     };
   }

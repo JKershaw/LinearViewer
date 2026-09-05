@@ -274,6 +274,10 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
   const startBtn = new FakeElement('button');
   const reorientBtn = new FakeElement('button');
   reorientBtn.classList.add('hidden');
+  // LIN-2621: the status strip's "next check-in due" mount — mirrors the
+  // real render's server-rendered em-dash placeholder.
+  const stripNextEl = new FakeElement('span');
+  stripNextEl.textContent = 'next check-in: —';
   doc._byId['flight-companion-thread'] = thread;
   doc._byId['flight-companion-chat-empty'] = emptyState;
   doc._byId['flight-companion-checkin'] = checkIn;
@@ -281,6 +285,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
   doc._byId['flight-companion-send'] = sendBtn;
   doc._byId['flight-companion-start'] = startBtn;
   doc._byId['flight-companion-reorient'] = reorientBtn;
+  doc._byId['flight-companion-strip-next'] = stripNextEl;
 
   const chatUI = makeChatUI();
   const fetchSpy = makeFetchSpy(fetchImpl || (() => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' })));
@@ -323,7 +328,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
 
   return {
     exports: sandbox.module.exports,
-    doc, thread, emptyState, checkIn, questionInput, sendBtn, startBtn, reorientBtn,
+    doc, thread, emptyState, checkIn, questionInput, sendBtn, startBtn, reorientBtn, stripNextEl,
     chatUICalls: chatUI.calls,
     fetchCalls: fetchSpy.calls,
     apiCalls: apiSpy.calls,
@@ -614,6 +619,58 @@ describe('flight-companion.js — cadence: base interval, doubling, cap, reset, 
     assert.strictEqual(fetchCalls.length, 0);
     t.mock.timers.tick(1);
     assert.strictEqual(fetchCalls.length, 1, 'the resumed countdown fires at its own full delay, not immediately');
+  });
+});
+
+describe('flight-companion.js — LIN-2621: the strip\'s "next check-in due" mount', () => {
+  test('formatNextCheckIn renders the wall-clock time the countdown ENDS at, not a duration', () => {
+    const { exports: m } = loadClient({});
+    const now = new Date('2026-09-05T12:00:00.000Z').getTime();
+    const got = m.formatNextCheckIn(90000, now);
+    const expectedDue = new Date(now + 90000);
+    const expected = 'next check-in: ' + expectedDue.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    assert.strictEqual(got, expected);
+  });
+
+  test('the mount updates as soon as the module arms its first countdown (tab visible at load)', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { stripNextEl } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+    });
+    assert.match(stripNextEl.textContent, /^next check-in: (?!—)/, 'expected a real predicted time, not the server-rendered placeholder');
+  });
+
+  test('the mount stays at the placeholder while the tab starts hidden — nothing is scheduled yet', () => {
+    const { stripNextEl } = loadClient({ hiddenInitial: true });
+    assert.strictEqual(stripNextEl.textContent, 'next check-in: —');
+  });
+
+  test('the mount reads the placeholder again once the cadence stops (e.g. a session expiry)', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { exports: m, stripNextEl } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+    });
+    assert.doesNotMatch(stripNextEl.textContent, /—$/);
+    m.applyCadenceEffect('stop');
+    assert.strictEqual(stripNextEl.textContent, 'next check-in: —');
+  });
+
+  test('a doubling effect re-arms the timer, which re-runs the SAME display-update wiring scheduleAutoWake owns', async (t) => {
+    // Not a display-string assertion (formatNextCheckIn's minute-granularity
+    // display can genuinely coincide for two predictions seconds apart — real
+    // wall-clock `Date.now()` under mock timers, not a virtual clock — so
+    // this asserts on the value the wiring actually depends on: the cadence
+    // delay driving the NEXT scheduleAutoWake call, already exercised end to
+    // end by the 'doubling' test above. This test only pins that the mount
+    // is still non-placeholder immediately after a reschedule.
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { exports: m, stripNextEl } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'floor' }),
+    });
+    t.mock.timers.tick(30000); // fires the base-interval tick, which doubles the cadence and reschedules
+    await flush();
+    assert.strictEqual(m.getCadenceState().delayMs, 60000);
+    assert.match(stripNextEl.textContent, /^next check-in: (?!—)/);
   });
 });
 
