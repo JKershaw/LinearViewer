@@ -537,9 +537,17 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
     assert.strictEqual(doc1.state.attention.length, 2);
     // stableStringify sorts object keys but preserves array order, and
     // canonicalizeForHash maps arrays without sorting either — the sweep must
-    // sort attention itself.
-    const [first, second] = doc1.state.attention;
-    assert.ok(first.loopId < second.loopId, 'attention must be sorted ascending by loopId');
+    // sort attention itself. LIN-2619: the sort key is now recency of `since`
+    // (most-recently-transitioned first, loopId tie-break), not loopId alone —
+    // asserted via self-consistency (mirrors the payload-contract "ledger 3"
+    // test) rather than a hardcoded relative order, since these two rows'
+    // real `since` timestamps come from real, close-together `new Date()`
+    // calls and are not deterministically orderable by loopId alone.
+    assert.deepStrictEqual(
+      doc1.state.attention,
+      [...doc1.state.attention].sort((a, b) => (a.since > b.since ? -1 : a.since < b.since ? 1 : (a.loopId < b.loopId ? -1 : 1))),
+      'attention must equal its own sorted-by-recency copy'
+    );
 
     await sweepOneWorkspace(urlKey, deps);
     const doc2 = await observerStateStore.readCurrent(instanceKey);

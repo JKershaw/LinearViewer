@@ -45,10 +45,15 @@ function attentionRow(loopId, lane, stage, since = '2026-08-31T00:00:00.000Z') {
   return { loopId, issue: `LIN-${loopId}`, lane, stage, since };
 }
 
-/** A raw sweep census store document (`observerStateStore.readCurrent('sweep:v1:<urlKey>')`'s shape). */
-function census({ stateHash, rev = 1, lanesState = ZERO_LANES, attention = [], truncated = false }) {
+/** A raw sweep census store document (`observerStateStore.readCurrent('sweep:v1:<urlKey>')`'s shape).
+ * `attentionKeysFull` is OMITTED by default (undefined) — most fixtures below
+ * deliberately exercise `buildCompanionSnapshot`'s pre-LIN-2619 fallback path
+ * (a census doc that predates the field), which is what most of this file's
+ * existing coverage was written against. Pass it explicitly to exercise the
+ * real LIN-2619 field. */
+function census({ stateHash, rev = 1, lanesState = ZERO_LANES, attention = [], truncated = false, attentionKeysFull } = {}) {
   return {
-    state: { v: 1, lanes: lanesState, attention, truncated },
+    state: { v: 1, lanes: lanesState, attention, truncated, ...(attentionKeysFull !== undefined ? { attentionKeysFull } : {}) },
     stateHash,
     rev
   };
@@ -76,10 +81,32 @@ describe('buildCompanionSnapshot', () => {
         ['loop-1', 'blocked', 'review'],
         ['loop-2', 'silent', 'waiting']
       ],
+      // No `attentionKeysFull` on the census doc (a pre-LIN-2619 shape) ->
+      // falls back to this same snapshot's own attentionKeys.
+      attentionKeysFull: [
+        ['loop-1', 'blocked', 'review'],
+        ['loop-2', 'silent', 'waiting']
+      ],
       attentionCount: 2,
       truncated: true,
       censusRev: 7
     });
+  });
+
+  test('LIN-2619: attentionKeysFull is sourced from the census doc\'s own field when present, independent of the (fossil-filtered) attentionKeys', () => {
+    const doc = census({
+      stateHash: 'h1',
+      rev: 7,
+      lanesState: lanes({ blocked: 1 }),
+      // Only the fresh row is enumerated in `attention` — the fossil row was
+      // collapsed into staleAttentionCount by the sweep (LIN-2619 beat 2),
+      // but the sweep's own attentionKeysFull still carries its identity.
+      attention: [attentionRow('loop-fresh', 'blocked', 'review')],
+      attentionKeysFull: [['loop-fossil', 'blocked', 'review'], ['loop-fresh', 'blocked', 'review']]
+    });
+    const snapshot = buildCompanionSnapshot(doc);
+    assert.deepStrictEqual(snapshot.attentionKeys, [['loop-fresh', 'blocked', 'review']]);
+    assert.deepStrictEqual(snapshot.attentionKeysFull, [['loop-fossil', 'blocked', 'review'], ['loop-fresh', 'blocked', 'review']]);
   });
 
   test('empty attention -> attentionCount 0, empty attentionKeys', () => {
@@ -251,6 +278,137 @@ describe('shouldSpendTurn: census-delta true/false', () => {
     assert.strictEqual(result.spend, true);
     assert.strictEqual(result.reason, 'spend');
     assert.strictEqual(result.surface, true);
+  });
+});
+
+// ─── shouldSpendTurn: the fossil no-delta fold (LIN-2619) ────────────────
+
+describe('shouldSpendTurn: fossil no-delta fold (LIN-2619)', () => {
+  test('a row ageing out of the enumerated attention (present in attentionKeysFull both ticks) -> false, reason no-delta', () => {
+    // Prior tick: the row was still fresh, enumerated in BOTH attention and
+    // attentionKeysFull.
+    const priorSnapshot = {
+      lanes: lanes({}),
+      attentionKeys: [['loop-1', 'blocked', 'review']],
+      attentionKeysFull: [['loop-1', 'blocked', 'review']],
+      attentionCount: 1,
+      truncated: false,
+      censusRev: 1
+    };
+    const companionDoc = companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null });
+    // Current tick: the sweep has now collapsed loop-1 into staleAttentionCount
+    // — gone from `attention`/`attentionKeys`, but STILL present in
+    // attentionKeysFull, since that key is fossil-filter-blind by design.
+    const doc = census({
+      stateHash: 'hNew',
+      rev: 2,
+      lanesState: lanes({}),
+      attention: [],
+      attentionKeysFull: [['loop-1', 'blocked', 'review']]
+    });
+    const result = shouldSpendTurn({ currentCensusDoc: doc, companionDoc, now: 1000 });
+    assert.deepStrictEqual(result, { spend: false, surface: false, reason: 'no-delta', nextRecord: null });
+  });
+
+  test('a genuinely NEW attention row (added to attentionKeysFull too) still spends, even with an unrelated fossil row aged out in the same tick', () => {
+    const priorSnapshot = {
+      lanes: lanes({}),
+      attentionKeys: [['loop-fossil', 'blocked', 'review']],
+      attentionKeysFull: [['loop-fossil', 'blocked', 'review']],
+      attentionCount: 1,
+      truncated: false,
+      censusRev: 1
+    };
+    const companionDoc = companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null });
+    // loop-fossil ages out of attention/attentionKeys (still in attentionKeysFull),
+    // AND a genuinely new loop-fresh appears in all three.
+    const doc = census({
+      stateHash: 'hNew',
+      rev: 2,
+      lanesState: lanes({}),
+      attention: [attentionRow('loop-fresh', 'blocked', 'review')],
+      attentionKeysFull: [['loop-fossil', 'blocked', 'review'], ['loop-fresh', 'blocked', 'review']]
+    });
+    const result = shouldSpendTurn({ currentCensusDoc: doc, companionDoc, now: 1000 });
+    assert.strictEqual(result.spend, true);
+    assert.strictEqual(result.surface, true);
+    assert.strictEqual(result.reason, 'spend');
+  });
+
+  test('a genuinely RESOLVED row (gone from attentionKeysFull too, not merely aged out) still spends', () => {
+    const priorSnapshot = {
+      lanes: lanes({}),
+      attentionKeys: [['loop-1', 'blocked', 'review']],
+      attentionKeysFull: [['loop-1', 'blocked', 'review']],
+      attentionCount: 1,
+      truncated: false,
+      censusRev: 1
+    };
+    const companionDoc = companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null });
+    // A human answered loop-1 — it is gone from EVERY key, not merely the
+    // enumerated one, which is exactly what distinguishes "resolved" from
+    // "aged out" and must still spend.
+    const doc = census({ stateHash: 'hNew', rev: 2, lanesState: lanes({}), attention: [], attentionKeysFull: [] });
+    const result = shouldSpendTurn({ currentCensusDoc: doc, companionDoc, now: 1000 });
+    assert.strictEqual(result.spend, true);
+    assert.strictEqual(result.surface, true);
+    assert.strictEqual(result.reason, 'spend');
+  });
+
+  describe('backward compatibility: a companion snapshot persisted BEFORE this deploy has no attentionKeysFull', () => {
+    test('prior snapshot missing attentionKeysFull falls back to its own attentionKeys — an unchanged fleet across the deploy boundary still folds to no-delta', () => {
+      // The prior snapshot is EXACTLY the pre-LIN-2619 shape — no
+      // attentionKeysFull key at all (not merely undefined; genuinely absent,
+      // as a real object literal read back from a pre-deploy persisted
+      // document would be).
+      const priorSnapshot = {
+        lanes: lanes({ terminal: 2 }),
+        attentionKeys: [['loop-1', 'blocked', 'review']],
+        attentionCount: 1,
+        truncated: false,
+        censusRev: 1
+      };
+      assert.ok(!('attentionKeysFull' in priorSnapshot), 'sanity: this snapshot must genuinely lack the key, not merely hold it as undefined');
+      const companionDoc = companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null });
+      // Current tick is post-deploy and DOES carry attentionKeysFull, but the
+      // underlying fleet is unchanged and under ATTENTION_CAP — so the new
+      // full set and the old capped-but-complete attentionKeys are identical.
+      const doc = census({
+        stateHash: 'hNew',
+        rev: 2,
+        lanesState: lanes({ terminal: 2 }),
+        attention: [attentionRow('loop-1', 'blocked', 'review')],
+        attentionKeysFull: [['loop-1', 'blocked', 'review']]
+      });
+      const result = shouldSpendTurn({ currentCensusDoc: doc, companionDoc, now: 1000 });
+      assert.deepStrictEqual(result, { spend: false, surface: false, reason: 'no-delta', nextRecord: null });
+    });
+
+    test('prior snapshot missing attentionKeysFull still detects a genuinely new row (never crashes, never silently swallows the delta)', () => {
+      const priorSnapshot = { lanes: lanes({}), attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 };
+      assert.ok(!('attentionKeysFull' in priorSnapshot));
+      const companionDoc = companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null });
+      const doc = census({
+        stateHash: 'hNew',
+        rev: 2,
+        lanesState: lanes({}),
+        attention: [attentionRow('loop-new', 'blocked', 'review')],
+        attentionKeysFull: [['loop-new', 'blocked', 'review']]
+      });
+      const result = shouldSpendTurn({ currentCensusDoc: doc, companionDoc, now: 1000 });
+      assert.strictEqual(result.spend, true, 'a real new row must still spend even when the PRIOR snapshot predates attentionKeysFull');
+      assert.strictEqual(result.reason, 'spend');
+    });
+
+    test('current census doc ALSO missing attentionKeysFull (mid-deploy race) never crashes — both sides fall back to attentionKeys, reproducing pre-LIN-2619 behavior exactly', () => {
+      const priorSnapshot = { lanes: lanes({ terminal: 1 }), attentionKeys: [['loop-1', 'blocked', 'review']], attentionCount: 1, truncated: false, censusRev: 1 };
+      const companionDoc = companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null });
+      // No attentionKeysFull passed to census() at all — a pre-LIN-2619 sweep doc.
+      const doc = census({ stateHash: 'hNew', rev: 2, lanesState: lanes({ terminal: 1 }), attention: [attentionRow('loop-1', 'blocked', 'review')] });
+      let result;
+      assert.doesNotThrow(() => { result = shouldSpendTurn({ currentCensusDoc: doc, companionDoc, now: 1000 }); });
+      assert.deepStrictEqual(result, { spend: false, surface: false, reason: 'no-delta', nextRecord: null });
+    });
   });
 });
 
