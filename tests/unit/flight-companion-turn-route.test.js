@@ -1281,3 +1281,152 @@ describe('Flight Companion turn endpoint (LIN-2442) — acceptance witnesses, mu
     assert.ok(turn3Done, 'once the lease fully expires, the still-uncommitted change is finally (re-)delivered — delayed, never lost');
   });
 });
+
+
+// ─── LIN-2449: a client that disconnects mid-turn must not consume the census
+// delta for a report nobody saw ────────────────────────────────────────────────
+//
+// LIN-2442's plan asserted that `onEvent('done')` does not fire on a client
+// disconnect, and that `sawDone` therefore already covered this. It does fire:
+// `sawDone` is driven by the MODEL stream's terminal frame, not by the client
+// receiving it, and the route wired no close handler and no abort signal. So a
+// disconnect left the turn running to completion, `res.end()` wrote into a dead
+// socket, `sawDone` was true, and the commit block consumed the delta anyway —
+// the same permanent report loss LIN-2442 fixed, reached by disconnect rather
+// than by error.
+//
+// These drive a REAL express server over a REAL socket and abort the request
+// mid-stream, rather than simulating a disconnect: the whole defect lives in
+// what `res` does when the peer goes away, which a stubbed `res` cannot show.
+describe('Flight Companion turn endpoint (LIN-2449) — client disconnect mid-turn', () => {
+  // Streams a first frame, waits for the caller to disconnect, and only THEN
+  // emits `done`. That ordering is the point: it forces `sawDone` true on a
+  // turn whose client is already gone, which is precisely the state the old
+  // code committed in. `signal` is captured so the threading is provable.
+  function disconnectingChatClient(observed) {
+    const streamed = async (messages, opts, onEvent) => {
+      observed.signal = opts.signal;
+      onEvent('token', { token: 'partial' });
+      await observed.clientGone.promise;
+      observed.signalAbortedAtDone = opts.signal ? opts.signal.aborted : null;
+      onEvent('done', {});
+    };
+    return { streamChat: streamed, streamChatWithTools: streamed };
+  }
+
+  function deferred() {
+    let resolve;
+    const promise = new Promise((r) => { resolve = r; });
+    return { promise, resolve };
+  }
+
+  async function postThenDisconnect(app, path, body) {
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise((resolve) => server.once('listening', resolve));
+    const { port } = server.address();
+    const controller = new AbortController();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {}),
+        signal: controller.signal,
+      });
+      // Read the first chunk so the handler is genuinely mid-stream, then drop
+      // the connection the way a closed tab does.
+      const reader = res.body.getReader();
+      await reader.read();
+      controller.abort();
+      await reader.cancel().catch(() => {});
+      return { status: res.status };
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  }
+
+  function buildDisconnectApp(observed, calls) {
+    return buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: realCensusDoc(), calls }),
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present'); } },
+      chatClient: disconnectingChatClient(observed),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+  }
+
+  test('the census baseline is NOT committed when the client disconnected before the terminal frame', async () => {
+    const calls = [];
+    const observed = { clientGone: deferred() };
+    const app = buildDisconnectApp(observed, calls);
+
+    await postThenDisconnect(app, '/workspace/acme/api/flight-companion/turn', {});
+    // Let the route's own 'close' handler run, then let the stream finish and
+    // reach the commit block with `sawDone` true.
+    await new Promise((r) => setTimeout(r, 50));
+    observed.clientGone.resolve();
+    await new Promise((r) => setTimeout(r, 50));
+
+    const commitAdvances = calls.filter(c =>
+      c.method === 'advance' && c.instanceKey.startsWith('companion:v1:'));
+    // Exactly one: the gate's own eager pre-model-call reservation (LIN-2435),
+    // which must still happen. The SECOND advance — the post-stream baseline
+    // commit — is the one this ticket stops.
+    assert.strictEqual(
+      commitAdvances.length, 1,
+      `expected only the pre-call reservation advance, got ${commitAdvances.length} — the delta was consumed for a report nobody saw`
+    );
+  });
+
+  test('the model call is aborted rather than left running for output that is discarded', async () => {
+    const calls = [];
+    const observed = { clientGone: deferred() };
+    const app = buildDisconnectApp(observed, calls);
+
+    await postThenDisconnect(app, '/workspace/acme/api/flight-companion/turn', {});
+    await new Promise((r) => setTimeout(r, 50));
+
+    assert.ok(observed.signal, 'an AbortSignal must be threaded into the streaming call at all');
+    assert.strictEqual(observed.signal.aborted, true, 'the disconnect must abort it');
+
+    observed.clientGone.resolve();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  test('the reservation is left to self-expire — no explicit release write on the disconnect path', async () => {
+    // LIN-2442's deliberate no-write-on-failure design, which LIN-2447 depends
+    // on. Asserted explicitly because "abort the turn" is exactly the change
+    // that would tempt someone to release the lease here.
+    const calls = [];
+    const observed = { clientGone: deferred() };
+    const app = buildDisconnectApp(observed, calls);
+
+    await postThenDisconnect(app, '/workspace/acme/api/flight-companion/turn', {});
+    await new Promise((r) => setTimeout(r, 50));
+    observed.clientGone.resolve();
+    await new Promise((r) => setTimeout(r, 50));
+
+    const writes = calls.filter(c => c.method === 'advance');
+    assert.strictEqual(writes.length, 1, 'only the pre-call reservation — nothing releases it, it self-expires via the lease');
+  });
+
+  test('control: the SAME flow WITHOUT a disconnect does commit the baseline — the gate is the disconnect, not the shape of this fake', async () => {
+    const calls = [];
+    const observed = { clientGone: deferred() };
+    observed.clientGone.resolve(); // never blocks: a clean, uninterrupted turn
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: realCensusDoc(), calls }),
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called'); } },
+      chatClient: disconnectingChatClient(observed),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {});
+    assert.strictEqual(status, 200);
+
+    const commitAdvances = calls.filter(c =>
+      c.method === 'advance' && c.instanceKey.startsWith('companion:v1:'));
+    assert.strictEqual(
+      commitAdvances.length, 2,
+      'reservation + commit — without this control, the test above would pass just as happily on a route that never commits at all'
+    );
+  });
+});

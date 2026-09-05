@@ -423,6 +423,29 @@ export function createFlightCompanionRoutes({
     });
     res.flushHeaders?.();
 
+    // LIN-2449: the client can vanish mid-turn, and nothing here noticed.
+    // `sawDone` is driven by the MODEL stream's terminal frame, not by the
+    // client receiving it — the route wires no close handler and no abort
+    // signal — so a disconnect left the turn running to completion, `res.end()`
+    // wrote into a dead socket, `sawDone` was true, and the commit block below
+    // consumed the census delta for a report nobody ever saw. Same permanent
+    // delta loss LIN-2442 fixed, reached by disconnect instead of by error.
+    //
+    // `writableFinished` is the discriminator: it is true only once the
+    // response has been fully flushed, so a 'close' before that is a genuine
+    // disconnect rather than our own `res.end()` completing normally.
+    const clientAbort = new AbortController();
+    let clientGone = false;
+    res.on('close', () => {
+      if (res.writableFinished) return;
+      clientGone = true;
+      // Ends the model call rather than letting it run to completion for
+      // output that is discarded. The reservation is deliberately NOT released
+      // here — it self-expires via the lease, which is LIN-2442's recorded
+      // no-write-on-failure design and the property LIN-2447 depends on.
+      clientAbort.abort();
+    });
+
     // §A.4: the 'proposed' phase is self-describing from the propose-mode
     // executor's own return shape (`{ proposed: true, ... }`), not a second
     // turnKind branch threaded through SSE forwarding — it can never fire for
@@ -503,6 +526,7 @@ export function createFlightCompanionRoutes({
           {
             apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, tools, executeTool, callMeta,
             toolResultMaxCharsByTool: CHAT_TOOL_RESULT_BUDGETS,
+            signal: clientAbort.signal,
           },
           onEvent
         );
@@ -511,7 +535,7 @@ export function createFlightCompanionRoutes({
         // exactly mirroring Task Chat — never a silent swap to a different model.
         await chatClient.streamChat(
           messages,
-          { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, callMeta },
+          { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, callMeta, signal: clientAbort.signal },
           onEvent
         );
       }
@@ -532,7 +556,14 @@ export function createFlightCompanionRoutes({
       // Isolated in its own try/catch — never the outer one, which would
       // otherwise try to `sendSSE`/`res.end()` a response already ended by
       // the `done` frame above.
-      if (sawDone && companionAdvance) {
+      // LIN-2449: `!clientGone` alongside `sawDone`. The abort above usually
+      // makes this moot by throwing out of the streaming call, but not always:
+      // a disconnect between the terminal frame being generated and its bytes
+      // reaching the socket arrives too late for an abort to help, and lands
+      // here with `sawDone` already true. Gating the commit as well is what
+      // actually closes the acceptance criterion — the abort is the spend
+      // optimisation, this is the correctness one.
+      if (sawDone && !clientGone && companionAdvance) {
         try {
           const currentEnvelope = await observerStateStore.readCurrent(companionAdvance.instanceKey);
           if (currentEnvelope) {
@@ -564,6 +595,14 @@ export function createFlightCompanionRoutes({
         }
       }
     } catch (error) {
+      // LIN-2449: a disconnect aborts the streaming call, which throws here.
+      // There is no socket left to tell, so skip the write rather than
+      // pushing an `error` frame into a dead one. Every other error path is
+      // unchanged, including its untouched no-commit behaviour.
+      if (clientGone) {
+        console.error('Flight Companion turn: client disconnected mid-turn, census delta left unconsumed');
+        return;
+      }
       console.error('Flight Companion turn error:', error);
       sendSSE(res, 'error', { message: 'Failed to generate a response' });
       res.end();
