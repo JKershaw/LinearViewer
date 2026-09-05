@@ -11,11 +11,13 @@
  * what only a direct caller can reach.
  */
 
-import { test, describe } from 'node:test';
+import { test, describe, mock } from 'node:test';
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { runFlightCompanionTurn, sumUsage } from '../../lib/flight-companion-turn.js';
 import { buildTurnRecords } from '../../lib/flight-companion-gate.js';
+import { streamChat, streamChatWithTools, setLlmCallRecorder } from '../../lib/openrouter.js';
+import { CHAT_TOOL_RESULT_BUDGETS } from '../../lib/chat-tools.js';
 
 const WORKSPACE = { urlKey: 'acme', id: 'ws-1' };
 
@@ -443,6 +445,150 @@ describe('LIN-2631 review round 1: the smaller hardening', () => {
     assert.strictEqual(
       Number(g[1].replace(/_/g, '')), live,
       'the derived lease must track openrouter\'s real request timeout, or every non-default budget drifts silently'
+    );
+  });
+});
+
+// LIN-2439 ledger item 2: every streamChat/streamChatWithTools call in the
+// rest of the suite is driven by a fake `chatClient` — message shape, the
+// 1500 maxTokens budget, callMeta, and toolResultMaxCharsByTool actually
+// reaching the wire are unproven by a green suite. This describe block wires
+// the REAL lib/openrouter.js functions as the turn core's chatClient, mocks
+// only `global.fetch` (the actual HTTP boundary, one level below "the
+// provider"), and asserts on the outgoing request bodies — a recorded-fixture
+// discharge rather than a live-key manual turn.
+describe('LIN-2439 ledger item 2: the real provider call shape, proven over a fixture', () => {
+  let originalFetch;
+  let savedProxyEnv;
+  let calls;
+
+  const beforeEachHook = () => {
+    originalFetch = global.fetch;
+    savedProxyEnv = {
+      HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+      https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy,
+    };
+    delete process.env.HTTPS_PROXY; delete process.env.HTTP_PROXY;
+    delete process.env.https_proxy; delete process.env.http_proxy;
+    calls = [];
+  };
+  const afterEachHook = () => {
+    global.fetch = originalFetch;
+    setLlmCallRecorder(null);
+    for (const [k, v] of Object.entries(savedProxyEnv)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  };
+
+  function toolHopResponse(toolCalls) {
+    return {
+      ok: true,
+      json: async () => ({
+        model: 'openai/gpt-5.4-mini', provider: 'OpenAI',
+        choices: [{ message: { role: 'assistant', content: null, tool_calls: toolCalls }, finish_reason: 'tool_calls' }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cost: 0.0001 },
+      }),
+    };
+  }
+
+  function finalHopResponse() {
+    return {
+      ok: true,
+      json: async () => ({
+        model: 'openai/gpt-5.4-mini', provider: 'OpenAI',
+        choices: [{ message: { role: 'assistant', content: null, tool_calls: [] }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28, cost: 0.0002 },
+      }),
+    };
+  }
+
+  function streamResponse(pieces) {
+    const enc = new TextEncoder();
+    const blocks = pieces.map(p =>
+      `data: ${JSON.stringify({ provider: 'OpenAI', model: 'openai/gpt-5.4-mini', choices: [{ delta: { content: p }, finish_reason: null }] })}\n\n`);
+    blocks.push(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28, cost: 0.0003 } })}\n\n`);
+    blocks.push('data: [DONE]\n\n');
+    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+  }
+
+  test('the real streamChatWithTools call carries the turn\'s maxTokens, callMeta, and per-tool truncation to the wire', async () => {
+    beforeEachHook();
+    try {
+      const queue = [
+        toolHopResponse([{ id: 'c1', type: 'function', function: { name: 'get_comments', arguments: '{}' } }]),
+        finalHopResponse(),
+      ];
+      global.fetch = mock.fn(async (_url, options) => {
+        const body = JSON.parse(options.body);
+        calls.push(body);
+        if (body.stream === true) return streamResponse(['answer']);
+        return queue.shift();
+      });
+      const records = [];
+      setLlmCallRecorder((r) => records.push(r));
+
+      const oversized = 'x'.repeat(CHAT_TOOL_RESULT_BUDGETS.get_comments + 500);
+      const store = fakeStore({ census: censusDoc() });
+      const deps = {
+        ...baseDeps(store, { streamChat, streamChatWithTools }),
+        createToolCatalog: () => ({
+          tools: [{ type: 'function', function: { name: 'get_comments', description: 'x', parameters: { type: 'object', properties: {} } } }],
+          executeTool: async () => oversized,
+        }),
+      };
+
+      const out = await runFlightCompanionTurn({
+        workspace: WORKSPACE, turnKind: 'user-initiated', message: 'catch me up',
+        apiKey: 'sk-test', onEvent: () => {}, deps,
+      });
+      assert.strictEqual(out.spent, true);
+
+      // Message shape + the 1500 maxTokens budget reached every hop, not just
+      // the first — a per-call default would drift on the second request.
+      assert.ok(calls.length >= 2, 'expected at least a tool hop and a final answer');
+      for (const body of calls) {
+        assert.strictEqual(body.max_tokens, 1500, 'flight-companion-turn.js\'s DEFAULT_MAX_TOKENS must reach every wire request');
+        assert.ok(Array.isArray(body.messages) && body.messages.some(m => m.role === 'user'), 'the user message must reach the wire');
+      }
+      const firstHop = calls[0];
+      assert.ok(firstHop.tools && firstHop.tools.some(t => t.function.name === 'get_comments'));
+
+      // toolResultMaxCharsByTool (CHAT_TOOL_RESULT_BUDGETS) must actually clip
+      // the oversized tool result before it is appended and re-sent — proving
+      // the budget reaches openrouter.js's real truncation, not just that the
+      // option object was passed somewhere.
+      const withToolMsg = calls.find(b => Array.isArray(b.messages) && b.messages.some(m => m.role === 'tool'));
+      assert.ok(withToolMsg, 'expected a follow-up request carrying the tool result');
+      const toolMsg = withToolMsg.messages.find(m => m.role === 'tool');
+      assert.strictEqual(toolMsg.content.length, CHAT_TOOL_RESULT_BUDGETS.get_comments + '\n… [truncated 500 chars]'.length);
+      assert.match(toolMsg.content, /\[truncated 500 chars\]$/);
+
+      // callMeta (urlKey/feature) must reach recordLlmCall on the REAL
+      // provider path, not just be threaded through options unread.
+      assert.ok(records.length >= 1);
+      assert.ok(records.every(r => r.urlKey === 'acme' && r.feature === 'flight-companion'));
+    } finally {
+      afterEachHook();
+    }
+  });
+});
+
+describe('LIN-2439 ledger item 6: the observerStateStore-omitted degradation path', () => {
+  // Unreachable in the wired configuration (every real caller injects the
+  // store), so this is a CONTRACT pin, not a production scenario: an
+  // auto-wake turn constructed without observerStateStore fails loud
+  // (a TypeError from the unguarded `observerStateStore.ensureSeeded` call)
+  // rather than silently degrading past the gate. Closing this honestly
+  // means proving that today, not asserting an untested "it's fine".
+  test('an auto-wake turn with no observerStateStore rejects instead of silently skipping the gate', async () => {
+    const deps = baseDeps(undefined, scriptedClient([['done', {}]]));
+    await assert.rejects(
+      () => runFlightCompanionTurn({
+        workspace: WORKSPACE, turnKind: 'auto-wake', apiKey: 'sk-test',
+        onEvent: () => {}, deps,
+      }),
+      TypeError,
+      'an auto-wake turn requires observerStateStore; omitting it must not silently proceed as though the gate passed'
     );
   });
 });

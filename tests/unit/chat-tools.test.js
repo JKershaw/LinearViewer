@@ -1509,6 +1509,21 @@ describe('LIN-2432 §A.4: send_follow_up followUpMode (execute/propose)', () => 
     const result = await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-dash', prompt: 'hi' } });
     assert.deepStrictEqual(result, { proposed: true, sessionId: 'sess-dash', prompt: 'hi' });
   });
+
+  // LIN-2439: the boundary must FAIL CLOSED. A second producer (a proxy
+  // caller, a future refactor) that threads a typo'd or otherwise
+  // unrecognised value into followUpMode must propose, never execute — the
+  // opposite of the old "anything that isn't exactly 'propose' executes"
+  // shape. This is the test that would fail if the default (or the check)
+  // flipped back to fail-open.
+  for (const garbage of ['Propose', 'propse', 'PROPOSE', 'true', '', 'exec', null, 42, {}]) {
+    test(`followUpMode: ${JSON.stringify(garbage)} (unrecognised) fails CLOSED to propose, never executes`, async () => {
+      const { executeTool, dispatchQueueStore } = makeCatalog({ history: twoSessionHistory(), followUpMode: garbage });
+      const result = await executeTool({ name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } });
+      assert.deepStrictEqual(result, { proposed: true, sessionId: 'sess-done', prompt: 'ship it' });
+      assert.strictEqual(dispatchQueueStore.calls.length, 0, 'createDispatchItem must never run for an unrecognised followUpMode');
+    });
+  }
 });
 
 describe('read-only invariant', () => {
