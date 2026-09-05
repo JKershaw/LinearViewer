@@ -46,7 +46,7 @@ import { MangoClient } from '@jkershaw/mangodb';
 
 import { __internal } from '../../lib/pipeline-loops.js';
 import { computeSupersededLoopIds } from '../../lib/loop-supersede.js';
-import { DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
+import { DEFAULT_LANE_STALE_MS, loopLastActivityMs } from '../../lib/live-console.js';
 import {
   classifyLoop,
   buildSweepPayload,
@@ -316,7 +316,7 @@ describe('observer-sweep: payload contract (LIN-2131)', () => {
     assert.ok(!payload.attention.some((row) => row.loopId === 'a1'), 'an answered row must never be surfaced as waiting on a human');
   });
 
-  test('ledger 3 — attention is deterministically sorted, from a fixture whose insertion order is NOT already sorted', () => {
+  test('ledger 3 — attention is deterministically sorted, from a fixture whose insertion order is NOT already sorted (LIN-2619: by recency, not loopId — attentionKeysFull stays loopId-sorted)', () => {
     const rows = [
       historyItem({
         id: 'zz-blocked', issueIdentifier: 'LIN-431', dispatchedAt: '2026-04-11T11:50:00.000Z',
@@ -333,21 +333,149 @@ describe('observer-sweep: payload contract (LIN-2131)', () => {
     ];
     const loops = _buildLoops({ historyItems: rows, now: NOW, lean: true });
     const readOrder = loops.map((l) => l.loopId);
-    const sortedOrder = [...readOrder].sort();
+    const alphabeticalOrder = [...readOrder].sort();
     // Load-bearing guard: the original coverage passed with the sort line
     // deleted precisely because its fixture arrived pre-sorted. If a future
     // change to _buildLoops' ordering makes this fixture sorted too, this
     // assertion fails loudly instead of quietly re-opening the hole.
-    assert.notDeepStrictEqual(readOrder, sortedOrder, 'fixture must reach buildSweepPayload UNSORTED, or it cannot detect a missing sort');
+    assert.notDeepStrictEqual(readOrder, alphabeticalOrder, 'fixture must reach buildSweepPayload UNSORTED, or it cannot detect a missing sort');
 
     const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
     assert.strictEqual(payload.attention.length, 3, 'all three blocked rows are waiting on a human');
+    // LIN-2619: attention now ranks by recency of `since` (most-recent first),
+    // NOT by loopId — zz-blocked (11:50) is the most recently transitioned,
+    // aa-blocked (11:40) the least, deliberately the REVERSE of the
+    // alphabetical order asserted here before this ticket.
+    assert.deepStrictEqual(
+      payload.attention.map((r) => r.loopId),
+      ['zz-blocked', 'mm-blocked', 'aa-blocked'],
+      'sorted by recency of `since`, most-recently-transitioned first'
+    );
     assert.deepStrictEqual(
       payload.attention,
-      [...payload.attention].sort((a, b) => (a.loopId < b.loopId ? -1 : a.loopId > b.loopId ? 1 : 0)),
-      'attention must equal its own sorted copy — stableStringify preserves array order, so an unsorted array hashes differently tick to tick'
+      [...payload.attention].sort((a, b) => (a.since > b.since ? -1 : a.since < b.since ? 1 : (a.loopId < b.loopId ? -1 : 1))),
+      'attention must equal its own sorted-by-recency copy — stableStringify preserves array order, so an unsorted array hashes differently tick to tick'
     );
-    assert.deepStrictEqual(payload.attention.map((r) => r.loopId), sortedOrder, 'sorted ascending by loopId');
+    // attentionKeysFull is a SEPARATE, additive key (LIN-2619 open question
+    // (c)) with its own independent contract: sorted by loopId, unaffected by
+    // the recency ranking above.
+    assert.deepStrictEqual(
+      payload.attentionKeysFull.map((tuple) => tuple[0]),
+      alphabeticalOrder,
+      'attentionKeysFull sorts by loopId, independent of attention\'s recency order'
+    );
+  });
+});
+
+// ─── G. Freshness ranking & fossil collapse (LIN-2619, beat 2) ────────────
+
+describe('observer-sweep: freshness ranking & fossil collapse (LIN-2619)', () => {
+  test('a row transitioned an hour ago ranks above a non-fossil row 3 days silent, and a genuinely fossil row (29 days) is counted, not enumerated', () => {
+    // A 29-day-old row also exceeds FOSSIL_AGE_MS (7 days) — there is no way
+    // to observe "ranks above" for a row that old without it ALSO being
+    // fossil-excluded, so this one fixture proves both contracts together:
+    // ranking among the survivors, and correct fossil exclusion of the row
+    // that can't survive to be ranked at all.
+    const rows = [
+      historyItem({
+        // Alphabetically LAST but the most recent — proves the surviving
+        // order comes from recency, not loopId (a loopId-ascending sort of
+        // the two survivors would read ['mm-medium', 'zz-fresh'], the reverse).
+        id: 'zz-fresh', issueIdentifier: 'LIN-501', dispatchedAt: '2026-04-11T11:00:00.000Z', // 1h ago
+        feedback: [{ message: '[blocked] recent', timestamp: '2026-04-11T11:00:00.000Z' }]
+      }),
+      historyItem({
+        id: 'mm-medium', issueIdentifier: 'LIN-502', dispatchedAt: '2026-04-08T12:00:00.000Z', // 3 days ago
+        feedback: [{ message: '[blocked] a few days', timestamp: '2026-04-08T12:00:00.000Z' }]
+      }),
+      historyItem({
+        id: 'aa-fossil', issueIdentifier: 'LIN-503', dispatchedAt: '2026-03-13T12:00:00.000Z', // 29 days ago
+        feedback: [{ message: '[blocked] ancient', timestamp: '2026-03-13T12:00:00.000Z' }]
+      })
+    ];
+    const loops = _buildLoops({ historyItems: rows, now: NOW, lean: true });
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+
+    assert.deepStrictEqual(
+      payload.attention.map((r) => r.loopId),
+      ['zz-fresh', 'mm-medium'],
+      'the fossil row is excluded from the enumerated array; the two survivors rank most-recent-first, NOT alphabetically'
+    );
+    assert.strictEqual(payload.staleAttentionCount, 1, 'exactly the one 29-day-old row is counted as a fossil');
+    assert.strictEqual(payload.staleAttentionThresholdMs, 7 * 24 * 60 * 60 * 1000, 'threshold mirrors FOSSIL_AGE_MS verbatim');
+    assert.strictEqual(payload.truncated, false, 'truncated reflects only ATTENTION_CAP truncation of the FRESH population — 2 rows never trips a 25 cap');
+    assert.deepStrictEqual(
+      payload.attentionKeysFull.map((tuple) => tuple[0]).sort(),
+      ['zz-fresh', 'mm-medium', 'aa-fossil'].sort(),
+      'attentionKeysFull carries the fossil row too — untouched by the fossil filter'
+    );
+  });
+
+  test('two rows with the IDENTICAL `since` timestamp tie-break deterministically by loopId, never by insertion/engine order', () => {
+    const rows = [
+      // Inserted zz before aa — insertion order already disagrees with the
+      // expected loopId tie-break order, so a sort that silently falls back
+      // to "leave ties as found" would pass this fixture by accident only if
+      // insertion order happened to already be ascending; it is not.
+      historyItem({
+        id: 'zz-tie', issueIdentifier: 'LIN-511', dispatchedAt: '2026-04-11T11:30:00.000Z',
+        feedback: [{ message: '[blocked] tie one', timestamp: '2026-04-11T11:30:00.000Z' }]
+      }),
+      historyItem({
+        id: 'aa-tie', issueIdentifier: 'LIN-512', dispatchedAt: '2026-04-11T11:30:00.000Z',
+        feedback: [{ message: '[blocked] tie two', timestamp: '2026-04-11T11:30:00.000Z' }]
+      })
+    ];
+    const loops = _buildLoops({ historyItems: rows, now: NOW, lean: true });
+    assert.strictEqual(loops.find((l) => l.loopId === 'zz-tie') && loopLastActivityMs(loops.find((l) => l.loopId === 'zz-tie')), loopLastActivityMs(loops.find((l) => l.loopId === 'aa-tie')), 'sanity: both rows must carry the exact same since timestamp for this to be a real tie');
+
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.deepStrictEqual(
+      payload.attention.map((r) => r.loopId),
+      ['aa-tie', 'zz-tie'],
+      'equal timestamps must tie-break ascending by loopId, deterministically, regardless of insertion order'
+    );
+  });
+
+  test('a blocked row with loopLastActivityMs === 0 (epoch, the beat-1 finding) never crashes, is treated as maximally stale, and still appears in attentionKeysFull', () => {
+    // Unreachable via _buildLoops (Note 1, top of file): `_buildLoops` skips
+    // any row whose `dispatchedAt` fails to parse, so every loop THAT PATH can
+    // ever produce already carries a non-zero `loopLastActivityMs`. A `blocked`
+    // row can still reach this shape in principle (classifyLoop's `blocked`
+    // branch never checks `loopLastActivityMs` at all, unlike `silent`), so this
+    // is a hand-built loop object bypassing `_buildLoops` — the only way to
+    // fixture the case buildSweepPayload's new ranking/fossil logic must not
+    // crash on.
+    const handBuiltZero = {
+      loopId: 'hand-blocked-zero',
+      issueIdentifier: 'LIN-599',
+      stage: 'implementation',
+      terminalStatus: null,
+      wakeMarker: 'blocked',
+      agentState: null,
+      historyStatus: null,
+      source: 'history',
+      dispatchedAt: null,
+      agentTimestamp: null,
+      telemetry: null,
+      lineageLastActivityMs: null
+    };
+    const freshRow = historyItem({
+      id: 'fresh-control', issueIdentifier: 'LIN-598', dispatchedAt: '2026-04-11T11:00:00.000Z',
+      feedback: [{ message: '[blocked] recent', timestamp: '2026-04-11T11:00:00.000Z' }]
+    });
+    const loops = [..._buildLoops({ historyItems: [freshRow], now: NOW, lean: true }), handBuiltZero];
+
+    let payload;
+    assert.doesNotThrow(() => { payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS }); }, 'an epoch-zero since must never crash the sweep');
+
+    assert.strictEqual(payload.lanes.blocked, 2, 'both rows classify blocked');
+    assert.ok(!payload.attention.some((r) => r.loopId === 'hand-blocked-zero'), 'epoch-zero is maximally stale — always past FOSSIL_AGE_MS, never enumerated as fresh');
+    assert.strictEqual(payload.staleAttentionCount, 1, 'the epoch-zero row is folded into the fossil count');
+    assert.ok(
+      payload.attentionKeysFull.some((tuple) => tuple[0] === 'hand-blocked-zero' && tuple[1] === 'blocked' && tuple[2] === 'implementation'),
+      'attentionKeysFull still carries its identity tuple, untouched by the fossil filter'
+    );
   });
 });
 
@@ -409,9 +537,17 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
     assert.strictEqual(doc1.state.attention.length, 2);
     // stableStringify sorts object keys but preserves array order, and
     // canonicalizeForHash maps arrays without sorting either — the sweep must
-    // sort attention itself.
-    const [first, second] = doc1.state.attention;
-    assert.ok(first.loopId < second.loopId, 'attention must be sorted ascending by loopId');
+    // sort attention itself. LIN-2619: the sort key is now recency of `since`
+    // (most-recently-transitioned first, loopId tie-break), not loopId alone —
+    // asserted via self-consistency (mirrors the payload-contract "ledger 3"
+    // test) rather than a hardcoded relative order, since these two rows'
+    // real `since` timestamps come from real, close-together `new Date()`
+    // calls and are not deterministically orderable by loopId alone.
+    assert.deepStrictEqual(
+      doc1.state.attention,
+      [...doc1.state.attention].sort((a, b) => (a.since > b.since ? -1 : a.since < b.since ? 1 : (a.loopId < b.loopId ? -1 : 1))),
+      'attention must equal its own sorted-by-recency copy'
+    );
 
     await sweepOneWorkspace(urlKey, deps);
     const doc2 = await observerStateStore.readCurrent(instanceKey);
@@ -434,6 +570,31 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
     assert.strictEqual(doc3.rev, doc1.rev, 'an ADVANCING clock over identical fleet state must not advance rev — no payload field may vary per tick');
     assert.strictEqual(doc3.ledger.length, doc1.ledger.length, 'a later-clock tick must not grow the ledger');
     assert.deepStrictEqual(doc3.state, doc1.state, 'the stored document must be byte-identical across ticks taken at DIFFERENT times');
+  });
+
+  test('LIN-2619: stateHash (via the real ObserverStateStore advance()/stableStringify path) is unchanged for an unchanged census, with the new staleAttentionCount/staleAttentionThresholdMs/attentionKeysFull fields present', async () => {
+    const { dispatchStore, agentStatusStore, observerStateStore } = freshStores();
+    const urlKey = `ws-fossil-hash-${randomUUID()}`;
+
+    const item = await dispatchStore.addItem(urlKey, { prompt: 'p', issueIdentifier: 'LIN-7', promptName: 'implementation' });
+    const taken = await dispatchStore.takeItem(item._id, urlKey, 'consumer-1');
+    await agentStatusStore.recordStatus({ urlKey, taskIdentifier: 'LIN-7', action: 'implementation', status: 'blocked', summary: 'blocked', dispatchId: taken.id, timestamp: new Date() });
+
+    const now = Date.now();
+    const deps = { dispatchStore, agentStatusStore, observerStateStore, now };
+    const instanceKey = `sweep:v1:${urlKey}`;
+
+    await sweepOneWorkspace(urlKey, deps);
+    const doc1 = await observerStateStore.readCurrent(instanceKey);
+    assert.strictEqual(doc1.rev, 2, 'seed (rev 1) then one genuine advance (rev 2)');
+    assert.strictEqual(doc1.state.staleAttentionCount, 0, 'a freshly-blocked row is not a fossil');
+    assert.strictEqual(doc1.state.staleAttentionThresholdMs, 7 * 24 * 60 * 60 * 1000);
+    assert.strictEqual(doc1.state.attentionKeysFull.length, 1);
+
+    await sweepOneWorkspace(urlKey, deps);
+    const doc2 = await observerStateStore.readCurrent(instanceKey);
+    assert.strictEqual(doc2.rev, doc1.rev, 'an unchanged census (same fleet, identical new fields too) must not advance rev — the LIN-2129 duplicate-tick gate still works');
+    assert.deepStrictEqual(doc2.state, doc1.state, 'the stored document, including the three new LIN-2619 fields, must be byte-identical across duplicate ticks');
   });
 
   test('interleaved/duplicate ticks (MangoDB gives no cross-process exclusivity — the sweep is the safety net)', async () => {
