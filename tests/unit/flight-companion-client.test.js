@@ -961,6 +961,132 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   });
 });
 
+// ─── The thinking state + "checking in…" status line (LIN-2632 beat 3) ─────
+
+describe('flight-companion.js — the thinking state (typed turns) and "checking in…" (auto-wake)', () => {
+  test('a typed turn shows the thinking row immediately, in-progress, before any network response', () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => new Promise(() => {}), // never resolves — this checks the pre-response state only
+    });
+    questionInput.value = 'status please';
+    m.submitQuestion();
+    // Synchronous — no flush(). sendTurn creates the row before the fetch
+    // even goes out, so this must already be true.
+    assert.strictEqual(thread.children.length, 2, 'user bubble + the immediate assistant thinking row');
+    const answerLi = thread.children[1];
+    assert.strictEqual(answerLi.querySelector('.fc-msg-body').textContent, 'thinking…');
+    const pill = answerLi.querySelector('.chat-msg__who');
+    assert.ok(pill.classList.contains('status-pill--in-progress'), 'the pill starts in-progress, same as the existing vocabulary');
+  });
+
+  test('the first token replaces the thinking placeholder outright — never concatenated after it', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: 'ack' }), sseFrame('done', {})]),
+    });
+    questionInput.value = 'status please';
+    m.submitQuestion();
+    assert.strictEqual(thread.children[1].querySelector('.fc-msg-body').textContent, 'thinking…', 'pre-token state');
+    await flush();
+    assert.strictEqual(thread.children.length, 2, 'still exactly one assistant row — ensureAssistantBubble is idempotent');
+    assert.strictEqual(thread.children[1].querySelector('.fc-msg-body').textContent, 'ack', 'fully replaced, not "thinking…ack"');
+  });
+
+  test('a tool breadcrumb during a hop inserts BEFORE the thinking row, not after it', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: '1', name: 'get_stack', arguments: {} }),
+        sseFrame('token', { token: 'done hop' }),
+        sseFrame('done', {}),
+      ]),
+    });
+    questionInput.value = 'status please';
+    m.submitQuestion();
+    await flush();
+    // you -> breadcrumb -> assistant row, in that order.
+    assert.strictEqual(thread.children.length, 3);
+    assert.ok(thread.children[1].className.includes('fc-inline-note'), 'the breadcrumb lands between the user turn and the answer');
+    assert.strictEqual(thread.children[2].querySelector('.fc-msg-body').textContent, 'done hop');
+  });
+
+  test('the thinking placeholder never leaks into history — even mid-turn, before any token arrives', () => {
+    const { exports: m, questionInput } = loadClient({ fetchImpl: () => new Promise(() => {}) });
+    questionInput.value = 'anything?';
+    m.submitQuestion();
+    looseDeepEqual(m.getChatHistory(), [{ role: 'user', content: 'anything?' }],
+      'only the user turn is recorded; the thinking placeholder is display-only');
+  });
+
+  test('an empty typed turn still leaves nothing in history, with the thinking row settling into the honest no-reply sentence (AC2 unchanged)', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    questionInput.value = 'anything to report?';
+    m.submitQuestion();
+    await flush();
+    assert.strictEqual(thread.children.length, 2, 'no second row — the thinking row settles in place');
+    assert.strictEqual(thread.children[1].querySelector('.fc-msg-body').textContent, 'no reply — nothing to add');
+    looseDeepEqual(m.getChatHistory(), [{ role: 'user', content: 'anything to report?' }]);
+  });
+
+  test('a silent auto-wake tick still paints no bubble (AC1 unchanged by the thinking-state work)', async () => {
+    const { exports: m, thread, chatUICalls } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(chatUICalls.appendMessage.length, 0, 'no assistant bubble is ever created for a silent auto-wake tick');
+    assert.strictEqual(thread.children.length, 0);
+  });
+
+  test('"checking in…" appears on the status line immediately on an auto-wake tick, before the network round-trip resolves, and clears on done', async () => {
+    const { exports: m, checkIn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    // Synchronous — no flush(). Shown before the fetch promise even settles.
+    assert.strictEqual(checkIn.hidden, false);
+    assert.strictEqual(checkIn.textContent, 'checking in…');
+    await flush();
+    assert.notStrictEqual(checkIn.textContent, 'checking in…', 'cleared once the tick resolves (AC2 of this beat)');
+    assert.match(checkIn.textContent, /^checked in .+ · nothing new$/, 'AC1: settles into the ordinary check-in line');
+  });
+
+  test('"checking in…" also clears on a gate-silent (non-stream) auto-wake outcome', async () => {
+    const { exports: m, checkIn } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'hash-identical' }),
+    });
+    m.autoWakeTick();
+    assert.strictEqual(checkIn.textContent, 'checking in…');
+    await flush();
+    assert.match(checkIn.textContent, /^checked in .+ · nothing new$/);
+  });
+
+  test('an auto-wake tick that surfaces a real narrated bubble still clears "checking in…" — restored to its prior state, never left stuck', async () => {
+    const { exports: m, checkIn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: 'heads up' }), sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    assert.strictEqual(checkIn.textContent, 'checking in…');
+    await flush();
+    // This tick never claims anything about "nothing new" (something DID
+    // happen — a narrated bubble) — it restores the line to whatever it
+    // held before this tick started, which for a fresh page is hidden/empty.
+    assert.notStrictEqual(checkIn.textContent, 'checking in…');
+    assert.strictEqual(checkIn.hidden, true, 'restored to its pre-tick (never-yet-shown) state');
+    assert.strictEqual(checkIn.textContent, '');
+  });
+
+  test('"checking in…" also clears (restored) on a mid-stream auto-wake error', async () => {
+    const { exports: m, checkIn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]),
+    });
+    m.autoWakeTick();
+    assert.strictEqual(checkIn.textContent, 'checking in…');
+    await flush();
+    assert.notStrictEqual(checkIn.textContent, 'checking in…');
+  });
+});
+
 // ─── Tool-wire phases + proposal control ────────────────────────────────
 
 describe('flight-companion.js — tool-wire phases (F5) + the proposal control', () => {

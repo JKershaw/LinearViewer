@@ -89,6 +89,14 @@
   var inFlight = false;
   var cadence = { delayMs: CADENCE_BASE_MS, stopped: false };
   var timerId = null;
+  // LIN-2632: an auto-wake tick's "checking in…" placeholder (set at
+  // sendTurn's start) snapshots whatever the status line showed before it,
+  // so finishTurn can restore that exact prior state if the turn ends
+  // without anything more specific to say (see finishTurn below). At most
+  // one turn is ever in flight (the `inFlight` guard above), so a single
+  // module-level slot is safe — never overwritten mid-turn.
+  var checkingInSnapshot = null;
+  var CHECKING_IN_TEXT = 'checking in…';
 
   // ─── Pure helpers (exposed via the test seam at the bottom — no DOM) ────
 
@@ -287,6 +295,21 @@
   function updateCheckInStatusNoCensus() {
     if (!checkInEl) return;
     checkInEl.textContent = formatNoCensus(new Date());
+    checkInEl.hidden = false;
+    checkInEl.classList.remove('fc-checkin--warning');
+  }
+
+  // LIN-2632: the auto-wake sibling of the typed-turn thinking row below —
+  // "it should show when it's loading/thinking" for a silent tick too,
+  // without ever painting a bubble (AC1 stays green: this only ever touches
+  // the existing #flight-companion-checkin status line). Deliberately NOT a
+  // fourth sibling reusing formatCheckIn's "nothing new" claim — that would
+  // be a lie the instant a tick DOES surface a real narrated bubble
+  // (existing behaviour, unchanged), so this is transient and always
+  // superseded or restored by finishTurn, never left as a final claim.
+  function updateCheckInStatusChecking() {
+    if (!checkInEl) return;
+    checkInEl.textContent = CHECKING_IN_TEXT;
     checkInEl.hidden = false;
     checkInEl.classList.remove('fc-checkin--warning');
   }
@@ -523,6 +546,21 @@
   function finishTurn() {
     inFlight = false;
     setComposerBusy(false);
+    // LIN-2632: clear the "checking in…" placeholder on every path out of an
+    // auto-wake turn, not just the silent one. Every branch with something
+    // more specific to say (a plain/sweep-not-seen/no-census check-in) has
+    // already overwritten checkInEl by the time finishTurn runs, so the
+    // `=== CHECKING_IN_TEXT` guard is false there and this is a no-op; the
+    // branches that say nothing (a real narrated auto-wake bubble, a
+    // mid-stream error, a network failure, or a non-'gate-silent' HTTP
+    // outcome) restore whatever the line showed before this tick, rather
+    // than asserting anything about what actually happened.
+    if (checkingInSnapshot && checkInEl && checkInEl.textContent === CHECKING_IN_TEXT) {
+      checkInEl.textContent = checkingInSnapshot.text;
+      checkInEl.hidden = checkingInSnapshot.hidden;
+      checkInEl.classList.toggle('fc-checkin--warning', checkingInSnapshot.warning);
+    }
+    checkingInSnapshot = null;
     // A hidden→visible transition mid-turn leaves onVisibilityChange's
     // `!inFlight` bail a no-op and the pending timer already consumed
     // (autoWakeTick nulled timerId before bailing on document.hidden) — so a
@@ -626,16 +664,6 @@
     inFlight = true;
     setComposerBusy(true);
 
-    if (turnKind === 'user-initiated') {
-      appendUserBubble(message);
-      chatHistory.push({ role: 'user', content: message });
-      capHistory(chatHistory);
-    }
-
-    var priorHistory = turnKind === 'user-initiated' ? chatHistory.slice(0, -1) : chatHistory.slice();
-    var body = { history: priorHistory };
-    if (message) body.message = message;
-
     var answerEl = null;
     var answerLi = null;
     var answerText = '';
@@ -651,6 +679,10 @@
     // row. `chat-cursor` therefore appears with the first token rather than
     // at stream open; the composer is already disabled via setComposerBusy,
     // so a user turn still has feedback during the pre-first-token wait.
+    // For a user-initiated turn specifically, this is called EAGERLY below
+    // (before the fetch even goes out) rather than waited on — so by the
+    // time the first token/tool event actually arrives, this is already a
+    // no-op that returns the existing bubble.
     function ensureAssistantBubble() {
       if (!answerEl) {
         answerEl = appendAssistantBubble();
@@ -659,6 +691,43 @@
       }
       return answerEl;
     }
+
+    if (turnKind === 'user-initiated') {
+      appendUserBubble(message);
+      chatHistory.push({ role: 'user', content: message });
+      capHistory(chatHistory);
+      // LIN-2632: the thinking state — an assistant row immediately, in the
+      // in-progress pill state, before any token or tool event. Previously
+      // the row only appeared on the first non-empty token, so a multi-hop
+      // tool turn (longer since LIN-2617) showed nothing but a disabled
+      // composer — John's "it should show when it's loading/thinking".
+      // `answerLi` being set now (not null) also means any tool breadcrumb
+      // that arrives during a hop inserts BEFORE this row instead of
+      // appending after it — the same "you → ↳ tool → the answer" order
+      // task-chat.js already has. The placeholder text lives ONLY in the
+      // DOM: `answerText` (what chatHistory is built from at 'done') stays
+      // '' until a real token arrives, so it can never leak into history —
+      // an empty turn's AC2 no-reply sentence below overwrites this SAME
+      // element (ensureAssistantBubble is idempotent, so it never creates a
+      // second row).
+      ensureAssistantBubble();
+      answerEl.textContent = 'thinking…';
+    } else if (checkInEl) {
+      // LIN-2632: "checking in…" — the auto-wake sibling of the thinking
+      // row above, shown for the duration of the tick. Snapshotted so
+      // finishTurn can restore the prior state if nothing more specific
+      // claims the line by the time this turn ends (see finishTurn).
+      checkingInSnapshot = {
+        text: checkInEl.textContent,
+        hidden: checkInEl.hidden,
+        warning: checkInEl.classList.contains('fc-checkin--warning'),
+      };
+      updateCheckInStatusChecking();
+    }
+
+    var priorHistory = turnKind === 'user-initiated' ? chatHistory.slice(0, -1) : chatHistory.slice();
+    var body = { history: priorHistory };
+    if (message) body.message = message;
 
     // Raw fetch carve-out: this response may be a Server-Sent Events stream
     // consumed via the reader below; window.api() parses the body as JSON
