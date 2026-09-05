@@ -1979,7 +1979,24 @@ a.wordmark:hover {
     margin-bottom: var(--space-4);
   }
 
-  /* Tighter nav spacing on very small phones */
+  /* LIN-2551: below 400px the brand yields the header to the controls. The
+     four selectors need ~332px of the ~296px available here, so something has
+     to give, and the wordmark is the only passenger that is not a control —
+     the app is still named in the tab title, on the footer, and in this very
+     header again from 412px up. Scoped to this breakpoint alone: it is the
+     narrowest phones that cannot afford it, not mobile generally. */
+  .nav-filters > .wordmark-nav {
+    display: none;
+  }
+}
+
+/* LIN-2551: the filter strip's tight spacing runs to 480px, not 400px. The
+   root font steps up above 400px, so the strip's content jumps ~40px exactly
+   where the old 400px cutoff stopped helping — leaving 412px (a real, swept
+   device width) with single-digit headroom while 360px and 430px had room.
+   Its own block rather than a wider `max-width` on the 400px one above, whose
+   other rules are about page sections and have no business moving. */
+@media (max-width: 480px) {
   .nav-filters {
     gap: 0.75ch;
   }

@@ -693,7 +693,11 @@ test.describe('.nav-filters assignee-item mobile sweep (LIN-2529)', () => {
 // load-bearing and was found the hard way: a budget tuned against `all`/`all`
 // fits, then overflows again the moment a real value replaces either — so a
 // spec that swept only the default state would have passed over the same bug.
-const DENSITY_SWEEP_WIDTHS = [360, 390, 412, 430];
+// The four LIN-2529 sweep widths, plus 320px (the narrowest phone still worth
+// supporting, and the width that exposed how little headroom the budget really
+// had) and 375px (between two of the swept ones, guarding the assumption that
+// passing at 360 and 390 implies passing between them).
+const DENSITY_SWEEP_WIDTHS = [320, 360, 375, 390, 412, 430];
 
 // One row of `.nav-item`s, whose mobile `min-height` is 44px (the tap-target
 // rule above). Anything at or under this is one row; a second row lands near
@@ -701,6 +705,11 @@ const DENSITY_SWEEP_WIDTHS = [360, 390, 412, 430];
 // 44 absorbs line-height/baseline-alignment jitter without being loose enough
 // to admit a second row.
 const SINGLE_ROW_MAX_HEIGHT = 60;
+
+// Spare width the strip must keep at every swept viewport. Set well above the
+// few px of cross-machine rendering variance that broke an earlier revision,
+// and comfortably below the ~22px the tightest width (412px) actually has.
+const MIN_HEADROOM_PX = 15;
 
 test.describe('.nav-filters mobile density budget (LIN-2551)', () => {
   test.beforeEach(async ({ page, workerUrlKey }) => {
@@ -716,10 +725,30 @@ test.describe('.nav-filters mobile density budget (LIN-2551)', () => {
 
       const filters = page.locator('.nav-filters');
       await expect(filters).toBeVisible();
+      // Still 4 DOM children at every width — below 400px the brand is hidden
+      // with `display: none` rather than removed, so the LIN-2529 count sweep
+      // above and this one agree about the strip's composition.
       expect(await filters.evaluate(el => el.children.length)).toBe(4);
 
       const height = await filters.evaluate(el => Math.round(el.getBoundingClientRect().height));
       expect(height, `.nav-filters must render as ONE row at ${width}px — measured ${height}px against a ${SINGLE_ROW_MAX_HEIGHT}px single-row bound`).toBeLessThanOrEqual(SINGLE_ROW_MAX_HEIGHT);
+
+      // Fitting is not enough — it has to fit with room to spare. An earlier
+      // revision of this fix cleared the height bound locally with 4px of
+      // headroom at 360px and 8px at 412px, then failed in CI at exactly
+      // those two widths on rendering differences of a few px. A bound that
+      // only holds on one machine's font metrics is not a fixed layout, so
+      // the margin itself is asserted rather than left implicit.
+      const headroom = await filters.evaluate(el => {
+        const kids = [...el.children];
+        const gap = parseFloat(getComputedStyle(el).columnGap) || 0;
+        const content = kids.reduce((a, k) => a + k.getBoundingClientRect().width, 0) + gap * (kids.length - 1);
+        const row = el.closest('.nav-primary-row');
+        const rcs = getComputedStyle(row);
+        const available = row.getBoundingClientRect().width - parseFloat(rcs.paddingLeft) - parseFloat(rcs.paddingRight);
+        return Math.round(available - content);
+      });
+      expect(headroom, `.nav-filters must fit at ${width}px with real margin, not scrape in — measured ${headroom}px`).toBeGreaterThanOrEqual(MIN_HEADROOM_PX);
     });
 
     test(`dashboard at ${width}px: no filter control is pushed off-viewport`, async ({ page, workerUrlKey }) => {
