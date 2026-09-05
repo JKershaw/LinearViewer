@@ -47,6 +47,9 @@ const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8
 // LIN-679 Stage 4 (LIN-2538): group F compute (including /north-star and
 // /cost) moved to its own sub-router, mounted from routes/proxy.js.
 const proxyComputeSource = readFileSync(join(__dirname, '../../routes/proxy-compute.js'), 'utf8');
+// LIN-679 Stage 6 (LIN-2540): group I, including the shared
+// `formatDispatchWatch`/`sessionId` band, moved to its own sub-router.
+const proxyDispatchSource = readFileSync(join(__dirname, '../../routes/proxy-dispatch.js'), 'utf8');
 const factorySource = readFileSync(join(__dirname, '../../lib/dispatch-factory.js'), 'utf8');
 const integrationSource = readFileSync(join(__dirname, '../../docs/proxy-integration.md'), 'utf8');
 // LIN-2245: the /api/proxy/instructions catalog (the source of all 3
@@ -88,7 +91,7 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
   // byte-identical across routes/proxy.js — see assertion 2 below).
   test('/dispatch list item is an exact field set that excludes sessionId', () => {
     const itemsLiteral = sliceBetween(
-      proxySource,
+      proxyDispatchSource,
       'const items = filtered.slice(0, limit).map(i => ({',
       '}));'
     );
@@ -110,7 +113,7 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
   // can only see this one copy.
   test('formatDispatchWatch includes sessionId, scoped to its own function body', () => {
     const fnBody = sliceBetween(
-      proxySource,
+      proxyDispatchSource,
       'function formatDispatchWatch(item, meta = null) {',
       'function dispatchWatchChanged(baseline, item) {'
     );

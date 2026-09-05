@@ -464,14 +464,15 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
   // LIN-2538 (Stage 4 / PR-4): group F's 12 router.* registrations moved to
   // routes/proxy-compute.js — 22 - 12 = 10.
   // LIN-2539 (Stage 5 / PR-5): group H's 4 registrations moved to routes/proxy-kickoff.js — 10 - 4 = 6.
-  test('routes/proxy.js has exactly 6 router.* registrations (65 URL forms across the whole proxy surface)', () => {
+  // LIN-2540 (Stage 6 / PR-6): group I's 5 registrations moved to routes/proxy-dispatch.js — 6 - 5 = 1.
+  test('routes/proxy.js has exactly 1 router.* registration (65 URL forms across the whole proxy surface)', () => {
     const src = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
     const matches = src.match(/^\s{2}router\.(get|post|put|patch|delete)\(/gm) || [];
-    assert.equal(matches.length, 6,
-      `expected 6 route registrations in routes/proxy.js, found ${matches.length} — ` +
+    assert.equal(matches.length, 1,
+      `expected 1 route registration in routes/proxy.js, found ${matches.length} — ` +
       `this file's 65-row ROWS table must be re-derived from source before trusting it`);
     assert.equal(ROWS.length, 65,
-      `this file's ROWS table must cover exactly 65 URL forms (6 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 13 in routes/proxy-reads.js + 12 in routes/proxy-writes.js + 12 in routes/proxy-compute.js + 4 in routes/proxy-kickoff.js + 10 array-path aliases), found ${ROWS.length}`);
+      `this file's ROWS table must cover exactly 65 URL forms (1 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 13 in routes/proxy-reads.js + 12 in routes/proxy-writes.js + 12 in routes/proxy-compute.js + 4 in routes/proxy-kickoff.js + 5 in routes/proxy-dispatch.js + 10 array-path aliases), found ${ROWS.length}`);
   });
 });
 
