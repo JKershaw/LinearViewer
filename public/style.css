@@ -1787,8 +1787,11 @@ a.wordmark:hover {
   }
 
   .nav-value {
-    /* Tightened from 12ch (LIN-2551). Only the workspace name is long enough
-       to reach this cap in practice; team/assignee values sit under it. */
+    /* Tightened from 12ch (LIN-2551). This is the 481-640px band only; the
+       phone block below relaxes it to 10ch once the brand is out of the way.
+       Which values reach the cap depends entirely on the workspace — a long
+       organisation or team name will, `all` never does — so this is a bound
+       on the damage, not a claim that nothing hits it. */
     max-width: 8ch;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1979,30 +1982,41 @@ a.wordmark:hover {
     margin-bottom: var(--space-4);
   }
 
-  /* LIN-2551: below 400px the brand yields the header to the controls. The
-     four selectors need ~332px of the ~296px available here, so something has
-     to give, and the wordmark is the only passenger that is not a control —
-     the app is still named in the tab title, on the footer, and in this very
-     header again from 412px up. Scoped to this breakpoint alone: it is the
-     narrowest phones that cannot afford it, not mobile generally. */
+}
+
+/* LIN-2551 — on a phone the header carries controls, not the brand.
+   ===========================================================================
+   Four labelled selectors do not fit beside the wordmark at phone widths: at
+   320px they need ~332px of ~296px available, and even at 412px — a real,
+   swept device width — every other lever combined left only ~10px of margin
+   on CI's font metrics, which is a layout that holds by luck. The wordmark is
+   the one passenger in this strip that is not a control, so it is what gives
+   way. The app is still named in the tab title, in the footer, and in this
+   same header from 481px up.
+
+   This is the deliberate, visible trade in this fix, and it is one line to
+   reverse if the brand is wanted back on mobile — but reversing it re-opens
+   LIN-2551 unless the labels go instead.
+
+   The bound is 480px rather than the 400px used elsewhere in this file
+   because the root font steps up above 400px: the strip's content jumps ~40px
+   exactly where a 400px cutoff would stop helping, which is precisely how
+   412px ended up the tightest width. Its own block rather than widening the
+   400px one above, whose other rules are about page sections and have no
+   business moving. */
+@media (max-width: 480px) {
   .nav-filters > .wordmark-nav {
     display: none;
   }
-}
 
-/* LIN-2551: the filter strip's tight spacing runs to 480px, not 400px. The
-   root font steps up above 400px, so the strip's content jumps ~40px exactly
-   where the old 400px cutoff stopped helping — leaving 412px (a real, swept
-   device width) with single-digit headroom while 360px and 430px had room.
-   Its own block rather than a wider `max-width` on the 400px one above, whose
-   other rules are about page sections and have no business moving. */
-@media (max-width: 480px) {
   .nav-filters {
     gap: 0.75ch;
   }
 
+  /* The brand's ~80px buys the values a LONGER cap than the ≤640px rule, not
+     a shorter one — the strip reads better after this fix than before it. */
   .nav-value {
-    max-width: 7ch;
+    max-width: 10ch;
   }
 }
 

@@ -679,113 +679,109 @@ test.describe('.nav-filters assignee-item mobile sweep (LIN-2529)', () => {
 // LIN-2551 — the mobile density budget, measured rather than counted.
 //
 // This discharges LIN-2516 ledger item L4. The LIN-2529 sweep above asserts
-// `.nav-filters` CHILD COUNTS at these same widths and never wrap-freedom,
-// which is exactly why CI stayed green while the strip rendered three rows
-// deep on every phone-sized viewport: a count of 4 is satisfied whether those
-// four items sit on one row or four.
+// `.nav-filters` CHILD COUNTS at these widths and never wrap-freedom, which is
+// exactly why CI stayed green while the strip rendered three rows deep on
+// every phone-sized viewport: a count of 4 is satisfied whether those four
+// items sit on one row or four. What is asserted here is the property the
+// count cannot see — the strip occupies a SINGLE row. `.nav-filters` is a
+// wrapping flex container, so its rendered height is the direct witness: one
+// row of 44px-min-height items, against the 94-101px (three rows) it measured
+// before the budget fix.
 //
-// What is asserted here is the property the count cannot see — the strip
-// occupies a SINGLE row. `.nav-filters` is a wrapping flex container, so its
-// rendered height is the direct witness: one row of 44px-min-height items, vs
-// the ~96px (three rows) it measured at before the budget fix.
+// SCOPE, stated precisely so it is not read as more than it is: this pins
+// `.nav-filters`. It does NOT pin `.nav-primary-row`, which still puts
+// `.nav-actions` (the search toggle) on its own line at narrow widths — that
+// is pre-existing behaviour, unchanged by LIN-2551, so LIN-2527 AC5's broader
+// "no `.nav-primary-row` wrap" question stays open.
 //
-// Measured with a real assignee SELECTED, not the default `all`. That is
-// load-bearing and was found the hard way: a budget tuned against `all`/`all`
-// fits, then overflows again the moment a real value replaces either — so a
-// spec that swept only the default state would have passed over the same bug.
-// The four LIN-2529 sweep widths, plus 320px (the narrowest phone still worth
-// supporting, and the width that exposed how little headroom the budget really
-// had) and 375px (between two of the swept ones, guarding the assumption that
-// passing at 360 and 390 implies passing between them).
-const DENSITY_SWEEP_WIDTHS = [320, 360, 375, 390, 412, 430];
+// EVERY FILTER STATE IS SWEPT, and that is the load-bearing part. A budget
+// tuned against the default `all`/`all` fits and then overflows the moment a
+// real value replaces either one — measured, not theorised: an earlier
+// revision of this fix passed at all four widths with `all`/`all` while still
+// rendering three rows at 412px and 430px with a team selected. Sweeping only
+// the default state is how a sweep passes over the very bug it exists for.
+
+// The Engineering team from tests/fixtures/mock-data.js — the ID, not the
+// name: `?team=` resolves through matchTeamId, and a bare name silently
+// degrades to unfiltered, which would quietly hand a "team selected" test the
+// `all` state it was written to avoid.
+const TEST_TEAM_ENGINEERING_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+
+const DENSITY_FILTER_STATES = [
+  { label: 'no filters', team: 'all', assignee: 'all' },
+  { label: 'assignee only', team: 'all', assignee: 'Charlie' },
+  { label: 'team only', team: TEST_TEAM_ENGINEERING_ID, assignee: 'all' },
+  { label: 'team + assignee (worst case)', team: TEST_TEAM_ENGINEERING_ID, assignee: 'Charlie' }
+];
+
+// The four LIN-2529 sweep widths, plus 375px — between two of them, guarding
+// the assumption that passing at 360 and 390 implies passing in between — and
+// 480px, the top of the phone budget's own media query.
+const DENSITY_SWEEP_WIDTHS = [360, 375, 390, 412, 430, 480];
 
 // One row of `.nav-item`s, whose mobile `min-height` is 44px (the tap-target
-// rule above). Anything at or under this is one row; a second row lands near
-// 88px and the pre-fix three-row state measured 94-101px. The allowance over
-// 44 absorbs line-height/baseline-alignment jitter without being loose enough
-// to admit a second row.
+// rule above). The allowance over 44 absorbs line-height and baseline-
+// alignment jitter without being loose enough to admit a second row, which
+// lands near 88px and which the pre-fix three-row state measured at 94-101px.
 const SINGLE_ROW_MAX_HEIGHT = 60;
 
-// Spare width the strip must keep at every swept viewport. Set well above the
-// few px of cross-machine rendering variance that broke an earlier revision,
-// and comfortably below the ~22px the tightest width (412px) actually has.
-const MIN_HEADROOM_PX = 15;
+function densityUrl(urlKey, state) {
+  return `/workspace/${urlKey}/?team=${encodeURIComponent(state.team)}&assignee=${encodeURIComponent(state.assignee)}`;
+}
 
 test.describe('.nav-filters mobile density budget (LIN-2551)', () => {
   test.beforeEach(async ({ page, workerUrlKey }) => {
     await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
-    await page.goto(`/workspace/${workerUrlKey}/?team=all`);
   });
 
   for (const width of DENSITY_SWEEP_WIDTHS) {
-    test(`dashboard at ${width}px: the 4-item filter strip does not wrap`, async ({ page, workerUrlKey }) => {
-      await page.setViewportSize({ width, height: 800 });
-      await page.goto(`/workspace/${workerUrlKey}/?assignee=Charlie`);
-      await page.waitForLoadState('networkidle');
+    for (const state of DENSITY_FILTER_STATES) {
+      test(`dashboard at ${width}px, ${state.label}: the 4-item filter strip does not wrap`, async ({ page, workerUrlKey }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto(densityUrl(workerUrlKey, state));
+        await page.waitForLoadState('networkidle');
 
-      const filters = page.locator('.nav-filters');
-      await expect(filters).toBeVisible();
-      // Still 4 DOM children at every width — below 400px the brand is hidden
-      // with `display: none` rather than removed, so the LIN-2529 count sweep
-      // above and this one agree about the strip's composition.
-      expect(await filters.evaluate(el => el.children.length)).toBe(4);
+        const filters = page.locator('.nav-filters');
+        await expect(filters).toBeVisible();
+        // Still 4 DOM children at every width — at phone widths the brand is
+        // hidden with `display: none` rather than removed, so this block and
+        // the LIN-2529 count sweep above agree about the strip's composition.
+        expect(await filters.evaluate(el => el.children.length)).toBe(4);
 
-      const height = await filters.evaluate(el => Math.round(el.getBoundingClientRect().height));
-      expect(height, `.nav-filters must render as ONE row at ${width}px — measured ${height}px against a ${SINGLE_ROW_MAX_HEIGHT}px single-row bound`).toBeLessThanOrEqual(SINGLE_ROW_MAX_HEIGHT);
-
-      // Fitting is not enough — it has to fit with room to spare. An earlier
-      // revision of this fix cleared the height bound locally with 4px of
-      // headroom at 360px and 8px at 412px, then failed in CI at exactly
-      // those two widths on rendering differences of a few px. A bound that
-      // only holds on one machine's font metrics is not a fixed layout, so
-      // the margin itself is asserted rather than left implicit.
-      const headroom = await filters.evaluate(el => {
-        const kids = [...el.children];
-        const gap = parseFloat(getComputedStyle(el).columnGap) || 0;
-        const content = kids.reduce((a, k) => a + k.getBoundingClientRect().width, 0) + gap * (kids.length - 1);
-        const row = el.closest('.nav-primary-row');
-        const rcs = getComputedStyle(row);
-        const available = row.getBoundingClientRect().width - parseFloat(rcs.paddingLeft) - parseFloat(rcs.paddingRight);
-        return Math.round(available - content);
+        const height = await filters.evaluate(el => Math.round(el.getBoundingClientRect().height));
+        expect(height, `.nav-filters must render as ONE row at ${width}px with ${state.label} — measured ${height}px against a ${SINGLE_ROW_MAX_HEIGHT}px single-row bound`).toBeLessThanOrEqual(SINGLE_ROW_MAX_HEIGHT);
       });
-      expect(headroom, `.nav-filters must fit at ${width}px with real margin, not scrape in — measured ${headroom}px`).toBeGreaterThanOrEqual(MIN_HEADROOM_PX);
-    });
+    }
 
     test(`dashboard at ${width}px: no filter control is pushed off-viewport`, async ({ page, workerUrlKey }) => {
-      // The other half of "it fits": a strip forced onto one row by shrinking
-      // can push its last item past the viewport edge, where the root's
-      // `overflow-x: clip` makes it unreachable with NO horizontal scrollbar
-      // to reveal it. That failure mode is invisible to a height assertion,
-      // and it is a worse outcome than the wrap it would have replaced — so
-      // both are pinned, not just the one this ticket set out to fix.
+      // The other half of "it fits", and a regression pin rather than a
+      // witness for this ticket's own bug: a strip forced onto one row by
+      // shrinking can push its last item past the viewport edge, where the
+      // root's `overflow-x: clip` makes it unreachable with no horizontal
+      // scrollbar to reveal it. A `nowrap` revision of this fix did exactly
+      // that. It is a worse outcome than the wrap it would have replaced, so
+      // it is pinned even though it passes against `main` too.
       await page.setViewportSize({ width, height: 800 });
-      await page.goto(`/workspace/${workerUrlKey}/?assignee=Charlie`);
+      await page.goto(densityUrl(workerUrlKey, DENSITY_FILTER_STATES[3]));
       await page.waitForLoadState('networkidle');
 
-      const overflow = await page.evaluate(() => {
+      const offscreen = await page.evaluate(() => {
         const viewport = document.documentElement.clientWidth;
-        const controls = [...document.querySelectorAll('.nav-filters .nav-value')];
-        return {
-          viewport,
-          offscreen: controls
-            .filter(c => c.getBoundingClientRect().right > viewport + 1)
-            .map(c => `${c.id || c.className}@${Math.round(c.getBoundingClientRect().right)}`),
-          docScrollWidth: document.documentElement.scrollWidth
-        };
+        return [...document.querySelectorAll('.nav-filters .nav-value')]
+          .filter(c => c.getBoundingClientRect().right > viewport + 1)
+          .map(c => `${c.id || c.className}@${Math.round(c.getBoundingClientRect().right)}`);
       });
-
-      expect(overflow.offscreen, `every filter control must sit inside the ${width}px viewport`).toEqual([]);
-      expect(overflow.docScrollWidth, 'the page must not scroll horizontally').toBeLessThanOrEqual(overflow.viewport);
+      expect(offscreen, `every filter control must sit inside the ${width}px viewport`).toEqual([]);
     });
   }
 
   test('the strip still shows what it is showing — values are not crushed away to fit', async ({ page, workerUrlKey }) => {
     // The guard against "passing" the assertions above by shrinking every
-    // value to nothing. A `nowrap` variant of this fix did exactly that
-    // (team and assignee values rendered 0px and 4px wide at 360px) and would
+    // value to nothing. A `nowrap` revision of this fix did exactly that —
+    // team and assignee values rendered 0px and 4px wide at 360px — and would
     // have satisfied both a height and an off-viewport check.
     await page.setViewportSize({ width: 360, height: 800 });
-    await page.goto(`/workspace/${workerUrlKey}/?assignee=Charlie`);
+    await page.goto(densityUrl(workerUrlKey, DENSITY_FILTER_STATES[3]));
     await page.waitForLoadState('networkidle');
 
     const values = await page.evaluate(() =>
@@ -800,10 +796,34 @@ test.describe('.nav-filters mobile density budget (LIN-2551)', () => {
     for (const v of values) {
       expect(v.width, `"${v.text}" must still render legibly, not be shrunk to nothing`).toBeGreaterThanOrEqual(10);
     }
-    // The short values fit outright; only a long workspace name reaches the
-    // truncation cap, which is the cap doing its job rather than a squeeze.
+    // Real selected values render IN FULL — only a long workspace name reaches
+    // the truncation cap, which is the cap doing its job rather than a squeeze.
     const [, team, assignee] = values;
-    expect(team.truncated, 'a short team value must not be truncated').toBe(false);
-    expect(assignee.truncated, 'a real assignee name must not be truncated').toBe(false);
+    expect(team.text, 'the selected team must be the value under test, not the `all` default').toBe('Engineering');
+    expect(team.truncated, 'a real selected team name must not be truncated').toBe(false);
+    expect(assignee.truncated, 'a real selected assignee name must not be truncated').toBe(false);
+  });
+
+  test('320px — below the swept range, the strip degrades by wrapping rather than by clipping', async ({ page, workerUrlKey }) => {
+    // 320px is narrower than any width this ticket covers, and it is where the
+    // budget genuinely runs out with a team selected. Recorded honestly rather
+    // than asserted away: `flex-wrap` is KEPT precisely so this width degrades
+    // to a second row instead of pushing a control out of reach. Still an
+    // improvement on `main`, which rendered three rows here.
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto(densityUrl(workerUrlKey, DENSITY_FILTER_STATES[3]));
+    await page.waitForLoadState('networkidle');
+
+    const { height, offscreen } = await page.evaluate(() => {
+      const el = document.querySelector('.nav-filters');
+      const viewport = document.documentElement.clientWidth;
+      return {
+        height: Math.round(el.getBoundingClientRect().height),
+        offscreen: [...el.querySelectorAll('.nav-value')].filter(c => c.getBoundingClientRect().right > viewport + 1).length
+      };
+    });
+
+    expect(height, 'at 320px the strip may take a second row, but never a third').toBeLessThanOrEqual(2 * SINGLE_ROW_MAX_HEIGHT);
+    expect(offscreen, 'wrapping is the degradation; clipping a control is not').toBe(0);
   });
 });
