@@ -147,6 +147,96 @@ describe('buildCompanionSnapshot', () => {
     const result = shouldSpendTurn({ currentCensusDoc: next, companionDoc, now: 1000 });
     assert.deepStrictEqual(result, { spend: false, surface: false, reason: 'no-delta', nextRecord: null });
   });
+
+  // ── LIN-2661: malformed persisted attention rows must not throw or ──────
+  // silently corrupt the identity diff / attentionCount.
+
+  test('LIN-2661: a null or undefined attention row does not throw', () => {
+    const nullDoc = census({ stateHash: 'h1', rev: 1, attention: [null] });
+    const undefinedDoc = census({ stateHash: 'h1', rev: 1, attention: [undefined] });
+    assert.doesNotThrow(() => buildCompanionSnapshot(nullDoc));
+    assert.doesNotThrow(() => buildCompanionSnapshot(undefinedDoc));
+  });
+
+  test('LIN-2661: a row missing loopId/lane/stage is dropped from attentionKeys/attentionCount and counted in malformedAttentionCount', () => {
+    const doc = census({
+      stateHash: 'h1',
+      rev: 3,
+      lanesState: lanes({ blocked: 1 }),
+      attention: [attentionRow('loop-1', 'blocked', 'review'), { loopId: 'loop-2' }]
+    });
+    assert.deepStrictEqual(buildCompanionSnapshot(doc), {
+      lanes: lanes({ blocked: 1 }),
+      attentionKeys: [['loop-1', 'blocked', 'review']],
+      attentionKeysFull: [['loop-1', 'blocked', 'review']],
+      attentionCount: 1,
+      malformedAttentionCount: 1,
+      truncated: false,
+      censusRev: 3
+    });
+  });
+
+  test('LIN-2661: a present, independently-malformed attentionKeysFull is sanitized separately from a malformed attention array (the attentionKeysFull trap)', () => {
+    const doc = census({
+      stateHash: 'h1',
+      rev: 5,
+      lanesState: lanes({ blocked: 1 }),
+      attention: [attentionRow('loop-1', 'blocked', 'review'), { loopId: 'loop-2' }],
+      attentionKeysFull: [
+        ['loop-1', 'blocked', 'review'],
+        [null, 'blocked', 'review'],
+        ['loop-2', undefined, undefined]
+      ]
+    });
+    const snapshot = buildCompanionSnapshot(doc);
+    assert.deepStrictEqual(snapshot.attentionKeys, [['loop-1', 'blocked', 'review']]);
+    assert.deepStrictEqual(snapshot.attentionKeysFull, [['loop-1', 'blocked', 'review']]);
+  });
+
+  test('LIN-2661: malformedAttentionCount is 0 for an all-well-formed census', () => {
+    const doc = census({
+      stateHash: 'h1',
+      rev: 2,
+      lanesState: lanes({ blocked: 2 }),
+      attention: [attentionRow('loop-1', 'blocked', 'review'), attentionRow('loop-2', 'silent', 'waiting')]
+    });
+    assert.strictEqual(buildCompanionSnapshot(doc).malformedAttentionCount, 0);
+  });
+
+  test('LIN-2661 invariant #1: well-formed input is untouched — lanes/attentionKeys/attentionKeysFull/attentionCount/truncated/censusRev unchanged', () => {
+    const doc = census({
+      stateHash: 'h1',
+      rev: 9,
+      lanesState: lanes({ blocked: 2, terminal: 1 }),
+      attention: [attentionRow('loop-1', 'blocked', 'review'), attentionRow('loop-2', 'silent', 'waiting')],
+      truncated: true
+    });
+    const snapshot = buildCompanionSnapshot(doc);
+    assert.deepStrictEqual(
+      {
+        lanes: snapshot.lanes,
+        attentionKeys: snapshot.attentionKeys,
+        attentionKeysFull: snapshot.attentionKeysFull,
+        attentionCount: snapshot.attentionCount,
+        truncated: snapshot.truncated,
+        censusRev: snapshot.censusRev
+      },
+      {
+        lanes: lanes({ blocked: 2, terminal: 1 }),
+        attentionKeys: [
+          ['loop-1', 'blocked', 'review'],
+          ['loop-2', 'silent', 'waiting']
+        ],
+        attentionKeysFull: [
+          ['loop-1', 'blocked', 'review'],
+          ['loop-2', 'silent', 'waiting']
+        ],
+        attentionCount: 2,
+        truncated: true,
+        censusRev: 9
+      }
+    );
+  });
 });
 
 // ─── shouldSpendTurn: precedence + reason/nextRecord witnesses ──────────
