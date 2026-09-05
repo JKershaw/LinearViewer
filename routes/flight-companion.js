@@ -558,11 +558,26 @@ export function createFlightCompanionRoutes({
       // the `done` frame above.
       // LIN-2449: `!clientGone` alongside `sawDone`. The abort above usually
       // makes this moot by throwing out of the streaming call, but not always:
-      // a disconnect between the terminal frame being generated and its bytes
-      // reaching the socket arrives too late for an abort to help, and lands
-      // here with `sawDone` already true. Gating the commit as well is what
-      // actually closes the acceptance criterion — the abort is the spend
-      // optimisation, this is the correctness one.
+      // a disconnect arriving after the terminal frame is generated is too
+      // late to abort, and reaches here with `sawDone` already true. This gate
+      // is what catches that.
+      //
+      // KNOWN RESIDUAL, measured rather than assumed: the gate closes the case
+      // once the socket's 'close' has actually been PROCESSED. If teardown has
+      // not been observed by the time this line runs — a disconnect landing in
+      // the same event-loop iteration as the terminal frame — `clientGone` is
+      // still false and the delta is consumed. That window cannot be closed
+      // from here: inside it every synchronous signal reads healthy
+      // (`res.destroyed` false, `socket.destroyed` false, `writable` true), so
+      // the alternative discriminator (`res.writableEnded && !res.destroyed`)
+      // is fooled identically, and deferring this block by a tick was measured
+      // NOT to close it. The residual is ~one event-loop iteration around the
+      // terminal frame, against a pre-fix behaviour of consuming the delta on
+      // 100% of disconnects. Accepted deliberately, not overlooked.
+      //
+      // Also unclosable here, and equally inherent: a client that vanishes
+      // without sending FIN/RST (a dropped mobile radio) never fires 'close'
+      // at all. Both would need an app-level acknowledgement to close.
       if (sawDone && !clientGone && companionAdvance) {
         try {
           const currentEnvelope = await observerStateStore.readCurrent(companionAdvance.instanceKey);
@@ -600,7 +615,14 @@ export function createFlightCompanionRoutes({
       // pushing an `error` frame into a dead one. Every other error path is
       // unchanged, including its untouched no-commit behaviour.
       if (clientGone) {
-        console.error('Flight Companion turn: client disconnected mid-turn, census delta left unconsumed');
+        // Keep the error itself: a genuine bug that happens to coincide with a
+        // disconnect would otherwise vanish without a trace, since this branch
+        // swallows the only report of it.
+        console.error('Flight Companion turn: client disconnected mid-turn, census delta left unconsumed', {
+          urlKey: workspace.urlKey,
+          instanceKey: companionAdvance ? companionAdvance.instanceKey : null,
+          error: error?.message,
+        });
         return;
       }
       console.error('Flight Companion turn error:', error);

@@ -1408,6 +1408,84 @@ describe('Flight Companion turn endpoint (LIN-2449) — client disconnect mid-tu
     assert.strictEqual(writes.length, 1, 'only the pre-call reservation — nothing releases it, it self-expires via the lease');
   });
 
+  test('an aborted stream that THROWS takes the client-gone branch — no error frame into a dead socket', async () => {
+    // Covers the `catch { if (clientGone) return; }` early-return, which is the
+    // path a real aborted streamChat takes: lib/openrouter.js surfaces an abort
+    // as a throw, not as an onEvent('error'). The fakes above resolve instead
+    // of throwing, so without this the branch had no test at all.
+    const calls = [];
+    const observed = { clientGone: deferred() };
+    const chatClient = {
+      async streamChat(messages, opts, onEvent) {
+        observed.signal = opts.signal;
+        onEvent('token', { token: 'partial' });
+        await observed.clientGone.promise;
+        const err = new Error('OpenRouter request timed out');
+        err.name = 'AbortError';
+        throw err;
+      },
+      async streamChatWithTools(messages, opts, onEvent) {
+        return this.streamChat(messages, opts, onEvent);
+      },
+    };
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: realCensusDoc(), calls }),
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called'); } },
+      chatClient,
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    await postThenDisconnect(app, '/workspace/acme/api/flight-companion/turn', {});
+    // Let the route's own 'close' listener run before releasing the stream —
+    // the same ordering the witnesses above use. Resolving first races the
+    // teardown against the terminal frame, which is the residual window the
+    // commit gate cannot close and which this test is not about.
+    await new Promise((r) => setTimeout(r, 50));
+    observed.clientGone.resolve();
+    await new Promise((r) => setTimeout(r, 50));
+
+    const writes = calls.filter(c => c.method === 'advance');
+    assert.strictEqual(writes.length, 1, 'reservation only — a throw must not commit, and must not release either');
+  });
+
+  test('AC1 literally: a disconnected turn leaves the census baseline unconsumed, so the change is still reportable', async () => {
+    // The witness above asserts "the second advance did not happen". This
+    // asserts what the acceptance criterion actually says — that the DELTA
+    // survives — by reading the stored companion record afterwards.
+    //
+    // Note what this deliberately does NOT do: run a second turn and expect it
+    // to spend. It would not, and that is correct — the reservation lease is
+    // still held (nothing releases it on this path, by LIN-2442's design), so
+    // the next turn is refused as `turn-in-flight` until the lease expires.
+    // Asserting the baseline directly separates "the delta survived" from
+    // "the lease has expired", which are different questions.
+    const calls = [];
+    const observed = { clientGone: deferred() };
+    const store = fakeObserverStateStore({ censusDoc: realCensusDoc(), calls });
+    const app = buildApp({
+      observerStateStore: store,
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called'); } },
+      chatClient: disconnectingChatClient(observed),
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    await postThenDisconnect(app, '/workspace/acme/api/flight-companion/turn', {});
+    // Let the route's own 'close' listener run before releasing the stream —
+    // the same ordering the witnesses above use. Resolving first races the
+    // teardown against the terminal frame, which is the residual window the
+    // commit gate cannot close and which this test is not about.
+    await new Promise((r) => setTimeout(r, 50));
+    observed.clientGone.resolve();
+    await new Promise((r) => setTimeout(r, 50));
+
+    const after = await store.readCurrent('companion:v1:acme');
+    assert.notStrictEqual(
+      after.state.lastCensusStateHash,
+      realCensusDoc().stateHash,
+      'the baseline must NOT have advanced to the census the disconnected turn read — that is the delta being consumed for a report nobody saw'
+    );
+  });
+
   test('control: the SAME flow WITHOUT a disconnect does commit the baseline — the gate is the disconnect, not the shape of this fake', async () => {
     const calls = [];
     const observed = { clientGone: deferred() };
