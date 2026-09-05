@@ -287,13 +287,35 @@ far through the list it got. A lane emits one additional, non-terminal marker at
 transition** — an extra feedback entry alongside its ordinary claim/close-out comments, not a
 replacement for them:
 
-```
-[ticket] LIN-XXXX started
-[ticket] LIN-XXXX done — <one line>
-[ticket] LIN-XXXX blocked — <reason>
-[ticket] LIN-XXXX refused — <reason>
-[ticket] LIN-XXXX dissolved — <reason>
-```
+The vocabulary is six states: `[ticket] LIN-XXXX started`, `[ticket] LIN-XXXX done — <one line>`,
+`[ticket] LIN-XXXX blocked — <reason>`, `[ticket] LIN-XXXX refused — <reason>`,
+`[ticket] LIN-XXXX dissolved — <reason>`, and `[ticket] LIN-XXXX trimmed — <reason>`.
+
+**The shape the lane writes is load-bearing, and getting it wrong is silent.** The relay that reads
+a lane's turn text for this line (`walkTicketMarkers` in `simple-dispatcher/transcript.js`) requires
+the marker to be **unfenced** — never inside a ` ``` ` or ` ~~~ ` block, since fenced lines are
+blanked out before the marker check ever runs — and **individually isolated**: its own paragraph,
+with a blank line (or the very start/end of the message) immediately above *and* immediately below
+it. Two marker lines placed back to back with no blank line between them are **both** dropped, the
+same as a marker sitting inside a fence. There is no error on either path, so the wrong shape reads
+on every downstream surface as "nothing happened here" rather than as a failure anyone would notice.
+
+A turn closing one ticket, written correctly, looks like this in the lane's own message text:
+
+Ticket verified closed, PR merged, CI green.
+
+[ticket] LIN-XXXX done
+
+Closing more than one ticket in the same turn means giving each marker its own isolated paragraph —
+never stacking them on consecutive lines:
+
+[ticket] LIN-XXXX done
+
+[ticket] LIN-YYYY blocked — <specific reason>
+
+Note that the six forms above are written inline, in backticks, precisely because a fenced block
+listing them would itself be an example of the shape that does not relay. This mirrors
+`docs/worker-lane-prompt.md`'s Step 5, which LIN-2450 corrected the same way.
 
 This is a **separate, orthogonal vocabulary** from the terminal markers above — `[ticket] ... done`
 is never read as the dispatch's own terminal status, and it does not derive `status`. It is parsed

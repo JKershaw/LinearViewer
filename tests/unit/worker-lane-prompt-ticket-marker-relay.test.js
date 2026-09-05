@@ -18,6 +18,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { buildWorkerLaneKickoff } from '../../lib/prompts/worker-lane-kickoff.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 // ─── Mirror of simple-dispatcher/transcript.js's relay guard (HEAD 63a56da) ───
 
@@ -138,5 +141,107 @@ describe('docs/worker-lane-prompt.md Step 5 — the example must actually be rel
 
   test('still preserves the pinned [ticket] LIN-XXXX done literal (tests/unit/worker-lane-kickoff.test.js:31)', () => {
     assert.ok(prompt.includes('[ticket] LIN-XXXX done'));
+  });
+});
+
+
+// ─── LIN-2503: the same guard, applied to docs/dispatch-integration.md ───
+//
+// `docs/worker-lane-prompt.md` (graded above, through buildWorkerLaneKickoff)
+// is READ INTO a generated prompt, so a wrong example there is fed to every
+// lane automatically. `docs/dispatch-integration.md` has no generator — it is
+// a linked integration guide — so this suite grades its RAW FILE CONTENT.
+//
+// That is a weaker altitude than the tests above and is called out rather than
+// glossed: nothing here proves a running consumer relays anything, only that
+// the canonical vocabulary reference does not teach a shape the relay drops.
+// It is worth having anyway, because worker-lane-prompt.md links to this file
+// as the vocabulary reference — so it is the next place a human or agent
+// implementing a consumer copies the shape from, which is exactly how
+// LIN-2450's defect reached a second file in the first place.
+const DISPATCH_INTEGRATION_MD = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../../docs/dispatch-integration.md'),
+  'utf8'
+);
+
+// The `[ticket]` section only — grading the whole file would let an unrelated
+// fenced block elsewhere in a 700-line document fail this suite.
+function ticketMarkerSection(doc) {
+  const start = doc.indexOf('### The `[ticket]` marker');
+  assert.notEqual(start, -1, 'expected the [ticket] marker section in docs/dispatch-integration.md');
+  const end = doc.indexOf('\n### ', start + 1);
+  return doc.slice(start, end === -1 ? doc.length : end);
+}
+
+describe('LIN-2503 — docs/dispatch-integration.md teaches a relayable [ticket] shape', () => {
+  const section = ticketMarkerSection(DISPATCH_INTEGRATION_MD);
+
+  test('acceptance witness: the PRE-FIX block (fenced, five adjacent marker lines) relays zero markers', () => {
+    // Byte-for-byte the block this ticket replaces (docs/dispatch-integration.md
+    // lines 290-296 before the fix). Kept as a literal rather than read from git
+    // history, so this test proves the defect independently and stands as a
+    // permanent guard against the doc reverting to this shape. Two independent
+    // causes, either sufficient: the fence, and the mutual adjacency.
+    const preFix = withRealTicketIds([
+      '```',
+      '[ticket] LIN-XXXX started',
+      '[ticket] LIN-XXXX done — <one line>',
+      '[ticket] LIN-XXXX blocked — <reason>',
+      '[ticket] LIN-XXXX refused — <reason>',
+      '[ticket] LIN-XXXX dissolved — <reason>',
+      '```',
+    ].join('\n'));
+    assert.deepStrictEqual(relayableMarkers(preFix), []);
+  });
+
+  test('no [ticket] marker appears inside a fenced code block in this section', () => {
+    assert.ok(
+      !/```[\s\S]*?\[ticket\][\s\S]*?```/.test(section),
+      'a fenced [ticket] example teaches a shape the relay blanks before it ever looks for a marker'
+    );
+  });
+
+  test('the section carries at least one worked example that actually relays', () => {
+    // The point of the fix: the reader must be able to copy something that
+    // works, not just be told what not to do.
+    const relayed = relayableMarkers(withRealTicketIds(section));
+    assert.ok(relayed.length > 0, 'expected at least one relayable [ticket] marker in the section');
+  });
+
+  test('the multi-ticket example relays BOTH markers — the adjacency trap is shown correctly, not just described', () => {
+    const match = /never stacking them on consecutive lines:\n\n([\s\S]*?)\n\nNote that/.exec(section);
+    assert.ok(match, 'expected the multi-ticket example block in docs/dispatch-integration.md');
+    assert.deepStrictEqual(
+      relayableMarkers(withRealTicketIds(match[1])),
+      ['[ticket] LIN-2450 done', '[ticket] LIN-2451 blocked — <specific reason>']
+    );
+  });
+
+  test('every standalone marker line in the section is relayable — none is stranded by adjacency', () => {
+    // Catches the subtler half of the defect class: a future edit that unfences
+    // an example but leaves two marker lines back to back would satisfy the
+    // fenced-block check above while still teaching a shape that drops both.
+    const graded = withRealTicketIds(section).split('\n');
+    const standalone = graded.filter(line => TICKET_MARKER_LINE.test(line.trim()));
+    const relayed = relayableMarkers(withRealTicketIds(section));
+    assert.equal(
+      standalone.length,
+      relayed.length,
+      `every standalone marker line must relay; ${standalone.length} present, ${relayed.length} relayable`
+    );
+  });
+
+  test('the six-state vocabulary is listed INLINE in backticks, which is why it does not need a fence', () => {
+    // Inline backticked references (`[ticket] LIN-XXXX done` inside a sentence)
+    // are deliberately NOT graded as emitted lines — they are prose, not an
+    // example to copy, and LIN-2450 kept the same form in worker-lane-prompt.md.
+    // This pins that the vocabulary is presented that way rather than as a
+    // fenced block, which is the choice that made the fence unnecessary.
+    for (const state of ['started', 'done', 'blocked', 'refused', 'dissolved', 'trimmed']) {
+      assert.ok(
+        section.includes(`\`[ticket] LIN-XXXX ${state}`),
+        `expected the \`${state}\` state listed inline in backticks`
+      );
+    }
   });
 });
