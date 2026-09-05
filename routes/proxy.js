@@ -18,6 +18,7 @@ import { createDedupeCache, createGenerationTracker } from '../lib/proxy-dedupe.
 import { createCredentialTrail } from '../lib/proxy-credential-trail.js';
 import { buildInstructions } from '../lib/proxy-instructions.js';
 import { createAgentStatusRoutes } from './proxy-agent-status.js';
+import { createRulingsRoutes } from './proxy-rulings.js';
 import { createTokensAdminRoutes } from './proxy-tokens-admin.js';
 import { createTokenExchangeRoutes } from './proxy-token-exchange.js';
 import { createReadRoutes } from './proxy-reads.js';
@@ -454,7 +455,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null }) {
   const router = Router();
 
   /**
@@ -1517,6 +1518,14 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // Group G agent-status (LIN-679 Stage 1 / LIN-2533): extracted to
   // routes/proxy-agent-status.js, mounted at its original position.
   router.use(createAgentStatusRoutes({ agentStatusStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent }));
+
+  // LIN-2444: the consumer-API rulings surface — a workspace-scoped READ of
+  // unanswered decisions, plus a PROPOSE-a-dismissal write. Deliberately no
+  // proxy dismiss: per John's ruling an agent may recommend a dismissal and
+  // never perform one, so `decision-answer` stays absent from
+  // FEEDBACK_ENTRY_KINDS (LIN-1728) and this router never reaches
+  // markDecisionAnswered. See routes/proxy-rulings.js.
+  router.use(createRulingsRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, sessionsFeedCache }));
 
   // Group H kickoff (LIN-679 Stage 5 / LIN-2539): extracted to
   // routes/proxy-kickoff.js, mounted at its original position.

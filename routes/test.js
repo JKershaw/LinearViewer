@@ -46,7 +46,7 @@ import { respondToAccountConflict } from '../lib/account-conflict.js';
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -811,6 +811,19 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   })
 
   // Endpoint to clear the task-snapshot archive for testing (LIN-598)
+  // LIN-2444: sibling of the snapshot clear below. Without it an e2e workspace
+  // reset clears shelved rulings but leaks proposed-dismissal rows into the
+  // next test, which the rulings-tab specs will depend on.
+  router.get('/test/clear-dismissal-suggestions', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace'
+      if (dismissalSuggestionsStore) await dismissalSuggestionsStore.clear(urlKey)
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
   router.get('/test/clear-task-snapshots', async (req, res) => {
     try {
       const urlKey = req.query.urlKey || 'test-workspace'

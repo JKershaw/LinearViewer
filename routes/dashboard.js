@@ -376,7 +376,13 @@ function loopActivityMs(loop) {
  * @param {Object} loop
  * @returns {Object}
  */
-function enrichLoop(loop) {
+// Exported for routes/proxy-rulings.js (LIN-2444): the consumer-API rulings
+// read needs loops shaped exactly as the rulings feed shapes them, because
+// `resolveDisposition` (lib/unanswered-decisions.js) reads `agentState`. Shared
+// by export rather than copied — a second local enrichment would drift from
+// this one silently, and the two would then disagree about whether a ruling can
+// be replied to.
+export function enrichLoop(loop) {
   // Prefer the build-time terminal completion (present on every reconstructed
   // loop); fall back to scanning raw feedback for loops built elsewhere. The
   // lean feed drops raw feedback[], so this must not depend on it (LIN-622).
@@ -499,7 +505,15 @@ export function createDashboardRoutes({
   // below. Default null → the shelving branch is simply skipped
   // (collectUnansweredDecisions defaults it to []), same degrade-gracefully
   // convention as taskDecisionsStore above.
-  shelvedRulingsStore = null
+  shelvedRulingsStore = null,
+  // Proposed dismissals (LIN-2444), the rulings feed's FOURTH input. An agent
+  // may PROPOSE that a ruling be dismissed and never perform one, so the
+  // proposal has to reach the surface where a human can agree to it — this
+  // one. Without it the whole feature is write-only. Default null → the
+  // suggestion join is skipped and every row reports
+  // `suggestedDismissal: null`, same degrade-gracefully convention as the
+  // three stores above.
+  dismissalSuggestionsStore = null
 }) {
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
@@ -1429,7 +1443,35 @@ export function createDashboardRoutes({
       const shelvedRulings = shelvedRulingsStore
         ? await shelvedRulingsStore.listForWorkspaces(workspaces.map(w => w.urlKey))
         : [];
-      const rulings = collectUnansweredDecisions({ loops: merged, taskDecisions, shelvedRulings }, { now: new Date() });
+      // Additive FOURTH input (LIN-2444). Scoped to the same `workspaces` set
+      // as every other read here, never fleet-wide; a WITHDRAWN row is not a
+      // standing proposal (the human already pressed Keep) and is excluded
+      // here rather than in the store, which returns raw rows so exactly one
+      // place owns that predicate.
+      const suggestions = dismissalSuggestionsStore
+        ? await dismissalSuggestionsStore.listForWorkspaces(workspaces.map(w => w.urlKey))
+        : [];
+      const standingSuggestions = new Map();
+      for (const s of suggestions) {
+        if (!s.withdrawn && s.urlKey && s.decisionId) standingSuggestions.set(`${s.urlKey}::${s.decisionId}`, s);
+      }
+
+      const rulings = collectUnansweredDecisions({ loops: merged, taskDecisions, shelvedRulings }, { now: new Date() })
+        .map(row => {
+          // Keyed on (workspace, decisionId), not decisionId alone: a
+          // decision_id is agent-invented free text and is not globally
+          // unique, so the same string in two workspaces must not share one
+          // proposal — the same composite-key reasoning
+          // lib/shelved-rulings-store.js already records.
+          const key = `${row.anchor?.workspaceUrlKey || ''}::${row.decision?.decision_id || ''}`;
+          const suggestion = standingSuggestions.get(key) || null;
+          return {
+            ...row,
+            suggestedDismissal: suggestion
+              ? { reason: suggestion.reason, suggestedBy: suggestion.suggestedBy, suggestedAt: suggestion.suggestedAt }
+              : null
+          };
+        });
 
       keepalive.stop();
       keepalive.send(200, {
