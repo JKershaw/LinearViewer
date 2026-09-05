@@ -767,13 +767,26 @@ describe('TaskDecisionsStore basisHash (LIN-2241 tier 1)', () => {
     store = new TaskDecisionsStore({ collection });
   });
 
-  test('a supplied basisHash round-trips through recordScan and getStatus', async () => {
+  test('a supplied basisHash and basisVersion round-trip through recordScan and getStatus', async () => {
+    await store.recordScan({
+      urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A,
+      basisHash: 'basis-abc', basisVersion: 7, decision: sampleDecision()
+    });
+    const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
+    assert.equal(status.basisHash, 'basis-abc');
+    assert.equal(status.basisVersion, 7);
+  });
+
+  test('an omitted basisVersion persists as null, not 0', async () => {
+    // 0 would be a legal BASIS_VERSION; coercing "absent" into it would make
+    // an unversioned row look like a version-0 row and silently pass the
+    // comparability gate in lib/scan-fingerprint.js.
     await store.recordScan({
       urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A,
       basisHash: 'basis-abc', decision: sampleDecision()
     });
     const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
-    assert.equal(status.basisHash, 'basis-abc');
+    assert.equal(status.basisVersion, null);
   });
 
   test('an omitted basisHash persists as null — UNKNOWN, never a stand-in value', async () => {
@@ -794,6 +807,7 @@ describe('TaskDecisionsStore basisHash (LIN-2241 tier 1)', () => {
     });
     const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
     assert.equal(status.basisHash, null);
+    assert.equal(status.basisVersion, null);
   });
 
   test('basisHash surfaces on the bulk unanswered read the rulings feed uses', async () => {

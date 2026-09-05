@@ -45,7 +45,7 @@ import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
-import { scanBasisHashFromContext, basisChanged as computeBasisChanged } from '../lib/scan-fingerprint.js';
+import { scanBasisHashFromContext, basisChanged as computeBasisChanged, BASIS_VERSION } from '../lib/scan-fingerprint.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
@@ -2329,10 +2329,18 @@ ${goal}`
       // acceptance criterion 1 requires be free of that nuisance. A row can
       // therefore be `stale` with `basisChanged: false` — relabelled, same
       // question — and that combination is the point, not a contradiction.
-      // This path compares against LIVE context, so it is exact; the rulings
-      // feed's snapshot-derived comparison is the free approximation of it.
+      //
+      // This route is the ONE producer of the signal, and it is deliberately
+      // the live-content path: it already holds a fresh
+      // `fetchRecommendationContext`, so the comparison is exact and costs no
+      // call this handler was not already making. Both consumers — the
+      // per-task scan panel (public/scan.js, which already polls this route)
+      // and the rulings card (public/observation.js, on demand when the tab is
+      // open) — read it from here rather than re-deriving it, so there is no
+      // second, approximate implementation to drift.
       const basisChanged = computeBasisChanged({
         raisedBasisHash: cached.basisHash,
+        raisedBasisVersion: cached.basisVersion,
         currentBasisHash: scanBasisHashFromContext(context)
       });
       if (cached.inputHash !== inputHash) {
@@ -2502,6 +2510,7 @@ ${goal}`
         // ruling is raised FROM, so a later reader can tell whether that basis
         // has since moved without spending a model call.
         basisHash: scanBasisHashFromContext(context),
+        basisVersion: BASIS_VERSION,
         decision: scanResult.outcome === 'decision' ? scanResult.decision : null
       });
       if (!record) {

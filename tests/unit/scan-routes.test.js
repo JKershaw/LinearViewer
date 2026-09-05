@@ -365,3 +365,58 @@ describe('POST /workspace/:urlKey/api/scan/:issueId/dismiss', () => {
     assert.equal(result.body.error, 'Scan record not found');
   });
 });
+
+// ─── basisChanged on the scan status route (LIN-2241 tier 1) ────────────────
+//
+// This route is the ONE producer of the basis signal — it is the only place
+// that holds live task content, which is what makes the comparison exact. Both
+// consumers (the per-task scan panel and the Observation rulings card) read it
+// from here, so its contract is worth pinning at the HTTP boundary rather than
+// only at the pure-function level.
+describe('GET /workspace/:urlKey/api/scan/:issueId — basisChanged (LIN-2241)', () => {
+  test('a fresh row on unchanged content reports basisChanged: false', async () => {
+    await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.equal(got.status, 200);
+    assert.equal(got.body.status, 'fresh');
+    assert.equal(got.body.basisChanged, false, 'nothing moved between the POST and the GET');
+  });
+
+  test('a never-scanned task reports `missing` and carries no basisChanged claim', async () => {
+    const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.deepEqual(got.body, { status: 'missing' }, 'the missing shape stays exactly as it was');
+  });
+
+  test('a row stored without a basisHash reports basisChanged: null, never false', async () => {
+    // The legacy-row path: every ruling raised before this landed. Reporting
+    // `false` would assert a check that never happened.
+    const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    const doc = collection._docs.find(d => d._id === posted.body.id);
+    assert.ok(doc, 'the scan row was written');
+    delete doc.basisHash;
+    delete doc.basisVersion;
+
+    const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.equal(got.body.basisChanged, null);
+  });
+
+  test('a row whose stored basisVersion is not the current one reports null, not a change', async () => {
+    // The mass-false-positive guard, at the route boundary: bumping the
+    // projection must not flag every pending ruling at once.
+    const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    const doc = collection._docs.find(d => d._id === posted.body.id);
+    doc.basisVersion = 999;
+    doc.basisHash = 'a-hash-from-another-projection';
+
+    const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.equal(got.body.basisChanged, null);
+  });
+
+  test('POST records a basisHash and the current basisVersion together', async () => {
+    const { BASIS_VERSION } = await import('../../lib/scan-fingerprint.js');
+    const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    const doc = collection._docs.find(d => d._id === posted.body.id);
+    assert.ok(doc.basisHash, 'a basis digest is recorded at raise time');
+    assert.equal(doc.basisVersion, BASIS_VERSION, 'stored beside the hash that produced it');
+  });
+});

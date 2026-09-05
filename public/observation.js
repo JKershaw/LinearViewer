@@ -1446,6 +1446,84 @@ function renderRulings(rulings) {
   if (empty) empty.hidden = nodes.length > 0;
 }
 
+// ─── Basis-freshness check for a task-bound ruling (LIN-2241 tier 1) ────────
+//
+// `GET /workspace/:urlKey/api/scan/:issueId` re-derives the basis digest from
+// LIVE task content and compares it to the digest recorded when the ruling was
+// raised. That call costs a provider read, so it is bounded three ways:
+//
+//   1. Cached per task-decision row for the life of the page. The rulings feed
+//      repaints wholesale on every poll (see the banner at the top of this
+//      file), so without a cache a 5s poll would re-issue every check forever.
+//   2. Serialized through a small concurrency gate, so opening the tab on a
+//      long queue does not fan out one request per row at once.
+//   3. Never started unless the Rulings tab is the active view.
+//
+// It is advisory: any failure resolves to "no flag" and is swallowed. A ruling
+// must never fail to render, or lose its actions, because an optional hint
+// could not be computed.
+const basisCheckCache = new Map();   // taskDecisionId → true | false | null
+const basisCheckStarted = new Set(); // taskDecisionId → already queued or in flight
+const basisCheckQueue = [];
+let basisChecksInFlight = 0;
+const BASIS_CHECK_CONCURRENCY = 3;
+
+function pumpBasisChecks() {
+  while (basisChecksInFlight < BASIS_CHECK_CONCURRENCY && basisCheckQueue.length) {
+    const job = basisCheckQueue.shift();
+    basisChecksInFlight++;
+    job().catch(() => {}).finally(() => {
+      basisChecksInFlight--;
+      pumpBasisChecks();
+    });
+  }
+}
+
+function applyBasisResult(noteEl, verdict) {
+  // Strictly `=== true`. The verdict is TRI-state: `false` means checked and
+  // unmoved, `null` means it could not be answered (a ruling raised before
+  // this landed, or a digest from an earlier BASIS_VERSION). Both render as
+  // "no flag" — the note is an additive nudge, never a "we verified this is
+  // current" badge, so its absence claims nothing either way.
+  if (noteEl) noteEl.hidden = verdict !== true;
+}
+
+function requestBasisCheck(anchor, noteEl) {
+  const cacheKey = anchor.taskDecisionId;
+  if (basisCheckCache.has(cacheKey)) {
+    applyBasisResult(noteEl, basisCheckCache.get(cacheKey));
+    return;
+  }
+  // AT MOST ONE attempt per row per page load. The rulings feed repaints
+  // wholesale on every poll, so without this guard each repaint would enqueue
+  // another job for every row still awaiting an answer — the queue would grow
+  // faster than a 3-wide gate drains it, and a slow or failing route would turn
+  // an advisory hint into a self-inflicted request flood against the operator's
+  // own workspace. A failed attempt is deliberately NOT retried for the same
+  // reason: a hint that silently gives up is strictly better than one that
+  // hammers.
+  if (basisCheckStarted.has(cacheKey)) return;
+  if (currentView !== 'rulings') return;
+  basisCheckStarted.add(cacheKey);
+
+  basisCheckQueue.push(async () => {
+    // `:urlKey` is the RULING's own workspace, not the page's — the rulings
+    // feed is cross-workspace, the same reason dismiss/reply target the anchor.
+    const url = `/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}`;
+    try {
+      const data = await window.api(url, { on401: false });
+      const verdict = data && typeof data.basisChanged === 'boolean' ? data.basisChanged : null;
+      basisCheckCache.set(cacheKey, verdict);
+      applyBasisResult(noteEl, verdict);
+    } catch {
+      // Advisory only: record the attempt as unknown so the row settles rather
+      // than re-queueing on the next repaint.
+      basisCheckCache.set(cacheKey, null);
+    }
+  });
+  pumpBasisChecks();
+}
+
 // Card content per Principle 5 (docs/escalation-philosophy.md): what (the
 // decision's own question) / why (decisionCase, the same bounded excerpt the
 // feed card uses) / the decision stated as a decision (rendered by the
@@ -1544,18 +1622,23 @@ function renderRulingRow(row) {
 
   li.appendChild(composer);
 
-  // LIN-2241 tier 1: the ruling's basis has moved since it was raised — the
-  // task was edited, commented on, or changed state after the scan read it, so
-  // the question may no longer be the right question. Strictly `=== true`: the
-  // field is TRI-state and `null` means unknown (no recorded basis, or nothing
-  // newer than the scan observed), which must never render as either answer.
-  // This is a fact, not a judgement — no model call produced it — so it is
-  // phrased as an observation and changes nothing about the row's actions.
-  if (row.basisChanged === true) {
+  // LIN-2241 tier 1: has the content this ruling was raised FROM moved since?
+  // Only a task-bound (scan-produced) ruling has a recorded basis to compare;
+  // a loop-backed one was not raised from a task scan at all.
+  //
+  // The answer is fetched per row rather than served on the feed payload, and
+  // that is deliberate. The feed backs an ambient badge that polls every few
+  // seconds, so anything computed there is paid for continuously by every open
+  // tab. The one place a CURRENT basis exists is the scan status route, which
+  // already holds live task content — so the check runs there, on demand, only
+  // for the rows on screen, and only while the Rulings tab is actually open.
+  if (anchor && !anchor.loopId && anchor.taskDecisionId && anchor.issueId && anchor.workspaceUrlKey) {
     const staleNote = document.createElement('p');
     staleNote.className = 'obs-ruling-stale-note';
     staleNote.textContent = '↻ the task changed since this was raised — re-read before answering';
+    staleNote.hidden = true;
     li.appendChild(staleNote);
+    requestBasisCheck(anchor, staleNote);
   }
 
   // LIN-1727: a decision that has lapsed out of a prior shelve (its timer

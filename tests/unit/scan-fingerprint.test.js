@@ -6,17 +6,24 @@
  * the reason this digest exists at all rather than reusing `hashContext`
  * (which carries labels) or a digest of the scan's own rendered input (which
  * carries `updatedAt`, and therefore moves on all three).
+ *
+ * The second group pins the properties that make the signal SAFE rather than
+ * merely correct: order-independence (a provider re-ordering an unchanged
+ * comment set must not manufacture a flag) and version-gating (a future change
+ * to the projection must not mass-flag every pending ruling at once). Both are
+ * false-positive guards, and a false positive is this feature's expensive
+ * failure — an operator who is told "the task changed" when it did not stops
+ * believing the panel (docs/escalation-philosophy.md §4).
  */
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import {
   scanBasisHashFromContext,
-  scanBasisHashFromSnapshot,
   scanBasisFromContext,
-  basisChanged
+  basisChanged,
+  BASIS_VERSION
 } from '../../lib/scan-fingerprint.js';
-import { snapshotFromContext } from '../../lib/task-snapshot-store.js';
 import { hashContext } from '../../lib/recap-cache.js';
 
 /** A representative recommendation context. */
@@ -48,20 +55,17 @@ function makeContext(overrides = {}) {
 
 describe('scan basis fingerprint — acceptance criterion 1 (no nuisance signal)', () => {
   test('a priority-only change does NOT move the basis', () => {
-    const before = makeContext();
-    const after = makeContext({ issue: { priority: 4 } });
-    assert.strictEqual(scanBasisHashFromContext(after), scanBasisHashFromContext(before));
+    assert.strictEqual(
+      scanBasisHashFromContext(makeContext({ issue: { priority: 4 } })),
+      scanBasisHashFromContext(makeContext())
+    );
   });
 
   test('a label-only change does NOT move the basis — and this is where hashContext differs', () => {
     const before = makeContext();
     const after = makeContext({ issue: { labels: ['Improvement', 'Bug'] } });
 
-    assert.strictEqual(
-      scanBasisHashFromContext(after),
-      scanBasisHashFromContext(before),
-      'basis must ignore labels'
-    );
+    assert.strictEqual(scanBasisHashFromContext(after), scanBasisHashFromContext(before), 'basis must ignore labels');
     // The reason this module exists rather than reusing the digest already
     // stored on every scan row: `inputHash` DOES move on a label-only edit, so
     // it cannot be the scan-due signal criterion 1 describes.
@@ -73,104 +77,143 @@ describe('scan basis fingerprint — acceptance criterion 1 (no nuisance signal)
   });
 
   test('an assignee-only change does NOT move the basis', () => {
-    const before = makeContext();
-    const after = makeContext({ issue: { assignee: { id: 'u2', name: 'Someone Else' } } });
-    assert.strictEqual(scanBasisHashFromContext(after), scanBasisHashFromContext(before));
+    // Weaker than it looks, and deliberately kept: the projection is a
+    // whitelist, so this passes because `assignee` is simply never read. That
+    // IS the guarantee criterion 1 asks for, and the test fails the moment
+    // someone widens the projection to spread over the whole issue object.
+    assert.strictEqual(
+      scanBasisHashFromContext(makeContext({ issue: { assignee: { id: 'u2', name: 'Someone Else' } } })),
+      scanBasisHashFromContext(makeContext())
+    );
   });
 
   test('an updatedAt-only bump does NOT move the basis', () => {
     // The trap the ticket's own prescription walks into: `formatIssueContext`
     // renders `**Updated:**`, so a digest of the scan's literal input would
     // move here — on every priority/label/assignee edit, transitively.
+    assert.strictEqual(
+      scanBasisHashFromContext(makeContext({ issue: { updatedAt: '2026-09-05T12:00:00.000Z' } })),
+      scanBasisHashFromContext(makeContext())
+    );
+  });
+
+  test('a cycle-only change does NOT move the basis', () => {
     const before = makeContext();
-    const after = makeContext({ issue: { updatedAt: '2026-09-05T12:00:00.000Z' } });
+    const after = makeContext({ issue: { cycle: { id: 'cyc-9', number: 9 } }, rest: { cycle: { id: 'cyc-9', number: 9 } } });
     assert.strictEqual(scanBasisHashFromContext(after), scanBasisHashFromContext(before));
   });
 
-  test('a cycle- or project-only change does NOT move the basis', () => {
-    const before = makeContext();
-    const after = makeContext({ rest: { project: { id: 'pr1', name: 'Platform' } } });
-    assert.strictEqual(scanBasisHashFromContext(after), scanBasisHashFromContext(before));
+  test('a project-only change does NOT move the basis', () => {
+    assert.strictEqual(
+      scanBasisHashFromContext(makeContext({ rest: { project: { id: 'pr1', name: 'Platform' } } })),
+      scanBasisHashFromContext(makeContext())
+    );
   });
 });
 
 describe('scan basis fingerprint — the changes that DO count', () => {
+  const base = () => scanBasisHashFromContext(makeContext());
+
   test('a description edit moves the basis', () => {
-    const before = makeContext();
-    const after = makeContext({ issue: { description: 'Rewritten, and it now answers the question.' } });
-    assert.notStrictEqual(scanBasisHashFromContext(after), scanBasisHashFromContext(before));
+    assert.notStrictEqual(scanBasisHashFromContext(makeContext({ issue: { description: 'Rewritten, and it now answers the question.' } })), base());
   });
 
   test('a new comment moves the basis', () => {
-    const before = makeContext();
-    const after = makeContext({
+    assert.notStrictEqual(scanBasisHashFromContext(makeContext({
       comments: [
         { id: 'c1', body: 'First comment', createdAt: '2026-09-01T09:00:00.000Z' },
         { id: 'c2', body: 'John: use option B.', createdAt: '2026-09-05T09:00:00.000Z' }
       ]
-    });
-    assert.notStrictEqual(scanBasisHashFromContext(after), scanBasisHashFromContext(before));
+    })), base());
   });
 
   test('an edit to an existing comment body moves the basis', () => {
-    const before = makeContext();
-    const after = makeContext({ comments: [{ id: 'c1', body: 'Edited in place', createdAt: '2026-09-01T09:00:00.000Z' }] });
-    assert.notStrictEqual(scanBasisHashFromContext(after), scanBasisHashFromContext(before));
+    assert.notStrictEqual(scanBasisHashFromContext(makeContext({
+      comments: [{ id: 'c1', body: 'Edited in place', createdAt: '2026-09-01T09:00:00.000Z' }]
+    })), base());
+  });
+
+  test('a comment body change is caught even with NO comment id — the Linear shape', () => {
+    // lib/providers/linear/index.js:910-915 maps comments to {body, createdAt,
+    // user} with no `id` at all. An id-keyed digest would be blind to comment
+    // changes on the primary provider, so the basis keys on content.
+    const withComment = body => scanBasisHashFromContext(makeContext({
+      comments: [{ body, createdAt: '2026-09-01T09:00:00.000Z', user: { name: 'John' } }]
+    }));
+    assert.notStrictEqual(withComment('the original question'), withComment('John answered: option B'));
   });
 
   test("the task's own state moving counts — the mandate's 'the task has moved on'", () => {
-    const before = makeContext();
-    const after = makeContext({ issue: { state: { name: 'Done', type: 'completed' } } });
-    assert.notStrictEqual(scanBasisHashFromContext(after), scanBasisHashFromContext(before));
+    assert.notStrictEqual(scanBasisHashFromContext(makeContext({ issue: { state: { name: 'Done', type: 'completed' } } })), base());
   });
 
   test('a subtask changing state moves the basis', () => {
-    const before = makeContext();
-    const after = makeContext({
+    assert.notStrictEqual(scanBasisHashFromContext(makeContext({
       children: [{ id: 'k1', identifier: 'LIN-2242', title: 'Child', state: { name: 'Done', type: 'completed' }, labels: [] }]
-    });
-    assert.notStrictEqual(scanBasisHashFromContext(after), scanBasisHashFromContext(before));
+    })), base());
   });
 
   test('a state RENAME at the same type does not count (cosmetic, provider-side)', () => {
-    const before = makeContext();
-    const after = makeContext({ issue: { state: { name: 'Doing', type: 'started' } } });
-    assert.strictEqual(scanBasisHashFromContext(after), scanBasisHashFromContext(before));
+    assert.strictEqual(scanBasisHashFromContext(makeContext({ issue: { state: { name: 'Doing', type: 'started' } } })), base());
   });
 
   test('a subtask label change does not count, though hashContext carries child labels', () => {
-    const before = makeContext();
-    const after = makeContext({
+    assert.strictEqual(scanBasisHashFromContext(makeContext({
       children: [{ id: 'k1', identifier: 'LIN-2242', title: 'Child', state: { name: 'Todo', type: 'unstarted' }, labels: ['Bug'] }]
-    });
-    assert.strictEqual(scanBasisHashFromContext(after), scanBasisHashFromContext(before));
+    })), base());
+  });
+
+  test('there is no comment cap — a 501st comment still moves the basis', () => {
+    // Why this is NOT routed through lib/task-snapshot-store.js's
+    // snapshotFromContext: that projection slices to 500 comments, which would
+    // make "an agent answered the question in a comment" invisible on exactly
+    // the long-running tasks most likely to carry a pending ruling.
+    const many = n => Array.from({ length: n }, (_, i) => ({
+      id: `c${i}`, body: `comment ${i}`, createdAt: `2026-09-01T09:${String(i % 60).padStart(2, '0')}:00.000Z`
+    }));
+    assert.notStrictEqual(
+      scanBasisHashFromContext(makeContext({ comments: many(501) })),
+      scanBasisHashFromContext(makeContext({ comments: many(500) }))
+    );
   });
 });
 
-describe('scan basis fingerprint — agreement by construction', () => {
-  test('context-derived and snapshot-derived digests agree for the same task state', () => {
-    // The whole rulings-feed mechanism rests on this: the scan routes hash a
-    // live context, the feed hashes a stored snapshot, and the two must be the
-    // same number or every comparison is noise.
-    const context = makeContext();
+describe('scan basis fingerprint — false-positive guards', () => {
+  test('re-ordering an unchanged comment set does NOT move the basis', () => {
+    // Linear sorts comments by createdAt, but same-timestamp ties fall through
+    // to the GraphQL connection order, which lib/providers/linear/index.js
+    // notes at :942-945 Linear does not guarantee. Without canonical ordering,
+    // two fetches of an unchanged task could hash differently and invent a
+    // "the task changed" flag out of nothing.
+    const tied = '2026-09-01T09:00:00.000Z';
+    const a = [{ id: 'c1', body: 'first', createdAt: tied }, { id: 'c2', body: 'second', createdAt: tied }];
+    const b = [{ id: 'c2', body: 'second', createdAt: tied }, { id: 'c1', body: 'first', createdAt: tied }];
     assert.strictEqual(
-      scanBasisHashFromSnapshot(snapshotFromContext(context)),
-      scanBasisHashFromContext(context)
+      scanBasisHashFromContext(makeContext({ comments: a })),
+      scanBasisHashFromContext(makeContext({ comments: b }))
     );
   });
 
-  test('the projection is stable under key order', () => {
-    const a = scanBasisHashFromContext(makeContext());
-    const b = scanBasisHashFromContext(makeContext());
-    assert.strictEqual(a, b);
+  test('re-ordering an unchanged subtask set does NOT move the basis', () => {
+    const k = (identifier, type) => ({ identifier, state: { name: 'x', type } });
+    assert.strictEqual(
+      scanBasisHashFromContext(makeContext({ children: [k('LIN-1', 'started'), k('LIN-2', 'unstarted')] })),
+      scanBasisHashFromContext(makeContext({ children: [k('LIN-2', 'unstarted'), k('LIN-1', 'started')] }))
+    );
   });
 
-  test('the basis slice carries no excluded field', () => {
+  test('the digest is independent of key insertion order in the source object', () => {
+    const ordered = { issue: { title: 't', description: 'd', state: { type: 'started' } }, comments: [], children: [], parent: null };
+    const reordered = { children: [], parent: null, comments: [], issue: { state: { type: 'started' }, description: 'd', title: 't' } };
+    assert.strictEqual(scanBasisHashFromContext(reordered), scanBasisHashFromContext(ordered));
+  });
+
+  test('the basis slice carries no excluded field, and no excluded VALUE reaches the digest', () => {
     const basis = scanBasisFromContext(makeContext());
-    const serialized = JSON.stringify(basis);
     for (const excluded of ['labels', 'priority', 'assignee', 'updatedAt']) {
       assert.ok(!Object.prototype.hasOwnProperty.call(basis, excluded), `${excluded} must not be a basis field`);
     }
+    const serialized = JSON.stringify(basis);
     assert.ok(!serialized.includes('Improvement'), 'label values must not reach the digest input');
     assert.ok(!serialized.includes('2026-09-01T10:00:00.000Z'), 'updatedAt must not reach the digest input');
   });
@@ -179,19 +222,20 @@ describe('scan basis fingerprint — agreement by construction', () => {
     assert.strictEqual(scanBasisHashFromContext(null), scanBasisHashFromContext(undefined));
     assert.strictEqual(typeof scanBasisHashFromContext({}), 'string');
   });
+
+  test('the version is folded into the digest, so a bump cannot collide with old hashes', () => {
+    const basis = scanBasisFromContext(makeContext());
+    assert.strictEqual(basis.v, BASIS_VERSION);
+  });
 });
 
 describe('basisChanged — the tri-state', () => {
-  test('differing hashes with a strictly newer observation → true', () => {
-    assert.strictEqual(basisChanged({
-      raisedBasisHash: 'aaa', currentBasisHash: 'bbb', raisedAtMs: 1000, observedAtMs: 2000
-    }), true);
+  test('differing hashes at the same version → true', () => {
+    assert.strictEqual(basisChanged({ raisedBasisHash: 'aaa', raisedBasisVersion: BASIS_VERSION, currentBasisHash: 'bbb' }), true);
   });
 
-  test('agreeing hashes → false', () => {
-    assert.strictEqual(basisChanged({
-      raisedBasisHash: 'aaa', currentBasisHash: 'aaa', raisedAtMs: 1000, observedAtMs: 2000
-    }), false);
+  test('agreeing hashes at the same version → false', () => {
+    assert.strictEqual(basisChanged({ raisedBasisHash: 'aaa', raisedBasisVersion: BASIS_VERSION, currentBasisHash: 'aaa' }), false);
   });
 
   test('a row with no recorded basis is UNKNOWN, never "unchanged"', () => {
@@ -200,38 +244,31 @@ describe('basisChanged — the tri-state', () => {
     assert.strictEqual(basisChanged({ raisedBasisHash: null, currentBasisHash: 'bbb' }), null);
   });
 
-  test('no observation at all is UNKNOWN', () => {
+  test('no current hash is UNKNOWN', () => {
     assert.strictEqual(basisChanged({ raisedBasisHash: 'aaa', currentBasisHash: null }), null);
   });
 
-  test('an observation OLDER than the scan is UNKNOWN, not a change', () => {
-    // It describes content the scan already saw; comparing against it would
-    // manufacture a difference that never happened.
-    assert.strictEqual(basisChanged({
-      raisedBasisHash: 'aaa', currentBasisHash: 'bbb', raisedAtMs: 5000, observedAtMs: 1000
-    }), null);
+  test('a hash recorded under a DIFFERENT BASIS_VERSION is UNKNOWN, not changed', () => {
+    // The mass-false-positive guard. Without it, editing the projection would
+    // flag every pending ruling in the fleet at once — the single worst thing
+    // this signal can do, and it would look exactly like a real finding.
+    assert.strictEqual(
+      basisChanged({ raisedBasisHash: 'aaa', raisedBasisVersion: BASIS_VERSION + 1, currentBasisHash: 'bbb' }),
+      null
+    );
+    assert.strictEqual(
+      basisChanged({ raisedBasisHash: 'aaa', raisedBasisVersion: BASIS_VERSION + 1, currentBasisHash: 'aaa' }),
+      null
+    );
   });
 
-  test('an observation at the same instant as the scan is UNKNOWN', () => {
-    assert.strictEqual(basisChanged({
-      raisedBasisHash: 'aaa', currentBasisHash: 'bbb', raisedAtMs: 5000, observedAtMs: 5000
-    }), null);
-  });
-
-  test('an unusable timestamp on either side is UNKNOWN', () => {
-    assert.strictEqual(basisChanged({
-      raisedBasisHash: 'aaa', currentBasisHash: 'bbb', raisedAtMs: NaN, observedAtMs: 2000
-    }), null);
-    assert.strictEqual(basisChanged({
-      raisedBasisHash: 'aaa', currentBasisHash: 'bbb', raisedAtMs: 1000, observedAtMs: NaN
-    }), null);
-  });
-
-  test('with no timestamps supplied at all the comparison is exact (the live-context path)', () => {
-    // `GET /workspace/:urlKey/api/scan/:issueId` compares against content it
-    // just fetched, so there is no staleness window to guard.
+  test('an absent version is still compared — pre-version rows are not silently voided', () => {
+    // `basisVersion` was added alongside `basisHash`, so in practice they
+    // arrive together; a row carrying a hash but no version is treated as
+    // comparable rather than discarded, since discarding it would throw away
+    // a real answer to avoid a hypothetical one.
     assert.strictEqual(basisChanged({ raisedBasisHash: 'aaa', currentBasisHash: 'bbb' }), true);
-    assert.strictEqual(basisChanged({ raisedBasisHash: 'aaa', currentBasisHash: 'aaa' }), false);
+    assert.strictEqual(basisChanged({ raisedBasisHash: 'aaa', raisedBasisVersion: null, currentBasisHash: 'bbb' }), true);
   });
 
   test('called with nothing at all → unknown, never a throw', () => {

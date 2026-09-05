@@ -57,7 +57,6 @@ import {
   DEFAULT_RUN_SUMMARY_MODEL
 } from '../lib/run-summary.js';
 import { hashLoop } from '../lib/run-summary-cache.js';
-import { scanBasisHashFromSnapshot } from '../lib/scan-fingerprint.js';
 import {
   generateSessionSummary,
   parseSessionSummaryResponse,
@@ -500,15 +499,7 @@ export function createDashboardRoutes({
   // below. Default null → the shelving branch is simply skipped
   // (collectUnansweredDecisions defaults it to []), same degrade-gracefully
   // convention as taskDecisionsStore above.
-  shelvedRulingsStore = null,
-  // Task snapshots (LIN-598), the rulings feed's FOURTH input (LIN-2241 tier 1)
-  // — the only source of a task's CURRENT content that costs neither a provider
-  // call nor a model call, since capture is opportunistic at the proxy read
-  // seam (`routes/proxy.js`'s captureTaskSnapshot). Default null → the
-  // basis-comparison branch is skipped and every row reports
-  // `basisChanged: null` (unknown), same degrade-gracefully convention as the
-  // three stores above.
-  taskSnapshotStore = null
+  shelvedRulingsStore = null
 }) {
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
@@ -1407,49 +1398,6 @@ export function createDashboardRoutes({
 
   // ─── Filtered rulings feed (LIN-1728 Phase 2) ─────────────────────────────────
 
-  /**
-   * Freshest known content per task, for the rulings feed's basis comparison
-   * (LIN-2241 tier 1). One `latest` point-read per DISTINCT task carrying a
-   * pending ruling — deduped, because several rulings on one task must not
-   * multiply the reads.
-   *
-   * Failure is never fatal and never guessed at: a missing store, a missing
-   * snapshot, or a throwing read all resolve to no entry, which
-   * `collectUnansweredDecisions` reports as `basisChanged: null` (unknown)
-   * rather than as "unchanged". The rulings feed must not fail to render
-   * because an advisory flag could not be computed.
-   */
-  async function collectTaskBasis(taskDecisions) {
-    if (!taskSnapshotStore || !Array.isArray(taskDecisions) || taskDecisions.length === 0) return [];
-    const wanted = new Map();
-    for (const row of taskDecisions) {
-      if (!row?.urlKey || !row?.issueId || !row?.issueIdentifier) continue;
-      if (!row.basisHash) continue; // no recorded basis → nothing to compare against
-      wanted.set(`${row.urlKey}::${row.issueId}`, row);
-    }
-    const entries = [];
-    for (const row of wanted.values()) {
-      try {
-        const snap = await taskSnapshotStore.latest(row.urlKey, row.issueIdentifier);
-        if (!snap?.snapshot) continue;
-        // The snapshot store is keyed by HUMAN identifier; the decision row is
-        // keyed by canonical UUID. When the snapshot carries a canonicalId that
-        // disagrees, the identifier has been reused or re-pointed and the two
-        // rows are not the same task — decline rather than compare across tasks.
-        if (snap.canonicalId && snap.canonicalId !== row.issueId) continue;
-        entries.push({
-          urlKey: row.urlKey,
-          issueId: row.issueId,
-          basisHash: scanBasisHashFromSnapshot(snap.snapshot),
-          observedAt: snap.capturedAt
-        });
-      } catch {
-        // advisory only — see docstring
-      }
-    }
-    return entries;
-  }
-
   // One cached read backs both consumers (the ambient nav badge, Phase 3, and the
   // rulings tab, Phase 4) — same `sessionsFeedCache` instance as `/sessions`, just
   // a separate `rulings` view namespace so the two payload shapes never collide on
@@ -1481,15 +1429,7 @@ export function createDashboardRoutes({
       const shelvedRulings = shelvedRulingsStore
         ? await shelvedRulingsStore.listForWorkspaces(workspaces.map(w => w.urlKey))
         : [];
-      // Additive FOURTH input (LIN-2241 tier 1) — the freshest content Harbour
-      // already knows about for each task carrying a pending ruling. Scoped to
-      // the task-decision rows just read (never a workspace-wide snapshot
-      // sweep), so this is at most one point-read per PENDING ruling, and the
-      // unanswered set is small by design (Principle 0). No provider call and
-      // no model call: detecting a moved basis is a hash comparison, which is
-      // exactly why LIN-2241's supersession comment ships this tier first.
-      const taskBasis = await collectTaskBasis(taskDecisions);
-      const rulings = collectUnansweredDecisions({ loops: merged, taskDecisions, shelvedRulings, taskBasis }, { now: new Date() });
+      const rulings = collectUnansweredDecisions({ loops: merged, taskDecisions, shelvedRulings }, { now: new Date() });
 
       keepalive.stop();
       keepalive.send(200, {
