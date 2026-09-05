@@ -26,6 +26,7 @@ import { createProxyWriteRoutes } from './proxy-writes.js';
 import { createComputeRoutes } from './proxy-compute.js';
 import { createKickoffRoutes } from './proxy-kickoff.js';
 import { createDispatchRoutes } from './proxy-dispatch.js';
+import { createProxyFlightCompanionRoutes } from './proxy-flight-companion.js';
 import { BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../lib/rejected-credentials.js';
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
 import { graphqlErrorExtra, graphqlErrorDetail, declaredProviderDisplayName } from '../lib/proxy-graphql-errors.js';
@@ -458,7 +459,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined }) {
   const router = Router();
 
   /**
@@ -1537,6 +1538,19 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // Group I dispatch (LIN-679 Stage 6 / LIN-2540): extracted to
   // routes/proxy-dispatch.js, mounted at its original position.
   router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, refuseIfBudgetExhausted, refuseIfDuplicateDispatch, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, VALID_PROXY_DISPATCH_TARGETS, workspacePreferencesStore, workspaceUnavailable }));
+
+  // LIN-2620: the Flight Companion turn, over the proxy — a LIN-679 sub-router
+  // (routes/proxy-flight-companion.js) built on the extracted turn core
+  // (lib/flight-companion-turn.js, LIN-2631). `read` scope, like every
+  // compute route above — a proposal is not a write.
+  // `flightCompanionChatClient`/`flightCompanionCreateToolCatalog` are a
+  // TEST-ONLY seam, passed straight through as `chatClient`/
+  // `createToolCatalog` below: `undefined` in production (the default for
+  // both), which is byte-identical to omitting the key entirely — the sub-
+  // router's own real defaults still apply. Named distinctly from a bare
+  // `chatClient`/`createToolCatalog` at this composer's own top level so a
+  // future second sub-router needing the same seam cannot collide with it.
+  router.use(createProxyFlightCompanionRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, workspaceUnavailable, logEvent, getWorkspaceOpenRouterKey, resolveProxyLLM, chargeFreeTierOrReject, observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, chatClient: flightCompanionChatClient, createToolCatalog: flightCompanionCreateToolCatalog }));
 
   return router;
 }

@@ -792,6 +792,59 @@ With `?noRefresh=1` and no cache, `status` is `"missing"` (or `"stale"`) and the
 > and can exceed 25s; the server streams whitespace keepalive bytes inside a single
 > `200` response, so don't set a client timeout below ~60s for these endpoints.
 
+#### Flight Companion Turn
+
+```
+POST /api/proxy/flight-companion/turn
+```
+
+Drive one turn of the Flight Companion — the same companion the browser's chat page
+runs — from an agent. This closes the loop between what an agent proposes and what a
+human actually sees: an agent can check in on how it's performing and improve it. Read
+scope is sufficient (a proposal is never a write); billed to the **token creator's own**
+OpenRouter key, the same credential rule as recommend/recap/brief — never the caller's
+own bearer token.
+
+Body:
+```json
+{ "message": "optional user text", "history": [{ "role": "user", "content": "..." }], "stream": false }
+```
+
+Omitting `message` (or sending only whitespace) requests a **message-less, auto-wake
+check-in**: it runs the same census gate the browser's own silent tick does, but
+against its **own** reservation instance — it can never advance the browser's instance,
+so polling this endpoint can never consume a report a human has not seen yet.
+
+**Always propose mode**, regardless of `message`: a proxy caller is an agent, not a
+human, so a model-proposed follow-up (the `send_follow_up` tool) always comes back in
+the response's `proposals` array rather than being enqueued. A human still approves one
+over the session-authed page.
+
+Default response (no `stream`, or `stream: false`) — one JSON body once the turn
+completes:
+```json
+{
+  "turnKind": "user-initiated",
+  "spent": true,
+  "text": "...",
+  "tools": [{ "name": "get_comments", "arguments": {}, "phase": "result", "result": "..." }],
+  "proposals": [{ "proposed": true, "sessionId": "...", "prompt": "..." }],
+  "usage": { "prompt_tokens": 147, "completion_tokens": 33, "total_tokens": 180, "cost": 0.0004 },
+  "model": "openai/gpt-5.4-mini"
+}
+```
+`spent: false` means the gate or a quota refused before any model call — `text`/
+`tools`/`proposals` are empty, `usage`/`model` are `null`, and `reason` names why
+(`no-census`, `hash-identical`, `lost-race`, `free-tier`, `not-configured`, …).
+
+`stream: true` instead yields the same Server-Sent-Events frames the browser's own chat
+receives (`token`/`tool`/`done`/`error` event types; `call`/`result`/`error`/`proposed`/
+`cap` tool phases) rather than one aggregated body.
+
+Rate-limited independently of the general 60/min proxy limiter: **30 turns/hour per
+token**, **200 turns/day per workspace**. A 429 here means back off this endpoint
+specifically — it says nothing about the token's own health.
+
 #### Get Task History Snapshots
 
 ```
