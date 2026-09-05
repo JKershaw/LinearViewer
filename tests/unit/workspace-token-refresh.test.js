@@ -1161,9 +1161,11 @@ describe('refreshOwnerCredential (LIN-2097, Block H — freeze + non-live bounda
     assert.equal(successes.length, 1);
     assert.equal(successes[0].detail.via, 'byte-identical',
       'a no-op exchange must not assert a rotation that did not happen');
-    assert.notEqual(successes[0].detail.via, 'rotated');
   });
 
+  // The "only the label changed" guard is H1 above, which already pins the
+  // freeze and the unconditional refreshToken write for this exact scenario —
+  // restating it here would be a strict subset of a test 80 lines up.
   test('LIN-2329 [genuinely new bytes]: still records via: rotated — the label is narrowed, not replaced', async () => {
     // The control. Without it, the test above would pass on an implementation
     // that labelled EVERY success 'byte-identical', which is the same class of
@@ -1190,26 +1192,10 @@ describe('refreshOwnerCredential (LIN-2097, Block H — freeze + non-live bounda
 
     const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store, lifecycleEventStore });
 
-    assert.notEqual(result.expiresAt, undefined, 'sanity: this case does NOT freeze — it calculates a fresh expiry');
+    assert.ok(Number.isFinite(result.expiresAt), 'sanity: this case does NOT freeze — it calculates a fresh expiry');
     const successes = lifecycleEventStore.events.filter(e => e.kind === 'refresh_success');
     assert.equal(successes[0].detail.via, 'rotated',
       'the event must describe what the write actually did, not what the bytes alone suggest');
-  });
-
-  test('LIN-2329: only the LABEL changed — the freeze and the unconditional refreshToken write are untouched', async () => {
-    // Guard on the ticket's explicit "Not in scope": the freeze is LIN-2097's
-    // deliberate behaviour, re-confirmed by LIN-2327's research. This ticket
-    // changes what the event SAYS, never what the refresh DOES.
-    const lifecycleEventStore = capturingLifecycleStore();
-    const store = fakeStore({ 'account-A::acme::linear': { provider: 'linear', scope: 'org-1', token: 'access-SAME', refreshToken: 'R0', tokenExpiresAt: NOW + FAR_FUTURE_MS } });
-    const refreshAccessToken = async () => ({ access_token: 'access-SAME', refresh_token: 'R1-rotated', expires_in: 3600 });
-
-    const result = await refreshOwnerCredential({ ownerAccountId: 'account-A', urlKey: 'acme', refreshAccessToken, store, lifecycleEventStore });
-
-    assert.equal(result.expiresAt, NOW + FAR_FUTURE_MS, 'still frozen at the stored expiry');
-    const durable = await store.get('account-A', 'acme');
-    assert.equal(durable.refreshToken, 'R1-rotated', 'the rotated refreshToken is still persisted unconditionally');
-    assert.equal(durable.tokenExpiresAt, NOW + FAR_FUTURE_MS);
   });
 
   test('H2 [B1: freeze + already-past stored expiry -> refreshOwnerCredential returns the RAW frozen result, not null]: the liveness null-check no longer lives on this shared seam — it moved to doRefresh\'s headless call site (see Block J) so a non-live result never reaches the two human refresh entrants (server.js\'s ensureValidToken / handleTokenRefreshAndRetry), which call refreshOwnerCredential directly and would otherwise tear the workspace down on a plain null', async () => {
