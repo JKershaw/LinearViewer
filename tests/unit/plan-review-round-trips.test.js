@@ -43,6 +43,121 @@ function issue(id, { description = '', comments = [], rows = [] } = {}) {
   return { id, identifier: `LIN-${id}`, description, comments, rows };
 }
 
+// ─── T19 / T19b (LIN-2653): the pinned status readers ───────────────────────
+//
+// The fossil bookkeeping pass writes only a `bookkeeping` field and NEVER
+// touches `status`. That is the whole reason `status: 'expired'` was rejected
+// as the mechanism: `'expired'` sits in NO_ATTEMPT_STATUSES but not
+// IN_FLIGHT_STATUSES, so stamping it would have been a TWO-SIDED
+// reclassification (in-flight → no-attempt) in this instrument, silently
+// rewriting the measured population. A stamped row keeps `status: 'taken'`
+// and therefore stays right-censored exactly as before.
+//
+// T19  pins NO_ATTEMPT_STATUSES (:152) — a stamped row must not fall into it.
+// T19b pins IN_FLIGHT_STATUSES (:159, read at :346) — the twelfth reader.
+//
+// Note on reachability, stated rather than implied: `bookkeeping` is NOT on
+// the proxy wire this instrument reads from (both proxy dispatch surfaces
+// project it away), so a row carrying the field is not a shape production
+// produces today. These tests are the stronger claim anyway — even if the
+// field were present, the instrument's output is unchanged — and the
+// load-bearing half, that `status` stays `'taken'`, is exactly what the pass
+// guarantees.
+
+describe('T19/T19b — the LIN-1963 instrument is unchanged for a bookkeeping-stamped row (LIN-2653)', () => {
+  const STAMP = { at: '2026-08-05T00:00:00.000Z', by: 'operator-1', reason: 'fossil-pass-lin2633' };
+  const stamp = (r) => ({ ...r, bookkeeping: STAMP });
+
+  // The result ECHOES the input rows back (`R0.row`, `R0.nextRow`), so a raw
+  // deep-equal would trivially differ on the extra field itself rather than on
+  // anything the instrument derived. Strip the stamp from any echoed row and
+  // compare the rest: that is the real claim — every DERIVED value (verdict,
+  // tier, resolved, rightCensored, roundTrips, diagnostics, subWindows,
+  // lineageBleed) is byte-identical.
+  const stripEchoedStamps = (result) => JSON.parse(JSON.stringify(result, (key, value) => (
+    key === 'bookkeeping' ? undefined : value
+  )));
+
+  test('T19b: a stamped `taken` row stays RIGHT-CENSORED via IN_FLIGHT_STATUSES — the twelfth reader', () => {
+    const plain = issue('t19b', {
+      description: 'plan-review due: yes',
+      rows: [
+        row('r1', 'plan-review', 'taken', '2026-08-09T10:00:00.000Z', null),
+        row('r2', 'plan', 'queued', '2026-08-09T11:00:00.000Z', null)
+      ]
+    });
+    const stamped = { ...plain, rows: plain.rows.map(stamp) };
+
+    const before = computeIssueRoundTrips(plain, { asOf: ASOF });
+    const after = computeIssueRoundTrips(stamped, { asOf: ASOF });
+
+    assert.equal(before.R0.rightCensored, true, 'sanity: a `taken` plan-review row is right-censored');
+    assert.equal(after.R0.rightCensored, true, 'and a stamped one still is — status is untouched');
+    assert.equal(after.R0.row.status, 'taken', 'the pass never touches status');
+    assert.equal(after.R0.resolved, before.R0.resolved);
+    assert.equal(after.roundTrips, before.roundTrips);
+    assert.equal(after.gateHonoured, before.gateHonoured);
+    assert.deepStrictEqual(stripEchoedStamps(after), stripEchoedStamps(before),
+      'every derived value must be byte-identical — only the echoed input row differs');
+  });
+
+  test('T19: a stamped row does NOT fall into NO_ATTEMPT_STATUSES', () => {
+    // The rejected `status: 'expired'` draft would have landed here. Assert
+    // the contrast directly: a genuinely `expired` row IS a no-attempt, and a
+    // stamped `taken` row is NOT — so the stamp is not a backdoor into that set.
+    const expired = issue('t19-exp', {
+      description: 'plan-review due: yes',
+      rows: [row('r1', 'plan-review', 'expired', '2026-08-09T10:00:00.000Z', null)]
+    });
+    const expiredResult = computeIssueRoundTrips(expired, { asOf: ASOF });
+    // A NO_ATTEMPT row never becomes R0 at all: walkR0 records it as
+    // `noGenuineAttempt` and moves on, so R0 stays null. That is the sharper
+    // form of the contrast — the two outcomes are not merely different flags,
+    // they are different SHAPES.
+    assert.equal(expiredResult.R0, null, 'sanity: an expired row is a no-attempt — it never becomes R0');
+    assert.equal(expiredResult.diagnostics.noGenuineAttempt, 1, 'and it is counted as one');
+    assert.deepEqual(expiredResult.diagnostics.noGenuineAttemptRowIds, ['r1']);
+
+    const stampedTaken = issue('t19-stamped', {
+      description: 'plan-review due: yes',
+      rows: [stamp(row('r1', 'plan-review', 'taken', '2026-08-09T10:00:00.000Z', null))]
+    });
+    const stampedResult = computeIssueRoundTrips(stampedTaken, { asOf: ASOF });
+    assert.ok(stampedResult.R0, 'a stamped row DOES become R0 — it is a genuine attempt');
+    assert.equal(stampedResult.R0.rightCensored, true,
+      'and stays in-flight/right-censored, never reclassified as a no-attempt — the two-sided flip the expired draft would have caused');
+    assert.equal(stampedResult.diagnostics.noGenuineAttempt, 0, 'it is never counted as a no-attempt');
+  });
+
+  test('the instrument is blind to the stamp across a settled verdict too, not only the censored path', () => {
+    const rows = [
+      row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z'),
+      row('r2', 'plan', 'done', '2026-08-09T11:00:00.000Z', '2026-08-09T11:05:00.000Z')
+    ];
+    const comments = [comment('c1', '**Verdict: Request Changes** — see findings.', '2026-08-09T10:30:00.000Z')];
+
+    const plain = issue('t19-settled', { description: 'plan-review due: yes', comments, rows });
+    const stamped = issue('t19-settled', { description: 'plan-review due: yes', comments, rows: rows.map(stamp) });
+
+    const before = computeIssueRoundTrips(plain, { asOf: ASOF });
+    const after = computeIssueRoundTrips(stamped, { asOf: ASOF });
+
+    assert.equal(before.R0.verdict, 'request changes', 'sanity: the settled path really was exercised');
+    assert.deepStrictEqual(stripEchoedStamps(after), stripEchoedStamps(before),
+      'byte-identical on the settled path as well');
+  });
+
+  test('the two status sets are disjoint and neither contains anything the stamp introduces', () => {
+    const { NO_ATTEMPT_STATUSES, IN_FLIGHT_STATUSES } = __internal;
+    for (const s of IN_FLIGHT_STATUSES) {
+      assert.ok(!NO_ATTEMPT_STATUSES.has(s), `${s} must not be in both sets`);
+    }
+    assert.ok(IN_FLIGHT_STATUSES.has('taken'), 'a stamped row keeps status taken, so this membership is what keeps it censored');
+    assert.ok(NO_ATTEMPT_STATUSES.has('expired'), 'and expired is the value the rejected draft would have written');
+    assert.ok(!IN_FLIGHT_STATUSES.has('expired'), 'the two-sided flip: expired leaves in-flight AND enters no-attempt');
+  });
+});
+
 // ─── extractVerdict — the five measured surface forms (G1) ──────────────────
 
 describe('extractVerdict — surface forms', () => {

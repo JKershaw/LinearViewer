@@ -144,7 +144,17 @@ describe('observer-sweep: classification (LIN-2131)', () => {
       historyItem({ id: 'h-blocked-agentstatus', issueIdentifier: 'LIN-204' }),
       historyItem({ id: 'h-working', issueIdentifier: 'LIN-206', dispatchedAt: '2026-04-11T11:55:00.000Z' }),
       historyItem({ id: 'h-silent', issueIdentifier: 'LIN-207', dispatchedAt: '2026-04-11T10:00:00.000Z' }),
-      historyItem({ id: 'h-unknown', issueIdentifier: 'LIN-208' })
+      historyItem({ id: 'h-unknown', issueIdentifier: 'LIN-208' }),
+      // LIN-2653 (T13): a bookkeeping-stamped fossil, deliberately ALSO
+      // carrying a stale [blocked] marker — the shape half the target
+      // population has. It lands `resolved`, so it costs the exhaustiveness
+      // and sum-reconciliation assertions below nothing new: no eighth lane
+      // key, and `lanes.blocked` stays 2.
+      historyItem({
+        id: 'h-bookkept', issueIdentifier: 'LIN-209',
+        bookkeeping: { at: '2026-04-04T09:00:00.000Z', by: 'operator-1', reason: 'fossil pass' },
+        feedback: [{ message: '[blocked] stale, bookkeeping-stamped after', timestamp: '2026-04-11T11:10:00.000Z' }]
+      })
     ];
     const liveItems = [liveItem({ id: 'l-queued', issueIdentifier: 'LIN-205' })];
     const agentStatuses = [
@@ -152,7 +162,7 @@ describe('observer-sweep: classification (LIN-2131)', () => {
       agentStatusEntry({ dispatchId: 'h-unknown', taskIdentifier: 'LIN-208', status: 'completed', timestamp: '2026-04-11T11:02:00.000Z' })
     ];
     const loops = _buildLoops({ historyItems: histItems, liveItems, agentStatusEntries: agentStatuses, now: NOW, lean: true });
-    assert.strictEqual(loops.length, 8, 'sanity: one loop per fixture row');
+    assert.strictEqual(loops.length, 9, 'sanity: one loop per fixture row');
 
     const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
     const sum = Object.values(payload.lanes).reduce((a, b) => a + b, 0);
@@ -160,10 +170,10 @@ describe('observer-sweep: classification (LIN-2131)', () => {
     for (const key of LANE_KEYS) {
       assert.ok(payload.lanes[key] >= 1, `lane "${key}" must be represented in this deliberately mixed fixture`);
     }
-    assert.strictEqual(payload.lanes.blocked, 2, 'both blocked channels contributed one row each');
+    assert.strictEqual(payload.lanes.blocked, 2, 'both blocked channels contributed one row each — the stamped row does NOT make a third');
     assert.strictEqual(payload.lanes.queued, 1);
     assert.strictEqual(payload.lanes.terminal, 1);
-    assert.strictEqual(payload.lanes.resolved, 1);
+    assert.strictEqual(payload.lanes.resolved, 2, 'the operator-cancelled row and the bookkeeping-stamped fossil (LIN-2653) share this lane');
   });
 
   test('F2 — agent-status blocked with no [blocked] feedback marker lands blocked, not unknown (the row plan-review traced)', () => {
@@ -200,6 +210,94 @@ describe('observer-sweep: classification (LIN-2131)', () => {
     const superseded = computeSupersededLoopIds(loops);
     const lane = classifyLoop(loops[0], { superseded, now: NOW_MS, staleMs: STALE_MS });
     assert.strictEqual(lane, 'resolved', 'resolved must be checked before blocked — an operator close-out wins over a stale wake marker');
+  });
+
+  // ── LIN-2653: the fossil-bookkeeping branch (base case, T11, T12) ────────
+  //
+  // Fixture-driven through `_buildLoops` with a real stamp shape and real
+  // marker text, same discipline as the rest of this section. `bookkeeping`
+  // rides the Loop record's always-present scalar set
+  // (`lib/pipeline-loops.js:763`), so the `lean: true` read this sweep uses
+  // carries it — these tests would fail on a lean-conditional threading.
+  //
+  // Each test pairs the stamped row with an otherwise-IDENTICAL unstamped
+  // control, so a green assertion proves the stamp is what moved the lane
+  // rather than the fixture landing there anyway.
+  const BOOKKEEPING_STAMP = { at: '2026-04-04T09:00:00.000Z', by: 'operator-1', reason: 'fossil pass' };
+
+  test('LIN-2653 base case: a bookkeeping-stamped row that would otherwise read silent lands resolved', () => {
+    const stamped = historyItem({
+      id: 'h-bk-silent', issueIdentifier: 'LIN-310',
+      dispatchedAt: '2026-04-11T10:00:00.000Z', bookkeeping: BOOKKEEPING_STAMP
+    });
+    const control = historyItem({
+      id: 'h-bk-silent-control', issueIdentifier: 'LIN-311',
+      dispatchedAt: '2026-04-11T10:00:00.000Z'
+    });
+    const loops = _buildLoops({ historyItems: [stamped, control], now: NOW, lean: true });
+    const superseded = computeSupersededLoopIds(loops);
+    const laneOf = (id) => classifyLoop(loops.find((l) => l.loopId === id), { superseded, now: NOW_MS, staleMs: STALE_MS });
+
+    assert.deepStrictEqual(
+      loops.find((l) => l.loopId === 'h-bk-silent').bookkeeping, BOOKKEEPING_STAMP,
+      'sanity: the stamp survives the lean read onto the Loop record — without this the branch could never fire'
+    );
+    assert.strictEqual(laneOf('h-bk-silent-control'), 'silent', 'control: the identical UNSTAMPED row reads silent');
+    assert.strictEqual(laneOf('h-bk-silent'), 'resolved', 'the stamp alone moves a fossil out of the waiting lanes');
+  });
+
+  test('LIN-2653 T11 ordering: a bookkeeping-stamped row carrying a stale [blocked] marker lands resolved, not blocked', () => {
+    // The load-bearing direction: `blocked` is roughly half the target
+    // population, so a branch placed AFTER blocked would be unreachable for
+    // half the rows the fossil pass exists to retire — silently.
+    const stamped = historyItem({
+      id: 'h-bk-blocked', issueIdentifier: 'LIN-312', bookkeeping: BOOKKEEPING_STAMP,
+      feedback: [{ message: '[blocked] need a decision', timestamp: '2026-04-11T11:10:00.000Z' }]
+    });
+    const control = historyItem({
+      id: 'h-bk-blocked-control', issueIdentifier: 'LIN-313',
+      feedback: [{ message: '[blocked] need a decision', timestamp: '2026-04-11T11:10:00.000Z' }]
+    });
+    const loops = _buildLoops({ historyItems: [stamped, control], now: NOW, lean: true });
+    const superseded = computeSupersededLoopIds(loops);
+    const laneOf = (id) => classifyLoop(loops.find((l) => l.loopId === id), { superseded, now: NOW_MS, staleMs: STALE_MS });
+
+    assert.strictEqual(
+      loops.find((l) => l.loopId === 'h-bk-blocked').wakeMarker, 'blocked',
+      'sanity: the stamped row really does still carry the stale blocked marker — otherwise this test would pass for the wrong reason'
+    );
+    assert.strictEqual(laneOf('h-bk-blocked-control'), 'blocked', 'control: the identical UNSTAMPED row reads blocked');
+    assert.strictEqual(laneOf('h-bk-blocked'), 'resolved', 'the bookkeeping branch must be checked BEFORE blocked');
+  });
+
+  test('LIN-2653 T12 ordering: a bookkeeping-stamped row that also posted [done] lands terminal, not resolved', () => {
+    // The other bound: the branch sits AFTER the terminal check, so a row
+    // that genuinely finished still reports as finished rather than being
+    // relabelled by the operator's stamp.
+    const stamped = historyItem({
+      id: 'h-bk-done', issueIdentifier: 'LIN-314', bookkeeping: BOOKKEEPING_STAMP,
+      feedback: [{ message: '[done] shipped', timestamp: '2026-04-11T11:10:00.000Z' }]
+    });
+    const loops = _buildLoops({ historyItems: [stamped], now: NOW, lean: true });
+    const superseded = computeSupersededLoopIds(loops);
+
+    assert.strictEqual(loops[0].terminalStatus, 'done', 'sanity: the row really is terminal');
+    assert.deepStrictEqual(loops[0].bookkeeping, BOOKKEEPING_STAMP, 'sanity: and really is stamped — both signals are present at once');
+
+    const lane = classifyLoop(loops[0], { superseded, now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(lane, 'terminal', 'terminal must be checked before the bookkeeping branch');
+  });
+
+  test('LIN-2653 T13: the bookkeeping branch returns an EXISTING lane key — no eighth lane', () => {
+    const stamped = historyItem({
+      id: 'h-bk-lane', issueIdentifier: 'LIN-315',
+      dispatchedAt: '2026-04-11T10:00:00.000Z', bookkeeping: BOOKKEEPING_STAMP
+    });
+    const loops = _buildLoops({ historyItems: [stamped], now: NOW, lean: true });
+    const lane = classifyLoop(loops[0], { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS });
+
+    assert.ok(LANE_KEYS.includes(lane), 'a stamped row must classify into one of the 7 tallied lanes');
+    assert.strictEqual(lane, 'resolved', 'and specifically the existing resolved lane, not a new bookkeeping one');
   });
 
   test('blocked is never folded into terminal, and dead is never a reachable classification', () => {

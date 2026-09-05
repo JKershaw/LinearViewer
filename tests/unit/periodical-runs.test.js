@@ -109,6 +109,62 @@ function historyRow(over = {}) {
   };
 }
 
+// ── T18 (LIN-2653): the pinned reader `foldPeriodicalRuns` ──────────────────
+//
+// The fossil pass writes only `bookkeeping` and never touches `status`, so a
+// stamped history row must fold IDENTICALLY to the same row unstamped. The
+// fold counts a row as run evidence only when it is both `status: 'taken'` and
+// carries a terminal `done` marker (LIN-2385); the stamp changes neither, so a
+// stamped row must keep contributing exactly as before — the cadence clock must
+// not move just because an operator retired a different, unrelated row.
+
+describe('T18 — foldPeriodicalRuns is unchanged for a bookkeeping-stamped row (LIN-2653)', () => {
+  const STAMP = { at: '2026-07-15T00:00:00.000Z', by: 'operator-1', reason: 'fossil-pass-lin2633' };
+
+  test('a stamped evidence row folds byte-identically to its unstamped twin', () => {
+    const t = template({ id: 'documentation-review' });
+    // In-horizon on purpose: the fixture default (2026-07-01) is 33 days
+    // before NOW and would count as NO evidence, making a byte-identity
+    // assertion vacuously true over two empty folds.
+    const base = { periodicalId: 'documentation-review', repo: 'harbour', dispatchedAt: '2026-08-02T00:00:00.000Z' };
+
+    const before = foldPeriodicalRuns([t], { historyRows: [historyRow(base)] }, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+    const after = foldPeriodicalRuns([t], { historyRows: [historyRow({ ...base, bookkeeping: STAMP })] }, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+
+    assert.deepStrictEqual(after, before,
+      'the whole fold result must be byte-identical — runs, state, daysSince, lastDispatchedAt, repos');
+    assert.equal(after[0].runs, 1, 'sanity: the row really did count as evidence');
+    assert.equal(after[0].state, before[0].state);
+  });
+
+  test('a stamped row still counts as run evidence — the stamp does not silently retire the cadence clock', () => {
+    const t = template({ id: 'documentation-review' });
+    const stamped = historyRow({ periodicalId: 'documentation-review', dispatchedAt: '2026-08-02T00:00:00.000Z', bookkeeping: STAMP });
+
+    const [result] = foldPeriodicalRuns([t], { historyRows: [stamped] }, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+
+    assert.equal(result.runs, 1, 'a stamped row is still a run');
+    assert.equal(result.state, 'recent', 'and still resets the cadence clock');
+    assert.ok(result.lastDispatchedAt, 'and still carries its dispatch instant');
+  });
+
+  test('the fold is blind to the stamp across every state it can emit', () => {
+    const t = template({ id: 'documentation-review' });
+    // due (old evidence), recent (fresh evidence), never (no evidence at all).
+    const cases = [
+      ['recent', [historyRow({ periodicalId: 'documentation-review', dispatchedAt: '2026-08-02T00:00:00.000Z' })]],
+      ['due', [historyRow({ periodicalId: 'documentation-review', dispatchedAt: '2026-06-01T00:00:00.000Z' })]],
+      ['never', []]
+    ];
+    for (const [label, rows] of cases) {
+      const before = foldPeriodicalRuns([t], { historyRows: rows }, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+      const stampedRows = rows.map((r) => ({ ...r, bookkeeping: STAMP }));
+      const after = foldPeriodicalRuns([t], { historyRows: stampedRows }, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+      assert.deepStrictEqual(after, before, `fold must be identical for the ${label} case`);
+    }
+  });
+});
+
 // ── resolveCadenceMs ─────────────────────────────────────────────────────────
 
 describe('resolveCadenceMs', () => {
