@@ -220,13 +220,40 @@ describe('LIN-2550 — fetchAndPrepareProjects reports what it applied', () => {
     SERVER_SRC.indexOf('async function fetchAndPrepareProjects(') + 20000
   );
 
-  test('appliedAssigneeName is declared null and only ever assigned inside the matched branch', () => {
+  test('appliedAssigneeName is declared null and only ever assigned INSIDE the matched branch', () => {
     assert.match(SRC, /let appliedAssigneeName = null;/, 'expected the applied-filter accumulator to default to null (the degraded reading)');
-    const assignIdx = SRC.indexOf('appliedAssigneeName = assigneeName;');
-    assert.notEqual(assignIdx, -1, 'expected appliedAssigneeName to be set to the applied name');
-    const guardIdx = SRC.indexOf('if (matchedIds.size > 0) {');
-    assert.notEqual(guardIdx, -1);
-    assert.ok(assignIdx > guardIdx, 'appliedAssigneeName must be assigned INSIDE the matched branch — assigning it outside would re-assert an unapplied filter');
+
+    // Brace-matched, not index-compared. A plain "the assignment appears after
+    // the guard" check is defeatable by moving the statement one line down,
+    // past the branch's closing brace — which silently reintroduces the exact
+    // defect (every requested filter reported as applied). Slice the branch
+    // body by walking its braces and require the assignment to be within it.
+    const guardMarker = 'if (matchedIds.size > 0) {';
+    const guardIdx = SRC.indexOf(guardMarker);
+    assert.notEqual(guardIdx, -1, 'expected the matched-branch guard — if this fails the filter seam was reshaped and this harness needs re-anchoring');
+
+    let depth = 0;
+    let end = -1;
+    for (let i = guardIdx + guardMarker.length - 1; i < SRC.length; i++) {
+      if (SRC[i] === '{') depth++;
+      else if (SRC[i] === '}') {
+        depth--;
+        if (depth === 0) { end = i; break; }
+      }
+    }
+    assert.notEqual(end, -1, 'expected the matched branch to be brace-balanced');
+
+    const branchBody = SRC.slice(guardIdx + guardMarker.length, end);
+    assert.match(
+      branchBody,
+      /appliedAssigneeName = assigneeName;/,
+      'appliedAssigneeName must be assigned INSIDE the matched branch — assigning it outside reports every requested filter as applied, which is the defect'
+    );
+    assert.equal(
+      SRC.slice(0, guardIdx).includes('appliedAssigneeName = assigneeName'),
+      false,
+      'nothing may set appliedAssigneeName before the branch that actually applies the filter'
+    );
   });
 
   test('appliedAssigneeName is returned to the caller', () => {
