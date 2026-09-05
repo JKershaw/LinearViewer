@@ -38,22 +38,22 @@ describe('resolveDispatchDefaults — backward compatibility', () => {
 
   test('no defaults configured resolves both fields to null', async () => {
     const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', kind: 'implementation', store });
-    assert.deepEqual(resolved, { model: null, harness: null });
+    assert.deepEqual(resolved, { model: null, harness: null, effort: null });
   });
 
   test('resolves to null when urlKey is missing', async () => {
     const resolved = await resolveDispatchDefaults({ urlKey: null, kind: 'implementation', store });
-    assert.deepEqual(resolved, { model: null, harness: null });
+    assert.deepEqual(resolved, { model: null, harness: null, effort: null });
   });
 
   test('resolves to null when store is missing', async () => {
     const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', kind: 'implementation', store: null });
-    assert.deepEqual(resolved, { model: null, harness: null });
+    assert.deepEqual(resolved, { model: null, harness: null, effort: null });
   });
 
   test('resolves to null when kind is omitted and only workspace-wide defaults would apply to none', async () => {
     const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', store });
-    assert.deepEqual(resolved, { model: null, harness: null });
+    assert.deepEqual(resolved, { model: null, harness: null, effort: null });
   });
 });
 
@@ -66,7 +66,7 @@ describe('resolveDispatchDefaults — precedence', () => {
       dispatchDefaults: { model: 'anthropic/claude-opus-4.8', harness: 'opencode' }
     });
     const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', kind: 'implementation', store });
-    assert.deepEqual(resolved, { model: 'anthropic/claude-opus-4.8', harness: 'opencode' });
+    assert.deepEqual(resolved, { model: 'anthropic/claude-opus-4.8', harness: 'opencode', effort: null });
   });
 
   test('per-kind override beats workspace-wide default', async () => {
@@ -80,7 +80,7 @@ describe('resolveDispatchDefaults — precedence', () => {
       }
     });
     const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', kind: 'implementation', store });
-    assert.deepEqual(resolved, { model: 'anthropic/claude-sonnet-5', harness: 'claude-code' });
+    assert.deepEqual(resolved, { model: 'anthropic/claude-sonnet-5', harness: 'claude-code', effort: null });
   });
 
   test('a different kind with no override falls back to the workspace-wide default', async () => {
@@ -94,7 +94,7 @@ describe('resolveDispatchDefaults — precedence', () => {
       }
     });
     const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', kind: 'review', store });
-    assert.deepEqual(resolved, { model: 'anthropic/claude-opus-4.8', harness: 'opencode' });
+    assert.deepEqual(resolved, { model: 'anthropic/claude-opus-4.8', harness: 'opencode', effort: null });
   });
 
   test('model and harness resolve independently across per-kind and workspace-wide levels', async () => {
@@ -108,7 +108,7 @@ describe('resolveDispatchDefaults — precedence', () => {
       }
     });
     const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', kind: 'implementation', store });
-    assert.deepEqual(resolved, { model: 'anthropic/claude-opus-4.8', harness: 'claude-code' });
+    assert.deepEqual(resolved, { model: 'anthropic/claude-opus-4.8', harness: 'claude-code', effort: null });
   });
 
   test('autopilot per-kind override is honored (LIN-1278) — autopilot is a configurable dispatch-default type', async () => {
@@ -124,7 +124,7 @@ describe('resolveDispatchDefaults — precedence', () => {
     const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', kind: 'autopilot', store });
     // autopilot now reads its byKind override instead of falling through to the
     // workspace-wide default — DISPATCH_DEFAULT_KINDS includes it.
-    assert.deepEqual(resolved, { model: 'anthropic/claude-sonnet-5', harness: 'claude-code' });
+    assert.deepEqual(resolved, { model: 'anthropic/claude-sonnet-5', harness: 'claude-code', effort: null });
   });
 
   test('byKind is still scoped to DISPATCH_DEFAULT_KINDS — a pass-through kind (custom) ignores byKind', async () => {
@@ -142,7 +142,7 @@ describe('resolveDispatchDefaults — precedence', () => {
     });
     const resolved = await resolveDispatchDefaults({ urlKey: 'ws-1', kind: 'custom', store });
     // Falls through to the workspace-wide default, not the byKind.custom entry.
-    assert.deepEqual(resolved, { model: 'anthropic/claude-opus-4.8', harness: 'opencode' });
+    assert.deepEqual(resolved, { model: 'anthropic/claude-opus-4.8', harness: 'opencode', effort: null });
   });
 
   test('preserves other workspace preference keys (read-merge-write, shared with modelId/features)', async () => {

@@ -281,3 +281,95 @@ test('terminal is opaque — survives verbatim alongside model and harness', asy
   assert.equal(taken.harness, 'claude-code');
   assert.equal(taken.model, 'some-provider/some-model');
 });
+
+// `effort` (LIN-2615) is a fourth opaque execution field: the effort level for
+// the consumer/runner to pass to its own CLI (e.g. --effort). Same plumbing as
+// `terminal` — stored + forwarded blindly, null when absent, never
+// interpreted/registry-checked here (an out-of-set level is only warned about
+// at the validation layer, not at the store).
+const EFFORT = 'high';
+
+test('addItem persists effort on the stored doc', async () => {
+  const store = makeStore();
+
+  const doc = await store.addItem('acme', { prompt: 'run me', effort: EFFORT });
+
+  assert.equal(doc.effort, EFFORT);
+});
+
+test('addItem defaults effort to null (not undefined) when absent', async () => {
+  const store = makeStore();
+
+  const doc = await store.addItem('acme', { prompt: 'fresh task' });
+
+  assert.strictEqual(doc.effort, null);
+});
+
+test('addItem coerces a falsy/omitted effort to null', async () => {
+  const store = makeStore();
+
+  const doc = await store.addItem('acme', { prompt: 'fresh task', effort: '' });
+
+  assert.strictEqual(doc.effort, null);
+});
+
+test('the _formatItem seam (poll/listItems) exposes effort to the consumer', async () => {
+  const store = makeStore();
+  await store.addItem('acme', { prompt: 'run me', effort: EFFORT });
+
+  const items = await store.pollAvailable('acme');
+
+  assert.equal(items.length, 1);
+  assert.equal(items[0].effort, EFFORT);
+});
+
+test('takeItem (the other _formatItem path) hands effort to the consumer', async () => {
+  const store = makeStore();
+  const created = await store.addItem('acme', { prompt: 'run me', effort: EFFORT });
+
+  const taken = await store.takeItem(created._id, 'acme');
+
+  assert.equal(taken.effort, EFFORT);
+});
+
+test('effort is carried into history (watch status + history list)', async () => {
+  const store = makeStore();
+  const created = await store.addItem('acme', { prompt: 'run me', effort: EFFORT });
+
+  // takeItem archives the doc to history.
+  await store.takeItem(created._id, 'acme');
+
+  const status = await store.getItemStatus('acme', created._id);
+  assert.equal(status.effort, EFFORT);
+
+  const { items } = await store.listHistory('acme');
+  assert.equal(items.length, 1);
+  assert.equal(items[0].effort, EFFORT);
+});
+
+test('a dispatch with no effort reads effort:null at every seam', async () => {
+  const store = makeStore();
+  const created = await store.addItem('acme', { prompt: 'run me' });
+
+  const polled = await store.pollAvailable('acme');
+  assert.strictEqual(polled[0].effort, null);
+
+  const taken = await store.takeItem(created._id, 'acme');
+  assert.strictEqual(taken.effort, null);
+
+  const { items } = await store.listHistory('acme');
+  assert.strictEqual(items[0].effort, null);
+});
+
+test('effort is opaque — survives verbatim alongside model, harness and terminal', async () => {
+  const store = makeStore();
+  // The store must not parse, normalize, or registry-check the value; an
+  // out-of-set level is only warned about at the validation layer.
+  const created = await store.addItem('acme', { prompt: 'run me', effort: 'turbo', terminal: 'kitty', harness: 'claude-code', model: 'some-provider/some-model' });
+
+  const taken = await store.takeItem(created._id, 'acme');
+  assert.equal(taken.effort, 'turbo');
+  assert.equal(taken.terminal, 'kitty');
+  assert.equal(taken.harness, 'claude-code');
+  assert.equal(taken.model, 'some-provider/some-model');
+});

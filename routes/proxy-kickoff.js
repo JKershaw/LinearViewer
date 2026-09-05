@@ -116,7 +116,7 @@ export function createKickoffRoutes({
     }
 
     try {
-      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness, presetId, maxTasks } = req.body || {};
+      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness, effort, presetId, maxTasks } = req.body || {};
 
       // Validate caller-supplied inputs. (The composed body is server-generated
       // and trusted, so only these raw inputs are checked — same split as the
@@ -283,6 +283,7 @@ export function createKickoffRoutes({
         kind: 'autopilot',
         model,
         harness,
+        effort,
         finalizePrompt: async (resolvedHarness) => {
           if (appendProxyContext !== false) {
             // LIN-376: embed a fresh single-use bootstrap, never the caller's own

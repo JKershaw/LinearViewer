@@ -1009,7 +1009,7 @@ describe('pass-3 write tool — send_follow_up (LIN-1073)', () => {
       urlKey: URL_KEY,
       item: {
         prompt: 'ship it', followUpTo: 'sess-done', target: 'cli', force: true, dispatchedBy: 'user-42',
-        kind: 'custom', model: null, harness: null, terminal: null, presetConfig: null, presetName: null, bootstrapToken: null,
+        kind: 'custom', model: null, harness: null, terminal: null, effort: null, presetConfig: null, presetName: null, bootstrapToken: null,
       },
     });
   });

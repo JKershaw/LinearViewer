@@ -120,4 +120,31 @@ describe('LIN-1390 — watch echo honesty against a real store', () => {
     assert.strictEqual(watchWithout.body.terminal, null);
     assert.strictEqual(takenWithout.terminal, null);
   });
+
+  // LIN-2615: the opaque effort level rides the same two formatters, so the
+  // watch echo must agree with takeItem on it too — and read null, not
+  // undefined, when absent.
+  test('GET /api/proxy/dispatch/:id (watch) agrees with takeItem on effort', async () => {
+    const dispatchQueueStore = new DispatchQueueStore({
+      collection: createMockCollection(),
+      historyCollection: createMockCollection()
+    });
+    const app = buildApp({ dispatchQueueStore, dispatchPresetsStore: null });
+
+    const withEffort = await dispatchQueueStore.addItem('acme', { prompt: 'run me', effort: 'high' });
+    const without = await dispatchQueueStore.addItem('acme', { prompt: 'run me too' });
+
+    const watchWith = await call(app, 'get', `/api/proxy/dispatch/${withEffort._id}`);
+    assert.equal(watchWith.status, 200, JSON.stringify(watchWith.body));
+    const watchWithout = await call(app, 'get', `/api/proxy/dispatch/${without._id}`);
+    assert.equal(watchWithout.status, 200, JSON.stringify(watchWithout.body));
+
+    const takenWith = await dispatchQueueStore.takeItem(withEffort._id, 'acme');
+    const takenWithout = await dispatchQueueStore.takeItem(without._id, 'acme');
+
+    assert.equal(watchWith.body.effort, takenWith.effort);
+    assert.equal(watchWith.body.effort, 'high');
+    assert.strictEqual(watchWithout.body.effort, null);
+    assert.strictEqual(takenWithout.effort, null);
+  });
 });

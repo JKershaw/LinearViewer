@@ -514,7 +514,7 @@ describe('createDispatchItem — field passthrough', () => {
     assert.deepEqual(store.captured.item, {
       promptName: 'Triage', issueIdentifier: 'LIN-9', target: 'cli',
       dispatchedBy: 'u1', force: true, waitForFollowUps: true,
-      prompt: 'x', kind: 'triage', model: null, harness: 'claude-code', terminal: null, bootstrapToken: null,
+      prompt: 'x', kind: 'triage', model: null, harness: 'claude-code', terminal: null, effort: null, bootstrapToken: null,
       presetConfig: null, presetName: null,
     });
     assert.equal(store.captured.urlKey, 'acme');
