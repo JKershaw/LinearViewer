@@ -336,19 +336,66 @@ test.describe('boundDecisionOptions — LIN-2195: the option run carries a budge
     assert.equal(overflow, 0);
   });
 
-  test('the joined run never exceeds the budget', () => {
-    // The acceptance property, mirroring excerptDecisionCase's own: whatever
-    // the input, what actually renders is bounded. This is what stops the card
-    // growth LIN-2184 traded clipping for.
-    for (const count of [3, 5, 12, 40]) {
-      const options = Array.from({ length: count }, (_, i) => ({ label: label(i % 10, 12) }));
-      const { labels } = boundDecisionOptions(options, DECISION_OPTIONS_CHARS);
-      const rendered = labels.join(' / ');
-      assert.ok(
-        rendered.length <= DECISION_OPTIONS_CHARS,
-        `run of ${count} rendered ${rendered.length} chars, over the ${DECISION_OPTIONS_CHARS} budget`
-      );
+  test('the RENDERED run — labels plus the "+N more" suffix — never exceeds the budget', () => {
+    // The acceptance property. Three things this deliberately does that the
+    // first version of it did not, each of which was hiding a real defect:
+    //   - it measures what RENDERS, including the `+N more` suffix the caller
+    //     appends. Measuring only `labels.join(' / ')` cannot see the suffix
+    //     overrun at all (measured at +12 chars, 15%, before the fix).
+    //   - label lengths VARY. The first version built every label with
+    //     String(n).repeat(12), so every label was exactly 12 chars and the
+    //     count=12 and count=40 cases were byte-identical — one non-trivial
+    //     case wearing four hats.
+    //   - it includes lengths that straddle the boundary, which is what kills
+    //     the `>` vs `>=` mutant.
+    const lengths = [1, 2, 3, 7, 11, 12, 19, 26, 37, 38, 39, 40, 41, 79, 80, 81, 200];
+    for (const count of [1, 2, 3, 5, 12, 40, 400]) {
+      for (const len of lengths) {
+        const options = Array.from({ length: count }, (_, i) => ({ label: `${String.fromCharCode(97 + (i % 26))}`.repeat(len) }));
+        const { labels, overflow } = boundDecisionOptions(options, DECISION_OPTIONS_CHARS);
+        const rendered = labels.join(' / ') + (overflow > 0 ? ` +${overflow} more` : '');
+        assert.ok(
+          rendered.length <= DECISION_OPTIONS_CHARS,
+          `count=${count} len=${len}: rendered ${rendered.length} chars, over the ${DECISION_OPTIONS_CHARS} budget — ${JSON.stringify(rendered)}`
+        );
+      }
     }
+  });
+
+  test('the boundary is exact — a run that exactly fills the budget keeps every label', () => {
+    // Kills the `>` -> `>=` mutant, which the original suite could not see.
+    // Two labels plus ' / ' land exactly on the budget once the (absent)
+    // suffix reservation is accounted for.
+    const { labels, overflow } = boundDecisionOptions(
+      [{ label: 'a'.repeat(30) }, { label: 'b'.repeat(30) }], 63
+    );
+    assert.equal(labels.length, 2, '30 + 3 + 30 = 63 exactly fills a 63-char budget');
+    assert.equal(overflow, 0);
+  });
+
+  test('one char more than the budget drops the second label', () => {
+    const { labels, overflow } = boundDecisionOptions(
+      [{ label: 'a'.repeat(30) }, { label: 'b'.repeat(31) }], 63
+    );
+    assert.equal(labels.length, 1);
+    assert.equal(overflow, 1);
+  });
+
+  test('a truncated label stays INSIDE the budget, ellipsis included', () => {
+    const { labels } = boundDecisionOptions([{ label: 'x'.repeat(500) }], DECISION_OPTIONS_CHARS);
+    assert.ok(
+      labels[0].length <= DECISION_OPTIONS_CHARS,
+      `truncated to ${labels[0].length}, over the ${DECISION_OPTIONS_CHARS} budget`
+    );
+    assert.ok(labels[0].endsWith('…'));
+  });
+
+  test('truncation never splits a surrogate pair', () => {
+    // A lone high surrogate paints as U+FFFD. Emoji in an option label are not
+    // exotic, and visible garbage undermines the run's only job.
+    const { labels } = boundDecisionOptions([{ label: '👍'.repeat(200) }], DECISION_OPTIONS_CHARS);
+    assert.ok(!/[\uD800-\uDBFF]$/.test(labels[0].replace(/…$/, '')), 'no dangling high surrogate');
+    assert.ok(!labels[0].includes('\uFFFD'));
   });
 
   test("the reviewer's measured case — 5 options — is bounded and reports the remainder", () => {
@@ -382,12 +429,12 @@ test.describe('boundDecisionOptions — LIN-2195: the option run carries a budge
     const { labels, overflow } = boundDecisionOptions([{ label: 'x'.repeat(200) }], DECISION_OPTIONS_CHARS);
     assert.equal(labels.length, 1);
     assert.ok(labels[0].endsWith('…'));
-    assert.ok(labels[0].length <= DECISION_OPTIONS_CHARS + 1, 'budget plus the ellipsis');
+    assert.ok(labels[0].length <= DECISION_OPTIONS_CHARS, 'the ellipsis comes out of the budget, not on top of it');
     assert.equal(overflow, 0);
   });
 
   test('no options, a non-array, and blank labels all yield an empty run', () => {
-    for (const input of [[], null, undefined, 'nonsense', [{}], [{ label: '' }]]) {
+    for (const input of [[], null, undefined, 'nonsense', [{}], [{ label: '' }], [{ label: {} }], [{ label: true }], [{ label: ['a', 'b'] }]]) {
       const { labels, overflow } = boundDecisionOptions(input, DECISION_OPTIONS_CHARS);
       assert.deepEqual(here(labels), []);
       assert.equal(overflow, 0);

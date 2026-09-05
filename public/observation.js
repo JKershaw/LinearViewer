@@ -365,25 +365,56 @@ function excerptDecisionCase(decisionCase, maxChars) {
  */
 function boundDecisionOptions(options, maxChars) {
   const all = (Array.isArray(options) ? options : [])
-    .map(o => (o && typeof o.label === 'string' ? o.label : String(o?.label ?? '')))
+    .map(o => (o && typeof o.label === 'string' ? o.label : ''))
     .filter(label => label.length > 0);
   if (all.length === 0) return { labels: [], overflow: 0 };
 
-  const labels = [];
-  let used = 0;
-  for (const label of all) {
-    // ' / ' between entries, so the budget covers what is actually rendered.
-    const cost = label.length + (labels.length ? 3 : 0);
-    if (labels.length && used + cost > maxChars) break;
-    if (!labels.length && cost > maxChars) {
-      labels.push(`${label.slice(0, maxChars).trimEnd()}…`);
-      used = maxChars;
-      break;
+  // Greedy fill against a budget: whole labels in order, ' / ' between them.
+  function fill(budget) {
+    const labels = [];
+    let used = 0;
+    for (const label of all) {
+      const cost = label.length + (labels.length ? 3 : 0);
+      if (labels.length && used + cost > budget) break;
+      if (!labels.length && cost > budget) {
+        // Nothing to fall back to. `Array.from` rather than `slice` so a
+        // truncation never splits a UTF-16 surrogate pair and paints a lone
+        // half as U+FFFD — emoji in an option label are not exotic. One
+        // character is left for the ellipsis so the result stays INSIDE the
+        // budget rather than at budget + 1.
+        labels.push(`${Array.from(label).slice(0, Math.max(1, budget - 1)).join('').trimEnd()}…`);
+        used = budget;
+        break;
+      }
+      labels.push(label);
+      used += cost;
     }
-    labels.push(label);
-    used += cost;
+    return { labels, overflow: all.length - labels.length };
   }
-  return { labels, overflow: all.length - labels.length };
+
+  // The `+N more` suffix is part of what RENDERS, so it has to come out of the
+  // same budget — otherwise the constant bounds this function's return value
+  // rather than the card, and the run overruns by the suffix's own width
+  // (measured at +12 chars, 15%, before this).
+  //
+  // But a run that FITS has no suffix, so reserving up front would shorten
+  // every run to pay for a suffix most never render. Instead: fill, and only
+  // if something overflowed, re-fill with the suffix reserved. Dropping labels
+  // can only raise the overflow count, which can only widen the suffix, so
+  // this is iterated to a fixed point — it converges in one or two passes
+  // because the width grows logarithmically in the count.
+  const renderedLength = ({ labels, overflow }) =>
+    labels.join(' / ').length + (overflow > 0 ? ` +${overflow} more`.length : 0);
+
+  let result = fill(maxChars);
+  // Converge on the RENDERED length, not on the label count: a re-fill can keep
+  // the same number of labels while truncating one of them, which is a real
+  // change the count cannot see.
+  for (let pass = 0; pass < 5; pass++) {
+    if (renderedLength(result) <= maxChars) break;
+    result = fill(Math.max(1, maxChars - ` +${result.overflow} more`.length));
+  }
+  return result;
 }
 
 /**

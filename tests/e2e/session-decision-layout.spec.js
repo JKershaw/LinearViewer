@@ -288,6 +288,22 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
     await expect(optionsRun).not.toHaveText('');
     await optionsRun.scrollIntoViewIfNeeded();
 
+    // LIN-2195: the ticket's ACTUAL acceptance criterion — "the glance surface
+    // should stay glanceable at 360px" — measured rather than asserted in
+    // prose. The clip check below proves the run is CONTAINED; containment was
+    // already true before this ticket and stayed true while the card grew to 7
+    // line boxes, so it cannot witness the growth. This does.
+    //
+    // The bound is on the option run's own line boxes, not the whole card, so
+    // it is not coupled to the excerpt's or the status line's own wrapping.
+    const optionRunLines = await optionsRun.evaluate(el => el.getClientRects().length);
+    expect(optionRunLines).toBeLessThanOrEqual(2);
+
+    // ...and the run must actually be doing its job — bounded, but not empty,
+    // and reporting the remainder rather than silently dropping it. The
+    // fixture's 5 options exceed the budget, so a "+N more" marker is expected.
+    await expect(optionsRun).toContainText('more');
+
     const cardBox = await card.boundingBox();
     const result = await optionsRun.evaluate(el => {
       const rects = el.getClientRects();
