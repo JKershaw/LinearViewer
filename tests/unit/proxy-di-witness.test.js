@@ -128,7 +128,7 @@ describe('Half A: diffMountAgainstFactory (fixture-based)', () => {
 // ---------------------------------------------------------------------------
 // Half A — integration test against the real repo. Corpus + deps are
 // filesystem-derived, never hand-listed (LIN-2557 records that exact failure
-// for a sibling census) — this test's 5/39 expectations are the CURRENT
+// for a sibling census) — this test's 6/70 expectations are the CURRENT
 // measured shape (see the ticket's corpus table), not a hard-coded list fed
 // into the parser itself.
 // ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ describe('Half A: mount-completeness census against the real repo', () => {
       // extraInMount is the LIN-2541 dead-dep class — computed and reported
       // here, but deciding what a nonempty result should DO (fail? warn?) is
       // explicitly LIN-2541's scope. Asserted empty because that is what is
-      // true at HEAD today (39/39 declared deps are mounted, none extra); a
+      // true at HEAD today (70/70 declared deps are mounted, none extra); a
       // future nonempty result is LIN-2541's to triage, not this test's to
       // silently accommodate.
       assert.deepEqual(
@@ -160,18 +160,18 @@ describe('Half A: mount-completeness census against the real repo', () => {
     }
   });
 
-  // A separate, coarser sanity pin: the corpus is exactly 5 files / 39
+  // A separate, coarser sanity pin: the corpus is exactly 6 files / 70
   // declared deps today. Unlike the test above, THIS one is not blind to a
   // signature+mount drop (removing a dep from a factory's signature shrinks
   // `required`, which this total catches) — that's a different, unrelated
   // invariant catching it, not evidence Half A's own missing/extra detectors
   // saw the gap; keeping the two in separate tests keeps that distinction
   // legible in the mutation-validation record.
-  test('the corpus is exactly 5 proxy sub-router files totalling 39 declared deps', () => {
+  test('the corpus is exactly 6 proxy sub-router files totalling 70 declared deps', () => {
     const rows = censusMountCompleteness({ routesDir: 'routes', proxySourcePath: 'routes/proxy.js' });
-    assert.equal(rows.length, 5, `expected 5 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
+    assert.equal(rows.length, 6, `expected 6 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
     const totalDeps = rows.reduce((sum, row) => sum + row.required.length, 0);
-    assert.equal(totalDeps, 39, `expected 39 total required deps across the 5 factories, found ${totalDeps}`);
+    assert.equal(totalDeps, 70, `expected 70 total required deps across the 6 factories, found ${totalDeps}`);
   });
 });
 
