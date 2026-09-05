@@ -133,6 +133,22 @@ describe('scan basis fingerprint — the changes that DO count', () => {
     })), base());
   });
 
+  test('a comment TIMESTAMP change moves the basis', () => {
+    // The docstring justifies keying on (createdAt, body, id); without this,
+    // dropping createdAt from the projection passes the whole suite.
+    const at = ts => scanBasisHashFromContext(makeContext({
+      comments: [{ id: 'c1', body: 'same body', createdAt: ts }]
+    }));
+    assert.notStrictEqual(at('2026-09-01T09:00:00.000Z'), at('2026-09-02T09:00:00.000Z'));
+  });
+
+  test('a Date-valued createdAt hashes the same as its ISO string — no timezone exposure', () => {
+    const iso = '2026-09-01T09:00:00.000Z';
+    const asString = scanBasisHashFromContext(makeContext({ comments: [{ id: 'c1', body: 'b', createdAt: iso }] }));
+    const asDate = scanBasisHashFromContext(makeContext({ comments: [{ id: 'c1', body: 'b', createdAt: new Date(iso) }] }));
+    assert.strictEqual(asDate, asString);
+  });
+
   test('a comment body change is caught even with NO comment id — the Linear shape', () => {
     // lib/providers/linear/index.js:910-915 maps comments to {body, createdAt,
     // user} with no `id` at all. An id-keyed digest would be blind to comment
@@ -191,6 +207,24 @@ describe('scan basis fingerprint — false-positive guards', () => {
     assert.strictEqual(
       scanBasisHashFromContext(makeContext({ comments: a })),
       scanBasisHashFromContext(makeContext({ comments: b }))
+    );
+  });
+
+  test('reorder-independence holds on the NO-ID Linear shape too', () => {
+    // The guard exists BECAUSE Linear emits comments without ids. Testing it
+    // only with ids present lets an id-only sort key pass, which on Linear
+    // makes every key '' and defeats the canonicalization entirely.
+    const tied = '2026-09-01T09:00:00.000Z';
+    const a = [{ body: 'first', createdAt: tied }, { body: 'second', createdAt: tied }];
+    const b = [{ body: 'second', createdAt: tied }, { body: 'first', createdAt: tied }];
+    assert.strictEqual(
+      scanBasisHashFromContext(makeContext({ comments: a })),
+      scanBasisHashFromContext(makeContext({ comments: b }))
+    );
+    // ...and still distinguishes a genuinely different set at the same instant.
+    assert.notStrictEqual(
+      scanBasisHashFromContext(makeContext({ comments: a })),
+      scanBasisHashFromContext(makeContext({ comments: [{ body: 'first', createdAt: tied }, { body: 'third', createdAt: tied }] }))
     );
   });
 
@@ -262,13 +296,16 @@ describe('basisChanged — the tri-state', () => {
     );
   });
 
-  test('an absent version is still compared — pre-version rows are not silently voided', () => {
-    // `basisVersion` was added alongside `basisHash`, so in practice they
-    // arrive together; a row carrying a hash but no version is treated as
-    // comparable rather than discarded, since discarding it would throw away
-    // a real answer to avoid a hypothetical one.
-    assert.strictEqual(basisChanged({ raisedBasisHash: 'aaa', currentBasisHash: 'bbb' }), true);
-    assert.strictEqual(basisChanged({ raisedBasisHash: 'aaa', raisedBasisVersion: null, currentBasisHash: 'bbb' }), true);
+  test('an ABSENT version is UNKNOWN too — there is no legitimate version-less row', () => {
+    // The only writer stores hash and version together (recordScan), so a row
+    // with a hash but no version cannot have come from this projection. The
+    // rows that COULD take a lenient branch are ones written by some earlier,
+    // different projection — every one of which compares as a guaranteed
+    // mismatch, i.e. exactly the fleet-wide false positive the gate exists to
+    // prevent, re-entering through the one door left open.
+    assert.strictEqual(basisChanged({ raisedBasisHash: 'aaa', currentBasisHash: 'bbb' }), null);
+    assert.strictEqual(basisChanged({ raisedBasisHash: 'aaa', raisedBasisVersion: null, currentBasisHash: 'bbb' }), null);
+    assert.strictEqual(basisChanged({ raisedBasisHash: 'aaa', raisedBasisVersion: undefined, currentBasisHash: 'aaa' }), null);
   });
 
   test('called with nothing at all → unknown, never a throw', () => {

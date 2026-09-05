@@ -778,9 +778,10 @@ describe('TaskDecisionsStore basisHash (LIN-2241 tier 1)', () => {
   });
 
   test('an omitted basisVersion persists as null, not 0', async () => {
-    // 0 would be a legal BASIS_VERSION; coercing "absent" into it would make
-    // an unversioned row look like a version-0 row and silently pass the
-    // comparability gate in lib/scan-fingerprint.js.
+    // 0 would be a legal BASIS_VERSION, so coercing "absent" into it would
+    // make an unversioned row claim a version it never had. `null` is refused
+    // by the comparability gate in lib/scan-fingerprint.js exactly as an
+    // unrecognised version is; 0 would not be.
     await store.recordScan({
       urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A,
       basisHash: 'basis-abc', decision: sampleDecision()

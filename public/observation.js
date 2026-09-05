@@ -1455,6 +1455,13 @@ function renderRulings(rulings) {
 //   1. Cached per task-decision row for the life of the page. The rulings feed
 //      repaints wholesale on every poll (see the banner at the top of this
 //      file), so without a cache a 5s poll would re-issue every check forever.
+//      Stated plainly, because it is a real limit and not only an optimisation:
+//      this also FREEZES the answer. A task edited after its row resolved to
+//      `false` will not flag until the page is reloaded. The alternative — a
+//      TTL — buys a fresher flag with sustained provider reads on an ambient
+//      panel meant to be left open, which is the cost this whole design moved
+//      off the polling path to avoid. A stale-but-cheap advisory beats a live
+//      one that bills the operator continuously; a reload is the refresh.
 //   2. Serialized through a small concurrency gate, so opening the tab on a
 //      long queue does not fan out one request per row at once.
 //   3. Never started unless the Rulings tab is the active view.
@@ -1467,6 +1474,15 @@ const basisCheckStarted = new Set(); // taskDecisionId → already queued or in 
 const basisCheckQueue = [];
 let basisChecksInFlight = 0;
 const BASIS_CHECK_CONCURRENCY = 3;
+// A ceiling on TOTAL checks per page load, not just on parallelism. The route
+// each check calls fetches live task context, so N rulings on screen is N
+// provider reads — and the unanswered set is the population that provably
+// accumulates (lib/task-decisions-store.js exempts unanswered rows from
+// pruning, with no TTL). Past this many, rows simply go unflagged: the flag is
+// an advisory nudge, and no nudge is a better failure than a queue that spends
+// the operator's rate limit on their own behalf.
+const BASIS_CHECK_MAX_PER_PAGE = 40;
+let basisChecksStartedCount = 0;
 
 function pumpBasisChecks() {
   while (basisChecksInFlight < BASIS_CHECK_CONCURRENCY && basisCheckQueue.length) {
@@ -1504,7 +1520,9 @@ function requestBasisCheck(anchor, noteEl) {
   // hammers.
   if (basisCheckStarted.has(cacheKey)) return;
   if (currentView !== 'rulings') return;
+  if (basisChecksStartedCount >= BASIS_CHECK_MAX_PER_PAGE) return;
   basisCheckStarted.add(cacheKey);
+  basisChecksStartedCount++;
 
   basisCheckQueue.push(async () => {
     // `:urlKey` is the RULING's own workspace, not the page's — the rulings
@@ -2194,5 +2212,9 @@ if (typeof module !== 'undefined' && module.exports) {
     // LIN-2244: expose the parked-wait seam (same lean-feed reasoning) for
     // unit testing.
     sessionParkedWait,
+    // LIN-2241 tier 1: expose the basis-check seam — the request-volume guards
+    // (one attempt per row, the concurrency gate, the per-page ceiling) and the
+    // strict `=== true` render are the parts most likely to regress silently.
+    requestBasisCheck, applyBasisResult, basisCheckCache, basisCheckStarted, BASIS_CHECK_MAX_PER_PAGE,
   };
 }

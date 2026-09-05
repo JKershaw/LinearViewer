@@ -2270,7 +2270,11 @@ ${goal}`
    * `missing` means this task has never been scanned.
    *
    * @route GET /workspace/:urlKey/api/scan/:issueId
-   * @returns {Object} { status: 'fresh'|'stale'|'missing', decision?, outcome?, outcomeAt?, scannedAt?, id?, issueId? } —
+   * @returns {Object} { status: 'fresh'|'stale'|'missing', decision?, outcome?, outcomeAt?, scannedAt?, id?, issueId?, basisChanged? } —
+   *   `basisChanged` (LIN-2241) rides on the `fresh` and `stale` shapes only,
+   *   never on `missing`: tri-state, `true`/`false`/`null`, where `null` means
+   *   the question could not be answered (no recorded basis, or one from a
+   *   different BASIS_VERSION) and must never be read as `false`.
    *   `stale` carries the same decision fields as `fresh` (LIN-2211): the row is still a live,
    *   answerable/dismissable ruling, only the content hash has moved, so a caller must not treat
    *   `stale` as a bare `{status, scannedAt}` shape.
