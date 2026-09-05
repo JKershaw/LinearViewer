@@ -903,3 +903,122 @@ describe('LIN-1890 — deriveJiraUrlKey', () => {
     assert.match(key, /^[a-z0-9-]{1,50}$/);
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// LIN-2340 — and the ticket's premise does NOT survive contact with HEAD.
+//
+// It reports that the OAuth add-source `establishAccount` 409 leaks a pending
+// rotating refresh token. It cannot: `jiraPending.refreshToken` has exactly one
+// writer in routes/jira-auth.js, gated on `mode === 'new' && sites.length > 1`,
+// and that exit is reached only when `mode !== 'new'` (the `new` arm returns
+// into completeJiraNewLogin first). On the single-site add-source path the token
+// is a function ARGUMENT and never touches the session at all. The gate has been
+// there since LIN-1890 introduced the mechanism, so the leak was never live.
+//
+// Two things follow, and both are worth testing:
+//
+//   1. The INVARIANT that makes it unreachable was itself unpinned. The module
+//      comment asserts "jiraPending carries NO rotating credential on the
+//      add-source path" and nothing checked it. Relax that gate and LIN-2340's
+//      leak becomes real. Pinned below.
+//   2. The exit now drops unconditionally anyway — defence in depth, and
+//      symmetry with its three siblings — so it is correct by construction
+//      rather than by a gate three hundred lines away. Witnessed below by
+//      seeding a token the way a relaxed gate would.
+// ---------------------------------------------------------------------------
+
+describe('LIN-2340 — the add-source path never parks a rotating refresh token', () => {
+  test('multi-site add-source: the pick is pending, and jiraPending carries NO refresh token', async () => {
+    // The ticket's own premise, tested directly. TWO_SITES so the pick is a
+    // separate round-trip — the exact shape in which `mode: 'new'` DOES park a
+    // token, which is what makes the add-source contrast meaningful.
+    const session = withLinearSession();
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores: makeAccountStores(), fetches: stubs(TWO_SITES) });
+
+    await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme-linear' });
+    const pending = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(pending.status, 200, 'the pick is genuinely still ahead');
+    assert.ok(session.jiraPending, 'and pending state exists to carry it');
+    assert.equal(session.jiraPending.refreshToken, undefined, 'but the ROTATING token is not in it — this is what makes LIN-2340 unreachable');
+    assert.equal(JSON.stringify(session).includes('atlassian-refresh-ROTATING'), false, 'and it is nowhere else in the session either');
+  });
+
+  test('contrast: the SAME shape under mode=new DOES park it — so the gate, not luck, is what protects add-source', async () => {
+    const session = makeSession({});
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores: makeAccountStores(), fetches: stubs(TWO_SITES) });
+
+    await request(app, { path: '/auth/jira/oauth?mode=new' });
+    await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(session.jiraPending.refreshToken, 'atlassian-refresh-ROTATING',
+      'mode:new parks it — the add-source assertion above is a real difference, not an artefact of the fixture');
+  });
+});
+
+describe('LIN-2340 — the add-source 409 exit drops a carried token regardless', () => {
+  // Each test SEEDS `jiraPending.refreshToken` before the pick, standing in for
+  // a future change that relaxes the `mode === 'new'` gate. That is the only
+  // way to witness this exit's own behaviour, since nothing reaches it with a
+  // token today — and it is precisely the regression the drop protects against.
+  const seedCarriedToken = (session) => { session.jiraPending.refreshToken = 'atlassian-refresh-ROTATING' };
+
+  test('unknown-account 409: a carried token is dropped, and the stale accountId still cleared', async () => {
+    const linearWs = { id: 'ws-1', urlKey: 'acme-linear', provider: 'linear', accessToken: 'linear-access', bindings: [{ provider: 'linear', scope: 'org-1', credentials: { token: 'linear-access' } }] };
+    const session = makeSession({
+      accountId: 'acct-DELETED',
+      identityAuthenticatedAt: Date.now(),
+      workspaces: [linearWs],
+      activeWorkspaceId: 'ws-1',
+    });
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores: makeUnknownAccountStores(), fetches: stubs(TWO_SITES) });
+
+    await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme-linear' });
+    await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+    seedCarriedToken(session);
+
+    const picked = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-2' } });
+
+    assert.equal(picked.status, 409);
+    assert.match(picked.text, /Account Conflict/);
+    assert.equal(session.jiraPending?.refreshToken, undefined, 'the carried token is dropped');
+    assert.equal(JSON.stringify(session).includes('atlassian-refresh-ROTATING'), false, 'and nothing else kept a copy');
+    assert.equal(session.accountId, undefined, 'LIN-2300 behaviour on this exit is unchanged');
+  });
+
+  test('MERGEABLE conflict 409: the token is dropped HERE TOO, while session.accountId is preserved', async () => {
+    // The branch LIN-2300's conditional clear deliberately skips. Both
+    // properties are asserted together because they pull opposite ways on one
+    // exit: dropping the accountId, or keeping the token, would each be wrong.
+    const session = withLinearSession();
+    const stores = makeAccountStores();
+    stores.accountStore.findAccountByIdentity = async () => ({ _id: 'acct-B' });
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores, fetches: stubs(TWO_SITES) });
+
+    await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme-linear' });
+    await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+    seedCarriedToken(session);
+
+    const picked = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-2' } });
+
+    assert.equal(picked.status, 409);
+    assert.equal(session.jiraPending?.refreshToken, undefined, 'dropped on the mergeable branch too — token residue is not the accountId class');
+    assert.equal(session.accountId, 'acct-1', 'and session.accountId is STILL preserved — LIN-2300 F1 untouched');
+  });
+
+  test('the successful add-source pick is unchanged — it already cleared jiraPending wholesale', async () => {
+    const session = withLinearSession();
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores: makeAccountStores(), fetches: stubs(TWO_SITES) });
+
+    await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme-linear' });
+    await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+    seedCarriedToken(session);
+
+    const picked = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-2' } });
+
+    assert.equal(picked.status, 302, 'the pick succeeds');
+    assert.equal(session.jiraPending, undefined, 'pending state cleared wholesale on success');
+    assert.equal(JSON.stringify(session).includes('atlassian-refresh-ROTATING'), false);
+  });
+});
