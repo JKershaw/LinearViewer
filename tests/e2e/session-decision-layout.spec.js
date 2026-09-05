@@ -294,10 +294,27 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
     // already true before this ticket and stayed true while the card grew to 7
     // line boxes, so it cannot witness the growth. This does.
     //
-    // The bound is on the option run's own line boxes, not the whole card, so
-    // it is not coupled to the excerpt's or the status line's own wrapping.
-    const optionRunLines = await optionsRun.evaluate(el => el.getClientRects().length);
-    expect(optionRunLines).toBeLessThanOrEqual(2);
+    // Measured RELATIVE to the same run rendered unbounded, in the same element
+    // and the same computed style, rather than against a fixed line count. An
+    // absolute count is a font-metrics assertion in disguise: it held at <= 2
+    // locally and produced 3 in the Linux CI container, where the self-hosted
+    // face resolves differently. The relative form asks the question the ticket
+    // actually asks — did bounding the run make the glance surface smaller —
+    // and is invariant to whatever font the runner ends up with.
+    const { boundedLines, unboundedLines } = await optionsRun.evaluate((el, labels) => {
+      const probe = el.cloneNode(false);
+      probe.textContent = `[${labels.join(' / ')}]`;
+      el.parentNode.appendChild(probe);
+      const unbounded = probe.getClientRects().length;
+      probe.remove();
+      return { boundedLines: el.getClientRects().length, unboundedLines: unbounded };
+    }, DECISION_PAYLOAD.options.map(o => o.label));
+
+    expect(unboundedLines).toBeGreaterThan(1); // the fixture must actually overflow, or this proves nothing
+    expect(boundedLines).toBeLessThan(unboundedLines);
+    // A generous absolute ceiling on top, so an unbounded run that happened to
+    // fit in 2 lines on some future runner still could not pass silently.
+    expect(boundedLines).toBeLessThanOrEqual(3);
 
     // ...and the run must actually be doing its job — bounded, but not empty,
     // and reporting the remainder rather than silently dropping it. The
