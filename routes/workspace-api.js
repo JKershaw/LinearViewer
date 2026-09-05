@@ -45,6 +45,7 @@ import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
+import { scanBasisHashFromContext, basisChanged as computeBasisChanged, BASIS_VERSION } from '../lib/scan-fingerprint.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
@@ -2269,7 +2270,11 @@ ${goal}`
    * `missing` means this task has never been scanned.
    *
    * @route GET /workspace/:urlKey/api/scan/:issueId
-   * @returns {Object} { status: 'fresh'|'stale'|'missing', decision?, outcome?, outcomeAt?, scannedAt?, id?, issueId? } —
+   * @returns {Object} { status: 'fresh'|'stale'|'missing', decision?, outcome?, outcomeAt?, scannedAt?, id?, issueId?, basisChanged? } —
+   *   `basisChanged` (LIN-2241) rides on the `fresh` and `stale` shapes only,
+   *   never on `missing`: tri-state, `true`/`false`/`null`, where `null` means
+   *   the question could not be answered (no recorded basis, or one from a
+   *   different BASIS_VERSION) and must never be read as `false`.
    *   `stale` carries the same decision fields as `fresh` (LIN-2211): the row is still a live,
    *   answerable/dismissable ruling, only the content hash has moved, so a caller must not treat
    *   `stale` as a bare `{status, scannedAt}` shape.
@@ -2319,6 +2324,29 @@ ${goal}`
       if (!cached) {
         return res.json({ status: 'missing' });
       }
+      // LIN-2241 tier 1: `status` and `basisChanged` answer DIFFERENT questions
+      // and are deliberately both reported rather than collapsed. `status:
+      // 'stale'` means the stored row is not for this exact content — it moves
+      // on a label edit, because `inputHash`/`hashContext` carries labels
+      // (lib/recap-cache.js:54). `basisChanged: true` means the content the
+      // ruling's judgement actually rests on has moved, which is the signal
+      // acceptance criterion 1 requires be free of that nuisance. A row can
+      // therefore be `stale` with `basisChanged: false` — relabelled, same
+      // question — and that combination is the point, not a contradiction.
+      //
+      // This route is the ONE producer of the signal, and it is deliberately
+      // the live-content path: it already holds a fresh
+      // `fetchRecommendationContext`, so the comparison is exact and costs no
+      // call this handler was not already making. Both consumers — the
+      // per-task scan panel (public/scan.js, which already polls this route)
+      // and the rulings card (public/observation.js, on demand when the tab is
+      // open) — read it from here rather than re-deriving it, so there is no
+      // second, approximate implementation to drift.
+      const basisChanged = computeBasisChanged({
+        raisedBasisHash: cached.basisHash,
+        raisedBasisVersion: cached.basisVersion,
+        currentBasisHash: scanBasisHashFromContext(context)
+      });
       if (cached.inputHash !== inputHash) {
         return res.json({
           status: 'stale',
@@ -2327,7 +2355,8 @@ ${goal}`
           decision: cached.decision,
           scannedAt: cached.scannedAt,
           outcome: cached.outcome,
-          outcomeAt: cached.outcomeAt
+          outcomeAt: cached.outcomeAt,
+          basisChanged
         });
       }
       return res.json({
@@ -2337,7 +2366,8 @@ ${goal}`
         decision: cached.decision,
         scannedAt: cached.scannedAt,
         outcome: cached.outcome,
-        outcomeAt: cached.outcomeAt
+        outcomeAt: cached.outcomeAt,
+        basisChanged
       });
     } catch (error) {
       console.error('Scan GET error:', error);
@@ -2478,6 +2508,13 @@ ${goal}`
         issueId: canonicalId,
         issueIdentifier: context.issue?.identifier || issueId,
         inputHash,
+        // LIN-2241 tier 1. A SECOND, narrower digest — `inputHash` stays the
+        // row's identity (buildId → `_id`, and lib/scan.js's decision_id), so
+        // it is never narrowed in place; this one records the content the
+        // ruling is raised FROM, so a later reader can tell whether that basis
+        // has since moved without spending a model call.
+        basisHash: scanBasisHashFromContext(context),
+        basisVersion: BASIS_VERSION,
         decision: scanResult.outcome === 'decision' ? scanResult.decision : null
       });
       if (!record) {

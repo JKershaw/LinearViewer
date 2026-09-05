@@ -139,15 +139,38 @@
     return `${header('scan · blocker found', meta, rescanBtn)}${renderDecisionBody(data.decision, { interactive: true })}`;
   }
 
+  // LIN-2241 tier 1. `status: 'stale'` is derived from `inputHash`
+  // (`hashContext`), which carries LABELS — on the issue and on every child
+  // (lib/recap-cache.js:54, :64) — so a label-only edit reports "content has
+  // changed" and invites a rescan that costs an LLM call and cannot possibly
+  // find a different answer. `basisChanged: false` says precisely that: the
+  // content the scan's judgement rests on did NOT move, only fields it never
+  // reads did. Saying so is the whole point of acceptance criterion 1.
+  //
+  // Strictly `=== false`. The field is TRI-state and `null` means unknown (a
+  // row raised before this landed, or one whose stored digest came from an
+  // earlier BASIS_VERSION); unknown must fall through to the original,
+  // non-committal copy rather than claim a check that never happened.
+  function staleReasonNote(data, tail) {
+    if (data && data.basisChanged === false) {
+      return `<div class="scan-placeholder" data-testid="scan-stale-metadata-only">Only fields this scan does not read (labels, priority, assignee) have changed. ${tail}</div>`;
+    }
+    return `<div class="scan-placeholder">Task content has changed since the last scan. ${tail}</div>`;
+  }
+
   function renderStale(data) {
     const ts = data && data.scannedAt ? relativeTime(data.scannedAt) : '';
     const meta = ts ? `last ${ts}` : '';
     const rescanBtn = actionButton('rescan', '↻ rescan');
-    const staleNote = '<div class="scan-placeholder">Task content has changed since the last scan. Rescan to check for further blockers.</div>';
+    const staleNote = staleReasonNote(data, data && data.basisChanged === false
+      ? 'The ruling below still stands — a rescan is unlikely to tell you anything new.'
+      : 'Rescan to check for further blockers.');
 
     if (!data || !data.decision) {
       return `${header('scan · out of date', meta, rescanBtn)}
-        <div class="scan-placeholder">Task content has changed since the last scan. Rescan to check for blockers.</div>`;
+        ${staleReasonNote(data, data && data.basisChanged === false
+          ? 'A rescan is unlikely to tell you anything new.'
+          : 'Rescan to check for blockers.')}`;
     }
 
     if (data.outcome === 'dismissed' || data.outcome === 'answered') {

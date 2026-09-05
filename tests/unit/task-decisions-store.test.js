@@ -759,3 +759,75 @@ describe('TaskDecisionsStore.listResolvedForWorkspaces (LIN-1736)', () => {
     assert.deepEqual(await unconfigured.listResolvedForWorkspaces(['ws-a'], 0), []);
   });
 });
+
+describe('TaskDecisionsStore basisHash (LIN-2241 tier 1)', () => {
+  let collection, store;
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  test('a supplied basisHash and basisVersion round-trip through recordScan and getStatus', async () => {
+    await store.recordScan({
+      urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A,
+      basisHash: 'basis-abc', basisVersion: 7, decision: sampleDecision()
+    });
+    const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
+    assert.equal(status.basisHash, 'basis-abc');
+    assert.equal(status.basisVersion, 7);
+  });
+
+  test('an omitted basisVersion persists as null, not 0', async () => {
+    // 0 would be a legal BASIS_VERSION, so coercing "absent" into it would
+    // make an unversioned row claim a version it never had. `null` is refused
+    // by the comparability gate in lib/scan-fingerprint.js exactly as an
+    // unrecognised version is; 0 would not be.
+    await store.recordScan({
+      urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A,
+      basisHash: 'basis-abc', decision: sampleDecision()
+    });
+    const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
+    assert.equal(status.basisVersion, null);
+  });
+
+  test('an omitted basisHash persists as null — UNKNOWN, never a stand-in value', async () => {
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
+    assert.equal(status.basisHash, null);
+  });
+
+  test('a legacy row with no basisHash field at all reads as null, not undefined', async () => {
+    // The real migration case: rows written before this field existed. The
+    // rulings feed reads the tri-state strictly, so `undefined` leaking out
+    // here would be a contract break.
+    collection._docs.push({
+      _id: TaskDecisionsStore.buildId(ISSUE_ID, HASH_A),
+      urlKey: 'ws-a', issueId: ISSUE_ID, issueIdentifier: 'LIN-1',
+      inputHash: HASH_A, decision: sampleDecision(), scannedAt: new Date(), seq: 0,
+      outcome: null, outcomeAt: null
+    });
+    const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
+    assert.equal(status.basisHash, null);
+    assert.equal(status.basisVersion, null);
+  });
+
+  test('basisHash surfaces on the bulk unanswered read the rulings feed uses', async () => {
+    await store.recordScan({
+      urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A,
+      basisHash: 'basis-abc', decision: sampleDecision()
+    });
+    const rows = await store.listUnansweredForWorkspaces(['ws-a']);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].basisHash, 'basis-abc');
+  });
+
+  test('the row _id still derives from inputHash alone — basisHash never touches identity', async () => {
+    // Identity is load-bearing: buildId feeds both the document `_id` and, via
+    // lib/scan.js, the decision's own decision_id. Two scans of the same
+    // content must collide on one row even if the basis digest differs.
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, basisHash: 'basis-1', decision: sampleDecision() });
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, basisHash: 'basis-2', decision: sampleDecision() });
+    assert.equal(collection._docs.filter(d => d.urlKey === 'ws-a').length, 1);
+    assert.equal(collection._docs[0]._id, TaskDecisionsStore.buildId(ISSUE_ID, HASH_A));
+  });
+});
