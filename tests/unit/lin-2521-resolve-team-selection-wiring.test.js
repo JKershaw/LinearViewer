@@ -116,7 +116,10 @@ describe('LIN-2521 — the refresh-retry chain threads teamId through, never re-
     assert.match(body, /fetchAndPrepareProjects\(workspace, teamId, null, workspace\.urlKey, \{ slim: true, assigneeName: assigneeState\.resolvedAssigneeName \}\)/,
       'must pass the received teamId into fetchAndPrepareProjects');
     // The destructure that captures selectedTeamId/teams off that same call.
-    assert.match(body, /const \{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees \} = await fetchAndPrepareProjects/);
+    // LIN-2550 added `appliedAssigneeName` to the same destructure — the
+    // refresh tail needs it to label the assignee selector off the filter the
+    // render actually applied, exactly as the primary route does.
+    assert.match(body, /const \{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName \} = await fetchAndPrepareProjects/);
     assert.match(body, /teams,\s*\n\s*selectedTeamId,/, 'renderPage must receive teams/selectedTeamId from the SAME resolved fetch, proving the 401-refresh re-render preserves them');
   });
 
@@ -147,7 +150,12 @@ describe('LIN-2526 — resolveAssigneeSelection is threaded the same way teamId 
     const endIdx = SERVER_SRC.indexOf('\n// ====', startIdx);
     const body = SERVER_SRC.slice(startIdx, endIdx === -1 ? startIdx + 4000 : endIdx);
     assert.match(body, /assigneeName: assigneeState\.resolvedAssigneeName/);
-    assert.match(body, /selectedAssignee: assigneeState\.selectedAssignee/);
+    // LIN-2550: the label is gated on the filter the render APPLIED, so
+    // `assigneeState.selectedAssignee` now reaches renderPage only through
+    // that gate. Pinning the gated expression (rather than loosening the
+    // assertion to a bare field name) is what keeps a regression that drops
+    // the gate — and re-asserts an unapplied filter — failing here.
+    assert.match(body, /selectedAssignee: appliedAssigneeName \? assigneeState\.selectedAssignee : 'all'/);
     assert.match(body, /availableAssignees/);
   });
 });

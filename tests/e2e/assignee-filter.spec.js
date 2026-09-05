@@ -85,6 +85,53 @@ test.describe('LIN-2529 — assignee filter (local provider, real `me` match)', 
   });
 });
 
+// LIN-2550 — an assignee filter that matches nothing degrades to the full
+// board (deliberate: John's ruling is show the board, not an empty page), and
+// the selector must degrade WITH it rather than keep asserting a filter the
+// render never applied. Reachable by ordinary clicking: buildFilterUrl carries
+// `?assignee=` across a team change, so picking a team the selected person has
+// no issues in strands a name that matches nothing.
+//
+// The first test here is also LIN-2516's ledger item L3: degrade path 3 — an
+// unmatched resolved name renders the FULL board rather than an empty one —
+// was pinned by regex only (`lin-2526`), never locked behaviourally. All six
+// FILT-* lines rendering under `?assignee=Nobody` is that behavioural lock.
+test.describe('LIN-2550 — an unmatched assignee degrades the board AND the label', () => {
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(assigneeFilterLocalSeed(localWorkerUrlKey));
+    await page.goto(`/workspace/${localWorkerUrlKey}/?assignee=Nobody`);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('L3 (LIN-2516 ledger): ?assignee=Nobody renders the FULL board — every seeded FILT-* line', async ({ page }) => {
+    for (const identifier of ['FILT-1', 'FILT-2', 'FILT-3', 'FILT-4', 'FILT-5', 'FILT-6']) {
+      await expect(page.locator(`.line[data-section="project"][data-identifier="${identifier}"]`)).toBeAttached();
+    }
+  });
+
+  test('the selector reads `all`, not the unapplied name', async ({ page }) => {
+    await expect(page.locator('#assignee-toggle')).toHaveText('all');
+  });
+
+  test('the `all` option is the one marked selected, and no phantom row is minted for the unmatched name', async ({ page }) => {
+    await expect(page.locator('#assignee-options .nav-option[data-assignee="all"]')).toHaveClass(/selected/);
+    await expect(page.locator('#assignee-options .nav-option.selected')).toHaveCount(1);
+    await expect(page.locator('#assignee-options .nav-option[data-assignee="Nobody"]')).toHaveCount(0);
+  });
+
+  test('control: a name that DOES match still filters and still labels itself', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/?assignee=Other%20User`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('#assignee-toggle')).toHaveText('Other User');
+    await expect(page.locator('#assignee-options .nav-option[data-assignee="Other User"]')).toHaveClass(/selected/);
+    // FILT-5 is Other User's; FILT-6 is unrelated and unassigned, so a genuinely
+    // applied filter drops it — the observable difference from the degrade above.
+    await expect(page.locator('.line[data-section="project"][data-identifier="FILT-5"]')).toBeAttached();
+    await expect(page.locator('.line[data-section="project"][data-identifier="FILT-6"]')).toHaveCount(0);
+  });
+});
+
 // LIN-2529 AC2: a second spec on a NON-viewer-capable provider, confirming the
 // `me` row is absent — proving the absence is gated on canFilterByMe, not on
 // an empty assignees list (GitHub issue #1 carries assignee: {login:'octocat'},
