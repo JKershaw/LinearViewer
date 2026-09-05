@@ -92,6 +92,10 @@ describe('LIN-2334: the blocked carve-out on the per-child liveness clock', () =
     // once-only terminal-wake slot, so "keep waiting" waits on a wake that
     // (at the time) could never arrive. The rejected phrasing must not
     // reappear here by way of a later well-meaning edit.
+    //
+    // Asserts BOTH halves: the negative alone stays green if the carve-out is
+    // deleted wholesale, which would make this test's name a lie.
+    assert.ok(flat().includes('surface it to the human'));
     assert.ok(!flat().includes('keep waiting for the unblock'));
   });
 
