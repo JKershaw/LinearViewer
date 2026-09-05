@@ -129,3 +129,45 @@ describe('renderFlightCompanionPage — LIN-2443: section order, prompt collapse
     assert.match(html, /<p class="fc-checkin-status" id="flight-companion-checkin" aria-live="polite" hidden><\/p>/);
   });
 });
+
+describe('renderFlightCompanionPage — LIN-2622: start button + re-orient affordance', () => {
+  const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
+
+  test('renders the start button, visible by default (empty state is the initial state)', () => {
+    assert.match(html, /<button type="button" id="flight-companion-start" class="[^"]*\baction-btn\b[^"]*\bsave\b[^"]*">start<\/button>/);
+    // No `hidden` class server-side — the empty state is the true initial
+    // state, exactly like #flight-companion-chat-empty itself.
+    const startIdx = html.indexOf('id="flight-companion-start"');
+    const tagStart = html.lastIndexOf('<button', startIdx);
+    const tagEnd = html.indexOf('>', startIdx);
+    assert.doesNotMatch(html.slice(tagStart, tagEnd), /\bhidden\b/);
+  });
+
+  test('renders the re-orient button, hidden by default — the complementary half of the start/reorient pair', () => {
+    assert.match(html, /<button type="button" id="flight-companion-reorient" class="[^"]*\bhidden\b[^"]*"[^>]*>reorient<\/button>/);
+  });
+
+  test('is NOT a status strip: no strip container element exists — the affordance sits beside the existing check-in line', () => {
+    // LIN-2621 (Backlog) owns the actual status strip. This pins the
+    // beat-4 decision honestly: no `.fc-status-strip`/`status-strip`
+    // class or id is introduced anywhere on the page.
+    assert.doesNotMatch(html, /status-strip/i);
+  });
+
+  test('the start button and the re-orient button are direct siblings of the thread/empty-state/check-in/composer — never wrapped', () => {
+    // Load-bearing for flight-companion.css's phone-shape media query,
+    // which sizes these elements as direct flex children of
+    // .flight-companion-chat-section by selector (see that file's header
+    // comment) — a wrapper div here would silently break it.
+    const threadIdx = html.indexOf('id="flight-companion-thread"');
+    const emptyIdx = html.indexOf('id="flight-companion-chat-empty"');
+    const startIdx = html.indexOf('id="flight-companion-start"');
+    const checkinIdx = html.indexOf('id="flight-companion-checkin"');
+    const reorientIdx = html.indexOf('id="flight-companion-reorient"');
+    const composerIdx = html.indexOf('flight-companion-question');
+    assert.ok(
+      threadIdx < emptyIdx && emptyIdx < startIdx && startIdx < checkinIdx && checkinIdx < reorientIdx && reorientIdx < composerIdx,
+      'expected thread -> empty-state -> start -> check-in -> reorient -> composer, in that order'
+    );
+  });
+});

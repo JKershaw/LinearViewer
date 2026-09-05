@@ -30,14 +30,20 @@ test.beforeEach(({ workerUrlKey }) => {
 });
 
 /**
- * Fulfils the turn endpoint's POST with a synthetic SSE body before it
+ * Fulfils a turn endpoint's POST with a synthetic SSE body before it
  * reaches Express — no model call is possible. Rendered through the SAME
  * `renderSSEFrames` helper the unit suite pins byte-for-byte against the
  * real `sendSSE` (lib/sse.js) — LIN-2453/LIN-2620 — so this mock cannot drift
  * from the wire format the real turn endpoint (session or proxy) emits.
+ *
+ * LIN-2622: `endpoint` defaults to `'turn'` (unchanged for every existing
+ * caller) and also accepts `'boot'` — beat 2 made the boot's SSE frame set
+ * byte-identical to /turn's precisely so ONE mock harness covers both; a
+ * second, forked mocking helper would be exactly the duplication that frame
+ * parity claim exists to avoid.
  */
-async function mockTurn(page, { token } = {}) {
-  await page.route('**/api/flight-companion/turn', (route) => {
+async function mockTurn(page, { token, endpoint = 'turn' } = {}) {
+  await page.route(`**/api/flight-companion/${endpoint}`, (route) => {
     if (route.request().method() !== 'POST') return route.continue();
     const frames = token
       ? renderSSEFrames([['token', { token }], ['done', {}]])
@@ -173,6 +179,70 @@ test.describe('Flight Companion Page (experimental)', () => {
       // False-positive guard: not still showing the class the bubble is
       // created with.
       await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+    });
+
+    // LIN-2622: the start button, driving a mocked boot SSE turn through to a
+    // rendered readout — the ticket's own acceptance bullet. Nested inside
+    // this same describe (rather than a fresh top-level one) so its
+    // beforeEach's mockTurn(page) for /turn is already installed too — belt
+    // and braces against a stray auto-wake tick firing during the test,
+    // matching the file's own "no test can slip through to a live turn
+    // request" discipline; the cadence's 30s floor means one shouldn't fire
+    // regardless, but the mock costs nothing to have in place.
+    test('the start control exists in the empty state and drives a mocked boot SSE turn through to a rendered readout', async ({ page }) => {
+      await mockTurn(page, { endpoint: 'boot', token: 'orient complete — nothing needs you right now' });
+
+      const startBtn = page.locator('#flight-companion-start');
+      const reorientBtn = page.locator('#flight-companion-reorient');
+      const emptyState = page.locator('#flight-companion-chat-empty');
+
+      // The empty state IS the initial state — this is what makes it "the
+      // start button in the empty state", not merely a button that happens
+      // to exist somewhere on the page.
+      await expect(emptyState).toBeVisible();
+      await expect(startBtn).toBeVisible();
+      await expect(reorientBtn).toBeHidden();
+
+      await startBtn.click();
+
+      // The synthetic "Start" user row — the human sees what they asked for,
+      // not a turn that appears from nowhere (LIN-2622's own acceptance).
+      await expect(page.locator('.fc-msg-body').first()).toHaveText('Start');
+
+      // The mocked boot turn's readout renders as the companion's reply,
+      // through the SAME SSE reader /turn already uses — no boot-specific
+      // rendering path exists to diverge.
+      const pill = page.locator('.fc-msg-who');
+      await expect(pill).toHaveCount(1);
+      await expect(pill).toHaveClass(/status-pill--done/);
+      await expect(page.locator('.fc-msg-body').nth(1)).toHaveText('orient complete — nothing needs you right now');
+
+      // The start/reorient pair flips once the thread has content.
+      await expect(startBtn).toBeHidden();
+      await expect(reorientBtn).toBeVisible();
+      await expect(emptyState).toBeHidden();
+    });
+
+    test('LIN-2622: a boot error mid-stream settles the pill failed rather than stranding it in-progress', async ({ page }) => {
+      await page.route('**/api/flight-companion/boot', (route) => {
+        if (route.request().method() !== 'POST') return route.continue();
+        return route.fulfill({
+          status: 200, contentType: 'text/event-stream',
+          body: `event: error\ndata: ${JSON.stringify({ message: 'boom' })}\n\n`,
+        });
+      });
+
+      await page.locator('#flight-companion-start').click();
+
+      const pill = page.locator('.fc-msg-who');
+      await expect(pill).toHaveClass(/status-pill--failed/);
+      await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+
+      // The failed attempt's bubble stays in the thread (a record of "you
+      // asked, it failed" — LIN-2443's precedent), so the empty state stays
+      // hidden and re-orient (not start) is the affordance offered next.
+      await expect(page.locator('#flight-companion-chat-empty')).toBeHidden();
+      await expect(page.locator('#flight-companion-reorient')).toBeVisible();
     });
 
     // LIN-2632 beat 4 — the phone shape (Shape B, LIN-1412 D2). Below 600px

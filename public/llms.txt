@@ -387,6 +387,10 @@ main.flight-companion-page[data-url-key]  - page container
                                               own id — never a new row) or a cap-limit /
                                               proposal-fallback note (LIN-2632 beat 2)
     #flight-companion-chat-empty            - empty state, hidden once a row exists
+    #flight-companion-start                 - "start" button (LIN-2622), visible only in the
+                                              empty state; POSTs the boot turn (see Endpoints
+                                              below) and renders it as a user-initiated turn
+                                              with a synthetic "Start" user row
     #flight-companion-checkin               - the one check-in status line: hidden until
                                               first use, then either the transient
                                               "checking in…" (for the duration of a
@@ -394,6 +398,12 @@ main.flight-companion-page[data-url-key]  - page container
                                               settled "checked in HH:MM · …" text it
                                               overwrites in place on `done`
                                               (aria-live=polite; never appended to)
+    #flight-companion-reorient              - "reorient" button (LIN-2622), the complementary
+                                              half of #flight-companion-start — hidden until
+                                              the empty state is gone, then visible; drives
+                                              the SAME boot turn. Deliberately NOT a status
+                                              strip (LIN-2621, still unbuilt, owns that) — a
+                                              minimal stand-in beside the check-in line
     #flight-companion-question              - chat composer input
     #flight-companion-send                  - send button
     .fc-proposal                            - an inline model-proposed follow-up
@@ -416,6 +426,7 @@ main.flight-companion-page[data-url-key]  - page container
 
 ### Flight Companion Endpoints
 - `POST /workspace/{urlKey}/api/flight-companion/turn` — SSE chat turn; body `{ message?, history[] }` (an absent/empty `message` is an auto-wake tick, never a client-asserted flag). Events: `token`, `tool` (`phase`: `call`/`result`/`error`/`cap`/`proposed`), `done` (an auto-wake `done` carries `surface`), `error`. A non-spend auto-wake tick returns plain JSON `{ turnKind, spent:false, reason }` instead of streaming.
+- `POST /workspace/{urlKey}/api/flight-companion/boot` — SSE boot (orient) turn (LIN-2622), driven by `#flight-companion-start`/`#flight-companion-reorient`; body `{ history[] }` only — `message`/turn kind/`followUpMode`/budget are all endpoint-hardcoded server-side, never read from the body (the same "never client-asserted" rule as `/turn`). Propose-only (never executes a follow-up), its own budget (5 tool iterations / 2500 tokens) and lease, and it charges the free tier with the SAME 429 shape a typed turn gets — never auto-wake's silent refusal. Same SSE frame set as `/turn` (`token`/`tool`/`done`/`error`), consumed by the identical client stream reader — no boot-specific parsing exists.
 - `POST /workspace/{urlKey}/api/flight-companion/approve-follow-up` — body `{ sessionId, prompt }`; enqueues the follow-up the model proposed on a prior auto-wake turn.
 
 ## Passage Planner (experimental)

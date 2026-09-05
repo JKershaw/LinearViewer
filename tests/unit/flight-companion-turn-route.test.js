@@ -1098,7 +1098,11 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     // a routes/ import.
     assert.match(CORE_SRC, /buildFlightCompanionMessages\(\{[^}]*censusSeedText:\s*deps\.buildCensusSeedText\(currentCensusDoc\)/s);
     // ...and the user-initiated branch reads the doc fresh (auto-wake already
-    // populated currentCensusDoc via the gate, above).
+    // populated currentCensusDoc via the gate, above). LIN-2622's boot branch
+    // deliberately does NOT widen this condition — its own reservation logic
+    // already reads the census unconditionally, so `currentCensusDoc` is
+    // always already set by the time this line runs on a boot turn; widening
+    // it here would be a no-op branch, not a minimal seam (beat 3 review).
     assert.match(CORE_SRC, /turnKind === 'user-initiated' && observerStateStore/);
     // The builder is defined in neither file — it belongs to the brief.
     assert.doesNotMatch(ROUTE_SRC, /function buildFlightCompanionMessages\(/);

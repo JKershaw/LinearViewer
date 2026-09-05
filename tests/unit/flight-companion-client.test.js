@@ -267,11 +267,20 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
   checkIn.hidden = true;
   const questionInput = new FakeElement('input');
   const sendBtn = new FakeElement('button');
+  // LIN-2622: the start button and the re-orient affordance — mirrors the
+  // real render (lib/render-flight-companion.js): reorient starts with the
+  // 'hidden' CLASS applied (the complementary-pair convention setEmptyVisible
+  // relies on), start does not.
+  const startBtn = new FakeElement('button');
+  const reorientBtn = new FakeElement('button');
+  reorientBtn.classList.add('hidden');
   doc._byId['flight-companion-thread'] = thread;
   doc._byId['flight-companion-chat-empty'] = emptyState;
   doc._byId['flight-companion-checkin'] = checkIn;
   doc._byId['flight-companion-question'] = questionInput;
   doc._byId['flight-companion-send'] = sendBtn;
+  doc._byId['flight-companion-start'] = startBtn;
+  doc._byId['flight-companion-reorient'] = reorientBtn;
 
   const chatUI = makeChatUI();
   const fetchSpy = makeFetchSpy(fetchImpl || (() => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' })));
@@ -314,7 +323,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
 
   return {
     exports: sandbox.module.exports,
-    doc, thread, emptyState, checkIn, questionInput, sendBtn,
+    doc, thread, emptyState, checkIn, questionInput, sendBtn, startBtn, reorientBtn,
     chatUICalls: chatUI.calls,
     fetchCalls: fetchSpy.calls,
     apiCalls: apiSpy.calls,
@@ -357,6 +366,13 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
     const { exports: m } = loadClient();
     assert.strictEqual(m.doneCadenceEffect('auto-wake', true), 'reset');
     assert.strictEqual(m.doneCadenceEffect('auto-wake', false), 'double');
+  });
+
+  test('doneCadenceEffect: a boot always resets, regardless of surface — LIN-2622, "reset on done ONLY"', () => {
+    const { exports: m } = loadClient();
+    assert.strictEqual(m.doneCadenceEffect('boot', undefined), 'reset');
+    assert.strictEqual(m.doneCadenceEffect('boot', true), 'reset');
+    assert.strictEqual(m.doneCadenceEffect('boot', false), 'reset');
   });
 
   test('advanceCadence: double/reset/stop reducer, and stopped is a true terminal state', () => {
@@ -1720,5 +1736,178 @@ describe('window.ChatUI.toolBreadcrumbLabel (LIN-2632) — lifted from task-chat
     assert.equal(ChatUI.toolBreadcrumbLabel({ phase: 'cap', name: 'get_stack' }), 'reached the tool-lookup limit');
     assert.equal(ChatUI.toolBreadcrumbLabel({ phase: 'result', name: 'get_stack' }), '');
     assert.equal(ChatUI.toolBreadcrumbLabel(null), '');
+  });
+});
+
+// ─── LIN-2622: the boot turn — start button / re-orient affordance ─────────
+
+describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the start/reorient pair', () => {
+  test('startBoot() posts to the boot endpoint, never /turn', async () => {
+    const { exports: m, fetchCalls } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    m.startBoot();
+    await flush();
+    assert.strictEqual(fetchCalls.length, 1);
+    assert.match(fetchCalls[0].url, /\/api\/flight-companion\/boot$/);
+    assert.doesNotMatch(fetchCalls[0].url, /\/api\/flight-companion\/turn$/);
+  });
+
+  test('a boot never sends a client-asserted message — only history', async () => {
+    const { exports: m, fetchCalls } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    m.startBoot();
+    await flush();
+    assert.strictEqual(fetchCalls[0].body.message, undefined, 'the server hardcodes its own turn content — the client must not assert one');
+    assert.deepStrictEqual(fetchCalls[0].body.history, []);
+  });
+
+  test('renders as a user-initiated turn: a synthetic "Start" user bubble, then a thinking placeholder, before any network response', () => {
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => new Promise(() => {}), // never resolves — pre-response state only
+    });
+    m.startBoot();
+    assert.strictEqual(thread.children.length, 2, 'a user bubble and a thinking assistant bubble, exactly like a typed turn');
+    assert.strictEqual(thread.children[0].querySelector('.fc-msg-body').textContent, 'Start');
+    assert.strictEqual(thread.children[1].querySelector('.fc-msg-body').textContent, 'thinking…');
+  });
+
+  test('a successful boot pushes a real {role:"user", content:"Start"} entry into history, matching what the server actually turned', async () => {
+    const { exports: m } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: 'orient ready' }), sseFrame('done', {})]),
+    });
+    m.startBoot();
+    await flush();
+    looseDeepEqual(m.getChatHistory(), [
+      { role: 'user', content: 'Start' },
+      { role: 'assistant', content: 'orient ready' },
+    ]);
+  });
+
+  test('the cadence resets on a boot\'s `done` — same as a typed turn', async () => {
+    const { exports: m } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    m.getCadenceState().delayMs = 120000; // simulate several prior doublings
+    m.startBoot();
+    await flush();
+    assert.strictEqual(m.getCadenceState().delayMs, 30000, 'a boot done must reset to the base delay');
+  });
+
+  test('the cadence is left UNTOUCHED by a mid-stream boot error — not reset, not doubled', async () => {
+    const { exports: m } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]),
+    });
+    m.getCadenceState().delayMs = 120000;
+    m.startBoot();
+    await flush();
+    assert.strictEqual(m.getCadenceState().delayMs, 120000, 'an error must move the cadence neither way for a boot');
+  });
+
+  test('the cadence is left UNTOUCHED by a boot network failure — not reset, not doubled', async () => {
+    const { exports: m } = loadClient({
+      fetchImpl: () => Promise.reject(new Error('network down')),
+    });
+    m.getCadenceState().delayMs = 120000;
+    m.startBoot();
+    await flush();
+    assert.strictEqual(m.getCadenceState().delayMs, 120000);
+  });
+
+  test('a mid-stream boot error settles the thinking row to failed and drops the turn from history — the button must not strand the UI in-progress', async () => {
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]),
+    });
+    m.startBoot();
+    await flush();
+    const pill = thread.children[1].querySelector('.chat-msg__who');
+    assert.ok(pill.classList.contains('status-pill--failed'), 'the pill must leave in-progress, never strand there');
+    assert.match(thread.children[1].querySelector('.fc-msg-body').textContent, /\[error: boom\]/);
+    looseDeepEqual(m.getChatHistory(), [], 'the failed turn must not remain in history');
+  });
+
+  test('a boot that loses the reservation race (gate-silent, spent:false) settles the bubble failed with an honest message, pops history, and leaves the cadence untouched', async () => {
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'boot', spent: false, reason: 'lost-race' }),
+    });
+    m.getCadenceState().delayMs = 60000;
+    m.startBoot();
+    await flush();
+    looseDeepEqual(m.getChatHistory(), [], 'the optimistic "Start" entry must be popped — this turn never actually happened');
+    const pill = thread.children[1].querySelector('.chat-msg__who');
+    assert.ok(pill.classList.contains('status-pill--failed'), 'the eager thinking bubble must be settled, not left in-progress');
+    assert.match(thread.children[1].querySelector('.fc-msg-body').textContent, /try again/i);
+    assert.strictEqual(m.getCadenceState().delayMs, 60000, 'a lost race is not "done" and must not move the cadence');
+  });
+
+  test('a boot 429 (free tier spent) settles the bubble failed with the free-tier message and pops history — same shape as a typed turn\'s 429', async () => {
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => jsonResponse(429, {
+        error: 'Free tier limit reached',
+        freeTier: { used: true, remaining: 0, limit: 10, resetsAt: '2026-09-01T00:00:00.000Z' },
+      }),
+    });
+    m.startBoot();
+    await flush();
+    looseDeepEqual(m.getChatHistory(), []);
+    assert.match(thread.children[1].querySelector('.fc-msg-body').textContent, /Free tier limit reached/);
+  });
+
+  test('the start button and the re-orient affordance are a complementary pair, never shown together', async () => {
+    const { exports: m, startBtn, reorientBtn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    // Initial state (mirrors the real render): start visible, reorient hidden.
+    assert.strictEqual(startBtn.classList.contains('hidden'), false);
+    assert.strictEqual(reorientBtn.classList.contains('hidden'), true);
+
+    m.startBoot();
+    await flush();
+    // Once the thread has content, the pair flips.
+    assert.strictEqual(startBtn.classList.contains('hidden'), true, 'start must hide once the empty state is gone');
+    assert.strictEqual(reorientBtn.classList.contains('hidden'), false, 'reorient must appear once there is something to re-orient from');
+  });
+
+  test('both the start button and the re-orient button drive the exact same boot turn', async () => {
+    const { exports: m, fetchCalls, reorientBtn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    reorientBtn.dispatch('click');
+    await flush();
+    assert.strictEqual(fetchCalls.length, 1);
+    assert.match(fetchCalls[0].url, /\/api\/flight-companion\/boot$/);
+  });
+
+  test('the start/reorient buttons are disabled while a turn is in flight, and re-enabled after', async () => {
+    const { exports: m, startBtn, reorientBtn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    m.startBoot();
+    assert.strictEqual(startBtn.disabled, true);
+    assert.strictEqual(reorientBtn.disabled, true);
+    await flush();
+    assert.strictEqual(startBtn.disabled, false);
+    assert.strictEqual(reorientBtn.disabled, false);
+  });
+
+  test('reuses the existing SSE reader unchanged: the SAME event frame set (token/tool/done/error) is understood on the boot endpoint', async () => {
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: 't1', name: 'get_stack' }),
+        sseFrame('tool', { phase: 'result', id: 't1', name: 'get_stack', result: '{}' }),
+        sseFrame('token', { token: 'orienting' }),
+        sseFrame('done', {}),
+      ]),
+    });
+    m.startBoot();
+    await flush();
+    // A breadcrumb note plus the user bubble plus the assistant bubble — the
+    // reader classified every frame type correctly with no boot-specific
+    // branch of its own.
+    assert.ok(thread.children.some((li) => li.className.includes('fc-inline-note')), 'the tool breadcrumb must render');
+    const bubbles = thread.children.filter((li) => li.className.includes('fc-msg'));
+    assert.strictEqual(bubbles.length, 2);
+    assert.strictEqual(bubbles[1].querySelector('.fc-msg-body').textContent, 'orienting');
   });
 });

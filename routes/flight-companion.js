@@ -567,6 +567,133 @@ export function createFlightCompanionRoutes({
     }
   });
 
+  // ─── SSE boot turn (LIN-2622) ───────────────────────────────────────────────
+  //
+  // A server-composed orient turn through the SAME core the browser's `/turn`
+  // route calls. `turnKind: 'boot'` and `followUpMode: 'propose'` are
+  // HARDCODED at this call site, never read from the request body — LIN-2432's
+  // "never client-asserted" rule, extended to a third endpoint. A boot's own
+  // budget (5 iterations / 2500 tokens, bigger than a typed turn's 4/1500 —
+  // the reference boot readout runs roughly 900 tokens) drives its own lease
+  // via the same `deriveReservationLeaseMs` derivation the core's auto-wake
+  // branch already uses. Free-tier `tryUse` is charged exactly like a typed
+  // turn, with the SAME 429 shape — unlike auto-wake's silent refusal, a boot
+  // is always something a human just asked for. Same `sendSSE` writer as
+  // `/turn`, so the frame set is byte-identical and the existing client
+  // stream reader (`readSSEStream` in public/flight-companion.js) needs no
+  // change to consume this route.
+  router.post('/workspace/:urlKey/api/flight-companion/boot', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const featureFlags = getFeatureFlags(req.session);
+
+    if (featureFlags.flightCompanion !== true) {
+      return res.status(403).json({ error: 'Flight Companion feature is not enabled' });
+    }
+
+    const body = req.body || {};
+    const safeHistory = filterChatTurns(body.history);
+
+    const sessionApiKey = req.session.openRouterApiKey;
+    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const apiKeyToUse = sessionApiKey || getPaidEnvKey() || freeTierKey;
+
+    // LIN-2449: same disconnect handling as `/turn` — the reservation is
+    // deliberately NOT released here; it self-expires via the lease.
+    const clientAbort = new AbortController();
+    let clientGone = false;
+    res.on('close', () => {
+      if (res.writableFinished) return;
+      clientGone = true;
+      clientAbort.abort();
+    });
+
+    let streaming = false;
+    const startStream = () => {
+      if (streaming) return;
+      streaming = true;
+      res.set({
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+      res.flushHeaders?.();
+    };
+
+    try {
+      const outcome = await runFlightCompanionTurn({
+        workspace,
+        turnKind: 'boot',
+        // A synthetic, server-authored final turn — the client renders its
+        // own "start" bubble independently (LIN-2622 item 6); this is what
+        // the model actually reacts to as the human's own message.
+        message: 'Start',
+        history: safeHistory,
+        apiKey: apiKeyToUse,
+        isFreeTier,
+        followUpMode: 'propose',
+        budget: { maxIterations: 5, maxTokens: 2500 },
+        onStreamStart: startStream,
+        onEvent: (type, data) => {
+          sendSSE(res, type, data);
+          if (type === 'done' || type === 'error') res.end();
+        },
+        signal: clientAbort.signal,
+        isClientGone: () => clientGone,
+        onBeforeSpend: async () => {
+          if (!apiKeyToUse) return { reason: 'not-configured' };
+          if (!isFreeTier) return null;
+          const check = await freeTierStore.tryUse(workspace.urlKey);
+          if (check.allowed) return null;
+          return { reason: 'free-tier', freeTierCheck: check };
+        },
+        deps: {
+          observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore,
+          dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore,
+          proxyTokenStore, sessionIsTerminal, enrichLoop,
+          chatClient, createToolCatalog,
+          getProvider: getProviderForWorkspace,
+          getScope: getWorkspaceCallScope,
+          buildCensusSeedText,
+          baseUrl: `${req.protocol}://${req.get('host')}`,
+          dispatchedBy: req.session?.accountId || null,
+        },
+      });
+
+      if (!outcome.spent && !streaming) {
+        if (outcome.reason === 'not-configured') {
+          return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+        }
+        // A boot is always human-initiated (Start was clicked): the 429 shape
+        // matches a typed turn's — never auto-wake's silent 200.
+        if (outcome.reason === 'free-tier') {
+          const check = outcome.freeTierCheck;
+          return res.status(429).json({
+            error: check.reason,
+            freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt },
+          });
+        }
+        return res.json({
+          turnKind: outcome.turnKind,
+          spent: false,
+          reason: outcome.reason,
+        });
+      }
+    } catch (error) {
+      if (clientGone) {
+        console.error('Flight Companion boot: client disconnected mid-turn, census delta left unconsumed', {
+          urlKey: workspace.urlKey,
+          error: error?.message,
+        });
+        return;
+      }
+      console.error('Flight Companion boot error:', error);
+      startStream();
+      sendSSE(res, 'error', { message: 'Failed to generate a response' });
+      res.end();
+    }
+  });
+
   router.post('/workspace/:urlKey/api/flight-companion/approve-follow-up', dispatchQueueLimiter, workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const featureFlags = getFeatureFlags(req.session);
