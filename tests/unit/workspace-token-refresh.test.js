@@ -502,6 +502,99 @@ describe('selectExpiredOwnerRow (LIN-1499, Block C — GitHub-family provider-aw
 // routing (D1/D2 fixed at the orchestration layer)
 // ---------------------------------------------------------------------------
 
+// ─── LIN-2349: the last raw-expiry ranker in workspace-token-resolver.js ─────
+//
+// After LIN-2278, `selectExpiredOwnerRow` was the only one of the file's four
+// ranking sites still comparing raw `expiry > bestExpiry` magnitudes from a
+// -Infinity seed. Its recorded exemption was that its refreshability filter
+// (`!!ws.refreshToken`) excludes sentinels in practice — an argument that
+// covers only the LINEAR branch.
+//
+// The GitHub-family branch is a second route INTO the compare, not out of it:
+// `isLive` is falsy whenever `accessToken` is absent, so such a row clears the
+// liveness gate, and `isRefreshable` then takes the installationId arm and
+// returns true without ever consulting `refreshToken`. The sentinel reaches the
+// compare and, at MAX_SAFE_INTEGER, beats a genuinely-expired-and-refreshable
+// Linear row — so doRefresh would re-mint the GitHub credential instead of
+// refreshing the Linear one it was called for. Same bounded
+// "wrong partition -> miss -> nothing refreshable" class as LIN-2278.
+//
+// Closed for symmetry, not on a demonstrated production path: neither the
+// LIN-2278 review nor this ticket could produce a concrete route to a workspace
+// whose scalar accessToken mirror is empty while a GitHub binding still holds
+// its installationId. What was established is narrower and enough — the
+// exemption on file covered one branch of two, and nothing pinned it either way.
+describe('selectExpiredOwnerRow (LIN-2349, Block K — sentinel-aware ranking)', () => {
+  const SENTINEL_MS = Number.MAX_SAFE_INTEGER;
+
+  // The ticket's own premise, built literally:
+  //   row A: linear, expired finite, refreshToken  -> refreshable, not live
+  //   row B: github, sentinel expiry, NO accessToken, binding w/ installationId
+  //                                                 -> refreshable, not live
+  const linearExpired = () => sessionRow('sid-linear', 'account-A', 'acme', {
+    accessToken: 'stale-linear', expiresAt: NOW + PAST_MS, refreshToken: 'R0',
+  });
+  const githubSentinelNoAccessToken = () => githubSessionRow('sid-gh', 'account-A', 'acme', {
+    accessToken: undefined, expiresAt: SENTINEL_MS, installationId: '987',
+  });
+
+  test('K1: a sentinel-expiry GitHub row does NOT outrank a genuinely-expired refreshable Linear row', () => {
+    const row = selectExpiredOwnerRow([linearExpired(), githubSentinelNoAccessToken()], 'acme', 'account-A');
+    assert.ok(row, 'something must still be selected');
+    assert.equal(row.sid, 'sid-linear',
+      'the finite, genuinely-expired row is what needs refreshing — a fake "never expires" must not win by magnitude');
+    assert.equal(row.provider, 'linear');
+  });
+
+  test('K2: and in the other scan order — the fix is a tier rule, not an ordering accident', () => {
+    const row = selectExpiredOwnerRow([githubSentinelNoAccessToken(), linearExpired()], 'acme', 'account-A');
+    assert.equal(row.sid, 'sid-linear');
+  });
+
+  test('K3: a sentinel row still wins when it is the ONLY candidate — this narrows nothing', () => {
+    // The ordinary, correct case for a GitHub-only workspace. LIN-1982's rule
+    // only ever changes the outcome when a finite candidate is ALSO in the
+    // running; a fix that made sentinels unselectable would break re-minting.
+    const row = selectExpiredOwnerRow([githubSentinelNoAccessToken()], 'acme', 'account-A');
+    assert.ok(row, 'a GitHub-only workspace must still be re-mintable');
+    assert.equal(row.sid, 'sid-gh');
+    assert.equal(row.provider, 'github');
+  });
+
+  test('K4: among two sentinels, the later-expiring one still wins — tier 2 is preserved', () => {
+    const older = githubSessionRow('sid-old', 'account-A', 'acme', {
+      accessToken: undefined, expiresAt: SENTINEL_MS - 1000, installationId: '111',
+    });
+    const newer = githubSessionRow('sid-new', 'account-A', 'acme', {
+      accessToken: undefined, expiresAt: SENTINEL_MS, installationId: '222',
+    });
+    assert.equal(selectExpiredOwnerRow([older, newer], 'acme', 'account-A').sid, 'sid-new');
+    assert.equal(selectExpiredOwnerRow([newer, older], 'acme', 'account-A').sid, 'sid-new');
+  });
+
+  test('K5: among two finite rows, the later-expiring one still wins — the pre-existing tie-break is untouched', () => {
+    const abandoned = sessionRow('sid-abandoned', 'account-A', 'acme', {
+      accessToken: 'stale-1', expiresAt: NOW + PAST_MS - 100_000, refreshToken: 'R-old',
+    });
+    const recent = sessionRow('sid-recent', 'account-A', 'acme', {
+      accessToken: 'stale-2', expiresAt: NOW + PAST_MS, refreshToken: 'R-new',
+    });
+    assert.equal(selectExpiredOwnerRow([abandoned, recent], 'acme', 'account-A').sid, 'sid-recent');
+    assert.equal(selectExpiredOwnerRow([recent, abandoned], 'acme', 'account-A').sid, 'sid-recent');
+  });
+
+  test('K6: an expiry of 0 (absent tokenExpiresAt) is finite, and still beats a sentinel', () => {
+    // `ws.tokenExpiresAt || 0` maps an absent expiry to 0. That is the most
+    // expired a row can be, so it must rank as finite rather than falling into
+    // any special case.
+    const noExpiry = sessionRow('sid-no-expiry', 'account-A', 'acme', {
+      accessToken: 'stale', expiresAt: undefined, refreshToken: 'R0',
+    });
+    const row = selectExpiredOwnerRow([githubSentinelNoAccessToken(), noExpiry], 'acme', 'account-A');
+    assert.equal(row.sid, 'sid-no-expiry');
+  });
+});
+
 describe('refreshOwnerWorkspaceToken (LIN-1499, Block D — GitHub-family routing)', () => {
   beforeEach(() => {
     _resetInflightForTests();
