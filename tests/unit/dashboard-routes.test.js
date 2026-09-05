@@ -3574,3 +3574,110 @@ describe('bounded feed hydration (LIN-1258)', () => {
     assert.equal(allSessions(p3).find(s => s.sessionId === 'sess-keep').status, 'done-with-warning', 'the flicker self-heals on the next poll once the overflow sessions are cached');
   });
 });
+
+// ─── Rulings feed: the proposed-dismissal join (LIN-2444) ────────────────────
+//
+// This is the HUMAN surface — the one John's ruling means by "it's easy for
+// me/a user to agree". The proxy route can propose all it likes; if the
+// proposal does not reach here, the feature is write-only. The first review of
+// LIN-2444 found exactly that, and a re-review then found the FIX could be
+// reverted with the whole suite green, which is why these exist.
+describe('GET /api/dashboard/rulings — suggestedDismissal join (LIN-2444)', () => {
+  const WS = [{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Beta' }];
+
+  function routerWith(suggestions, cacheSpy) {
+    const perWorkspace = {
+      'ws-a': { live: [], history: [decisionItem('a-dec', 'LIN-20', 'shared-id')], agentStatus: [] },
+      'ws-b': { live: [], history: [decisionItem('b-dec', 'LIN-21', 'other-id')], agentStatus: [] }
+    };
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore,
+      agentStatusStore,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({ issue: { state: { name: 'In Progress', type: 'started' }, labels: { nodes: [] } } }),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      dismissalSuggestionsStore: { async listForWorkspaces() { return suggestions; } },
+      ...(cacheSpy ? { sessionsFeedCache: cacheSpy } : {})
+    });
+  }
+
+  async function rulingsFrom(suggestions) {
+    const handler = getHandler(routerWith(suggestions), 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: WS } });
+    await handler(req, res);
+    return res.jsonBody;
+  }
+
+  const suggestion = over => ({
+    urlKey: 'ws-a', decisionId: 'shared-id', reason: 'the task shipped',
+    suggestedBy: 'lane-e', suggestedAt: NOW_ISO, withdrawn: false, withdrawnAt: null, ...over
+  });
+
+  test('a standing proposal reaches the human surface', async () => {
+    // Deleting the join outright previously left the entire suite green,
+    // reinstating the review's own HIGH-1 silently.
+    const body = await rulingsFrom([suggestion()]);
+    const row = body.rulings.find(r => r.decision.decision_id === 'shared-id');
+    assert.ok(row, 'the ruling is present');
+    assert.equal(row.suggestedDismissal.reason, 'the task shipped');
+    assert.equal(row.suggestedDismissal.suggestedBy, 'lane-e');
+  });
+
+  test('a ruling with no proposal reports null, not undefined', async () => {
+    const body = await rulingsFrom([]);
+    for (const row of body.rulings) assert.equal(row.suggestedDismissal, null);
+  });
+
+  test('a WITHDRAWN proposal does not reach the surface — Keep means keep', async () => {
+    const body = await rulingsFrom([suggestion({ withdrawn: true, withdrawnAt: NOW_ISO })]);
+    const row = body.rulings.find(r => r.decision.decision_id === 'shared-id');
+    assert.equal(row.suggestedDismissal, null);
+  });
+
+  test('the join is keyed on (workspace, decisionId) — a same-id proposal in ANOTHER workspace must not attach', async () => {
+    // decision_id is agent-invented free text and is not globally unique. Keyed
+    // on decisionId alone, workspace B's ruling would show workspace A's
+    // proposal, and the next PR's one-click Agree would act on it.
+    const body = await rulingsFrom([suggestion({ urlKey: 'ws-b' })]);
+    const rowA = body.rulings.find(r => r.anchor.workspaceUrlKey === 'ws-a');
+    assert.ok(rowA, "workspace A's ruling is present");
+    assert.equal(rowA.suggestedDismissal, null, "another workspace's proposal must not attach");
+  });
+
+  test('an unwired store leaves every row null and changes nothing else', async () => {
+    const perWorkspace = { 'ws-a': { live: [], history: [decisionItem('a-dec', 'LIN-20', 'd-1')], agentStatus: [] } };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.rulings.length, 1);
+    assert.equal(res.jsonBody.rulings[0].suggestedDismissal, null);
+  });
+
+  test('the feed reads its loops under the `rulings` cache namespace', async () => {
+    // The proxy route caches under `proxy-rulings`. If either side changed to
+    // share a namespace the two entries would hold DIFFERENT types — merged
+    // loops here, and on the proxy side whatever it caches — so a collision
+    // would feed one to the other. Pinning the namespace is what makes that
+    // collision a test failure rather than a production surprise.
+    const keys = [];
+    const cacheSpy = {
+      keyFor: (workspaces, view) => `${view}::${workspaces.map(w => w.urlKey).sort().join(',')}`,
+      async get(key, load) { keys.push(key); return load(); }
+    };
+    const handler = getHandler(routerWith([], cacheSpy), 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: WS } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.ok(keys.some(k => k.startsWith('rulings::')), `expected a 'rulings' namespace, saw ${JSON.stringify(keys)}`);
+    assert.ok(!keys.some(k => k.startsWith('proxy-rulings::')), 'the human feed must not read the proxy entry');
+  });
+});

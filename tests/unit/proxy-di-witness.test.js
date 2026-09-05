@@ -165,9 +165,10 @@ describe('Half A: mount-completeness census against the real repo', () => {
   // 24, all un-defaulted so classifyParams counts every one as required —
   // 87 + 24 = 111; LIN-2444's routes/proxy-rulings.js then adds 6 more —
   // proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent,
-  // dispatchQueueStore, agentStatusStore — its other three
-  // (taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore) are
-  // defaulted to null and so are not counted as required: 111 + 6 = 117). Unlike the test above, THIS one is not blind to a
+  // dispatchQueueStore, agentStatusStore — its other four
+  // (taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore,
+  // sessionsFeedCache) are defaulted to null and so are not counted as
+  // required: 111 + 6 = 117). Unlike the test above, THIS one is not blind to a
   // signature+mount drop (removing a dep from a factory's signature shrinks
   // `required`, which this total catches) — that's a different, unrelated
   // invariant catching it, not evidence Half A's own missing/extra detectors

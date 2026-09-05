@@ -78,28 +78,49 @@ export function createRulingsRoutes({
    * colliding with the dashboard's on the same workspace key.
    */
   async function readRulings(urlKey) {
-    const load = async () => {
+    const loadLoops = async () => {
       const rawLoops = await getLoopsForWorkspace(urlKey, {
         dispatchStore: dispatchQueueStore,
         agentStatusStore,
         lean: true
       });
       // Shaped as the session-authed feed shapes its own loops, minus
-      // `workspaceName` and the activity sort (neither of which any answer-state
-      // decision reads): `enrichLoop` supplies the `agentState` that
-      // `resolveDisposition` reads, and the workspace tag is what puts a usable
-      // `anchor.workspaceUrlKey` on every row. Without the enrichment a live,
-      // mid-turn ruling reports as repliable; without the tag a caller cannot
-      // route a reply back to the right workspace.
-      const loops = rawLoops.map(loop => ({ ...enrichLoop(loop), workspaceUrlKey: urlKey }));
-      const [taskDecisions, shelvedRulings] = await Promise.all([
-        taskDecisionsStore ? taskDecisionsStore.listUnansweredForWorkspaces([urlKey]) : Promise.resolve([]),
-        shelvedRulingsStore ? shelvedRulingsStore.listForWorkspaces([urlKey]) : Promise.resolve([])
-      ]);
-      return collectUnansweredDecisions({ loops, taskDecisions, shelvedRulings }, { now: new Date() });
+      // `workspaceName` and the activity sort (neither of which any
+      // answer-state decision reads).
+      //
+      // The workspace tag IS load-bearing: without it `anchor.workspaceUrlKey`
+      // is null and a caller cannot route a reply to the right workspace.
+      //
+      // `enrichLoop` is NOT, on this route, today — an earlier version of this
+      // comment claimed it was ("a live, mid-turn ruling reports as
+      // repliable") and that was simply false. It sets `agentState` and
+      // `completedAt`; `completedAt` never reaches the response, and
+      // `agentState` is read only by `resolveDisposition`'s `'mid-turn'`
+      // branch, which yields `canReply: false` exactly as `'indeterminate'`
+      // does, so repliability cannot change. It is kept so the two feeds
+      // cannot drift on how a loop is shaped: `effectiveAgentState` returning
+      // `loop.agentState` unchanged here is a property of today's
+      // reconstruction, not a contract, and re-deriving the shaping locally is
+      // precisely how the two surfaces would come to disagree about a ruling.
+      return rawLoops.map(loop => ({ ...enrichLoop(loop), workspaceUrlKey: urlKey }));
     };
-    if (!sessionsFeedCache) return load();
-    return sessionsFeedCache.get(sessionsFeedCache.keyFor([{ urlKey }], 'proxy-rulings'), load);
+
+    // Only the LOOP READ is cached — the expensive part. The collection runs
+    // fresh on every request, matching the dashboard. That distinction is
+    // load-bearing, not stylistic: `resolveDisposition`'s own docstring says a
+    // disposition is "resolved fresh at press time and never stored (liveness
+    // decays, so a stored flag would lie to the operator by the time they act
+    // on it)", and `shelfGate` likewise compares `resurfaceAt` against now.
+    // Caching the collected rows would store both.
+    const loops = sessionsFeedCache
+      ? await sessionsFeedCache.get(sessionsFeedCache.keyFor([{ urlKey }], 'proxy-rulings'), loadLoops)
+      : await loadLoops();
+
+    const [taskDecisions, shelvedRulings] = await Promise.all([
+      taskDecisionsStore ? taskDecisionsStore.listUnansweredForWorkspaces([urlKey]) : Promise.resolve([]),
+      shelvedRulingsStore ? shelvedRulingsStore.listForWorkspaces([urlKey]) : Promise.resolve([])
+    ]);
+    return collectUnansweredDecisions({ loops, taskDecisions, shelvedRulings }, { now: new Date() });
   }
 
   /**
@@ -194,8 +215,9 @@ export function createRulingsRoutes({
         // workspace. Without this a caller gets `201 {success: true}` for a
         // typo or an already-answered decision, and writes a durable, no-TTL
         // row nobody will ever see — a success signal that means nothing, and
-        // unbounded orphan rows from any readWrite token. The read is the same
-        // cached one the GET just served, so the check is effectively free.
+        // unbounded orphan rows from any readWrite token. It reuses the GET's
+        // own cached loop read, so the check costs a collection pass, not a
+        // second reconstruction.
         const rulings = await readRulings(req.proxyUrlKey);
         if (!rulings.some(row => row.decision?.decision_id === decisionId)) {
           logEvent(req, '/api/proxy/rulings/suggest-dismissal', 404);

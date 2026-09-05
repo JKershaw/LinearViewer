@@ -80,7 +80,9 @@ before(async () => {
   // workspace and the whole suite stayed green — the isolation property these
   // routes exist to hold had zero coverage.
   const dispatchQueueStore = {
-    async listItems(urlKey) { return urlKey === URL_KEY ? [] : []; },
+    // Always empty: this workspace has no LIVE queue items in these fixtures.
+    // `listHistory` below is what carries the isolation.
+    async listItems() { return []; },
     async listHistory(urlKey) { return { items: urlKey === URL_KEY ? historyItems : foreignHistoryItems }; }
   };
   const agentStatusStore = { async listStatus() { return { items: [] }; } };
