@@ -1185,7 +1185,7 @@ app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
  *
  * @param {import('./lib/workspace.js').Workspace} workspace - The workspace whose provider/token serve the reads
  * @param {string|null} teamId - Optional team ID to filter issues by
- * @returns {Promise<{trees, inProgressTrees, organizationName, teams, selectedTeamId}>} Prepared data for rendering
+ * @returns {Promise<{trees, inProgressTrees, organizationName, teams, selectedTeamId, appliedAssigneeName}>} Prepared data for rendering. `appliedAssigneeName` is the assignee filter that was actually APPLIED to `trees` — null whenever no filter was requested, or a requested one matched nothing and degraded to unfiltered (LIN-2550).
  */
 async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = null, urlKey = null, { slim = false, assigneeName = null } = {}) {
   // Fan out across ALL of the workspace's provider bindings and merge the
@@ -1290,6 +1290,12 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
   // parent's subtask list). expandToTreeContext (LIN-2524) keeps the matched
   // issues' ancestor chain AND descendants, source-qualified (LIN-544) via
   // nodeKey — never a raw issue.id walk.
+  // LIN-2550: `null` until the filter actually narrows the set. This is the
+  // assignee half of the invariant LIN-2520's R4 tightened for the team filter
+  // — the caller must label the navbar off what the render APPLIED, never off
+  // what the URL asked for — and it mirrors `selectedTeamId: resolvedTeamId`
+  // below, which reports the resolved team rather than the requested one.
+  let appliedAssigneeName = null;
   if (assigneeName) {
     const matchedIds = new Set(
       issues.filter(issue => issue.assignee?.name === assigneeName).map(nodeKey)
@@ -1297,9 +1303,12 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
     // LIN-2526: a resolved name matching nothing in the loaded set (most
     // notably `me` for a viewer with no assigned issues) degrades SILENTLY to
     // unfiltered rather than rendering an empty dashboard — no visible error.
+    // The degrade stays; LIN-2550 only stops the nav label asserting a filter
+    // this branch declined to apply.
     if (matchedIds.size > 0) {
       const relevantIds = expandToTreeContext(issues, matchedIds);
       issues = issues.filter(issue => relevantIds.has(nodeKey(issue)));
+      appliedAssigneeName = assigneeName;
     }
   }
 
@@ -1362,7 +1371,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       return { project: { ...project, collapsed }, incomplete, completed, completedCount };
     });
 
-  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees };
+  return { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId: resolvedTeamId, periodicalsEnabled, showSource, truncated, availableAssignees, appliedAssigneeName };
 }
 
 /**
@@ -1482,12 +1491,15 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
   const provider = getProviderForWorkspace(workspace);
   // Pass urlKey so the periodicals group renders consistently after a token
   // refresh, matching the primary dashboard route (LIN-341).
-  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName });
+  const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName });
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
     availableAssignees,
-    selectedAssignee: assigneeState.selectedAssignee,
+    // LIN-2550: same applied-not-requested labelling rule as the primary
+    // dashboard route above — this post-401 re-render carries the assignee
+    // state forward (F2), so it must carry the correction with it.
+    selectedAssignee: appliedAssigneeName ? assigneeState.selectedAssignee : 'all',
     canFilterByMe: provider.supports('viewer'),
     workspaces: session.workspaces,
     openRouterSource,
@@ -2621,13 +2633,18 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
     } catch (e) { /* non-fatal */ }
 
-    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName });
+    const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName });
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
       selectedTeamId,
       availableAssignees,
-      selectedAssignee: assigneeState.selectedAssignee,
+      // LIN-2550: label the selector off the filter the render APPLIED. An
+      // unmatched name (a stale `?assignee=` carried across a team change by
+      // buildFilterUrl, `me` for a viewer with nothing assigned, an old
+      // bookmark) degrades to the full board by design — so the toggle must
+      // read `all` with it, not keep asserting a scope that was not applied.
+      selectedAssignee: appliedAssigneeName ? assigneeState.selectedAssignee : 'all',
       canFilterByMe,
       workspaces: req.session.workspaces,
       openRouterSource,
