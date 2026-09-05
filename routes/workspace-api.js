@@ -1549,6 +1549,23 @@ ${goal}`
           const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore })
           if (stampOk) decisionStampDedupe.set(key, true)
         }
+
+        // Dedupe-hit ledger repair (LIN-2649 S1, F2): a dedupe hit means the
+        // ORIGINAL create's own ledger-record attempt (below) may have failed
+        // silently, leaving a Harbour-written comment unrecorded. Re-attempt
+        // it here before returning — idempotent upsert, same best-effort
+        // discipline as the non-dedupe path, never gates the response.
+        if (harbourCommentsStore) {
+          try {
+            const priorCommentId = prior.comment?.id
+            if (priorCommentId) {
+              await harbourCommentsStore.record({ urlKey: workspace.urlKey, commentId: priorCommentId })
+            }
+          } catch (ledgerErr) {
+            console.error('Harbour-comments ledger repair failed:', ledgerErr.message)
+          }
+        }
+
         return res.status(200).json({ ...prior, deduped: true })
       }
 
