@@ -228,3 +228,40 @@ describe('LIN-2618: one shared brief, rendered into both surfaces', () => {
     assert.doesNotMatch(c, /Invalid Date/);
   });
 });
+
+describe('LIN-2618: the extraction must not cost the kickoff any instruction it had', () => {
+  test('the gate is still concrete about which of THIS transport\'s calls it covers', () => {
+    // The shared gate is transport-neutral ("anything that changes state"),
+    // because the in-page chat has no verbs to name. The kickoff's old inline
+    // gate DID name them, and a curl-driven session that has to infer which of
+    // its own calls the rule covers is worse off than before the extraction.
+    const text = buildFlightCompanionKickoff({ baseUrl: BASE_URL });
+    assert.match(text, /every `GET`[\s\S]*reading/i);
+    assert.match(text, /No approval needed/i);
+    assert.match(text, /every `POST`[\s\S]*changes state/i);
+    // The named POST routes specifically — the ones the catalog above offers.
+    assert.ok(text.includes('/recommend-and-dispatch'));
+    // ...and this concretisation belongs to THIS renderer, not the shared brief,
+    // since the chat has no such verbs.
+    assert.ok(!COMPANION_BRIEF_SECTIONS.join('\n').includes('`GET`'));
+  });
+
+  test('every substantive instruction the pre-extraction kickoff carried still has a home', () => {
+    const text = buildFlightCompanionKickoff({ baseUrl: BASE_URL });
+    // Spot-checked against the pre-LIN-2618 output: the persona's watch/narrate
+    // framing, the boot sequence, the altitude rule, the propose-then-wait gate
+    // and its prompt-only caveat, and the monitoring substrate.
+    for (const claim of [
+      /you \*\*watch\*\*/i,
+      /narrate in plain\s+language/i,
+      /read a colleague\s+would give over their shoulder/i,
+      /propose it in plain language and wait/i,
+      /prompt-only/i,
+      /dispatch\?status=blocked/,
+      /they will 401/i,
+      /Say hello/i,
+    ]) {
+      assert.match(text, claim, `the kickoff lost: ${claim}`);
+    }
+  });
+});
