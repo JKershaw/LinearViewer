@@ -49,14 +49,20 @@
  *     `send_follow_up` tool can still be REASONED ABOUT and REQUESTED —
  *     `followUpEnabled` stays `true` for both shapes — but its write only
  *     *executes* on a turn a human demonstrably started). An auto-wake turn also
- *     runs §A.2's `shouldSpendTurn` (`lib/flight-companion-gate.js`) FIRST — before
- *     `tryUse`, before any model call — reusing the companion's own
- *     `companion:v1:<urlKey>` `observerStateStore` instance (no new store) against
- *     the sweep's `sweep:v1:<urlKey>` census. `false` short-circuits with a cheap
- *     JSON response; no quota is touched and no model is called. A free-tier
- *     `tryUse` rejection is asymmetric too: 429 (with the `freeTier` body) for
- *     user-initiated, silent (plain 200, no toast) for auto-wake — there may be no
- *     one watching an auto-wake tick.
+ *     clears §A.2's `shouldSpendTurn` gate FIRST — before `tryUse`, before any
+ *     model call — against the companion's own `companion:v1:<urlKey>`
+ *     `observerStateStore` instance and the sweep's `sweep:v1:<urlKey>` census.
+ *     **Since LIN-2631 that happens in `lib/flight-companion-turn.js`, not here.**
+ *     This file no longer evaluates the gate, seeds that instance, or writes a
+ *     reservation; it supplies the config and quota checks through the core's
+ *     `onBeforeSpend` hook, which the core calls at exactly that point in the
+ *     order. That is what let the gate move without the ordering moving with it —
+ *     and leaving the check here instead is what had this handler running its own
+ *     duplicate copy of the gate. A refusal comes back as a value and is answered
+ *     here with the same cheap JSON response as before; no quota is touched and no
+ *     model is called. The free-tier rejection stays asymmetric: 429 (with the
+ *     `freeTier` body) for user-initiated, silent (plain 200, no toast) for
+ *     auto-wake — there may be no one watching an auto-wake tick.
  *
  * The `tool` SSE event gains one new `phase` value, `'proposed'` — never a new
  * event kind — emitted in place of the generic `'result'` phase specifically when
