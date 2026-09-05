@@ -55,6 +55,9 @@ function buildApp({ resolveWorkspaceAccess, validateToken, issueDetail, rejected
       validateToken: validateToken ?? (async () => ({
         tokenId: 'tok-agent-1', urlKey: 'acme', label: 'autopilot', scope: 'readWrite', createdBy: 'acct-owner',
       })),
+      // LIN-1938 S2: these fixtures use a bearer nothing recognizes, so there
+      // is no descriptor to return.
+      describeRejectionCause: async () => null,
     },
     proxyEventStore: proxyEventStore ?? { recordEvent: async () => {} },
     resolveWorkspaceAccess: resolveWorkspaceAccess ?? (async () => ({

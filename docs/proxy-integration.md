@@ -133,6 +133,33 @@ exchanging a bootstrap that was already issued.
 > agent follows the exchange instruction in the prompt. Only a consumer that programmatically
 > extracts and reuses the embedded token must add the one-call exchange.
 
+#### Token lifetimes (LIN-1938)
+
+`expiresAt` above is a per-call value on the exchange response, not a fixed constant — the
+lifetime it carries depends on how the token was minted, not on anything a caller chooses.
+The authoritative source is the code, not this table: `WORKING_TOKEN_TTL_SECONDS` and
+`BOOTSTRAP_TOKEN_TTL_SECONDS` (`lib/proxy-tokens.js`) and `PROMPT_PROXY_TOKEN_TTL_SECONDS`
+(`routes/proxy-tokens-admin.js`) are the values themselves; this table names which mint path
+uses which one so a value change there is not also a doc-drift bug here.
+
+| Mint path | TTL constant | Lifetime today |
+| --- | --- | --- |
+| This exchange (`POST /api/proxy/token`) | `WORKING_TOKEN_TTL_SECONDS` | 48h |
+| Dispatch preamble bootstrap | `BOOTSTRAP_TOKEN_TTL_SECONDS` | 48h |
+| Refire broker bootstrap (`POST /api/dispatch/broker-token`) | `BOOTSTRAP_TOKEN_TTL_SECONDS` | 48h |
+| Operator bootstrap mint (`"bootstrap": true`) | `BOOTSTRAP_TOKEN_TTL_SECONDS` | 48h |
+| Operator standard mint, label `prompt-proxy` | `PROMPT_PROXY_TOKEN_TTL_SECONDS` | 48h |
+| Operator standard mint, any other label | `ProxyTokenStore.defaultTtl` (store default) | 90 days |
+| Dispatch/runner tokens (`DispatchTokenStore`) | — (schema has no `expiresAt`) | never expires |
+
+Every path an agent reaches programmatically is 48h. There is no mint-time duration control on
+this consumer surface — an operator choosing a longer lifetime at mint time is tracked
+separately as **LIN-2602**; a human-approved extension of an existing token, with no new token
+bytes ever minted, is tracked as **LIN-2603**. Today, a session expected to outlive 48h needs a
+fresh operator mint before the old token expires, not a self-service renewal or refresh call —
+none exists, and none is planned at this endpoint (`POST /api/proxy/token` remains
+bootstrap-exchange-only, never a re-exchange of a live working token).
+
 ### Using the Token
 
 Include the token in the `Authorization` header:
@@ -225,6 +252,37 @@ This endpoint returns `LINEAR_AUTH` in both rows above — **do not** assume `40
 
 - `stage: "proxy-token"` → **your own token**. Mint or re-issue a proxy token; reconnecting the workspace will not help — the workspace credential was never even reached.
 - `stage: "provider-lane"` → the workspace credential itself (now also stamped on every `LINEAR_AUTH` `401` from the table above, alongside its pre-existing `code`/`retryable`). Escalate / reconnect the workspace, per the `LINEAR_AUTH` table above; re-issuing your own proxy token will not help.
+
+**`proxyTokenState` / `proxyTokenExpiredAt`** (LIN-1938) make a `stage: "proxy-token"` `401`
+self-describing when the bearer is a *recognized* (if rejected) token — previously this branch
+never looked further than "invalid, expired, or consumed", and a genuinely expired working token
+left no way to tell that apart from a garbage/never-issued bearer:
+
+```json
+{ "error": "Invalid, expired, or consumed token", "code": "PROXY_TOKEN_INVALID",
+  "category": "auth", "retryable": false, "stage": "proxy-token",
+  "proxyTokenState": "expired", "proxyTokenExpiredAt": "2026-08-30T06:09:00.000Z" }
+```
+
+- `proxyTokenState` — `"bootstrap_only"` (a single-use bootstrap presented on a data endpoint),
+  `"expired"`, or `"consumed"` (a single-use token already spent). Present only when the bearer
+  matches a token Harbour has on record; a wholly unrecognized bearer (never issued, or a typo)
+  carries neither field — there is nothing to describe.
+- `proxyTokenExpiredAt` — ISO timestamp, present only when `proxyTokenState` is `"expired"`.
+- These are **deliberately distinct names** from `expiryKind`/`msUntilExpiry` in the
+  `[credential-rejected]` audit line and `GET /api/proxy/credential-health` — those describe the
+  *workspace's stored provider credential* (a different concept from your own bearer token).
+  Never conflate the two: a `proxyTokenState` field never appears alongside `expiryKind` in the
+  same response, and vice versa.
+- This is observability only — it does not change the remedy. `retryable` stays `false` in every
+  case; the only recovery today is an operator-minted replacement token (see the [token lifetimes
+  table](#token-lifetimes-lin-1938) above and LIN-2602/LIN-2603 for the tracked self-service work).
+- The recognized-expired case now also writes an audit row (`stage: "proxy-token"`, `status: 401`)
+  where before it left none at all — an expired working token used to be invisible to an operator
+  as well as to the agent holding it. This row is scoped to the workspace only (`tokenId: null`,
+  since the caller's own token is the one being rejected) and is excluded from
+  `GET /api/proxy/credential-health`'s provider-lane fold by construction (`stage` and `status`
+  both differ from what that endpoint counts).
 
 Before this, both classes of `401` were undocumented and easy to conflate — a caller-token rejection carried no `code`/`category`/`stage` at all, and the distinction lived only in Harbour's own server-side logs (`[credential-rejected]`), invisible to the very agent that has to pick a remedy.
 
@@ -2070,6 +2128,8 @@ curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" \
 4. **Handle 503 gracefully, but check `retryable` before deciding what "gracefully" means** — a `WORKSPACE_*`-coded 503 (see the structured error envelope above) means the workspace OAuth token has expired or is otherwise unavailable; the user needs to re-authenticate. A `LINEAR_AUTH`-coded 503 is different: it means a credential this proxy believed was still valid was rejected upstream anyway — back off and retry, it is usually a short-lived race that heals on its own (LIN-2216). If it keeps happening for the same request, it self-escalates to a `401` on its own; treat that as the re-authenticate case.
 
 5. **On a `401`, check `stage` before assuming "the workspace is disconnected"** (LIN-1985) — `stage: "proxy-token"` (`code: "PROXY_TOKEN_INVALID"`) means YOUR bearer/bootstrap token was rejected; mint or re-issue one, the workspace was never touched. `stage: "provider-lane"` (`code: "LINEAR_AUTH"`) means the STORED workspace credential was rejected; escalate/reconnect the workspace instead. Never guess from the bare status code alone — see the structured error envelope above.
+
+    **Don't park on a single `401` snapshot — and the two `stage`s need opposite treatment (LIN-1938).** A `stage: "provider-lane"` `401` can be a transient upstream OAuth-refresh window (minutes, not permanent) — retry over 10-15 minutes (two attempts is enough) before concluding the workspace is genuinely disconnected, and if you still give up, record *both* observation timestamps (`T1`, `T2`) in the park message rather than a single snapshot; a worker that parks on one 401 during a five-minute blip has cost the whole session for nothing. A `stage: "proxy-token"` `401` is the opposite case: it is `retryable: false` and will not recover on its own no matter how long you wait — retrying it wastes the window instead of using it. Its only recovery today is an operator-minted replacement token (see `proxyTokenState`/`proxyTokenExpiredAt` above and LIN-2602/LIN-2603 for the tracked self-service work).
 
 6. **Respect rate limits** — 60 requests/minute per IP. Add backoff on 429 responses.
 

@@ -13,6 +13,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildInstructions } from '../../lib/proxy-instructions.js';
+import { WORKING_TOKEN_TTL_SECONDS, BOOTSTRAP_TOKEN_TTL_SECONDS } from '../../lib/proxy-tokens.js';
 
 const BASE_URL = 'https://example.test';
 
@@ -80,5 +81,33 @@ describe('buildInstructions — requiresTeam (LIN-2352)', () => {
     const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite', requiresTeam: true });
     assert.match(text, /teamId is required for this workspace\./);
     assert.match(text, /teamId accepts a team key \(e\.g\. LIN\) or name as well as a UUID\./);
+  });
+});
+
+describe('buildInstructions — per-path token lifetime table (LIN-1938 S1)', () => {
+  test('states the working/bootstrap-token lifetimes, sourced from the exported TTL constants', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /Token lifetimes \(LIN-1938\)/);
+    assert.match(text, new RegExp(`${WORKING_TOKEN_TTL_SECONDS / 3600}h  - this exchange`));
+    assert.match(text, new RegExp(`${BOOTSTRAP_TOKEN_TTL_SECONDS / 3600}h  - the single-use bootstrap itself`));
+    assert.match(text, /prompt-proxy` \(`PROMPT_PROXY_TOKEN_TTL_SECONDS`/);
+    assert.match(text, /90d {2}- an operator standard mint under any other label/);
+    assert.match(text, /never - dispatch\/runner tokens/);
+  });
+});
+
+describe('buildInstructions — proxy-token 401 fields + Class-B retry guidance (LIN-1938 S3/S6)', () => {
+  test('documents proxyTokenState/proxyTokenExpiredAt as distinct from provider-credential fields', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /proxyTokenState/);
+    assert.match(text, /proxyTokenExpiredAt/);
+    assert.match(text, /distinct fields from `credential-health`'s\n\s*provider-credential `expiryKind`\/`msUntilExpiry`/);
+  });
+
+  test('tells an agent to retry a provider-lane 401 but never a proxy-token 401', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /Don't park on one 401/);
+    assert.match(text, /retry over 10-15 minutes/);
+    assert.match(text, /`stage: "proxy-token"`[\s\S]*?retrying it wastes the window/);
   });
 });

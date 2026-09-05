@@ -34,15 +34,18 @@ function linearAuthError() {
   return err;
 }
 
-function buildApp({ resolveWorkspaceAccess, issueDetail, validateToken } = {}) {
+function buildApp({ resolveWorkspaceAccess, issueDetail, validateToken, describeRejectionCause, proxyEventStore } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
     proxyTokenStore: {
       validateToken: validateToken ?? (async () => ({ tokenId: 'tok-1', urlKey: 'acme', label: 'autopilot', scope: 'readWrite', createdBy: 'acct-owner' })),
       exchangeBootstrapToken: async () => null,
+      // LIN-1938 S2/S3: the default mirrors these tests' existing bogus/missing
+      // bearers — a token nothing recognizes has no descriptor to return.
+      describeRejectionCause: describeRejectionCause ?? (async () => null),
     },
-    proxyEventStore: { recordEvent: async () => {} },
+    proxyEventStore: proxyEventStore ?? { recordEvent: async () => {} },
     resolveWorkspaceAccess: resolveWorkspaceAccess ?? (async () => ({
       token: 'linear-tok', reason: 'ok', provider: 'linear', source: 'session-scan',
       expiresAt: Date.now() + 3600_000, credentialFingerprint: fingerprintCredential('linear-tok'),
@@ -83,6 +86,11 @@ describe('proxy-token-stage 401s now carry code/category/stage (LIN-1985, Block 
     assert.equal(body.category, 'auth');
     assert.equal(body.retryable, false);
     assert.equal(body.stage, 'proxy-token', 'the remedy is re-issue the caller\'s own token, never reconnect the workspace');
+    // LIN-1938 regression: an unrecognized bearer (describeRejectionCause's
+    // default null) carries neither new field — there is no recognized token
+    // to describe.
+    assert.equal('proxyTokenState' in body, false);
+    assert.equal('proxyTokenExpiredAt' in body, false);
   });
 
   test('a missing Authorization header carries the same shape', async () => {
@@ -122,6 +130,67 @@ describe('provider-lane 401s now carry an explicit stage (LIN-1985, Block B)', (
     assert.equal(status, 401);
     assert.equal(body.code, 'LINEAR_AUTH', 'the pre-existing LIN-2216 code — unchanged by this ticket');
     assert.equal(body.stage, 'provider-lane', 'the remedy is escalate/reconnect the workspace, never re-issue the caller\'s own token');
+  });
+});
+
+describe('LIN-1938 S3: the 401 self-describes a recognized-expired token, and audits it', () => {
+  test('a recognized-expired token carries proxyTokenState + proxyTokenExpiredAt, distinct from provider-credential fields', async () => {
+    const app = buildApp({
+      validateToken: async () => null,
+      describeRejectionCause: async () => ({ state: 'expired', expiresAt: '2026-08-30T06:09:00.000Z', urlKey: 'acme' }),
+    });
+    const { status, body } = await request(app, `/api/proxy/issues/${ISSUE_UUID}`, { bearer: 'expired-working-token' });
+
+    assert.equal(status, 401);
+    assert.equal(body.code, 'PROXY_TOKEN_INVALID');
+    assert.equal(body.stage, 'proxy-token');
+    assert.equal(body.retryable, false, 'LIN-1938 must not weaken PROXY_TOKEN_INVALID.retryable');
+    assert.equal(body.proxyTokenState, 'expired');
+    assert.equal(body.proxyTokenExpiredAt, '2026-08-30T06:09:00.000Z');
+    // Distinct names from lib/credential-diagnostics.js's provider-credential fields.
+    assert.equal('expiryKind' in body, false);
+    assert.equal('msUntilExpiry' in body, false);
+  });
+
+  test('a recognized-but-not-expired rejection (bootstrap_only/consumed) carries proxyTokenState but NOT proxyTokenExpiredAt', async () => {
+    const app = buildApp({
+      validateToken: async () => null,
+      describeRejectionCause: async () => ({ state: 'consumed', expiresAt: null, urlKey: 'acme' }),
+    });
+    const { body } = await request(app, `/api/proxy/issues/${ISSUE_UUID}`, { bearer: 'consumed-token' });
+
+    assert.equal(body.proxyTokenState, 'consumed');
+    assert.equal('proxyTokenExpiredAt' in body, false);
+  });
+
+  test('writes an audit row for the recognized-expired case: tokenId null, stage proxy-token, status 401, note the state', async () => {
+    const recorded = [];
+    const app = buildApp({
+      validateToken: async () => null,
+      describeRejectionCause: async () => ({ state: 'expired', expiresAt: '2026-08-30T06:09:00.000Z', urlKey: 'acme' }),
+      proxyEventStore: { recordEvent: async (event) => { recorded.push(event); } },
+    });
+    await request(app, `/api/proxy/issues/${ISSUE_UUID}`, { bearer: 'expired-working-token' });
+
+    assert.equal(recorded.length, 1, 'exactly one audit row for the recognized-expired 401');
+    assert.equal(recorded[0].urlKey, 'acme');
+    assert.equal(recorded[0].tokenId, null);
+    assert.equal(recorded[0].tokenLabel, null);
+    assert.equal(recorded[0].status, 401);
+    assert.equal(recorded[0].stage, 'proxy-token');
+    assert.equal(recorded[0].note, 'expired');
+  });
+
+  test('writes NO audit row for a wholly unrecognized bearer — there is no urlKey to attribute it to', async () => {
+    const recorded = [];
+    const app = buildApp({
+      validateToken: async () => null,
+      describeRejectionCause: async () => null,
+      proxyEventStore: { recordEvent: async (event) => { recorded.push(event); } },
+    });
+    await request(app, `/api/proxy/issues/${ISSUE_UUID}`, { bearer: 'garbage-never-issued' });
+
+    assert.equal(recorded.length, 0);
   });
 });
 

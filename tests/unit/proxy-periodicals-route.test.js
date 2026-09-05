@@ -91,7 +91,9 @@ function buildApp({
   app.use(createProxyRoutes({
     proxyTokenStore: {
       validateToken: validateTokenOverride
-        || (async () => ({ tokenId: 't1', urlKey: tokenUrlKey, label: 'test', scope: tokenScope, createdBy: 'u1' }))
+        || (async () => ({ tokenId: 't1', urlKey: tokenUrlKey, label: 'test', scope: tokenScope, createdBy: 'u1' })),
+      // LIN-1938 S2: this fixture's invalid-token case is a bearer nothing recognizes.
+      describeRejectionCause: async () => null,
     },
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: async () => ({ token: 'test-token', reason: 'ok' }),

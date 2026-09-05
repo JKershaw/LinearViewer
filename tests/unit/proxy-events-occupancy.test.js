@@ -242,3 +242,51 @@ describe('LIN-2473: the credential-health feeder must carry the fingerprint to t
     assert.equal(occupancy.failedCalls, 0);
   });
 });
+
+/**
+ * LIN-1938 S3 (plan-review finding fe10a599, recorded as acceptance evidence
+ * rather than merely asserted): the new audit row an expired-proxy-token 401
+ * writes must not contaminate `/api/proxy/credential-health` for the caller
+ * whose OWN token happens to be the recognized-expired one. It is excluded
+ * three independent ways — `tokenId: null` (the row names no live caller
+ * token), `stage: 'proxy-token'` (not `provider-lane`), and `status: 401`
+ * (not `503`) — and this test drives the real store end to end, the same
+ * discipline as the LIN-2473 block above, rather than trusting the shape by
+ * inspection alone.
+ */
+describe('LIN-1938 S3: the proxy-token-expiry audit row does not pollute credential-health', () => {
+  test('a recognized-expired-token 401 row (tokenId: null, stage: proxy-token) never counts toward the fold', async () => {
+    const collection = projectionFaithfulCollection();
+    const store = new ProxyEventStore({ collection });
+
+    // Exactly the shape authenticateProxyToken's rejection branch writes.
+    await store.recordEvent({
+      urlKey: 'ws', tokenId: null, tokenLabel: null, method: 'GET',
+      endpoint: '/api/proxy/issues/LIN-1', status: 401, stage: STAGE_PROXY_TOKEN,
+      note: 'expired',
+    });
+
+    // Two more rows, in TWO distinct buckets, so the fold clears the
+    // OCCUPANCY_MIN_BUCKETS sample floor and reports a real verdict rather
+    // than 'unknown' — otherwise 'unknown' could mean either "correctly
+    // excluded" or "not enough evidence yet", and this test needs to tell
+    // those apart.
+    await store.recordEvent({
+      urlKey: 'ws', tokenId: 'tok', tokenLabel: 'runner', method: 'GET',
+      endpoint: '/api/proxy/issues/LIN-1', status: 200, stage: STAGE_PROVIDER_LANE,
+      credentialFingerprint: 'fp-real-caller',
+    });
+    await store.recordEvent({
+      urlKey: 'ws', tokenId: 'tok', tokenLabel: 'runner', method: 'GET',
+      endpoint: '/api/proxy/issues/LIN-1', status: 200, stage: STAGE_PROVIDER_LANE,
+      credentialFingerprint: 'fp-real-caller',
+    });
+    collection._docs[2].timestamp = new Date(Date.now() - 35_000);
+
+    const { occupancy } = await store.listSelfCredentialHealth('ws', 'tok');
+
+    assert.equal(occupancy.verdict, 'ok', 'the proxy-token-expiry row must not read as a provider-lane fault for this caller');
+    assert.equal(occupancy.failedCalls, 0);
+    assert.equal(occupancy.totalCalls, 2, 'only the caller\'s own 200s should be visible; the null-tokenId row is invisible to this query entirely');
+  });
+});
