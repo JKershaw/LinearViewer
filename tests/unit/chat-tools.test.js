@@ -142,8 +142,10 @@ describe('CHAT_TOOL_RESULT_BUDGETS (LIN-1065, LIN-1073, LIN-2617)', () => {
     assert.ok(CHAT_TOOL_RESULT_BUDGETS.get_session > TOOL_RESULT_MAX_CHARS);
     // LIN-2617: sized so twenty rows fit without truncation — a clipped row list
     // is a silently wrong answer to "what is in flight?", not a shorter one.
-    assert.ok(CHAT_TOOL_RESULT_BUDGETS.list_active_sessions >= 12000);
-    assert.ok(CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions >= 12000);
+    // The exact figures are pinned by the full-cap serialization witnesses
+    // below; here we only hold the line that both exceed the global default.
+    assert.ok(CHAT_TOOL_RESULT_BUDGETS.list_active_sessions > TOOL_RESULT_MAX_CHARS);
+    assert.ok(CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions > TOOL_RESULT_MAX_CHARS);
   });
 
   test('does NOT override any other tool, so they keep the 4000 default', () => {
@@ -2142,5 +2144,97 @@ describe('pass-4 fleet reads — review-ledger witnesses (LIN-2617)', () => {
     assert.strictEqual(row.runCount, 0);
     // Called with no ctx at all (LIN-1951's twin may), it still returns a row.
     assert.doesNotThrow(() => projectActiveSession({ sessionId: 's0', loops: [] }));
+  });
+});
+
+describe('pass-4 — the decision row resolves the session get_session actually keys by (LIN-2617)', () => {
+  test('a follow-up loop resolves to its CHAIN ROOT session, not its own id or its group key', async () => {
+    // `_buildSessions` pass 2.5 stitches a follow-up into the session of the
+    // loop at the root of its followUpTo chain. A precedence that read
+    // `sessionGroupId` first would answer 'hop' here — which is itself only an
+    // intermediate follow-up (LIN-1393), not a session key.
+    const history = [
+      sessionHistoryItem({
+        id: 'root', issueIdentifier: 'LIN-910', target: 'cli',
+        dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
+        feedback: [{ message: '[working] started', timestamp: T_FLEET_OLD }],
+      }),
+      sessionHistoryItem({
+        id: 'hop', issueIdentifier: 'LIN-910', target: 'cli', followUpTo: 'root',
+        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
+        feedback: [{ message: '[working] continued', timestamp: T_FLEET_MID }],
+      }),
+      sessionHistoryItem({
+        id: 'leaf', issueIdentifier: 'LIN-910', target: 'cli',
+        followUpTo: 'hop', sessionGroupId: 'hop',
+        dispatchedAt: T_FLEET_FRESH, resolvedAt: null, status: 'taken',
+        feedback: [
+          { message: '[blocked] parked', timestamp: T_FLEET_FRESH },
+          decisionEntry('dec-leaf', 'Which way?', T_FLEET_FRESH),
+        ],
+      }),
+    ];
+    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
+    const row = (await executeTool({ name: 'list_pending_decisions', arguments: {} }))
+      .decisions.find(d => d.decisionId === 'dec-leaf');
+
+    assert.strictEqual(row.loopId, 'leaf');
+    assert.strictEqual(row.sessionId, 'root', 'the chain root, not the loop and not the group key');
+
+    // The id it reports is one get_session can actually resolve — which is the
+    // whole point of reporting it separately from the loopId.
+    const session = await executeTool({ name: 'get_session', arguments: { sessionId: row.sessionId } });
+    assert.strictEqual(session.sessionId, 'root');
+  });
+
+  test('an unresolvable chain reports null rather than a confidently wrong id', async () => {
+    // The predecessor is outside the 30-day window, so nothing in this read can
+    // say which session the follow-up belongs to.
+    const history = [
+      sessionHistoryItem({
+        id: 'orphan', issueIdentifier: 'LIN-911', target: 'cli', followUpTo: 'aged-out-of-window',
+        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
+        feedback: [
+          { message: '[blocked] parked', timestamp: T_FLEET_MID },
+          decisionEntry('dec-orphan', 'Still?', T_FLEET_MID),
+        ],
+      }),
+    ];
+    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
+    const row = (await executeTool({ name: 'list_pending_decisions', arguments: {} }))
+      .decisions.find(d => d.decisionId === 'dec-orphan');
+
+    assert.strictEqual(row.loopId, 'orphan', 'the run is still named');
+    assert.strictEqual(row.sessionId, null, 'a guess here would send get_session to the wrong session');
+  });
+
+  test('the session read also fits its budget at a full cap of worst-case rows', async () => {
+    // The decisions side was measured; this is the other half. `tasksTouched`
+    // is the unbounded field here — a long autopilot session touches many.
+    const history = [];
+    for (let i = 0; i < 25; i += 1) {
+      history.push(sessionHistoryItem({
+        id: `wide-${i}`, kind: 'autopilot', issueIdentifier: `LIN-80${i}`, target: 'cli',
+        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
+        feedback: [{ message: `[working] ${'z'.repeat(5000)}`, timestamp: T_FLEET_FRESH }],
+      }));
+      for (let j = 0; j < 40; j += 1) {
+        history.push(sessionHistoryItem({
+          id: `wide-${i}-w${j}`, sessionId: `wide-${i}`, issueIdentifier: `LIN-8${i}${j}`, target: 'cli',
+          dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken', feedback: [],
+        }));
+      }
+    }
+    const { executeTool } = makeFleetCatalog(history);
+    const result = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
+
+    assert.strictEqual(result.sessions.length, 20);
+    assert.ok(result.sessions.every(r => r.tasksTouched.length <= 12), 'tasksTouched is capped');
+    assert.ok(result.sessions.some(r => r.tasksTouchedTotal > 12), 'and the true total still rides');
+    const size = JSON.stringify(result).length;
+    assert.ok(
+      size <= CHAT_TOOL_RESULT_BUDGETS.list_active_sessions,
+      `20 session rows serialize to ${size}, over the declared budget`
+    );
   });
 });
