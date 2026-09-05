@@ -809,6 +809,109 @@ describe('derivePrimaryFloor', () => {
   });
 });
 
+// ─── LIN-2592: {gateKind, rePassKind} option — same walk, new pair ───────────
+
+describe('computeIssueRoundTrips — {gateKind, rePassKind} option (LIN-2592)', () => {
+  test('a {gateKind: "review", rePassKind: "implementation"} walk produces the analogous result to the default plan/plan-review walk over an isomorphic fixture', () => {
+    // Two structurally identical fixtures — same timestamps, same verdict-comment
+    // convention — differing ONLY in which kind labels play gate vs re-pass.
+    const buildRows = (gateKind, rePassKind) => [
+      row('r1', rePassKind, 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z'),
+      row('r2', gateKind, 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z',
+        feedbackDone('DONE: Verdict: Request Changes.', '2026-08-09T10:05:00.000Z')),
+      row('r3', rePassKind, 'done', '2026-08-09T10:10:00.000Z', '2026-08-09T10:40:00.000Z'),
+      row('r4', gateKind, 'done', '2026-08-09T11:00:00.000Z', '2026-08-09T11:05:00.000Z',
+        feedbackDone('DONE: Verdict: Approve.', '2026-08-09T11:05:00.000Z')),
+    ];
+
+    const defaultResult = computeIssueRoundTrips(
+      issue('default-pair', { rows: buildRows('plan-review', 'plan') }),
+      { asOf: ASOF },
+    );
+    const newPairResult = computeIssueRoundTrips(
+      issue('new-pair', { rows: buildRows('review', 'implementation') }),
+      { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' },
+    );
+
+    // Same algorithm, new pair: every derived field that doesn't embed the
+    // literal kind string must match exactly.
+    assert.equal(newPairResult.R0.tier, defaultResult.R0.tier);
+    assert.equal(newPairResult.R0.verdict, defaultResult.R0.verdict);
+    assert.equal(newPairResult.R0.resolved, defaultResult.R0.resolved);
+    assert.equal(newPairResult.R0.rightCensored, defaultResult.R0.rightCensored);
+    assert.equal(newPairResult.reachedPlanReviewAny, defaultResult.reachedPlanReviewAny);
+    assert.equal(newPairResult.roundTrips, defaultResult.roundTrips);
+    assert.deepEqual(newPairResult.verdictTier, defaultResult.verdictTier);
+    assert.deepEqual(newPairResult.crossTierDisagreements, defaultResult.crossTierDisagreements);
+    assert.equal(newPairResult.subWindows.length, defaultResult.subWindows.length);
+
+    // And the concrete values are the ones the shared walk is known to produce
+    // for this shape (R0 settles on the FIRST gate row, tier B, "request changes";
+    // roundTrips=1 for the one re-pass row — r3 — following it).
+    assert.equal(newPairResult.R0.tier, 'b');
+    assert.equal(newPairResult.R0.verdict, 'request changes');
+    assert.equal(newPairResult.roundTrips, 1);
+  });
+
+  test('under the review pair, a `plan-review` row is NOT treated as the gate (no silent fallback to the literal)', () => {
+    const iss = issue('not-a-gate', {
+      rows: [
+        row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z',
+          feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:05:00.000Z')),
+      ],
+    });
+    const result = computeIssueRoundTrips(iss, { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
+    // If a helper silently fell back to the hardcoded 'plan-review' literal,
+    // this row WOULD settle R0 (it carries a perfectly resolving DONE line).
+    assert.equal(result.R0, null);
+    assert.equal(result.reachedPlanReviewAny, false);
+  });
+
+  test('under the review pair, a legacy `plan` row is NOT counted as the re-pass kind by countRoundTrips (no silent fallback to the literal)', () => {
+    const iss = issue('not-a-repass', {
+      rows: [
+        row('r1', 'review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z',
+          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-09T10:05:00.000Z')),
+        // A `plan` row, not `implementation` — must NOT be counted as a re-pass
+        // under the {gateKind: 'review', rePassKind: 'implementation'} pair.
+        row('r2', 'plan', 'done', '2026-08-09T10:10:00.000Z', '2026-08-09T10:20:00.000Z'),
+      ],
+    });
+    const result = computeIssueRoundTrips(iss, { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
+    assert.equal(result.roundTrips, 0);
+  });
+
+  test('gateDue reaches true under the review pair via a non-default rePassKind dispatch (kills a hardcoded-`plan` regression in hasRePassDispatch)', () => {
+    const iss = issue('gate-review-pair', {
+      description: 'plan-review due: yes — (a) needs multiple sessions.',
+      rows: [
+        row('i1', 'implementation', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z'),
+      ],
+    });
+    const result = computeIssueRoundTrips(iss, { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
+    assert.equal(result.gateDue, true,
+      'hasRePassDispatch must check options.rePassKind ("implementation"), not a hardcoded "plan" literal — this issue has an implementation row and no plan row at all');
+  });
+
+  test('computePlanReviewRoundTrips forwards a non-default gate pair to every issue (kills a dropped pair-forwarding regression in the aggregate wrapper)', () => {
+    const iss = issue('agg-review-pair', {
+      rows: [
+        row('i1', 'implementation', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z'),
+        row('r1', 'review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z',
+          feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:05:00.000Z')),
+        row('i2', 'implementation', 'done', '2026-08-09T10:10:00.000Z', '2026-08-09T10:40:00.000Z'),
+      ],
+    });
+    const agg = computePlanReviewRoundTrips([iss], { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
+    assert.equal(agg.scale.reachedPlanReviewAny, 1,
+      'the aggregate must forward {gateKind, rePassKind} to computeIssueRoundTrips per issue — a dropped pair would default to plan-review/plan and find no gate row in this review/implementation fixture');
+    assert.equal(agg.primary.denominator, 1);
+    assert.equal(agg.primary.numerator, 1);
+    assert.equal(agg.roundTrips.mean, 1,
+      'the i2 implementation row after the gate only counts as a re-pass if rePassKind is forwarded through to countRoundTrips — dropping just rePassKind (gateKind still threaded, defaulting to the literal "plan") would leave this degenerate at 0');
+  });
+});
+
 // ─── __internal sanity (mirrors follow-on-ratio.test.js's pattern) ──────────
 
 describe('__internal', () => {
