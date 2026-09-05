@@ -2571,6 +2571,10 @@ ${goal}`
         // both hashes together and there is exactly one write path to keep
         // in sync.
         dueBasisHash: dueBasisHashFromContext(context, { recordedCommentIds }),
+        // LIN-2665 L1: dueBasisHash's OWN version field, never shared with
+        // tier-1's basisVersion above — see lib/task-decisions-store.js's
+        // [F-2] terminal-row patch for why the split is load-bearing.
+        dueBasisVersion: BASIS_VERSION,
         decision: scanResult.outcome === 'decision' ? scanResult.decision : null
       });
       if (!record) {

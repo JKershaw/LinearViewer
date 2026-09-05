@@ -842,10 +842,16 @@ describe('TaskDecisionsStore recordScan — dueBasisHash (LIN-2649 WS2)', () => 
   test('a supplied dueBasisHash round-trips through recordScan and getStatus, alongside the unaffected basisHash', async () => {
     await store.recordScan({
       urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A,
-      basisHash: 'basis-abc', basisVersion: 7, dueBasisHash: 'due-abc', decision: sampleDecision()
+      basisHash: 'basis-abc', basisVersion: 7, dueBasisHash: 'due-abc', dueBasisVersion: 3, decision: sampleDecision()
     });
     const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
     assert.equal(status.dueBasisHash, 'due-abc');
+    // LIN-2665 L1 mutation witness (beat 4): a bare `dueBasisVersion` param
+    // with no assertion on it left the insert path's own persistence
+    // unverified — mutating it to always store null stayed GREEN. Asserted
+    // here, and deliberately a DIFFERENT value from basisVersion (3 vs 7) so
+    // the two fields can't be silently conflated back into one.
+    assert.equal(status.dueBasisVersion, 3);
     assert.equal(status.basisHash, 'basis-abc');
     assert.equal(status.basisVersion, 7);
   });
@@ -886,37 +892,51 @@ describe('TaskDecisionsStore recordScan — [F-2] terminal-row due-basis patch (
     return { id, stamped };
   }
 
-  test('scanning a terminal row with unchanged content patches dueBasisHash/basisVersion and leaves outcome/outcomeAt/decision/basisHash byte-identical', async () => {
+  // LIN-2665 L1: this test used to assert that the terminal-row patch moved
+  // `basisVersion` to the fresh value passed in — that assertion encoded the
+  // L1 defect itself (a due-basis-only refresh stamping tier-1's version
+  // field, making a frozen stale-version basisHash misread as
+  // current-version-comparable). It is rewritten here to assert the fixed
+  // contract: the patch touches dueBasisHash + its OWN dueBasisVersion field,
+  // and tier-1's basisHash/basisVersion pairing is untouched, not just
+  // basisHash alone.
+  test('scanning a terminal row with unchanged content patches dueBasisHash/dueBasisVersion and leaves outcome/outcomeAt/decision/basisHash/basisVersion byte-identical', async () => {
     const { stamped } = await terminalRow({ dueBasisHash: null });
 
     const patched = await store.recordScan({
       urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A,
       basisHash: 'basis-DIFFERENT-should-be-ignored', basisVersion: 99,
-      dueBasisHash: 'due-fresh', decision: sampleDecision({ question: 'a different question, also ignored' })
+      dueBasisHash: 'due-fresh', dueBasisVersion: 7, decision: sampleDecision({ question: 'a different question, also ignored' })
     });
 
-    // Changed: exactly dueBasisHash + basisVersion.
+    // Changed: exactly dueBasisHash + dueBasisVersion.
     assert.equal(patched.dueBasisHash, 'due-fresh');
-    assert.equal(patched.basisVersion, 99);
+    assert.equal(patched.dueBasisVersion, 7);
 
-    // Preserved byte-identical: outcome/outcomeAt/decision/basisHash — the
-    // terminal-row invariant holds by field list, not by convention.
+    // Preserved byte-identical: outcome/outcomeAt/decision/basisHash/basisVersion —
+    // the terminal-row invariant holds by field list, not by convention, and
+    // tier-1's OWN version field must never move on a due-basis-only refresh
+    // (LIN-2665 L1 — the whole point of giving dueBasisHash its own version).
     assert.equal(patched.outcome, stamped.outcome);
     assert.equal(patched.outcomeAt, stamped.outcomeAt);
     assert.deepEqual(patched.decision, stamped.decision);
     assert.equal(patched.basisHash, stamped.basisHash);
     assert.equal(patched.basisHash, 'basis-frozen'); // never the "DIFFERENT" value passed in
+    assert.equal(patched.basisVersion, stamped.basisVersion);
+    assert.equal(patched.basisVersion, 5); // never the 99 passed in — tier-1's version stays frozen
 
-    // The $set field list on the underlying write was exactly {dueBasisHash, basisVersion}.
+    // The $set field list on the underlying write was exactly {dueBasisHash, dueBasisVersion}.
     const doc = collection._docs.find(d => d._id === TaskDecisionsStore.buildId(ISSUE_ID, HASH_A));
     assert.equal(doc.outcome, 'dismissed');
     assert.equal(doc.decision.question, sampleDecision().question);
     assert.equal(doc.basisHash, 'basis-frozen');
+    assert.equal(doc.basisVersion, 5);
 
     // Confirmed via getStatus too — not just the return value.
     const status = await store.getStatus(URL_KEY, ISSUE_ID, HASH_A);
     assert.equal(status.dueBasisHash, 'due-fresh');
-    assert.equal(status.basisVersion, 99);
+    assert.equal(status.dueBasisVersion, 7);
+    assert.equal(status.basisVersion, 5);
     assert.equal(status.outcome, 'dismissed');
   });
 

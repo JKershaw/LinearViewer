@@ -465,7 +465,7 @@ describe('dueChanged — the tri-state (LIN-2649 WS2 required tests)', () => {
     // same genuine comment, same ledgered Harbour comment, present again.
     const currentDueBasisHash = dueBasisHashFromContext(raisedContext(), { recordedCommentIds: recorded() });
     assert.strictEqual(
-      dueChanged({ raisedDueBasisHash: raisedDueBasisHash(), raisedBasisVersion: BASIS_VERSION, currentDueBasisHash }),
+      dueChanged({ raisedDueBasisHash: raisedDueBasisHash(), raisedDueBasisVersion: BASIS_VERSION, currentDueBasisHash }),
       false
     );
   });
@@ -480,7 +480,7 @@ describe('dueChanged — the tri-state (LIN-2649 WS2 required tests)', () => {
     });
     const currentDueBasisHash = dueBasisHashFromContext(live, { recordedCommentIds: recorded() });
     assert.strictEqual(
-      dueChanged({ raisedDueBasisHash: raisedDueBasisHash(), raisedBasisVersion: BASIS_VERSION, currentDueBasisHash }),
+      dueChanged({ raisedDueBasisHash: raisedDueBasisHash(), raisedDueBasisVersion: BASIS_VERSION, currentDueBasisHash }),
       true
     );
   });
@@ -495,7 +495,7 @@ describe('dueChanged — the tri-state (LIN-2649 WS2 required tests)', () => {
     });
     const currentDueBasisHash = dueBasisHashFromContext(live, { recordedCommentIds: recorded() });
     assert.strictEqual(
-      dueChanged({ raisedDueBasisHash: raisedDueBasisHash(), raisedBasisVersion: BASIS_VERSION, currentDueBasisHash }),
+      dueChanged({ raisedDueBasisHash: raisedDueBasisHash(), raisedDueBasisVersion: BASIS_VERSION, currentDueBasisHash }),
       true
     );
   });
@@ -510,19 +510,19 @@ describe('dueChanged — the tri-state (LIN-2649 WS2 required tests)', () => {
     });
     const currentDueBasisHash = dueBasisHashFromContext(live, { recordedCommentIds: recorded() });
     assert.strictEqual(
-      dueChanged({ raisedDueBasisHash: raisedDueBasisHash(), raisedBasisVersion: BASIS_VERSION, currentDueBasisHash }),
+      dueChanged({ raisedDueBasisHash: raisedDueBasisHash(), raisedDueBasisVersion: BASIS_VERSION, currentDueBasisHash }),
       true
     );
   });
 
   test('a pre-WS2 row with no recorded dueBasisHash is UNKNOWN (null), never false', () => {
-    const result = dueChanged({ raisedDueBasisHash: null, raisedBasisVersion: BASIS_VERSION, currentDueBasisHash: 'bbb' });
+    const result = dueChanged({ raisedDueBasisHash: null, raisedDueBasisVersion: BASIS_VERSION, currentDueBasisHash: 'bbb' });
     assert.strictEqual(result, null);
     assert.notStrictEqual(result, false);
   });
 
   test('a hash raised under a stale BASIS_VERSION is UNKNOWN (null), never false — the literal day-one state of every pre-WS2 row', () => {
-    const result = dueChanged({ raisedDueBasisHash: 'aaa', raisedBasisVersion: BASIS_VERSION - 1, currentDueBasisHash: 'aaa' });
+    const result = dueChanged({ raisedDueBasisHash: 'aaa', raisedDueBasisVersion: BASIS_VERSION - 1, currentDueBasisHash: 'aaa' });
     assert.strictEqual(result, null);
     assert.notStrictEqual(result, false);
   });
