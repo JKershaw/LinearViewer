@@ -2452,3 +2452,112 @@ describe('pass-4 — bounds that must hold on real data, not just fixtures (LIN-
     assert.deepStrictEqual(ids, ['d-old', 'd-new']);
   });
 });
+
+describe('pass-4 — review-ledger discharge (LIN-2617)', () => {
+  test('no single row can escape the byte bound, however long its identifier fields are', async () => {
+    // The one path that could outgrow the whole budget in ONE row: the id
+    // fields are agent-authored free text and nothing upstream bounds their
+    // length. A payload that still exceeded the budget would reach the model
+    // hard-sliced into invalid JSON.
+    const huge = 'k'.repeat(30000);
+    const taskDecisions = [{
+      id: 'td-huge', urlKey: URL_KEY, issueId: 'uuid-970', issueIdentifier: huge,
+      scannedAt: T_FLEET_FRESH, outcome: null,
+      decision: {
+        decision_id: huge, question: 'short', recommended: huge,
+        options: [{ id: huge, label: huge }],
+      },
+    }];
+    const { executeTool } = makeDecisionsCatalog({ history: [], taskDecisions, shelvedRulings: [] });
+    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+
+    const size = JSON.stringify(result).length;
+    assert.ok(size <= CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions, `serialized to ${size}`);
+    assert.doesNotThrow(() => JSON.parse(JSON.stringify(result)));
+    // The row survives, capped — reaching zero rows is the last resort, not the
+    // first response to a long identifier.
+    assert.strictEqual(result.decisions.length, 1);
+    assert.strictEqual(result.count, 1);
+    const row = result.decisions[0];
+    for (const [field, value] of Object.entries({
+      decisionId: row.decisionId, issueIdentifier: row.issueIdentifier, recommended: row.recommended,
+      optionId: row.options[0].id, optionLabel: row.options[0].label,
+    })) {
+      assert.ok(value.length <= 501, `${field} must be capped, got ${value.length}`);
+    }
+  });
+
+  test('fitToBudget reports the truncation it performs, even under the row cap', async () => {
+    // Under the row cap (5 < 20) but over the byte budget, so ONLY the byte
+    // trim can set the flag — the row-count cap cannot mask a missing one here.
+    // Fifteen rows, each at its per-field caps — under the 20-row cap, over the
+    // 18000-byte budget.
+    const taskDecisions = [];
+    for (let i = 0; i < 15; i += 1) {
+      taskDecisions.push({
+        id: `td-fat-${i}`, urlKey: URL_KEY, issueId: `uuid-97${i}`, issueIdentifier: 'L'.repeat(400),
+        scannedAt: new Date(Date.now() - (100 - i) * 60000).toISOString(), outcome: null,
+        decision: {
+          decision_id: `fat-dec-${i}${'z'.repeat(400)}`,
+          question: 'p'.repeat(2000),
+          options: Array.from({ length: 4 }, (_, j) => ({ id: `${j}${'q'.repeat(400)}`, label: 'r'.repeat(400) })),
+        },
+      });
+    }
+    const { executeTool } = makeDecisionsCatalog({ history: [], taskDecisions, shelvedRulings: [] });
+
+    const decisions = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    assert.ok(decisions.count <= 20, 'the row cap is NOT what trimmed this');
+    assert.ok(decisions.decisions.length < decisions.count, 'rows were dropped by the byte trim');
+    assert.strictEqual(decisions.truncated, true, 'and the payload says so');
+  });
+
+  test('a decision whose parked-since cannot be resolved sorts last, never first', async () => {
+    // An unresolvable `since` must not masquerade as the longest wait and
+    // displace a genuinely old decision from the top of the list.
+    const history = [sessionHistoryItem({
+      id: 'aged', kind: 'autopilot', issueIdentifier: 'LIN-980', target: 'cli',
+      dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
+      feedback: [
+        { message: '[blocked] parked', timestamp: T_FLEET_OLD },
+        decisionEntry('dec-aged', 'Oldest?', T_FLEET_OLD),
+      ],
+    })];
+    const taskDecisions = [{
+      id: 'td-nostamp', urlKey: URL_KEY, issueId: 'uuid-981', issueIdentifier: 'LIN-981',
+      scannedAt: 'not a date', outcome: null,
+      decision: { decision_id: 'dec-nostamp', question: 'When?', options: [] },
+    }];
+    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions, shelvedRulings: [] });
+    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+
+    assert.deepStrictEqual(result.decisions.map(d => d.decisionId), ['dec-aged', 'dec-nostamp']);
+    assert.strictEqual(result.decisions[1].since, null);
+  });
+
+  test('the session index read is lean — it exists only to map short ids', async () => {
+    const fixture = decisionsFixture();
+    const leanFlags = [];
+    const base = makeMockSessionStores({ history: fixture.history });
+    const { executeTool } = createChatToolCatalog({
+      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
+      dispatchQueueStore: {
+        ...base.dispatchQueueStore,
+        async listHistory(urlKey, options) {
+          // `lean` sets `projection: { prompt: 0 }` at the query
+          // (lib/pipeline-loops.js:1309) so a real DB never transfers 30 days of
+          // prompt text — the LIN-623 read the LIN-608 OOM is blamed on.
+          leanFlags.push(options?.projection?.prompt);
+          return base.dispatchQueueStore.listHistory(urlKey, options);
+        },
+      },
+      agentStatusStore: base.agentStatusStore,
+      taskDecisionsStore: { async listUnansweredForWorkspaces() { return fixture.taskDecisions; } },
+      shelvedRulingsStore: { async listForWorkspaces() { return fixture.shelvedRulings; } },
+    });
+    await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    assert.strictEqual(leanFlags.length, 2, 'the loop read for the predicate, and the session read for the index');
+    // BOTH reads project prompt away — the index read has no use for it at all.
+    assert.deepStrictEqual(leanFlags, [0, 0], 'neither read drags prompt text along');
+  });
+});
