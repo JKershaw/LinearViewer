@@ -29,7 +29,14 @@ const EXCLUDED_COLLECTIONS = [
   // scheduler-locks (LIN-2128): the plan relies on THIS test staying red until
   // the exclusion lands, not on manual review, to catch a future contributor
   // adding an INDEX_SPECS entry here (plan-review F2; PR #1149 review F-B).
-  'scheduler-locks'
+  'scheduler-locks',
+  // harbour-comments (LIN-2648/LIN-2649): wereRecordedByHarbour queries by
+  // `_id` (the `${urlKey}::${commentId}` composition), served by the automatic
+  // `_id_` index — deliberately NOT indexed via INDEX_SPECS. This entry is the
+  // enforcement for that decision: it relies on THIS test staying red until
+  // the exclusion lands, not on manual review, to catch a future contributor
+  // adding an INDEX_SPECS entry here.
+  'harbour-comments'
 ];
 
 // MangoDB serialises an index key into a name; compare by key spec instead.

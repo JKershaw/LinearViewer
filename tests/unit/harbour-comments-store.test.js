@@ -169,6 +169,23 @@ describe('HarbourCommentsStore.wereRecordedByHarbour — batch/set-membership re
     const unconfigured = new HarbourCommentsStore({});
     assert.deepStrictEqual(await unconfigured.wereRecordedByHarbour('acme', ['recorded-1']), new Set());
   });
+
+  test('queries the collection by `_id` using the `${urlKey}::${commentId}` composition, not a field-filter (LIN-2664 F1)', async () => {
+    // Acceptance witness: reverting wereRecordedByHarbour's query back to the
+    // pre-fix `find({ urlKey, commentId: { $in: ids } })` shape makes this
+    // assertion fail — capturedQuery would be `{ urlKey: 'acme', commentId: {
+    // $in: [...] } }` rather than an `_id`-keyed filter.
+    let capturedQuery = null;
+    const spiedCollection = {
+      ...collection,
+      find(query) { capturedQuery = query; return collection.find(query); }
+    };
+    const spiedStore = new HarbourCommentsStore({ collection: spiedCollection });
+    await spiedStore.wereRecordedByHarbour('acme', ['recorded-1', 'unrecorded-1', 'recorded-2']);
+    assert.deepStrictEqual(capturedQuery, {
+      _id: { $in: ['acme::recorded-1', 'acme::unrecorded-1', 'acme::recorded-2'] }
+    }, 'wereRecordedByHarbour must query by _id using the urlKey::commentId composition');
+  });
 });
 
 describe('HarbourCommentsStore.wereRecordedByHarbour — the id || commentId precedence', () => {
