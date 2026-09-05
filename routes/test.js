@@ -46,7 +46,7 @@ import { respondToAccountConflict } from '../lib/account-conflict.js';
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo, observerStateStore }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -1480,6 +1480,33 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   };
   router.get('/test/set-jira-session', setJiraSession);
   router.post('/test/set-jira-session', setJiraSession);
+
+  // LIN-2625: e2e-only seeding for the Flight Companion playbook (the
+  // `companion:v1:<urlKey>` record's `notes` field), so a spec can prove the
+  // page's empty state renders a fixture playbook's open promises without
+  // driving a real chat turn. Writes ONLY this test-only fixture path — never
+  // a stand-in for the real `remember` tool / turn-core write, which stays
+  // exercised by the unit suite (tests/unit/flight-companion-turn-core.test.js).
+  router.post('/test/set-flight-companion-playbook', async (req, res) => {
+    try {
+      if (!observerStateStore) throw new Error('observerStateStore not configured');
+      const urlKey = (req.body && req.body.urlKey) || '';
+      const playbook = (req.body && req.body.playbook) || '';
+      if (!urlKey) return res.status(400).json({ error: 'urlKey is required' });
+      const instanceKey = `companion:v1:${urlKey}`;
+      const envelope = await observerStateStore.ensureSeeded(instanceKey, {
+        v: 1, lastCensusStateHash: null, lastCensusSnapshot: null, lastTurnAt: null,
+        turnReservedUntil: null, reservationId: null, notes: '',
+      });
+      await observerStateStore.advance(
+        instanceKey, envelope.rev, { ...envelope.state, notes: playbook },
+        { reason: 'test-fixture' }
+      );
+      res.json({ ok: true, urlKey, playbook });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   return router;
 }

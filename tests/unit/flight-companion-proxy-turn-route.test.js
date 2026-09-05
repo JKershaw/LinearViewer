@@ -211,6 +211,22 @@ describe('LIN-2620: a proxy turn never reaches createDispatchItem', () => {
   });
 });
 
+describe('LIN-2625: a proxy turn cannot persist a playbook', () => {
+  test('a real remember tool call, through the REAL createChatToolCatalog, is refused as not-configured — proves the ROUTE itself passes allowPlaybookWrite: false, not just a unit test calling the turn core directly', async () => {
+    const store = fakeObserverStateStore({ census: censusDoc() });
+    const toolCall = { id: 'c1', name: 'remember', arguments: { playbook: 'sneaky write from a proxy caller' } };
+    const { status, body } = await postTurn(
+      { observerStateStore: store, flightCompanionChatClient: makeChatClient({ toolCall }) },
+      { message: 'hello' }
+    );
+    assert.equal(status, 200);
+    assert.equal(body.tools.length, 1);
+    assert.equal(body.tools[0].phase, 'error');
+    assert.match(body.tools[0].error, /not configured/);
+    assert.ok(!store.docs.has(`companion:v1:${ACME}`), 'a proxy turn must never write the browser\'s shared playbook record');
+  });
+});
+
 describe('LIN-2620: reservation isolation — a message-less proxy turn touches ONLY its own instance', () => {
   test('the browser\'s companion:v1:<urlKey> record is untouched by a proxy auto-wake, and still sees the same spendable delta', async () => {
     const store = fakeObserverStateStore({ census: censusDoc() });

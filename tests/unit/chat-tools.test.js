@@ -10,7 +10,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA, deriveFollowUpDispatch, projectActiveSession } from '../../lib/chat-tools.js';
+import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA, REMEMBER_TOOL_SCHEMA, PLAYBOOK_MAX_CHARS, deriveFollowUpDispatch, projectActiveSession } from '../../lib/chat-tools.js';
 import { TOOL_RESULT_MAX_CHARS } from '../../lib/openrouter.js';
 import { hashContext } from '../../lib/recap-cache.js';
 import { snapshotFromContext } from '../../lib/task-snapshot-store.js';
@@ -1529,6 +1529,90 @@ describe('LIN-2432 §A.4: send_follow_up followUpMode (execute/propose)', () => 
   }
 });
 
+// ─── remember (LIN-2625) ─────────────────────────────────────────────────────
+
+describe('remember', () => {
+  function makeRememberCatalog({ playbookEnabled = true, onRemember } = {}) {
+    const provider = makeFakeProvider();
+    return createChatToolCatalog({ provider, scope: SCOPE, urlKey: URL_KEY, playbookEnabled, onRemember });
+  }
+
+  test('is absent from tools when playbookEnabled is false (the default) — Task Chat never gets it', () => {
+    const { tools } = makeRememberCatalog({ playbookEnabled: false, onRemember: () => {} });
+    assert.ok(!tools.some(t => t.function.name === 'remember'));
+  });
+
+  test('is present in tools when playbookEnabled is true', () => {
+    const { tools } = makeRememberCatalog({ onRemember: () => {} });
+    assert.ok(tools.some(t => t.function.name === 'remember'));
+  });
+
+  test('forwards the validated playbook to onRemember and never touches a store', async () => {
+    const calls = [];
+    const { executeTool } = makeRememberCatalog({ onRemember: (p) => calls.push(p) });
+    const result = await executeTool({ name: 'remember', arguments: { playbook: 'lane G: confirm LIN-1988 at 08:00' } });
+    assert.deepStrictEqual(calls, ['lane G: confirm LIN-1988 at 08:00']);
+    assert.deepStrictEqual(result, { remembered: true, length: calls[0].length });
+  });
+
+  test('a second call in the same turn keeps the last value — REPLACES, never appends', async () => {
+    const calls = [];
+    const { executeTool } = makeRememberCatalog({ onRemember: (p) => calls.push(p) });
+    await executeTool({ name: 'remember', arguments: { playbook: 'first draft' } });
+    await executeTool({ name: 'remember', arguments: { playbook: 'final draft' } });
+    assert.deepStrictEqual(calls, ['first draft', 'final draft']);
+  });
+
+  test('the size cap is enforced with a clear, recoverable tool error — before onRemember is ever called', async () => {
+    const calls = [];
+    const { executeTool } = makeRememberCatalog({ onRemember: (p) => calls.push(p) });
+    const tooLong = 'x'.repeat(PLAYBOOK_MAX_CHARS + 1);
+    await assert.rejects(
+      () => executeTool({ name: 'remember', arguments: { playbook: tooLong } }),
+      new RegExp(`Playbook must be ${PLAYBOOK_MAX_CHARS} characters or fewer`),
+    );
+    assert.strictEqual(calls.length, 0, 'a rejected call must never reach the buffer');
+  });
+
+  test('exactly at the cap succeeds (boundary, not off-by-one)', async () => {
+    const calls = [];
+    const { executeTool } = makeRememberCatalog({ onRemember: (p) => calls.push(p) });
+    const atCap = 'x'.repeat(PLAYBOOK_MAX_CHARS);
+    const result = await executeTool({ name: 'remember', arguments: { playbook: atCap } });
+    assert.strictEqual(result.remembered, true);
+    assert.strictEqual(calls.length, 1);
+  });
+
+  test('a non-string playbook is rejected before onRemember is called', async () => {
+    const calls = [];
+    const { executeTool } = makeRememberCatalog({ onRemember: (p) => calls.push(p) });
+    await assert.rejects(
+      () => executeTool({ name: 'remember', arguments: { playbook: 42 } }),
+      /requires a string "playbook"/,
+    );
+    assert.strictEqual(calls.length, 0);
+  });
+
+  test('fails cleanly as not-configured when playbookEnabled is true but onRemember is missing (mutation-check: a misconfigured call site never silently no-ops)', async () => {
+    const provider = makeFakeProvider();
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE, urlKey: URL_KEY, playbookEnabled: true });
+    await assert.rejects(
+      () => executeTool({ name: 'remember', arguments: { playbook: 'x' } }),
+      /not configured/,
+    );
+  });
+
+  test('a proxy-shaped catalog construction (playbookEnabled omitted, matching routes/proxy-flight-companion.js) advertises no remember tool, and the model can never reach it', async () => {
+    const provider = makeFakeProvider();
+    const { tools, executeTool } = createChatToolCatalog({ provider, scope: SCOPE, urlKey: URL_KEY });
+    assert.ok(!tools.some(t => t.function.name === 'remember'), 'a proxy turn must never see remember in its own tool list');
+    await assert.rejects(
+      () => executeTool({ name: 'remember', arguments: { playbook: 'x' } }),
+      /not configured/,
+    );
+  });
+});
+
 describe('read-only invariant', () => {
   test('the catalog exposes no write/mutation tools', () => {
     const names = CHAT_TOOL_SCHEMAS.map(t => t.function.name);
@@ -1544,9 +1628,11 @@ describe('read-only invariant', () => {
     }
   });
 
-  test('send_follow_up (LIN-1073) is the sole, deliberate exception — kept out of CHAT_TOOL_SCHEMAS', () => {
+  test('send_follow_up (LIN-1073) and remember (LIN-2625) are the two deliberate exceptions — both kept out of CHAT_TOOL_SCHEMAS', () => {
     assert.strictEqual(FOLLOW_UP_TOOL_SCHEMA.function.name, 'send_follow_up');
+    assert.strictEqual(REMEMBER_TOOL_SCHEMA.function.name, 'remember');
     assert.ok(!CHAT_TOOL_SCHEMAS.includes(FOLLOW_UP_TOOL_SCHEMA));
+    assert.ok(!CHAT_TOOL_SCHEMAS.includes(REMEMBER_TOOL_SCHEMA));
   });
 });
 

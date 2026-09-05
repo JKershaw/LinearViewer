@@ -15,7 +15,7 @@ import { test, describe, mock } from 'node:test';
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { runFlightCompanionTurn, sumUsage } from '../../lib/flight-companion-turn.js';
-import { buildTurnRecords } from '../../lib/flight-companion-gate.js';
+import { buildTurnRecords, COMPANION_SEED_STATE } from '../../lib/flight-companion-gate.js';
 import { streamChat, streamChatWithTools, setLlmCallRecorder } from '../../lib/openrouter.js';
 import { CHAT_TOOL_RESULT_BUDGETS } from '../../lib/chat-tools.js';
 
@@ -590,5 +590,239 @@ describe('LIN-2439 ledger item 6: the observerStateStore-omitted degradation pat
       TypeError,
       'an auto-wake turn requires observerStateStore; omitting it must not silently proceed as though the gate passed'
     );
+  });
+});
+
+// ─── LIN-2625: playbook memory ───────────────────────────────────────────────
+
+// A store keyed by exact instance-key string, so a test can seed/inspect the
+// BASE (unsuffixed) companion instance and a SUFFIXED (proxy) one
+// independently — the single shared-doc `fakeStore` above cannot express
+// "these are two different records", which the base-vs-suffixed playbook
+// read/write split is precisely about.
+function multiKeyStore(initial = {}) {
+  const docs = new Map(Object.entries(initial).map(([k, v]) => [k, { rev: 1, state: v }]));
+  const advances = [];
+  return {
+    docs, advances,
+    async ensureSeeded(key, seed) {
+      if (!docs.has(key)) docs.set(key, { rev: 1, state: seed });
+      const d = docs.get(key);
+      return { rev: d.rev, state: d.state };
+    },
+    async readCurrent(key) {
+      const d = docs.get(key);
+      return d ? { rev: d.rev, state: d.state } : null;
+    },
+    async advance(key, expectedRev, record, meta) {
+      advances.push({ key, expectedRev, record, meta });
+      const d = docs.get(key);
+      const currentRev = d ? d.rev : 0;
+      if (expectedRev !== currentRev) return false;
+      docs.set(key, { rev: currentRev + 1, state: record });
+      return true;
+    },
+  };
+}
+
+function catalogCapturing(capture) {
+  return (args) => { capture.args = args; return { tools: [], executeTool: async () => ({}) }; };
+}
+
+describe('LIN-2625: playbook memory', () => {
+  test('a typed (user-initiated) turn persists a remembered playbook on done', async () => {
+    const capture = {};
+    const store = fakeStore({ census: censusDoc() });
+    const out = await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'user-initiated', message: 'notes please', apiKey: 'sk-test',
+      onEvent: () => {},
+      deps: {
+        ...baseDeps(store, {
+          async streamChat() {},
+          async streamChatWithTools(_m, _o, onEvent) {
+            capture.args.onRemember('lane G: confirm LIN-1988 at 08:00');
+            onEvent('done', {});
+          },
+        }),
+        createToolCatalog: catalogCapturing(capture),
+      },
+    });
+    assert.strictEqual(out.spent, true);
+    assert.strictEqual(store.state.companion.notes, 'lane G: confirm LIN-1988 at 08:00');
+  });
+
+  test('a second remember call within the same turn keeps the LAST value — replace, never append', async () => {
+    const capture = {};
+    const store = fakeStore({ census: censusDoc() });
+    await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'user-initiated', message: 'hi', apiKey: 'sk-test',
+      onEvent: () => {},
+      deps: {
+        ...baseDeps(store, {
+          async streamChat() {},
+          async streamChatWithTools(_m, _o, onEvent) {
+            capture.args.onRemember('first draft');
+            capture.args.onRemember('final draft');
+            onEvent('done', {});
+          },
+        }),
+        createToolCatalog: catalogCapturing(capture),
+      },
+    });
+    assert.strictEqual(store.state.companion.notes, 'final draft');
+  });
+
+  test('an errored typed turn never persists its buffered playbook — the prior value is left intact', async () => {
+    const capture = {};
+    const store = fakeStore({ census: censusDoc(), companionState: { ...COMPANION_SEED_STATE, notes: 'prior playbook' } });
+    await assert.rejects(() => runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'user-initiated', message: 'hi', apiKey: 'sk-test',
+      onEvent: () => {},
+      deps: {
+        ...baseDeps(store, {
+          async streamChat() {},
+          async streamChatWithTools() {
+            capture.args.onRemember('half-thought');
+            throw new Error('boom');
+          },
+        }),
+        createToolCatalog: catalogCapturing(capture),
+      },
+    }));
+    assert.strictEqual(store.state.companion.notes, 'prior playbook');
+    assert.strictEqual(store.state.advances.length, 0, 'no persist write was attempted for an errored turn');
+  });
+
+  test('the lease field already on the record is untouched by a typed turn\'s playbook write', async () => {
+    const capture = {};
+    const leaseUntil = new Date(Date.now() + 60_000).toISOString();
+    const store = fakeStore({
+      census: censusDoc(),
+      companionState: { ...COMPANION_SEED_STATE, turnReservedUntil: leaseUntil, reservationId: 'some-other-reservation', notes: 'old' },
+    });
+    await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'user-initiated', message: 'hi', apiKey: 'sk-test',
+      onEvent: () => {},
+      deps: {
+        ...baseDeps(store, {
+          async streamChat() {},
+          async streamChatWithTools(_m, _o, onEvent) { capture.args.onRemember('new playbook'); onEvent('done', {}); },
+        }),
+        createToolCatalog: catalogCapturing(capture),
+      },
+    });
+    assert.strictEqual(store.state.companion.notes, 'new playbook');
+    assert.strictEqual(store.state.companion.turnReservedUntil, leaseUntil, 'a typed turn must never touch a lease it does not own');
+    assert.strictEqual(store.state.companion.reservationId, 'some-other-reservation');
+  });
+
+  test('the next turn\'s system prompt contains a previously-persisted playbook verbatim', async () => {
+    const store = fakeStore({ census: censusDoc(), companionState: { ...COMPANION_SEED_STATE, notes: 'lane G: confirm LIN-1988 at 08:00' } });
+    let capturedMessages = null;
+    await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'user-initiated', message: 'status?', apiKey: 'sk-test',
+      onEvent: () => {},
+      deps: baseDeps(store, {
+        async streamChat() {},
+        async streamChatWithTools(m, _o, onEvent) { capturedMessages = m; onEvent('done', {}); },
+      }),
+    });
+    const systemMessage = capturedMessages[0];
+    assert.strictEqual(systemMessage.role, 'system');
+    assert.ok(systemMessage.content.includes('## Playbook'));
+    assert.ok(systemMessage.content.includes('lane G: confirm LIN-1988 at 08:00'));
+  });
+
+  test('no playbook persisted yet renders no Playbook section at all', async () => {
+    const store = fakeStore({ census: censusDoc() });
+    let capturedMessages = null;
+    await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'user-initiated', message: 'status?', apiKey: 'sk-test',
+      onEvent: () => {},
+      deps: baseDeps(store, {
+        async streamChat() {},
+        async streamChatWithTools(m, _o, onEvent) { capturedMessages = m; onEvent('done', {}); },
+      }),
+    });
+    assert.ok(!capturedMessages[0].content.includes('## Playbook'));
+  });
+
+  test('review finding F1: an auto-wake commit never overwrites a newer playbook written mid-flight — it commits the FRESH read, not its own gate-time snapshot', async () => {
+    const store = fakeStore({ census: censusDoc('hash-new') });
+    await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'auto-wake', apiKey: 'sk-test',
+      onEvent: () => {},
+      deps: baseDeps(store, {
+        async streamChat(_m, _o, onEvent) { onEvent('done', {}); },
+        async streamChatWithTools(_m, _o, onEvent) {
+          // A DIFFERENT, overlapping typed turn persists a newer playbook
+          // while this auto-wake turn's own model call is mid-flight — a
+          // direct store mutation stands in for that concurrent write,
+          // preserving the reservation fields this turn's own advance()
+          // already wrote so the commit's `stillOurs` check still passes.
+          store.state.companion = { ...store.state.companion, notes: 'fresh playbook written mid-flight' };
+          onEvent('done', {});
+        },
+      }),
+    });
+    assert.strictEqual(store.state.companion.notes, 'fresh playbook written mid-flight');
+  });
+
+  test('an auto-wake turn that itself calls remember commits ITS OWN buffered value, not the fresh read', async () => {
+    const capture = {};
+    const store = fakeStore({ census: censusDoc('hash-new2') });
+    await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'auto-wake', apiKey: 'sk-test',
+      onEvent: () => {},
+      deps: {
+        ...baseDeps(store, {
+          async streamChat(_m, _o, onEvent) { onEvent('done', {}); },
+          async streamChatWithTools(_m, _o, onEvent) {
+            capture.args.onRemember('buffered playbook from this very turn');
+            // A stray concurrent write must NOT win over this turn's own buffer.
+            store.state.companion = { ...store.state.companion, notes: 'some other fresh value' };
+            onEvent('done', {});
+          },
+        }),
+        createToolCatalog: catalogCapturing(capture),
+      },
+    });
+    assert.strictEqual(store.state.companion.notes, 'buffered playbook from this very turn');
+  });
+
+  test('allowPlaybookWrite: false (the proxy shape) never enables the remember tool — no onRemember, playbookEnabled: false', async () => {
+    const capture = {};
+    const store = fakeStore({ census: censusDoc() });
+    await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'user-initiated', message: 'hi', apiKey: 'sk-test',
+      allowPlaybookWrite: false,
+      onEvent: () => {},
+      deps: {
+        ...baseDeps(store, scriptedClient([['done', {}]])),
+        createToolCatalog: catalogCapturing(capture),
+      },
+    });
+    assert.strictEqual(capture.args.playbookEnabled, false);
+    assert.strictEqual(capture.args.onRemember, undefined);
+  });
+
+  test('a proxy-shaped call (suffixed instance + allowPlaybookWrite:false) reads the BROWSER\'s unsuffixed playbook, never a separate one keyed by its own suffix', async () => {
+    const store = multiKeyStore({
+      'companion:v1:acme': { ...COMPANION_SEED_STATE, notes: 'browser playbook' },
+      'sweep:v1:acme': censusDoc(),
+    });
+    let capturedMessages = null;
+    await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'user-initiated', message: 'hi', apiKey: 'sk-test',
+      instanceKeySuffix: ':proxy', allowPlaybookWrite: false,
+      onEvent: () => {},
+      deps: baseDeps(store, {
+        async streamChat() {},
+        async streamChatWithTools(m, _o, onEvent) { capturedMessages = m; onEvent('done', {}); },
+      }),
+    });
+    assert.ok(capturedMessages[0].content.includes('browser playbook'));
+    // And no write of any kind was attempted against either instance key.
+    assert.strictEqual(store.advances.length, 0);
   });
 });

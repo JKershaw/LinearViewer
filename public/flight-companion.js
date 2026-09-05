@@ -73,7 +73,25 @@
   document.addEventListener('DOMContentLoaded', function () {
     var btn = document.getElementById('flight-companion-copy');
     if (btn) btn.addEventListener('click', copyPrompt);
+    loadPlaybookEmptyState();
   });
+
+  // LIN-2625: the empty state shows the playbook's open promises before you
+  // tap anything. Read-only fetch of the small dedicated endpoint
+  // (routes/flight-companion.js) — never a write path from this page. A
+  // fetch failure or an absent/blank playbook leaves the server-rendered
+  // generic empty-state text untouched (the honest "nothing to show yet"
+  // case, not an error state worth surfacing).
+  function loadPlaybookEmptyState() {
+    var el = document.getElementById('flight-companion-chat-empty');
+    if (!el || !urlKey) return;
+    window.api('/workspace/' + encodeURIComponent(urlKey) + '/api/flight-companion/playbook', { on401: false })
+      .then(function (body) {
+        var playbook = body && typeof body.playbook === 'string' ? body.playbook.trim() : '';
+        if (playbook) el.textContent = '○ ' + playbook;
+      })
+      .catch(function () { /* leave the generic empty-state text as-is */ });
+  }
 
   // ─── Chat thread (LIN-2435) ─────────────────────────────────────────────
 

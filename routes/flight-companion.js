@@ -109,6 +109,15 @@ const MAX_MESSAGE_LENGTH = 2000;
 // vocabulary restates it rather than sharing a cross-module import.
 const CENSUS_LANE_KEYS = ['working', 'silent', 'blocked', 'terminal', 'queued', 'resolved', 'unknown'];
 
+// LIN-2625: restated, not imported, from lib/flight-companion-turn.js's own
+// private COMPANION_INSTANCE_PREFIX — same house convention every observer-
+// pipeline-stage consumer of an instance-key prefix follows (see that file's
+// header comment). Deliberately NEVER suffixed here: the playbook is one
+// shared, workspace-scoped record, the same key `lib/flight-companion-turn.js`
+// reads/writes regardless of which (possibly suffixed) reservation instance a
+// given turn is using.
+const COMPANION_INSTANCE_PREFIX = 'companion:v1:';
+
 /**
  * §A.7: the deterministic census seed, built from the SAME raw sweep census
  * doc (`sweep:v1:<urlKey>`, via `buildCompanionSnapshot`) the auto-wake gate
@@ -355,6 +364,32 @@ export function createFlightCompanionRoutes({
         actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/flight-companion`,
       });
       res.status(500).send(html);
+    }
+  });
+
+  // LIN-2625: read-only playbook fetch for the page's own empty state (LIN-2621's
+  // mount). Deliberately its own tiny endpoint rather than baked into the GET
+  // page render above: `lib/render-flight-companion.js` is provider-free,
+  // business-logic-free markup (its own header's stated design), and the
+  // empty state's content is filled entirely client-side by
+  // public/flight-companion.js — this mirrors that split rather than reaching
+  // into the renderer. `readCurrent` ONLY, same discipline as the page route
+  // above: this route can never write observer state.
+  router.get('/workspace/:urlKey/api/flight-companion/playbook', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const featureFlags = getFeatureFlags(req.session);
+    if (featureFlags.flightCompanion !== true) {
+      return jsonError(res, 404, 'Not found');
+    }
+    try {
+      const envelope = observerStateStore
+        ? await observerStateStore.readCurrent(`${COMPANION_INSTANCE_PREFIX}${workspace.urlKey}`).catch(() => null)
+        : null;
+      const playbook = envelope?.state?.notes || '';
+      res.json({ playbook });
+    } catch (error) {
+      console.error('Flight Companion playbook read error:', error);
+      return jsonError(res, 500, 'Could not read the playbook');
     }
   });
 
