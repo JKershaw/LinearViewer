@@ -899,6 +899,7 @@ describe('computeIssueRoundTrips — {gateKind, rePassKind} option (LIN-2592)', 
         row('i1', 'implementation', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z'),
         row('r1', 'review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z',
           feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:05:00.000Z')),
+        row('i2', 'implementation', 'done', '2026-08-09T10:10:00.000Z', '2026-08-09T10:40:00.000Z'),
       ],
     });
     const agg = computePlanReviewRoundTrips([iss], { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
@@ -906,6 +907,8 @@ describe('computeIssueRoundTrips — {gateKind, rePassKind} option (LIN-2592)', 
       'the aggregate must forward {gateKind, rePassKind} to computeIssueRoundTrips per issue — a dropped pair would default to plan-review/plan and find no gate row in this review/implementation fixture');
     assert.equal(agg.primary.denominator, 1);
     assert.equal(agg.primary.numerator, 1);
+    assert.equal(agg.roundTrips.mean, 1,
+      'the i2 implementation row after the gate only counts as a re-pass if rePassKind is forwarded through to countRoundTrips — dropping just rePassKind (gateKind still threaded, defaulting to the literal "plan") would leave this degenerate at 0');
   });
 });
 
