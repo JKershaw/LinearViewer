@@ -519,11 +519,15 @@ describe('selectExpiredOwnerRow (LIN-1499, Block C — GitHub-family provider-aw
 // refreshing the Linear one it was called for. Same bounded
 // "wrong partition -> miss -> nothing refreshable" class as LIN-2278.
 //
-// Closed for symmetry, not on a demonstrated production path: neither the
-// LIN-2278 review nor this ticket could produce a concrete route to a workspace
-// whose scalar accessToken mirror is empty while a GitHub binding still holds
-// its installationId. What was established is narrower and enough — the
-// exemption on file covered one branch of two, and nothing pinned it either way.
+// On reachability: unreachable from Harbour's own state transitions (four of
+// the five writers move token and expiry as a pair in adjacent statements;
+// linkProvider is the lone asymmetric one and every caller passes a token) —
+// but NOT unreachable from upstream. `isSentinelExpiry` is a THRESHOLD
+// (>= year 3000), not MAX_SAFE_INTEGER equality, and the GitHub mint path
+// checks that `expires_at` parses but neither that it is plausible nor that
+// `token` is present. One malformed 2xx mint produces every condition at once.
+// Recorded that way rather than as "nobody could find a route", which is the
+// too-strong claim this ticket exists to correct.
 describe('selectExpiredOwnerRow (LIN-2349, Block K — sentinel-aware ranking)', () => {
   const SENTINEL_MS = Number.MAX_SAFE_INTEGER;
 
