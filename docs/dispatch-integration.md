@@ -285,11 +285,14 @@ dispatch. The terminal markers above describe the LANE's own lifecycle (one `[do
 at the very end); they say nothing about which of the lane's several tickets that covers, or how
 far through the list it got. A lane emits one additional, non-terminal marker at **each ticket
 transition** — an extra feedback entry alongside its ordinary claim/close-out comments, not a
-replacement for them:
+replacement for them.
 
 The vocabulary is six states: `[ticket] LIN-XXXX started`, `[ticket] LIN-XXXX done — <one line>`,
 `[ticket] LIN-XXXX blocked — <reason>`, `[ticket] LIN-XXXX refused — <reason>`,
-`[ticket] LIN-XXXX dissolved — <reason>`, and `[ticket] LIN-XXXX trimmed — <reason>`.
+`[ticket] LIN-XXXX dissolved — <reason>`, and `[ticket] LIN-XXXX trimmed — <reason>`. Those six are
+listed inline, in backticks, rather than as a fenced block — a fenced list of them would itself be
+an example of the one shape that never relays. `docs/worker-lane-prompt.md`'s Step 5 presents them
+the same way, for the same reason (LIN-2450).
 
 **The shape the lane writes is load-bearing, and getting it wrong is silent.** The relay that reads
 a lane's turn text for this line (`walkTicketMarkers` in `simple-dispatcher/transcript.js`) requires
@@ -311,11 +314,7 @@ never stacking them on consecutive lines:
 
 [ticket] LIN-XXXX done
 
-[ticket] LIN-YYYY blocked — <specific reason>
-
-Note that the six forms above are written inline, in backticks, precisely because a fenced block
-listing them would itself be an example of the shape that does not relay. This mirrors
-`docs/worker-lane-prompt.md`'s Step 5, which LIN-2450 corrected the same way.
+[ticket] LIN-YYYY blocked — needs a Linux host with tmux
 
 This is a **separate, orthogonal vocabulary** from the terminal markers above — `[ticket] ... done`
 is never read as the dispatch's own terminal status, and it does not derive `status`. It is parsed

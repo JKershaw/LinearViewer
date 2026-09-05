@@ -195,8 +195,24 @@ describe('LIN-2503 — docs/dispatch-integration.md teaches a relayable [ticket]
   });
 
   test('no [ticket] marker appears inside a fenced code block in this section', () => {
-    assert.ok(
-      !/```[\s\S]*?\[ticket\][\s\S]*?```/.test(section),
+    // Walk the fences the way the guard does rather than regexing across them:
+    // a `[\s\S]*?` pair only matches when there are two ``` in the section, and
+    // it is blind to ~~~ entirely — which `blankFencedCodeLines` blanks too.
+    let fenceChar = null;
+    const offenders = [];
+    for (const line of section.split('\n')) {
+      const trimmed = line.trim();
+      const fence = /^(`{3,}|~{3,})/.exec(trimmed);
+      if (fence) {
+        const ch = fence[1][0];
+        if (!fenceChar) { fenceChar = ch; continue; }
+        if (ch === fenceChar) { fenceChar = null; continue; }
+      }
+      if (fenceChar && /\[ticket\]/.test(trimmed)) offenders.push(trimmed);
+    }
+    assert.deepStrictEqual(
+      offenders,
+      [],
       'a fenced [ticket] example teaches a shape the relay blanks before it ever looks for a marker'
     );
   });
@@ -209,11 +225,11 @@ describe('LIN-2503 — docs/dispatch-integration.md teaches a relayable [ticket]
   });
 
   test('the multi-ticket example relays BOTH markers — the adjacency trap is shown correctly, not just described', () => {
-    const match = /never stacking them on consecutive lines:\n\n([\s\S]*?)\n\nNote that/.exec(section);
+    const match = /never stacking them on consecutive lines:\n\n([\s\S]*?)\n\nThis is a \*\*separate/.exec(section);
     assert.ok(match, 'expected the multi-ticket example block in docs/dispatch-integration.md');
     assert.deepStrictEqual(
       relayableMarkers(withRealTicketIds(match[1])),
-      ['[ticket] LIN-2450 done', '[ticket] LIN-2451 blocked — <specific reason>']
+      ['[ticket] LIN-2450 done', '[ticket] LIN-2451 blocked — needs a Linux host with tmux']
     );
   });
 
@@ -231,17 +247,24 @@ describe('LIN-2503 — docs/dispatch-integration.md teaches a relayable [ticket]
     );
   });
 
-  test('the six-state vocabulary is listed INLINE in backticks, which is why it does not need a fence', () => {
-    // Inline backticked references (`[ticket] LIN-XXXX done` inside a sentence)
-    // are deliberately NOT graded as emitted lines — they are prose, not an
-    // example to copy, and LIN-2450 kept the same form in worker-lane-prompt.md.
-    // This pins that the vocabulary is presented that way rather than as a
-    // fenced block, which is the choice that made the fence unnecessary.
-    for (const state of ['started', 'done', 'blocked', 'refused', 'dissolved', 'trimmed']) {
-      assert.ok(
-        section.includes(`\`[ticket] LIN-XXXX ${state}`),
-        `expected the \`${state}\` state listed inline in backticks`
+  test('every state the doc documents is one the guard actually accepts', () => {
+    // Graded against the guard, not against the doc's own text. A presence
+    // check (`section.includes('...paused')`) would pass just as happily on an
+    // invented or typo'd state, and nothing else would catch it: an unmatched
+    // state is invisible to TICKET_MARKER_LINE, so it never reaches either the
+    // `standalone` or the `relayed` count below.
+    const documented = [...section.matchAll(/`\[ticket\] LIN-XXXX ([a-z]+)/g)].map(m => m[1]);
+    assert.ok(documented.length >= 6, `expected the inline vocabulary list; found ${documented.length} entries`);
+    for (const state of documented) {
+      assert.equal(
+        relayableMarkers(`[ticket] LIN-1 ${state}`).length,
+        1,
+        `the doc lists "${state}", which the relay guard does not accept — documenting a state that can never relay is the same defect class as documenting a shape that cannot`
       );
+    }
+    // And the reverse direction: none of the guard's states quietly missing.
+    for (const state of ['started', 'done', 'blocked', 'refused', 'dissolved', 'trimmed']) {
+      assert.ok(documented.includes(state), `the guard accepts "${state}" but the doc does not list it`);
     }
   });
 });
