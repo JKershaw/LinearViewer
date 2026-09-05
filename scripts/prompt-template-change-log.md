@@ -61,6 +61,45 @@ Newest last.
 | 2026-08-25 | `3c573ac6` | LIN-2316 | handwritten | Annotated triage's displayed priority; named `priorityLevel` as the sole write field. | unknown (backfilled) |
 | 2026-08-25 | `b5235e9e` | LIN-2317 | handwritten + meta | Named `priorityLevel` in the meta-prompt triage path; annotated canonical 0. | unknown (backfilled) |
 | 2026-09-04 | `d8152ee8` | LIN-1873 | handwritten + meta | Generalised the cited-sweep rule into plan and plan-review: a claim of covering a class must cite the reproducible query whose output IS the enumeration (with output and sha), the reviewer re-runs that query rather than searching independently, and a class with no possible sweep is declared as such with its reason. | **down** |
+| 2026-09-05 | PR #1403 | LIN-2618 | neither (lib/prompts/flight-companion-brief.js) | Extracted the Flight Companion's persona, disposition, readout shape, fossil-row instruction, surfacing policy, vocabulary and propose-then-wait gate into one shared brief rendered by BOTH the pasted kickoff and the in-page chat's system turn; the chat additionally gained the clock, the turn kind and the headline-block-plus-six-part readout it previously had none of. | unknown |
+
+### On the LIN-2618 row, and why its Paths cell reads `neither`
+
+Recorded by analogy, not by the two-path rule. The Flight Companion brief is not
+a registered template: there is no `flight`/`companion` entry in
+`lib/prompt-template-defs.js`, `lib/prompt-templates.js` or
+`lib/completion-signals.js`, and the `Paths` column above admits only
+`handwritten` and `meta`. So neither path moved, no meta-prompt edit was owed,
+and the row as the column is specified could not be filled.
+
+**On "seven-part".** LIN-2618's description calls the body seven-part while its
+own enumeration lists six, and its acceptance asks for "the seven body
+headings". The implementation follows the enumeration — a mandatory headline
+block plus six body parts, seven sections in all — because the enumeration is
+the substance and the count word is a slip. Whoever scores the LIN-2634
+agent-graded side-by-side should grade against the six enumerated parts plus the
+headline block, not hunt for a seventh body heading that was never specified.
+
+**On the `Commit` cell.** It names the PR rather than a sha. A sha cannot be
+self-referenced from inside the commit that would carry it, and the merge sha
+does not exist until the runner merges — the earlier rows carry merge shas
+because they were backfilled after landing. The PR is checkable at HEAD in the
+same way and is knowable now; whoever next appends here can swap it for the
+merge sha if they prefer the uniformity.
+
+It is recorded anyway because the pasted kickoff **drives real dispatches** — a
+session running that prompt does the same class of work a registered template's
+session does, so a change to it can move the same series. The in-page chat half
+cannot: every write on that surface is propose-only, executed by a human tap.
+
+**Direction `unknown`, and the reasoning written before the read.** The honest
+answer is that this cuts both ways and I cannot pick between them. Giving the
+chat the readout shape and the propose-then-wait gate it never had should reduce
+the follow-on turns spent asking it to say something useful. But the same change
+gives the pasted kickoff a longer, more prescriptive brief, and a more
+prescriptive brief can produce more proposals to accept or reject. `unknown` is
+the honest value here rather than a failure to think — guessing a direction to
+avoid writing it is what this column exists to prevent.
 
 ### On the LIN-1873 row's direction, recorded before the read
 

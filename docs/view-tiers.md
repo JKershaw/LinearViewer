@@ -61,7 +61,8 @@ Members (the shared `EXPERIMENTAL_VIEWS` list, in order):
 - **ship** (`ship`) — radial dependency view; in-progress work at the centre,
   everything else orbiting by priority and sector (surfaced under this tier by LIN-496)
 - **nextRun** (`next-run`) — grounded goal options for the next autopilot run (LIN-603)
-- **flightCompanion** (`flight-companion`) — realtime chat with work in flight (LIN-922)
+- **flightCompanion** (`flight-companion`) — realtime chat with work in flight (LIN-922); the
+  in-page chat and the copyable kickoff prompt render one shared brief (LIN-2618)
 - **shipBiscuit** (`ship-biscuit`) — LLM-set newspaper of autopilot activity (LIN-818)
 - **shipJourney** (`ship-journey`) — animated playback of waypoints charted
   against your north star over retained report history, with a coverage
