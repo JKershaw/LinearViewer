@@ -21,7 +21,7 @@ import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, get
 import { getPeriodicals } from '../lib/periodicals.js';
 import { isValidIssueId, UUID_REGEX } from '../lib/workspace.js';
 import { parseRepoFromDescription, resolveDispatchRepo } from '../lib/prompt-formatters.js';
-import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload } from '../lib/dispatch-validation.js';
+import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
 
 // Dispatch input limits. The prompt/url caps for the POST /dispatch payload now
@@ -71,6 +71,7 @@ function formatDispatchWatch(item, meta = null) {
     model: item.model || null,
     harness: item.harness || null,
     terminal: item.terminal || null,
+    effort: item.effort || null,
     presetName: item.presetName || null,
     followUpTo: item.followUpTo || null,
     force: item.force === true,
@@ -203,7 +204,7 @@ export function createDispatchRoutes({
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -400,6 +401,7 @@ export function createDispatchRoutes({
         model,
         harness,
         terminal,
+        effort,
         finalizePrompt: async (resolvedHarness) => {
           const baseUrl = `${req.protocol}://${req.get('host')}`;
           if (prompt && shouldAppendProxyContext) {
@@ -525,7 +527,7 @@ export function createDispatchRoutes({
     }
 
     try {
-      const { issueIdentifier, target, repo, repoInherited, model, harness, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription, periodicalId } = req.body || {};
+      const { issueIdentifier, target, repo, repoInherited, model, harness, effort, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription, periodicalId } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -592,6 +594,17 @@ export function createDispatchRoutes({
       if (recommendHarnessValidationError) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, recommendHarnessValidationError.error);
+      }
+      // Effort (LIN-2615): same opaque rule, own inline check since this route
+      // validates model/harness itself rather than through validateDispatchPayload.
+      // An out-of-set level is a console.warn only, never a 400.
+      const recommendEffortValidationError = validateOpaqueDispatchField(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
+      if (recommendEffortValidationError) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, recommendEffortValidationError.error);
+      }
+      if (effort && !DISPATCH_EFFORT_LEVELS.includes(effort)) {
+        console.warn(`Unknown dispatch effort level: ${effort}`);
       }
       // Optional verb override (LIN-573). When present, the caller pins the step
       // and the server still writes the body — "autopilot picks the verb, never
@@ -704,6 +717,7 @@ export function createDispatchRoutes({
             kind,
             model,
             harness,
+            effort,
             finalizePrompt: async (resolvedHarness) => {
               if (appendProxyContext !== false) {
                 const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -896,6 +910,7 @@ export function createDispatchRoutes({
           kind: effectiveKind,
           model,
           harness,
+          effort,
           finalizePrompt: async (resolvedHarness) => {
             if (appendProxyContext !== false) {
               const baseUrl = `${req.protocol}://${req.get('host')}`;

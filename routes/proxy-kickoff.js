@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import { badRequest, jsonError, notFound, classifyUpstreamError } from '../lib/errors.js';
 import { MAX_NAME_LENGTH } from '../lib/issue-write-validation.js';
-import { validateOpaqueDispatchField, validateSessionId } from '../lib/dispatch-validation.js';
+import { validateOpaqueDispatchField, validateSessionId, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
@@ -116,7 +116,7 @@ export function createKickoffRoutes({
     }
 
     try {
-      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness, presetId, maxTasks } = req.body || {};
+      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness, effort, presetId, maxTasks } = req.body || {};
 
       // Validate caller-supplied inputs. (The composed body is server-generated
       // and trusted, so only these raw inputs are checked — same split as the
@@ -184,6 +184,22 @@ export function createKickoffRoutes({
       if (kickoffHarnessValidationError) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, kickoffHarnessValidationError.error);
+      }
+      // Execution effort (LIN-2615): opaque string, same helper/convention as
+      // model/harness above — closes the ingress gap review flagged (kickoff
+      // forwarded effort without validating it, unlike every other write verb).
+      const kickoffEffortValidationError = validateOpaqueDispatchField(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
+      if (kickoffEffortValidationError) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, kickoffEffortValidationError.error);
+      }
+      // An out-of-set level stays accepted (fail-soft, never a 400) but is
+      // logged, the same as the other three write verbs. Symmetry only — the
+      // caller-observable contract is identical either way; without it the
+      // runtime-served `## Effort` docs describe a warning this verb alone
+      // never emitted.
+      if (effort && !DISPATCH_EFFORT_LEVELS.includes(effort)) {
+        console.warn(`Unknown dispatch effort level: ${effort}`);
       }
       // Selected dispatch preset (LIN-1390): an unknown/invalid id is rejected
       // here, up front — the factory treats a presetId it can't resolve as "no
@@ -283,6 +299,7 @@ export function createKickoffRoutes({
         kind: 'autopilot',
         model,
         harness,
+        effort,
         finalizePrompt: async (resolvedHarness) => {
           if (appendProxyContext !== false) {
             // LIN-376: embed a fresh single-use bootstrap, never the caller's own

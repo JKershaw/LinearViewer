@@ -423,6 +423,7 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `model` | string | **Execution** model the consumer should use to *run* this prompt (the value it passes to its own CLI, e.g. `claude --model`), or `null`. OpenRouter `provider/model` naming convention (e.g. `"anthropic/claude-opus-4.8"`). Opaque and forwarded blindly; `null` keeps the consumer's current default. See [Execution model](#execution-model-model) (nullable) |
 | `harness` | string | **Execution** harness the consumer should use to *run* this prompt (e.g. `"claude-code"`, `"opencode"`), or `null`. Opaque and forwarded blindly; `null` keeps the consumer's own default. See [Harness](#harness-harness) (nullable) |
 | `terminal` | string | **Terminal-emulator driver** the consumer should launch this session in (e.g. `"terminal"`, `"iterm"`, `"kitty"`, `"tmux"`), or `null`. Opaque and forwarded blindly; `null` keeps the consumer's own default. See [Terminal](#terminal-terminal) (nullable) |
+| `effort` | string | **Effort level** for the consumer to pass to its own CLI (e.g. `"low"`, `"medium"`, `"high"`, `"xhigh"`, `"max"`), or `null`. Opaque and forwarded blindly; an out-of-set value is accepted with a server-side warning, never rejected. `null` keeps the consumer's own default/precedence chain. See [Effort](#effort-effort) (nullable) |
 | `followUpTo` | string | The `id` of an earlier dispatch whose session this item should resume, or `null`. See [Follow-ups](#follow-ups) (nullable) |
 | `force` | boolean | When `true`, the consumer should **override a runner-side guard**: on a follow-up it resumes even a wedged/sleeping session; on a single abort it force-closes even a human-continued session. Defaults to `false`; meaningful only alongside `followUpTo` **or** a single `abort`, and never with `cascade`. See [Follow-ups](#follow-ups) / [Cascade close](#cascade-close-closing-a-session-subtree) |
 | `abort` | boolean | When `true`, this item asks the consumer to cancel/close an existing session (named by `abortTo`) instead of running a prompt. Defaults to `false`. See [Aborting a session](#aborting-a-session) |
@@ -777,6 +778,51 @@ consumer's own configured driver. See LIN-2452.
 
 `terminal` is accepted on the two main dispatch write verbs: `POST /api/dispatch` (user/UI) and
 `POST /api/proxy/dispatch`.
+
+## Effort (`effort`)
+
+`effort` lets a dispatch specify **the effort level the consumer/runner should pass to its own
+CLI** to run the prompt — e.g. `"low"`, `"medium"`, `"high"`, `"xhigh"`, or `"max"` (Claude
+Code's `--effort` vocabulary today). It is optional and nullable; omit it (or send `null`) to
+keep the consumer's own default/precedence chain. See LIN-2615.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `effort` | string | No | Effort level, e.g. `"low"`, `"medium"`, `"high"`, `"xhigh"`, `"max"`. `null`/omitted ⇒ consumer default/precedence chain. |
+
+- **Opaque at the server boundary, same rigor as `model`/`harness`/`terminal`.** The dispatch
+  store records and forwards `effort` verbatim. Validation is the same loose opaque-string
+  check — a string within the length limit and free of dangerous control characters — via the
+  shared `validateOpaqueDispatchField` helper every one of these fields routes through.
+- **Fail-soft, never a 400.** The server does **not** enforce an effort registry: an
+  out-of-set, non-empty value (anything outside `low`/`medium`/`high`/`xhigh`/`max`) is
+  accepted and merely logs a server-side warning — the same posture Claude Code itself takes
+  toward an unrecognized `--effort`, so Harbour never rejects a request the consumer would
+  have run anyway.
+- **Harbour-side default tier, mirroring `model` (not `terminal`'s pure passthrough).**
+  Harbour resolves a blank incoming `effort` against the same unified per-field precedence
+  `model`/`harness` use: explicit incoming value → selected dispatch preset (per-`kind`, then
+  preset-wide) → an inherited follow-up anchor's frozen preset config → workspace-configured
+  dispatch defaults (Settings → Dispatch defaults; per-`kind`, then workspace-wide) → `null`.
+  Like `model`, the resolution is **row-atomic** against whichever harness is already in
+  force (LIN-1694): a source row scoped to a *different* harness does not donate its `effort`
+  to the current dispatch. Unlike `harness`, there is **no** separate anchor-inheritance tier
+  for `effort` — it mirrors `model`'s shape exactly, not `harness`'s extra follow-up step.
+- **Inert until the runner reads it.** A server-side `effort` is a no-op until the (external)
+  consumer reads `item.effort` and passes it along; a `null` value preserves today's default
+  behaviour, so existing runners are unaffected.
+- **Surfaces on `/cost`.** When a runner reports its usage back via a `[usage]` feedback entry
+  carrying `effort`, it is parsed alongside `model`/`harness` and surfaced per worker session
+  on `GET /api/proxy/issues/:identifier/cost` (`workerSessions[].effort`), next to a derived
+  `workerSessions[].durationMs` for that session. As with everything else on this field, an
+  absent value reads `null`, never an error.
+
+`effort` is accepted on every dispatch write verb: `POST /api/dispatch` (user/UI),
+`POST /api/proxy/dispatch`, `POST /api/proxy/recommend-and-dispatch`, and
+`POST /api/proxy/autopilot/kickoff`. Kickoff only ever creates the *orchestrator* row — a
+child dispatched later by that running orchestrator (`POST /api/proxy/dispatch`) resolves its
+own `effort` independently through the same per-`kind` chain above, plus ordinary
+`presetConfig` inheritance from its anchor; kickoff introduces no separate fan-out mechanism.
 
 ## Dispatch-time UI (model/harness)
 
