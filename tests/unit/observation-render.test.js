@@ -39,6 +39,7 @@ const sandbox = {
 vm.runInNewContext(src, sandbox, { filename: 'observation.js' });
 const { renderActivityLog, renderArtifacts, classifyArtifact, renderObjective } = sandbox.module.exports;
 const { renderSummaryLine, excerptDecisionCase, renderWaitingDecisionSummary, DECISION_EXCERPT_CHARS } = sandbox.module.exports;
+const { boundDecisionOptions, DECISION_OPTIONS_CHARS } = sandbox.module.exports;
 const { laneTicketWalk, ticketProgressText } = sandbox.module.exports;
 const { sessionParkedWait } = sandbox.module.exports;
 
@@ -317,5 +318,102 @@ test.describe('sessionParkedWait / renderSummaryLine parked branch (LIN-2244)', 
     const s = { stale: false, waiting: false, terminal: false, statusLine: null, runs: [] };
     const html = renderSummaryLine(s);
     assert.ok(!html.includes('obs-summary-parked'));
+  });
+});
+
+test.describe('boundDecisionOptions — LIN-2195: the option run carries a budget', () => {
+  const label = (n, len = 10) => `${String(n).repeat(len)}`;
+  // observation.js runs inside a vm sandbox, so arrays it returns are from
+  // another realm and `deepStrictEqual` fails on prototype identity alone.
+  // Copy into this realm before comparing structurally.
+  const here = (arr) => Array.from(arr);
+
+  test('a short run is rendered whole, with no overflow marker', () => {
+    const { labels, overflow } = boundDecisionOptions(
+      [{ label: 'ship it' }, { label: 'hold' }], DECISION_OPTIONS_CHARS
+    );
+    assert.deepEqual(here(labels), ['ship it', 'hold']);
+    assert.equal(overflow, 0);
+  });
+
+  test('the joined run never exceeds the budget', () => {
+    // The acceptance property, mirroring excerptDecisionCase's own: whatever
+    // the input, what actually renders is bounded. This is what stops the card
+    // growth LIN-2184 traded clipping for.
+    for (const count of [3, 5, 12, 40]) {
+      const options = Array.from({ length: count }, (_, i) => ({ label: label(i % 10, 12) }));
+      const { labels } = boundDecisionOptions(options, DECISION_OPTIONS_CHARS);
+      const rendered = labels.join(' / ');
+      assert.ok(
+        rendered.length <= DECISION_OPTIONS_CHARS,
+        `run of ${count} rendered ${rendered.length} chars, over the ${DECISION_OPTIONS_CHARS} budget`
+      );
+    }
+  });
+
+  test("the reviewer's measured case — 5 options — is bounded and reports the remainder", () => {
+    // LIN-2195 recorded this exact shape at 7 lines on a 360px card.
+    const options = [
+      { label: 'Rebuild the index from scratch' },
+      { label: 'Patch the existing index in place' },
+      { label: 'Fall back to the previous snapshot' },
+      { label: 'Escalate to the platform team' },
+      { label: 'Do nothing for now' }
+    ];
+    const { labels, overflow } = boundDecisionOptions(options, DECISION_OPTIONS_CHARS);
+    assert.ok(labels.length < options.length, 'the run is actually shortened');
+    assert.equal(overflow, options.length - labels.length);
+    assert.ok(labels.join(' / ').length <= DECISION_OPTIONS_CHARS);
+  });
+
+  test('labels are taken WHOLE — never cut mid-word — while any fit', () => {
+    // An option cut mid-word reads as a rendering bug, and a half-word cannot
+    // say what kind of choice is waiting, which is the run's whole job here.
+    const options = [{ label: 'approve the rollout' }, { label: 'reject the rollout' }, { label: 'defer to Monday' }];
+    const { labels } = boundDecisionOptions(options, DECISION_OPTIONS_CHARS);
+    for (const l of labels) {
+      assert.ok(options.some(o => o.label === l), `"${l}" is not a whole original label`);
+    }
+  });
+
+  test('a single label longer than the whole budget is truncated rather than dropped', () => {
+    // The one case where there is nothing to fall back to. Showing a truncated
+    // option beats showing none, and beats a card sized by one long option.
+    const { labels, overflow } = boundDecisionOptions([{ label: 'x'.repeat(200) }], DECISION_OPTIONS_CHARS);
+    assert.equal(labels.length, 1);
+    assert.ok(labels[0].endsWith('…'));
+    assert.ok(labels[0].length <= DECISION_OPTIONS_CHARS + 1, 'budget plus the ellipsis');
+    assert.equal(overflow, 0);
+  });
+
+  test('no options, a non-array, and blank labels all yield an empty run', () => {
+    for (const input of [[], null, undefined, 'nonsense', [{}], [{ label: '' }]]) {
+      const { labels, overflow } = boundDecisionOptions(input, DECISION_OPTIONS_CHARS);
+      assert.deepEqual(here(labels), []);
+      assert.equal(overflow, 0);
+    }
+  });
+
+  test('the rendered summary shows the overflow marker and escapes labels', () => {
+    const html = renderWaitingDecisionSummary(
+      {
+        options: [
+          { label: '<script>alert(1)</script>' },
+          { label: 'a second option that is fairly long' },
+          { label: 'a third option that is also long' },
+          { label: 'a fourth' }
+        ]
+      },
+      []
+    );
+    assert.ok(!html.includes('<script>'), 'agent-authored labels must stay escaped');
+    assert.match(html, /&lt;script&gt;/);
+    assert.match(html, /\+\d+ more/, 'the remainder is reported rather than silently dropped');
+  });
+
+  test('a run that fits shows no "+N more" marker', () => {
+    const html = renderWaitingDecisionSummary({ options: [{ label: 'yes' }, { label: 'no' }] }, []);
+    assert.ok(!/\+\d+ more/.test(html));
+    assert.match(html, /\[yes \/ no\]/);
   });
 });
