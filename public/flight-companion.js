@@ -89,6 +89,14 @@
   var inFlight = false;
   var cadence = { delayMs: CADENCE_BASE_MS, stopped: false };
   var timerId = null;
+  // LIN-2632: an auto-wake tick's "checking in…" placeholder (set at
+  // sendTurn's start) snapshots whatever the status line showed before it,
+  // so finishTurn can restore that exact prior state if the turn ends
+  // without anything more specific to say (see finishTurn below). At most
+  // one turn is ever in flight (the `inFlight` guard above), so a single
+  // module-level slot is safe — never overwritten mid-turn.
+  var checkingInSnapshot = null;
+  var CHECKING_IN_TEXT = 'checking in…';
 
   // ─── Pure helpers (exposed via the test seam at the bottom — no DOM) ────
 
@@ -291,6 +299,21 @@
     checkInEl.classList.remove('fc-checkin--warning');
   }
 
+  // LIN-2632: the auto-wake sibling of the typed-turn thinking row below —
+  // "it should show when it's loading/thinking" for a silent tick too,
+  // without ever painting a bubble (AC1 stays green: this only ever touches
+  // the existing #flight-companion-checkin status line). Deliberately NOT a
+  // fourth sibling reusing formatCheckIn's "nothing new" claim — that would
+  // be a lie the instant a tick DOES surface a real narrated bubble
+  // (existing behaviour, unchanged), so this is transient and always
+  // superseded or restored by finishTurn, never left as a final claim.
+  function updateCheckInStatusChecking() {
+    if (!checkInEl) return;
+    checkInEl.textContent = CHECKING_IN_TEXT;
+    checkInEl.hidden = false;
+    checkInEl.classList.remove('fc-checkin--warning');
+  }
+
   function appendAssistantBubble() {
     var li = window.ChatUI.appendMessage(thread, {
       who: 'companion', whoState: 'in-progress', whoClass: 'fc-msg-who',
@@ -308,8 +331,9 @@
   }
 
   function showInlineNote(message, beforeLi) {
-    window.ChatUI.appendNote(thread, message, { liClass: 'fc-inline-note', before: beforeLi });
+    var li = window.ChatUI.appendNote(thread, message, { liClass: 'fc-inline-note', before: beforeLi });
     setEmptyVisible(false);
+    return li;
   }
 
   function freeTierMessage(classification) {
@@ -420,14 +444,52 @@
 
   // ─── Tool-wire phase handling (F5: all five phases explicit) ───────────
 
-  function handleToolEvent(data, beforeLi) {
-    if (data.phase === 'proposed') {
+  // Settle a 'call' breadcrumb on its matching 'result' — correlated via the
+  // tool event's own `id` (stable across call/result/error for one hop,
+  // lib/openrouter.js:1588-1607). Reuses the label already rendered at call
+  // time rather than recomputing from the result event, which carries no
+  // `arguments` at all — recomputing here would silently drop call-time
+  // specifics (e.g. which issueId list_task_sessions was asked for). A
+  // result with no matching call (defensive only — the wire always pairs
+  // them within one turn) is a no-op.
+  function settleToolCall(data, toolLis) {
+    var entry = toolLis && data.id ? toolLis[data.id] : null;
+    if (!entry) return;
+    entry.li.textContent = '↳ ' + entry.label;
+  }
+
+  // Mark a 'call' breadcrumb failed on its matching 'error'. Unlike settle,
+  // this recomputes the label — from the error event's own name + error
+  // message via the shared helper — since that is genuinely new information
+  // the call-time label never had.
+  function failToolCall(data, toolLis) {
+    var entry = toolLis && data.id ? toolLis[data.id] : null;
+    if (!entry) return;
+    entry.li.textContent = '↳ ' + window.ChatUI.toolBreadcrumbLabel({ phase: 'error', name: data.name, error: data.error });
+  }
+
+  function handleToolEvent(data, beforeLi, toolLis) {
+    if (data.phase === 'call') {
+      // Tool use is invisible on this page even when it happens (the bug
+      // this beat fixes) — task-chat.js renders a breadcrumb per tool event
+      // via appendToolBreadcrumb (public/task-chat.js) through
+      // ChatUI.appendNote (public/chat.js), using labels from the shared
+      // window.ChatUI.toolBreadcrumbLabel (lifted off task-chat.js, LIN-2632
+      // beat 1). This mirrors that — call renders pending, settled on the
+      // matching 'result' below, marked on 'error'.
+      var label = window.ChatUI.toolBreadcrumbLabel(data);
+      if (!label) return;
+      var li = showInlineNote('↳ ' + label + ' …', beforeLi);
+      if (toolLis && data.id) toolLis[data.id] = { li: li, label: label };
+    } else if (data.phase === 'result') {
+      settleToolCall(data, toolLis);
+    } else if (data.phase === 'error') {
+      failToolCall(data, toolLis);
+    } else if (data.phase === 'proposed') {
       renderProposal(data.result, beforeLi);
     } else if (data.phase === 'cap') {
       showInlineNote('Reached the tool-call limit for this turn — answering with what it has.', beforeLi);
     }
-    // 'call' / 'result' (non-proposed) / 'error' → no UI, mirrors
-    // task-chat.js's own silent handling of these phases.
   }
 
   // ─── Cadence scheduling ──────────────────────────────────────────────────
@@ -484,6 +546,21 @@
   function finishTurn() {
     inFlight = false;
     setComposerBusy(false);
+    // LIN-2632: clear the "checking in…" placeholder on every path out of an
+    // auto-wake turn, not just the silent one. Every branch with something
+    // more specific to say (a plain/sweep-not-seen/no-census check-in) has
+    // already overwritten checkInEl by the time finishTurn runs, so the
+    // `=== CHECKING_IN_TEXT` guard is false there and this is a no-op; the
+    // branches that say nothing (a real narrated auto-wake bubble, a
+    // mid-stream error, a network failure, or a non-'gate-silent' HTTP
+    // outcome) restore whatever the line showed before this tick, rather
+    // than asserting anything about what actually happened.
+    if (checkingInSnapshot && checkInEl && checkInEl.textContent === CHECKING_IN_TEXT) {
+      checkInEl.textContent = checkingInSnapshot.text;
+      checkInEl.hidden = checkingInSnapshot.hidden;
+      checkInEl.classList.toggle('fc-checkin--warning', checkingInSnapshot.warning);
+    }
+    checkingInSnapshot = null;
     // A hidden→visible transition mid-turn leaves onVisibilityChange's
     // `!inFlight` bail a no-op and the pending timer already consumed
     // (autoWakeTick nulled timerId before bailing on document.hidden) — so a
@@ -497,7 +574,22 @@
     }
   }
 
-  function handleNonStreamOutcome(classification, turnKind, sentMessage) {
+  // LIN-2632 review F1: every non-SSE exit for a user-initiated turn must
+  // settle the eager "thinking…" row the same way a mid-stream error does
+  // (drop chat-cursor, mark failed) — otherwise it sits in
+  // status-pill--in-progress forever and a retry stacks another one on top.
+  // `answerLi` is null on every auto-wake path (ensureAssistantBubble is
+  // never called there), so this is a no-op for those regardless of
+  // `turnKind` — the guard is belt-and-braces, not load-bearing on its own.
+  function settleFailedThinkingRow(answerEl, answerLi, turnKind, message) {
+    if (turnKind !== 'user-initiated' || !answerLi) return;
+    answerEl.classList.remove('chat-cursor');
+    answerEl.textContent = '[error: ' + (message || 'failed') + ']';
+    setBubbleState(answerLi, 'failed');
+  }
+
+  function handleNonStreamOutcome(classification, turnKind, sentMessage, answerEl, answerLi) {
+    var settleMessage = classification.message;
     switch (classification.kind) {
       case 'gate-silent':
         // Auto-wake only — nothing to report; counts as "nothing to report"
@@ -566,8 +658,9 @@
       case 'free-tier-limit':
         // user-initiated only — the auto-wake equivalent is the silent
         // gate-silent row above, a distinct code path.
+        settleMessage = freeTierMessage(classification);
         chatHistory.pop();
-        showInlineNote(freeTierMessage(classification));
+        showInlineNote(settleMessage);
         break;
       case 'server-error':
       default:
@@ -580,6 +673,7 @@
         }
         break;
     }
+    settleFailedThinkingRow(answerEl, answerLi, turnKind, settleMessage);
     finishTurn();
   }
 
@@ -587,25 +681,25 @@
     inFlight = true;
     setComposerBusy(true);
 
-    if (turnKind === 'user-initiated') {
-      appendUserBubble(message);
-      chatHistory.push({ role: 'user', content: message });
-      capHistory(chatHistory);
-    }
-
-    var priorHistory = turnKind === 'user-initiated' ? chatHistory.slice(0, -1) : chatHistory.slice();
-    var body = { history: priorHistory };
-    if (message) body.message = message;
-
     var answerEl = null;
     var answerLi = null;
     var answerText = '';
+    // Correlates a 'call' breadcrumb to the 'result'/'error' that settles it,
+    // keyed by the tool event's own `id` (stable across all three phases for
+    // one hop — lib/openrouter.js:1588-1607). Scoped to this turn, matching
+    // answerLi/answerText above — a fresh turn gets a fresh map, and real
+    // tool-call ids never repeat within one turn.
+    var toolBreadcrumbLis = {};
 
     // AC3 (LIN-2443): the bubble is created on demand rather than at stream
     // open, so a silent or tool-only auto-wake tick never paints an empty
     // row. `chat-cursor` therefore appears with the first token rather than
     // at stream open; the composer is already disabled via setComposerBusy,
     // so a user turn still has feedback during the pre-first-token wait.
+    // For a user-initiated turn specifically, this is called EAGERLY below
+    // (before the fetch even goes out) rather than waited on — so by the
+    // time the first token/tool event actually arrives, this is already a
+    // no-op that returns the existing bubble.
     function ensureAssistantBubble() {
       if (!answerEl) {
         answerEl = appendAssistantBubble();
@@ -614,6 +708,43 @@
       }
       return answerEl;
     }
+
+    if (turnKind === 'user-initiated') {
+      appendUserBubble(message);
+      chatHistory.push({ role: 'user', content: message });
+      capHistory(chatHistory);
+      // LIN-2632: the thinking state — an assistant row immediately, in the
+      // in-progress pill state, before any token or tool event. Previously
+      // the row only appeared on the first non-empty token, so a multi-hop
+      // tool turn (longer since LIN-2617) showed nothing but a disabled
+      // composer — John's "it should show when it's loading/thinking".
+      // `answerLi` being set now (not null) also means any tool breadcrumb
+      // that arrives during a hop inserts BEFORE this row instead of
+      // appending after it — the same "you → ↳ tool → the answer" order
+      // task-chat.js already has. The placeholder text lives ONLY in the
+      // DOM: `answerText` (what chatHistory is built from at 'done') stays
+      // '' until a real token arrives, so it can never leak into history —
+      // an empty turn's AC2 no-reply sentence below overwrites this SAME
+      // element (ensureAssistantBubble is idempotent, so it never creates a
+      // second row).
+      ensureAssistantBubble();
+      answerEl.textContent = 'thinking…';
+    } else if (checkInEl) {
+      // LIN-2632: "checking in…" — the auto-wake sibling of the thinking
+      // row above, shown for the duration of the tick. Snapshotted so
+      // finishTurn can restore the prior state if nothing more specific
+      // claims the line by the time this turn ends (see finishTurn).
+      checkingInSnapshot = {
+        text: checkInEl.textContent,
+        hidden: checkInEl.hidden,
+        warning: checkInEl.classList.contains('fc-checkin--warning'),
+      };
+      updateCheckInStatusChecking();
+    }
+
+    var priorHistory = turnKind === 'user-initiated' ? chatHistory.slice(0, -1) : chatHistory.slice();
+    var body = { history: priorHistory };
+    if (message) body.message = message;
 
     // Raw fetch carve-out: this response may be a Server-Sent Events stream
     // consumed via the reader below; window.api() parses the body as JSON
@@ -637,7 +768,7 @@
             // (:269-270) and ChatUI.appendNote (chat.js:106) both already
             // append at thread level in that case, so the Approve/Dismiss
             // card renders identically — just appended rather than inserted.
-            handleToolEvent(eventData, answerLi);
+            handleToolEvent(eventData, answerLi, toolBreadcrumbLis);
           } else if (type === 'token' || type === 'message') {
             var chunk = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
             // First NON-EMPTY chunk creates the bubble — text is the only
@@ -693,17 +824,19 @@
       // an /api path (mirrors task-chat.js's own response.json().catch()).
       return response.json().catch(function () { return null; }).then(function (jsonBody) {
         var classification = classifyTurnResponse({ ok: response.ok, status: response.status, isEventStream: isEventStream, jsonBody: jsonBody });
-        handleNonStreamOutcome(classification, turnKind, message);
+        handleNonStreamOutcome(classification, turnKind, message, answerEl, answerLi);
       });
     }).catch(function () {
       // Network failure (fetch itself rejected).
+      var networkMessage = 'Network failure — try again.';
       if (turnKind === 'user-initiated') {
         chatHistory.pop();
-        showInlineNote('Network failure — try again.');
+        showInlineNote(networkMessage);
         questionInput.value = message;
       } else {
         applyCadenceEffect('double');
       }
+      settleFailedThinkingRow(answerEl, answerLi, turnKind, networkMessage);
       finishTurn();
     });
   }

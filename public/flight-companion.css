@@ -190,3 +190,100 @@
 .fc-proposal--resolved .fc-proposal-actions {
   display: none;
 }
+
+/* ── The phone shape (Shape B, LIN-2632 beat 4) ───────────────────────────
+ *
+ * LIN-1412 D2 gives every chat that owns its route Shape B: full-height
+ * thread, composer anchored to the viewport, keyboard-safe. Flight Companion
+ * was excluded from that audit because it wasn't a chat yet; it is now the
+ * chat John uses most, and today it is Shape A by accident — chat.css's
+ * `--chat-thread-max-height` default (40vh) is left uncontested here, so the
+ * thread sits as a small box inside an otherwise ordinary scrolling page.
+ *
+ * This is that override, on the SAME breakpoint chat.css already establishes
+ * (`@media (max-width: 600px)`, public/chat.css:140) rather than a new one.
+ *
+ * Mechanism: `.flight-companion-chat-section` becomes a flex column, one
+ * viewport tall (`height: 100dvh`), in ORDINARY document flow — no
+ * `position` of its own. An earlier revision made it `position: sticky; top:
+ * 0` to land the composer flush with the viewport's bottom edge without a
+ * magic `calc()` tied to the page header's height. That backfired (LIN-2632
+ * review finding F2): this section is the first of four siblings
+ * inside one shared container (`<main class="flight-companion-page">`), and
+ * `position: sticky`'s containing block for release purposes is that WHOLE
+ * container, not the section's own box — so it stayed pinned across nearly
+ * the entire page scroll, painting itself over How-to/Kickoff/Observer and
+ * intercepting pointer events meant for them (measured: `elementFromPoint`
+ * over the copy-prompt button resolved to the chat thread, and a real
+ * Playwright `click({trial: true})` on it timed out).
+ *
+ * No `position` is needed at all, because the page's own shared header
+ * (`.nav-bar`, public/style.css) is ALREADY `position: sticky; top: 0` and
+ * stays visually pinned across the whole page regardless of this section —
+ * that is what closes the header-height gap for free: scrolling the section
+ * into view (e.g. `scrollIntoViewIfNeeded`, or a user's own swipe) naturally
+ * lands its bottom — the composer, its last child — flush with the
+ * viewport's bottom edge, with the nav's own sticky band overlapping only
+ * the section's OWN top edge (its "Chat" heading), never anything below it.
+ * Scrolling further moves the section (now just an ordinary block) out of
+ * view like any other content, letting the next section slide up in normal
+ * flow — the same mechanism that makes How-to/Kickoff/Observer reachable
+ * below, but now genuinely reachable rather than merely geometrically
+ * "in viewport" underneath an opaque overlay.
+ *
+ * Its direct children are already in exactly the right DOM order for this
+ * (lib/render-flight-companion.js's `chatBody`: the section-header, the
+ * thread, the empty-state placeholder, the check-in status line, then the
+ * composer) — the thread/empty-state pair (only one is ever visible; both
+ * carry `[hidden]` toggled by flight-companion.js) gets `flex: 1`, so
+ * whichever is showing fills the remaining space, while chat.css's own
+ * `overflow-y: auto` on `.chat-thread` does the actual scrolling;
+ * everything else (section-header, check-in line, composer) keeps its
+ * natural height. Nothing here is ever stacked/overlaid, so no new
+ * background is needed — this block declares no color and no animation,
+ * so it is dark-theme- and reduced-motion-safe by construction, not by a
+ * separate override.
+ *
+ * `100dvh` (with a `100vh` fallback for engines that don't support dynamic
+ * viewport units) rather than `100vh` alone: the dynamic unit shrinks with
+ * the browser chrome/software keyboard, which is what keeps the composer
+ * from being pushed off-screen when the keyboard opens — the LIN-751 review
+ * comments' own ask ("LAND the composer visible with the keyboard open").
+ *
+ * This is a per-surface layout built entirely on Flight Companion's OWN
+ * selectors (`.flight-companion-chat-section`, `#flight-companion-thread`,
+ * `.flight-companion-chat-empty`, `#flight-companion-checkin`,
+ * `.fc-chat-composer`) plus the ONE property chat.css already documents as
+ * its per-surface override point for exactly this
+ * (`--chat-thread-max-height`, public/chat.css:2-35). Zero lines of chat.css
+ * itself change, so every other consumer (public/session.*, public/task-
+ * chat.*, public/collective.*) is provably byte-identical — this file never
+ * touches their selectors, and chat.css's own rules are untouched.
+ *
+ * The other three sections (How to use / Kickoff prompt / Latest observer
+ * report) need no rule at all: they already sit below
+ * `.flight-companion-chat-section` in normal document flow, so making that
+ * one section a viewport-tall block is what pushes them below the fold —
+ * reachable by scrolling the page past it, never hidden.
+ */
+@media (max-width: 600px) {
+  .flight-companion-chat-section {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+  }
+  .flight-companion-chat-section > .section-header {
+    flex: 0 0 auto;
+  }
+  #flight-companion-thread,
+  .flight-companion-chat-empty {
+    flex: 1 1 auto;
+    min-height: 0;
+    --chat-thread-max-height: none;
+  }
+  #flight-companion-checkin,
+  .fc-chat-composer {
+    flex: 0 0 auto;
+  }
+}

@@ -25,6 +25,11 @@ import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLIENT_SRC = readFileSync(join(__dirname, '../../public/flight-companion.js'), 'utf8');
+// LIN-2632: the shared window.ChatUI.toolBreadcrumbLabel implementation the
+// Flight Companion breadcrumb rendering will call — loaded from its real
+// home (public/chat.js, lifted off task-chat.js per LIN-1578) rather than
+// re-declared here, so a drift between the two can't hide from this suite.
+const CHAT_JS_SRC = readFileSync(join(__dirname, '../../public/chat.js'), 'utf8');
 // Comments legitimately name the very things a constraint check forbids
 // (explaining why NOT to use them) — strip block/line comments before
 // grepping for CODE, so a doc comment's own prose can't trip a "must not
@@ -134,6 +139,12 @@ function makeChatUI() {
   const calls = { appendMessage: [], appendNote: [] };
   return {
     calls,
+    // LIN-2632 beat 2: flight-companion.js now calls
+    // window.ChatUI.toolBreadcrumbLabel for its tool breadcrumbs — sourced
+    // from the REAL chat.js (loadChatUI(), defined further down this file)
+    // rather than a second hand-rolled fake, so a real regression in the
+    // shared label helper fails these tests too, not just its own.
+    toolBreadcrumbLabel: loadChatUI().toolBreadcrumbLabel,
     appendMessage(thread, opts) {
       calls.appendMessage.push(opts);
       const li = new FakeElement('li');
@@ -824,7 +835,13 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
       'the display-only no-reply sentence must never be pushed to history');
   });
 
-  test('AC3: an auto-wake tick emitting only tool call/result frames appends ZERO rows', async () => {
+  // LIN-2632 beat 2 narrows this: AC3's real invariant is "no empty assistant
+  // BUBBLE for a tool-only tick" — it predates tool breadcrumbs existing at
+  // all, back when 'call'/'result' rendered nothing whatsoever. Now that they
+  // render a breadcrumb note (the fix for "it doesn't appear to use tools?"),
+  // the thread is no longer empty on a tool-only tick, but it still must
+  // never contain an assistant bubble (chat-msg / ChatUI.appendMessage).
+  test('AC3: an auto-wake tick emitting only tool call/result frames appends breadcrumbs but never an assistant bubble', async () => {
     const { exports: m, thread, chatUICalls } = loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: '1', name: 'get_stack' }),
@@ -834,8 +851,9 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
     });
     m.autoWakeTick();
     await flush();
-    assert.strictEqual(thread.children.length, 0, 'a tool-only tick must not paint an empty bubble');
     assert.strictEqual(chatUICalls.appendMessage.length, 0, 'no bubble may be created for a tool-only turn');
+    assert.strictEqual(chatUICalls.appendNote.length, 1, 'the call breadcrumb renders (settled by the result, not a second note)');
+    assert.ok(thread.children.every(li => !li.className.includes('chat-msg')), 'every row is a note, never a bubble');
   });
 
   test('AC3 preservation: a `proposed` event on a text-free turn still renders a wired Approve/Dismiss card (null-beforeLi fallback)', async () => {
@@ -943,6 +961,206 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   });
 });
 
+// ─── The thinking state + "checking in…" status line (LIN-2632 beat 3) ─────
+
+describe('flight-companion.js — the thinking state (typed turns) and "checking in…" (auto-wake)', () => {
+  test('a typed turn shows the thinking row immediately, in-progress, before any network response', () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => new Promise(() => {}), // never resolves — this checks the pre-response state only
+    });
+    questionInput.value = 'status please';
+    m.submitQuestion();
+    // Synchronous — no flush(). sendTurn creates the row before the fetch
+    // even goes out, so this must already be true.
+    assert.strictEqual(thread.children.length, 2, 'user bubble + the immediate assistant thinking row');
+    const answerLi = thread.children[1];
+    assert.strictEqual(answerLi.querySelector('.fc-msg-body').textContent, 'thinking…');
+    const pill = answerLi.querySelector('.chat-msg__who');
+    assert.ok(pill.classList.contains('status-pill--in-progress'), 'the pill starts in-progress, same as the existing vocabulary');
+  });
+
+  test('the first token replaces the thinking placeholder outright — never concatenated after it', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: 'ack' }), sseFrame('done', {})]),
+    });
+    questionInput.value = 'status please';
+    m.submitQuestion();
+    assert.strictEqual(thread.children[1].querySelector('.fc-msg-body').textContent, 'thinking…', 'pre-token state');
+    await flush();
+    assert.strictEqual(thread.children.length, 2, 'still exactly one assistant row — ensureAssistantBubble is idempotent');
+    assert.strictEqual(thread.children[1].querySelector('.fc-msg-body').textContent, 'ack', 'fully replaced, not "thinking…ack"');
+  });
+
+  test('a tool breadcrumb during a hop inserts BEFORE the thinking row, not after it', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: '1', name: 'get_stack', arguments: {} }),
+        sseFrame('token', { token: 'done hop' }),
+        sseFrame('done', {}),
+      ]),
+    });
+    questionInput.value = 'status please';
+    m.submitQuestion();
+    await flush();
+    // you -> breadcrumb -> assistant row, in that order.
+    assert.strictEqual(thread.children.length, 3);
+    assert.ok(thread.children[1].className.includes('fc-inline-note'), 'the breadcrumb lands between the user turn and the answer');
+    assert.strictEqual(thread.children[2].querySelector('.fc-msg-body').textContent, 'done hop');
+  });
+
+  test('the thinking placeholder never leaks into history — even mid-turn, before any token arrives', () => {
+    const { exports: m, questionInput } = loadClient({ fetchImpl: () => new Promise(() => {}) });
+    questionInput.value = 'anything?';
+    m.submitQuestion();
+    looseDeepEqual(m.getChatHistory(), [{ role: 'user', content: 'anything?' }],
+      'only the user turn is recorded; the thinking placeholder is display-only');
+  });
+
+  test('an empty typed turn still leaves nothing in history, with the thinking row settling into the honest no-reply sentence (AC2 unchanged)', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    questionInput.value = 'anything to report?';
+    m.submitQuestion();
+    await flush();
+    assert.strictEqual(thread.children.length, 2, 'no second row — the thinking row settles in place');
+    assert.strictEqual(thread.children[1].querySelector('.fc-msg-body').textContent, 'no reply — nothing to add');
+    looseDeepEqual(m.getChatHistory(), [{ role: 'user', content: 'anything to report?' }]);
+  });
+
+  // ─── LIN-2632 review F1: settle the eager thinking row on every non-SSE
+  // failure exit ────────────────────────────────────────────────────────────
+  //
+  // `ensureAssistantBubble()` runs EAGERLY for a user-initiated turn (above),
+  // before the fetch even goes out. Every in-stream exit (`done`, the empty
+  // no-reply case, a mid-stream `error` frame) already settles that row. The
+  // independent review on PR #1401 found two exits that leave the stream
+  // entirely without ever touching it: `handleNonStreamOutcome` (a gate JSON
+  // response, or any non-OK/non-stream HTTP status) and the outer network-
+  // failure `.catch`. Both left the row's pill permanently
+  // `status-pill--in-progress` with `thinking…` as its final text, and a
+  // retry stacked a second one on top rather than replacing the first.
+
+  test('LIN-2632 review F1: a user-initiated turn that fails outside the SSE stream (e.g. a 500 non-JSON response) settles the thinking row to failed, never left stuck in-progress', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => htmlResponse(500),
+    });
+    questionInput.value = 'what is in flight?';
+    m.submitQuestion();
+    // Pre-fix (observed red): the assistant row's pill stayed
+    // status-pill--in-progress and its text stayed 'thinking…' forever —
+    // this is the exact regression the independent review reproduced.
+    await flush();
+    assert.strictEqual(thread.children.length, 3, 'user bubble + the settled assistant row + the inline failure note');
+    const answerLi = thread.children[1];
+    const pill = answerLi.querySelector('.chat-msg__who');
+    assert.ok(pill.classList.contains('status-pill--failed'), 'the pill must settle to failed, not stay stuck in-progress');
+    assert.ok(!pill.classList.contains('status-pill--in-progress'), 'in-progress must be cleared on this exit too');
+    assert.notStrictEqual(answerLi.querySelector('.fc-msg-body').textContent, 'thinking…', 'the placeholder text must not survive the failure');
+    looseDeepEqual(m.getChatHistory(), [], 'the unanswered turn is dropped from history, same as every other failure path');
+  });
+
+  test('LIN-2632 review F1: a network failure (fetch rejects) on a user-initiated turn also settles the thinking row to failed', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => Promise.reject(new Error('network down')),
+    });
+    questionInput.value = 'what is in flight?';
+    m.submitQuestion();
+    await flush();
+    const answerLi = thread.children[1];
+    const pill = answerLi.querySelector('.chat-msg__who');
+    assert.ok(pill.classList.contains('status-pill--failed'), 'the pill must settle to failed on a network rejection too');
+    assert.ok(!pill.classList.contains('status-pill--in-progress'));
+    assert.notStrictEqual(answerLi.querySelector('.fc-msg-body').textContent, 'thinking…');
+  });
+
+  test('LIN-2632 review F1: repeated failed turns never leave more than one settled row each — no permanently in-progress rows accumulate across retries', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => htmlResponse(500),
+    });
+    questionInput.value = 'first attempt';
+    m.submitQuestion();
+    await flush();
+    questionInput.value = 'retry';
+    m.submitQuestion();
+    await flush();
+
+    const stillInProgress = thread.children.filter((li) => {
+      const pill = li.querySelector && li.querySelector('.chat-msg__who');
+      return pill && pill.classList.contains('status-pill--in-progress');
+    });
+    assert.strictEqual(stillInProgress.length, 0, 'no row may still read in-progress/"thinking…" after two failed retries');
+  });
+
+  test('LIN-2632 review F1: an auto-wake tick that fails outside the SSE stream still creates no assistant bubble (F1\'s fix is user-initiated only, since ensureAssistantBubble is never called on auto-wake)', async () => {
+    const { exports: m, thread, chatUICalls } = loadClient({
+      fetchImpl: () => htmlResponse(500),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(chatUICalls.appendMessage.length, 0, 'no assistant bubble is ever created for an auto-wake tick, failed or not');
+    assert.strictEqual(thread.children.length, 1, 'only the pre-existing inline failure note — no settled/pending row alongside it');
+  });
+
+  test('a silent auto-wake tick still paints no bubble (AC1 unchanged by the thinking-state work)', async () => {
+    const { exports: m, thread, chatUICalls } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(chatUICalls.appendMessage.length, 0, 'no assistant bubble is ever created for a silent auto-wake tick');
+    assert.strictEqual(thread.children.length, 0);
+  });
+
+  test('"checking in…" appears on the status line immediately on an auto-wake tick, before the network round-trip resolves, and clears on done', async () => {
+    const { exports: m, checkIn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    // Synchronous — no flush(). Shown before the fetch promise even settles.
+    assert.strictEqual(checkIn.hidden, false);
+    assert.strictEqual(checkIn.textContent, 'checking in…');
+    await flush();
+    assert.notStrictEqual(checkIn.textContent, 'checking in…', 'cleared once the tick resolves (AC2 of this beat)');
+    assert.match(checkIn.textContent, /^checked in .+ · nothing new$/, 'AC1: settles into the ordinary check-in line');
+  });
+
+  test('"checking in…" also clears on a gate-silent (non-stream) auto-wake outcome', async () => {
+    const { exports: m, checkIn } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'hash-identical' }),
+    });
+    m.autoWakeTick();
+    assert.strictEqual(checkIn.textContent, 'checking in…');
+    await flush();
+    assert.match(checkIn.textContent, /^checked in .+ · nothing new$/);
+  });
+
+  test('an auto-wake tick that surfaces a real narrated bubble still clears "checking in…" — restored to its prior state, never left stuck', async () => {
+    const { exports: m, checkIn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: 'heads up' }), sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    assert.strictEqual(checkIn.textContent, 'checking in…');
+    await flush();
+    // This tick never claims anything about "nothing new" (something DID
+    // happen — a narrated bubble) — it restores the line to whatever it
+    // held before this tick started, which for a fresh page is hidden/empty.
+    assert.notStrictEqual(checkIn.textContent, 'checking in…');
+    assert.strictEqual(checkIn.hidden, true, 'restored to its pre-tick (never-yet-shown) state');
+    assert.strictEqual(checkIn.textContent, '');
+  });
+
+  test('"checking in…" also clears (restored) on a mid-stream auto-wake error', async () => {
+    const { exports: m, checkIn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]),
+    });
+    m.autoWakeTick();
+    assert.strictEqual(checkIn.textContent, 'checking in…');
+    await flush();
+    assert.notStrictEqual(checkIn.textContent, 'checking in…');
+  });
+});
+
 // ─── Tool-wire phases + proposal control ────────────────────────────────
 
 describe('flight-companion.js — tool-wire phases (F5) + the proposal control', () => {
@@ -958,18 +1176,86 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
     assert.strictEqual(capNotes.length, 1);
   });
 
-  test('call/result(non-proposed)/error phases render no UI', async () => {
-    const { exports: m, chatUICalls } = loadClient({
+  // LIN-2632 beat 2: 'call'/'result'/'error' used to render nothing at all
+  // (the bug — "it doesn't appear to use tools?"). Now 'call' renders a
+  // pending breadcrumb via the shared window.ChatUI.toolBreadcrumbLabel,
+  // 'result' settles it, and 'error' marks it — correlated by the tool
+  // event's own `id`.
+  test('"call" renders a pending breadcrumb using the shared label helper', async () => {
+    const { exports: m, chatUICalls, thread } = loadClient({
       fetchImpl: () => sseResponse([
-        sseFrame('tool', { phase: 'call', id: '1', name: 'get_stack' }),
-        sseFrame('tool', { phase: 'result', id: '1', name: 'get_stack', result: '{}' }),
+        sseFrame('tool', { phase: 'call', id: '1', name: 'get_stack', arguments: {} }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(chatUICalls.appendNote.length, 1);
+    assert.equal(chatUICalls.appendNote[0].text, '↳ checked the task stack …');
+    const li = thread.children.find(l => l.textContent.includes('checked the task stack'));
+    assert.ok(li, 'expected the pending breadcrumb in the thread');
+  });
+
+  test('"result" settles the matching "call" breadcrumb in place (no new note), dropping the pending ellipsis', async () => {
+    const { exports: m, chatUICalls, thread } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: '1', name: 'list_task_sessions', arguments: { issueId: 'LIN-9' } }),
+        sseFrame('tool', { phase: 'result', id: '1', name: 'list_task_sessions', result: '[]' }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    // Settling mutates the existing note in place — it must not append a
+    // second one.
+    assert.strictEqual(chatUICalls.appendNote.length, 1);
+    const li = thread.children.find(l => l.className.includes('fc-inline-note'));
+    assert.equal(li.textContent, '↳ checked sessions for LIN-9', 'settled text keeps the call-time specifics and drops the ellipsis');
+  });
+
+  test('"error" marks the matching "call" breadcrumb failed, recomputed from the error event', async () => {
+    const { exports: m, chatUICalls, thread } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: '2', name: 'get_session', arguments: { sessionId: 'abc' } }),
         sseFrame('tool', { phase: 'error', id: '2', name: 'get_session', error: 'boom' }),
         sseFrame('done', { surface: true }),
       ]),
     });
     m.autoWakeTick();
     await flush();
+    assert.strictEqual(chatUICalls.appendNote.length, 1);
+    const li = thread.children.find(l => l.className.includes('fc-inline-note'));
+    assert.equal(li.textContent, '↳ get_session failed: boom');
+  });
+
+  test('a result/error with no matching call id is a defensive no-op (never throws, no orphan note)', async () => {
+    const { exports: m, chatUICalls } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'result', id: 'orphan', name: 'get_stack', result: '{}' }),
+        sseFrame('tool', { phase: 'error', id: 'orphan-2', name: 'get_stack', error: 'x' }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    await assert.doesNotReject(async () => { m.autoWakeTick(); await flush(); });
     assert.strictEqual(chatUICalls.appendNote.length, 0);
+  });
+
+  test('two concurrent tool calls in one turn settle independently, correlated by id', async () => {
+    const { chatUICalls, thread, exports: m } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: 'a', name: 'get_stack', arguments: {} }),
+        sseFrame('tool', { phase: 'call', id: 'b', name: 'get_session', arguments: { sessionId: 'xyz' } }),
+        sseFrame('tool', { phase: 'result', id: 'a', name: 'get_stack', result: '{}' }),
+        sseFrame('tool', { phase: 'error', id: 'b', name: 'get_session', error: 'timeout' }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(chatUICalls.appendNote.length, 2, 'each call gets exactly one note, settling mutates in place');
+    const notes = thread.children.filter(l => l.className.includes('fc-inline-note')).map(l => l.textContent);
+    assert.ok(notes.includes('↳ checked the task stack'), 'the "a" breadcrumb settled');
+    assert.ok(notes.includes('↳ get_session failed: timeout'), 'the "b" breadcrumb failed independently');
   });
 
   test('a valid proposal renders Approve/Dismiss; Dismiss is zero-fetch and terminal', async () => {
@@ -1280,5 +1566,159 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
     await flush();
     assert.strictEqual(user.questionInput.value, 'status please');
     looseDeepEqual(user.exports.getChatHistory(), []);
+  });
+});
+
+// ─── Shared tool-label helper (LIN-2632) ────────────────────────────────────
+//
+// toolBreadcrumbLabel used to be a task-chat.js-local function; it is lifted
+// into window.ChatUI (public/chat.js) here so Flight Companion's breadcrumb
+// rendering (a later beat) and Task Chat share one implementation, per
+// LIN-1578's direction that this shared layer must not be forked. chat.js
+// has no document/window dependency at load time (only inside appendMessage/
+// appendNote, neither of which these tests call), so a bare `{ window: {} }`
+// sandbox is enough to load it and read off the attached ChatUI.
+function loadChatUI() {
+  const sandbox = { window: {}, console };
+  vm.createContext(sandbox);
+  vm.runInContext(CHAT_JS_SRC, sandbox, { filename: 'chat.js' });
+  return sandbox.window.ChatUI;
+}
+
+describe('window.ChatUI.toolBreadcrumbLabel (LIN-2632) — lifted from task-chat.js, extended for Flight Companion', () => {
+  test('is exposed on the shared ChatUI surface', () => {
+    const ChatUI = loadChatUI();
+    assert.strictEqual(typeof ChatUI.toolBreadcrumbLabel, 'function');
+  });
+
+  // Pre-fix (acceptance-witness): before this beat's chat.js edit, ChatUI has
+  // no toolBreadcrumbLabel at all, so `ChatUI.toolBreadcrumbLabel(...)` throws
+  // a TypeError — every assertion below was observed to fail that way against
+  // unfixed public/chat.js (a pre-fix "red" is impossible in the normal
+  // fail-differently sense since the function is simply absent; this is the
+  // mutation-equivalent: delete the export and the whole suite throws instead
+  // of asserting).
+
+  test('get_stack: names the count when a limit was requested', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'get_stack', arguments: { limit: 5 } }),
+      'checked the top 5 tasks on the stack'
+    );
+  });
+
+  test('get_stack: falls back to a plain description with no limit argument', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'get_stack', arguments: {} }),
+      'checked the task stack'
+    );
+  });
+
+  test('list_task_sessions: names the task when an issueId was requested', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'list_task_sessions', arguments: { issueId: 'LIN-123' } }),
+      'checked sessions for LIN-123'
+    );
+  });
+
+  test('list_task_sessions: falls back to a plain description with no issueId', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'list_task_sessions', arguments: {} }),
+      'checked task sessions'
+    );
+  });
+
+  test('get_session: names the session when a sessionId was requested', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'get_session', arguments: { sessionId: 'abc-123' } }),
+      'checked session abc-123'
+    );
+  });
+
+  test('get_session: falls back to a plain description with no sessionId', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'get_session', arguments: {} }),
+      'checked a session'
+    );
+  });
+
+  test('list_active_sessions never prints the bare tool name', () => {
+    const ChatUI = loadChatUI();
+    const label = ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'list_active_sessions', arguments: {} });
+    assert.equal(label, 'checked active sessions');
+    assert.notEqual(label, 'list_active_sessions');
+  });
+
+  test('list_pending_decisions never prints the bare tool name', () => {
+    const ChatUI = loadChatUI();
+    const label = ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'list_pending_decisions', arguments: {} });
+    assert.equal(label, 'checked pending decisions');
+    assert.notEqual(label, 'list_pending_decisions');
+  });
+
+  test('every companion catalog tool name resolves to a non-empty, non-bare label on call', () => {
+    const ChatUI = loadChatUI();
+    const COMPANION_TOOLS = ['get_stack', 'list_task_sessions', 'get_session', 'list_active_sessions', 'list_pending_decisions'];
+    for (const name of COMPANION_TOOLS) {
+      const label = ChatUI.toolBreadcrumbLabel({ phase: 'call', name, arguments: {} });
+      assert.ok(label, `${name} must produce a non-empty label`);
+      assert.notEqual(label, name, `${name} must not fall through to the bare-name fallback`);
+    }
+  });
+
+  test('error phase still names the tool for a companion tool, matching the pre-existing Task Chat shape', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'error', name: 'get_stack', error: 'timeout' }),
+      'get_stack failed: timeout'
+    );
+  });
+
+  // The existing Task Chat labels (LIN-990/LIN-1073) must still resolve
+  // byte-for-byte after the lift.
+  test('lookup_task/get_relations: unchanged from task-chat.js', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'lookup_task', arguments: { issueId: 'LIN-9' } }),
+      'looked up LIN-9'
+    );
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'get_relations', arguments: {} }),
+      'get_relations'
+    );
+  });
+
+  test('search_tasks: unchanged from task-chat.js', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'search_tasks', arguments: { query: 'billing' } }),
+      'searched "billing"'
+    );
+  });
+
+  test('send_follow_up: unchanged from task-chat.js, including the write-tool snippet', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({
+        phase: 'call', name: 'send_follow_up', arguments: { sessionId: 'sess-1', prompt: 'keep going' }
+      }),
+      'sent a follow-up to session sess-1: "keep going"'
+    );
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'send_follow_up', arguments: {} }),
+      'send_follow_up'
+    );
+  });
+
+  test('cap and unrecognized phases: unchanged from task-chat.js', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(ChatUI.toolBreadcrumbLabel({ phase: 'cap', name: 'get_stack' }), 'reached the tool-lookup limit');
+    assert.equal(ChatUI.toolBreadcrumbLabel({ phase: 'result', name: 'get_stack' }), '');
+    assert.equal(ChatUI.toolBreadcrumbLabel(null), '');
   });
 });

@@ -54,14 +54,16 @@ function extractRenderSavedRowsSrc() {
 // slice could not reproduce.
 //
 // LIN-2445 widened the signature to `(role, text, state)` and added
-// `setBubbleState` + `PILL_GLYPHS` between this function and
-// `toolBreadcrumbLabel`, so the slice now carries all three. That is
-// deliberate: they are the pill's write path either side of the turn, and
-// keeping them in one slice is what lets the tests below drive both.
+// `setBubbleState` + `PILL_GLYPHS` between this function and the next one.
+// That is deliberate: they are the pill's write path either side of the
+// turn, and keeping them in one slice is what lets the tests below drive
+// both. LIN-2632 lifted `toolBreadcrumbLabel` (the function that used to
+// follow) into the shared window.ChatUI, so the end marker is now the next
+// remaining top-level function, `appendToolBreadcrumb`.
 function extractAppendBubbleSrc() {
   const start = TASK_CHAT_JS_SRC.indexOf('  function appendBubble(role, text, state) {');
   assert.notEqual(start, -1, 'appendBubble found in public/task-chat.js');
-  const end = TASK_CHAT_JS_SRC.indexOf('\n  function toolBreadcrumbLabel', start);
+  const end = TASK_CHAT_JS_SRC.indexOf('\n  function appendToolBreadcrumb', start);
   assert.notEqual(end, -1, 'the next top-level function marks the end of the slice');
   return TASK_CHAT_JS_SRC.slice(start, end);
 }

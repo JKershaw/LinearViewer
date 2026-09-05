@@ -199,5 +199,71 @@
     return wrap;
   }
 
-  window.ChatUI = { appendMessage: appendMessage, appendNote: appendNote, appendOptions: appendOptions };
+  // Human-readable label for a `tool` SSE breadcrumb (LIN-990). Derived from
+  // the streamChatWithTools event shape ({ phase, name, arguments, error }).
+  // Returns '' for phases neither current surface names (e.g. 'result') so
+  // the caller can skip them.
+  //
+  // Lifted out of task-chat.js (LIN-2632, per LIN-1578's direction that this
+  // shared layer must not be forked) and extended with the Flight Companion
+  // tool catalog (get_stack, list_task_sessions, get_session,
+  // list_active_sessions, list_pending_decisions) so their generic fallback
+  // never prints a bare tool name.
+  function toolBreadcrumbLabel(data) {
+    if (!data || typeof data !== 'object') return '';
+    var name = data.name || 'tool';
+    var args = data.arguments || {};
+    if (data.phase === 'call') {
+      if (name === 'lookup_task' || name === 'get_relations') {
+        return args.issueId ? 'looked up ' + args.issueId : name;
+      }
+      if (name === 'search_tasks') {
+        return args.query ? 'searched "' + args.query + '"' : name;
+      }
+      if (name === 'send_follow_up') {
+        // LIN-1073 review: this is the catalog's one WRITE tool — the generic
+        // fallback below would hide a real side effect (a queued dispatch
+        // follow-up) behind an anonymous tool name, so it must always name the
+        // session it targeted and a snippet of what was sent.
+        if (!args.sessionId) return name;
+        var prompt = typeof args.prompt === 'string' ? args.prompt.trim() : '';
+        var snippet = prompt ? ': "' + (prompt.length > 60 ? prompt.slice(0, 60) + '…' : prompt) + '"' : '';
+        return 'sent a follow-up to session ' + args.sessionId + snippet;
+      }
+      // Flight Companion catalog (LIN-2632) — same discipline as send_follow_up
+      // above: name the specifics available on the call, never just the tool.
+      if (name === 'get_stack') {
+        return typeof args.limit === 'number'
+          ? 'checked the top ' + args.limit + ' tasks on the stack'
+          : 'checked the task stack';
+      }
+      if (name === 'list_task_sessions') {
+        return args.issueId ? 'checked sessions for ' + args.issueId : 'checked task sessions';
+      }
+      if (name === 'get_session') {
+        return args.sessionId ? 'checked session ' + args.sessionId : 'checked a session';
+      }
+      if (name === 'list_active_sessions') {
+        return 'checked active sessions';
+      }
+      if (name === 'list_pending_decisions') {
+        return 'checked pending decisions';
+      }
+      return name;
+    }
+    if (data.phase === 'error') {
+      return name + ' failed: ' + (data.error || 'unknown error');
+    }
+    if (data.phase === 'cap') {
+      return 'reached the tool-lookup limit';
+    }
+    return '';
+  }
+
+  window.ChatUI = {
+    appendMessage: appendMessage,
+    appendNote: appendNote,
+    appendOptions: appendOptions,
+    toolBreadcrumbLabel: toolBreadcrumbLabel
+  };
 })();
