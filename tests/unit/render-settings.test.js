@@ -438,6 +438,18 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
     assert.match(html, /name="defaultHarnessSelect"[^>]*>[\s\S]*?<option value="opencode" selected>/);
   });
 
+  // LIN-2616 G2 — the workspace-wide row is the one row that MAY pre-select
+  // (harness only); it must still render a stored effort value like model.
+  test('populates the workspace-wide row from dispatchDefaults.effort (LIN-2616)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchDefaults: { effort: 'high' }
+    });
+    const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
+    const row = html.slice(rowStart, rowStart + 1200);
+    assert.match(row, /name="defaultEffort"[^>]*value="high"/);
+  });
+
   test('LIN-1282: the free-text custom harness input is gone; only the two-harness select remains', () => {
     const html = renderSettingsPage('Acme', BASE);
     assert.doesNotMatch(html, /name="defaultHarnessCustom"/);
@@ -475,6 +487,20 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
     assert.match(row, /<option value="claude-code" selected>/);
   });
 
+  // LIN-2616 (L5) — the per-kind row's own effort input renders a stored
+  // byKind effort value, mirroring model/harness.
+  test('populates a per-kind override row from dispatchDefaults.byKind effort (LIN-2616)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchDefaults: {
+        byKind: { implementation: { effort: 'xhigh' } }
+      }
+    });
+    const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
+    const row = html.slice(rowStart, rowStart + 1200);
+    assert.match(row, /name="kind__implementation__Effort"[^>]*value="xhigh"/);
+  });
+
   test('a kind with no override renders blank (inherits workspace default)', () => {
     const html = renderSettingsPage('Acme', {
       ...BASE,
@@ -483,6 +509,20 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
     const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
     const row = html.slice(rowStart, rowStart + 1200);
     assert.match(row, /name="kind__implementation__Model"[^>]*value=""/);
+  });
+
+  // LIN-2616 (L5) — blank-by-construction (LIN-1747): a per-kind row's effort
+  // control must render blank even when the WORKSPACE-WIDE effort is set —
+  // never inherit visually into the per-kind control, which would make the
+  // next save write it as an explicit 18-kind override.
+  test('a kind with no effort override renders blank even when the workspace-wide effort is set (LIN-2616, LIN-1747)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchDefaults: { effort: 'high', byKind: {} }
+    });
+    const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
+    const row = html.slice(rowStart, rowStart + 1200);
+    assert.match(row, /name="kind__implementation__Effort"[^>]*value=""/);
   });
 
   describe('claude-code default + model suggestions (LIN-1111)', () => {
@@ -612,6 +652,17 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       });
       assert.match(html, /<details class="dispatch-kind-overrides" open>/);
     });
+
+    // LIN-2616 — the widened hasKindOverride gate: an effort-only per-kind
+    // override (no model/harness) must still auto-expand the details block,
+    // or a saved effort override is silently hidden behind a closed panel.
+    test('auto-expands the <details> when the only per-kind override is an effort (LIN-2616)', () => {
+      const html = renderSettingsPage('Acme', {
+        ...BASE,
+        dispatchDefaults: { byKind: { implementation: { effort: 'low' } } }
+      });
+      assert.match(html, /<details class="dispatch-kind-overrides" open>/);
+    });
   });
 
   test('escapes a validation error message when dispatchDefaultsError is set', () => {
@@ -678,6 +729,29 @@ describe('renderSettingsPage — Dispatch presets section (LIN-1391 S7)', () => 
     assert.match(p2, /class="dispatch-preset-name-input"[^>]*value="OpenCode preset"/);
     assert.match(p2, /name="preset__p2__Model"[^>]*value=""/);
     assert.match(p2, /<option value="opencode" selected>/);
+  });
+
+  // LIN-2616 (L4/L5) — a preset's stored top-level `effort` must render on
+  // its config row, or the value the client posted and the store accepted
+  // is invisible on reload.
+  test('renders a preset\'s stored top-level effort (LIN-2616)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchPresets: [{ id: 'p1', name: 'Effort preset', config: { model: 'm1', effort: 'high' } }]
+    });
+    const rowStart = html.indexOf('data-testid="dispatch-preset-item-p1"');
+    const row = html.slice(rowStart, rowStart + 1800);
+    assert.match(row, /name="preset__p1__Effort"[^>]*value="high"/);
+  });
+
+  test('a preset with no stored effort renders the top-level effort input blank (LIN-2616)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchPresets: [{ id: 'p1', name: 'No effort', config: { model: 'm1' } }]
+    });
+    const rowStart = html.indexOf('data-testid="dispatch-preset-item-p1"');
+    const row = html.slice(rowStart, rowStart + 1800);
+    assert.match(row, /name="preset__p1__Effort"[^>]*value=""/);
   });
 
   test('a preset with a blank harness does NOT pre-select claude-code — blank must stay meaningfully blank', () => {
@@ -900,5 +974,34 @@ describe('renderSettingsPage — Dispatch preset per-kind (byKind) overrides (LI
     assert.ok(rowStart > -1);
     assert.match(html, /name="newDispatchPreset__kind__review__Model"/);
     assert.match(html, /<details class="dispatch-preset-kind-overrides" data-testid="dispatch-preset-new-row-kind-overrides">/);
+  });
+
+  // LIN-2616 (L5) — per-kind preset rows get an effort input too, following
+  // the same replace-vs-preserve (LIN-1400) byKind shape.
+  test('a preset byKind entry populates the per-kind effort input (LIN-2616)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchPresets: [{
+        id: 'p1',
+        name: 'Blend',
+        config: { model: 'top-model', byKind: { review: { effort: 'max' } } }
+      }]
+    });
+    assert.match(html, /name="preset__p1__kind__review__Effort"[^>]*value="max"/);
+  });
+
+  // LIN-2616 — the widened hasKindOverride gate on the preset side: an
+  // effort-only byKind entry (no model/harness) must still auto-open the
+  // per-kind <details>, mirroring the workspace-wide-section widening above.
+  test('auto-opens the per-kind <details> when the only byKind override is an effort (LIN-2616)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      dispatchPresets: [{
+        id: 'p1',
+        name: 'Effort blend',
+        config: { byKind: { review: { effort: 'low' } } }
+      }]
+    });
+    assert.match(html, /<details class="dispatch-preset-kind-overrides" open data-testid="dispatch-preset-row-p1-kind-overrides">/);
   });
 });
