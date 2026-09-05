@@ -107,6 +107,10 @@ class FakeElement {
     if (!this._listeners[type]) return;
     this._listeners[type] = this._listeners[type].filter(f => f !== fn);
   }
+  // LIN-2621 beat 4: needed once the REAL public/chat.js's appendOptions
+  // runs against this shim (`wrap.setAttribute('data-disposition', ...)`).
+  setAttribute(name, value) { (this._attrs = this._attrs || {})[name] = String(value); }
+  getAttribute(name) { return (this._attrs && this._attrs[name]) ?? null; }
   dispatch(type) { (this._listeners[type] || []).forEach(fn => fn()); }
   focus() {}
 }
@@ -135,8 +139,14 @@ function makeDocument({ hiddenInitial = false } = {}) {
   return doc;
 }
 
-function makeChatUI() {
+function makeChatUI(doc) {
   const calls = { appendMessage: [], appendNote: [] };
+  // LIN-2621 beat 4: sourcing appendOptions from the SAME real chat.js load
+  // as toolBreadcrumbLabel below — genuine reuse evidence, not a second
+  // hand-rolled option-row fake. Requires `doc` (the caller's own FakeElement
+  // document) since, unlike toolBreadcrumbLabel, appendOptions does real
+  // `document.createElement`/`setAttribute` work.
+  const realChatUI = loadChatUI(doc);
   return {
     calls,
     // LIN-2632 beat 2: flight-companion.js now calls
@@ -144,7 +154,8 @@ function makeChatUI() {
     // from the REAL chat.js (loadChatUI(), defined further down this file)
     // rather than a second hand-rolled fake, so a real regression in the
     // shared label helper fails these tests too, not just its own.
-    toolBreadcrumbLabel: loadChatUI().toolBreadcrumbLabel,
+    toolBreadcrumbLabel: realChatUI.toolBreadcrumbLabel,
+    appendOptions: realChatUI.appendOptions,
     appendMessage(thread, opts) {
       calls.appendMessage.push(opts);
       const li = new FakeElement('li');
@@ -197,6 +208,21 @@ function makeApiSpy(impl) {
   };
   fn.calls = calls;
   return fn;
+}
+
+// LIN-2621 beat 4: a fake window.ReplyDelivery.postComment — the ONLY
+// ReplyDelivery method a decision-button tap is allowed to reach (never
+// deliverReply, which also dispatches/resumes a run). Real signature:
+// `postComment(urlKey, issueId, prompt, decision)` -> `{ok, status, data}`,
+// never rejecting on a non-2xx (mirrors public/common.js).
+function makeReplyDeliverySpy(impl) {
+  const calls = [];
+  const postComment = (urlKey, issueId, prompt, decision) => {
+    calls.push({ urlKey, issueId, prompt, decision });
+    return Promise.resolve().then(() => impl(urlKey, issueId, prompt, decision));
+  };
+  postComment.calls = calls;
+  return postComment;
 }
 
 function makeFetchSpy(responder) {
@@ -255,7 +281,7 @@ function sseResponse(frames) {
   };
 }
 
-function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
+function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl } = {}) {
   const doc = makeDocument({ hiddenInitial });
   const page = new FakeElement('main');
   page.dataset.urlKey = 'acme';
@@ -293,13 +319,15 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
   doc._byId['flight-companion-strip-next'] = stripNextEl;
   doc._byId['flight-companion-strip-tab-total'] = stripTabTotalEl;
 
-  const chatUI = makeChatUI();
+  const chatUI = makeChatUI(doc);
   const fetchSpy = makeFetchSpy(fetchImpl || (() => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' })));
   const apiSpy = makeApiSpy(apiImpl || (async () => { throw Object.assign(new Error('unexpected api call'), { status: 500 }); }));
+  const postCommentSpy = makeReplyDeliverySpy(postCommentImpl || (() => ({ ok: true, status: 200, data: {} })));
 
   const windowShim = {
     ChatUI: chatUI,
     api: apiSpy,
+    ReplyDelivery: { postComment: postCommentSpy },
     _listeners: {},
     addEventListener(type, fn) { (windowShim._listeners[type] = windowShim._listeners[type] || []).push(fn); },
     removeEventListener(type, fn) {
@@ -338,6 +366,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
     chatUICalls: chatUI.calls,
     fetchCalls: fetchSpy.calls,
     apiCalls: apiSpy.calls,
+    replyDeliveryCalls: postCommentSpy.calls,
     windowShim,
   };
 }
@@ -498,7 +527,7 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
   test('formatTabTotal: the ticket\'s own literal template, applied as-is', () => {
     const { exports: m } = loadClient();
     assert.strictEqual(m.formatTabTotal(0, 0), '0 check-ins · $0.00 this tab');
-    assert.strictEqual(m.formatTabTotal(1, 0.00042), '1 check-ins · $0.0004 this tab');
+    assert.strictEqual(m.formatTabTotal(1, 0.00042), '1 check-in · $0.0004 this tab');
     assert.strictEqual(m.formatTabTotal(5, 1.2), '5 check-ins · $1.20 this tab');
   });
 });
@@ -1182,7 +1211,7 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
     assert.strictEqual(m.getTabTotalText(), '0 check-ins · $0.00 this tab');
     m.autoWakeTick();
     await flush();
-    assert.strictEqual(m.getTabTotalText(), '1 check-ins · $0.5000 this tab');
+    assert.strictEqual(m.getTabTotalText(), '1 check-in · $0.5000 this tab');
   });
 });
 
@@ -1581,6 +1610,238 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
   });
 });
 
+// LIN-2621 beat 4: decisions as option buttons, reusing public/chat.js's
+// window.ChatUI.appendOptions (the rulings tab's own primitive) and
+// window.ReplyDelivery.postComment ONLY (never deliverReply, which also
+// dispatches/resumes a run for a resumable/gone row on the rulings tab —
+// deliberately narrower here, see renderOneDecision's own comment).
+describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons', () => {
+  // Matches lib/chat-tools.js's projectPendingDecision shape exactly.
+  function decision(overrides) {
+    return Object.assign({
+      decisionId: 'dec-1',
+      issueIdentifier: 'LIN-100',
+      loopId: 'loop-1',
+      sessionId: 'sess-1',
+      question: 'Should we ship it?',
+      options: [{ id: 'yes', label: 'Ship it' }, { id: 'no', label: 'Hold' }],
+      optionsTotal: 2,
+      recommended: 'yes',
+      since: '2026-09-05T00:00:00.000Z',
+      disposition: 'resumable',
+      canReply: true,
+      shelvedLapseCount: 0,
+    }, overrides || {});
+  }
+
+  function decisionsResult(decisions) {
+    return JSON.stringify({ count: decisions.length, truncated: false, decisions });
+  }
+
+  function decisionToolFrame(decisions) {
+    return sseFrame('tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: decisionsResult(decisions) });
+  }
+
+  test('parseDecisionsResult: valid shape, malformed JSON, non-array decisions, and per-row shape filtering', () => {
+    const { exports: m } = loadClient();
+    const d = decision();
+    looseDeepEqual(m.parseDecisionsResult(decisionsResult([d])), { ok: true, decisions: [d] });
+    assert.strictEqual(m.parseDecisionsResult('not json').ok, false);
+    assert.strictEqual(m.parseDecisionsResult('{}').ok, false, 'decisions must be an array');
+    assert.strictEqual(m.parseDecisionsResult(JSON.stringify({ decisions: 'x' })).ok, false);
+    // A truncation marker (lib/openrouter.js's truncateToolResult shape) fails
+    // JSON.parse honestly, mirroring parseProposalResult's own contract.
+    assert.strictEqual(m.parseDecisionsResult(decisionsResult([d]).slice(0, 20) + '\n… [truncated 400 chars]').ok, false);
+    // A row missing decisionId or options is dropped, not thrown on.
+    const parsed = m.parseDecisionsResult(decisionsResult([d, { question: 'no id' }, { decisionId: 'x', options: 'not-array' }]));
+    assert.strictEqual(parsed.ok, true);
+    assert.strictEqual(parsed.decisions.length, 1);
+  });
+
+  test('renders the question and one option button per option, with the recommended star on the recommended one', async () => {
+    const d = decision();
+    const { exports: m, thread } = loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]) });
+    m.autoWakeTick();
+    await flush();
+
+    const decisionLi = thread.children.find(li => li.querySelector('.fc-decision'));
+    assert.ok(decisionLi, 'expected a rendered decision card');
+    const wrap = decisionLi.querySelector('.fc-decision');
+    assert.strictEqual(wrap.querySelector('.fc-decision-question').textContent, 'Should we ship it?');
+    const row = wrap.querySelector('.chat-options-row');
+    assert.strictEqual(row.children.length, 2, 'one button per option');
+    assert.strictEqual(row.children[0].textContent, 'Ship it');
+    assert.ok(row.children[0].classList.contains('chat-option--recommended'), 'the recommended option carries the star class');
+    assert.ok(!row.children[1].classList.contains('chat-option--recommended'));
+  });
+
+  test('a read-only disposition (mid-turn) renders the caption only — no buttons, matching appendOptions\' own allow-list', async () => {
+    const d = decision({ disposition: 'mid-turn', canReply: false });
+    const { exports: m, thread } = loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]) });
+    m.autoWakeTick();
+    await flush();
+    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
+    assert.ok(wrap.querySelector('.chat-options--readonly'), 'read-only wrapper class present');
+    assert.strictEqual(wrap.querySelector('.chat-options-row'), null, 'no button row at all');
+  });
+
+  test('multiple decisions in one result each render their own card', async () => {
+    const d1 = decision({ decisionId: 'dec-1', question: 'First?' });
+    const d2 = decision({ decisionId: 'dec-2', question: 'Second?' });
+    const { exports: m, thread } = loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d1, d2]), sseFrame('done', { surface: true })]) });
+    m.autoWakeTick();
+    await flush();
+    const cards = thread.children.filter(li => li.querySelector('.fc-decision'));
+    assert.strictEqual(cards.length, 2);
+    assert.strictEqual(cards[0].querySelector('.fc-decision-question').textContent, 'First?');
+    assert.strictEqual(cards[1].querySelector('.fc-decision-question').textContent, 'Second?');
+  });
+
+  test('a malformed/truncated tool result shows an inline note and renders no decision card, without throwing', async () => {
+    const { exports: m, thread, chatUICalls } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: '{"decisions": [' }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    await assert.doesNotReject(async () => { m.autoWakeTick(); await flush(); });
+    assert.strictEqual(thread.children.find(li => li.querySelector('.fc-decision')), undefined);
+    assert.ok(chatUICalls.appendNote.some(c => /too long to show/.test(c.text)));
+  });
+
+  test('a tap on a loop-anchored (resumable) decision posts through window.ReplyDelivery.postComment ONLY, with decisionLoopId + decisionId', async () => {
+    const d = decision({ disposition: 'resumable', loopId: 'loop-7', decisionId: 'dec-7', issueIdentifier: 'LIN-77' });
+    const { exports: m, thread, replyDeliveryCalls, apiCalls } = loadClient({
+      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
+    const shipBtn = wrap.querySelector('.chat-options-row').children[0];
+    shipBtn.dispatch('click');
+    await flush();
+    assert.strictEqual(replyDeliveryCalls.length, 1);
+    // looseDeepEqual: the `decision` object is constructed INSIDE the vm
+    // sandbox, so it carries a different (but structurally identical)
+    // Object.prototype than this file's own literal — same cross-realm
+    // reason beat 3's getTabTotals() assertions use looseDeepEqual.
+    looseDeepEqual(replyDeliveryCalls[0], {
+      urlKey: 'acme', issueId: 'LIN-77', prompt: 'Ship it',
+      decision: { decisionLoopId: 'loop-7', decisionId: 'dec-7' },
+    });
+    assert.strictEqual(apiCalls.length, 0, 'never window.api — postComment is a raw fetch of its own');
+  });
+
+  test('a tap on a task-bound decision (no loopId) posts with no stamp pair — a plain, unstamped reply', async () => {
+    const d = decision({ disposition: 'task-bound', loopId: null, decisionId: 'scan_abc123', issueIdentifier: 'LIN-9' });
+    const { exports: m, thread, replyDeliveryCalls } = loadClient({
+      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
+    wrap.querySelector('.chat-options-row').children[1].dispatch('click'); // "Hold"
+    await flush();
+    assert.strictEqual(replyDeliveryCalls.length, 1);
+    assert.strictEqual(replyDeliveryCalls[0].decision, undefined,
+      'the tool exposes no raw issue UUID for a task-bound row, so the best-effort stamp pair is omitted rather than sent wrong');
+    assert.strictEqual(replyDeliveryCalls[0].prompt, 'Hold');
+  });
+
+  test('the row settles visibly on a successful reply: buttons disabled, feedback shown, card marked resolved', async () => {
+    const d = decision();
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
+      postCommentImpl: () => ({ ok: true, status: 200, data: {} }),
+    });
+    m.autoWakeTick();
+    await flush();
+    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
+    const buttons = wrap.querySelector('.chat-options-row').children;
+    buttons[0].dispatch('click');
+    await flush();
+    assert.ok(buttons[0].disabled && buttons[1].disabled, 'both options disable together, not just the tapped one');
+    assert.ok(wrap.classList.contains('fc-decision--resolved'));
+    assert.match(wrap.querySelector('.fc-decision-feedback').textContent, /Replied/);
+  });
+
+  test('a double tap never posts twice — the second click on an already-disabled/resolved row is a no-op', async () => {
+    const d = decision();
+    const { exports: m, thread, replyDeliveryCalls } = loadClient({
+      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
+    const btn = wrap.querySelector('.chat-options-row').children[0];
+    btn.dispatch('click');
+    btn.dispatch('click'); // synchronous second tap, before the first fetch resolves
+    await flush();
+    assert.strictEqual(replyDeliveryCalls.length, 1, 'the resolved-guard blocks re-entry even before the button\'s own disabled state can');
+  });
+
+  test('canReply: false is respected even on an (in practice unreachable) interactive-looking disposition — the onSelect guard is a real second gate, not decorative', async () => {
+    const d = decision({ disposition: 'resumable', canReply: false });
+    const { exports: m, thread, replyDeliveryCalls } = loadClient({
+      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
+    wrap.querySelector('.chat-options-row').children[0].dispatch('click');
+    await flush();
+    assert.strictEqual(replyDeliveryCalls.length, 0);
+  });
+
+  test('a failed reply (4xx) is handled honestly, never silently swallowed, and stays disabled (retrying would fail the same way)', async () => {
+    const d = decision();
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
+      postCommentImpl: () => ({ ok: false, status: 422, data: { error: 'decision already answered' } }),
+    });
+    m.autoWakeTick();
+    await flush();
+    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
+    const buttons = wrap.querySelector('.chat-options-row').children;
+    buttons[0].dispatch('click');
+    await flush();
+    assert.strictEqual(wrap.querySelector('.fc-decision-feedback').textContent, 'decision already answered');
+    assert.ok(buttons[0].disabled, 'a 4xx is terminal — left disabled rather than inviting an identical retry');
+  });
+
+  test('a failed reply (5xx) re-enables the row for retry', async () => {
+    const d = decision();
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
+      postCommentImpl: () => ({ ok: false, status: 500, data: {} }),
+    });
+    m.autoWakeTick();
+    await flush();
+    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
+    const buttons = wrap.querySelector('.chat-options-row').children;
+    buttons[0].dispatch('click');
+    await flush();
+    assert.ok(!buttons[0].disabled, 'a 5xx is retryable — restored, matching renderProposal\'s own disable-then-restore idiom');
+    assert.match(wrap.querySelector('.fc-decision-feedback').textContent, /try again/);
+  });
+
+  test('a network failure (postComment rejects) re-enables the row for retry with an honest message', async () => {
+    const d = decision();
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
+      postCommentImpl: () => { throw new Error('offline'); },
+    });
+    m.autoWakeTick();
+    await flush();
+    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
+    const buttons = wrap.querySelector('.chat-options-row').children;
+    buttons[0].dispatch('click');
+    await flush();
+    assert.ok(!buttons[0].disabled);
+    assert.match(wrap.querySelector('.fc-decision-feedback').textContent, /Network failure — try again/);
+  });
+});
+
 // ─── Full response matrix (F4 + F6) ─────────────────────────────────────
 
 describe('flight-companion.js — response matrix outcomes end-to-end', () => {
@@ -1803,8 +2064,15 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
 // has no document/window dependency at load time (only inside appendMessage/
 // appendNote, neither of which these tests call), so a bare `{ window: {} }`
 // sandbox is enough to load it and read off the attached ChatUI.
-function loadChatUI() {
+// `doc`, when given, is the SAME FakeElement-based document shim the calling
+// test's own thread lives in — needed once a caller wants a real, callable
+// `appendOptions` (LIN-2621 beat 4), which does real `document.createElement`
+// work internally. Omitted, as every pre-existing caller does (this file's
+// own toolBreadcrumbLabel suite below), the sandbox carries no `document` at
+// all — fine for the string-only helpers that never touch the DOM.
+function loadChatUI(doc) {
   const sandbox = { window: {}, console };
+  if (doc) sandbox.document = doc;
   vm.createContext(sandbox);
   vm.runInContext(CHAT_JS_SRC, sandbox, { filename: 'chat.js' });
   return sandbox.window.ChatUI;

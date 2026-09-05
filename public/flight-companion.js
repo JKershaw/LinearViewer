@@ -193,11 +193,12 @@
     return parts.join(' · ');
   }
 
-  // LIN-2621 beat 3: the strip's running "this tab so far" total. The exact
-  // template the ticket specifies, applied literally (always plural,
-  // regardless of count) — "N check-ins · $x this tab".
+  // LIN-2621 beat 4: the strip's running "this tab so far" total. The
+  // ticket's own template ("N check-ins · $x this tab") is a format sketch,
+  // not a byte-pinned string (unlike the mode line) — pluralised properly
+  // (1 check-in, 2 check-ins), everything else unchanged.
   function formatTabTotal(count, cost) {
-    return count + ' check-ins · ' + formatCost(cost) + ' this tab';
+    return count + (count === 1 ? ' check-in' : ' check-ins') + ' · ' + formatCost(cost) + ' this tab';
   }
 
   // The reset criterion (ruling 62bb3b4e): a user-initiated `done` always
@@ -260,6 +261,28 @@
         return { ok: true, proposal: parsed };
       }
       return { ok: false };
+    } catch (e) {
+      return { ok: false };
+    }
+  }
+
+  // LIN-2621 beat 4: `list_pending_decisions`' tool result (lib/chat-tools.js's
+  // `projectPendingDecision` shape: `{count, truncated, decisions: [{decisionId,
+  // question, options: [{id,label}], recommended, disposition, canReply,
+  // loopId, issueIdentifier, ...}]}`), parsed with the SAME defensive posture
+  // as parseProposalResult above — a truncated/malformed payload fails
+  // JSON.parse or the shape check honestly, never throws uncaught. A row
+  // missing `decisionId` or a non-array `options` is dropped rather than
+  // rendered half-built; `appendOptions` (public/chat.js) already drops any
+  // individual malformed OPTION the same way, one level down.
+  function parseDecisionsResult(resultString) {
+    try {
+      var parsed = JSON.parse(resultString);
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.decisions)) return { ok: false };
+      var decisions = parsed.decisions.filter(function (d) {
+        return d && typeof d.decisionId === 'string' && d.decisionId && Array.isArray(d.options);
+      });
+      return { ok: true, decisions: decisions };
     } catch (e) {
       return { ok: false };
     }
@@ -581,6 +604,133 @@
     });
   }
 
+  // LIN-2621 beat 4: a waiting-on-you decision, rendered as the SAME option-
+  // button row the rulings tab uses (public/chat.js's window.ChatUI.
+  // appendOptions — composed here, never forked: no new CSS rule, no copied
+  // button markup). `renderDecisions` handles the tool result's `decisions`
+  // array; `renderOneDecision` builds one row.
+  //
+  // A tap answers through `window.ReplyDelivery.postComment` ONLY — never
+  // `deliverReply` (which also resumes/dispatches a run for a `resumable`/
+  // `gone` disposition on the rulings tab). That is a deliberately NARROWER
+  // write surface than rulings has: a human click posting a comment through
+  // the existing session-auth reply path is exactly the write posture
+  // Flight Companion already has (LIN-2434's approve card), so no new one is
+  // introduced; starting/resuming a run from here would be, so it never
+  // happens from this control regardless of disposition.
+  function renderDecisions(resultString, beforeLi) {
+    var parsed = parseDecisionsResult(resultString);
+    if (!parsed.ok) {
+      showInlineNote('The companion checked pending decisions, but the details were too long to show in full.', beforeLi);
+      return;
+    }
+    // Nothing pending: the model's own prose says so — no dead UI to add.
+    parsed.decisions.forEach(function (decision) {
+      renderOneDecision(decision, beforeLi);
+    });
+  }
+
+  function renderOneDecision(decision, beforeLi) {
+    var wrap = document.createElement('div');
+    wrap.className = 'fc-decision';
+
+    if (decision.question) {
+      var q = document.createElement('p');
+      q.className = 'fc-decision-question';
+      // Model/task-authored text — textContent only.
+      q.textContent = decision.question;
+      wrap.appendChild(q);
+    }
+
+    var feedback = document.createElement('span');
+    feedback.className = 'fc-decision-feedback';
+
+    // Reused verbatim: the rulings tab's own option-button row primitive.
+    // `disposition` alone decides interactive vs. read-only inside
+    // appendOptions via the SAME allow-list `canReplyFor` (lib/unanswered-
+    // decisions.js) computes `decision.canReply` from — the two predicates
+    // are structurally identical, so they cannot disagree for a row this
+    // tool actually produced. `resolved`/`replying` guard against a double
+    // tap firing two posts for the same row.
+    var resolved = false;
+    window.ChatUI.appendOptions(wrap, {
+      options: decision.options,
+      recommended: decision.recommended,
+      disposition: decision.disposition,
+      onSelect: function (optionId, optionLabel) {
+        // Second, structural guard (mirrors public/observation.js's rulings
+        // row handler) — belt-and-braces alongside appendOptions' own
+        // disposition-driven readOnly branch, which already omits buttons
+        // entirely for a non-interactive disposition.
+        if (!decision.canReply || resolved) return;
+        resolved = true;
+        // `.children` of the shared row rather than querySelectorAll (not
+        // part of this codebase's minimal DOM-shim surface, see
+        // tests/unit/flight-companion-client.test.js's own header) — every
+        // child of `.chat-options-row` is one option button, by
+        // appendOptions' own construction (public/chat.js).
+        var optionsRow = wrap.querySelector('.chat-options-row');
+        var buttons = optionsRow ? Array.prototype.slice.call(optionsRow.children) : [];
+        buttons.forEach(function (b) { b.disabled = true; });
+        feedback.textContent = 'Replying…';
+
+        // Loop-anchored (resumable/gone): both fields the comment route
+        // needs for a best-effort `markDecisionAnswered` stamp are present
+        // in this tool's own projection. Task-bound: the tool exposes
+        // `decisionId` (== the scan store's own row id, `lib/scan.js`'s
+        // "a scan's decision_id and its store row id always agree") but NOT
+        // the raw issue UUID `taskDecisionsStore.markOutcome` matches
+        // against — only `issueIdentifier`, a human string. Rather than
+        // send a value known to be the wrong shape, this omits the stamp
+        // pair for that case: the reply comment still posts (the durable,
+        // human-visible half), only the best-effort "answered" stamp on the
+        // scan row does not fire — the SAME graceful degradation
+        // window.ReplyDelivery.postComment already gives any caller that
+        // omits the decision argument.
+        var extra = decision.loopId
+          ? { decisionLoopId: decision.loopId, decisionId: decision.decisionId }
+          : undefined;
+
+        window.ReplyDelivery.postComment(urlKey, decision.issueIdentifier, optionLabel, extra)
+          .then(function (commentResult) {
+            if (!commentResult.ok) {
+              var status = commentResult.status;
+              var message = (commentResult.data && commentResult.data.error) || ('HTTP ' + status);
+              if (status >= 400 && status < 500) {
+                // Terminal client error — leave the row disabled; retrying
+                // the same request would only fail the same way.
+                feedback.textContent = message;
+              } else {
+                // 5xx — retryable.
+                resolved = false;
+                buttons.forEach(function (b) { b.disabled = false; });
+                feedback.textContent = message + ' — try again.';
+              }
+              return;
+            }
+            feedback.textContent = 'Replied ✓';
+            wrap.classList.add('fc-decision--resolved');
+          })
+          .catch(function () {
+            // Network failure — retryable.
+            resolved = false;
+            buttons.forEach(function (b) { b.disabled = false; });
+            feedback.textContent = 'Network failure — try again.';
+          });
+      },
+    });
+    wrap.appendChild(feedback);
+
+    var li = document.createElement('li');
+    li.className = 'chat-msg fc-decision-msg';
+    li.appendChild(wrap);
+    if (beforeLi && beforeLi.parentNode === thread) thread.insertBefore(li, beforeLi);
+    else thread.appendChild(li);
+    thread.hidden = false;
+    thread.scrollTop = thread.scrollHeight;
+    setEmptyVisible(false);
+  }
+
   // ─── Tool-wire phase handling (F5: all five phases explicit) ───────────
 
   // Settle a 'call' breadcrumb on its matching 'result' — correlated via the
@@ -622,6 +772,12 @@
       if (toolLis && data.id) toolLis[data.id] = { li: li, label: label };
     } else if (data.phase === 'result') {
       settleToolCall(data, toolLis);
+      // LIN-2621 beat 4: additive to the ordinary breadcrumb settle above —
+      // `list_pending_decisions` is a plain read-only tool with no server-
+      // side phase relabel (unlike send_follow_up's 'proposed'), so this
+      // branches on the tool's own name within 'result' rather than a
+      // second phase value.
+      if (data.name === 'list_pending_decisions') renderDecisions(data.result, beforeLi);
     } else if (data.phase === 'error') {
       failToolCall(data, toolLis);
     } else if (data.phase === 'proposed') {
@@ -1121,7 +1277,7 @@
     module.exports = {
       capHistory, nextCadenceDelay, doneCadenceEffect, autoWakeErrorCadenceEffect,
       advanceCadence, classifyTurnResponse, parseProposalResult, formatCheckIn, formatSweepNotSeen,
-      formatNoCensus, formatNextCheckIn, formatCost, formatTurnMeta, formatTabTotal,
+      formatNoCensus, formatNextCheckIn, formatCost, formatTurnMeta, formatTabTotal, parseDecisionsResult,
       applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion, startBoot,
       getCadenceState: function () { return cadence; },
       getChatHistory: function () { return chatHistory; },

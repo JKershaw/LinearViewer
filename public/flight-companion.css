@@ -250,6 +250,41 @@
   display: none;
 }
 
+/* A waiting-on-you decision (LIN-2621 beat 4): the question + the SHARED
+   option-button row (`.chat-options*`, public/chat.css / public/chat.js's
+   window.ChatUI.appendOptions) inside this page's own bubble surface —
+   composed, not forked. Only the wrapper/question/feedback are page-local;
+   the interactive row itself is chat.css's, byte-identical to the rulings
+   tab's. Mirrors `.fc-proposal`'s own card shape. */
+.fc-decision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+
+.fc-decision-question {
+  margin: 0;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.fc-decision-feedback {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+/* Once resolved, the shared option row's own :disabled styling (chat.css)
+   already dims the buttons — this only fades the whole card slightly so a
+   settled decision reads as past tense in the scrollback. */
+.fc-decision--resolved {
+  opacity: 0.85;
+}
+
 /* ── The phone shape (Shape B, LIN-2632 beat 4) ───────────────────────────
  *
  * LIN-1412 D2 gives every chat that owns its route Shape B: full-height
