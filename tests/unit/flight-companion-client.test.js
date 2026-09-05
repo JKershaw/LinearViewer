@@ -1112,6 +1112,72 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
     assert.strictEqual(m.getCadenceState().delayMs, 60000);
   });
 
+  // ─── LIN-2487: the no-census path, the OTHER gate-silent reason that does
+  // not mean "checked, nothing new" ───────────────────────────────────────────
+  //
+  // LIN-2438 relabels hash-identical/no-delta to sweep-not-seen when the sweep
+  // is stale, but deliberately leaves `no-census` alone — it is an honest
+  // reason, and flight-companion-gate.test.js pins that it is never rewritten.
+  // The consequence was that it arrived at the client with no branch of its own
+  // and fell through to "checked in HH:MM · nothing new": a successful quiet
+  // scan reported for a fleet that has never been scanned at all. Narrow, since
+  // it needs no prior census (a brand-new workspace, or a deployment where
+  // observer-sweep's register() rejected at boot — census documents survive
+  // restarts), and precisely the silence LIN-2438 exists to break.
+
+  test('LIN-2487: gate-silent + no-census says so, instead of claiming a quiet scan', async () => {
+    const { exports: m, thread, checkIn, chatUICalls } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(checkIn.hidden, false);
+    assert.match(checkIn.textContent, /^checked in .+ \u00b7 no fleet scan yet$/);
+    assert.doesNotMatch(checkIn.textContent, /nothing new/, 'the whole defect: this line must not claim a scan happened');
+    assert.strictEqual(thread.children.length, 0, 'no row is ever appended to the thread');
+    assert.strictEqual(chatUICalls.appendNote.length, 0);
+    assert.strictEqual(m.getCadenceState().delayMs, 60000, 'doubles from the 30s base, same as any other gate-silent tick');
+    assert.strictEqual(m.getCadenceState().stopped, false, 'never stops — a census can appear on the next sweep');
+  });
+
+  test('LIN-2487: no-census carries no warning class, and clears a stale one', async () => {
+    // Deliberately not styled as a warning: the common case is a brand-new
+    // workspace still waiting for its first sweep, which is not a fault — and
+    // that wait runs to roster-length × 60s, since observer-sweep is
+    // round-robin one workspace per tick, not 60s flat. Clearing a leftover
+    // class matters because the previous tick may have been sweep-not-seen.
+    const { exports: m, checkIn } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+    });
+    checkIn.classList.add('fc-checkin--warning');
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(checkIn.classList.contains('fc-checkin--warning'), false);
+  });
+
+  test('LIN-2487: formatNoCensus reports THIS tick\'s time, not the sweep\'s — there is no sweep instant to name', () => {
+    const { exports: m } = loadClient({ fetchImpl: () => jsonResponse(200, {}) });
+    const line = m.formatNoCensus(new Date('2026-09-05T09:00:00.000Z'));
+    assert.match(line, /no fleet scan yet$/, 'the state being reported');
+    assert.match(line, /^checked in /, 'and the ordinary line\'s leading clause, so a stopped/hidden/offline page is still distinguishable from a ticking one');
+    // The clock is an argument, never read inside — same purity contract as
+    // its two siblings, which is what puts it on the test seam at all.
+    assert.notStrictEqual(line, m.formatNoCensus(new Date('2026-09-05T11:00:00.000Z')));
+  });
+
+  test('LIN-2487: the three gate-silent lines are mutually distinct', () => {
+    // The regression this guards: a future edit that collapses two of these
+    // onto the same wording would silently restore the ambiguity the branch
+    // exists to remove, while every assertion above still passed.
+    const { exports: m } = loadClient({ fetchImpl: () => jsonResponse(200, {}) });
+    const lines = [
+      m.formatCheckIn(new Date('2026-09-05T09:00:00.000Z')),
+      m.formatSweepNotSeen(new Date('2026-09-05T08:00:00.000Z')),
+      m.formatNoCensus(new Date('2026-09-05T09:00:00.000Z')),
+    ];
+    assert.strictEqual(new Set(lines).size, 3, `expected three distinct check-in lines, got ${JSON.stringify(lines)}`);
+  });
+
   test('an ordinary check-in clears a previously-set sweep-not-seen warning class (the line settles)', async () => {
     const { exports: m, checkIn } = loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'hash-identical' }),

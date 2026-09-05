@@ -205,6 +205,19 @@
     return 'sweep last seen ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' \u00b7 the periodic scan may be down';
   }
 
+  // Third sibling to formatCheckIn/formatSweepNotSeen (LIN-2487). Keeps
+  // formatCheckIn's leading clause and replaces only its second half: the
+  // date here is THIS TICK's wall clock, exactly as the ordinary line uses,
+  // never the sweep's own stamp — `no-census` means there has never been a
+  // scan, so there is no sweep instant to name (that is what distinguishes it
+  // from sweep-not-seen). Keeping the tick time matters: without it a page
+  // whose auto-wake has stopped, whose tab is hidden, or whose network is
+  // dead would render identically to one polling every 30s, forever. Pure,
+  // like both siblings.
+  function formatNoCensus(date) {
+    return 'checked in ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' \u00b7 no fleet scan yet';
+  }
+
   // ─── DOM-touching glue ───────────────────────────────────────────────────
 
   function setEmptyVisible(visible) {
@@ -254,6 +267,28 @@
     checkInEl.textContent = formatSweepNotSeen(sweepLastSeenAt ? new Date(sweepLastSeenAt) : null);
     checkInEl.hidden = false;
     checkInEl.classList.add('fc-checkin--warning');
+  }
+
+  // Sibling to the two above (LIN-2487) — the SAME single, replaceable element.
+  // Deliberately does NOT set `fc-checkin--warning`, and removes it: a
+  // workspace with no census yet is most often a brand-new one still waiting
+  // for its first sweep, which is not a fault. That wait is longer than one
+  // interval — observer-sweep is round-robin, ONE workspace per 60s tick
+  // (lib/observer-sweep.js), so a given workspace's first census lands after
+  // up to roster-length × 60s. Colouring that red would be noise on every new
+  // workspace for minutes.
+  //
+  // What this line buys is honesty, not volume: the operator is no longer told
+  // a scan completed and found nothing. It does NOT make the boot-rejection
+  // case loud — a dead sweep still reads in the muted base style. Telling a
+  // first-run workspace apart from a dead one needs a persistence signal the
+  // client does not have (and note that, for the same round-robin reason,
+  // "it persisted across several ticks" is NOT that signal). See the ticket.
+  function updateCheckInStatusNoCensus() {
+    if (!checkInEl) return;
+    checkInEl.textContent = formatNoCensus(new Date());
+    checkInEl.hidden = false;
+    checkInEl.classList.remove('fc-checkin--warning');
   }
 
   function appendAssistantBubble() {
@@ -478,8 +513,19 @@
         // effect stays 'double' either way: nothing was surfaced by a model
         // (never 'reset'), and a dead sweep can recover (never 'stop' —
         // advanceCadence has no un-stop).
+        //
+        // LIN-2487: `no-census` is the OTHER reason that does not mean
+        // "checked, nothing new" — there is no census document at all, so
+        // nothing was checked. LIN-2438 deliberately left this reason
+        // un-relabelled inside the gate (it is an honest reason, and the gate
+        // tests pin that it is never rewritten), which meant it arrived here
+        // and fell through to the ordinary check-in line — reporting a
+        // successful quiet scan for a fleet that has never been scanned.
+        // Handled here, on the client, exactly as that ticket intended.
         if (classification.reason === 'sweep-not-seen') {
           updateCheckInStatusSweepNotSeen(classification.sweepLastSeenAt);
+        } else if (classification.reason === 'no-census') {
+          updateCheckInStatusNoCensus();
         } else {
           updateCheckInStatus();
         }
@@ -726,6 +772,7 @@
     module.exports = {
       capHistory, nextCadenceDelay, doneCadenceEffect, autoWakeErrorCadenceEffect,
       advanceCadence, classifyTurnResponse, parseProposalResult, formatCheckIn, formatSweepNotSeen,
+      formatNoCensus,
       applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion,
       getCadenceState: function () { return cadence; },
       getChatHistory: function () { return chatHistory; },
