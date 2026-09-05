@@ -160,7 +160,7 @@ describe('Half A: mount-completeness census against the real repo', () => {
     }
   });
 
-  // A separate, coarser sanity pin: the corpus is exactly 9 files / 117
+  // A separate, coarser sanity pin: the corpus is exactly 10 files / 132
   // declared deps today (LIN-2540: group I's routes/proxy-dispatch.js adds
   // 24, all un-defaulted so classifyParams counts every one as required —
   // 87 + 24 = 111; LIN-2444's routes/proxy-rulings.js then adds 6 more —
@@ -168,17 +168,25 @@ describe('Half A: mount-completeness census against the real repo', () => {
   // dispatchQueueStore, agentStatusStore — its other four
   // (taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore,
   // sessionsFeedCache) are defaulted to null and so are not counted as
-  // required: 111 + 6 = 117). Unlike the test above, THIS one is not blind to a
+  // required: 111 + 6 = 117; LIN-2620's routes/proxy-flight-companion.js then
+  // adds a 10th file with 15 required deps — proxyLimiter,
+  // authenticateProxyToken, resolveProviderAccess, workspaceUnavailable,
+  // logEvent, getWorkspaceOpenRouterKey, resolveProxyLLM,
+  // chargeFreeTierOrReject, observerStateStore, workspacePreferencesStore,
+  // recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore,
+  // proxyTokenStore — its two optional deps (taskDecisionsStore,
+  // shelvedRulingsStore) are defaulted to null and so are not counted:
+  // 117 + 15 = 132). Unlike the test above, THIS one is not blind to a
   // signature+mount drop (removing a dep from a factory's signature shrinks
   // `required`, which this total catches) — that's a different, unrelated
   // invariant catching it, not evidence Half A's own missing/extra detectors
   // saw the gap; keeping the two in separate tests keeps that distinction
   // legible in the mutation-validation record.
-  test('the corpus is exactly 9 proxy sub-router files totalling 117 declared deps', () => {
+  test('the corpus is exactly 10 proxy sub-router files totalling 132 declared deps', () => {
     const rows = censusMountCompleteness({ routesDir: 'routes', proxySourcePath: 'routes/proxy.js' });
-    assert.equal(rows.length, 9, `expected 9 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
+    assert.equal(rows.length, 10, `expected 10 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
     const totalDeps = rows.reduce((sum, row) => sum + row.required.length, 0);
-    assert.equal(totalDeps, 117, `expected 117 total required deps across the 9 factories, found ${totalDeps}`);
+    assert.equal(totalDeps, 132, `expected 132 total required deps across the 10 factories, found ${totalDeps}`);
   });
 });
 

@@ -9,7 +9,7 @@
  * asserts that all 55 registrations still resolve"). This file is that
  * replacement, landed as PR-0 (no handler moves) before any group is moved.
  *
- * All 65 (method, URL) forms — 55 route registrations, 10 of them
+ * All 66 (method, URL) forms — 56 route registrations, 10 of them
  * array-path aliases (2 URL forms each) — are driven through
  * `createProxyRoutes` over REAL HTTP (an express app + `fetch`, the pattern
  * already established by tests/unit/proxy-route-aliases.test.js), each
@@ -35,7 +35,7 @@
  * application/json for them, so a route that stops resolving fails loudly
  * instead of silently matching Express's default.
  *
- * Group letters (A-I) in the row comments below are LIN-679's own group
+ * Group letters (A-J) in the row comments below are LIN-679's own group
  * labels (see the ticket), matching route registration order 1:1 — this
  * file's own witness (see the "registration count" test below) is what
  * proves the mapping stays accurate, not a hand-maintained comment.
@@ -440,6 +440,13 @@ const ROWS = [
     expectBody: { error: 'Dispatch item not found' },
     run: () => call(buildApp({ dispatchQueueStore: makeDispatchStore() }), 'GET', '/api/proxy/dispatch/d1/prompt'),
   },
+
+  // --- Group J: Flight Companion turn (LIN-2620, routes/proxy-flight-companion.js) ---
+  {
+    group: 'J', method: 'POST', url: '/api/proxy/flight-companion/turn', expect: 400,
+    note: 'message must be <=2000 chars — the cheapest branch past auth+resolveProviderAccess, before any store is touched',
+    run: () => call(buildApp(), 'POST', '/api/proxy/flight-companion/turn', { body: { message: 'x'.repeat(2001) } }),
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -465,14 +472,17 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
   // routes/proxy-compute.js — 22 - 12 = 10.
   // LIN-2539 (Stage 5 / PR-5): group H's 4 registrations moved to routes/proxy-kickoff.js — 10 - 4 = 6.
   // LIN-2540 (Stage 6 / PR-6): group I's 5 registrations moved to routes/proxy-dispatch.js — 6 - 5 = 1.
-  test('routes/proxy.js has exactly 1 router.* registration (65 URL forms across the whole proxy surface)', () => {
+  // LIN-2620: group J adds 1 more registration, but it lands directly in
+  // routes/proxy-flight-companion.js via router.use() (like every other
+  // group above it) — routes/proxy.js's OWN registration count is unchanged.
+  test('routes/proxy.js has exactly 1 router.* registration (66 URL forms across the whole proxy surface)', () => {
     const src = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
     const matches = src.match(/^\s{2}router\.(get|post|put|patch|delete)\(/gm) || [];
     assert.equal(matches.length, 1,
       `expected 1 route registration in routes/proxy.js, found ${matches.length} — ` +
-      `this file's 65-row ROWS table must be re-derived from source before trusting it`);
-    assert.equal(ROWS.length, 65,
-      `this file's ROWS table must cover exactly 65 URL forms (1 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 13 in routes/proxy-reads.js + 12 in routes/proxy-writes.js + 12 in routes/proxy-compute.js + 4 in routes/proxy-kickoff.js + 5 in routes/proxy-dispatch.js + 10 array-path aliases), found ${ROWS.length}`);
+      `this file's 66-row ROWS table must be re-derived from source before trusting it`);
+    assert.equal(ROWS.length, 66,
+      `this file's ROWS table must cover exactly 66 URL forms (1 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 13 in routes/proxy-reads.js + 12 in routes/proxy-writes.js + 12 in routes/proxy-compute.js + 4 in routes/proxy-kickoff.js + 5 in routes/proxy-dispatch.js + 1 in routes/proxy-flight-companion.js + 10 array-path aliases), found ${ROWS.length}`);
   });
 });
 
@@ -480,7 +490,7 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
 // The witness itself.
 // ---------------------------------------------------------------------------
 
-describe('LIN-679 PR-0: endpoint inventory witness (all 65 URL forms resolve)', () => {
+describe('LIN-679 PR-0: endpoint inventory witness (all 66 URL forms resolve)', () => {
   for (const row of ROWS) {
     test(`[${row.group}] ${row.method} ${row.url} -> ${row.expect} (${row.note})`, async () => {
       const { status, body, contentType } = await row.run();

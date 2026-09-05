@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
 
 // LIN-971: Flight Companion route-gating + settings exposure, plus the
 // LIN-2443-ledger layout/client behaviours routed into this ticket. Mirrors
@@ -30,16 +31,17 @@ test.beforeEach(({ workerUrlKey }) => {
 
 /**
  * Fulfils the turn endpoint's POST with a synthetic SSE body before it
- * reaches Express — no model call is possible. Wire format read from
- * routes/flight-companion.js's sendSSE / public/flight-companion.js's
- * readSSEStream: `event: <type>\ndata: <json>\n\n` frames.
+ * reaches Express — no model call is possible. Rendered through the SAME
+ * `renderSSEFrames` helper the unit suite pins byte-for-byte against the
+ * real `sendSSE` (lib/sse.js) — LIN-2453/LIN-2620 — so this mock cannot drift
+ * from the wire format the real turn endpoint (session or proxy) emits.
  */
 async function mockTurn(page, { token } = {}) {
   await page.route('**/api/flight-companion/turn', (route) => {
     if (route.request().method() !== 'POST') return route.continue();
     const frames = token
-      ? `event: token\ndata: ${JSON.stringify({ token })}\n\nevent: done\ndata: {}\n\n`
-      : `event: done\ndata: {}\n\n`;
+      ? renderSSEFrames([['token', { token }], ['done', {}]])
+      : renderSSEFrames([['done', {}]]);
     return route.fulfill({ status: 200, contentType: 'text/event-stream', body: frames });
   });
 }
