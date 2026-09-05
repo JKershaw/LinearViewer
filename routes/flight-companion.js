@@ -128,7 +128,20 @@ export function buildCensusSeedText(currentCensusDoc) {
   if (!currentCensusDoc) {
     return 'CURRENT CENSUS: not available yet for this workspace (no sweep has run).';
   }
-  const snapshot = buildCompanionSnapshot(currentCensusDoc);
+  // Sanitised BEFORE `buildCompanionSnapshot`, not after. That function maps
+  // `attention` straight to `[row.loopId, …]` (lib/flight-companion-gate.js:219)
+  // and throws on a null row — so defending only the rendering below would be
+  // dead code, because the snapshot call happens first. Dropping the unusable
+  // rows here fixes it entirely inside this route, without editing the gate
+  // file (which this change's carve does not permit), and keeps the count and
+  // the rendered rows counting the same set. A row with no `loopId` cannot be
+  // drilled into and is not an attention row anyone can act on.
+  const attention = (Array.isArray(currentCensusDoc.state?.attention) ? currentCensusDoc.state.attention : [])
+    .filter((row) => row && typeof row === 'object' && row.loopId);
+  const usableDoc = attention.length === (currentCensusDoc.state?.attention?.length ?? 0)
+    ? currentCensusDoc
+    : { ...currentCensusDoc, state: { ...currentCensusDoc.state, attention } };
+  const snapshot = buildCompanionSnapshot(usableDoc);
   const laneLines = CENSUS_LANE_KEYS.map((key) => `  ${key}: ${snapshot.lanes[key]}`).join('\n');
 
   // LIN-2617: the ROWS, not just the count. Read straight off the census doc's
@@ -142,23 +155,14 @@ export function buildCensusSeedText(currentCensusDoc) {
   // comparison. The gate needs the identity tuple; the model needs the age.
   // The sweep already applies ATTENTION_CAP before storing, so the stored array
   // is bounded and `truncated` says whether it was cut.
-  //
-  // Every field is defended, not just two. This document is persisted store
+  // Every remaining field is defended too: this document is persisted store
   // state read back at turn time, so a row written by an older sweep revision
-  // can be partial — and this function is called from
-  // `buildFlightCompanionMessages` with no try/catch around it, so one
-  // malformed row would take out the whole companion turn. Rendering the
-  // literal string "undefined" inside a block the prompt calls ground truth is
-  // the worse failure of the two, so an unusable row is skipped outright.
-  const attention = Array.isArray(currentCensusDoc.state?.attention) ? currentCensusDoc.state.attention : [];
-  const attentionLines = [];
-  for (const row of attention) {
-    if (!row || typeof row !== 'object' || !row.loopId) continue;
-    attentionLines.push(
-      `  - ${row.issue || '(no task)'} · ${row.lane || 'unknown lane'} · stage ${row.stage || 'unknown'}` +
+  // can be partial, and rendering the literal string "undefined" inside a block
+  // the prompt calls ground truth is worse than saying "unknown".
+  const attentionLines = attention.map(
+    (row) => `  - ${row.issue || '(no task)'} · ${row.lane || 'unknown lane'} · stage ${row.stage || 'unknown'}` +
       ` · since ${row.since || 'unknown'} · loop ${row.loopId}`
-    );
-  }
+  );
 
   const lines = [
     'CURRENT CENSUS (authoritative — these numbers are ground truth; narrate them, never recompute or restate them differently):',

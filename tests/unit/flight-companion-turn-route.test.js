@@ -929,17 +929,17 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     // function is called with no try/catch around it — one bad row from an
     // older sweep revision must not take out the whole companion turn.
     //
-    // A literal `null` row is NOT covered here, and deliberately so: it throws
-    // upstream of this function, in `buildCompanionSnapshot`
+    // A literal `null` row IS covered: `buildCompanionSnapshot` throws on one
     // (lib/flight-companion-gate.js:219, `attention.map(row => [row.loopId, …])`),
-    // which this change's file carve does not permit editing. That is a
-    // pre-existing defect on the gate's own read path, not one this rendering
-    // introduces, and it is reported rather than worked around here.
+    // and it runs before any rendering here, so defending only the rendering
+    // would have been dead code. The array is sanitised before that call
+    // instead — which fixes it entirely inside this route, without editing the
+    // gate file, whose own latent fault on that input is reported separately.
     const text = buildCensusSeedText({
       rev: 3, stateHash: 'h',
       state: {
         lanes: base, truncated: false,
-        attention: ['nonsense', { lane: 'blocked' }, { loopId: 'l9' }, { loopId: 'l8', issue: 'LIN-1', lane: 'blocked', stage: 'plan', since: '2026-09-05T00:00:00.000Z' }],
+        attention: [null, 'nonsense', { lane: 'blocked' }, { loopId: 'l9' }, { loopId: 'l8', issue: 'LIN-1', lane: 'blocked', stage: 'plan', since: '2026-09-05T00:00:00.000Z' }],
       },
     });
     assert.doesNotMatch(text, /undefined/, 'never the literal string "undefined" inside a ground-truth block');
@@ -950,6 +950,9 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     assert.ok(text.includes('  - (no task) · unknown lane · stage unknown · since unknown · loop l9'));
     // ...and the well-formed row is unaffected.
     assert.ok(text.includes('  - LIN-1 · blocked · stage plan · since 2026-09-05T00:00:00.000Z · loop l8'));
+    // The count and the rendered rows count the SAME set — a header claiming
+    // five attention items above two rendered rows is its own small lie.
+    assert.match(text, /attention items: 2\b/);
   });
 
   test('LIN-2617: the seed states what a lane actually counts, so a loop total is never narrated as tasks', () => {

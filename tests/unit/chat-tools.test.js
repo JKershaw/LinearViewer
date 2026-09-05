@@ -2187,9 +2187,12 @@ describe('pass-4 — the decision row resolves the session get_session actually 
     assert.strictEqual(session.sessionId, 'root');
   });
 
-  test('an unresolvable chain reports null rather than a confidently wrong id', async () => {
-    // The predecessor is outside the 30-day window, so nothing in this read can
-    // say which session the follow-up belongs to.
+  test('a follow-up whose predecessor aged out reports the session the reconstruction actually gives it', async () => {
+    // Nothing in this read can walk the chain — the predecessor is outside the
+    // 30-day window — so `_buildSessions` falls through to its standalone pass
+    // and keys the loop by its own id. Reading the index off the reconstruction
+    // gets that right for free; the field-inference draft this replaced had to
+    // guess, and guessed the same answer for the WRONG reason.
     const history = [
       sessionHistoryItem({
         id: 'orphan', issueIdentifier: 'LIN-911', target: 'cli', followUpTo: 'aged-out-of-window',
@@ -2204,8 +2207,37 @@ describe('pass-4 — the decision row resolves the session get_session actually 
     const row = (await executeTool({ name: 'list_pending_decisions', arguments: {} }))
       .decisions.find(d => d.decisionId === 'dec-orphan');
 
-    assert.strictEqual(row.loopId, 'orphan', 'the run is still named');
-    assert.strictEqual(row.sessionId, null, 'a guess here would send get_session to the wrong session');
+    assert.strictEqual(row.loopId, 'orphan');
+    // The claim that matters is not which id it is, but that it RESOLVES.
+    const session = await executeTool({ name: 'get_session', arguments: { sessionId: row.sessionId } });
+    assert.strictEqual(session.sessionId, row.sessionId);
+  });
+
+  test("a decision on a loop the reconstruction never groups reports sessionId null, not an id that throws", async () => {
+    // `_buildSessions` claims no unclaimed `dash`/`local` loop
+    // (lib/pipeline-loops.js:1234), so this decision has no session at all. The
+    // rulings feed still shows it, so this tool must too — with an honest null
+    // rather than the loop's own id, which get_session would reject.
+    const history = [
+      sessionHistoryItem({
+        id: 'dash-run', issueIdentifier: 'LIN-912', target: 'dash',
+        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
+        feedback: [
+          { message: '[blocked] parked', timestamp: T_FLEET_MID },
+          decisionEntry('dec-dash', 'Which?', T_FLEET_MID),
+        ],
+      }),
+    ];
+    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
+    const row = (await executeTool({ name: 'list_pending_decisions', arguments: {} }))
+      .decisions.find(d => d.decisionId === 'dec-dash');
+
+    assert.ok(row, 'the decision must still be reported — this is the parity case');
+    assert.strictEqual(row.loopId, 'dash-run');
+    assert.strictEqual(row.sessionId, null);
+    await assert.rejects(
+      () => executeTool({ name: 'get_session', arguments: { sessionId: 'dash-run' } }), /not found/
+    );
   });
 
   test('the session read also fits its budget at a full cap of worst-case rows', async () => {
@@ -2236,5 +2268,187 @@ describe('pass-4 — the decision row resolves the session get_session actually 
       size <= CHAT_TOOL_RESULT_BUDGETS.list_active_sessions,
       `20 session rows serialize to ${size}, over the declared budget`
     );
+  });
+});
+
+describe('pass-4 — bounds that must hold on real data, not just fixtures (LIN-2617)', () => {
+  test("a child absorbed by _buildSessions' INFERENCE fallback still reports a resolvable session", async () => {
+    // The case that defeated a field-inference map: this child carries no
+    // sessionId, no sessionGroupId and no followUpTo. Pass 1 absorbs it into
+    // the orchestrator's session by issue + time window alone, and none of
+    // those inputs exist on the loop — so only reading the reconstruction's own
+    // output gets it right.
+    const history = [
+      sessionHistoryItem({
+        id: 'orc-1', kind: 'autopilot', issueIdentifier: 'LIN-920', target: 'cli',
+        dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
+        feedback: [{ message: '[working] orchestrating', timestamp: T_FLEET_OLD }],
+      }),
+      sessionHistoryItem({
+        id: 'inferred-child', issueIdentifier: 'LIN-920', target: 'cli',
+        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
+        feedback: [
+          { message: '[blocked] parked', timestamp: T_FLEET_MID },
+          decisionEntry('dec-inferred', 'Which option?', T_FLEET_MID),
+        ],
+      }),
+    ];
+    const { executeTool, stores } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
+
+    // Ground the premise: the reconstruction really does absorb it.
+    const sessions = await getSessionsForWorkspace(URL_KEY, {
+      dispatchStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
+    });
+    const owner = sessions.find(s => (s.loops || []).some(l => l.loopId === 'inferred-child'));
+    assert.strictEqual(owner.sessionId, 'orc-1', 'fixture must exercise the inference fallback');
+
+    const row = (await executeTool({ name: 'list_pending_decisions', arguments: {} }))
+      .decisions.find(d => d.decisionId === 'dec-inferred');
+    assert.strictEqual(row.loopId, 'inferred-child');
+    assert.strictEqual(row.sessionId, 'orc-1', 'not the child loop id, which get_session rejects');
+    const session = await executeTool({ name: 'get_session', arguments: { sessionId: row.sessionId } });
+    assert.strictEqual(session.sessionId, 'orc-1');
+  });
+
+  test('neither list can exceed its result budget at the largest limit its schema advertises', async () => {
+    // The schema advertises `maximum: 50`. `truncateToolResult` hard-slices an
+    // over-budget payload, so the model would receive invalid JSON — and
+    // `truncated` would still be reporting only the row-count cap. The fit is
+    // structural: whatever the rows contain, this holds.
+    const history = [];
+    for (let i = 0; i < 60; i += 1) {
+      history.push(sessionHistoryItem({
+        id: `big-${i}`, kind: 'autopilot', issueIdentifier: `LIN-70${i}`, target: 'cli',
+        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
+        feedback: [
+          { message: `[working] ${'q'.repeat(5000)}`, timestamp: T_FLEET_FRESH },
+          decisionEntry(`big-dec-${i}`, 'w'.repeat(5000), T_FLEET_MID, 9),
+        ],
+      }));
+    }
+    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
+
+    const fleet = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all', limit: 50 } });
+    const fleetSize = JSON.stringify(fleet).length;
+    assert.ok(fleetSize <= CHAT_TOOL_RESULT_BUDGETS.list_active_sessions, `sessions serialized to ${fleetSize}`);
+    assert.strictEqual(fleet.truncated, true, 'and it says so');
+    assert.doesNotThrow(() => JSON.parse(JSON.stringify(fleet)), 'what the model receives is valid JSON');
+
+    const decisions = await executeTool({ name: 'list_pending_decisions', arguments: { limit: 20 } });
+    const decSize = JSON.stringify(decisions).length;
+    assert.ok(decSize <= CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions, `decisions serialized to ${decSize}`);
+    assert.strictEqual(decisions.truncated, true);
+  });
+
+  test('a malformed task decision degrades instead of taking out the whole call', async () => {
+    // Task decisions are stored raw — `taskDecisionsStore` documents
+    // parseDecision's shape in a comment but does not enforce it, so a
+    // non-array `options` and a non-string `question` are both reachable.
+    const taskDecisions = [{
+      id: 'td-bad', urlKey: URL_KEY, issueId: 'uuid-930', issueIdentifier: 'LIN-930',
+      scannedAt: T_FLEET_FRESH, outcome: null,
+      decision: { decision_id: 'dec-bad', question: { not: 'a string' }, options: 'not an array' },
+    }];
+    const { executeTool } = makeDecisionsCatalog({ history: [], taskDecisions, shelvedRulings: [] });
+
+    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    const row = result.decisions.find(d => d.decisionId === 'dec-bad');
+    assert.ok(row, 'the row still rides — the rulings feed shows it too');
+    assert.deepStrictEqual(row.options, []);
+    assert.strictEqual(row.optionsTotal, 0);
+    assert.strictEqual(row.question, null, 'an unrenderable question is null, never 3000 uncapped chars');
+  });
+
+  test('the option cap reports what it withheld', async () => {
+    const history = [sessionHistoryItem({
+      id: 'many-opts', kind: 'autopilot', issueIdentifier: 'LIN-931', target: 'cli',
+      dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
+      feedback: [
+        { message: '[blocked] parked', timestamp: T_FLEET_MID },
+        decisionEntry('dec-many', 'Pick one', T_FLEET_MID, 9),
+      ],
+    })];
+    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
+    const row = (await executeTool({ name: 'list_pending_decisions', arguments: {} }))
+      .decisions.find(d => d.decisionId === 'dec-many');
+    assert.strictEqual(row.options.length, 4, 'capped');
+    assert.strictEqual(row.optionsTotal, 9, 'and the true count still rides, computed before the slice');
+  });
+
+  test('a wake loop INSIDE a real session is not counted as a suppressed row', async () => {
+    // `wakeLoopsFolded` claims rows suppressed. A wake loop stitched into a real
+    // session produced no row of its own to suppress, so counting it would
+    // overstate the noise.
+    const history = [
+      sessionHistoryItem({
+        id: 'sess-wk', kind: 'autopilot', issueIdentifier: 'LIN-940', target: 'cli',
+        dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
+        feedback: [{ message: '[working] going', timestamp: T_FLEET_OLD }],
+      }),
+      sessionHistoryItem({
+        id: 'inner-wake', kind: 'wake', sessionId: 'sess-wk', issueIdentifier: 'LIN-940', target: 'cli',
+        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken', feedback: [],
+      }),
+    ];
+    const { executeTool } = makeFleetCatalog(history);
+    const result = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
+    assert.strictEqual(result.sessions.length, 1);
+    assert.strictEqual(result.noise.wakeLoopsFolded, 0, 'nothing was suppressed');
+    assert.strictEqual(result.sessions[0].runCount, 2, 'but the wake run still counts as a run');
+  });
+
+  test('noise reports everything the filter withheld, not only the finished rows', async () => {
+    const { executeTool } = makeFleetCatalog(fleetHistory());
+    const blocked = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'blocked' } });
+    assert.strictEqual(blocked.sessions.length, 1);
+    assert.strictEqual(blocked.noise.terminalOmitted, 1);
+    // Two more were withheld by the lane filter itself; terminalOmitted alone
+    // would have the model under-report the fleet.
+    assert.strictEqual(blocked.noise.omittedByFilter, 2);
+  });
+
+  test('both lists are actually ordered, not merely non-reversed', async () => {
+    // Built so the reconstruction's own order (most-recent DISPATCH first) and
+    // this tool's order (most-recent ACTIVITY first) genuinely disagree: 'quiet'
+    // was dispatched more recently but has not moved since, while 'busy' was
+    // dispatched earlier and beat ten minutes ago. A comparator returning 0
+    // leaves the reconstruction's order and fails here — a flip test alone
+    // would not catch that.
+    const { executeTool } = makeFleetCatalog([
+      sessionHistoryItem({
+        id: 'quiet', kind: 'autopilot', issueIdentifier: 'LIN-960', target: 'cli',
+        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken', feedback: [],
+      }),
+      sessionHistoryItem({
+        id: 'busy', kind: 'autopilot', issueIdentifier: 'LIN-961', target: 'cli',
+        dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
+        feedback: [{ message: '[working] 9 tools/30s · alive', timestamp: T_FLEET_FRESH }],
+      }),
+    ]);
+    const fleet = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
+    assert.deepStrictEqual(fleet.sessions.map(r => r.sessionId), ['busy', 'quiet']);
+    const stamps = fleet.sessions.map(r => r.lastActivityAt);
+    assert.deepStrictEqual(stamps, [...stamps].sort().reverse());
+    assert.ok(new Set(stamps).size > 1, 'the fixture must have something to order');
+
+    const { executeTool: dec } = makeDecisionsCatalog({
+      history: [
+        sessionHistoryItem({
+          id: 'newer', kind: 'autopilot', issueIdentifier: 'LIN-951', target: 'cli',
+          dispatchedAt: T_FLEET_FRESH, resolvedAt: null, status: 'taken',
+          feedback: [{ message: '[blocked] b', timestamp: T_FLEET_FRESH }, decisionEntry('d-new', 'new?', T_FLEET_FRESH)],
+        }),
+        sessionHistoryItem({
+          id: 'older', kind: 'autopilot', issueIdentifier: 'LIN-950', target: 'cli',
+          dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
+          feedback: [{ message: '[blocked] a', timestamp: T_FLEET_OLD }, decisionEntry('d-old', 'old?', T_FLEET_OLD)],
+        }),
+      ],
+      taskDecisions: [], shelvedRulings: [],
+    });
+    // Reconstruction order is most-recent-session-first, so oldest-first is a
+    // real re-ordering the comparator has to perform.
+    const ids = (await dec({ name: 'list_pending_decisions', arguments: {} })).decisions.map(d => d.decisionId);
+    assert.deepStrictEqual(ids, ['d-old', 'd-new']);
   });
 });
