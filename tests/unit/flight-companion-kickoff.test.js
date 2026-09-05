@@ -408,7 +408,10 @@ describe('LIN-2618: the builder is defensive where a future caller will actually
     assert.strictEqual(formatFossilThreshold(30 * 60000), '30m');
     assert.strictEqual(formatFossilThreshold(60000), '1m');
     assert.strictEqual(formatFossilThreshold(1), '1m');
-    assert.strictEqual(formatFossilThreshold(90 * 60000), '2h');
+    // Floored, never rounded: this renders "older than X", so rounding 90m up
+    // to "2h" would assert an age the data does not support.
+    assert.strictEqual(formatFossilThreshold(90 * 60000), '1h');
+    assert.strictEqual(formatFossilThreshold(100 * 60000), '1h');
     // The production value and the ordinary shapes are unchanged.
     assert.strictEqual(formatFossilThreshold(7 * 24 * 3600000), '7d');
     assert.strictEqual(formatFossilThreshold(6 * 3600000), '6h');
@@ -423,5 +426,57 @@ describe('LIN-2618: the builder is defensive where a future caller will actually
     assert.strictEqual(out.length, 2, 'system turn plus the stand-in user turn');
     assert.strictEqual(out[0].role, 'system');
     assert.strictEqual(out[1].role, 'user');
+  });
+});
+
+describe('LIN-2618: review-ledger discharge', () => {
+  test('both surfaces render the shared sections in the SAME order', () => {
+    // Presence, exactly-once and per-section byte-identity were all pinned; the
+    // relative ORDER was not. A renderer could put the gate before the readout
+    // in one surface and after it in the other and stay green — which is
+    // precisely the divergence "one source, two renderings" is meant to exclude.
+    const k = buildFlightCompanionKickoff({ baseUrl: BASE_URL });
+    const c = buildFlightCompanionMessages({ history: [], censusSeedText: 'CENSUS' })[0].content;
+    for (const [text, label] of [[k, 'kickoff'], [c, 'chat']]) {
+      let cursor = -1;
+      for (const section of COMPANION_BRIEF_SECTIONS) {
+        const at = text.indexOf(section);
+        assert.ok(at > cursor, `${label} renders "${section.split('\n')[0]}" out of shared order`);
+        cursor = at;
+      }
+    }
+  });
+
+  test('a clock that would render a confident WRONG time reads as unknown', () => {
+    // `0` is a legal epoch-ms number that renders 1970; the string '0' is parsed
+    // by V8 as the year 2000. Both are "valid" in the type sense and both
+    // produce the failure the guard exists to prevent.
+    for (const bad of [0, '0', -1, new Date(0), '1970-01-01T00:00:00.000Z']) {
+      assert.match(
+        formatCompanionClock(bad), /CURRENT TIME: unknown/,
+        `${JSON.stringify(bad)} must not render as a confident timestamp`
+      );
+    }
+    // A plausible instant still works.
+    assert.match(formatCompanionClock(Date.parse('2026-09-05T12:00:00.000Z')), /2026-09-05T12:00/);
+  });
+
+  test('a null history is an empty one, not a throw', () => {
+    // `history = []` is a parameter default and covers `undefined` only — the
+    // same trap the clock guard calls out. A caller threading `body.history`
+    // straight through hits the null.
+    for (const bad of [null, undefined, 'nonsense', 42, {}]) {
+      assert.doesNotThrow(
+        () => buildFlightCompanionMessages({ history: bad, censusSeedText: 'C' }),
+        `history: ${JSON.stringify(bad)} must not throw`
+      );
+      const out = buildFlightCompanionMessages({ history: bad, censusSeedText: 'C' });
+      assert.strictEqual(out.length, 2, 'system turn plus the stand-in user turn');
+    }
+    // A real history still rides.
+    const real = [{ role: 'user', content: 'hi' }];
+    assert.deepStrictEqual(
+      buildFlightCompanionMessages({ history: real, censusSeedText: 'C' })[1], real[0]
+    );
   });
 });
