@@ -18,9 +18,10 @@ import { LlmCallLogStore } from '../../lib/llm-call-log.js';
 
 const T1 = '2026-08-01T10:00:00.000Z';
 
-function usageEntry({ model = 'anthropic/claude-sonnet-5', costUsd, timestamp = T1, rootItemId } = {}) {
+function usageEntry({ model = 'anthropic/claude-sonnet-5', costUsd, effort, timestamp = T1, rootItemId } = {}) {
   const payload = { model };
   if (costUsd !== undefined) payload.costUsd = costUsd;
+  if (effort !== undefined) payload.effort = effort;
   const entry = { kind: 'usage', timestamp, message: `[usage] ${JSON.stringify(payload)}` };
   if (rootItemId) entry.rootItemId = rootItemId;
   return entry;
@@ -272,6 +273,28 @@ describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
     const { app: wiringApp } = buildApp({ history: [row()], llmCallLogStore: wiringStore });
     const { body: wiringBody } = await get(wiringApp, '/api/proxy/issues/LIN-42/cost');
     assert.equal(wiringBody.window.days, 90);
+  });
+
+  test('LIN-2615: effort and durationMs reach the wire through the route spread', async () => {
+    // `buildTaskCost` is well covered directly, but the route re-emits its
+    // result with a bare spread (`res.json({ identifier, ...result, window })`)
+    // — no projection, so the two fields LIN-2615 added SHOULD survive. That
+    // was inspection-only until now; this asserts it off a live request.
+    const { app } = buildApp({
+      history: [row({
+        feedback: [
+          usageEntry({ costUsd: 4.9, effort: 'high' }),
+          { kind: 'status', timestamp: '2026-08-01T10:05:00.000Z', message: '[done] finished' }
+        ]
+      })]
+    });
+    const { status, body } = await get(app, '/api/proxy/issues/LIN-42/cost');
+
+    assert.equal(status, 200);
+    assert.equal(body.workerSessions.length, 1);
+    assert.equal(body.workerSessions[0].effort, 'high');
+    // dispatchedAt T1 (10:00:00Z) → terminal marker (10:05:00Z).
+    assert.equal(body.workerSessions[0].durationMs, 5 * 60 * 1000);
   });
 
   test('missing llmCallLogStore degrades to an empty app-call summary, never a 500', async () => {

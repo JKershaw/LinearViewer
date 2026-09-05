@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import { badRequest, jsonError, notFound, classifyUpstreamError } from '../lib/errors.js';
 import { MAX_NAME_LENGTH } from '../lib/issue-write-validation.js';
-import { validateOpaqueDispatchField, validateSessionId } from '../lib/dispatch-validation.js';
+import { validateOpaqueDispatchField, validateSessionId, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
@@ -192,6 +192,14 @@ export function createKickoffRoutes({
       if (kickoffEffortValidationError) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, kickoffEffortValidationError.error);
+      }
+      // An out-of-set level stays accepted (fail-soft, never a 400) but is
+      // logged, the same as the other three write verbs. Symmetry only — the
+      // caller-observable contract is identical either way; without it the
+      // runtime-served `## Effort` docs describe a warning this verb alone
+      // never emitted.
+      if (effort && !DISPATCH_EFFORT_LEVELS.includes(effort)) {
+        console.warn(`Unknown dispatch effort level: ${effort}`);
       }
       // Selected dispatch preset (LIN-1390): an unknown/invalid id is rejected
       // here, up front — the factory treats a presetId it can't resolve as "no

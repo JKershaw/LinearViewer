@@ -252,4 +252,39 @@ describe('LIN-2615 — POST /api/proxy/autopilot/kickoff: effort parity fix (the
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
     assert.equal(captured.item.effort, 'turbo');
   });
+
+  test('an unknown level is logged, matching the other three write verbs (close-out symmetry nit)', async () => {
+    // Log observability only — the caller-observable contract is already
+    // pinned by the fail-soft test above. Pinned because the runtime-served
+    // `## Effort` docs describe the warning as a property of every write verb.
+    const captured = {};
+    const app = buildProxyApp(captured);
+    const warnings = [];
+    const realWarn = console.warn;
+    console.warn = (...args) => warnings.push(args.join(' '));
+    try {
+      const res = await call(app, 'post', '/api/proxy/autopilot/kickoff', { goal: 'ship it', target: 'cli', effort: 'turbo' });
+      assert.equal(res.status, 201);
+    } finally {
+      console.warn = realWarn;
+    }
+    assert.ok(
+      warnings.some(w => w.includes('Unknown dispatch effort level: turbo')),
+      `expected an unknown-effort warning, got: ${JSON.stringify(warnings)}`
+    );
+  });
+
+  test('a known level is NOT warned about (the warn is out-of-set only, not every dispatch)', async () => {
+    const captured = {};
+    const app = buildProxyApp(captured);
+    const warnings = [];
+    const realWarn = console.warn;
+    console.warn = (...args) => warnings.push(args.join(' '));
+    try {
+      await call(app, 'post', '/api/proxy/autopilot/kickoff', { goal: 'ship it', target: 'cli', effort: 'high' });
+    } finally {
+      console.warn = realWarn;
+    }
+    assert.ok(!warnings.some(w => w.includes('Unknown dispatch effort level')), JSON.stringify(warnings));
+  });
 });

@@ -588,6 +588,24 @@ describe('createDispatchItem — dispatch preset routing precedence (LIN-1390)',
     assert.equal(store.captured.item.harness, 'anchor-harness');
   });
 
+  test('an inherited anchor presetConfig donates its effort over workspace defaults (LIN-2615)', async () => {
+    // Mirrors the model case directly above for `effort`'s third resolution
+    // pass. Tier 3 of the six-tier chain was otherwise unpinned: deleting the
+    // `anchor?.presetConfig` effort pass left the whole suite green because
+    // the workspace tier below it silently answered instead. Asserting the
+    // ANCHOR's effort wins (not merely that some effort resolved) is what
+    // makes that fallthrough visible.
+    const store = capturingStoreWithItems({
+      'anchor-1': { issueIdentifier: 'LIN-1', presetConfig: { model: 'anchor-model', harness: 'anchor-harness', effort: 'anchor-effort' }, presetName: 'Anchor Preset' }
+    });
+    const prefs = await prefsWith({ model: 'ws-model', harness: 'ws-harness', effort: 'ws-effort' });
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'autopilot', prompt: 'x',
+      workspacePreferencesStore: prefs, fields: { followUpTo: 'anchor-1' }
+    });
+    assert.equal(store.captured.item.effort, 'anchor-effort');
+  });
+
   test('a selected preset beats an inherited anchor presetConfig', async () => {
     const store = capturingStoreWithItems({
       'anchor-1': { issueIdentifier: 'LIN-1', presetConfig: { model: 'anchor-model', harness: 'anchor-harness' } }
