@@ -82,9 +82,14 @@ describe('LIN-2334: the blocked carve-out on the per-child liveness clock', () =
     );
   });
 
-  test('it names the blocked silence as a human parked on it, not a wedge', () => {
-    assert.ok(flat().includes('a child already woken to you as `blocked` is expected to stay silent'));
-    assert.ok(flat().includes('that silence is a human parked on it, not a wedge'));
+  test('it names a human parked on the child, and does not promise silence (LIN-2332)', () => {
+    assert.ok(flat().includes('a child already woken to you as `blocked` has a human parked on it'));
+    assert.ok(flat().includes('so that silence is not a wedge'));
+    // LIN-2332: the "expected to stay silent" premise is false since LIN-2297
+    // made the wake guard class-aware — a later terminal on that row does now
+    // reach the coordinator. The carve-out must not reinstate it.
+    assert.ok(!flat().includes('expected to stay silent'));
+    assert.ok(flat().includes('You may be woken again on it'));
   });
 
   test('it uses "surface it to the human", never LIN-2269\'s rejected "keep waiting for the unblock"', () => {

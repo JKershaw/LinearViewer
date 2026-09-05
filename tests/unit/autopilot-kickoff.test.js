@@ -120,7 +120,7 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('no live session to resume'));
   });
 
-  test('the wedged-session rule carves out an already-blocked step as expected silence, not a wedge (LIN-2124)', () => {
+  test('the wedged-session rule carves out an already-blocked step — a human is parked on it, not a wedge (LIN-2124/LIN-2332)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
     const flat = text.replace(/\s+/g, ' ');
     // Without this, a step already woken to the orchestrator as `blocked` (a human
@@ -134,7 +134,12 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     // genuine done/failed never reaches the orchestrator on the in-place resume
     // path. Waiting on a wake that provably never arrives strands the run; the
     // adjudicated wording keeps the orchestrator active instead ("surface it").
-    assert.ok(flat.includes('a step already woken to you as `blocked` is expected to stay silent'));
+    assert.ok(flat.includes('a step already woken to you as `blocked` has a human parked on it'));
+    // LIN-2332: the orchestrator may now be woken again on that row, and must
+    // NOT be told to expect silence — but it must also not be told the step
+    // will report for itself, which LIN-2297's research disproved.
+    assert.ok(flat.includes('You may be woken again on it'));
+    assert.ok(!flat.includes('expected to stay silent'));
     assert.ok(flat.includes("don't nudge or re-dispatch it on this rule, surface it to the human so they can unblock it"));
   });
 
@@ -716,20 +721,30 @@ describe('buildAutopilotKickoff (variant axis, LIN-791)', () => {
     return beat4Section.split(/^5\. \*\*/m)[0].replace(/\s+/g, ' ');
   };
 
-  test('stepper beat 4 (push) carves out an already-blocked beat as expected silence, not a wedge (LIN-2294)', () => {
+  test('stepper beat 4 (push) carves out an already-blocked beat — a human is parked on it, not a wedge (LIN-2294/LIN-2332)', () => {
     const beat4 = flatStepperBeat4();
     // Ported from the already-adjudicated orchestrator wording (LIN-2124/LIN-2269):
     // without this, a beat already woken to the stepper as `blocked` still matches
     // the ~30-min wedged-beat ceiling as written, with nothing telling the stepper the
     // silence is expected — risking a nudge/re-dispatch on a beat a human is parked on.
-    assert.ok(beat4.includes('a beat already woken to you as `blocked` is expected to stay silent'));
+    assert.ok(beat4.includes('a beat already woken to you as `blocked` has a human parked on it'));
+    // LIN-2332: the orchestrator may now be woken again on that row, and must
+    // NOT be told to expect silence — but it must also not be told the step
+    // will report for itself, which LIN-2297's research disproved.
+    assert.ok(beat4.includes('You may be woken again on it'));
+    assert.ok(!beat4.includes('expected to stay silent'));
     // The operative directive, not just the setup sentence — dropping this half must go red.
     assert.ok(beat4.includes("don't nudge or re-dispatch it on this rule, surface it to the human so they can unblock it"));
   });
 
-  test('stepper beat 4 (standalone) carves out an already-blocked beat as expected silence, not a wedge (LIN-2294)', () => {
+  test('stepper beat 4 (standalone) carves out an already-blocked beat — a human is parked on it, not a wedge (LIN-2294/LIN-2332)', () => {
     const beat4 = flatStepperBeat4({ standalone: true });
-    assert.ok(beat4.includes('a beat already woken to you as `blocked` is expected to stay silent'));
+    assert.ok(beat4.includes('a beat already woken to you as `blocked` has a human parked on it'));
+    // LIN-2332: the orchestrator may now be woken again on that row, and must
+    // NOT be told to expect silence — but it must also not be told the step
+    // will report for itself, which LIN-2297's research disproved.
+    assert.ok(beat4.includes('You may be woken again on it'));
+    assert.ok(!beat4.includes('expected to stay silent'));
     assert.ok(beat4.includes("don't nudge or re-dispatch it on this rule, surface it to the human so they can unblock it"));
   });
 });
@@ -795,7 +810,7 @@ describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
     assert.ok(text.includes('liveness'));
   });
 
-  test('standalone also carves out an already-blocked step as expected silence (LIN-2124)', () => {
+  test('standalone also carves out an already-blocked step — a human is parked on it (LIN-2124/LIN-2332)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, standalone: true });
     const flat = text.replace(/\s+/g, ' ');
     // Both variants of the wedged-session rule need the carve-out — the ticket's
@@ -805,7 +820,12 @@ describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
     // human" replaces "keep waiting for the unblock", since the wake that wording
     // waited on is suppressed by the in-place resume path (LIN-1357's terminal-wake
     // slot; see lib/dispatch-terminal.js).
-    assert.ok(flat.includes('a step already woken to you as `blocked` is expected to stay silent'));
+    assert.ok(flat.includes('a step already woken to you as `blocked` has a human parked on it'));
+    // LIN-2332: the orchestrator may now be woken again on that row, and must
+    // NOT be told to expect silence — but it must also not be told the step
+    // will report for itself, which LIN-2297's research disproved.
+    assert.ok(flat.includes('You may be woken again on it'));
+    assert.ok(!flat.includes('expected to stay silent'));
     assert.ok(flat.includes("don't nudge or re-dispatch it on this rule, surface it to the human so they can unblock it"));
   });
 
