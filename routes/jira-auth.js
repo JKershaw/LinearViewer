@@ -546,6 +546,30 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       { email: myself.emailAddress, displayName: myself.displayName }, workspace.id
     )
     if (!established.ok) {
+      // LIN-2340, and read the next sentence before trusting the ticket: the
+      // leak it describes is NOT reachable here today. `jiraPending.refreshToken`
+      // has exactly one writer in this file, and it is gated on
+      // `mode === 'new' && sites.length > 1` — while this branch is reached
+      // only when `mode !== 'new'` (the `new` arm returns into
+      // `completeJiraNewLogin` above). On the single-site add-source path the
+      // token is a function ARGUMENT and never touches the session at all. So
+      // on this exit there has never been anything to drop.
+      //
+      // This call is therefore DEFENCE IN DEPTH, not a fix for a live leak. It
+      // is worth having because the safety of this exit currently rests on a
+      // gate three hundred lines away: relax that gate and this becomes a real
+      // token leak, silently. With this line the exit is correct by
+      // construction, and it matches its three siblings (the unknown-site 400,
+      // the identity-lookup 400, and the binding-add 409), which all drop
+      // unconditionally.
+      //
+      // Unconditional, and above the identity clear. Token residue is a
+      // different class from the stale-accountId one LIN-2300 closed on this
+      // same exit — that clear is correctly gated on `!established.conflict`,
+      // since a MERGEABLE conflict needs `session.accountId` to survive as the
+      // canonical id. A refresh token has no such reason to survive either
+      // branch.
+      dropCarriedRefreshToken(req)
       if (!established.conflict) clearUnresolvableAccountSession(req.session)
       return res.status(409).send(renderErrorPage('Account Conflict', 'This Jira account is already linked to a different Harbour account. Please sign in with that account, or contact support.', {
         action: 'Go to homepage', actionUrl: '/'
