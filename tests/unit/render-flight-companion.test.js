@@ -237,4 +237,10 @@ describe('renderFlightCompanionPage — LIN-2621: the status strip', () => {
     const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
     assert.match(html, /<span class="fc-strip-next-checkin" id="flight-companion-strip-next">next check-in: —<\/span>/);
   });
+
+  // LIN-2621 beat 3
+  test('the running "this tab so far" total mount is present, server-rendered with its TRUE initial value (a fresh tab has spent nothing)', () => {
+    const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
+    assert.match(html, /<span class="fc-strip-tab-total" id="flight-companion-strip-tab-total">0 check-ins · \$0\.00 this tab<\/span>/);
+  });
 });

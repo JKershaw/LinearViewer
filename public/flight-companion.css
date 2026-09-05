@@ -140,6 +140,20 @@
   color: var(--text);
 }
 
+/* A visible turn's own per-bubble cost meta line (LIN-2621 beat 3): tokens +
+   cost, appended as a trailing sub-line inside the bubble's own surface.
+   Page-local addition (`.fc-*`), not chat.css's `.chat-msg__time` — that
+   class is documented there for row/log-style layouts (Collective) only;
+   this page's bubbles are the default stacked-column shape, so reusing it
+   would misapply an unrelated house rule rather than follow one. */
+.fc-msg-meta {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: var(--font-structural);
+  color: var(--muted);
+  font-size: 0.78em;
+}
+
 /* Chat thread + composer (LIN-2435). `.chat-thread`/`.chat-composer`
    themselves need no new rules — chat.css already styles them; this is the
    page-local proposal sub-component + a couple of thin composer hooks,

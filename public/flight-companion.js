@@ -114,6 +114,14 @@
   // in-memory countdown with no server-side schedule to render at page-load
   // time. Optional-guarded like every other mount here.
   var nextCheckInEl = document.getElementById('flight-companion-strip-next');
+  // LIN-2621 beat 3: the strip's running "this tab so far" total — server-
+  // rendered with its true initial value (a fresh tab has spent nothing),
+  // unlike the next-check-in placeholder above, whose initial value is
+  // genuinely unknown at render time. Updated in place on EVERY `done`
+  // frame this tab observes, visible or silent (see sendTurn's 'done'
+  // handling below) — the whole point being that a silent tick's cost is
+  // otherwise invisible nowhere else on the page.
+  var tabTotalEl = document.getElementById('flight-companion-strip-tab-total');
 
   if (!thread || !questionInput || !sendBtn) return;
 
@@ -121,6 +129,10 @@
   var inFlight = false;
   var cadence = { delayMs: CADENCE_BASE_MS, stopped: false };
   var timerId = null;
+  // LIN-2621 beat 3: per-tab, in-memory only — deliberately not persisted
+  // across a reload (the ticket's own "does not need to persist" note).
+  var tabCheckInCount = 0;
+  var tabTotalCost = 0;
   // LIN-2632: an auto-wake tick's "checking in…" placeholder (set at
   // sendTurn's start) snapshots whatever the status line showed before it,
   // so finishTurn can restore that exact prior state if the turn ends
@@ -140,6 +152,52 @@
 
   function nextCadenceDelay(currentDelayMs) {
     return Math.min(currentDelayMs * 2, CADENCE_CAP_MS);
+  }
+
+  // LIN-2621 beat 3: format a USD amount for display. Mirrors lib/render-
+  // settings.js's own formatCost (the settings page's AI usage KPI tree) —
+  // same house rule (small per-call amounts keep 4 decimals; a larger total
+  // rounds to 2) — restated here rather than imported, since this file is a
+  // browser IIFE with no module graph to lib/, the same reason every other
+  // vocabulary/prefix restatement in this codebase exists.
+  function formatCost(cost) {
+    var n = (typeof cost === 'number' && isFinite(cost)) ? cost : 0;
+    return '$' + n.toFixed(n > 0 && n < 1 ? 4 : 2);
+  }
+
+  // A single turn's meta line: tokens and cost, read straight off the final
+  // `done` frame's `usage` (lib/openrouter.js's extractUsage shape —
+  // `{prompt_tokens, completion_tokens, total_tokens, cost}`). Renders
+  // exactly what the frame carries — no hedging, no caveat about a
+  // tool-using turn's usage being under-reported today (that gap is
+  // lib/openrouter.js's, out of this ticket's scope per beat 1's finding;
+  // this plumbing is correct for whatever usage arrives and becomes
+  // accurate for free once that lands). Returns '' when there is nothing
+  // usable to show, so a turn with no usage at all renders no meta line —
+  // never a fabricated "0 tokens · $0.00".
+  function formatTurnMeta(usage) {
+    if (!usage || typeof usage !== 'object') return '';
+    var tokens = null;
+    if (typeof usage.total_tokens === 'number' && isFinite(usage.total_tokens)) {
+      tokens = usage.total_tokens;
+    } else {
+      var p = typeof usage.prompt_tokens === 'number' && isFinite(usage.prompt_tokens) ? usage.prompt_tokens : 0;
+      var c = typeof usage.completion_tokens === 'number' && isFinite(usage.completion_tokens) ? usage.completion_tokens : 0;
+      if (p || c) tokens = p + c;
+    }
+    var hasCost = typeof usage.cost === 'number' && isFinite(usage.cost);
+    if (tokens === null && !hasCost) return '';
+    var parts = [];
+    if (tokens !== null) parts.push(tokens.toLocaleString() + ' tokens');
+    if (hasCost) parts.push(formatCost(usage.cost));
+    return parts.join(' · ');
+  }
+
+  // LIN-2621 beat 3: the strip's running "this tab so far" total. The exact
+  // template the ticket specifies, applied literally (always plural,
+  // regardless of count) — "N check-ins · $x this tab".
+  function formatTabTotal(count, cost) {
+    return count + ' check-ins · ' + formatCost(cost) + ' this tab';
   }
 
   // The reset criterion (ruling 62bb3b4e): a user-initiated `done` always
@@ -377,6 +435,31 @@
     });
     setEmptyVisible(false);
     return li.querySelector('.fc-msg-body');
+  }
+
+  // LIN-2621 beat 3: the visible turn's own meta line — tokens and cost, read
+  // from the final `done` frame's `usage`. Appended as a page-local `.fc-msg-
+  // meta` span inside the bubble's own surface (a sibling after the text
+  // node), the same namespaced-addition convention `.fc-proposal*`/`.fc-obs-
+  // *` already use elsewhere in this file rather than reusing chat.css's
+  // `.chat-msg__time` — that class is documented there as specifically for
+  // row/log-style layouts (Collective), not the stacked-bubble column this
+  // page uses, so repurposing it would be forcing an unrelated house style
+  // rather than following one. No new chat.css rule; flight-companion.css
+  // owns `.fc-msg-meta` alongside its other `.fc-*` bubble sub-components.
+  function appendTurnMeta(answerEl, usage) {
+    if (!answerEl || !answerEl.parentNode) return;
+    var text = formatTurnMeta(usage);
+    if (!text) return;
+    var meta = document.createElement('span');
+    meta.className = 'fc-msg-meta';
+    meta.textContent = text;
+    answerEl.parentNode.appendChild(meta);
+  }
+
+  function updateTabTotalDisplay() {
+    if (!tabTotalEl) return;
+    tabTotalEl.textContent = formatTabTotal(tabCheckInCount, tabTotalCost);
   }
 
   function appendUserBubble(text) {
@@ -902,6 +985,20 @@
               // none is created now — only the one status line updates.
               updateCheckInStatus();
             }
+            // LIN-2621 beat 3: every `done` frame — visible or silent, any
+            // turn kind — updates the running "this tab so far" total and
+            // check-in count. This is the ONLY other visible effect a silent
+            // tick has (AC1/AC2 above are otherwise unchanged): the strip
+            // updates, no bubble paints. `answerLi` is non-null exactly when
+            // a bubble exists this turn (the two branches above, never AC1's
+            // silent one) — that is what gates the per-bubble meta line,
+            // independent of the always-on tab-total accumulation.
+            tabCheckInCount += 1;
+            if (eventData && eventData.usage && typeof eventData.usage.cost === 'number' && isFinite(eventData.usage.cost)) {
+              tabTotalCost += eventData.usage.cost;
+            }
+            updateTabTotalDisplay();
+            if (answerLi) appendTurnMeta(answerEl, eventData && eventData.usage);
             // LIN-2622: the cadence resets on `done` ONLY — doneCadenceEffect
             // treats a boot exactly like a user-initiated turn here, and every
             // failure exit below (mid-stream error, non-stream outcome,
@@ -1024,11 +1121,13 @@
     module.exports = {
       capHistory, nextCadenceDelay, doneCadenceEffect, autoWakeErrorCadenceEffect,
       advanceCadence, classifyTurnResponse, parseProposalResult, formatCheckIn, formatSweepNotSeen,
-      formatNoCensus, formatNextCheckIn,
+      formatNoCensus, formatNextCheckIn, formatCost, formatTurnMeta, formatTabTotal,
       applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion, startBoot,
       getCadenceState: function () { return cadence; },
       getChatHistory: function () { return chatHistory; },
       getNextCheckInText: function () { return nextCheckInEl ? nextCheckInEl.textContent : null; },
+      getTabTotalText: function () { return tabTotalEl ? tabTotalEl.textContent : null; },
+      getTabTotals: function () { return { count: tabCheckInCount, cost: tabTotalCost }; },
       CADENCE_BASE_MS: CADENCE_BASE_MS, CADENCE_CAP_MS: CADENCE_CAP_MS, HISTORY_CAP: HISTORY_CAP,
     };
   }

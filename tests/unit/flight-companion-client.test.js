@@ -278,6 +278,11 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
   // real render's server-rendered em-dash placeholder.
   const stripNextEl = new FakeElement('span');
   stripNextEl.textContent = 'next check-in: —';
+  // LIN-2621 beat 3: the strip's running "this tab so far" total — mirrors
+  // the real render's server-rendered TRUE initial value (a fresh tab has
+  // spent nothing).
+  const stripTabTotalEl = new FakeElement('span');
+  stripTabTotalEl.textContent = '0 check-ins · $0.00 this tab';
   doc._byId['flight-companion-thread'] = thread;
   doc._byId['flight-companion-chat-empty'] = emptyState;
   doc._byId['flight-companion-checkin'] = checkIn;
@@ -286,6 +291,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
   doc._byId['flight-companion-start'] = startBtn;
   doc._byId['flight-companion-reorient'] = reorientBtn;
   doc._byId['flight-companion-strip-next'] = stripNextEl;
+  doc._byId['flight-companion-strip-tab-total'] = stripTabTotalEl;
 
   const chatUI = makeChatUI();
   const fetchSpy = makeFetchSpy(fetchImpl || (() => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' })));
@@ -328,7 +334,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl } = {}) {
 
   return {
     exports: sandbox.module.exports,
-    doc, thread, emptyState, checkIn, questionInput, sendBtn, startBtn, reorientBtn, stripNextEl,
+    doc, thread, emptyState, checkIn, questionInput, sendBtn, startBtn, reorientBtn, stripNextEl, stripTabTotalEl,
     chatUICalls: chatUI.calls,
     fetchCalls: fetchSpy.calls,
     apiCalls: apiSpy.calls,
@@ -457,6 +463,43 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
 
     // Valid JSON, wrong shape (missing sessionId/prompt).
     looseDeepEqual(m.parseProposalResult(JSON.stringify({ ok: true, itemId: 'x' })), { ok: false });
+  });
+
+  // LIN-2621 beat 3
+  test('formatCost: small amounts keep 4 decimals, larger totals round to 2 (mirrors lib/render-settings.js\'s own formatCost)', () => {
+    const { exports: m } = loadClient();
+    assert.strictEqual(m.formatCost(0.00042), '$0.0004');
+    assert.strictEqual(m.formatCost(0.5), '$0.5000');
+    assert.strictEqual(m.formatCost(1), '$1.00');
+    assert.strictEqual(m.formatCost(12.3), '$12.30');
+    assert.strictEqual(m.formatCost(0), '$0.00');
+    assert.strictEqual(m.formatCost(undefined), '$0.00', 'a non-numeric input degrades to $0.00, never NaN');
+    assert.strictEqual(m.formatCost(NaN), '$0.00');
+  });
+
+  test('formatTurnMeta: tokens + cost, reading exactly what the usage payload carries', () => {
+    const { exports: m } = loadClient();
+    assert.strictEqual(
+      m.formatTurnMeta({ prompt_tokens: 100, completion_tokens: 47, total_tokens: 147, cost: 0.00042 }),
+      '147 tokens · $0.0004'
+    );
+    // No total_tokens: falls back to prompt+completion.
+    assert.strictEqual(m.formatTurnMeta({ prompt_tokens: 10, completion_tokens: 5, cost: 1 }), '15 tokens · $1.00');
+    // Cost only, no token fields at all.
+    assert.strictEqual(m.formatTurnMeta({ cost: 0.02 }), '$0.0200');
+    // Tokens only, no cost.
+    assert.strictEqual(m.formatTurnMeta({ total_tokens: 50 }), '50 tokens');
+    // Nothing usable at all — never a fabricated "0 tokens · $0.00".
+    assert.strictEqual(m.formatTurnMeta({}), '');
+    assert.strictEqual(m.formatTurnMeta(null), '');
+    assert.strictEqual(m.formatTurnMeta(undefined), '');
+  });
+
+  test('formatTabTotal: the ticket\'s own literal template, applied as-is', () => {
+    const { exports: m } = loadClient();
+    assert.strictEqual(m.formatTabTotal(0, 0), '0 check-ins · $0.00 this tab');
+    assert.strictEqual(m.formatTabTotal(1, 0.00042), '1 check-ins · $0.0004 this tab');
+    assert.strictEqual(m.formatTabTotal(5, 1.2), '5 check-ins · $1.20 this tab');
   });
 });
 
@@ -1031,6 +1074,115 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
     assert.strictEqual(body.textContent, 'all quiet');
     assert.ok(!body.classList.contains('chat-cursor'), 'the streaming cursor is cleared on done');
     looseDeepEqual(m.getChatHistory(), [{ role: 'assistant', content: 'all quiet' }]);
+  });
+});
+
+describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "this tab so far" total', () => {
+  test('a visible (user-initiated) turn with usage on done renders its own meta line inside the bubble', async () => {
+    const usage = { prompt_tokens: 100, completion_tokens: 47, total_tokens: 147, cost: 0.00042 };
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: 'hi' }), sseFrame('done', { usage })]),
+    });
+    questionInput.value = 'are you there?';
+    m.submitQuestion();
+    await flush();
+
+    // user bubble + assistant bubble
+    assert.strictEqual(thread.children.length, 2);
+    const answerLi = thread.children[1];
+    const meta = answerLi.querySelector('.fc-msg-meta');
+    assert.ok(meta, 'expected a .fc-msg-meta node inside the answer bubble');
+    assert.strictEqual(meta.textContent, '147 tokens · $0.0004');
+  });
+
+  test('a visible turn with NO usage on done renders no meta line at all', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: 'hi' }), sseFrame('done', {})]),
+    });
+    questionInput.value = 'are you there?';
+    m.submitQuestion();
+    await flush();
+    const answerLi = thread.children[1];
+    assert.strictEqual(answerLi.querySelector('.fc-msg-meta'), null);
+  });
+
+  // AC2's own empty-reply bubble is still a visible turn — it gets a meta
+  // line too, same as any other bubble-bearing done (answerLi is set either
+  // way; the gate is bubble existence, not answerText).
+  test('AC2\'s empty-reply bubble also renders a meta line when usage is present', async () => {
+    const usage = { total_tokens: 12, cost: 0.0001 };
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { usage })]),
+    });
+    questionInput.value = 'anything to report?';
+    m.submitQuestion();
+    await flush();
+    const answerLi = thread.children[1];
+    assert.strictEqual(answerLi.querySelector('.fc-msg-body').textContent, 'no reply — nothing to add');
+    assert.strictEqual(answerLi.querySelector('.fc-msg-meta').textContent, '12 tokens · $0.0001');
+  });
+
+  test('AC1 unchanged: a silent auto-wake tick with usage paints no bubble and no meta line — the running total is the ONLY other effect', async () => {
+    const usage = { total_tokens: 210, cost: 0.0009 };
+    const { exports: m, thread, checkIn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { usage })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(thread.children.length, 0, 'a silent tick must never paint a row (AC1)');
+    assert.match(checkIn.textContent, /nothing new$/, 'AC1\'s own check-in line is unaffected');
+    looseDeepEqual(m.getTabTotals(), { count: 1, cost: 0.0009 });
+  });
+
+  test('the running total sums EVERY done frame — visible and silent, any turn kind — and the check-in count matches', async () => {
+    const { exports: m, questionInput } = loadClient({
+      fetchImpl: (url, opts) => {
+        const body = JSON.parse(opts.body);
+        return body.message
+          ? sseResponse([sseFrame('done', { usage: { total_tokens: 10, cost: 0.001 } })])
+          : sseResponse([sseFrame('done', { usage: { total_tokens: 20, cost: 0.002 } })]);
+      },
+    });
+    looseDeepEqual(m.getTabTotals(), { count: 0, cost: 0 }, 'a fresh tab starts at zero');
+
+    // A silent auto-wake tick.
+    m.autoWakeTick();
+    await flush();
+    looseDeepEqual(m.getTabTotals(), { count: 1, cost: 0.002 });
+
+    // A visible, user-initiated turn.
+    questionInput.value = 'hi';
+    m.submitQuestion();
+    await flush();
+    looseDeepEqual(m.getTabTotals(), { count: 2, cost: 0.003 });
+  });
+
+  test('a done frame with no usage still counts as a check-in (cost contribution is zero)', async () => {
+    const { exports: m } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    m.autoWakeTick();
+    await flush();
+    looseDeepEqual(m.getTabTotals(), { count: 1, cost: 0 });
+  });
+
+  test('a gate-silent (non-stream) refusal — no model call at all — does NOT count as a check-in', async () => {
+    const { exports: m } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+    });
+    m.autoWakeTick();
+    await flush();
+    looseDeepEqual(m.getTabTotals(), { count: 0, cost: 0 }, 'nothing was spent, so nothing is counted');
+  });
+
+  test('the strip\'s tab-total mount renders the formatted running total in place', async () => {
+    const { exports: m } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { usage: { total_tokens: 5, cost: 0.5 } })]),
+    });
+    assert.strictEqual(m.getTabTotalText(), '0 check-ins · $0.00 this tab');
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(m.getTabTotalText(), '1 check-ins · $0.5000 this tab');
   });
 });
 

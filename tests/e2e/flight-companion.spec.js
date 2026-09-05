@@ -41,13 +41,19 @@ test.beforeEach(({ workerUrlKey }) => {
  * byte-identical to /turn's precisely so ONE mock harness covers both; a
  * second, forked mocking helper would be exactly the duplication that frame
  * parity claim exists to avoid.
+ *
+ * LIN-2621 beat 3: `usage`, when given, rides on the `done` frame exactly
+ * like the real turn core's summed hop usage does (LIN-2631) — omitted by
+ * default so every pre-existing caller stays byte-identical (a `done` with
+ * no `usage` key at all, not `usage: undefined`).
  */
-async function mockTurn(page, { token, endpoint = 'turn' } = {}) {
+async function mockTurn(page, { token, endpoint = 'turn', usage } = {}) {
   await page.route(`**/api/flight-companion/${endpoint}`, (route) => {
     if (route.request().method() !== 'POST') return route.continue();
+    const doneData = usage ? { usage } : {};
     const frames = token
-      ? renderSSEFrames([['token', { token }], ['done', {}]])
-      : renderSSEFrames([['done', {}]]);
+      ? renderSSEFrames([['token', { token }], ['done', doneData]])
+      : renderSSEFrames([['done', doneData]]);
     return route.fulfill({ status: 200, contentType: 'text/event-stream', body: frames });
   });
 }
@@ -179,6 +185,39 @@ test.describe('Flight Companion Page (experimental)', () => {
       // False-positive guard: not still showing the class the bubble is
       // created with.
       await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+    });
+
+    // LIN-2621 beat 3: the ticket's own item 1 — a visible turn's bubble
+    // renders its OWN meta line (tokens + cost), read from the final `done`
+    // frame's usage. Renders exactly what the frame carries — no caveat
+    // string, per beat 3's explicit instruction not to hedge the known
+    // lib/openrouter.js tool-hop gap.
+    test('a visible turn\'s bubble renders its own meta line with tokens and cost', async ({ page }) => {
+      await mockTurn(page, {
+        token: 'ack',
+        usage: { prompt_tokens: 100, completion_tokens: 47, total_tokens: 147, cost: 0.00042 },
+      });
+
+      await page.locator('#flight-companion-question').fill('are you there?');
+      await page.locator('#flight-companion-send').click();
+
+      const meta = page.locator('.fc-msg-meta');
+      await expect(meta).toHaveCount(1);
+      await expect(meta).toHaveText('147 tokens · $0.0004');
+    });
+
+    // LIN-2621 beat 3: a turn with no usage at all (the model call resolved,
+    // but no cost information reached this client — a defensive shape, not
+    // one the real turn core produces) renders no meta line, never a
+    // fabricated "0 tokens · $0.00".
+    test('a visible turn with no usage on its done frame renders no meta line', async ({ page }) => {
+      await mockTurn(page, { token: 'ack' });
+
+      await page.locator('#flight-companion-question').fill('are you there?');
+      await page.locator('#flight-companion-send').click();
+
+      await expect(page.locator('.fc-msg-who')).toHaveCount(1);
+      await expect(page.locator('.fc-msg-meta')).toHaveCount(0);
     });
 
     // LIN-2622: the start button, driving a mocked boot SSE turn through to a
@@ -442,6 +481,31 @@ test.describe('Flight Companion Page (experimental)', () => {
 
       await expect(page.locator('.fc-msg-who')).toHaveCount(0);
       await expect(page.locator('#flight-companion-chat-empty')).toBeVisible();
+    });
+
+    // LIN-2621 beat 3: "otherwise the page's biggest spender is its only
+    // invisible one" — a silent tick still carries real usage (a tool-using
+    // auto-wake turn that narrated nothing), and the strip's running total +
+    // check-in count are the ONLY other visible effect, alongside the
+    // unchanged check-in line above. No bubble paints either way (LIN-2443
+    // AC1 unchanged).
+    test('a silent tick with usage updates the strip\'s running total and check-in count, still with no bubble', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+
+      await page.clock.install();
+      await mockTurn(page, { usage: { prompt_tokens: 200, completion_tokens: 10, total_tokens: 210, cost: 0.0009 } });
+
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+
+      const tabTotal = page.locator('#flight-companion-strip-tab-total');
+      await expect(tabTotal).toHaveText('0 check-ins · $0.00 this tab');
+
+      await page.clock.fastForward(30000);
+
+      await expect(tabTotal).toHaveText('1 check-ins · $0.0009 this tab');
+      await expect(page.locator('.fc-msg-who')).toHaveCount(0);
+      await expect(page.locator('.fc-msg-meta')).toHaveCount(0);
     });
   });
 
