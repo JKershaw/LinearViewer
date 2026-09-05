@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { DispatchPresetsStore } from '../../lib/dispatch-presets-store.js';
+import { resolveRoutingFromConfig } from '../../lib/workspace-preferences.js';
 
 function createMockCollection() {
   const docs = [];
@@ -228,6 +229,61 @@ describe('LIN-1391 S7 — POST /workspace/:urlKey/api/dispatch/presets', () => {
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.deepEqual(res.body.preset.config, { model: 'anthropic/claude-opus-4.8', harness: 'claude-code' });
   });
+
+  // G1 (LIN-2616) — buildDispatchPresetConfig previously read only
+  // { model, harness, byKind } and silently discarded a preset's top-level
+  // `effort`, even though validatePresetInput would have accepted it and the
+  // client posts it. This is the create-side half of that witness.
+  test('a preset-carried top-level effort survives buildDispatchPresetConfig (G1)', async () => {
+    const app = buildApp({ dispatchPresetsStore: new DispatchPresetsStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', BASE, { name: 'Effort preset', model: 'm1', harness: 'claude-code', effort: 'high' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(res.body.preset.config, { model: 'm1', harness: 'claude-code', effort: 'high' });
+  });
+
+  test('an effort-only preset is not dropped by the model||harness||effort gate (G1)', async () => {
+    const app = buildApp({ dispatchPresetsStore: new DispatchPresetsStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', BASE, { name: 'Effort only', effort: 'xhigh' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(res.body.preset.config, { effort: 'xhigh' });
+  });
+
+  test('rejects dangerous control characters in effort (opaque contract, not a registry check)', async () => {
+    const app = buildApp({ dispatchPresetsStore: new DispatchPresetsStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', BASE, { name: 'X', effort: 'bad\x00effort' });
+    assert.equal(res.status, 400);
+  });
+
+  test('accepts an unknown-level effort value with no 400 (fail-soft, opaque contract)', async () => {
+    const app = buildApp({ dispatchPresetsStore: new DispatchPresetsStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', BASE, { name: 'X', effort: 'not-a-real-level' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(res.body.preset.config.effort, 'not-a-real-level');
+  });
+
+  test('authors a per-kind effort override (byKind) alongside model/harness (LIN-1400 shape)', async () => {
+    const app = buildApp({ dispatchPresetsStore: new DispatchPresetsStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', BASE, {
+      name: 'Blend',
+      byKind: { review: { effort: 'max' }, implementation: { model: 'opus', effort: 'low' } }
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(res.body.preset.config, {
+      byKind: { review: { effort: 'max' }, implementation: { model: 'opus', effort: 'low' } }
+    });
+  });
+
+  test('a preset-carried top-level effort reaches the dispatch item via resolveRoutingFromConfig (G1)', async () => {
+    const app = buildApp({ dispatchPresetsStore: new DispatchPresetsStore({ collection: createMockCollection() }) });
+    const res = await call(app, 'post', BASE, { name: 'Effort preset', effort: 'high' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    // The stored config is exactly the shape resolveRoutingFromConfig (and, via
+    // it, createDispatchItem's anchor.presetConfig/selectedPreset.config tiers
+    // in lib/dispatch-factory.js) reads at resolution time — proving the
+    // surviving field actually reaches a resolved dispatch, not just storage.
+    const resolved = resolveRoutingFromConfig(res.body.preset.config, 'implementation');
+    assert.equal(resolved.effort, 'high');
+  });
 });
 
 describe('LIN-1391 S7 — PATCH /workspace/:urlKey/api/dispatch/presets/:presetId', () => {
@@ -329,6 +385,27 @@ describe('LIN-1391 S7 — PATCH /workspace/:urlKey/api/dispatch/presets/:presetI
     const app = buildApp({});
     const res = await call(app, 'patch', `${BASE}/some-id`, { name: 'X' });
     assert.equal(res.status, 503);
+  });
+
+  // G1 (LIN-2616) — patch-side half of the same witness: a preset that
+  // starts with no top-level effort gains one via PATCH, and it must not be
+  // dropped by buildDispatchPresetConfig on the update path either.
+  test('updates a preset to add a top-level effort (G1)', async () => {
+    const store = new DispatchPresetsStore({ collection: createMockCollection() });
+    const created = await store.createCustom('acme', { name: 'X', config: { model: 'm1' } });
+    const app = buildApp({ dispatchPresetsStore: store });
+
+    const res = await call(app, 'patch', `${BASE}/${created.id}`, { name: 'X', model: 'm1', effort: 'low' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(res.body.preset.config, { model: 'm1', effort: 'low' });
+  });
+
+  test('rejects an oversized effort field on PATCH', async () => {
+    const store = new DispatchPresetsStore({ collection: createMockCollection() });
+    const created = await store.createCustom('acme', { name: 'X', config: {} });
+    const app = buildApp({ dispatchPresetsStore: store });
+    const res = await call(app, 'patch', `${BASE}/${created.id}`, { effort: 'a'.repeat(1001) });
+    assert.equal(res.status, 400);
   });
 });
 

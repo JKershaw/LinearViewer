@@ -17,10 +17,10 @@
 // Matches a per-kind row's harness-select/model-input `name` attribute, e.g.
 // `preset__<id>__kind__review__HarnessSelect` or
 // `newDispatchPreset__kind__review__Model` — captures the kind in between.
-const DISPATCH_PRESET_KIND_FIELD_RE = /__kind__(.+)__(?:HarnessSelect|Model)$/
+const DISPATCH_PRESET_KIND_FIELD_RE = /__kind__(.+)__(?:HarnessSelect|Model|Effort)$/
 
 /**
- * Read a preset row's `{ name, model, harness, byKind }` out of its DOM.
+ * Read a preset row's `{ name, model, harness, effort, byKind }` out of its DOM.
  * Works for both an existing preset's row (`.dispatch-preset-item`) and the
  * "new preset" create block (`.dispatch-preset-create`) — both carry the
  * same name-input + top-level config row + per-kind overrides shape
@@ -36,6 +36,7 @@ function readDispatchPresetRow(container) {
   const topLevel = container.querySelector('.dispatch-preset-toplevel-config')
   const harnessSelect = topLevel ? topLevel.querySelector('.harness-select') : null
   const modelInput = topLevel ? topLevel.querySelector('.dispatch-model-input') : null
+  const effortInput = topLevel ? topLevel.querySelector('.dispatch-effort-input') : null
 
   const byKind = {}
   container.querySelectorAll('.dispatch-preset-kind-overrides .harness-select').forEach((select) => {
@@ -44,12 +45,15 @@ function readDispatchPresetRow(container) {
     const kind = match[1]
     const row = select.closest('.dispatch-default-row')
     const modelField = row ? row.querySelector('.dispatch-model-input') : null
+    const effortField = row ? row.querySelector('.dispatch-effort-input') : null
     const model = modelField ? modelField.value.trim() : ''
     const harness = select.value
-    if (model || harness) {
+    const effort = effortField ? effortField.value.trim() : ''
+    if (model || harness || effort) {
       byKind[kind] = {}
       if (model) byKind[kind].model = model
       if (harness) byKind[kind].harness = harness
+      if (effort) byKind[kind].effort = effort
     }
   })
 
@@ -57,6 +61,7 @@ function readDispatchPresetRow(container) {
     name: nameInput ? nameInput.value.trim() : '',
     harness: harnessSelect ? harnessSelect.value : '',
     model: modelInput ? modelInput.value.trim() : '',
+    effort: effortInput ? effortInput.value.trim() : '',
     byKind
   }
 }
@@ -68,7 +73,7 @@ function readDispatchPresetRow(container) {
 async function createDispatchPreset(urlKey, createBlock, btn) {
   const originalText = btn ? btn.textContent : null
 
-  const { name, model, harness, byKind } = readDispatchPresetRow(createBlock)
+  const { name, model, harness, effort, byKind } = readDispatchPresetRow(createBlock)
   if (!name) {
     toast('Preset name is required', { type: 'error' })
     return
@@ -83,6 +88,7 @@ async function createDispatchPreset(urlKey, createBlock, btn) {
         name,
         model: model || undefined,
         harness: harness || undefined,
+        effort: effort || undefined,
         byKind: Object.keys(byKind).length ? byKind : undefined
       }),
       on401: false
@@ -102,7 +108,7 @@ async function saveDispatchPreset(urlKey, presetId, row) {
   const btn = row.querySelector('.dispatch-preset-save-btn')
   const originalText = btn ? btn.textContent : null
 
-  const { name, model, harness, byKind } = readDispatchPresetRow(row)
+  const { name, model, harness, effort, byKind } = readDispatchPresetRow(row)
   if (!name) {
     toast('Preset name is required', { type: 'error' })
     return
@@ -116,7 +122,7 @@ async function saveDispatchPreset(urlKey, presetId, row) {
     await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/presets/${encodeURIComponent(presetId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, model: model || undefined, harness: harness || undefined, byKind }),
+      body: JSON.stringify({ name, model: model || undefined, harness: harness || undefined, effort: effort || undefined, byKind }),
       on401: false
     })
     window.location.reload()

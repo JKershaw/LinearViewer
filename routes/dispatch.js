@@ -1086,25 +1086,31 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
       const model = typeof entry.model === 'string' ? entry.model.trim() : '';
       const harness = typeof entry.harness === 'string' ? entry.harness.trim() : '';
+      const effort = typeof entry.effort === 'string' ? entry.effort.trim() : '';
       const modelError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
       if (modelError) return { error: modelError.error };
       const harnessError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
       if (harnessError) return { error: harnessError.error };
-      if (model || harness) {
+      const effortError = validateOpaqueDispatchField(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
+      if (effortError) return { error: effortError.error };
+      if (model || harness || effort) {
         normalized[kind] = {};
         if (model) normalized[kind].model = model;
         if (harness) normalized[kind].harness = harness;
+        if (effort) normalized[kind].effort = effort;
       }
     }
     return { byKind: normalized };
   }
 
-  function buildDispatchPresetConfig({ model, harness, byKind }) {
+  function buildDispatchPresetConfig({ model, harness, effort, byKind }) {
     const config = {};
     const trimmedModel = typeof model === 'string' ? model.trim() : '';
     const trimmedHarness = typeof harness === 'string' ? harness.trim() : '';
+    const trimmedEffort = typeof effort === 'string' ? effort.trim() : '';
     if (trimmedModel) config.model = trimmedModel;
     if (trimmedHarness) config.harness = trimmedHarness;
+    if (trimmedEffort) config.effort = trimmedEffort;
     if (byKind && typeof byKind === 'object' && Object.keys(byKind).length) config.byKind = byKind;
     return config;
   }
@@ -1134,23 +1140,25 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
   /**
    * POST /workspace/:urlKey/api/dispatch/presets
-   * Create a new dispatch preset. Body: { name, model?, harness?, byKind? }.
+   * Create a new dispatch preset. Body: { name, model?, harness?, effort?, byKind? }.
    */
   router.post('/workspace/:urlKey/api/dispatch/presets', workspaceFromUrl, async (req, res) => {
     if (!dispatchPresetsStore) return jsonError(res, 503, 'Preset storage is not configured');
 
-    const { name, model, harness, byKind } = req.body || {};
+    const { name, model, harness, effort, byKind } = req.body || {};
     const modelError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
     if (modelError) return badRequest.json(res, modelError.error);
     const harnessError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
     if (harnessError) return badRequest.json(res, harnessError.error);
+    const effortError = validateOpaqueDispatchField(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
+    if (effortError) return badRequest.json(res, effortError.error);
     const byKindResult = normalizeDispatchPresetByKind(byKind);
     if (byKindResult.error) return badRequest.json(res, byKindResult.error);
 
     try {
       const preset = await dispatchPresetsStore.createCustom(req.workspace.urlKey, {
         name,
-        config: buildDispatchPresetConfig({ model, harness, byKind: byKindResult.byKind })
+        config: buildDispatchPresetConfig({ model, harness, effort, byKind: byKindResult.byKind })
       });
       res.status(201).json({ success: true, preset });
     } catch (error) {
@@ -1161,18 +1169,20 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
   /**
    * PATCH /workspace/:urlKey/api/dispatch/presets/:presetId
-   * Update an existing dispatch preset in place. Body: { name?, model?, harness?, byKind? }.
+   * Update an existing dispatch preset in place. Body: { name?, model?, harness?, effort?, byKind? }.
    * `byKind` present in the body (even `{}`) replaces/clears the stored value;
    * `byKind` absent from the body preserves the existing stored value (LIN-1400).
    */
   router.patch('/workspace/:urlKey/api/dispatch/presets/:presetId', workspaceFromUrl, async (req, res) => {
     if (!dispatchPresetsStore) return jsonError(res, 503, 'Preset storage is not configured');
 
-    const { name, model, harness, byKind } = req.body || {};
+    const { name, model, harness, effort, byKind } = req.body || {};
     const modelError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
     if (modelError) return badRequest.json(res, modelError.error);
     const harnessError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
     if (harnessError) return badRequest.json(res, harnessError.error);
+    const effortError = validateOpaqueDispatchField(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
+    if (effortError) return badRequest.json(res, effortError.error);
     const byKindResult = normalizeDispatchPresetByKind(byKind);
     if (byKindResult.error) return badRequest.json(res, byKindResult.error);
 
@@ -1181,7 +1191,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (!existing) return notFound.json(res, 'Preset not found');
 
       const effectiveByKind = byKind !== undefined ? byKindResult.byKind : existing.config?.byKind;
-      const config = buildDispatchPresetConfig({ model, harness, byKind: effectiveByKind });
+      const config = buildDispatchPresetConfig({ model, harness, effort, byKind: effectiveByKind });
       const preset = await dispatchPresetsStore.update(req.workspace.urlKey, req.params.presetId, {
         name: name !== undefined ? name : existing.name,
         config
