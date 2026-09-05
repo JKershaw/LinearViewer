@@ -141,15 +141,16 @@ export function buildCensusSeedText(currentCensusDoc) {
   }
   // This filter is for RENDERING HONESTY, not crash avoidance (LIN-2661 made
   // `buildCompanionSnapshot` itself safe against a null/undefined row — see
-  // `lib/flight-companion-gate.js:304` — so feeding it the raw
-  // `currentCensusDoc` directly, below, is no longer a hazard). It stays
-  // because it serves an independent purpose: this route reads `since`/`issue`
-  // straight off these rows for `attentionLines` below, fields the snapshot
-  // deliberately drops (`lib/flight-companion-gate.js:304`), and a row with no
-  // `loopId` cannot be drilled into or shown honestly to a human — it is
-  // dropped outright rather than rendered as a half-row. The bar here is
-  // deliberately LOOSER than the gate's own well-formed-tuple criterion
-  // (`loopId`+`lane`+`stage`, `lib/flight-companion-gate.js:304`): a row with
+  // `isWellFormedAttentionRow`, `lib/flight-companion-gate.js:280` — so
+  // feeding it the raw `currentCensusDoc` directly, below, is no longer a
+  // hazard). It stays because it serves an independent purpose: this route
+  // reads `since`/`issue` straight off these rows for `attentionLines` below,
+  // fields the snapshot's identity-tuple projection deliberately drops
+  // (`lib/flight-companion-gate.js:360`), and a row with no `loopId` cannot be
+  // drilled into or shown honestly to a human — it is dropped outright rather
+  // than rendered as a half-row. The bar here is deliberately LOOSER than the
+  // gate's own well-formed-ROW criterion (`loopId`+`lane`+`stage`,
+  // `isWellFormedAttentionRow`, `lib/flight-companion-gate.js:280`): a row with
   // an id but no `lane`/`stage` still renders here, honestly labelled, even
   // though the gate excludes it from its own identity-tuple accounting.
   const attention = (Array.isArray(currentCensusDoc.state?.attention) ? currentCensusDoc.state.attention : [])
@@ -163,7 +164,7 @@ export function buildCensusSeedText(currentCensusDoc) {
   // already carry — never re-sorted, re-dated or re-derived here.
   //
   // Deliberately NOT `buildCompanionSnapshot`'s `attentionKeys`: that projection
-  // drops `since` on purpose (lib/flight-companion-gate.js:304), because it
+  // drops `since` on purpose (lib/flight-companion-gate.js:360), because it
   // moves on every heartbeat and would defeat the gate's own identity
   // comparison. The gate needs the identity tuple; the model needs the age.
   // The sweep already applies ATTENTION_CAP before storing, so the stored array
@@ -183,7 +184,8 @@ export function buildCensusSeedText(currentCensusDoc) {
   // bug to reconcile later. `snapshot.attentionCount` only counts rows the
   // gate trusts as identity-tuples for its own no-delta diff; this header
   // must count the SAME set as `attentionLines` above so the header and the
-  // rendered rows never disagree (:971-974's invariant). The two predicates
+  // rendered rows never disagree (the invariant at
+  // `tests/unit/flight-companion-turn-route.test.js:982-984`). The two predicates
   // can differ in both directions: a row with an id but no `lane`/`stage`
   // renders here (counted in the header) but is excluded from the gate's own
   // `attentionCount`; conversely a falsy-but-present `loopId` (e.g. `''`) is
@@ -193,7 +195,8 @@ export function buildCensusSeedText(currentCensusDoc) {
   // is compared only against this route's own rows, never against the gate's
   // count. Do NOT "fix" the two numbers back into agreement: doing so either
   // re-admits an unsanitized tuple into the gate's identity diff, or deletes
-  // the tested honest-partial-row rendering at `:968`.
+  // the tested honest-partial-row rendering at
+  // `tests/unit/flight-companion-turn-route.test.js:979`.
   const lines = [
     'CURRENT CENSUS (authoritative — these numbers are ground truth; narrate them, never recompute or restate them differently):',
     laneLines,

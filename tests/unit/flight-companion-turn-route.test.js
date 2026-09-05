@@ -954,8 +954,9 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     // older sweep revision must not take out the whole companion turn.
     //
     // Post-LIN-2661, `buildCompanionSnapshot` itself no longer throws on a
-    // `null`/`undefined` row (lib/flight-companion-gate.js:304) — this route's
-    // own `row.loopId`-present filter is no longer crash defense, since the
+    // `null`/`undefined` row (`isWellFormedAttentionRow`,
+    // lib/flight-companion-gate.js:280) — this route's own
+    // `row.loopId`-present filter is no longer crash defense, since the
     // raw `currentCensusDoc` (including this fixture's `null` row) is now fed
     // to it directly. This test is therefore now the route-side regression
     // guard for the gate's non-throwing (it would fail loudly, not just
