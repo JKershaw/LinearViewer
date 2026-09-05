@@ -1857,13 +1857,12 @@ export function createDashboardRoutes({
       }));
     } catch (error) {
       if (isAuthError(error)) {
-        // No numbers at all on an auth failure — a "Try again" against the
-        // same rejected credential is a dead end, so this page routes to the
-        // re-auth recovery instead.
-        return res.status(401).send(renderUpstreamAwareErrorPage(error, {
-          actionUrl: `/workspace/${workspace.urlKey}/effort-readout`,
-          time: now.toISOString(),
-        }));
+        // No numbers at all on an auth failure. No `actionUrl` is passed on
+        // purpose: `renderUpstreamAwareErrorPage` overrides it to /logout for
+        // the auth category anyway, because a "Try again" against the same
+        // rejected credential is a dead end. Supplying one would read as if
+        // the button came back here.
+        return res.status(401).send(renderUpstreamAwareErrorPage(error, { time: now.toISOString() }));
       }
       console.error('Effort read-out page error:', error);
       res.status(500).send('Failed to compute the effort read-out');
