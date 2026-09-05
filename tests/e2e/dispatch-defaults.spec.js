@@ -113,16 +113,121 @@ test.describe('Dispatch defaults settings', () => {
 
     await page.fill('input[name="defaultModel"]', 'anthropic/claude-opus-4.8');
     await page.selectOption('select[name="defaultHarnessSelect"]', 'opencode');
+    await page.fill('input[name="defaultEffort"]', 'high');
     await page.locator('.dispatch-defaults-submit button[type="submit"]').click();
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('input[name="defaultModel"]')).toHaveValue('anthropic/claude-opus-4.8');
     await expect(page.locator('select[name="defaultHarnessSelect"]')).toHaveValue('opencode');
+    await expect(page.locator('input[name="defaultEffort"]')).toHaveValue('high');
 
     await page.reload();
     await page.waitForLoadState('networkidle');
     await expect(page.locator('input[name="defaultModel"]')).toHaveValue('anthropic/claude-opus-4.8');
     await expect(page.locator('select[name="defaultHarnessSelect"]')).toHaveValue('opencode');
+    await expect(page.locator('input[name="defaultEffort"]')).toHaveValue('high');
+
+    // G2's real proof (LIN-2616): not just that the settings page echoes the
+    // stored value back, but that it RESOLVES into an actual dispatch item —
+    // through S1's widened dispatch-factory.js gate, which is exactly the path
+    // this ticket says G2 is inert without. Post a dispatch with explicit
+    // model/harness (both already set above) and NO effort, then confirm the
+    // created item's effort came from the workspace-wide default.
+    await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
+    const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/dispatch`, {
+      data: { prompt: 'G2 resolution witness', promptName: 'G2 witness', model: 'anthropic/claude-opus-4.8', harness: 'opencode' }
+    });
+    expect(createRes.ok()).toBeTruthy();
+
+    const { items } = await (await page.request.get(`/workspace/${localWorkerUrlKey}/api/dispatch`)).json();
+    const created = items.find(i => i.promptName === 'G2 witness');
+    expect(created).toBeDefined();
+    expect(created.effort).toBe('high');
+
+    await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
+  });
+
+  // Acceptance #3 (LIN-2616, the LIN-1747 hazard): a save with no operator
+  // input for a given per-kind row must write NO byKind.effort entry for that
+  // row — never silently promote 18 inherited rows into explicit overrides.
+  // Proven the same way the rest of this spec proves persistence: through the
+  // real POST handler + a real reload, scoping the check to the row a save
+  // actually touched vs. every row it didn't.
+  test('saving one per-kind effort override does not write byKind.effort entries for untouched kinds (LIN-2616, LIN-1747)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
+    const reviewRow = page.locator('[data-testid="dispatch-default-row-review"]');
+    await reviewRow.locator('input.dispatch-effort-input').fill('max');
+    await page.locator('.dispatch-defaults-submit button[type="submit"]').click();
+    await page.waitForLoadState('networkidle');
+
+    // The touched row persisted...
+    await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
+    const savedReviewRow = page.locator('[data-testid="dispatch-default-row-review"]');
+    await expect(savedReviewRow.locator('input.dispatch-effort-input')).toHaveValue('max');
+
+    // ...but every OTHER kind's effort input is still blank — the save did not
+    // fan the single touched row out into explicit overrides for the rest of
+    // DISPATCH_DEFAULT_KINDS (18 kinds total; sampling a few is sufficient,
+    // the hazard this guards is "all of them", which any surviving value
+    // would already prove).
+    for (const kind of ['implementation', 'bug', 'autopilot', 'plan']) {
+      const row = page.locator(`[data-testid="dispatch-default-row-${kind}"]`);
+      await expect(row.locator('input.dispatch-effort-input')).toHaveValue('');
+    }
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
+    const reloadedReviewRow = page.locator('[data-testid="dispatch-default-row-review"]');
+    await expect(reloadedReviewRow.locator('input.dispatch-effort-input')).toHaveValue('max');
+    for (const kind of ['implementation', 'bug', 'autopilot', 'plan']) {
+      const row = page.locator(`[data-testid="dispatch-default-row-${kind}"]`);
+      await expect(row.locator('input.dispatch-effort-input')).toHaveValue('');
+    }
+  });
+
+  // Acceptance #2 (LIN-1694 row-atomic style): a per-kind byKind.effort entry
+  // scoped to one harness must NOT donate when a DIFFERENT harness is in
+  // force for the actual dispatch — proven end-to-end through a real
+  // Settings save + a real dispatch resolution, not just the unit-level
+  // resolveRoutingFromConfig coverage this mirrors.
+  test('a per-kind effort override scoped to another harness does not donate (row-atomic, LIN-2616/LIN-1694)', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('[data-testid="dispatch-kind-overrides-toggle"]').click();
+    const row = page.locator('[data-testid="dispatch-default-row-implementation"]');
+    await row.locator('select.harness-select').selectOption('opencode');
+    await row.locator('input.dispatch-effort-input').fill('xhigh');
+    await page.locator('.dispatch-defaults-submit button[type="submit"]').click();
+    await page.waitForLoadState('networkidle');
+
+    const savedRow = page.locator('[data-testid="dispatch-default-row-implementation"]');
+    await expect(savedRow.locator('select.harness-select')).toHaveValue('opencode');
+    await expect(savedRow.locator('input.dispatch-effort-input')).toHaveValue('xhigh');
+
+    // Dispatch kind:implementation with harness EXPLICITLY claude-code — the
+    // opposite of the byKind row's opencode scoping. Row-atomic: an
+    // ineligible row must be skipped, not donate anyway.
+    await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
+    const createRes = await page.request.post(`/workspace/${localWorkerUrlKey}/api/dispatch`, {
+      data: { prompt: 'row-atomic witness', promptName: 'row-atomic witness', kind: 'implementation', harness: 'claude-code' }
+    });
+    expect(createRes.ok()).toBeTruthy();
+
+    const { items } = await (await page.request.get(`/workspace/${localWorkerUrlKey}/api/dispatch`)).json();
+    const created = items.find(i => i.promptName === 'row-atomic witness');
+    expect(created).toBeDefined();
+    // The opencode-scoped row's 'xhigh' must NOT have donated to this
+    // claude-code-in-force resolution — nothing else donates either (no
+    // workspace-wide effort was set), so the correct resolution is null, not
+    // merely "something other than xhigh".
+    expect(created.effort).toBeNull();
+
+    await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
   });
 
   test('saving a per-prompt-type override persists independently of the workspace-wide default', async ({ page, localWorkerUrlKey }) => {
