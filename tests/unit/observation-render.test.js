@@ -349,15 +349,24 @@ test.describe('boundDecisionOptions — LIN-2195: the option run carries a budge
     //   - it includes lengths that straddle the boundary, which is what kills
     //     the `>` vs `>=` mutant.
     const lengths = [1, 2, 3, 7, 11, 12, 19, 26, 37, 38, 39, 40, 41, 79, 80, 81, 200];
+    // ASCII, an astral (2-unit) char, a 4-unit flag, and an 11-unit ZWJ family.
+    // The budget counts UTF-16 units, so a truncation that counted CODE POINTS
+    // instead rendered an astral label at ~2x the budget — and the two halves
+    // of that bug (surrogate safety, budget arithmetic) were each covered
+    // separately while their intersection was not.
+    const alphabets = ['ascii', '👍', '🇬🇧', '👨‍👩‍👧‍👦'];
     for (const count of [1, 2, 3, 5, 12, 40, 400]) {
       for (const len of lengths) {
-        const options = Array.from({ length: count }, (_, i) => ({ label: `${String.fromCharCode(97 + (i % 26))}`.repeat(len) }));
+        for (const alpha of alphabets) {
+        const unit = i => (alpha === 'ascii' ? String.fromCharCode(97 + (i % 26)) : alpha);
+        const options = Array.from({ length: count }, (_, i) => ({ label: unit(i).repeat(len) }));
         const { labels, overflow } = boundDecisionOptions(options, DECISION_OPTIONS_CHARS);
         const rendered = labels.join(' / ') + (overflow > 0 ? ` +${overflow} more` : '');
         assert.ok(
           rendered.length <= DECISION_OPTIONS_CHARS,
-          `count=${count} len=${len}: rendered ${rendered.length} chars, over the ${DECISION_OPTIONS_CHARS} budget — ${JSON.stringify(rendered)}`
+          `count=${count} len=${len} alphabet=${alpha}: rendered ${rendered.length} UTF-16 units, over the ${DECISION_OPTIONS_CHARS} budget — ${JSON.stringify(rendered)}`
         );
+        }
       }
     }
   });

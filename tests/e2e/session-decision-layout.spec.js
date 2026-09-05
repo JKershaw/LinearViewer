@@ -302,12 +302,23 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
     // actually asks — did bounding the run make the glance surface smaller —
     // and is invariant to whatever font the runner ends up with.
     const { boundedLines, unboundedLines } = await optionsRun.evaluate((el, labels) => {
+      // BOTH strings are measured in the SAME probe, from the SAME origin.
+      // Measuring the live element against a clone appended at the end of the
+      // inline flow compares a run starting at x=37 with one starting at
+      // x=237 — a ~1.5 line-box head start that is an artifact of position,
+      // not of the bound, and it let both assertions pass with the bound
+      // disabled. The probe stays INLINE inside a block wrapper: getClientRects
+      // on a block returns one border-box rect, not per-line fragments.
+      const wrap = document.createElement('div');
       const probe = el.cloneNode(false);
+      wrap.appendChild(probe);
+      el.parentNode.parentNode.appendChild(wrap);
+      probe.textContent = el.textContent;
+      const bounded = probe.getClientRects().length;
       probe.textContent = `[${labels.join(' / ')}]`;
-      el.parentNode.appendChild(probe);
       const unbounded = probe.getClientRects().length;
-      probe.remove();
-      return { boundedLines: el.getClientRects().length, unboundedLines: unbounded };
+      wrap.remove();
+      return { boundedLines: bounded, unboundedLines: unbounded };
     }, DECISION_PAYLOAD.options.map(o => o.label));
 
     expect(unboundedLines).toBeGreaterThan(1); // the fixture must actually overflow, or this proves nothing

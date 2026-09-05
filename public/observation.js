@@ -377,12 +377,22 @@ function boundDecisionOptions(options, maxChars) {
       const cost = label.length + (labels.length ? 3 : 0);
       if (labels.length && used + cost > budget) break;
       if (!labels.length && cost > budget) {
-        // Nothing to fall back to. `Array.from` rather than `slice` so a
-        // truncation never splits a UTF-16 surrogate pair and paints a lone
-        // half as U+FFFD — emoji in an option label are not exotic. One
-        // character is left for the ellipsis so the result stays INSIDE the
-        // budget rather than at budget + 1.
-        labels.push(`${Array.from(label).slice(0, Math.max(1, budget - 1)).join('').trimEnd()}…`);
+        // Nothing to fall back to, so truncate — walking CODE POINTS but
+        // counting UTF-16 UNITS. Both halves matter and an earlier version had
+        // only one: iterating code points stops a truncation splitting a
+        // surrogate pair (a lone half paints as U+FFFD, and emoji in an option
+        // label are not exotic), but every budget comparison in this function
+        // is in UTF-16 units, so slicing by code-point COUNT let an astral
+        // label render at roughly twice the budget — measured at 143 chars for
+        // an 80-char budget, which reproduced the very card growth this
+        // function exists to prevent. One unit is reserved for the ellipsis so
+        // the result stays INSIDE the budget rather than at budget + 1.
+        let kept = '';
+        for (const ch of label) {
+          if (kept.length + ch.length > budget - 1) break;
+          kept += ch;
+        }
+        labels.push(`${kept.trimEnd()}…`);
         used = budget;
         break;
       }
