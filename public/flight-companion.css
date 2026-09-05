@@ -190,3 +190,90 @@
 .fc-proposal--resolved .fc-proposal-actions {
   display: none;
 }
+
+/* ── The phone shape (Shape B, LIN-2632 beat 4) ───────────────────────────
+ *
+ * LIN-1412 D2 gives every chat that owns its route Shape B: full-height
+ * thread, composer anchored to the viewport, keyboard-safe. Flight Companion
+ * was excluded from that audit because it wasn't a chat yet; it is now the
+ * chat John uses most, and today it is Shape A by accident — chat.css's
+ * `--chat-thread-max-height` default (40vh) is left uncontested here, so the
+ * thread sits as a small box inside an otherwise ordinary scrolling page.
+ *
+ * This is that override, on the SAME breakpoint chat.css already establishes
+ * (`@media (max-width: 600px)`, public/chat.css:140) rather than a new one.
+ *
+ * Mechanism: `.flight-companion-chat-section` becomes a flex column,
+ * `position: sticky; top: 0;`, one viewport tall (`height: 100dvh`). It sits
+ * below the page's own nav/header in normal flow (this page has no bespoke
+ * chrome removal), so `height: 100dvh` alone is not enough — measured: with
+ * only `height`, the composer's bottom edge lands PAST the viewport's own
+ * bottom by exactly the header's height, the opposite of "anchored". Sticky
+ * fixes that without a magic `calc()` tied to the header's current height
+ * (which the CSS here has no reliable way to know, and which itself changes
+ * with content): scrolling the page by that same header height brings the
+ * section's top to the viewport's own top, where it sticks — at that point
+ * the section's `100dvh` height exactly fills the viewport, so its LAST
+ * child (the composer) sits flush with the viewport's bottom edge for free.
+ * Scrolling further releases it (there is nothing left of the section above
+ * the fold to keep sticking to), letting the next section slide up — the
+ * same mechanism that makes How-to/Kickoff/Observer reachable below.
+ *
+ * Its direct children are already in exactly the right DOM order for this
+ * (lib/render-flight-companion.js's `chatBody`: the section-header, the
+ * thread, the empty-state placeholder, the check-in status line, then the
+ * composer) — the thread/empty-state pair (only one is ever visible; both
+ * carry `[hidden]` toggled by flight-companion.js) gets `flex: 1`, so
+ * whichever is showing fills the remaining space, while chat.css's own
+ * `overflow-y: auto` on `.chat-thread` does the actual scrolling;
+ * everything else (section-header, check-in line, composer) keeps its
+ * natural height. Nothing here is ever stacked/overlaid, so no new
+ * background is needed — this block declares no color and no animation,
+ * so it is dark-theme- and reduced-motion-safe by construction, not by a
+ * separate override.
+ *
+ * `100dvh` (with a `100vh` fallback for engines that don't support dynamic
+ * viewport units) rather than `100vh` alone: the dynamic unit shrinks with
+ * the browser chrome/software keyboard, which is what keeps the composer
+ * from being pushed off-screen when the keyboard opens — the LIN-751 review
+ * comments' own ask ("LAND the composer visible with the keyboard open").
+ *
+ * This is a per-surface layout built entirely on Flight Companion's OWN
+ * selectors (`.flight-companion-chat-section`, `#flight-companion-thread`,
+ * `.flight-companion-chat-empty`, `#flight-companion-checkin`,
+ * `.fc-chat-composer`) plus the ONE property chat.css already documents as
+ * its per-surface override point for exactly this
+ * (`--chat-thread-max-height`, public/chat.css:2-35). Zero lines of chat.css
+ * itself change, so every other consumer (public/session.*, public/task-
+ * chat.*, public/collective.*) is provably byte-identical — this file never
+ * touches their selectors, and chat.css's own rules are untouched.
+ *
+ * The other three sections (How to use / Kickoff prompt / Latest observer
+ * report) need no rule at all: they already sit below
+ * `.flight-companion-chat-section` in normal document flow, so making that
+ * one section a viewport-tall block is what pushes them below the fold —
+ * reachable by scrolling the page past it, never hidden.
+ */
+@media (max-width: 600px) {
+  .flight-companion-chat-section {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100dvh;
+  }
+  .flight-companion-chat-section > .section-header {
+    flex: 0 0 auto;
+  }
+  #flight-companion-thread,
+  .flight-companion-chat-empty {
+    flex: 1 1 auto;
+    min-height: 0;
+    --chat-thread-max-height: none;
+  }
+  #flight-companion-checkin,
+  .fc-chat-composer {
+    flex: 0 0 auto;
+  }
+}
