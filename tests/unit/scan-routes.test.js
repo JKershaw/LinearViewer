@@ -419,4 +419,74 @@ describe('GET /workspace/:urlKey/api/scan/:issueId — basisChanged (LIN-2241)',
     assert.ok(doc.basisHash, 'a basis digest is recorded at raise time');
     assert.equal(doc.basisVersion, BASIS_VERSION, 'stored beside the hash that produced it');
   });
+
+  // LIN-2649 WS2 (LIN-2665 beat 3): the scan route's sole write path computes
+  // dueBasisHash from the SAME context, in the SAME request, as basisHash —
+  // this is the live end-to-end witness that it actually lands on the row,
+  // driven through the REAL router with NO harbourCommentsStore mounted (see
+  // this file's own module docstring) — the [C-3] null-guard's fail-open path.
+  test('POST records a dueBasisHash alongside basisHash, live, with NO harbourCommentsStore mounted — the [C-3] null-guard fail-open path', async () => {
+    const { BASIS_VERSION } = await import('../../lib/scan-fingerprint.js');
+    const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    const doc = collection._docs.find(d => d._id === posted.body.id);
+
+    assert.ok(doc.dueBasisHash, 'a due-basis digest is recorded at raise time');
+    // LIN-2665 L1: basisVersion and dueBasisVersion are SEPARATE fields — they
+    // are simply both stamped with the current BASIS_VERSION at raise time,
+    // never "shared" as one field (that framing was the L1 defect itself).
+    assert.equal(doc.basisVersion, BASIS_VERSION, 'tier-1 basisVersion stamped at raise time');
+    assert.equal(doc.dueBasisVersion, BASIS_VERSION, 'dueBasisHash gets its own dueBasisVersion, stamped independently at raise time');
+
+    // With no ledger store mounted, recordedCommentIds resolves to an empty
+    // Set — nothing filtered — so dueBasisHash's projection is identical to
+    // basisHash's and the two digests must be byte-equal. This is the
+    // fail-open property made legible: an absent ledger store filters
+    // NOTHING, so a later comparison against a dueBasisHash computed WITH the
+    // ledger present can only ever read as MORE due, never less.
+    assert.equal(doc.dueBasisHash, doc.basisHash);
+  });
+
+  // LIN-2665 L1 (John's ruling, 2026-09-05): the [F-2] terminal-row due-basis
+  // patch stamps a fresh basisVersion beside a frozen (stale-version)
+  // basisHash — this route then reads that pairing as version-comparable and
+  // reports `basisChanged: true`, the cross-version false positive
+  // `basisChanged`'s own docstring calls "the single worst outcome this
+  // signal can produce." A frozen v1 row must read `null` (not comparable)
+  // both before AND after a due-basis-only refresh.
+  test('a terminal row with a frozen v1 basisHash reports basisChanged: null (not true) after the [F-2] due-basis refresh — LIN-2665 L1', async () => {
+    // Raise a real row, then dismiss it, so the next scan of unchanged
+    // content takes the terminal ([F-2]) branch in recordScan.
+    const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    const dismissed = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}/dismiss`, { id: posted.body.id });
+    assert.equal(dismissed.body.outcome, 'dismissed');
+
+    // Simulate a row raised under an OLD projection version: `basisHash` is a
+    // frozen "v1" digest — deliberately NOT equal to what the current
+    // projection computes for this content, standing in for a real
+    // cross-version mismatch — stored beside its own `basisVersion: 1`.
+    // `dueBasisHash: null` forces the [F-2] patch to fire on the next scan
+    // (fresh !== stored).
+    const doc = collection._docs.find(d => d._id === posted.body.id);
+    doc.basisHash = 'frozen-v1-digest-not-equal-to-current-projection';
+    doc.basisVersion = 1;
+    doc.dueBasisHash = null;
+
+    const before = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.equal(before.body.basisChanged, null, 'sanity: the honest pre-refresh row already reads null via the version-mismatch branch');
+
+    // Re-scan unchanged content: the row is terminal, so recordScan takes the
+    // [F-2] branch, which must touch ONLY dueBasisHash (+ its own version),
+    // never tier-1's basisHash/basisVersion pairing.
+    await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.ok(doc.dueBasisHash, 'sanity: the due-basis refresh actually fired');
+    assert.equal(doc.basisHash, 'frozen-v1-digest-not-equal-to-current-projection', 'basisHash must stay frozen — tier-1 invariant');
+
+    const after = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.equal(after.body.basisChanged, null, 'LIN-2665 L1: a frozen v1 basisHash must never read as a current-version match after a due-basis-only refresh');
+
+    // The whole terminal-row contract, not just the one field.
+    assert.equal(after.body.outcome, 'dismissed');
+    assert.equal(after.body.outcomeAt, dismissed.body.outcomeAt);
+    assert.deepEqual(after.body.decision, dismissed.body.decision);
+  });
 });

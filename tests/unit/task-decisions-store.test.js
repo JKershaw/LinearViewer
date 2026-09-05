@@ -831,3 +831,211 @@ describe('TaskDecisionsStore basisHash (LIN-2241 tier 1)', () => {
     assert.equal(collection._docs[0]._id, TaskDecisionsStore.buildId(ISSUE_ID, HASH_A));
   });
 });
+
+describe('TaskDecisionsStore recordScan — dueBasisHash (LIN-2649 WS2)', () => {
+  let collection, store;
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  test('a supplied dueBasisHash round-trips through recordScan and getStatus, alongside the unaffected basisHash', async () => {
+    await store.recordScan({
+      urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A,
+      basisHash: 'basis-abc', basisVersion: 7, dueBasisHash: 'due-abc', dueBasisVersion: 3, decision: sampleDecision()
+    });
+    const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
+    assert.equal(status.dueBasisHash, 'due-abc');
+    // LIN-2665 L1 mutation witness (beat 4): a bare `dueBasisVersion` param
+    // with no assertion on it left the insert path's own persistence
+    // unverified — mutating it to always store null stayed GREEN. Asserted
+    // here, and deliberately a DIFFERENT value from basisVersion (3 vs 7) so
+    // the two fields can't be silently conflated back into one.
+    assert.equal(status.dueBasisVersion, 3);
+    assert.equal(status.basisHash, 'basis-abc');
+    assert.equal(status.basisVersion, 7);
+  });
+
+  test('an omitted dueBasisHash persists as null — UNKNOWN, never a stand-in value; no other recordScan caller changes', async () => {
+    await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, basisHash: 'basis-abc', decision: sampleDecision() });
+    const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
+    assert.equal(status.dueBasisHash, null);
+    assert.equal(status.basisHash, 'basis-abc'); // unaffected — backward-compatible
+  });
+
+  test('a legacy row with no dueBasisHash field at all reads as null, not undefined', async () => {
+    collection._docs.push({
+      _id: TaskDecisionsStore.buildId(ISSUE_ID, HASH_A),
+      urlKey: 'ws-a', issueId: ISSUE_ID, issueIdentifier: 'LIN-1',
+      inputHash: HASH_A, decision: sampleDecision(), scannedAt: new Date(), seq: 0,
+      outcome: null, outcomeAt: null
+    });
+    const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
+    assert.equal(status.dueBasisHash, null);
+  });
+});
+
+describe('TaskDecisionsStore recordScan — [F-2] terminal-row due-basis patch (LIN-2649 WS2)', () => {
+  let collection, store;
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  async function terminalRow({ dueBasisHash = null } = {}) {
+    await store.recordScan({
+      urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A,
+      basisHash: 'basis-frozen', basisVersion: 5, dueBasisHash, decision: sampleDecision()
+    });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    const stamped = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'dismissed' });
+    return { id, stamped };
+  }
+
+  // LIN-2665 L1: this test used to assert that the terminal-row patch moved
+  // `basisVersion` to the fresh value passed in — that assertion encoded the
+  // L1 defect itself (a due-basis-only refresh stamping tier-1's version
+  // field, making a frozen stale-version basisHash misread as
+  // current-version-comparable). It is rewritten here to assert the fixed
+  // contract: the patch touches dueBasisHash + its OWN dueBasisVersion field,
+  // and tier-1's basisHash/basisVersion pairing is untouched, not just
+  // basisHash alone.
+  test('scanning a terminal row with unchanged content patches dueBasisHash/dueBasisVersion and leaves outcome/outcomeAt/decision/basisHash/basisVersion byte-identical', async () => {
+    const { stamped } = await terminalRow({ dueBasisHash: null });
+
+    const patched = await store.recordScan({
+      urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A,
+      basisHash: 'basis-DIFFERENT-should-be-ignored', basisVersion: 99,
+      dueBasisHash: 'due-fresh', dueBasisVersion: 7, decision: sampleDecision({ question: 'a different question, also ignored' })
+    });
+
+    // Changed: exactly dueBasisHash + dueBasisVersion.
+    assert.equal(patched.dueBasisHash, 'due-fresh');
+    assert.equal(patched.dueBasisVersion, 7);
+
+    // Preserved byte-identical: outcome/outcomeAt/decision/basisHash/basisVersion —
+    // the terminal-row invariant holds by field list, not by convention, and
+    // tier-1's OWN version field must never move on a due-basis-only refresh
+    // (LIN-2665 L1 — the whole point of giving dueBasisHash its own version).
+    assert.equal(patched.outcome, stamped.outcome);
+    assert.equal(patched.outcomeAt, stamped.outcomeAt);
+    assert.deepEqual(patched.decision, stamped.decision);
+    assert.equal(patched.basisHash, stamped.basisHash);
+    assert.equal(patched.basisHash, 'basis-frozen'); // never the "DIFFERENT" value passed in
+    assert.equal(patched.basisVersion, stamped.basisVersion);
+    assert.equal(patched.basisVersion, 5); // never the 99 passed in — tier-1's version stays frozen
+
+    // The $set field list on the underlying write was exactly {dueBasisHash, dueBasisVersion}.
+    const doc = collection._docs.find(d => d._id === TaskDecisionsStore.buildId(ISSUE_ID, HASH_A));
+    assert.equal(doc.outcome, 'dismissed');
+    assert.equal(doc.decision.question, sampleDecision().question);
+    assert.equal(doc.basisHash, 'basis-frozen');
+    assert.equal(doc.basisVersion, 5);
+
+    // Confirmed via getStatus too — not just the return value.
+    const status = await store.getStatus(URL_KEY, ISSUE_ID, HASH_A);
+    assert.equal(status.dueBasisHash, 'due-fresh');
+    assert.equal(status.dueBasisVersion, 7);
+    assert.equal(status.basisVersion, 5);
+    assert.equal(status.outcome, 'dismissed');
+  });
+
+  test('re-scanning a terminal row with the SAME dueBasisHash is a no-op — no spurious write', async () => {
+    const { stamped } = await terminalRow({ dueBasisHash: 'due-same' });
+
+    const result = await store.recordScan({
+      urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A,
+      dueBasisHash: 'due-same', decision: sampleDecision()
+    });
+    assert.equal(result.dueBasisHash, 'due-same');
+    assert.equal(result.basisVersion, stamped.basisVersion); // untouched, not overwritten with undefined/null
+  });
+
+  test('re-scanning a terminal row with NO dueBasisHash supplied leaves the stored one untouched', async () => {
+    await terminalRow({ dueBasisHash: 'due-existing' });
+
+    const result = await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    assert.equal(result.dueBasisHash, 'due-existing');
+  });
+});
+
+describe('TaskDecisionsStore.listCandidatesForWorkspace (LIN-2649 WS2)', () => {
+  let collection, store;
+  const ID_A = '11111111-1111-1111-1111-111111111111';
+  const ID_B = '22222222-2222-2222-2222-222222222222';
+  const ID_C = '33333333-3333-3333-3333-333333333333';
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  test('due list only contains issueIds with a prior row — never-scanned C is absent by construction', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ID_A, inputHash: HASH_A, decision: sampleDecision() });
+    await store.recordScan({ urlKey: URL_KEY, issueId: ID_B, inputHash: HASH_A, decision: sampleDecision() });
+    // ID_C is deliberately never scanned.
+
+    const page = await store.listCandidatesForWorkspace(URL_KEY, {});
+    const issueIds = page.items.map(r => r.issueId).sort();
+    assert.deepEqual(issueIds, [ID_A, ID_B].sort());
+    assert.ok(!issueIds.includes(ID_C));
+    assert.equal(page.totalCandidateCount, 2);
+  });
+
+  test('only the latest row per issueId is returned when a task has multiple scan rows', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ID_A, inputHash: HASH_A, dueBasisHash: 'old', decision: sampleDecision() });
+    await store.recordScan({ urlKey: URL_KEY, issueId: ID_A, inputHash: HASH_B, dueBasisHash: 'new', decision: sampleDecision() });
+
+    const page = await store.listCandidatesForWorkspace(URL_KEY, {});
+    assert.equal(page.items.length, 1);
+    assert.equal(page.items[0].dueBasisHash, 'new');
+    assert.equal(page.totalCandidateCount, 1);
+  });
+
+  test('a workspace with no scanned tasks returns an empty page, not an error', async () => {
+    const page = await store.listCandidatesForWorkspace(URL_KEY, {});
+    assert.deepEqual(page.items, []);
+    assert.equal(page.nextCursor, null);
+    assert.equal(page.totalCandidateCount, 0);
+  });
+
+  test('pagination: nextCursor/hasMore across a page boundary, no overlap, no gap, and totalCandidateCount counts the whole population', async () => {
+    // Three distinct-issueId rows, each with a distinct scannedAt so ordering
+    // is deterministic without relying on real-clock timing.
+    collection._docs.push(
+      { _id: 's1', urlKey: URL_KEY, issueId: ID_A, issueIdentifier: 'LIN-1', inputHash: HASH_A, decision: sampleDecision(), scannedAt: new Date('2026-01-01T00:00:00.000Z'), seq: 0, outcome: null, outcomeAt: null },
+      { _id: 's2', urlKey: URL_KEY, issueId: ID_B, issueIdentifier: 'LIN-2', inputHash: HASH_A, decision: sampleDecision(), scannedAt: new Date('2026-01-02T00:00:00.000Z'), seq: 0, outcome: null, outcomeAt: null },
+      { _id: 's3', urlKey: URL_KEY, issueId: ID_C, issueIdentifier: 'LIN-3', inputHash: HASH_A, decision: sampleDecision(), scannedAt: new Date('2026-01-03T00:00:00.000Z'), seq: 0, outcome: null, outcomeAt: null }
+    );
+
+    const page1 = await store.listCandidatesForWorkspace(URL_KEY, { limit: 2 });
+    assert.deepEqual(page1.items.map(r => r.issueId), [ID_A, ID_B]);
+    assert.ok(page1.nextCursor);
+    assert.equal(page1.totalCandidateCount, 3);
+
+    const page2 = await store.listCandidatesForWorkspace(URL_KEY, { limit: 2, cursor: page1.nextCursor });
+    assert.deepEqual(page2.items.map(r => r.issueId), [ID_C]);
+    assert.equal(page2.nextCursor, null); // last page
+    assert.equal(page2.totalCandidateCount, 3);
+
+    // No overlap, no gap across the two pages.
+    const allIssueIds = [...page1.items, ...page2.items].map(r => r.issueId);
+    assert.deepEqual(allIssueIds, [ID_A, ID_B, ID_C]);
+  });
+
+  test('ordering is (scannedAt asc, issueId asc)', async () => {
+    collection._docs.push(
+      { _id: 's1', urlKey: URL_KEY, issueId: ID_C, issueIdentifier: 'LIN-3', inputHash: HASH_A, decision: sampleDecision(), scannedAt: new Date('2026-01-01T00:00:00.000Z'), seq: 0, outcome: null, outcomeAt: null },
+      { _id: 's2', urlKey: URL_KEY, issueId: ID_A, issueIdentifier: 'LIN-1', inputHash: HASH_A, decision: sampleDecision(), scannedAt: new Date('2026-01-01T00:00:00.000Z'), seq: 0, outcome: null, outcomeAt: null }
+    );
+    // Same scannedAt — tie-break is issueId ascending.
+    const page = await store.listCandidatesForWorkspace(URL_KEY, {});
+    assert.deepEqual(page.items.map(r => r.issueId), [ID_A, ID_C]);
+  });
+
+  test('a different workspace\'s rows never appear', async () => {
+    await store.recordScan({ urlKey: 'other-ws', issueId: ID_A, inputHash: HASH_A, decision: sampleDecision() });
+    const page = await store.listCandidatesForWorkspace(URL_KEY, {});
+    assert.deepEqual(page.items, []);
+  });
+});

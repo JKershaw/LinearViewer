@@ -22,6 +22,9 @@ import {
   scanBasisHashFromContext,
   scanBasisFromContext,
   basisChanged,
+  dueBasisFromContext,
+  dueBasisHashFromContext,
+  dueChanged,
   BASIS_VERSION
 } from '../../lib/scan-fingerprint.js';
 import { hashContext } from '../../lib/recap-cache.js';
@@ -383,5 +386,148 @@ describe('F1 — commentId is invisible to hashContext/snapshotFromContext, visi
       { commentId: 'lin-c-2', body: 'Second comment', createdAt: '2026-09-02T09:00:00.000Z', user: 'Jane' }
     ]);
     assert.notStrictEqual(scanBasisHashFromContext(a), scanBasisHashFromContext(b));
+  });
+});
+
+/**
+ * LIN-2649 WS2 (LIN-2665 beat 1) — the due-basis fingerprint.
+ *
+ * `dueBasisFromContext`/`dueBasisHashFromContext` are the identical projection
+ * to their tier-1 siblings above, with exactly one addition: a comment whose
+ * resolved id is in the WS1 ledger's `recordedCommentIds` set is dropped
+ * before the digest is built. `dueChanged` is the tri-state comparison over
+ * the resulting hash, byte-parallel to `basisChanged`.
+ */
+describe('dueBasisFromContext / dueBasisHashFromContext — the ledger-filtered sibling', () => {
+  test('a comment whose id is in recordedCommentIds is excluded from the due-basis, and from the digest', () => {
+    const withBoth = makeContext({
+      comments: [
+        { id: 'c1', body: 'First comment', createdAt: '2026-09-01T09:00:00.000Z' },
+        { id: 'harbour-1', body: 'Closing this out — no action needed.', createdAt: '2026-09-05T09:00:00.000Z' }
+      ]
+    });
+
+    const basis = dueBasisFromContext(withBoth, { recordedCommentIds: new Set(['harbour-1']) });
+    assert.deepStrictEqual(basis.comments.map(c => c.id), ['c1']);
+
+    // Filtering the ledgered comment out and physically deleting it must be
+    // indistinguishable to the digest — that equivalence is what dueBasisHash
+    // actually depends on.
+    const withoutHarbourComment = makeContext({
+      comments: [{ id: 'c1', body: 'First comment', createdAt: '2026-09-01T09:00:00.000Z' }]
+    });
+    assert.strictEqual(
+      dueBasisHashFromContext(withBoth, { recordedCommentIds: new Set(['harbour-1']) }),
+      dueBasisHashFromContext(withoutHarbourComment, {})
+    );
+  });
+
+  test('an empty/absent recordedCommentIds set filters nothing — the fail-open direction', () => {
+    const ctx = makeContext();
+    assert.strictEqual(dueBasisHashFromContext(ctx), scanBasisHashFromContext(ctx));
+    assert.strictEqual(dueBasisHashFromContext(ctx, { recordedCommentIds: new Set() }), scanBasisHashFromContext(ctx));
+  });
+
+  test('dueBasisFromContext never reads context.focusedChild.comments[] — the F3 non-goal, pinned', () => {
+    // grep -n focusedChild lib/scan-fingerprint.js must return nothing; this
+    // pins the observable behaviour rather than the source text. Linear's
+    // fetchFocusedChild projects comments with no id, so a reader of
+    // focusedChild.comments[].id would silently get undefined for every entry.
+    const ctx = makeContext();
+    const withFocusedChild = {
+      ...ctx,
+      focusedChild: { comments: [{ body: 'focused-child noise', createdAt: '2099-01-01T00:00:00.000Z' }] }
+    };
+    assert.strictEqual(dueBasisHashFromContext(withFocusedChild), dueBasisHashFromContext(ctx));
+  });
+
+  test('the version is folded into the due-basis digest too, sharing BASIS_VERSION with the tier-1 slice', () => {
+    const basis = dueBasisFromContext(makeContext());
+    assert.strictEqual(basis.v, BASIS_VERSION);
+  });
+});
+
+describe('dueChanged — the tri-state (LIN-2649 WS2 required tests)', () => {
+  // A representative "already scanned" context carrying one genuine comment
+  // (c1) and one Harbour-authored close-out comment (harbour-1) already in
+  // the WS1 ledger at raise time.
+  const raisedContext = () => makeContext({
+    comments: [
+      { id: 'c1', body: 'First comment', createdAt: '2026-09-01T09:00:00.000Z' },
+      { id: 'harbour-1', body: 'Closing this out — no action needed.', createdAt: '2026-09-05T09:00:00.000Z' }
+    ]
+  });
+  const recorded = () => new Set(['harbour-1']);
+  const raisedDueBasisHash = () => dueBasisHashFromContext(raisedContext(), { recordedCommentIds: recorded() });
+
+  test('Harbour-comment-only change (since raise) → not-due (false)', () => {
+    // Nothing about the live context has moved relative to what was raised —
+    // same genuine comment, same ledgered Harbour comment, present again.
+    const currentDueBasisHash = dueBasisHashFromContext(raisedContext(), { recordedCommentIds: recorded() });
+    assert.strictEqual(
+      dueChanged({ raisedDueBasisHash: raisedDueBasisHash(), raisedDueBasisVersion: BASIS_VERSION, currentDueBasisHash }),
+      false
+    );
+  });
+
+  test('a genuine new (non-ledger) comment → due (true)', () => {
+    const live = makeContext({
+      comments: [
+        { id: 'c1', body: 'First comment', createdAt: '2026-09-01T09:00:00.000Z' },
+        { id: 'harbour-1', body: 'Closing this out — no action needed.', createdAt: '2026-09-05T09:00:00.000Z' },
+        { id: 'c2', body: 'John: actually, reopen this.', createdAt: '2026-09-06T09:00:00.000Z' }
+      ]
+    });
+    const currentDueBasisHash = dueBasisHashFromContext(live, { recordedCommentIds: recorded() });
+    assert.strictEqual(
+      dueChanged({ raisedDueBasisHash: raisedDueBasisHash(), raisedDueBasisVersion: BASIS_VERSION, currentDueBasisHash }),
+      true
+    );
+  });
+
+  test('a description edit → due (true)', () => {
+    const live = makeContext({
+      issue: { description: 'Rewritten since the scan.' },
+      comments: [
+        { id: 'c1', body: 'First comment', createdAt: '2026-09-01T09:00:00.000Z' },
+        { id: 'harbour-1', body: 'Closing this out — no action needed.', createdAt: '2026-09-05T09:00:00.000Z' }
+      ]
+    });
+    const currentDueBasisHash = dueBasisHashFromContext(live, { recordedCommentIds: recorded() });
+    assert.strictEqual(
+      dueChanged({ raisedDueBasisHash: raisedDueBasisHash(), raisedDueBasisVersion: BASIS_VERSION, currentDueBasisHash }),
+      true
+    );
+  });
+
+  test('a subtask edit → due (true)', () => {
+    const live = makeContext({
+      comments: [
+        { id: 'c1', body: 'First comment', createdAt: '2026-09-01T09:00:00.000Z' },
+        { id: 'harbour-1', body: 'Closing this out — no action needed.', createdAt: '2026-09-05T09:00:00.000Z' }
+      ],
+      children: [{ id: 'k1', identifier: 'LIN-2242', title: 'Child', state: { name: 'Done', type: 'completed' }, labels: [] }]
+    });
+    const currentDueBasisHash = dueBasisHashFromContext(live, { recordedCommentIds: recorded() });
+    assert.strictEqual(
+      dueChanged({ raisedDueBasisHash: raisedDueBasisHash(), raisedDueBasisVersion: BASIS_VERSION, currentDueBasisHash }),
+      true
+    );
+  });
+
+  test('a pre-WS2 row with no recorded dueBasisHash is UNKNOWN (null), never false', () => {
+    const result = dueChanged({ raisedDueBasisHash: null, raisedDueBasisVersion: BASIS_VERSION, currentDueBasisHash: 'bbb' });
+    assert.strictEqual(result, null);
+    assert.notStrictEqual(result, false);
+  });
+
+  test('a hash raised under a stale BASIS_VERSION is UNKNOWN (null), never false — the literal day-one state of every pre-WS2 row', () => {
+    const result = dueChanged({ raisedDueBasisHash: 'aaa', raisedDueBasisVersion: BASIS_VERSION - 1, currentDueBasisHash: 'aaa' });
+    assert.strictEqual(result, null);
+    assert.notStrictEqual(result, false);
+  });
+
+  test('called with nothing at all → unknown, never a throw', () => {
+    assert.strictEqual(dueChanged(), null);
   });
 });
