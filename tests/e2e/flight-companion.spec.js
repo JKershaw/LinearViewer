@@ -176,15 +176,24 @@ test.describe('Flight Companion Page (experimental)', () => {
     // LIN-2632 beat 4 — the phone shape (Shape B, LIN-1412 D2). Below 600px
     // (public/flight-companion.css, the same @media (max-width: 600px)
     // breakpoint public/chat.css already establishes) `.flight-companion-
-    // chat-section` becomes a `position: sticky; top: 0; height: 100dvh;`
+    // chat-section` becomes an ordinary (non-positioned) `height: 100dvh;`
     // flex column: the thread/empty-state pair (chat.css's
     // `--chat-thread-max-height` overridden to `none`, `flex: 1`) fills the
     // remaining space, and the composer — simply the last flex child — ends
     // up flush with the viewport's own bottom edge once the section is
-    // scrolled to (stickiness is what lets a fixed-height section pin to the
-    // viewport despite starting below the page's own nav/header, which this
-    // page does not otherwise touch). Was Shape A by accident before this
-    // beat: `.chat-thread` sat at chat.css's 40vh default (337.6px at this
+    // scrolled into view. An earlier revision made the section
+    // `position: sticky; top: 0` to close that same gap; the independent
+    // review on PR #1401 (finding F2) found that this section is the first
+    // of four siblings sharing one container, so sticky's containing block
+    // for release purposes was that whole container — it stayed pinned
+    // across nearly the entire page scroll, overlaying How-to/Kickoff/
+    // Observer below and intercepting clicks meant for them. No `position`
+    // is needed at all: the page's own shared `.nav-bar` (public/style.css)
+    // is already `position: sticky; top: 0`, and scrolling the section into
+    // view naturally lands the composer flush with the viewport bottom, with
+    // the nav's own sticky band overlapping only the section's own top edge
+    // — never anything below it. Was Shape A by accident before this beat:
+    // `.chat-thread` sat at chat.css's 40vh default (337.6px at this
     // viewport) inside an ordinary scrolling page.
     test.describe('Mobile viewport (390x844) — the phone shape (Shape B)', () => {
       // Scoped to only this test via test.use inside its own nested describe
@@ -214,62 +223,84 @@ test.describe('Flight Companion Page (experimental)', () => {
         expect(scrollHeight).toBeGreaterThan(clientHeight);
       });
 
-      test('the composer stays pinned to the viewport bottom across a whole range of scroll positions, not just one exact alignment, and survives a viewport shrink (keyboard-open proxy)', async ({ page }) => {
+      test('the composer is genuinely reachable (visible AND clickable) once scrolled into view, and stays that way through a viewport shrink (keyboard-open proxy)', async ({ page }) => {
         await mockTurn(page, { token: 'ack' });
         await page.locator('#flight-companion-question').fill('are you there?');
         await page.locator('#flight-companion-send').click();
         await expect(page.locator('.fc-msg-who')).toHaveClass(/status-pill--done/);
 
-        // Scroll by an ARBITRARY amount past the header — not
-        // scrollIntoViewIfNeeded's precise top-alignment, which would land
-        // the composer in the same place whether or not the section is
-        // actually sticky (a single top-aligned scroll always makes an
-        // exactly-one-viewport-tall element fill the viewport, sticky or
-        // not). `position: sticky` is what a real one-finger swipe needs:
-        // ANY scroll position past the header pins the section to the
-        // viewport top for the rest of its own height, so the composer ends
-        // up flush with the viewport bottom regardless of exactly how far
-        // the user scrolled — not just at one precise stopping point.
-        await page.mouse.wheel(0, 350);
-        await page.waitForTimeout(50);
+        // Scroll the composer into view the way a user reaching for the
+        // input (or focusing it) naturally would. LIN-2632 review F2:
+        // an earlier revision relied on `position: sticky` so that ANY
+        // scroll position past the header pinned the section to the
+        // viewport top — but that same mechanism pinned the section over
+        // the ENTIRE rest of the page too (see the "Below the fold" describe
+        // below), since its containing block was the shared parent of all
+        // four page sections, not its own box. The fix drops the extra
+        // "pinned across an arbitrary scroll range" claim entirely: the
+        // composer only needs to be visible+clickable once scrolled to,
+        // which needs no `position` at all (see public/flight-companion.css).
+        await page.locator('#flight-companion-send').scrollIntoViewIfNeeded();
         await expect(page.locator('#flight-companion-send')).toBeInViewport();
-
-        // A different, larger arbitrary scroll — still within the sticky
-        // section's own height, so it must still be pinned.
-        await page.mouse.wheel(0, 200);
-        await page.waitForTimeout(50);
-        await expect(page.locator('#flight-companion-send')).toBeInViewport();
+        // A real click, not just geometric intersection — `toBeInViewport()`
+        // alone is true of an element hidden under an opaque overlay too,
+        // which is exactly how F2's regression escaped the old assertion.
+        await page.locator('#flight-companion-send').click({ trial: true, timeout: 2000 });
 
         // Playwright cannot drive a real OS software keyboard, so a viewport
         // shrink is the closest faithful proxy for "the keyboard opened,
         // shrinking the visual viewport" — exactly the case `100dvh` (vs.
-        // `100vh`) exists to handle. Before beat 4 this had no meaning: a
-        // 40vh-capped thread inside an ordinary page never needed to react
-        // to viewport height at all.
+        // `100vh`) exists to handle.
         await page.setViewportSize({ width: 390, height: 500 });
         await expect(page.locator('#flight-companion-send')).toBeInViewport();
+        await page.locator('#flight-companion-send').click({ trial: true, timeout: 2000 });
       });
     });
 
     test.describe('Below the fold on a phone viewport (LIN-2632 beat 4)', () => {
       test.use({ viewport: { width: 390, height: 844 } });
 
-      test('How to use / Kickoff prompt / Latest observer report — and the copy-prompt controls — are reachable by scrolling past the sticky chat section', async ({ page }) => {
+      test('How to use / Kickoff prompt / Latest observer report — and the copy-prompt controls — are genuinely clickable after scrolling past the chat section, not merely geometrically in the viewport', async ({ page }) => {
         const howTo = page.locator('.flight-companion-page .section-header', { hasText: 'How to use' });
         const copyBtn = page.locator('#flight-companion-copy');
         const observer = page.locator('.flight-companion-page .section-header', { hasText: 'Latest observer report' });
 
-        // Not reachable without scrolling past the sticky, viewport-tall
-        // chat section — proves they genuinely fold below, not merely
+        // Not reachable without scrolling past the one-viewport-tall chat
+        // section — proves they genuinely fold below, not merely
         // "elsewhere on an unaffected page".
         await expect(howTo).not.toBeInViewport();
 
-        await howTo.scrollIntoViewIfNeeded();
-        await expect(howTo).toBeInViewport();
-        await copyBtn.scrollIntoViewIfNeeded();
-        await expect(copyBtn).toBeInViewport();
-        await observer.scrollIntoViewIfNeeded();
-        await expect(observer).toBeInViewport();
+        // LIN-2632 review F2: `toBeInViewport()` alone is a pure geometry
+        // check — true of an element completely covered by an opaque
+        // overlay. The sticky chat section (before this fix) satisfied
+        // exactly that assertion while a real click on the same locator
+        // timed out, because `.flight-companion-chat-section`'s subtree
+        // intercepted the pointer event (its own DOM comment claimed
+        // scrolling past it released the section; measurement showed
+        // otherwise — the containing block for a sticky release is the
+        // shared parent of all four sections, not the section's own box).
+        // `click({ trial: true })` performs every real-click actionability
+        // step (scroll into view, wait, hit-test the target point) without
+        // dispatching the event, so it only resolves if the browser would
+        // actually deliver the click here — the assertion review named as
+        // the fix.
+        await copyBtn.click({ trial: true, timeout: 2000 });
+        // elementFromPoint identity is the same claim from the other
+        // direction: the point at the control's own centre must resolve to
+        // the control itself (or a descendant), never to something stacked
+        // on top of it — this is the literal browser API the independent
+        // review used to reproduce F2. Checked immediately after the trial
+        // click above (which scrolled the button into view) rather than
+        // after the other two below, which scroll the page elsewhere first.
+        const copyIsHit = await copyBtn.evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return hit === el || el.contains(hit);
+        });
+        expect(copyIsHit).toBe(true);
+
+        await observer.click({ trial: true, timeout: 2000 });
+        await howTo.click({ trial: true, timeout: 2000 });
       });
     });
   });
@@ -284,7 +315,7 @@ test.describe('Flight Companion Page (experimental)', () => {
   test.describe('The phone shape under dark theme + reduced motion (LIN-2632 beat 4)', () => {
     test.use({ viewport: { width: 390, height: 844 } });
 
-    test('the same Shape B layout holds — thread fill, sticky composer — under dark theme and prefers-reduced-motion', async ({ page }) => {
+    test('the same Shape B layout holds — thread fill, reachable composer — under dark theme and prefers-reduced-motion', async ({ page }) => {
       await page.context().addCookies([{ name: 'theme', value: 'dark', url: 'http://localhost:3001' }]);
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await mockTurn(page);
@@ -307,9 +338,9 @@ test.describe('Flight Companion Page (experimental)', () => {
       expect(clientHeight).toBeGreaterThan(500);
       expect(scrollHeight).toBeGreaterThan(clientHeight);
 
-      await page.mouse.wheel(0, 350);
-      await page.waitForTimeout(50);
+      await page.locator('#flight-companion-send').scrollIntoViewIfNeeded();
       await expect(page.locator('#flight-companion-send')).toBeInViewport();
+      await page.locator('#flight-companion-send').click({ trial: true, timeout: 2000 });
     });
   });
 

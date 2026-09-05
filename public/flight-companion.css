@@ -203,21 +203,33 @@
  * This is that override, on the SAME breakpoint chat.css already establishes
  * (`@media (max-width: 600px)`, public/chat.css:140) rather than a new one.
  *
- * Mechanism: `.flight-companion-chat-section` becomes a flex column,
- * `position: sticky; top: 0;`, one viewport tall (`height: 100dvh`). It sits
- * below the page's own nav/header in normal flow (this page has no bespoke
- * chrome removal), so `height: 100dvh` alone is not enough — measured: with
- * only `height`, the composer's bottom edge lands PAST the viewport's own
- * bottom by exactly the header's height, the opposite of "anchored". Sticky
- * fixes that without a magic `calc()` tied to the header's current height
- * (which the CSS here has no reliable way to know, and which itself changes
- * with content): scrolling the page by that same header height brings the
- * section's top to the viewport's own top, where it sticks — at that point
- * the section's `100dvh` height exactly fills the viewport, so its LAST
- * child (the composer) sits flush with the viewport's bottom edge for free.
- * Scrolling further releases it (there is nothing left of the section above
- * the fold to keep sticking to), letting the next section slide up — the
- * same mechanism that makes How-to/Kickoff/Observer reachable below.
+ * Mechanism: `.flight-companion-chat-section` becomes a flex column, one
+ * viewport tall (`height: 100dvh`), in ORDINARY document flow — no
+ * `position` of its own. An earlier revision made it `position: sticky; top:
+ * 0` to land the composer flush with the viewport's bottom edge without a
+ * magic `calc()` tied to the page header's height. That backfired (LIN-2632
+ * review finding F2): this section is the first of four siblings
+ * inside one shared container (`<main class="flight-companion-page">`), and
+ * `position: sticky`'s containing block for release purposes is that WHOLE
+ * container, not the section's own box — so it stayed pinned across nearly
+ * the entire page scroll, painting itself over How-to/Kickoff/Observer and
+ * intercepting pointer events meant for them (measured: `elementFromPoint`
+ * over the copy-prompt button resolved to the chat thread, and a real
+ * Playwright `click({trial: true})` on it timed out).
+ *
+ * No `position` is needed at all, because the page's own shared header
+ * (`.nav-bar`, public/style.css) is ALREADY `position: sticky; top: 0` and
+ * stays visually pinned across the whole page regardless of this section —
+ * that is what closes the header-height gap for free: scrolling the section
+ * into view (e.g. `scrollIntoViewIfNeeded`, or a user's own swipe) naturally
+ * lands its bottom — the composer, its last child — flush with the
+ * viewport's bottom edge, with the nav's own sticky band overlapping only
+ * the section's OWN top edge (its "Chat" heading), never anything below it.
+ * Scrolling further moves the section (now just an ordinary block) out of
+ * view like any other content, letting the next section slide up in normal
+ * flow — the same mechanism that makes How-to/Kickoff/Observer reachable
+ * below, but now genuinely reachable rather than merely geometrically
+ * "in viewport" underneath an opaque overlay.
  *
  * Its direct children are already in exactly the right DOM order for this
  * (lib/render-flight-companion.js's `chatBody`: the section-header, the
@@ -258,8 +270,6 @@
   .flight-companion-chat-section {
     display: flex;
     flex-direction: column;
-    position: sticky;
-    top: 0;
     height: 100vh;
     height: 100dvh;
   }

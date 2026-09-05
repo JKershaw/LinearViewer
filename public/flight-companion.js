@@ -574,7 +574,22 @@
     }
   }
 
-  function handleNonStreamOutcome(classification, turnKind, sentMessage) {
+  // LIN-2632 review F1: every non-SSE exit for a user-initiated turn must
+  // settle the eager "thinking…" row the same way a mid-stream error does
+  // (drop chat-cursor, mark failed) — otherwise it sits in
+  // status-pill--in-progress forever and a retry stacks another one on top.
+  // `answerLi` is null on every auto-wake path (ensureAssistantBubble is
+  // never called there), so this is a no-op for those regardless of
+  // `turnKind` — the guard is belt-and-braces, not load-bearing on its own.
+  function settleFailedThinkingRow(answerEl, answerLi, turnKind, message) {
+    if (turnKind !== 'user-initiated' || !answerLi) return;
+    answerEl.classList.remove('chat-cursor');
+    answerEl.textContent = '[error: ' + (message || 'failed') + ']';
+    setBubbleState(answerLi, 'failed');
+  }
+
+  function handleNonStreamOutcome(classification, turnKind, sentMessage, answerEl, answerLi) {
+    var settleMessage = classification.message;
     switch (classification.kind) {
       case 'gate-silent':
         // Auto-wake only — nothing to report; counts as "nothing to report"
@@ -643,8 +658,9 @@
       case 'free-tier-limit':
         // user-initiated only — the auto-wake equivalent is the silent
         // gate-silent row above, a distinct code path.
+        settleMessage = freeTierMessage(classification);
         chatHistory.pop();
-        showInlineNote(freeTierMessage(classification));
+        showInlineNote(settleMessage);
         break;
       case 'server-error':
       default:
@@ -657,6 +673,7 @@
         }
         break;
     }
+    settleFailedThinkingRow(answerEl, answerLi, turnKind, settleMessage);
     finishTurn();
   }
 
@@ -807,17 +824,19 @@
       // an /api path (mirrors task-chat.js's own response.json().catch()).
       return response.json().catch(function () { return null; }).then(function (jsonBody) {
         var classification = classifyTurnResponse({ ok: response.ok, status: response.status, isEventStream: isEventStream, jsonBody: jsonBody });
-        handleNonStreamOutcome(classification, turnKind, message);
+        handleNonStreamOutcome(classification, turnKind, message, answerEl, answerLi);
       });
     }).catch(function () {
       // Network failure (fetch itself rejected).
+      var networkMessage = 'Network failure — try again.';
       if (turnKind === 'user-initiated') {
         chatHistory.pop();
-        showInlineNote('Network failure — try again.');
+        showInlineNote(networkMessage);
         questionInput.value = message;
       } else {
         applyCadenceEffect('double');
       }
+      settleFailedThinkingRow(answerEl, answerLi, turnKind, networkMessage);
       finishTurn();
     });
   }

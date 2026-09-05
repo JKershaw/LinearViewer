@@ -1028,6 +1028,80 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
     looseDeepEqual(m.getChatHistory(), [{ role: 'user', content: 'anything to report?' }]);
   });
 
+  // ─── LIN-2632 review F1: settle the eager thinking row on every non-SSE
+  // failure exit ────────────────────────────────────────────────────────────
+  //
+  // `ensureAssistantBubble()` runs EAGERLY for a user-initiated turn (above),
+  // before the fetch even goes out. Every in-stream exit (`done`, the empty
+  // no-reply case, a mid-stream `error` frame) already settles that row. The
+  // independent review on PR #1401 found two exits that leave the stream
+  // entirely without ever touching it: `handleNonStreamOutcome` (a gate JSON
+  // response, or any non-OK/non-stream HTTP status) and the outer network-
+  // failure `.catch`. Both left the row's pill permanently
+  // `status-pill--in-progress` with `thinking…` as its final text, and a
+  // retry stacked a second one on top rather than replacing the first.
+
+  test('LIN-2632 review F1: a user-initiated turn that fails outside the SSE stream (e.g. a 500 non-JSON response) settles the thinking row to failed, never left stuck in-progress', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => htmlResponse(500),
+    });
+    questionInput.value = 'what is in flight?';
+    m.submitQuestion();
+    // Pre-fix (observed red): the assistant row's pill stayed
+    // status-pill--in-progress and its text stayed 'thinking…' forever —
+    // this is the exact regression the independent review reproduced.
+    await flush();
+    assert.strictEqual(thread.children.length, 3, 'user bubble + the settled assistant row + the inline failure note');
+    const answerLi = thread.children[1];
+    const pill = answerLi.querySelector('.chat-msg__who');
+    assert.ok(pill.classList.contains('status-pill--failed'), 'the pill must settle to failed, not stay stuck in-progress');
+    assert.ok(!pill.classList.contains('status-pill--in-progress'), 'in-progress must be cleared on this exit too');
+    assert.notStrictEqual(answerLi.querySelector('.fc-msg-body').textContent, 'thinking…', 'the placeholder text must not survive the failure');
+    looseDeepEqual(m.getChatHistory(), [], 'the unanswered turn is dropped from history, same as every other failure path');
+  });
+
+  test('LIN-2632 review F1: a network failure (fetch rejects) on a user-initiated turn also settles the thinking row to failed', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => Promise.reject(new Error('network down')),
+    });
+    questionInput.value = 'what is in flight?';
+    m.submitQuestion();
+    await flush();
+    const answerLi = thread.children[1];
+    const pill = answerLi.querySelector('.chat-msg__who');
+    assert.ok(pill.classList.contains('status-pill--failed'), 'the pill must settle to failed on a network rejection too');
+    assert.ok(!pill.classList.contains('status-pill--in-progress'));
+    assert.notStrictEqual(answerLi.querySelector('.fc-msg-body').textContent, 'thinking…');
+  });
+
+  test('LIN-2632 review F1: repeated failed turns never leave more than one settled row each — no permanently in-progress rows accumulate across retries', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => htmlResponse(500),
+    });
+    questionInput.value = 'first attempt';
+    m.submitQuestion();
+    await flush();
+    questionInput.value = 'retry';
+    m.submitQuestion();
+    await flush();
+
+    const stillInProgress = thread.children.filter((li) => {
+      const pill = li.querySelector && li.querySelector('.chat-msg__who');
+      return pill && pill.classList.contains('status-pill--in-progress');
+    });
+    assert.strictEqual(stillInProgress.length, 0, 'no row may still read in-progress/"thinking…" after two failed retries');
+  });
+
+  test('LIN-2632 review F1: an auto-wake tick that fails outside the SSE stream still creates no assistant bubble (F1\'s fix is user-initiated only, since ensureAssistantBubble is never called on auto-wake)', async () => {
+    const { exports: m, thread, chatUICalls } = loadClient({
+      fetchImpl: () => htmlResponse(500),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(chatUICalls.appendMessage.length, 0, 'no assistant bubble is ever created for an auto-wake tick, failed or not');
+    assert.strictEqual(thread.children.length, 1, 'only the pre-existing inline failure note — no settled/pending row alongside it');
+  });
+
   test('a silent auto-wake tick still paints no bubble (AC1 unchanged by the thinking-state work)', async () => {
     const { exports: m, thread, chatUICalls } = loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
