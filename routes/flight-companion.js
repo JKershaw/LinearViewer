@@ -73,7 +73,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildFlightCompanionKickoff } from '../lib/prompts/flight-companion-kickoff.js';
 import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
-import { COMPANION_INSTANCE_PREFIX, COMPANION_SEED_STATE, shouldSpendTurn, buildCompanionSnapshot } from '../lib/flight-companion-gate.js';
+import { buildCompanionSnapshot } from '../lib/flight-companion-gate.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS, deriveFollowUpDispatch } from '../lib/chat-tools.js';
@@ -94,11 +94,6 @@ import { sendSSE } from '../lib/sse.js';
 // turn, the playbook memory and the scheduler tick can each run one without
 // pretending to be an Express handler. This route is the browser's adapter.
 import { runFlightCompanionTurn } from '../lib/flight-companion-turn.js';
-
-// Duplicated, not imported — same house convention `lib/flight-companion-gate.js`'s
-// own header documents (each observer-pipeline-stage file restates its own
-// instance-key prefix rather than sharing a cross-module import).
-const SWEEP_INSTANCE_PREFIX = 'sweep:v1:';
 
 const MAX_MESSAGE_LENGTH = 2000;
 
@@ -361,72 +356,17 @@ export function createFlightCompanionRoutes({
 
     const safeHistory = filterChatTurns(body.history);
 
-    // §A.7: the deterministic census this route seeds the system turn from —
-    // populated below on BOTH turn shapes (the auto-wake gate needs it first
-    // and ahead of tryUse either way; a user-initiated turn reads it fresh,
-    // purely for orientation, no ordering constraint attached).
-    let currentCensusDoc = null;
-
-    // §A.0/§A.2: an auto-wake turn must clear the deterministic pre-call gate
-    // BEFORE the model or the free-tier quota is touched at all — ordering is
-    // an acceptance criterion, not a style preference.
-    let companionAdvance = null;
-    // LIN-2435 Commit 1: the gate's own computed `surface` (whether this
-    // spend is worth resetting the client's wake cadence for), hoisted the
-    // same way `companionAdvance` is — set inside the auto-wake block below,
-    // read by the `onEvent` closure's `done`-frame relabel further down. Only
-    // ever attached to an auto-wake turn's terminal frame; a user-initiated
-    // `done` carries no `surface` field at all.
-    let turnSurface = null;
-    if (turnKind === 'auto-wake') {
-      const companionInstanceKey = `${COMPANION_INSTANCE_PREFIX}${workspace.urlKey}`;
-      const sweepInstanceKey = `${SWEEP_INSTANCE_PREFIX}${workspace.urlKey}`;
-      const companionDocEnvelope = await observerStateStore.ensureSeeded(companionInstanceKey, COMPANION_SEED_STATE);
-      currentCensusDoc = await observerStateStore.readCurrent(sweepInstanceKey);
-      const gate = shouldSpendTurn({
-        currentCensusDoc,
-        companionDoc: companionDocEnvelope ? companionDocEnvelope.state : null,
-        now: Date.now(),
-      });
-      if (!gate.spend) {
-        // Nothing to report — a cheap response with no model call and no
-        // quota touched at all. LIN-2438: `sweepLastSeenAt` is additive and
-        // only ever present when `gate.reason === 'sweep-not-seen'` (the
-        // gate's own relabel) — every other reason forwards `undefined`,
-        // which JSON.stringify omits, so no other client-visible shape changes.
-        return res.json({ turnKind, spent: false, reason: gate.reason, sweepLastSeenAt: gate.sweepLastSeenAt });
-      }
-      turnSurface = gate.surface;
-      // Captured now (CAS'd against the rev we just read), but only actually
-      // PERSISTED below once tryUse has also cleared — a config/quota failure
-      // between here and there must not mark the floor as spent when no real
-      // turn happened.
-      //
-      // LIN-2442: two records travel together from here on. `reserveRecord`
-      // is what the eager advance() below writes — the prior census baseline
-      // re-emitted unchanged plus a reservation lease, so a turn that never
-      // reaches a terminal `done` frame leaves the baseline untouched and the
-      // lease self-expires. `commitRecord` (the gate's old `nextRecord`, the
-      // NEW baseline) is written later, only after `done` is actually
-      // observed — see the `sawDone` commit block below.
-      if (companionDocEnvelope) {
-        companionAdvance = {
-          instanceKey: companionInstanceKey,
-          expectedRev: companionDocEnvelope.rev,
-          reserveRecord: gate.reserveRecord,
-          commitRecord: gate.nextRecord,
-        };
-      }
-    }
-
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
     const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
     const apiKeyToUse = sessionApiKey || getPaidEnvKey() || freeTierKey;
-
-    if (!apiKeyToUse) {
-      return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
-    }
+    // The "AI is not configured" 503 is NOT checked here, even though the key is
+    // resolved here. §A.2 requires the gate to be cleared before anything else
+    // is touched, and the gate lives in the core — so this check rides in
+    // `onBeforeSpend` below, which the core calls at exactly the right moment.
+    // Checking it here instead is what left this handler running its own copy of
+    // the gate: the ordering was preserved by duplicating the gate rather than
+    // by moving the check.
 
     // LIN-2449: the client can vanish mid-turn. `writableFinished` is the
     // discriminator — true only once the response has been fully flushed, so a
@@ -479,7 +419,12 @@ export function createFlightCompanionRoutes({
         // reservation write — which is the ordering LIN-2432 §A.2 makes an
         // acceptance criterion. The core owns the ordering; this route owns
         // what a quota is.
+        // Everything that must happen AFTER the gate and BEFORE the reservation
+        // write, in the order the pre-extraction handler ran it: the config
+        // check, then the quota. The core owns WHEN this runs; this route owns
+        // WHAT a config or quota failure is.
         onBeforeSpend: async () => {
+          if (!apiKeyToUse) return { reason: 'not-configured' };
           if (!isFreeTier) return null;
           const check = await freeTierStore.tryUse(workspace.urlKey);
           if (check.allowed) return null;
@@ -499,6 +444,9 @@ export function createFlightCompanionRoutes({
       });
 
       if (!outcome.spent && !streaming) {
+        if (outcome.reason === 'not-configured') {
+          return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+        }
         // A free-tier refusal is the one that differs by turn kind: a user
         // typed and deserves the 429 with its quota detail; an auto-wake tick
         // fails SILENTLY — no toast, no surfaced error, since there may be no
@@ -523,19 +471,36 @@ export function createFlightCompanionRoutes({
       // an `error` frame into a dead one. Keep the error itself: a genuine bug
       // coinciding with a disconnect would otherwise vanish without a trace.
       if (clientGone) {
+        // Keep the error itself: a genuine bug that happens to coincide with a
+        // disconnect would otherwise vanish without a trace, since this branch
+        // swallows the only report of it.
+        // The pre-extraction handler also logged `instanceKey` here. That value
+        // lives inside the core now, and hardcoding `null` would be worse than
+        // omitting it — a diagnostic saying "no reservation" for a turn that
+        // held one is a false lead. It is derivable from what IS logged: the
+        // companion instance key is `companion:v1:<urlKey>`.
         console.error('Flight Companion turn: client disconnected mid-turn, census delta left unconsumed', {
           urlKey: workspace.urlKey,
-          error,
+          error: error?.message,
         });
         return;
       }
       console.error('Flight Companion turn error:', error);
-      if (streaming) {
-        sendSSE(res, 'error', { error: error.message || 'Turn failed' });
-        res.end();
-      } else if (!res.headersSent) {
-        res.status(500).json({ error: 'Turn failed' });
-      }
+      // The frame the browser has always received, unchanged: a FIXED generic
+      // message under `message`. Not `error.message` — this is the one place a
+      // refactor is most tempted to "improve" by forwarding the real text, and
+      // that would both change the client's payload shape and hand the browser
+      // internal error strings it has never been given.
+      //
+      // The headers are always up by the time a model error lands
+      // (`onStreamStart` fires before the model call), so this is the same
+      // 200-plus-error-frame the pre-extraction handler produced. A throw from
+      // BEFORE the stream opened — a store fault, say — also lands here and
+      // also gets a frame, exactly as it did before: matching the old behaviour
+      // is the job, not improving on it inside a refactor.
+      startStream();
+      sendSSE(res, 'error', { message: 'Failed to generate a response' });
+      res.end();
     }
   });
 

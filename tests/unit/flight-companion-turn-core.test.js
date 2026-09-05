@@ -13,7 +13,9 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { runFlightCompanionTurn, sumUsage } from '../../lib/flight-companion-turn.js';
+import { buildTurnRecords } from '../../lib/flight-companion-gate.js';
 
 const WORKSPACE = { urlKey: 'acme', id: 'ws-1' };
 
@@ -310,5 +312,137 @@ describe('LIN-2631: hop usage is summed onto the final done', () => {
       deps: baseDeps(fakeStore({ census: censusDoc() }), scriptedClient([['done', { finishReason: 'stop' }]])),
     });
     assert.ok(!('surface' in userDone));
+  });
+});
+
+describe('LIN-2631: the extraction must not change what the browser receives on failure', () => {
+  test('the SSE error frame is a FIXED generic message, never the internal error text', () => {
+    // Found by diffing the pre-extraction handler's statements against the new
+    // core + route rather than trusting that "the code moved". My first draft
+    // sent `{ error: error.message }` — a different payload KEY and a leak of
+    // internal error strings to the browser, in a PR whose whole claim is
+    // "behaviour byte-identical".
+    const ROUTE_SRC = readFileSync(new URL('../../routes/flight-companion.js', import.meta.url), 'utf8');
+    assert.match(ROUTE_SRC, /sendSSE\(res, 'error', \{ message: 'Failed to generate a response' \}\)/);
+    // The internal text must not reach the wire from the turn handler's catch.
+    const turnStart = ROUTE_SRC.indexOf("router.post('/workspace/:urlKey/api/flight-companion/turn'");
+    const turnEnd = ROUTE_SRC.indexOf('\n  });\n', turnStart);
+    const handler = ROUTE_SRC.slice(turnStart, turnEnd);
+    assert.match(handler, /client disconnected mid-turn/, 'the slice must reach the handler\'s own catch');
+    assert.doesNotMatch(handler, /sendSSE\([^)]*error\.message/);
+  });
+
+  test('a throw before the stream opens still reaches the client as a frame, not a bare 500', () => {
+    // The pre-extraction handler wrote its SSE headers up front, so EVERY throw
+    // produced an error frame. Answering a pre-stream throw with 500 JSON
+    // instead would be a different client contract for a store fault.
+    const ROUTE_SRC = readFileSync(new URL('../../routes/flight-companion.js', import.meta.url), 'utf8');
+    const turnStart = ROUTE_SRC.indexOf("router.post('/workspace/:urlKey/api/flight-companion/turn'");
+    const turnEnd = ROUTE_SRC.indexOf('\n  });\n', turnStart);
+    const handler = ROUTE_SRC.slice(turnStart, turnEnd);
+    assert.doesNotMatch(handler, /status\(500\)/, 'the turn handler has never answered a throw with 500');
+    // The catch opens the stream itself if the throw beat `onStreamStart`.
+    assert.match(handler, /startStream\(\);\s*\n\s*sendSSE\(res, 'error'/);
+  });
+});
+
+describe('LIN-2631 review round 1: the gate is EXTRACTED, not duplicated', () => {
+  const ROUTE_SRC = readFileSync(new URL('../../routes/flight-companion.js', import.meta.url), 'utf8');
+
+  test('the route runs no gate of its own — it was duplicated, not moved, in the first draft', () => {
+    // The first extraction left the whole auto-wake block in the handler AND
+    // added it to the core, so every auto-wake tick did ensureSeeded +
+    // readCurrent + shouldSpendTurn TWICE, on a client cadence, per workspace.
+    // Worse than the wasted reads: two independent Date.now() gate evaluations
+    // meant a turn that lost a race between them reported `turn-in-flight`
+    // where it used to report `lost-race` — a wire-visible divergence.
+    assert.doesNotMatch(ROUTE_SRC, /shouldSpendTurn\(/, 'the route must not evaluate the gate');
+    assert.doesNotMatch(ROUTE_SRC, /observerStateStore\.ensureSeeded\(/, 'nor seed the companion instance');
+    assert.doesNotMatch(ROUTE_SRC, /observerStateStore\.advance\(/, 'nor write a reservation');
+  });
+
+  test('the config 503 rides in onBeforeSpend, which is what let the duplicate go', () => {
+    // The block could not simply be deleted: it was the only thing keeping the
+    // gate ahead of the "AI is not configured" 503. Moving that check into the
+    // hook the core calls at the right moment is what makes the deletion safe.
+    assert.match(ROUTE_SRC, /onBeforeSpend: async \(\) => \{\s*\n\s*if \(!apiKeyToUse\) return \{ reason: 'not-configured' \}/);
+    assert.match(ROUTE_SRC, /outcome\.reason === 'not-configured'[\s\S]{0,200}status\(503\)/);
+  });
+
+  test('an unconfigured workspace still 503s, and only AFTER the gate has spoken', async () => {
+    const order = [];
+    // No census => the gate refuses first, so the config check must never run.
+    const refused = await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'auto-wake', apiKey: null,
+      onBeforeSpend: async () => { order.push('config'); return { reason: 'not-configured' }; },
+      onEvent: () => {},
+      deps: baseDeps(fakeStore({ census: null }), scriptedClient([['done', {}]])),
+    });
+    assert.strictEqual(refused.reason, 'no-census');
+    assert.deepStrictEqual(order, [], 'a gate refusal must short-circuit before the config check');
+
+    // With a census, the gate clears and the config refusal is what comes back.
+    const unconfigured = await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'auto-wake', apiKey: null,
+      onBeforeSpend: async () => { order.push('config'); return { reason: 'not-configured' }; },
+      onEvent: () => assert.fail('must not stream'),
+      deps: baseDeps(fakeStore({ census: censusDoc() }), scriptedClient([['done', {}]])),
+    });
+    assert.strictEqual(unconfigured.reason, 'not-configured');
+    assert.deepStrictEqual(order, ['config']);
+  });
+});
+
+describe('LIN-2631 review round 1: the smaller hardening', () => {
+  test('sumUsage never returns a caller\'s own object, and NaN cannot poison the total', () => {
+    const a = { prompt_tokens: 5 };
+    const out = sumUsage(null, a);
+    assert.notStrictEqual(out, a, 'a returned reference would let later frames mutate an already-read payload');
+    out.prompt_tokens = 999;
+    assert.strictEqual(a.prompt_tokens, 5);
+    // NaN is a number, so a typeof check would let one field poison the rest.
+    assert.deepStrictEqual(sumUsage({ t: NaN }, { t: 4 }), { t: 4 });
+    assert.deepStrictEqual(sumUsage({ t: 4 }, { t: NaN }), { t: 4 });
+  });
+
+  test('a zero iteration budget means the same thing to the lease and to the model call', () => {
+    // They disagreed: the lease treated 0 as a real budget (180s) while the
+    // model call treated it as falsy and fell back to openrouter's default of
+    // 4 — a 600s worst case against a 180s lease.
+    const CORE_SRC = readFileSync(new URL('../../lib/flight-companion-turn.js', import.meta.url), 'utf8');
+    assert.match(CORE_SRC, /const usableIterations = Number\.isInteger\(budget\.maxIterations\) && budget\.maxIterations > 0/);
+    assert.match(CORE_SRC, /deriveReservationLeaseMs\(usableIterations\)/);
+    assert.match(CORE_SRC, /usableIterations != null \? \{ maxIterations: usableIterations \}/);
+  });
+
+  test('buildTurnRecords refuses a null census or companion doc rather than TypeError-ing', () => {
+    // It is public API now precisely so a boot turn can skip the gate's refusal
+    // branches — which is where a null arrives.
+    assert.throws(
+      () => buildTurnRecords({ currentCensusDoc: null, companionDoc: {}, now: 1 }),
+      /requires a census doc/
+    );
+    assert.throws(
+      () => buildTurnRecords({ currentCensusDoc: { stateHash: 'h', state: {} }, companionDoc: null, now: 1 }),
+      /requires a companion doc/
+    );
+  });
+
+  test('the lease timeout constant is pinned against openrouter\'s own source, not just asserted', () => {
+    // LIN-2447 regexes REQUEST_TIMEOUT_MS out of the source because it is
+    // module-private. That pin protects the DEFAULT budget through
+    // RESERVATION_LEASE_MS; this one protects every other budget, which is what
+    // deriveReservationLeaseMs exists for.
+    const OR_SRC = readFileSync(new URL('../../lib/openrouter.js', import.meta.url), 'utf8');
+    const m = OR_SRC.match(/const REQUEST_TIMEOUT_MS = (\d+);/);
+    assert.ok(m, 'expected REQUEST_TIMEOUT_MS in lib/openrouter.js');
+    const live = Number(m[1]);
+    const GATE_SRC = readFileSync(new URL('../../lib/flight-companion-gate.js', import.meta.url), 'utf8');
+    const g = GATE_SRC.match(/const LEASE_REQUEST_TIMEOUT_MS = ([\d_]+);/);
+    assert.ok(g, 'expected LEASE_REQUEST_TIMEOUT_MS in the gate');
+    assert.strictEqual(
+      Number(g[1].replace(/_/g, '')), live,
+      'the derived lease must track openrouter\'s real request timeout, or every non-default budget drifts silently'
+    );
   });
 });
