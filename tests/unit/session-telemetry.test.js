@@ -400,6 +400,16 @@ describe('parseUsage (LIN-1425)', () => {
     assert.strictEqual(usage.cacheCreation1hInputTokens, 90210);
   });
 
+  test('LIN-2615: effort is parsed as an open-string passthrough, including an out-of-set value', () => {
+    // Open-string, like harness/model above — NOT lane's closed enum. An
+    // out-of-set value ('turbo') must still be preserved verbatim: squashing
+    // it to null would destroy the datum Phase 2's read-out exists to
+    // collect (review gate item 3 — this line previously had zero positive
+    // coverage; only the exact-key-set no-edit pins existed).
+    const usage = parseUsage([{ message: usageMessage({ effort: 'turbo' }), kind: 'usage' }]);
+    assert.equal(usage.effort, 'turbo');
+  });
+
   test('LIN-2113: an absent cacheCreation1hInputTokens does not add the key at all', () => {
     const usage = parseUsage([{ message: usageMessage(), kind: 'usage' }]);
     assert.strictEqual('cacheCreation1hInputTokens' in usage, false);

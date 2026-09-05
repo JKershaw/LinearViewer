@@ -15,9 +15,10 @@ import { buildTaskCost, anchorFor } from '../../lib/task-cost.js';
 // (parseUsagePayload prefers a native cost over deriving one), so tests can
 // pin an exact price without needing a real model-pricing rate. Omit it (and
 // use a model with no rate-card row) to exercise the unpriced path.
-function usageEntry({ model = 'anthropic/claude-sonnet-5', costUsd, timestamp, rootItemId } = {}) {
+function usageEntry({ model = 'anthropic/claude-sonnet-5', costUsd, timestamp, rootItemId, effort } = {}) {
   const payload = { model };
   if (costUsd !== undefined) payload.costUsd = costUsd;
+  if (effort !== undefined) payload.effort = effort;
   const entry = { kind: 'usage', timestamp, message: `[usage] ${JSON.stringify(payload)}` };
   if (rootItemId) entry.rootItemId = rootItemId;
   return entry;
@@ -225,5 +226,123 @@ describe('buildTaskCost — worker-session audit fields', () => {
     const a = row({ id: 'a', dispatchedAt: '2026-08-01T10:00:00Z', rootItemId: 'root1', feedback: [usageEntry({ costUsd: 1 })] });
     const result = buildTaskCost({ ownRows: [a], appSummary: EMPTY_APP });
     assert.equal(result.workerSessions[0].rootItemId, 'root1');
+  });
+});
+
+// LIN-2615 review gate item 4: `effort`/`durationMs` had zero test coverage
+// (mutation F stripped both fields on both branches with a fully green
+// suite). These pin both fields on the priced and no-telemetry branches,
+// plus the documented null guards for unavailable/invalid completion timing
+// and a negative-duration case.
+describe('buildTaskCost — effort + durationMs surface (LIN-2615)', () => {
+  test('priced branch: effort and durationMs are derived from usage + the terminal marker timestamp', () => {
+    const a = row({
+      id: 'a', dispatchedAt: '2026-08-01T10:00:00Z', rootItemId: 'root1',
+      feedback: [
+        usageEntry({ effort: 'high', costUsd: 1.5, timestamp: '2026-08-01T10:09:30Z' }),
+        { message: '[done] finished', timestamp: '2026-08-01T10:09:40Z' }
+      ]
+    });
+
+    const result = buildTaskCost({ ownRows: [a], appSummary: EMPTY_APP });
+
+    assert.equal(result.workerSessions[0].effort, 'high');
+    // 10:00:00 -> 10:09:40 terminal marker = 580000ms.
+    assert.equal(result.workerSessions[0].durationMs, 580000);
+  });
+
+  test('priced branch: an absent usage.effort surfaces as null, not undefined', () => {
+    const a = row({
+      id: 'a', dispatchedAt: '2026-08-01T10:00:00Z', rootItemId: 'root1',
+      feedback: [
+        usageEntry({ costUsd: 1 }),
+        { message: '[done] finished', timestamp: '2026-08-01T10:05:00Z' }
+      ]
+    });
+
+    const result = buildTaskCost({ ownRows: [a], appSummary: EMPTY_APP });
+
+    assert.strictEqual(result.workerSessions[0].effort, null);
+  });
+
+  test('no-telemetry branch: effort is null (no usage row to derive from); durationMs still derives from the terminal marker alone', () => {
+    const a = row({
+      id: 'a', dispatchedAt: '2026-08-01T10:00:00Z', rootItemId: 'root1',
+      feedback: [{ message: '[done] finished', timestamp: '2026-08-01T10:05:00Z' }]
+    });
+
+    const result = buildTaskCost({ ownRows: [a], appSummary: EMPTY_APP });
+
+    assert.equal(result.noTelemetryCount, 1);
+    assert.strictEqual(result.workerSessions[0].effort, null);
+    // durationMs is derived from dispatchedAt + the terminal marker's own
+    // timestamp — independent of whether a `[usage]` entry exists at all.
+    assert.strictEqual(result.workerSessions[0].durationMs, 300000);
+  });
+
+  test('no-telemetry branch: durationMs is null too when there is no terminal marker either', () => {
+    const a = row({
+      id: 'a', dispatchedAt: '2026-08-01T10:00:00Z', rootItemId: 'root1',
+      feedback: []
+    });
+
+    const result = buildTaskCost({ ownRows: [a], appSummary: EMPTY_APP });
+
+    assert.equal(result.noTelemetryCount, 1);
+    assert.strictEqual(result.workerSessions[0].effort, null);
+    assert.strictEqual(result.workerSessions[0].durationMs, null);
+  });
+
+  test('durationMs is null when no terminal marker exists yet (completedAt unavailable)', () => {
+    const a = row({
+      id: 'a', dispatchedAt: '2026-08-01T10:00:00Z', rootItemId: 'root1',
+      feedback: [usageEntry({ costUsd: 1, timestamp: '2026-08-01T10:05:00Z' })]
+    });
+
+    const result = buildTaskCost({ ownRows: [a], appSummary: EMPTY_APP });
+
+    assert.strictEqual(result.workerSessions[0].durationMs, null);
+  });
+
+  test('durationMs is null when dispatchedAt is missing, even with a terminal marker', () => {
+    const a = row({
+      id: 'a', dispatchedAt: undefined, rootItemId: 'root1',
+      feedback: [
+        usageEntry({ costUsd: 1 }),
+        { message: '[done] finished', timestamp: '2026-08-01T10:05:00Z' }
+      ]
+    });
+
+    const result = buildTaskCost({ ownRows: [a], appSummary: EMPTY_APP });
+
+    assert.strictEqual(result.workerSessions[0].durationMs, null);
+  });
+
+  test('durationMs is null when the terminal timestamp is an unparseable date (invalid completion timing)', () => {
+    const a = row({
+      id: 'a', dispatchedAt: '2026-08-01T10:00:00Z', rootItemId: 'root1',
+      feedback: [
+        usageEntry({ costUsd: 1 }),
+        { message: '[done] finished', timestamp: 'not-a-real-date' }
+      ]
+    });
+
+    const result = buildTaskCost({ ownRows: [a], appSummary: EMPTY_APP });
+
+    assert.strictEqual(result.workerSessions[0].durationMs, null);
+  });
+
+  test('durationMs is null (never negative) when the terminal marker predates dispatchedAt', () => {
+    const a = row({
+      id: 'a', dispatchedAt: '2026-08-01T10:00:00Z', rootItemId: 'root1',
+      feedback: [
+        usageEntry({ costUsd: 1 }),
+        { message: '[done] finished', timestamp: '2026-08-01T09:59:00Z' }
+      ]
+    });
+
+    const result = buildTaskCost({ ownRows: [a], appSummary: EMPTY_APP });
+
+    assert.strictEqual(result.workerSessions[0].durationMs, null);
   });
 });

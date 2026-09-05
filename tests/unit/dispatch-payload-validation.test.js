@@ -109,6 +109,72 @@ describe('validateDispatchPayload — terminal (opaque, LIN-2452)', () => {
   });
 });
 
+describe('validateDispatchPayload — effort (opaque, fail-soft, LIN-2615)', () => {
+  // Same opaque rule as model/harness/terminal (type + length + dangerous
+  // chars), but with one addition: an out-of-set value is a server-side
+  // WARNING only, never a 400 — Claude Code itself warns and runs on an
+  // unknown `--effort`, so Harbour must not be stricter than the thing it
+  // forwards to (acceptance #5).
+  test('a known effort level passes with no warning', () => {
+    const originalWarn = console.warn;
+    const calls = [];
+    console.warn = (...args) => calls.push(args.join(' '));
+    try {
+      assert.strictEqual(validateDispatchPayload({ prompt: 'x', effort: 'high' }), null);
+      assert.equal(calls.length, 0, 'a known level must not warn');
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
+  test('an unknown effort level is accepted (never 400) AND emits a server-side warning', () => {
+    const originalWarn = console.warn;
+    const calls = [];
+    console.warn = (...args) => calls.push(args.join(' '));
+    try {
+      const result = validateDispatchPayload({ prompt: 'x', effort: 'turbo' });
+      assert.strictEqual(result, null, 'an out-of-set effort level must be accepted, not rejected with a 400');
+      assert.equal(calls.length, 1, 'exactly one warning must be emitted for the unknown level');
+      assert.match(calls[0], /Unknown dispatch effort level: turbo/);
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
+  test('null/omitted is absent (valid), no warning', () => {
+    const originalWarn = console.warn;
+    const calls = [];
+    console.warn = (...args) => calls.push(args.join(' '));
+    try {
+      assert.strictEqual(validateDispatchPayload({ prompt: 'x', effort: null }), null);
+      assert.strictEqual(validateDispatchPayload({ prompt: 'x' }), null);
+      assert.equal(calls.length, 0);
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
+  test('non-string effort rejected', () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', effort: 42 }),
+      { error: 'effort must be a string' });
+  });
+
+  test('over-length effort rejected', () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', effort: 'a'.repeat(1001) }),
+      { error: 'effort exceeds maximum length of 1000' });
+  });
+
+  test('effort with a control char rejected', () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', effort: 'high\x00' }),
+      { error: 'effort contains invalid characters' });
+  });
+
+  test('effort is checked after terminal (first-error order)', () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', terminal: 42, effort: 42 }),
+      { error: 'terminal must be a string' });
+  });
+});
+
 describe('validateDispatchPayload — dangerous chars', () => {
   test('prompt with a null byte', () => {
     assert.deepEqual(validateDispatchPayload({ prompt: 'bad\x00prompt' }),

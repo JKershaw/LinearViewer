@@ -209,4 +209,28 @@ describe('createDispatchItem — F2 gate widening for workspace-wide effort (LIN
     assert.equal(captured.item.harness, 'explicit-harness', 'the explicit harness still wins');
     assert.equal(captured.item.effort, 'high', 'the workspace-wide effort default still donates through the widened gate');
   });
+
+  // Review finding I: the gate-widening test above supplies no explicit
+  // `effort`, so it cannot pin the TOP of the precedence chain — an explicit
+  // per-call `effort` must beat a workspace-wide default, not just donate
+  // when nothing was supplied.
+  test('an explicit request effort beats the workspace-wide default', async () => {
+    const captured = {};
+    const store = {
+      addItem: async (urlKey, item) => {
+        captured.urlKey = urlKey;
+        captured.item = item;
+        return { _id: 'item-2', ...item };
+      }
+    };
+    const prefs = new WorkspacePreferencesStore({ collection: createMockCollection() });
+    await prefs.saveWorkspacePreferences('acme', { dispatchDefaults: { effort: 'high' } });
+
+    await createDispatchItem({
+      store, urlKey: 'acme', workspacePreferencesStore: prefs, kind: 'implementation',
+      model: 'explicit-model', harness: 'explicit-harness', effort: 'low', prompt: 'x'
+    });
+
+    assert.equal(captured.item.effort, 'low', 'the explicit per-call effort wins over the workspace-wide default');
+  });
 });

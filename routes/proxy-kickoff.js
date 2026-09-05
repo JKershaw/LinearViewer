@@ -185,6 +185,14 @@ export function createKickoffRoutes({
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, kickoffHarnessValidationError.error);
       }
+      // Execution effort (LIN-2615): opaque string, same helper/convention as
+      // model/harness above — closes the ingress gap review flagged (kickoff
+      // forwarded effort without validating it, unlike every other write verb).
+      const kickoffEffortValidationError = validateOpaqueDispatchField(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
+      if (kickoffEffortValidationError) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, kickoffEffortValidationError.error);
+      }
       // Selected dispatch preset (LIN-1390): an unknown/invalid id is rejected
       // here, up front — the factory treats a presetId it can't resolve as "no
       // preset" (a defensive fallback for this seam's own store lookup below),
